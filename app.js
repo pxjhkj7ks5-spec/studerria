@@ -313,7 +313,7 @@ process.on('unhandledRejection', (err) => {
 
 const adminSeed = process.env.ADMIN_HASHED_PASS
   ? {
-      full_name: process.env.ADMIN_NAME || 'Марченко Андрій Юрійович',
+      full_name: process.env.ADMIN_NAME || 'Р В РЎС™Р В Р’В°Р РЋР вЂљР РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂќР В РЎвЂў Р В РЎвЂ™Р В Р вЂ¦Р В РўвЂР РЋР вЂљР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р’В®Р РЋР вЂљР РЋРІР‚вЂњР В РІвЂћвЂ“Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚РЋ',
       role: 'admin',
       password_hash: process.env.ADMIN_HASHED_PASS,
     }
@@ -322,25 +322,25 @@ const adminSeed = process.env.ADMIN_HASHED_PASS
 const userSeed = adminSeed ? [adminSeed] : [];
 
 const ADMIN_SECTION_OPTIONS = [
-  { id: 'admin-overview', label: 'Огляд' },
-  { id: 'admin-settings', label: 'Налаштування' },
+  { id: 'admin-overview', label: 'Р В РЎвЂєР В РЎвЂ“Р В Р’В»Р РЋР РЏР В РўвЂ' },
+  { id: 'admin-settings', label: 'Р В РЎСљР В Р’В°Р В Р’В»Р В Р’В°Р РЋРІвЂљВ¬Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ' },
   { id: 'admin-role-access', label: 'Role Studio' },
   { id: 'admin-visit-analytics', label: 'Security analytics' },
   { id: 'admin-students', label: 'Students' },
-  { id: 'admin-schedule', label: 'Розклад' },
-  { id: 'admin-import-export', label: 'Імпорт/Експорт' },
-  { id: 'admin-schedule-generator', label: 'Генератори' },
-  { id: 'admin-homework', label: 'Домашні' },
-  { id: 'admin-users', label: 'Користувачі' },
-  { id: 'admin-teachers', label: 'Заявки викладачів' },
-  { id: 'admin-subjects', label: 'Предмети' },
-  { id: 'admin-semesters', label: 'Семестри' },
-  { id: 'admin-courses', label: 'Курси' },
-  { id: 'admin-history', label: 'Історія' },
-  { id: 'admin-activity', label: 'Активність' },
-  { id: 'admin-teamwork', label: 'Командна робота' },
-  { id: 'admin-messages', label: 'Повідомлення' },
-  { id: 'admin-support', label: 'Звернення' },
+  { id: 'admin-schedule', label: 'Р В Р’В Р В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ' },
+  { id: 'admin-import-export', label: 'Р В РІР‚В Р В РЎВР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™/Р В РІР‚СћР В РЎвЂќР РЋР С“Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™' },
+  { id: 'admin-schedule-generator', label: 'Р В РІР‚СљР В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В РЎвЂ' },
+  { id: 'admin-homework', label: 'Р В РІР‚СњР В РЎвЂўР В РЎВР В Р’В°Р РЋРІвЂљВ¬Р В Р вЂ¦Р РЋРІР‚вЂњ' },
+  { id: 'admin-users', label: 'Р В РЎв„ўР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ' },
+  { id: 'admin-teachers', label: 'Р В РІР‚вЂќР В Р’В°Р РЋР РЏР В Р вЂ Р В РЎвЂќР В РЎвЂ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ ' },
+  { id: 'admin-subjects', label: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ' },
+  { id: 'admin-semesters', label: 'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂ' },
+  { id: 'admin-courses', label: 'Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ' },
+  { id: 'admin-history', label: 'Р В РІР‚В Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР РЋРІР‚вЂњР РЋР РЏ' },
+  { id: 'admin-activity', label: 'Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰' },
+  { id: 'admin-teamwork', label: 'Р В РЎв„ўР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р вЂ¦Р В Р’В° Р РЋР вЂљР В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚С™Р В Р’В°' },
+  { id: 'admin-messages', label: 'Р В РЎСџР В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂўР В РЎВР В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ' },
+  { id: 'admin-support', label: 'Р В РІР‚вЂќР В Р вЂ Р В Р’ВµР РЋР вЂљР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ' },
 ];
 
 const DEFAULT_ROLE_PERMISSIONS = {
@@ -354,16 +354,16 @@ const LEGACY_SESSION_ROLES = new Set(['admin', 'teacher', 'deanery', 'starosta',
 const ROLE_KEY_ALIASES = {
   admin: 'admin',
   administrator: 'admin',
-  адмін: 'admin',
-  администратор: 'admin',
+  Р В Р’В°Р В РўвЂР В РЎВР РЋРІР‚вЂњР В Р вЂ¦: 'admin',
+  Р В Р’В°Р В РўвЂР В РЎВР В РЎвЂР В Р вЂ¦Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљ: 'admin',
   starosta: 'starosta',
-  староста: 'starosta',
+  Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°: 'starosta',
   deanery: 'deanery',
-  деканат: 'deanery',
+  Р В РўвЂР В Р’ВµР В РЎвЂќР В Р’В°Р В Р вЂ¦Р В Р’В°Р РЋРІР‚С™: 'deanery',
   teacher: 'teacher',
-  викладач: 'teacher',
+  Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ: 'teacher',
   student: 'student',
-  студент: 'student',
+  Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™: 'student',
 };
 
 const ADMIN_SECTION_PERMISSION_OPTIONS = ADMIN_SECTION_OPTIONS.map((section) => ({
@@ -373,8 +373,8 @@ const ADMIN_SECTION_PERMISSION_OPTIONS = ADMIN_SECTION_OPTIONS.map((section) => 
 }));
 
 const JOURNAL_PERMISSION_OPTIONS = [
-  { key: 'journal-own', label: 'Журнал: свій доступ', category: 'feature' },
-  { key: 'journal-full', label: 'Журнал: повний доступ', category: 'feature' },
+  { key: 'journal-own', label: 'Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»: Р РЋР С“Р В Р вЂ Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”', category: 'feature' },
+  { key: 'journal-full', label: 'Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»: Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”', category: 'feature' },
 ];
 
 const RBAC_PERMISSION_OPTIONS = [
@@ -390,23 +390,23 @@ const HOMEWORK_REVIEW_SLA_SUBJECT_LIMIT = 8;
 const REVIEW_QUEUE_FEEDBACK_TEMPLATES = [
   {
     key: 'strong',
-    label: 'Сильна робота',
-    text: 'Сильна робота: чітка структура, аргументи і висновок. Так тримати.',
+    label: 'Р В Р Р‹Р В РЎвЂР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В Р’В° Р РЋР вЂљР В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚С™Р В Р’В°',
+    text: 'Р В Р Р‹Р В РЎвЂР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В Р’В° Р РЋР вЂљР В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚С™Р В Р’В°: Р РЋРІР‚РЋР РЋРІР‚вЂњР РЋРІР‚С™Р В РЎвЂќР В Р’В° Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В РЎвЂќР РЋРІР‚С™Р РЋРЎвЂњР РЋР вЂљР В Р’В°, Р В Р’В°Р РЋР вЂљР В РЎвЂ“Р РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚вЂњ Р В Р вЂ Р В РЎвЂР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂўР В РЎвЂќ. Р В РЎС›Р В Р’В°Р В РЎвЂќ Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂ.',
   },
   {
     key: 'argumentation',
-    label: 'Посилити аргументи',
-    text: 'Добрий старт, але потрібно посилити аргументацію фактами та прикладами.',
+    label: 'Р В РЎСџР В РЎвЂўР РЋР С“Р В РЎвЂР В Р’В»Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В Р’В°Р РЋР вЂљР В РЎвЂ“Р РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂ',
+    text: 'Р В РІР‚СњР В РЎвЂўР В Р’В±Р РЋР вЂљР В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚С™, Р В Р’В°Р В Р’В»Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р В РЎвЂўР РЋР С“Р В РЎвЂР В Р’В»Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В Р’В°Р РЋР вЂљР В РЎвЂ“Р РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р РЋРІР‚С›Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В Р’В°Р В РЎВР В РЎвЂ Р РЋРІР‚С™Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р В РЎВР В РЎвЂ.',
   },
   {
     key: 'clarity',
-    label: 'Більше конкретики',
-    text: 'Потрібно більше конкретики: додай чіткі тези, приклади і короткий висновок.',
+    label: 'Р В РІР‚ВР РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р В РЎвЂќР РЋР вЂљР В Р’ВµР РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В РЎвЂ',
+    text: 'Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р В РЎвЂќР РЋР вЂљР В Р’ВµР РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В РЎвЂ: Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В РІвЂћвЂ“ Р РЋРІР‚РЋР РЋРІР‚вЂњР РЋРІР‚С™Р В РЎвЂќР РЋРІР‚вЂњ Р РЋРІР‚С™Р В Р’ВµР В Р’В·Р В РЎвЂ, Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В РЎвЂ Р РЋРІР‚вЂњ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂўР РЋРІР‚С™Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ Р В РЎвЂР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂўР В РЎвЂќ.',
   },
   {
     key: 'revision',
-    label: 'Потрібне доопрацювання',
-    text: 'Робота потребує доопрацювання за критеріями предмета. Після правок можна перездати.',
+    label: 'Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В Р’Вµ Р В РўвЂР В РЎвЂўР В РЎвЂўР В РЎвЂ”Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ',
+    text: 'Р В Р’В Р В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚С™Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В Р’В±Р РЋРЎвЂњР РЋРІР‚Сњ Р В РўвЂР В РЎвЂўР В РЎвЂўР В РЎвЂ”Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В Р’В·Р В Р’В° Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋР РЏР В РЎВР В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В°. Р В РЎСџР РЋРІР‚вЂњР РЋР С“Р В Р’В»Р РЋР РЏ Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂўР В РЎвЂќ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚С™Р В РЎвЂ.',
   },
 ];
 const STUDENT_RISK_ADMISSION_TARGET = 60;
@@ -1969,7 +1969,7 @@ const initDb = async () => {
     if (!activeRow.rows.length) {
       await pool.query(
         'INSERT INTO semesters (course_id, title, start_date, weeks_count, is_active, is_archived) VALUES ($1, $2, $3, $4, 1, 0)',
-        [course.id, `${course.name} семестр`, '2026-01-19', 15]
+        [course.id, `${course.name} Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ`, '2026-01-19', 15]
       );
     } else if (activeRow.rows[0].is_active !== 1) {
       await pool.query('UPDATE semesters SET is_active = 1 WHERE id = $1', [activeRow.rows[0].id]);
@@ -2263,7 +2263,7 @@ function normalizeUploadedOriginalName(rawName, fallbackName = null) {
   let normalized = initial;
   try {
     const decoded = Buffer.from(initial, 'latin1').toString('utf8');
-    const hasMojibakeMarkers = /[ÐÑÃÂ]/.test(initial);
+    const hasMojibakeMarkers = /[Р вЂњРЎвЂ™Р вЂњРІР‚ВР вЂњРЎвЂњР вЂњРІР‚С™]/.test(initial);
     const hasCyrillic = /[\u0400-\u04FF]/.test(decoded);
     const hasReplacement = decoded.includes('\uFFFD');
     if (hasMojibakeMarkers && hasCyrillic && !hasReplacement) {
@@ -2414,10 +2414,10 @@ const normalizeLessonType = (value) => {
   const raw = String(value).trim().toLowerCase();
   if (!raw) return null;
   if (['lecture', 'seminar', 'lab', 'practice'].includes(raw)) return raw;
-  if (raw.startsWith('лек')) return 'lecture';
-  if (raw.startsWith('сем')) return 'seminar';
-  if (raw.startsWith('лаб')) return 'lab';
-  if (raw.startsWith('практ')) return 'practice';
+  if (raw.startsWith('Р В Р’В»Р В Р’ВµР В РЎвЂќ')) return 'lecture';
+  if (raw.startsWith('Р РЋР С“Р В Р’ВµР В РЎВ')) return 'seminar';
+  if (raw.startsWith('Р В Р’В»Р В Р’В°Р В Р’В±')) return 'lab';
+  if (raw.startsWith('Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В РЎвЂќР РЋРІР‚С™')) return 'practice';
   return null;
 };
 
@@ -2595,7 +2595,7 @@ function formatStudyContextCampusLabel(campusKey, lang = 'uk') {
   if (lang === 'en') {
     return normalized === 'munich' ? 'Munich' : 'Kyiv';
   }
-  return normalized === 'munich' ? 'Мюнхен' : 'Київ';
+  return normalized === 'munich' ? 'Р В РЎС™Р РЋР вЂ№Р В Р вЂ¦Р РЋРІР‚В¦Р В Р’ВµР В Р вЂ¦' : 'Р В РЎв„ўР В РЎвЂР РЋРІР‚вЂќР В Р вЂ ';
 }
 
 function formatStudyContextStageLabel(stage, trackKey = 'bachelor', lang = 'uk') {
@@ -2607,9 +2607,9 @@ function formatStudyContextStageLabel(stage, trackKey = 'bachelor', lang = 'uk')
     return `Year ${normalizedStage}`;
   }
   if (normalizeRegistrationTrack(trackKey, 'bachelor') === 'teacher') {
-    return 'Викладацький контекст';
+    return 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™';
   }
-  return `${normalizedStage} курс`;
+  return `${normalizedStage} Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“`;
 }
 
 function buildStudyContextLabel(context = {}, lang = 'uk') {
@@ -3144,16 +3144,16 @@ function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk') {
   const copy = {
     missing_selection: isEn
       ? 'Choose program, admission year, campus, and academic course before continuing.'
-      : 'Оберіть програму, рік вступу, кампус і академічний курс перед продовженням.',
+      : 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРЎвЂњ, Р РЋР вЂљР РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ, Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“ Р РЋРІР‚вЂњ Р В Р’В°Р В РЎвЂќР В Р’В°Р В РўвЂР В Р’ВµР В РЎВР РЋРІР‚вЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РўвЂР В РЎвЂўР В Р вЂ Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏР В РЎВ.',
     invalid_group: isEn
       ? 'The selected academic course is no longer available for registration.'
-      : 'Обраний академічний курс більше недоступний для реєстрації.',
+      : 'Р В РЎвЂєР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В°Р В РЎвЂќР В Р’В°Р В РўвЂР В Р’ВµР В РЎВР РЋРІР‚вЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ.',
     invalid_scope: isEn
       ? 'The selected academic course no longer matches this registration path.'
-      : 'Обраний академічний курс більше не відповідає цьому шляху реєстрації.',
+      : 'Р В РЎвЂєР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В°Р В РЎвЂќР В Р’В°Р В РўвЂР В Р’ВµР В РЎВР РЋРІР‚вЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В Р’В°Р РЋРІР‚Сњ Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р РЋРІвЂљВ¬Р В Р’В»Р РЋР РЏР РЋРІР‚В¦Р РЋРЎвЂњ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ.',
     group_required: isEn
       ? 'Finish academic course selection first. Legacy-only registration is disabled.'
-      : 'Спершу завершіть вибір академічного курсу. Legacy-реєстрацію вимкнено.',
+      : 'Р В Р Р‹Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР РЋРІвЂљВ¬Р РЋРЎвЂњ Р В Р’В·Р В Р’В°Р В Р вЂ Р В Р’ВµР РЋР вЂљР РЋРІвЂљВ¬Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋРІР‚вЂњР РЋР вЂљ Р В Р’В°Р В РЎвЂќР В Р’В°Р В РўвЂР В Р’ВµР В РЎВР РЋРІР‚вЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ. Legacy-Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В Р вЂ Р В РЎвЂР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў.',
   };
   return copy[issue] || copy.invalid_group;
 }
@@ -4508,7 +4508,7 @@ function inferLegacyCourseOrdinal(rawCourseName) {
     120
   ).toLowerCase();
   if (!normalizedName) return null;
-  const match = normalizedName.match(/(^|\s)(\d{1,2})\s*курс\b/u)
+  const match = normalizedName.match(/(^|\s)(\d{1,2})\s*Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“\b/u)
     || normalizedName.match(/(^|\s)(\d{1,2})\s*course\b/u)
     || normalizedName.match(/^(\d{1,2})\b/u);
   if (!match) return null;
@@ -6895,9 +6895,9 @@ const parseSubjectTypeSuffix = (name) => {
   }
   const label = match[1].trim().toLowerCase();
   let type = null;
-  if (label.startsWith('лек') || label === 'lecture' || label === 'lect') {
+  if (label.startsWith('Р В Р’В»Р В Р’ВµР В РЎвЂќ') || label === 'lecture' || label === 'lect') {
     type = 'lecture';
-  } else if (label.startsWith('сем') || label === 'seminar') {
+  } else if (label.startsWith('Р РЋР С“Р В Р’ВµР В РЎВ') || label === 'seminar') {
     type = 'seminar';
   }
   if (!type) {
@@ -7066,15 +7066,15 @@ const buildGenerationInsights = ({
   config,
 }) => {
   const reasonLabels = {
-    missing_course_context: 'Немає активного семестру',
-    missing_weeks_count: 'Не задано кількість тижнів',
-    no_available_weeks: 'Немає доступних тижнів',
-    no_allowed_days: 'Немає доступних днів',
-    no_allowed_classes: 'Немає дозволених слотів',
-    no_slot_found: 'Немає слота',
-    partial_schedule: 'Часткова генерація',
-    subject_day_mismatch: 'Предмет має різні дні',
-    unknown: 'Невідома причина',
+    missing_course_context: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ',
+    missing_weeks_count: 'Р В РЎСљР В Р’Вµ Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂќР РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂќР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ ',
+    no_available_weeks: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ ',
+    no_allowed_days: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ ',
+    no_allowed_classes: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РўвЂР В РЎвЂўР В Р’В·Р В Р вЂ Р В РЎвЂўР В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ ',
+    no_slot_found: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В Р’В°',
+    partial_schedule: 'Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В° Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ',
+    subject_day_mismatch: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋР вЂљР РЋРІР‚вЂњР В Р’В·Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњ',
+    unknown: 'Р В РЎСљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂўР В РЎВР В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚РЋР В РЎвЂР В Р вЂ¦Р В Р’В°',
   };
   const result = { kyiv: null, munich: null };
   ['kyiv', 'munich'].forEach((location) => {
@@ -7138,27 +7138,27 @@ const buildGenerationInsights = ({
 
     const tips = [];
     if (blockers > 0) {
-      tips.push('Спершу закрийте критичні пункти у блоці "Перед запуском".');
+      tips.push('Р В Р Р‹Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР РЋРІвЂљВ¬Р РЋРЎвЂњ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР В РІвЂћвЂ“Р РЋРІР‚С™Р В Р’Вµ Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂ”Р РЋРЎвЂњР В Р вЂ¦Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂ Р РЋРЎвЂњ Р В Р’В±Р В Р’В»Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњ "Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ Р В Р’В·Р В Р’В°Р В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂќР В РЎвЂўР В РЎВ".');
     }
     if (partialCount > 0) {
-      tips.push('Є часткова генерація: зменшіть к-сть пар або розширте доступні тижні/дні.');
+      tips.push('Р В РІР‚С› Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В° Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ: Р В Р’В·Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІвЂљВ¬Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќ-Р РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ Р В Р’В°Р В Р’В±Р В РЎвЂў Р РЋР вЂљР В РЎвЂўР В Р’В·Р РЋРІвЂљВ¬Р В РЎвЂР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњ/Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњ.');
     }
     if (noSlotCount > 0) {
-      tips.push('Для no-slot перевірте fixed-обмеження та ліміти викладачів.');
+      tips.push('Р В РІР‚СњР В Р’В»Р РЋР РЏ no-slot Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ fixed-Р В РЎвЂўР В Р’В±Р В РЎВР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р РЋРІР‚С™Р В Р’В° Р В Р’В»Р РЋРІР‚вЂњР В РЎВР РЋРІР‚вЂњР РЋРІР‚С™Р В РЎвЂ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ .');
     }
     if (noAllowedClassesCount > 0) {
-      tips.push('Немає дозволених слотів: вимкніть strict no-evening або перегляньте fixed-слоти.');
+      tips.push('Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РўвЂР В РЎвЂўР В Р’В·Р В Р вЂ Р В РЎвЂўР В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : Р В Р вЂ Р В РЎвЂР В РЎВР В РЎвЂќР В Р вЂ¦Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ strict no-evening Р В Р’В°Р В Р’В±Р В РЎвЂў Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎвЂ“Р В Р’В»Р РЋР РЏР В Р вЂ¦Р РЋР Р‰Р РЋРІР‚С™Р В Р’Вµ fixed-Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ.');
     }
     if (mirrorWarn > 0) {
-      tips.push('Перевірте дзеркальні ключі: A/B має формуватися між різними предметами.');
+      tips.push('Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ Р В РўвЂР В Р’В·Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋР РЋРІР‚вЂњ: A/B Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋРІР‚С›Р В РЎвЂўР РЋР вЂљР В РЎВР РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋР С“Р РЋР РЏ Р В РЎВР РЋРІР‚вЂњР В Р’В¶ Р РЋР вЂљР РЋРІР‚вЂњР В Р’В·Р В Р вЂ¦Р В РЎвЂР В РЎВР В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В°Р В РЎВР В РЎвЂ.');
     }
     if (lateShare > 0.22 && Number(config.late_slot_weight || 0) > 0) {
-      tips.push('Багато вечірніх пар: зменшіть compactness або target пар/день.');
+      tips.push('Р В РІР‚ВР В Р’В°Р В РЎвЂ“Р В Р’В°Р РЋРІР‚С™Р В РЎвЂў Р В Р вЂ Р В Р’ВµР РЋРІР‚РЋР РЋРІР‚вЂњР РЋР вЂљР В Р вЂ¦Р РЋРІР‚вЂњР РЋРІР‚В¦ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ: Р В Р’В·Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІвЂљВ¬Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ compactness Р В Р’В°Р В Р’В±Р В РЎвЂў target Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ/Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰.');
     }
     if (dayImbalance > 0.42) {
-      tips.push('Є перекіс по днях: підніміть evenness або вимкніть фіксацію дня для частини предметів.');
+      tips.push('Р В РІР‚С› Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚вЂњР РЋР С“ Р В РЎвЂ”Р В РЎвЂў Р В РўвЂР В Р вЂ¦Р РЋР РЏР РЋРІР‚В¦: Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњР В РЎВР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ evenness Р В Р’В°Р В Р’В±Р В РЎвЂў Р В Р вЂ Р В РЎвЂР В РЎВР В РЎвЂќР В Р вЂ¦Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚С›Р РЋРІР‚вЂњР В РЎвЂќР РЋР С“Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В РўвЂР В Р вЂ¦Р РЋР РЏ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .');
     }
-    const finalTips = tips.length ? tips.slice(0, 3) : ['Поточна конфігурація виглядає збалансовано.'];
+    const finalTips = tips.length ? tips.slice(0, 3) : ['Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В Р’В° Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р РЋРІР‚вЂњР В РЎвЂ“Р РЋРЎвЂњР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В Р вЂ Р В РЎвЂР В РЎвЂ“Р В Р’В»Р РЋР РЏР В РўвЂР В Р’В°Р РЋРІР‚Сњ Р В Р’В·Р В Р’В±Р В Р’В°Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў.'];
 
     let healthScore = 100;
     healthScore -= blockers * 22;
@@ -7330,19 +7330,19 @@ const buildGeneratorValidation = ({
   };
 
   if (!items.length) {
-    pushIssue('error', `Немає предметів для ${locationLabel}.`);
+    pushIssue('error', `Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В РўвЂР В Р’В»Р РЋР РЏ ${locationLabel}.`);
     return { issues, itemIssues, hasCritical: true };
   }
 
   items.forEach((item) => {
     const meta = courseMetaById[item.course_id];
     if (!meta) {
-      pushIssue('error', `Предмет "${item.subject_name}" без активного семестру.`, item.id);
+      pushIssue('error', `Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ "${item.subject_name}" Р В Р’В±Р В Р’ВµР В Р’В· Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ.`, item.id);
       return;
     }
     const weeksCount = Number(meta.weeks_count || 0);
     if (!weeksCount) {
-      pushIssue('error', `Курс "${item.subject_name}" без кількості тижнів.`, item.id);
+      pushIssue('error', `Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ "${item.subject_name}" Р В Р’В±Р В Р’ВµР В Р’В· Р В РЎвЂќР РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ .`, item.id);
     }
     const targetPairs = Number(item.pairs_count || 0);
     const allWeeks = weeksCount ? Array.from({ length: weeksCount }, (_, idx) => idx + 1) : [];
@@ -7358,67 +7358,67 @@ const buildGeneratorValidation = ({
       if (item.fixed_class_number) {
         pushIssue(
           'warn',
-          `"${item.subject_name}" має ${targetPairs} пар при фіксованому слоті: за ${baseWeeks.length} тижнів це майже точно призведе до часткової генерації.`,
+          `"${item.subject_name}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ ${targetPairs} Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂ Р РЋРІР‚С›Р РЋРІР‚вЂњР В РЎвЂќР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњ: Р В Р’В·Р В Р’В° ${baseWeeks.length} Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  Р РЋРІР‚В Р В Р’Вµ Р В РЎВР В Р’В°Р В РІвЂћвЂ“Р В Р’В¶Р В Р’Вµ Р РЋРІР‚С™Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ Р В Р’ВµР В РўвЂР В Р’Вµ Р В РўвЂР В РЎвЂў Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂўР РЋРІР‚вЂќ Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ.`,
           item.id
         );
       } else if (targetPairs > roughCapacity) {
         pushIssue(
           'warn',
-          `"${item.subject_name}" має ${targetPairs} пар, а груба місткість за період близько ${roughCapacity} (тижні × слоти). Ймовірна часткова генерація.`,
+          `"${item.subject_name}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ ${targetPairs} Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ, Р В Р’В° Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В±Р В Р’В° Р В РЎВР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р В РЎвЂќР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В Р’В·Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР В РЎвЂўР В РўвЂ Р В Р’В±Р В Р’В»Р В РЎвЂР В Р’В·Р РЋР Р‰Р В РЎвЂќР В РЎвЂў ${roughCapacity} (Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњ Р вЂњРІР‚вЂќ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ). Р В РІвЂћСћР В РЎВР В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В Р вЂ¦Р В Р’В° Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В° Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ.`,
           item.id
         );
       } else {
         pushIssue(
           'warn',
-          `"${item.subject_name}" має ${targetPairs} пар на ${baseWeeks.length} тижнів: генератору доведеться ставити більше ніж 1 пару на тиждень.`,
+          `"${item.subject_name}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ ${targetPairs} Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ Р В Р вЂ¦Р В Р’В° ${baseWeeks.length} Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ : Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњ Р В РўвЂР В РЎвЂўР В Р вЂ Р В Р’ВµР В РўвЂР В Р’ВµР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ Р В Р вЂ¦Р РЋРІР‚вЂњР В Р’В¶ 1 Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР РЋРЎвЂњ Р В Р вЂ¦Р В Р’В° Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰.`,
           item.id
         );
       }
     }
     if (item.group_number && item.group_count && Number(item.group_number) > Number(item.group_count)) {
-      pushIssue('error', `Група ${item.group_number} перевищує кількість груп у "${item.subject_name}".`, item.id);
+      pushIssue('error', `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${item.group_number} Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р В РЎвЂР РЋРІР‚В°Р РЋРЎвЂњР РЋРІР‚Сњ Р В РЎвЂќР РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂќР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ” Р РЋРЎвЂњ "${item.subject_name}".`, item.id);
     }
     const lessonType = String(item.lesson_type || '').toLowerCase();
-    const seminarAllGroups = (lessonType.includes('seminar') || lessonType.includes('сем'))
+    const seminarAllGroups = (lessonType.includes('seminar') || lessonType.includes('Р РЋР С“Р В Р’ВµР В РЎВ'))
       && !item.group_number
       && Number(item.group_count || 1) > 1;
     if (seminarAllGroups) {
-      pushIssue('warn', `"${item.subject_name}" як семінар для "Усі групи" буде автоматично розбитий на окремі групи.`, item.id);
+      pushIssue('warn', `"${item.subject_name}" Р РЋР РЏР В РЎвЂќ Р РЋР С“Р В Р’ВµР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р РЋР вЂљ Р В РўвЂР В Р’В»Р РЋР РЏ "Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ" Р В Р’В±Р РЋРЎвЂњР В РўвЂР В Р’Вµ Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂў Р РЋР вЂљР В РЎвЂўР В Р’В·Р В Р’В±Р В РЎвЂР РЋРІР‚С™Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’В° Р В РЎвЂўР В РЎвЂќР РЋР вЂљР В Р’ВµР В РЎВР РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ.`, item.id);
     }
     if (config.strict_no_evening && item.fixed_class_number && Number(item.fixed_class_number) > 5) {
-      pushIssue('error', `"${item.subject_name}" має фіксований слот ${item.fixed_class_number}, але strict no-evening забороняє 6-7 пари.`, item.id);
+      pushIssue('error', `"${item.subject_name}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋРІР‚С›Р РЋРІР‚вЂњР В РЎвЂќР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™ ${item.fixed_class_number}, Р В Р’В°Р В Р’В»Р В Р’Вµ strict no-evening Р В Р’В·Р В Р’В°Р В Р’В±Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋР РЏР РЋРІР‚Сњ 6-7 Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В РЎвЂ.`, item.id);
     }
     if (item.fixed_class_number && Number(item.fixed_class_number) > Number(config.max_daily_pairs || 7)) {
-      pushIssue('warn', `"${item.subject_name}" має фіксований слот поза max пар/день.`, item.id);
+      pushIssue('warn', `"${item.subject_name}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋРІР‚С›Р РЋРІР‚вЂњР В РЎвЂќР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™ Р В РЎвЂ”Р В РЎвЂўР В Р’В·Р В Р’В° max Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ/Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰.`, item.id);
     }
     if (item.weeks_set && weeksCount) {
       const parsedWeeks = parseWeekSet(item.weeks_set, weeksCount);
       if (!parsedWeeks.length) {
-        pushIssue('warn', `"${item.subject_name}" має некоректний набір тижнів.`, item.id);
+        pushIssue('warn', `"${item.subject_name}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р вЂ¦Р В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’В°Р В Р’В±Р РЋРІР‚вЂњР РЋР вЂљ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ .`, item.id);
       } else {
         const parsedSet = new Set(parsedWeeks);
         const effectiveWeeks = baseWeeks.filter((week) => parsedSet.has(week));
         if (effectiveWeeks.length < targetPairs) {
           pushIssue(
             'warn',
-            `"${item.subject_name}" має менше доступних тижнів (${effectiveWeeks.length}) ніж пар (${targetPairs}).`,
+            `"${item.subject_name}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІвЂљВ¬Р В Р’Вµ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  (${effectiveWeeks.length}) Р В Р вЂ¦Р РЋРІР‚вЂњР В Р’В¶ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ (${targetPairs}).`,
             item.id
           );
         }
       }
     }
     if (item.fixed_day && meta.active_days && meta.active_days.length && !meta.active_days.includes(item.fixed_day)) {
-      pushIssue('warn', `"${item.subject_name}" стоїть на день поза активними днями курсу.`, item.id);
+      pushIssue('warn', `"${item.subject_name}" Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋРІР‚вЂќР РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ¦Р В Р’В° Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰ Р В РЎвЂ”Р В РЎвЂўР В Р’В·Р В Р’В° Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РЎВР В РЎвЂ Р В РўвЂР В Р вЂ¦Р РЋР РЏР В РЎВР В РЎвЂ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ.`, item.id);
     }
     const limit = teacherLimits[item.teacher_id] || null;
     if (limit && limit.allowed_weekdays && limit.allowed_weekdays.length) {
       if (item.fixed_day && !limit.allowed_weekdays.includes(item.fixed_day)) {
-        pushIssue('error', `"${item.subject_name}" у день, коли викладач недоступний.`, item.id);
+        pushIssue('error', `"${item.subject_name}" Р РЋРЎвЂњ Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰, Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“.`, item.id);
       }
       if (!item.fixed_day && meta.active_days && meta.active_days.length) {
         const overlap = meta.active_days.some((day) => limit.allowed_weekdays.includes(day));
         if (!overlap) {
-          pushIssue('error', `"${item.subject_name}" не має доступних днів викладача.`, item.id);
+          pushIssue('error', `"${item.subject_name}" Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’В°.`, item.id);
         }
       }
     }
@@ -7440,12 +7440,12 @@ const buildGeneratorValidation = ({
       if (!bucket.group1.length || !bucket.group2.length) {
         const list = [...bucket.group1, ...bucket.group2];
         list.forEach((item) => {
-          pushIssue('warn', `"${item.subject_name}" дзеркало "${key}" без пари.`, item.id);
+          pushIssue('warn', `"${item.subject_name}" Р В РўвЂР В Р’В·Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В°Р В Р’В»Р В РЎвЂў "${key}" Р В Р’В±Р В Р’ВµР В Р’В· Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В РЎвЂ.`, item.id);
         });
       } else if (bucket.group1.length !== bucket.group2.length) {
         const list = [...bucket.group1, ...bucket.group2];
         list.forEach((item) => {
-          pushIssue('warn', `"${item.subject_name}" дзеркало "${key}" має різні кількості пар.`, item.id);
+          pushIssue('warn', `"${item.subject_name}" Р В РўвЂР В Р’В·Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В°Р В Р’В»Р В РЎвЂў "${key}" Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋР вЂљР РЋРІР‚вЂњР В Р’В·Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ.`, item.id);
         });
       }
     });
@@ -7492,7 +7492,7 @@ const buildConflictContext = (conflicts, itemsById, courseById, courseLocationMa
         subject: item.subject_name,
         course: courseById[item.course_id],
         teacher: item.teacher_name,
-        group: item.group_number ? `Група ${item.group_number}` : 'Усі групи',
+        group: item.group_number ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${item.group_number}` : 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
       })),
     });
   });
@@ -7848,18 +7848,18 @@ function buildForensicsDeviceFingerprint(rawValue) {
 
 function resolveForensicsConfidence(scoreRaw) {
   const score = Number(scoreRaw || 0);
-  if (score >= 110) return { key: 'high', label: 'Висока' };
-  if (score >= 65) return { key: 'medium', label: 'Середня' };
-  if (score >= 35) return { key: 'low', label: 'Низька' };
-  return { key: 'weak', label: 'Слабка' };
+  if (score >= 110) return { key: 'high', label: 'Р В РІР‚в„ўР В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќР В Р’В°' };
+  if (score >= 65) return { key: 'medium', label: 'Р В Р Р‹Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂР В Р вЂ¦Р РЋР РЏ' };
+  if (score >= 35) return { key: 'low', label: 'Р В РЎСљР В РЎвЂР В Р’В·Р РЋР Р‰Р В РЎвЂќР В Р’В°' };
+  return { key: 'weak', label: 'Р В Р Р‹Р В Р’В»Р В Р’В°Р В Р’В±Р В РЎвЂќР В Р’В°' };
 }
 
 function resolveForensicsRiskState(scoreRaw) {
   const score = Number(scoreRaw || 0);
-  if (score >= 90) return { key: 'high', label: 'Високий ризик' };
-  if (score >= 50) return { key: 'watch', label: 'Під наглядом' };
-  if (score >= 20) return { key: 'low', label: 'Низький ризик' };
-  return { key: 'clear', label: 'Ознак ризику не виявлено' };
+  if (score >= 90) return { key: 'high', label: 'Р В РІР‚в„ўР В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќ' };
+  if (score >= 50) return { key: 'watch', label: 'Р В РЎСџР РЋРІР‚вЂњР В РўвЂ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р В Р’В»Р РЋР РЏР В РўвЂР В РЎвЂўР В РЎВ' };
+  if (score >= 20) return { key: 'low', label: 'Р В РЎСљР В РЎвЂР В Р’В·Р РЋР Р‰Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќ' };
+  return { key: 'clear', label: 'Р В РЎвЂєР В Р’В·Р В Р вЂ¦Р В Р’В°Р В РЎвЂќ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р В РЎвЂР РЋР РЏР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' };
 }
 
 const SECURITY_CASE_SCORE_WATCH = 50;
@@ -7889,12 +7889,12 @@ function normalizeSecurityCaseStatus(rawStatus) {
 function resolveSecurityCaseLevel(scoreRaw) {
   const score = Number(scoreRaw || 0);
   if (score >= SECURITY_CASE_SCORE_HIGH) {
-    return { key: 'high-risk', label: 'Високий ризик' };
+    return { key: 'high-risk', label: 'Р В РІР‚в„ўР В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќ' };
   }
   if (score >= SECURITY_CASE_SCORE_WATCH) {
-    return { key: 'watch', label: 'Під наглядом' };
+    return { key: 'watch', label: 'Р В РЎСџР РЋРІР‚вЂњР В РўвЂ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р В Р’В»Р РЋР РЏР В РўвЂР В РЎвЂўР В РЎВ' };
   }
-  return { key: 'normal', label: 'Нормально' };
+  return { key: 'normal', label: 'Р В РЎСљР В РЎвЂўР РЋР вЂљР В РЎВР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂў' };
 }
 
 function normalizeRoleListForAudit(rawRoles) {
@@ -8520,7 +8520,7 @@ async function recordUserRoleChangeEvent({
       alertKey: 'role-elevation',
       severity: 'high',
       title: 'Privileged role elevation',
-      message: `${normalizedTargetName || `User ${normalizedUserId}`} отримав(ла) підвищені права`,
+      message: `${normalizedTargetName || `User ${normalizedUserId}`} Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎВР В Р’В°Р В Р вЂ (Р В Р’В»Р В Р’В°) Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂР В Р вЂ Р В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В Р’В°`,
       userId: normalizedUserId,
       courseId: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
       details: {
@@ -8599,7 +8599,7 @@ async function recordAuthFailureEvent({
         alertKey: 'auth-failure-ip-burst',
         severity: 'high',
         title: 'Mass failed logins from one IP',
-        message: `${normalizedIp}: ${burstCount} невдалих логінів за 10 хв`,
+        message: `${normalizedIp}: ${burstCount} Р В Р вЂ¦Р В Р’ВµР В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚В¦ Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В·Р В Р’В° 10 Р РЋРІР‚В¦Р В Р вЂ `,
         userId: normalizedUserId,
         courseId: normalizedCourseId,
         details: {
@@ -8628,7 +8628,7 @@ async function recordAuthFailureEvent({
         alertKey: 'auth-failure-user-spike',
         severity: 'medium',
         title: 'User login failures spike',
-        message: `${normalizedName || `User ${normalizedUserId}`}: ${failed24h} невдалих входів за 24г`,
+        message: `${normalizedName || `User ${normalizedUserId}`}: ${failed24h} Р В Р вЂ¦Р В Р’ВµР В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚В¦ Р В Р вЂ Р РЋРІР‚В¦Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В Р вЂ  Р В Р’В·Р В Р’В° 24Р В РЎвЂ“`,
         userId: normalizedUserId,
         courseId: normalizedCourseId,
         details: {
@@ -8923,38 +8923,38 @@ async function recomputeUserSecurityCase(userId, options = {}) {
   const reasons = Array.isArray(options.extraReasons) ? options.extraReasons.slice(0, 8) : [];
   if (counters.shared_session_users >= 1) {
     score += 48 + Math.min(24, counters.shared_session_users * 6);
-    reasons.push(`Спільна session з іншими акаунтами (${counters.shared_session_users})`);
+    reasons.push(`Р В Р Р‹Р В РЎвЂ”Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В Р’В° session Р В Р’В· Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР В РЎВР В РЎвЂ Р В Р’В°Р В РЎвЂќР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р В РЎВР В РЎвЂ (${counters.shared_session_users})`);
   }
   if (counters.shared_ip_users >= 2 && !allowlistedIp) {
     score += 18 + Math.min(22, (counters.shared_ip_users - 2) * 7);
-    reasons.push(`IP збігається з іншими акаунтами (${counters.shared_ip_users})`);
+    reasons.push(`IP Р В Р’В·Р В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“Р В Р’В°Р РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р’В· Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР В РЎВР В РЎвЂ Р В Р’В°Р В РЎвЂќР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р В РЎВР В РЎвЂ (${counters.shared_ip_users})`);
   }
   if (counters.shared_device_users >= 2) {
     score += 20 + Math.min(24, (counters.shared_device_users - 2) * 6);
-    reasons.push(`Device fingerprint збігається (${counters.shared_device_users})`);
+    reasons.push(`Device fingerprint Р В Р’В·Р В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“Р В Р’В°Р РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ (${counters.shared_device_users})`);
   }
   if (counters.failed_24h >= 5) {
     score += 22;
-    reasons.push(`Багато невдалих логінів за 24г (${counters.failed_24h})`);
+    reasons.push(`Р В РІР‚ВР В Р’В°Р В РЎвЂ“Р В Р’В°Р РЋРІР‚С™Р В РЎвЂў Р В Р вЂ¦Р В Р’ВµР В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚В¦ Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В·Р В Р’В° 24Р В РЎвЂ“ (${counters.failed_24h})`);
   }
   if (counters.failed_7d >= 12) {
     score += 12;
-    reasons.push(`Підвищена кількість невдалих логінів за 7д (${counters.failed_7d})`);
+    reasons.push(`Р В РЎСџР РЋРІР‚вЂњР В РўвЂР В Р вЂ Р В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В Р’В° Р В РЎвЂќР РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂќР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ¦Р В Р’ВµР В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚В¦ Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В·Р В Р’В° 7Р В РўвЂ (${counters.failed_7d})`);
   }
   if (counters.privileged_role_changes_30d >= 1) {
     score += 28;
-    reasons.push(`Було підвищення до привілейованої ролі (${counters.privileged_role_changes_30d})`);
+    reasons.push(`Р В РІР‚ВР РЋРЎвЂњР В Р’В»Р В РЎвЂў Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂР В Р вЂ Р В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РўвЂР В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р РЋРІР‚вЂњР В Р’В»Р В Р’ВµР В РІвЂћвЂ“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР РЋРІР‚вЂќ Р РЋР вЂљР В РЎвЂўР В Р’В»Р РЋРІР‚вЂњ (${counters.privileged_role_changes_30d})`);
   } else if (counters.role_changes_30d >= 3) {
     score += 14;
-    reasons.push(`Часті зміни ролей (${counters.role_changes_30d})`);
+    reasons.push(`Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ Р В Р’В·Р В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ Р РЋР вЂљР В РЎвЂўР В Р’В»Р В Р’ВµР В РІвЂћвЂ“ (${counters.role_changes_30d})`);
   }
   if (counters.registration_ip_cluster_10m >= 3) {
     score += 34;
-    reasons.push(`Кластер реєстрацій з одного IP за 10 хв (${counters.registration_ip_cluster_10m})`);
+    reasons.push(`Р В РЎв„ўР В Р’В»Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р’В· Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў IP Р В Р’В·Р В Р’В° 10 Р РЋРІР‚В¦Р В Р вЂ  (${counters.registration_ip_cluster_10m})`);
   }
   if (counters.registration_device_cluster_10m >= 3) {
     score += 26;
-    reasons.push(`Кластер реєстрацій з одного device за 10 хв (${counters.registration_device_cluster_10m})`);
+    reasons.push(`Р В РЎв„ўР В Р’В»Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р’В· Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў device Р В Р’В·Р В Р’В° 10 Р РЋРІР‚В¦Р В Р вЂ  (${counters.registration_device_cluster_10m})`);
   }
   if (!allowlistedIp) {
     const total30d = Number(loginIpRow && loginIpRow.total_30d ? loginIpRow.total_30d : 0);
@@ -8964,16 +8964,16 @@ async function recomputeUserSecurityCase(userId, options = {}) {
       const lastLoginTs = new Date(lastLoginAt).getTime();
       if (Number.isFinite(lastLoginTs) && Date.now() - lastLoginTs <= (7 * 24 * 60 * 60 * 1000)) {
         score += 10;
-        reasons.push('Новий IP в останній активності');
+        reasons.push('Р В РЎСљР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ IP Р В Р вЂ  Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ');
       }
     }
   }
   if (counters.open_alerts_72h > 0) {
     score += Math.min(20, counters.open_alerts_72h * 5);
-    reasons.push(`Є активні security alerts (${counters.open_alerts_72h})`);
+    reasons.push(`Р В РІР‚С› Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњ security alerts (${counters.open_alerts_72h})`);
   }
   if (allowlistedIp) {
-    reasons.push('IP у allowlist адміністратора (знижено чутливість)');
+    reasons.push('IP Р РЋРЎвЂњ allowlist Р В Р’В°Р В РўвЂР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В Р’В° (Р В Р’В·Р В Р вЂ¦Р В РЎвЂР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р РЋРІР‚РЋР РЋРЎвЂњР РЋРІР‚С™Р В Р’В»Р В РЎвЂР В Р вЂ Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰)');
   }
 
   const resolvedLevel = resolveSecurityCaseLevel(score);
@@ -9006,7 +9006,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
       alertKey: 'auto-quarantine',
       severity: 'critical',
       title: 'Account auto-quarantined',
-      message: `${String(user.full_name || `User ${normalizedUserId}`)} переведено в inactive через high-risk сигнал`,
+      message: `${String(user.full_name || `User ${normalizedUserId}`)} Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р В Р’ВµР В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р вЂ  inactive Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· high-risk Р РЋР С“Р В РЎвЂР В РЎвЂ“Р В Р вЂ¦Р В Р’В°Р В Р’В»`,
       userId: normalizedUserId,
       courseId,
       details: {
@@ -9040,7 +9040,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
         Math.round(score),
         resolvedLevel.key,
         nextStatus,
-        reasons.length ? reasons.slice(0, 6).join(' · ') : null,
+        reasons.length ? reasons.slice(0, 6).join(' Р вЂ™Р’В· ') : null,
         reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
         JSON.stringify(counters),
         allowlistedIp ? 1 : 0,
@@ -9076,7 +9076,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
         Math.round(score),
         resolvedLevel.key,
         resolvedLevel.key === 'high-risk' ? 'open' : 'open',
-        reasons.length ? reasons.slice(0, 6).join(' · ') : null,
+        reasons.length ? reasons.slice(0, 6).join(' Р вЂ™Р’В· ') : null,
         reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
         JSON.stringify(counters),
         autoQuarantined ? 1 : 0,
@@ -9643,42 +9643,42 @@ function buildAcademicV2StudentProjectionAlert(req, issues = {}, context = 'subj
   const reasons = [];
   if (normalizedIssues.missing_scope) {
     reasons.push(isUk
-      ? 'для цього користувача ще не визначено academic v2 групу'
+      ? 'Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР В Р’В° Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂў academic v2 Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ'
       : 'no academic v2 group is assigned for this user');
   }
   if (normalizedIssues.missing_legacy_course) {
     reasons.push(isUk
-      ? 'група ще не має legacy course binding'
+      ? 'Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ legacy course binding'
       : 'the group is missing a legacy course binding');
   }
   if (normalizedIssues.missing_active_term) {
     reasons.push(isUk
-      ? 'для групи не знайдено активний терм'
+      ? 'Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР В РЎВ'
       : 'no active term was found for this group');
   }
   if (normalizedIssues.missing_legacy_semester) {
     reasons.push(isUk
-      ? 'активний терм ще не прив’язаний до legacy semester'
+      ? 'Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР В РЎВ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В РЎвЂў legacy semester'
       : 'the active term is missing a legacy semester binding');
   }
   if (Array.isArray(normalizedIssues.unmapped_subjects) && normalizedIssues.unmapped_subjects.length) {
     reasons.push(isUk
-      ? `предмети без legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`
+      ? `Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ Р В Р’В±Р В Р’ВµР В Р’В· legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`
       : `subjects without legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`);
   }
   if (context === 'schedule'
     && Array.isArray(normalizedIssues.unmapped_schedule_entries)
     && normalizedIssues.unmapped_schedule_entries.length) {
     reasons.push(isUk
-      ? `пари без subject mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_schedule_entries)}`
+      ? `Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В РЎвЂ Р В Р’В±Р В Р’ВµР В Р’В· subject mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_schedule_entries)}`
       : `schedule rows without subject mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_schedule_entries)}`);
   }
 
   const title = isUk
-    ? (context === 'schedule' ? 'Розклад відображено не повністю' : 'Academic v2 проєкція неповна')
+    ? (context === 'schedule' ? 'Р В Р’В Р В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР вЂ№' : 'Academic v2 Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋРІР‚СњР В РЎвЂќР РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В Р вЂ¦Р В Р’ВµР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В Р’В°')
     : (context === 'schedule' ? 'Schedule is only partially available' : 'Academic v2 projection is incomplete');
   const fallbackBody = isUk
-    ? 'Частина даних ще не має сумісної legacy-проєкції.'
+    ? 'Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂўР РЋРІР‚вЂќ legacy-Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋРІР‚СњР В РЎвЂќР РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ.'
     : 'Some data is still missing compatibility bindings.';
 
   return {
@@ -9704,37 +9704,37 @@ function buildAcademicV2CourseProjectionAlert(req, issues = {}, context = 'cours
   const reasons = [];
   if (normalizedIssues.missing_scope) {
     reasons.push(isUk
-      ? 'для вибраного курсу ще не знайдено academic v2 owner'
+      ? 'Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў academic v2 owner'
       : 'no academic v2 owner was found for the selected course');
   }
   if (normalizedIssues.missing_legacy_course) {
     reasons.push(isUk
-      ? 'курс ще не має legacy course projection'
+      ? 'Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ legacy course projection'
       : 'the course is missing a legacy course projection');
   }
   if (normalizedIssues.missing_active_term) {
     reasons.push(isUk
-      ? 'для курсу не визначено активний терм'
+      ? 'Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР В РЎВ'
       : 'no active term is defined for this course');
   }
   if (normalizedIssues.missing_legacy_semester) {
     reasons.push(isUk
-      ? 'активний терм ще не має legacy semester binding'
+      ? 'Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР В РЎВ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ legacy semester binding'
       : 'the active term is missing a legacy semester binding');
   }
   if (Array.isArray(normalizedIssues.unmapped_subjects) && normalizedIssues.unmapped_subjects.length) {
     reasons.push(isUk
-      ? `предмети без legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`
+      ? `Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ Р В Р’В±Р В Р’ВµР В Р’В· legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`
       : `subjects without legacy mapping: ${summarizeAcademicV2ProjectionItems(normalizedIssues.unmapped_subjects)}`);
   }
   return {
     title: isUk
-      ? (context === 'schedule' ? 'Курс показано не повністю' : 'Academic v2 projection курсу неповна')
+      ? (context === 'schedule' ? 'Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РЎвЂ”Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР вЂ№' : 'Academic v2 projection Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’ВµР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В Р’В°')
       : (context === 'schedule' ? 'Course data is only partially available' : 'Course academic v2 projection is incomplete'),
     body: reasons.length
       ? `${reasons.join('. ')}.`
       : (isUk
-        ? 'Частина live-даних курсу ще не має legacy compatibility bindings.'
+        ? 'Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° live-Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ legacy compatibility bindings.'
         : 'Some live course data is still missing compatibility bindings.'),
   };
 }
@@ -9755,27 +9755,27 @@ function buildAcademicV2TeacherProjectionAlert(req, rows = [], context = 'subjec
   const reasons = [];
   if (missingCourse) {
     reasons.push(isUk
-      ? 'деякі викладацькі предмети ще не мають legacy course binding'
+      ? 'Р В РўвЂР В Р’ВµР РЋР РЏР В РЎвЂќР РЋРІР‚вЂњ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ legacy course binding'
       : 'some teacher subjects are missing a legacy course binding');
   }
   if (missingSemester) {
     reasons.push(isUk
-      ? 'деякі викладацькі предмети ще не мають active legacy semester binding'
+      ? 'Р В РўвЂР В Р’ВµР РЋР РЏР В РЎвЂќР РЋРІР‚вЂњ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ active legacy semester binding'
       : 'some teacher subjects are missing an active legacy semester binding');
   }
   if (unmappedSubjects.length) {
     reasons.push(isUk
-      ? `предмети без legacy subject mapping: ${summarizeAcademicV2ProjectionItems(unmappedSubjects)}`
+      ? `Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ Р В Р’В±Р В Р’ВµР В Р’В· legacy subject mapping: ${summarizeAcademicV2ProjectionItems(unmappedSubjects)}`
       : `subjects without legacy subject mapping: ${summarizeAcademicV2ProjectionItems(unmappedSubjects)}`);
   }
   return {
     title: isUk
-      ? (context === 'schedule' ? 'Викладацький розклад показано не повністю' : 'Викладацький academic v2 scope неповний')
+      ? (context === 'schedule' ? 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ Р В РЎвЂ”Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР вЂ№' : 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ academic v2 scope Р В Р вЂ¦Р В Р’ВµР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“')
       : (context === 'schedule' ? 'Teacher schedule is only partially available' : 'Teacher academic v2 scope is incomplete'),
     body: reasons.length
       ? `${reasons.join('. ')}.`
       : (isUk
-        ? 'Частина викладацьких даних ще не має compatibility bindings.'
+        ? 'Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР РЋРІР‚В¦ Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ compatibility bindings.'
         : 'Some teacher data is still missing compatibility bindings.'),
   };
 }
@@ -9848,8 +9848,8 @@ async function loadAcademicV2LegacyStudentRows(userOrId, options = {}) {
         course_name: subject.course_name || '',
         group_count: Math.max(1, Number(subject.group_count || 1)),
         group_label: subject.is_general === true || Number(subject.is_general) === 1
-          ? 'Усі групи'
-          : `Група ${groupNumber}`,
+          ? 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ'
+          : `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groupNumber}`,
         group_numbers: [groupNumber],
         has_all_groups: false,
         show_in_teamwork: subject.show_in_teamwork === true || Number(subject.show_in_teamwork || 0) === 1,
@@ -9917,32 +9917,32 @@ function invalidateAcademicV2CompatibilityCaches() {
 function getAcademicV2RouteMessages(req) {
   const isUk = getPreferredLang(req) === 'uk';
   return isUk ? {
-    unknown: 'Не вдалося зберегти academic v2 зміни',
-    programSaved: 'Програму збережено',
-    cohortSaved: 'Когорту збережено',
-    groupSaved: 'Групу збережено',
-    groupProjectionRebuilt: 'Сумісну legacy-проекцію перебудовано',
-    termSaved: 'Терм збережено',
-    termDeleted: 'Терм видалено',
-    templateSaved: 'Шаблон предмета збережено',
-    groupSubjectSaved: 'Предмет групи збережено',
-    groupSubjectDeleted: 'Предмет групи видалено',
-    usersAssigned: 'Користувачів перепризначено',
-    scheduleSaved: 'Рядок розкладу збережено',
-    scheduleDeleted: 'Рядок розкладу видалено',
-    PROGRAM_NAME_REQUIRED: 'Назва програми обов’язкова',
-    PROGRAM_REQUIRED: 'Спочатку виберіть програму',
-    COHORT_REQUIRED: 'Спочатку виберіть когорту',
-    GROUP_LABEL_REQUIRED: 'Назва групи обов’язкова',
-    GROUP_REQUIRED: 'Спочатку виберіть групу',
-    TERM_NOT_FOUND: 'Терм не знайдено',
-    TEMPLATE_NAME_REQUIRED: 'Назва шаблону предмета обов’язкова',
-    GROUP_SUBJECT_TARGET_REQUIRED: 'Для предмета групи треба вибрати групу і шаблон',
-    GROUP_SUBJECT_NOT_FOUND: 'Предмет групи не знайдено',
-    USER_ASSIGNMENT_TARGET_REQUIRED: 'Виберіть групу і хоча б одного користувача',
-    SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм і предмет групи',
-    SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
-    SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
+    unknown: 'Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР РЏ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎвЂ“Р РЋРІР‚С™Р В РЎвЂ academic v2 Р В Р’В·Р В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ',
+    programSaved: 'Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРЎвЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    cohortSaved: 'Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    groupSaved: 'Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    groupProjectionRebuilt: 'Р В Р Р‹Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р РЋРЎвЂњ legacy-Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р’ВµР В РЎвЂќР РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В±Р РЋРЎвЂњР В РўвЂР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+    termSaved: 'Р В РЎС›Р В Р’ВµР РЋР вЂљР В РЎВ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    termDeleted: 'Р В РЎС›Р В Р’ВµР РЋР вЂљР В РЎВ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    templateSaved: 'Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    groupSubjectSaved: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    groupSubjectDeleted: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    usersAssigned: 'Р В РЎв„ўР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    scheduleSaved: 'Р В Р’В Р РЋР РЏР В РўвЂР В РЎвЂўР В РЎвЂќ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    scheduleDeleted: 'Р В Р’В Р РЋР РЏР В РўвЂР В РЎвЂўР В РЎвЂќ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    PROGRAM_NAME_REQUIRED: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В РЎвЂ Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    PROGRAM_REQUIRED: 'Р В Р Р‹Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚РЋР В Р’В°Р РЋРІР‚С™Р В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРЎвЂњ',
+    COHORT_REQUIRED: 'Р В Р Р‹Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚РЋР В Р’В°Р РЋРІР‚С™Р В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ',
+    GROUP_LABEL_REQUIRED: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    GROUP_REQUIRED: 'Р В Р Р‹Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚РЋР В Р’В°Р РЋРІР‚С™Р В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ',
+    TERM_NOT_FOUND: 'Р В РЎС›Р В Р’ВµР РЋР вЂљР В РЎВ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    TEMPLATE_NAME_REQUIRED: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р РЋРЎвЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    GROUP_SUBJECT_TARGET_REQUIRED: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В Р’В±Р В Р’В° Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р РЋРІР‚вЂњ Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦',
+    GROUP_SUBJECT_NOT_FOUND: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    USER_ASSIGNMENT_TARGET_REQUIRED: 'Р В РІР‚в„ўР В РЎвЂР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р РЋРІР‚вЂњ Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚РЋР В Р’В° Р В Р’В± Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР В Р’В°',
+    SCHEDULE_TARGET_REQUIRED: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ Р РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В Р’В±Р В Р’В° Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР В РЎВ Р РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
+    SCHEDULE_ENTRY_NOT_FOUND: 'Р В Р’В Р РЋР РЏР В РўвЂР В РЎвЂўР В РЎвЂќ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    SUBJECT_TEMPLATE_NOT_FOUND: 'Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
   } : {
     unknown: 'Unable to save academic v2 changes',
     programSaved: 'Program saved',
@@ -10486,10 +10486,10 @@ function normalizeCourseCampus(rawValue, fallback = 'kyiv') {
 function inferCourseCampusFromName(rawName) {
   const name = sanitizeCompactText(rawName, 160);
   if (!name) return null;
-  if (/(?:^|[\s(/|,\-–—])(?:мюнхен|munich)(?=$|[\s)/|,\-–—])/iu.test(name)) {
+  if (/(?:^|[\s(/|,\-Р Р†Р вЂљРІР‚СљР Р†Р вЂљРІР‚Сњ])(?:Р В РЎВР РЋР вЂ№Р В Р вЂ¦Р РЋРІР‚В¦Р В Р’ВµР В Р вЂ¦|munich)(?=$|[\s)/|,\-Р Р†Р вЂљРІР‚СљР Р†Р вЂљРІР‚Сњ])/iu.test(name)) {
     return 'munich';
   }
-  if (/(?:^|[\s(/|,\-–—])(?:київ|киев|kyiv|kiev)(?=$|[\s)/|,\-–—])/iu.test(name)) {
+  if (/(?:^|[\s(/|,\-Р Р†Р вЂљРІР‚СљР Р†Р вЂљРІР‚Сњ])(?:Р В РЎвЂќР В РЎвЂР РЋРІР‚вЂќР В Р вЂ |Р В РЎвЂќР В РЎвЂР В Р’ВµР В Р вЂ |kyiv|kiev)(?=$|[\s)/|,\-Р Р†Р вЂљРІР‚СљР Р†Р вЂљРІР‚Сњ])/iu.test(name)) {
     return 'kyiv';
   }
   return null;
@@ -10499,8 +10499,8 @@ function stripLegacyCourseCampusSuffix(rawName) {
   const compact = sanitizeCompactText(rawName, 120);
   if (!compact) return '';
   const stripped = compact
-    .replace(/\s*(?:[-–—|/,]\s*|\(\s*)?(?:мюнхен|munich|київ|киев|kyiv|kiev)(?:\s*\))?\s*$/iu, '')
-    .replace(/[\s,()/|\-–—]+$/u, '')
+    .replace(/\s*(?:[-Р Р†Р вЂљРІР‚СљР Р†Р вЂљРІР‚Сњ|/,]\s*|\(\s*)?(?:Р В РЎВР РЋР вЂ№Р В Р вЂ¦Р РЋРІР‚В¦Р В Р’ВµР В Р вЂ¦|munich|Р В РЎвЂќР В РЎвЂР РЋРІР‚вЂќР В Р вЂ |Р В РЎвЂќР В РЎвЂР В Р’ВµР В Р вЂ |kyiv|kiev)(?:\s*\))?\s*$/iu, '')
+    .replace(/[\s,()/|\-Р Р†Р вЂљРІР‚СљР Р†Р вЂљРІР‚Сњ]+$/u, '')
     .trim();
   return stripped || compact;
 }
@@ -12119,8 +12119,8 @@ async function listTeacherOfferingCatalog() {
     return Array.from(offeringsById.values())
       .map((item) => ({
         ...item,
-        course_name: item.course_labels.join(' • '),
-        pathway_labels: item.context_labels.join(' • '),
+        course_name: item.course_labels.join(' Р Р†Р вЂљРЎС› '),
+        pathway_labels: item.context_labels.join(' Р Р†Р вЂљРЎС› '),
         search_text: [
           item.name,
           item.catalog_name,
@@ -14093,36 +14093,36 @@ app.get('/login', (req, res) => {
 app.get('/about', requireLogin, (req, res) => {
   const aboutCards = [
     {
-      kicker: 'Для чого',
+      kicker: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р РЋРІР‚РЋР В РЎвЂўР В РЎвЂ“Р В РЎвЂў',
       chipClass: 'status-chip status-chip--info',
-      title: 'Для чого Studerria',
-      body: 'Studerria збирає щоденний навчальний потік в один цілісний простір, щоб студент, викладач і команда адміністрування працювали в одному інтерфейсі без розриву між сервісами.',
+      title: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р РЋРІР‚РЋР В РЎвЂўР В РЎвЂ“Р В РЎвЂў Studerria',
+      body: 'Studerria Р В Р’В·Р В Р’В±Р В РЎвЂР РЋР вЂљР В Р’В°Р РЋРІР‚Сњ Р РЋРІР‚В°Р В РЎвЂўР В РўвЂР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ  Р В РЎвЂўР В РўвЂР В РЎвЂР В Р вЂ¦ Р РЋРІР‚В Р РЋРІР‚вЂњР В Р’В»Р РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњР РЋР вЂљ, Р РЋРІР‚В°Р В РЎвЂўР В Р’В± Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™, Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ Р РЋРІР‚вЂњ Р В РЎвЂќР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р’В° Р В Р’В°Р В РўвЂР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р’В»Р В РЎвЂ Р В Р вЂ  Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР РЋРІР‚С›Р В Р’ВµР В РІвЂћвЂ“Р РЋР С“Р РЋРІР‚вЂњ Р В Р’В±Р В Р’ВµР В Р’В· Р РЋР вЂљР В РЎвЂўР В Р’В·Р РЋР вЂљР В РЎвЂР В Р вЂ Р РЋРЎвЂњ Р В РЎВР РЋРІР‚вЂњР В Р’В¶ Р РЋР С“Р В Р’ВµР РЋР вЂљР В Р вЂ Р РЋРІР‚вЂњР РЋР С“Р В Р’В°Р В РЎВР В РЎвЂ.',
       items: [
-        'Один вхід для щоденного фокусу, розкладу й особистого простору.',
-        'Менше ручних переходів між різними навчальними модулями.',
-        'Спільний простір і однакова логіка навігації для всіх ролей.',
+        'Р В РЎвЂєР В РўвЂР В РЎвЂР В Р вЂ¦ Р В Р вЂ Р РЋРІР‚В¦Р РЋРІР‚вЂњР В РўвЂ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚В°Р В РЎвЂўР В РўвЂР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋРІР‚С›Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР РЋР С“Р РЋРЎвЂњ, Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ Р В РІвЂћвЂ“ Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р’В±Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњ.',
+        'Р В РЎС™Р В Р’ВµР В Р вЂ¦Р РЋРІвЂљВ¬Р В Р’Вµ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР РЋРІР‚В¦Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В Р вЂ  Р В РЎВР РЋРІР‚вЂњР В Р’В¶ Р РЋР вЂљР РЋРІР‚вЂњР В Р’В·Р В Р вЂ¦Р В РЎвЂР В РЎВР В РЎвЂ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РЎВР В РЎвЂ Р В РЎВР В РЎвЂўР В РўвЂР РЋРЎвЂњР В Р’В»Р РЋР РЏР В РЎВР В РЎвЂ.',
+        'Р В Р Р‹Р В РЎвЂ”Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњР РЋР вЂљ Р РЋРІР‚вЂњ Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В Р’В°Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В° Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р РЋРІР‚вЂњР В РЎвЂќР В Р’В° Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚вЂњР В РЎвЂ“Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р РЋР С“Р РЋРІР‚вЂњР РЋРІР‚В¦ Р РЋР вЂљР В РЎвЂўР В Р’В»Р В Р’ВµР В РІвЂћвЂ“.',
       ],
     },
     {
-      kicker: 'Модулі',
+      kicker: 'Р В РЎС™Р В РЎвЂўР В РўвЂР РЋРЎвЂњР В Р’В»Р РЋРІР‚вЂњ',
       chipClass: 'status-chip status-chip--active',
-      title: 'Ключові модулі',
-      body: 'Ядро сайту побудоване навколо щоденного маршруту користувача: від домашнього завдань до матеріалів лекцій, командної роботи та персональних налаштувань.',
+      title: 'Р В РЎв„ўР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋР В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњ Р В РЎВР В РЎвЂўР В РўвЂР РЋРЎвЂњР В Р’В»Р РЋРІР‚вЂњ',
+      body: 'Р В Р вЂЎР В РўвЂР РЋР вЂљР В РЎвЂў Р РЋР С“Р В Р’В°Р В РІвЂћвЂ“Р РЋРІР‚С™Р РЋРЎвЂњ Р В РЎвЂ”Р В РЎвЂўР В Р’В±Р РЋРЎвЂњР В РўвЂР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂў Р РЋРІР‚В°Р В РЎвЂўР В РўвЂР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р РЋРЎвЂњ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР В Р’В°: Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂ Р В РўвЂР В РЎвЂўР В РЎВР В Р’В°Р РЋРІвЂљВ¬Р В Р вЂ¦Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р’В·Р В Р’В°Р В Р вЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋР Р‰ Р В РўвЂР В РЎвЂў Р В РЎВР В Р’В°Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В»Р В Р’ВµР В РЎвЂќР РЋРІР‚В Р РЋРІР‚вЂњР В РІвЂћвЂ“, Р В РЎвЂќР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р вЂ¦Р В РЎвЂўР РЋРІР‚вЂќ Р РЋР вЂљР В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР РЋР С“Р В РЎвЂўР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В Р’В°Р РЋРІвЂљВ¬Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋР Р‰.',
       items: [
-        'Головна з фокусом на день, дедлайнами та швидким контекстом.',
-        'Навчання: розклад, журнал, teamwork, предмети та повʼязані інструменти.',
-        'Особисте: профіль, повідомлення та керування темою інтерфейсу.',
+        'Р В РІР‚СљР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В Р’В° Р В Р’В· Р РЋРІР‚С›Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР РЋР С“Р В РЎвЂўР В РЎВ Р В Р вЂ¦Р В Р’В° Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰, Р В РўвЂР В Р’ВµР В РўвЂР В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В Р’В°Р В РЎВР В РЎвЂ Р РЋРІР‚С™Р В Р’В° Р РЋРІвЂљВ¬Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂќР В РЎвЂР В РЎВ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР В РЎВ.',
+        'Р В РЎСљР В Р’В°Р В Р вЂ Р РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ: Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ, Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В», teamwork, Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋРІР‚вЂњР В Р вЂ¦Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂ.',
+        'Р В РЎвЂєР РЋР С“Р В РЎвЂўР В Р’В±Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’Вµ: Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋРІР‚С›Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰, Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂўР В РЎВР В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р РЋРІР‚С™Р В Р’В° Р В РЎвЂќР В Р’ВµР РЋР вЂљР РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р РЋРІР‚С™Р В Р’ВµР В РЎВР В РЎвЂўР РЋР вЂ№ Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР РЋРІР‚С›Р В Р’ВµР В РІвЂћвЂ“Р РЋР С“Р РЋРЎвЂњ.',
       ],
     },
     {
-      kicker: 'Доступи',
+      kicker: 'Р В РІР‚СњР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
       chipClass: 'status-chip status-chip--neutral',
-      title: 'Ролі та доступи',
-      body: 'Studerria показує різний інструментарій залежно від ролі, але лишається в одному візуальному контурі, щоб перехід між сценаріями не ламав відчуття системи.',
+      title: 'Р В Р’В Р В РЎвЂўР В Р’В»Р РЋРІР‚вЂњ Р РЋРІР‚С™Р В Р’В° Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
+      body: 'Studerria Р В РЎвЂ”Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В·Р РЋРЎвЂњР РЋРІР‚Сњ Р РЋР вЂљР РЋРІР‚вЂњР В Р’В·Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚вЂњР В Р вЂ¦Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р’В·Р В Р’В°Р В Р’В»Р В Р’ВµР В Р’В¶Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂ Р РЋР вЂљР В РЎвЂўР В Р’В»Р РЋРІР‚вЂњ, Р В Р’В°Р В Р’В»Р В Р’Вµ Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р’В°Р РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р вЂ  Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В Р вЂ Р РЋРІР‚вЂњР В Р’В·Р РЋРЎвЂњР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋРЎвЂњР РЋР вЂљР РЋРІР‚вЂњ, Р РЋРІР‚В°Р В РЎвЂўР В Р’В± Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР РЋРІР‚В¦Р РЋРІР‚вЂњР В РўвЂ Р В РЎВР РЋРІР‚вЂњР В Р’В¶ Р РЋР С“Р РЋРІР‚В Р В Р’ВµР В Р вЂ¦Р В Р’В°Р РЋР вЂљР РЋРІР‚вЂњР РЋР РЏР В РЎВР В РЎвЂ Р В Р вЂ¦Р В Р’Вµ Р В Р’В»Р В Р’В°Р В РЎВР В Р’В°Р В Р вЂ  Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР РЋРІР‚РЋР РЋРЎвЂњР РЋРІР‚С™Р РЋРІР‚С™Р РЋР РЏ Р РЋР С“Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’ВµР В РЎВР В РЎвЂ.',
       items: [
-        'Студенти отримують власний навчальний простір і щоденний маршрут.',
-        'Викладачі працюють із предметами, журналом і робочими шаблонами.',
-        'Адміністратор, деканат і староста формують процеси.',
+        'Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂ Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎВР РЋРЎвЂњР РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р В Р’В»Р В Р’В°Р РЋР С“Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњР РЋР вЂљ Р РЋРІР‚вЂњ Р РЋРІР‚В°Р В РЎвЂўР В РўвЂР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™.',
+        'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋР вЂ№Р РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚вЂњР В Р’В· Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В°Р В РЎВР В РЎвЂ, Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р В РЎвЂўР В РЎВ Р РЋРІР‚вЂњ Р РЋР вЂљР В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР В РЎВР В РЎвЂ Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р В Р’В°Р В РЎВР В РЎвЂ.',
+        'Р В РЎвЂ™Р В РўвЂР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљ, Р В РўвЂР В Р’ВµР В РЎвЂќР В Р’В°Р В Р вЂ¦Р В Р’В°Р РЋРІР‚С™ Р РЋРІР‚вЂњ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В° Р РЋРІР‚С›Р В РЎвЂўР РЋР вЂљР В РЎВР РЋРЎвЂњР РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋРІР‚В Р В Р’ВµР РЋР С“Р В РЎвЂ.',
       ],
     },
   ];
@@ -14151,7 +14151,7 @@ app.get('/help', requireLogin, async (req, res) => {
       return supportHelpers.buildSupportRequestPreview(row, messages);
     }));
     const supportStats = supportHelpers.summarizeSupportRequests(supportRequests, {
-      responseLabel: lang === 'uk' ? 'до 1 робочого дня' : 'within 1 business day',
+      responseLabel: lang === 'uk' ? 'Р В РўвЂР В РЎвЂў 1 Р РЋР вЂљР В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РўвЂР В Р вЂ¦Р РЋР РЏ' : 'within 1 business day',
     });
     let inboxFeed = [];
     let inboxSummary = null;
@@ -14224,7 +14224,7 @@ app.post('/help/support/:id/reply', requireLogin, writeLimiter, async (req, res)
     .trim();
 
   if (!Number.isInteger(requestId) || requestId < 1 || replyBody.length < 2 || replyBody.length > 2000) {
-    return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Перевірте текст відповіді' : 'Check the reply text')}`);
+    return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР РЋРІР‚вЂњ' : 'Check the reply text')}`);
   }
 
   try {
@@ -14255,10 +14255,10 @@ app.post('/help/support/:id/reply', requireLogin, writeLimiter, async (req, res)
     logAction(db, req, 'support_request_reply', {
       request_id: requestId,
     });
-    return res.redirect(`/help?ok=${encodeURIComponent(lang === 'uk' ? 'Відповідь додано' : 'Reply sent')}`);
+    return res.redirect(`/help?ok=${encodeURIComponent(lang === 'uk' ? 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР РЋР Р‰ Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў' : 'Reply sent')}`);
   } catch (err) {
     if (isDbSchemaCompatibilityError(err)) {
-      return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Потік підтримки недоступний у цій схемі БД' : 'Support thread storage is unavailable in this DB schema')}`);
+      return res.redirect(`/help?err=${encodeURIComponent(lang === 'uk' ? 'Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњР В РЎвЂќ Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂР РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎВР В РЎвЂќР В РЎвЂ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРЎвЂњ Р РЋРІР‚В Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р РЋРІР‚В¦Р В Р’ВµР В РЎВР РЋРІР‚вЂњ Р В РІР‚ВР В РІР‚Сњ' : 'Support thread storage is unavailable in this DB schema')}`);
     }
     return handleDbError(res, err, 'help.support.reply');
   }
@@ -17079,7 +17079,7 @@ async function getMyDayReviewSubjects({ userId, courseId, roleKeys = [] }) {
       const groupCount = Math.max(1, Number(row.group_count || 1));
       return {
         subject_id: Number(row.id || 0),
-        subject_name: row.name || 'Предмет',
+        subject_name: row.name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
         owner_course_id: Number(row.owner_course_id || row.course_id || courseId || 0) || null,
         has_all_groups: true,
         group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
@@ -17103,7 +17103,7 @@ async function getMyDayReviewSubjects({ userId, courseId, roleKeys = [] }) {
     if (!bySubject.has(subjectId)) {
       bySubject.set(subjectId, {
         subject_id: subjectId,
-        subject_name: row.subject_name || 'Предмет',
+        subject_name: row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
         group_count: Math.max(1, Number(row.group_count || 1)),
         owner_course_id: Number(row.owner_course_id || row.course_id || courseId || 0) || null,
         has_all_groups: false,
@@ -17183,7 +17183,7 @@ async function buildMyDayReviewQueue({
       const student = row?.student || {};
       const studentId = Number(student.id || 0);
       if (!Number.isFinite(studentId) || studentId < 1) return;
-      const studentName = String(student.full_name || '').trim() || 'Студент';
+      const studentName = String(student.full_name || '').trim() || 'Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™';
       const studentGroup = Number(student.group_number || 0);
       const cells = Array.isArray(row?.cells) ? row.cells : [];
       cells.forEach((cell, index) => {
@@ -17219,12 +17219,12 @@ async function buildMyDayReviewQueue({
           queue_key: queueKey,
           queue_type: queueType,
           subject_id: subjectId,
-          subject_name: subject.subject_name || 'Предмет',
+          subject_name: subject.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
           student_id: studentId,
           student_name: studentName,
           student_group: Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
           column_id: columnId,
-          column_title: String(column.title || 'Колонка'),
+          column_title: String(column.title || 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В°'),
           max_points: Number(column.max_points || 0),
           score: hasScore ? Number(cell.score) : null,
           teacher_comment: String(cell.teacher_comment || ''),
@@ -17339,7 +17339,7 @@ async function buildAdminHomeworkReviewSla({
     `
       SELECT
         h.subject_id,
-        COALESCE(s.name, 'Предмет') AS subject_name,
+        COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
         COUNT(*)::int AS submissions_total,
         COUNT(*) FILTER (WHERE jg.id IS NULL)::int AS ungraded_total,
         COUNT(*) FILTER (
@@ -17362,7 +17362,7 @@ async function buildAdminHomeworkReviewSla({
         AND h.course_id = ANY(?::int[])
         ${semesterClause}
         AND u.course_id = ?
-        AND COALESCE(h.is_teacher_homework, 0) = 1
+        AND ${buildTruthyTextCondition('h.is_teacher_homework')}
       GROUP BY h.subject_id, s.name
       ORDER BY overdue_ungraded_total DESC, ungraded_total DESC, subject_name ASC
     `,
@@ -17378,7 +17378,7 @@ async function buildAdminHomeworkReviewSla({
       : 0;
     return {
       subject_id: Number(row.subject_id || 0),
-      subject_name: String(row.subject_name || 'Предмет'),
+      subject_name: String(row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'),
       submissions_total: Number(row.submissions_total || 0),
       ungraded_total: Number(row.ungraded_total || 0),
       overdue_ungraded_total: Number(row.overdue_ungraded_total || 0),
@@ -17602,7 +17602,7 @@ const sendJournalPlainFallback = (res) => {
     .status(200)
     .type('html')
     .send(
-      '<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Журнал</title></head><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;padding:24px;line-height:1.45"><h1 style="margin:0 0 8px">Журнал у режимі сумісності</h1><p style="margin:0 0 16px">Сторінка тимчасово спрощена через несумісну структуру БД. Оновіть міграції та перезавантажте сервіс.</p><p style="margin:0"><a href="/journal">Оновити</a></p></body></html>'
+      '<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»</title></head><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;padding:24px;line-height:1.45"><h1 style="margin:0 0 8px">Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В» Р РЋРЎвЂњ Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВР РЋРІР‚вЂњ Р РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ</h1><p style="margin:0 0 16px">Р В Р Р‹Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР В Р’В° Р РЋРІР‚С™Р В РЎвЂР В РЎВР РЋРІР‚РЋР В Р’В°Р РЋР С“Р В РЎвЂўР В Р вЂ Р В РЎвЂў Р РЋР С“Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В Р’В° Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р В Р вЂ¦Р В Р’ВµР РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р РЋРЎвЂњ Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В РЎвЂќР РЋРІР‚С™Р РЋРЎвЂњР РЋР вЂљР РЋРЎвЂњ Р В РІР‚ВР В РІР‚Сњ. Р В РЎвЂєР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎВР РЋРІР‚вЂњР В РЎвЂ“Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р РЋРІР‚С™Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В·Р В Р’В°Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р В Р’В¶Р РЋРІР‚С™Р В Р’Вµ Р РЋР С“Р В Р’ВµР РЋР вЂљР В Р вЂ Р РЋРІР‚вЂњР РЋР С“.</p><p style="margin:0"><a href="/journal">Р В РЎвЂєР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ</a></p></body></html>'
     );
 };
 
@@ -17640,8 +17640,8 @@ const buildDataQualityCheck = ({
 
 const buildDataQualityCompatibilityCheck = ({
   key = 'partial_schema_compatibility',
-  title = 'Частина перевірок недоступна',
-  description = 'Деякі діагностичні запити пропущено, показано частковий результат.',
+  title = 'Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂўР В РЎвЂќ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В Р’В°',
+  description = 'Р В РІР‚СњР В Р’ВµР РЋР РЏР В РЎвЂќР РЋРІР‚вЂњ Р В РўвЂР РЋРІР‚вЂњР В Р’В°Р В РЎвЂ“Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚вЂњ Р В Р’В·Р В Р’В°Р В РЎвЂ”Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ”Р РЋРЎвЂњР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў, Р В РЎвЂ”Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р РЋРІР‚РЋР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В Р’ВµР В Р’В·Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚С™.',
   examples = [],
 } = {}) => buildDataQualityCheck({
   key,
@@ -17761,7 +17761,7 @@ async function buildAdminDataQualityDiagnostics({
           WHERE h.subject_id = ANY(?::int[])
             AND h.course_id = ANY(?::int[])
             ${homeworkSemesterClause}
-            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND ${buildTruthyTextCondition('h.is_teacher_homework')}
             AND COALESCE(h.status, 'published') = 'published'
             AND jc.id IS NULL
         `,
@@ -17772,12 +17772,12 @@ async function buildAdminDataQualityDiagnostics({
           SELECT
             h.id AS homework_id,
             h.subject_id,
-            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
             COALESCE(h.group_number, 0)::int AS group_number,
             COALESCE(
               NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''),
               NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''),
-              '—'
+              'Р Р†Р вЂљРІР‚Сњ'
             ) AS due_label,
             LEFT(TRIM(COALESCE(h.description, '')), 80) AS description_preview
           FROM homework h
@@ -17786,7 +17786,7 @@ async function buildAdminDataQualityDiagnostics({
           WHERE h.subject_id = ANY(?::int[])
             AND h.course_id = ANY(?::int[])
             ${homeworkSemesterClause}
-            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND ${buildTruthyTextCondition('h.is_teacher_homework')}
             AND COALESCE(h.status, 'published') = 'published'
             AND jc.id IS NULL
           ORDER BY h.created_at DESC
@@ -17799,12 +17799,12 @@ async function buildAdminDataQualityDiagnostics({
           WITH grouped AS (
             SELECT
               h.subject_id,
-              COALESCE(s.name, 'Предмет') AS subject_name,
+              COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
               COALESCE(h.group_number, 0)::int AS group_number,
               COALESCE(
                 NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''),
                 NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''),
-                '—'
+                'Р Р†Р вЂљРІР‚Сњ'
               ) AS due_label,
               COALESCE(h.class_number, 0)::int AS class_number,
               COUNT(*)::int AS duplicates
@@ -17813,7 +17813,7 @@ async function buildAdminDataQualityDiagnostics({
             WHERE h.subject_id = ANY(?::int[])
               AND h.course_id = ANY(?::int[])
               ${homeworkSemesterClause}
-              AND COALESCE(h.is_teacher_homework, 0) = 1
+              AND ${buildTruthyTextCondition('h.is_teacher_homework')}
               AND COALESCE(h.status, 'published') = 'published'
             GROUP BY
               h.subject_id,
@@ -17822,13 +17822,13 @@ async function buildAdminDataQualityDiagnostics({
               COALESCE(
                 NULLIF(TRIM(CAST(h.class_date AS TEXT)), ''),
                 NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''),
-                '—'
+                'Р Р†Р вЂљРІР‚Сњ'
               ),
               COALESCE(h.class_number, 0),
               LOWER(REGEXP_REPLACE(TRIM(COALESCE(h.description, '')), '\\s+', ' ', 'g')),
               COALESCE(h.is_control, 0),
               COALESCE(h.is_credit, 0),
-              COALESCE(h.is_custom_deadline, 0)
+              ${buildFalsyTextCondition('h.is_custom_deadline')}
             HAVING COUNT(*) > 1
           )
           SELECT
@@ -17864,8 +17864,8 @@ async function buildAdminDataQualityDiagnostics({
           SELECT
             jc.id,
             jc.subject_id,
-            COALESCE(s.name, 'Предмет') AS subject_name,
-            COALESCE(jc.title, 'Колонка') AS title
+            COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
+            COALESCE(jc.title, 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В°') AS title
           FROM journal_columns jc
           LEFT JOIN subjects s ON s.id = jc.subject_id
           WHERE jc.subject_id = ANY(?::int[])
@@ -17884,7 +17884,7 @@ async function buildAdminDataQualityDiagnostics({
           WITH grouped AS (
             SELECT
               jc.subject_id,
-              COALESCE(s.name, 'Предмет') AS subject_name,
+              COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
               LOWER(TRIM(COALESCE(jc.title, ''))) AS title_key,
               COALESCE(jc.column_type, 'custom') AS column_type,
               COALESCE(jc.max_points, 0)::numeric(8, 2) AS max_points,
@@ -17921,7 +17921,7 @@ async function buildAdminDataQualityDiagnostics({
         `
           SELECT
             sg.subject_id,
-            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
             COALESCE(s.group_count, 1)::int AS max_group,
             sg.group_number::int AS group_number,
             COUNT(*)::int AS rows_count,
@@ -17955,7 +17955,7 @@ async function buildAdminDataQualityDiagnostics({
           if (!grouped.has(key)) {
             grouped.set(key, {
               subject_id: Number(row.subject_id || 0) || null,
-              subject_name: String(row.subject_name || 'Предмет'),
+              subject_name: String(row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'),
               max_group: maxGroup,
               group_number: groupNumber,
               rows_count: 0,
@@ -17978,7 +17978,7 @@ async function buildAdminDataQualityDiagnostics({
         `
           SELECT
             sgs.subject_id,
-            COALESCE(s.name, 'Предмет') AS subject_name,
+            COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
             ROUND((
               (CASE WHEN COALESCE(sgs.homework_enabled, 1) = 1 THEN COALESCE(sgs.homework_weight_points, 0) ELSE 0 END) +
               (CASE WHEN COALESCE(sgs.seminar_enabled, 1) = 1 THEN COALESCE(sgs.seminar_weight_points, 0) ELSE 0 END) +
@@ -18028,23 +18028,23 @@ async function buildAdminDataQualityDiagnostics({
     const items = [];
     items.push(buildDataQualityCheck({
       key: 'teacher_homework_without_journal_column',
-      title: 'Викладацьке ДЗ без колонки журналу',
+      title: 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В Р’Вµ Р В РІР‚СњР В РІР‚вЂќ Р В Р’В±Р В Р’ВµР В Р’В· Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ',
       severity: 'critical',
-      description: 'ДЗ створене, але автоматична колонка журналу відсутня.',
+      description: 'Р В РІР‚СњР В РІР‚вЂќ Р РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂўР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В Р’Вµ, Р В Р’В°Р В Р’В»Р В Р’Вµ Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В Р’В° Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В° Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР РЋР С“Р РЋРЎвЂњР РЋРІР‚С™Р В Р вЂ¦Р РЋР РЏ.',
       count: Number(missingJournalCountRow?.count || 0),
       subjectIds: parseDbIntegerArray(missingJournalCountRow?.subject_ids),
       examples: (missingJournalRows || []).map((row) => {
-        const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
-        const dueLabel = row.due_label ? String(row.due_label) : '—';
-        return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${dueLabel} · #${Number(row.homework_id || 0)}`;
+        const groupLabel = Number(row.group_number || 0) > 0 ? `Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${row.group_number}` : 'Р В Р вЂ Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ';
+        const dueLabel = row.due_label ? String(row.due_label) : 'Р Р†Р вЂљРІР‚Сњ';
+        return `${row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'} Р вЂ™Р’В· ${groupLabel} Р вЂ™Р’В· ${dueLabel} Р вЂ™Р’В· #${Number(row.homework_id || 0)}`;
       }),
     }));
 
     items.push(buildDataQualityCheck({
       key: 'duplicate_teacher_homework',
-      title: 'Дублі викладацьких ДЗ',
+      title: 'Р В РІР‚СњР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР РЋРІР‚В¦ Р В РІР‚СњР В РІР‚вЂќ',
       severity: 'warning',
-      description: 'Підозра на подвійне створення однакових завдань.',
+      description: 'Р В РЎСџР РЋРІР‚вЂњР В РўвЂР В РЎвЂўР В Р’В·Р РЋР вЂљР В Р’В° Р В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РўвЂР В Р вЂ Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В Р вЂ¦Р В Р’Вµ Р РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂўР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В Р’В°Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚В¦ Р В Р’В·Р В Р’В°Р В Р вЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋР Р‰.',
       count: Number(duplicateTeacherHomeworkRows && duplicateTeacherHomeworkRows[0]
         ? duplicateTeacherHomeworkRows[0].extra_total
         : 0),
@@ -18056,29 +18056,29 @@ async function buildAdminDataQualityDiagnostics({
         )
       ),
       examples: (duplicateTeacherHomeworkRows || []).map((row) => {
-        const groupLabel = Number(row.group_number || 0) > 0 ? `група ${row.group_number}` : 'всі групи';
-        const classLabel = Number(row.class_number || 0) > 0 ? `пара ${row.class_number}` : 'без пари';
-        return `${row.subject_name || 'Предмет'} · ${groupLabel} · ${row.due_label || '—'} · ${classLabel} · x${Number(row.duplicates || 0)}`;
+        const groupLabel = Number(row.group_number || 0) > 0 ? `Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${row.group_number}` : 'Р В Р вЂ Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ';
+        const classLabel = Number(row.class_number || 0) > 0 ? `Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В° ${row.class_number}` : 'Р В Р’В±Р В Р’ВµР В Р’В· Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В РЎвЂ';
+        return `${row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'} Р вЂ™Р’В· ${groupLabel} Р вЂ™Р’В· ${row.due_label || 'Р Р†Р вЂљРІР‚Сњ'} Р вЂ™Р’В· ${classLabel} Р вЂ™Р’В· x${Number(row.duplicates || 0)}`;
       }),
     }));
 
     items.push(buildDataQualityCheck({
       key: 'orphan_homework_journal_columns',
-      title: 'Колонки типу homework без source_homework_id',
+      title: 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р РЋРІР‚С™Р В РЎвЂР В РЎвЂ”Р РЋРЎвЂњ homework Р В Р’В±Р В Р’ВµР В Р’В· source_homework_id',
       severity: 'critical',
-      description: 'Колонка журналу не прив’язана до первинного ДЗ.',
+      description: 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В° Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В Р’В° Р В РўвЂР В РЎвЂў Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р вЂ Р В РЎвЂР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РІР‚СњР В РІР‚вЂќ.',
       count: Number(orphanHomeworkColumnCountRow?.count || 0),
       subjectIds: parseDbIntegerArray(orphanHomeworkColumnCountRow?.subject_ids),
       examples: (orphanHomeworkColumnRows || []).map((row) => (
-        `${row.subject_name || 'Предмет'} · ${row.title || 'Колонка'} · #${Number(row.id || 0)}`
+        `${row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'} Р вЂ™Р’В· ${row.title || 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В°'} Р вЂ™Р’В· #${Number(row.id || 0)}`
       )),
     }));
 
     items.push(buildDataQualityCheck({
       key: 'duplicate_manual_journal_columns',
-      title: 'Дублі ручних колонок журналу',
+      title: 'Р В РІР‚СњР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В РЎвЂќ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ',
       severity: 'warning',
-      description: 'У межах предмета знайдено однакові ручні колонки.',
+      description: 'Р В Р в‚¬ Р В РЎВР В Р’ВµР В Р’В¶Р В Р’В°Р РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В Р’В°Р В РЎвЂќР В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В РЎвЂ.',
       count: Number(duplicateManualColumnsRows && duplicateManualColumnsRows[0]
         ? duplicateManualColumnsRows[0].extra_total
         : 0),
@@ -18090,16 +18090,16 @@ async function buildAdminDataQualityDiagnostics({
         )
       ),
       examples: (duplicateManualColumnsRows || []).map((row) => {
-        const title = String(row.title_key || '').trim() || 'без назви';
-        return `${row.subject_name || 'Предмет'} · ${title} · ${row.column_type || 'custom'} · x${Number(row.duplicates || 0)}`;
+        const title = String(row.title_key || '').trim() || 'Р В Р’В±Р В Р’ВµР В Р’В· Р В Р вЂ¦Р В Р’В°Р В Р’В·Р В Р вЂ Р В РЎвЂ';
+        return `${row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'} Р вЂ™Р’В· ${title} Р вЂ™Р’В· ${row.column_type || 'custom'} Р вЂ™Р’В· x${Number(row.duplicates || 0)}`;
       }),
     }));
 
     items.push(buildDataQualityCheck({
       key: 'invalid_student_group_numbers',
-      title: 'Некоректні групи студентів',
+      title: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ ',
       severity: 'warning',
-      description: 'group_number виходить за діапазон предмета.',
+      description: 'group_number Р В Р вЂ Р В РЎвЂР РЋРІР‚В¦Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В Р’В·Р В Р’В° Р В РўвЂР РЋРІР‚вЂњР В Р’В°Р В РЎвЂ”Р В Р’В°Р В Р’В·Р В РЎвЂўР В Р вЂ¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В°.',
       count: Number(invalidStudentGroupRows && invalidStudentGroupRows[0]
         ? invalidStudentGroupRows[0].affected_rows_total
         : 0),
@@ -18111,15 +18111,15 @@ async function buildAdminDataQualityDiagnostics({
         )
       ),
       examples: (invalidStudentGroupRows || []).map((row) => (
-        `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · студентів ${Number(row.rows_count || 0)}`
+        `${row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'} Р вЂ™Р’В· group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} Р вЂ™Р’В· Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  ${Number(row.rows_count || 0)}`
       )),
     }));
 
     items.push(buildDataQualityCheck({
       key: 'invalid_teacher_subject_groups',
-      title: 'Некоректні групи у зв’язках викладач-предмет',
+      title: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ Р РЋРЎвЂњ Р В Р’В·Р В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР В Р’В°Р РЋРІР‚В¦ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ-Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
       severity: 'warning',
-      description: 'У legacy teacher assignment mirror записано group_number поза межами предмета.',
+      description: 'Р В Р в‚¬ legacy teacher assignment mirror Р В Р’В·Р В Р’В°Р В РЎвЂ”Р В РЎвЂР РЋР С“Р В Р’В°Р В Р вЂ¦Р В РЎвЂў group_number Р В РЎвЂ”Р В РЎвЂўР В Р’В·Р В Р’В° Р В РЎВР В Р’ВµР В Р’В¶Р В Р’В°Р В РЎВР В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В°.',
       count: Number(invalidTeacherGroupRows && invalidTeacherGroupRows[0]
         ? invalidTeacherGroupRows[0].affected_rows_total
         : 0),
@@ -18131,15 +18131,15 @@ async function buildAdminDataQualityDiagnostics({
         )
       ),
       examples: (invalidTeacherGroupRows || []).map((row) => (
-        `${row.subject_name || 'Предмет'} · group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} · зв’язків ${Number(row.rows_count || 0)}`
+        `${row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'} Р вЂ™Р’В· group ${Number(row.group_number || 0)} / max ${Number(row.max_group || 1)} Р вЂ™Р’В· Р В Р’В·Р В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР РЋРІР‚вЂњР В Р вЂ  ${Number(row.rows_count || 0)}`
       )),
     }));
 
     items.push(buildDataQualityCheck({
       key: 'grading_weights_not_100',
-      title: 'Вага оцінювання не дорівнює 100',
+      title: 'Р В РІР‚в„ўР В Р’В°Р В РЎвЂ“Р В Р’В° Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В Р вЂ¦Р В Р’Вµ Р В РўвЂР В РЎвЂўР РЋР вЂљР РЋРІР‚вЂњР В Р вЂ Р В Р вЂ¦Р РЋР вЂ№Р РЋРІР‚Сњ 100',
       severity: 'warning',
-      description: 'Сума активних внесків у фінал має бути рівно 100.',
+      description: 'Р В Р Р‹Р РЋРЎвЂњР В РЎВР В Р’В° Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В Р вЂ Р В Р вЂ¦Р В Р’ВµР РЋР С“Р В РЎвЂќР РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњ Р РЋРІР‚С›Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р В Р’В» Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р’В±Р РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂ Р РЋР вЂљР РЋРІР‚вЂњР В Р вЂ Р В Р вЂ¦Р В РЎвЂў 100.',
       count: Number(gradingWeightMismatchRows && gradingWeightMismatchRows[0]
         ? gradingWeightMismatchRows[0].rows_total
         : 0),
@@ -18151,7 +18151,7 @@ async function buildAdminDataQualityDiagnostics({
         )
       ),
       examples: (gradingWeightMismatchRows || []).map((row) => (
-        `${row.subject_name || 'Предмет'} · активна сума ${Number(row.active_weight_sum || 0)} / 100`
+        `${row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'} Р вЂ™Р’В· Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В Р’В° Р РЋР С“Р РЋРЎвЂњР В РЎВР В Р’В° ${Number(row.active_weight_sum || 0)} / 100`
       )),
     }));
 
@@ -18159,7 +18159,7 @@ async function buildAdminDataQualityDiagnostics({
       result.partial = true;
       const fallbackExamples = Array.from(
         new Set([
-          `Пропущено перевірок: ${compatibilityFallbacks}`,
+          `Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂ”Р РЋРЎвЂњР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂўР В РЎвЂќ: ${compatibilityFallbacks}`,
           ...fallbackMessages.slice(0, 3),
         ].filter(Boolean))
       );
@@ -18176,15 +18176,15 @@ async function buildAdminDataQualityDiagnostics({
     result.partial = true;
     const compatibilityExamples = Array.from(
       new Set([
-        'Поточна схема БД не підтримує повний набір data quality перевірок.',
+        'Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В Р’В° Р РЋР С“Р РЋРІР‚В¦Р В Р’ВµР В РЎВР В Р’В° Р В РІР‚ВР В РІР‚Сњ Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂР РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎВР РЋРЎвЂњР РЋРІР‚Сњ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’В°Р В Р’В±Р РЋРІР‚вЂњР РЋР вЂљ data quality Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂўР В РЎвЂќ.',
         String(err && err.message ? err.message : err || '').trim().slice(0, 180),
       ].filter(Boolean))
     );
     return finalizeDataQualityDiagnosticsResult(result, [
       buildDataQualityCompatibilityCheck({
         key: 'schema_compatibility_mode',
-        title: 'Data quality у режимі сумісності',
-        description: 'Повний набір перевірок недоступний для поточної схеми БД.',
+        title: 'Data quality Р РЋРЎвЂњ Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВР РЋРІР‚вЂњ Р РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ',
+        description: 'Р В РЎСџР В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’В°Р В Р’В±Р РЋРІР‚вЂњР РЋР вЂљ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂўР В РЎвЂќ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР РЋРІР‚вЂќ Р РЋР С“Р РЋРІР‚В¦Р В Р’ВµР В РЎВР В РЎвЂ Р В РІР‚ВР В РІР‚Сњ.',
         examples: compatibilityExamples,
       }),
     ]);
@@ -18280,7 +18280,7 @@ async function buildCoursePulseAnalytics({
             AND h.course_id = ANY(?::int[])
             ${homeworkSemesterClause}
             AND su.course_id = ?
-            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND ${buildTruthyTextCondition('h.is_teacher_homework')}
             AND COALESCE(h.status, 'published') = 'published'
             AND COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) < ?
             AND NOT EXISTS (
@@ -18328,7 +18328,7 @@ async function buildCoursePulseAnalytics({
           AND h.course_id = ANY(?::int[])
           ${homeworkSemesterClause}
           AND su.course_id = ?
-          AND COALESCE(h.is_teacher_homework, 0) = 1
+          AND ${buildTruthyTextCondition('h.is_teacher_homework')}
       `,
       [
         now.toISOString(),
@@ -18359,7 +18359,7 @@ async function buildCoursePulseAnalytics({
       `
         SELECT
           jc.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
+          COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
           AVG(CASE WHEN jg.graded_at >= ? THEN (jg.score / NULLIF(jc.max_points, 0)) END) AS recent_ratio,
           AVG(CASE WHEN jg.graded_at >= ? AND jg.graded_at < ? THEN (jg.score / NULLIF(jc.max_points, 0)) END) AS previous_ratio,
           COUNT(*) FILTER (WHERE jg.graded_at >= ?)::int AS recent_count,
@@ -18415,7 +18415,7 @@ async function buildCoursePulseAnalytics({
       `
         SELECT
           h.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
+          COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
           COUNT(*)::int AS overdue_homework_total,
           COUNT(DISTINCT sg.student_id)::int AS at_risk_students
         FROM student_groups sg
@@ -18428,7 +18428,7 @@ async function buildCoursePulseAnalytics({
           AND h.course_id = ANY(?::int[])
           ${homeworkSemesterClause}
           AND su.course_id = ?
-          AND COALESCE(h.is_teacher_homework, 0) = 1
+          AND ${buildTruthyTextCondition('h.is_teacher_homework')}
           AND COALESCE(h.status, 'published') = 'published'
           AND COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) < ?
           AND NOT EXISTS (
@@ -18452,7 +18452,7 @@ async function buildCoursePulseAnalytics({
       `
         SELECT
           h.subject_id,
-          COALESCE(s.name, 'Предмет') AS subject_name,
+          COALESCE(s.name, 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') AS subject_name,
           COUNT(*) FILTER (
             WHERE jg.id IS NULL
               AND hs.submitted_at <= (?::timestamptz - (48 * INTERVAL '1 hour'))
@@ -18472,7 +18472,7 @@ async function buildCoursePulseAnalytics({
           AND h.course_id = ANY(?::int[])
           ${homeworkSemesterClause}
           AND su.course_id = ?
-          AND COALESCE(h.is_teacher_homework, 0) = 1
+          AND ${buildTruthyTextCondition('h.is_teacher_homework')}
         GROUP BY h.subject_id, s.name
         ORDER BY sla_overdue_ungraded DESC, subject_name ASC
       `,
@@ -18512,7 +18512,7 @@ async function buildCoursePulseAnalytics({
     const previousPercent = Number.isFinite(previousRatio) ? Math.round(previousRatio * 100) : null;
     bySubject.set(subjectId, {
       subject_id: subjectId,
-      subject_name: String(row.subject_name || 'Предмет'),
+      subject_name: String(row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'),
       recent_score_percent: recentPercent,
       previous_score_percent: previousPercent,
       delta_score_percent: (
@@ -18533,7 +18533,7 @@ async function buildCoursePulseAnalytics({
     if (!bySubject.has(subjectId)) {
       bySubject.set(subjectId, {
         subject_id: subjectId,
-        subject_name: String(row.subject_name || 'Предмет'),
+        subject_name: String(row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'),
         recent_score_percent: null,
         previous_score_percent: null,
         delta_score_percent: null,
@@ -18554,7 +18554,7 @@ async function buildCoursePulseAnalytics({
     if (!bySubject.has(subjectId)) {
       bySubject.set(subjectId, {
         subject_id: subjectId,
-        subject_name: String(row.subject_name || 'Предмет'),
+        subject_name: String(row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'),
         recent_score_percent: null,
         previous_score_percent: null,
         delta_score_percent: null,
@@ -18710,7 +18710,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     if (!whatIfSubjectMap.has(subjectId)) {
       whatIfSubjectMap.set(subjectId, {
         subject_id: subjectId,
-        subject_name: row.subject_name || 'Предмет',
+        subject_name: row.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
       });
     }
   });
@@ -18725,7 +18725,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       if (!teacherCompetencySubjectMap.has(subjectId)) {
         teacherCompetencySubjectMap.set(subjectId, {
           subject_id: subjectId,
-          subject_name: target.subject_name || 'Предмет',
+          subject_name: target.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
         });
       }
     });
@@ -18896,7 +18896,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
 	        : 'AND h.semester_id IS NULL');
 	    const studentHomeworkVisibilityClause = includeStudentHomeworkInMyDay
 	      ? ''
-	      : 'AND COALESCE(h.is_teacher_homework, 0) = 1';
+	      : 'AND ${buildTruthyTextCondition('h.is_teacher_homework')}';
 	    const homeworkCourseClause = workloadOwnerCourseIds.length
 	      ? 'h.course_id = ANY(?::int[])'
 	      : 'h.course_id = ?';
@@ -18948,7 +18948,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       return {
         id: Number(row.id),
         type: 'homework',
-        description: row.description || 'Завдання',
+        description: row.description || 'Р В РІР‚вЂќР В Р’В°Р В Р вЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ',
         subject_id: Number(row.subject_id),
         subject_name: row.subject_name,
         group_number: row.group_number === null ? null : Number(row.group_number),
@@ -19011,7 +19011,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     teamworkDeadlines = (rows || []).map((row) => ({
       id: Number(row.id),
       type: 'teamwork',
-      description: row.title || 'Командна задача',
+      description: row.title || 'Р В РЎв„ўР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р вЂ¦Р В Р’В° Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’В°',
       subject_id: Number(row.subject_id),
       subject_name: row.subject_name,
       deadline_date: row.due_date,
@@ -19259,7 +19259,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           if (!forecast) return null;
           return {
             subject_id: subjectId,
-            subject_name: subject.subject_name || forecast.subject?.name || 'Предмет',
+            subject_name: subject.subject_name || forecast.subject?.name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
             forecast,
           };
         } catch (err) {
@@ -19289,20 +19289,20 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         const remainingColumnsCount = Math.max(0, Number(forecast.remaining_columns_count || 0));
 
         let riskLevel = 'low';
-        let riskReason = 'Стабільний прогрес по предмету.';
+        let riskReason = 'Р В Р Р‹Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’ВµР РЋР С“ Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРЎвЂњ.';
         if (maxReachableFinalScore < admissionTarget) {
           riskLevel = 'high';
-          riskReason = `Навіть максимальний сценарій дає < ${admissionTarget}. Потрібен план із викладачем.`;
+          riskReason = `Р В РЎСљР В Р’В°Р В Р вЂ Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎВР В Р’В°Р В РЎвЂќР РЋР С“Р В РЎвЂР В РЎВР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р РЋРІР‚В Р В Р’ВµР В Р вЂ¦Р В Р’В°Р РЋР вЂљР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РўвЂР В Р’В°Р РЋРІР‚Сњ < ${admissionTarget}. Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р’ВµР В Р вЂ¦ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦ Р РЋРІР‚вЂњР В Р’В· Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’ВµР В РЎВ.`;
         } else if (currentFinalScore < admissionTarget && overdueBySubject > 0) {
           riskLevel = 'high';
-          riskReason = 'Фінал нижче цілі та є прострочені задачі.';
+          riskReason = 'Р В Р’В¤Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р В Р’В» Р В Р вЂ¦Р В РЎвЂР В Р’В¶Р РЋРІР‚РЋР В Р’Вµ Р РЋРІР‚В Р РЋРІР‚вЂњР В Р’В»Р РЋРІР‚вЂњ Р РЋРІР‚С™Р В Р’В° Р РЋРІР‚Сњ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р РЋРІР‚вЂњ Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ.';
         } else if (
           currentFinalScore < admissionTarget
           || overdueBySubject > 0
           || (onTimeShareBySubject !== null && onTimeShareBySubject < STUDENT_RISK_ON_TIME_WARNING_PERCENT)
         ) {
           riskLevel = 'medium';
-          riskReason = 'Потрібно стабілізувати темп здач і добрати бали.';
+          riskReason = 'Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋРІР‚вЂњР В Р’В·Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р В Р’ВµР В РЎВР В РЎвЂ” Р В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚РЋ Р РЋРІР‚вЂњ Р В РўвЂР В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В Р’В±Р В Р’В°Р В Р’В»Р В РЎвЂ.';
         }
 
         const riskScore = riskLevel === 'high' ? 2 : riskLevel === 'medium' ? 1 : 0;
@@ -19376,7 +19376,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
         enabled: true,
         subjects: teacherCompetencySubjects,
         selected_subject_id: selectedTeacherCompetencySubjectId,
-        selected_subject_name: selectedTeacherSubject ? (selectedTeacherSubject.subject_name || 'Предмет') : null,
+        selected_subject_name: selectedTeacherSubject ? (selectedTeacherSubject.subject_name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™') : null,
       };
     }
   }
@@ -19565,7 +19565,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     }));
     supportPreviewItems = detailedSupportRows;
     supportSummary = supportHelpers.summarizeSupportRequests(detailedSupportRows, {
-      responseLabel: preferredMyDayLang === 'en' ? 'within 1 business day' : 'до 1 робочого дня',
+      responseLabel: preferredMyDayLang === 'en' ? 'within 1 business day' : 'Р В РўвЂР В РЎвЂў 1 Р РЋР вЂљР В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РўвЂР В Р вЂ¦Р РЋР РЏ',
     });
   } catch (err) {
     if (!isDbSchemaCompatibilityError(err)) {
@@ -19607,7 +19607,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           href: '/teacher',
         },
         {
-          label: preferredMyDayLang === 'en' ? 'Templates & assets' : 'Шаблони й assets',
+          label: preferredMyDayLang === 'en' ? 'Templates & assets' : 'Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂ Р В РІвЂћвЂ“ assets',
           href: '/teacher/workspace',
         },
         {
@@ -19625,46 +19625,46 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   if (overdueCount > 0) {
     inboxItems.push({
       kind: 'risk',
-      title: `Прострочено: ${overdueCount}`,
-      meta: 'Закрий прострочки, щоб не втратити темп',
+      title: `Р В РЎСџР РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂў: ${overdueCount}`,
+      meta: 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В РЎвЂќР В РЎвЂ, Р РЋРІР‚В°Р В РЎвЂўР В Р’В± Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р В Р’ВµР В РЎВР В РЎвЂ”',
       action_href: '/home#deadlinesBlock',
-      action_label: 'До дедлайнів',
+      action_label: 'Р В РІР‚СњР В РЎвЂў Р В РўвЂР В Р’ВµР В РўвЂР В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ ',
     });
   }
   if (dueSoonCount > 0) {
     inboxItems.push({
       kind: 'focus',
-      title: `На 48 год: ${dueSoonCount}`,
-      meta: 'Найближчі завдання потребують уваги',
+      title: `Р В РЎСљР В Р’В° 48 Р В РЎвЂ“Р В РЎвЂўР В РўвЂ: ${dueSoonCount}`,
+      meta: 'Р В РЎСљР В Р’В°Р В РІвЂћвЂ“Р В Р’В±Р В Р’В»Р В РЎвЂР В Р’В¶Р РЋРІР‚РЋР РЋРІР‚вЂњ Р В Р’В·Р В Р’В°Р В Р вЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В Р’В±Р РЋРЎвЂњР РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В РЎвЂ“Р В РЎвЂ',
       action_href: '/home#deadlinesBlock',
-      action_label: 'Відкрити',
+      action_label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ',
     });
   }
   if (feedbackCount > 0) {
     inboxItems.push({
       kind: 'update',
-      title: `Новий фідбек: ${feedbackCount}`,
-      meta: 'Оновлені оцінки за 14 днів',
+      title: `Р В РЎСљР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С›Р РЋРІР‚вЂњР В РўвЂР В Р’В±Р В Р’ВµР В РЎвЂќ: ${feedbackCount}`,
+      meta: 'Р В РЎвЂєР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р В Р’В·Р В Р’В° 14 Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ ',
       action_href: '/journal',
-      action_label: 'До журналу',
+      action_label: 'Р В РІР‚СњР В РЎвЂў Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ',
     });
   }
   if (nextClass) {
     inboxItems.push({
       kind: 'class',
-      title: `Найближча пара: ${nextClass.subject_name}`,
+      title: `Р В РЎСљР В Р’В°Р В РІвЂћвЂ“Р В Р’В±Р В Р’В»Р В РЎвЂР В Р’В¶Р РЋРІР‚РЋР В Р’В° Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В°: ${nextClass.subject_name}`,
       meta: `${nextClass.start} - ${nextClass.end}`,
       action_href: '/schedule',
-      action_label: 'Розклад',
+      action_label: 'Р В Р’В Р В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ',
     });
   }
   if (openReminders > 0) {
     inboxItems.push({
       kind: 'reminder',
-      title: `Активні нагадування: ${openReminders}`,
-      meta: 'Не забудь перевірити особистий список',
+      title: `Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р В Р’В°Р В РўвЂР РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ: ${openReminders}`,
+      meta: 'Р В РЎСљР В Р’Вµ Р В Р’В·Р В Р’В°Р В Р’В±Р РЋРЎвЂњР В РўвЂР РЋР Р‰ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р’В±Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В РЎвЂ”Р В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќ',
       action_href: '/home#inboxBlock',
-      action_label: 'Перевірити',
+      action_label: 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ',
     });
   }
   if (latestRatingSnapshot && latestRatingSnapshot.top_entry) {
@@ -19672,7 +19672,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       kind: 'update',
       title: preferredMyDayLang === 'en'
         ? `Latest rating: ${latestRatingSnapshot.scope_label}`
-        : `Останній рейтинг: ${latestRatingSnapshot.scope_label}`,
+        : `Р В РЎвЂєР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР вЂљР В Р’ВµР В РІвЂћвЂ“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В РЎвЂ“: ${latestRatingSnapshot.scope_label}`,
       meta: [
         latestRatingSnapshot.target_label || '',
         latestRatingSnapshot.period_label || '',
@@ -19681,12 +19681,12 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           ? (
             preferredMyDayLang === 'en'
               ? `Leader: ${latestRatingSnapshot.top_entry.full_name}`
-              : `Лідер: ${latestRatingSnapshot.top_entry.full_name}`
+              : `Р В РІР‚С”Р РЋРІР‚вЂњР В РўвЂР В Р’ВµР РЋР вЂљ: ${latestRatingSnapshot.top_entry.full_name}`
           )
           : '',
-      ].filter(Boolean).join(' · '),
+      ].filter(Boolean).join(' Р вЂ™Р’В· '),
       action_href: '/journal/insights',
-      action_label: preferredMyDayLang === 'en' ? 'Open insights' : 'До insights',
+      action_label: preferredMyDayLang === 'en' ? 'Open insights' : 'Р В РІР‚СњР В РЎвЂў insights',
     });
   }
   if (inboxMessageSummary && Number(inboxMessageSummary.fresh_unread || 0) > 0) {
@@ -19694,24 +19694,24 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       kind: 'focus',
       title: preferredMyDayLang === 'en'
         ? `Unread updates: ${inboxMessageSummary.fresh_unread}`
-        : `Непрочитані оновлення: ${inboxMessageSummary.fresh_unread}`,
+        : `Р В РЎСљР В Р’ВµР В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ: ${inboxMessageSummary.fresh_unread}`,
       meta: preferredMyDayLang === 'en'
         ? 'Broadcast, group, subject, and direct updates stay in the schedule inbox. Support stays in Help.'
-        : 'Загальні, групові, предметні й адресні оновлення живуть в inbox розкладу, а підтримка лишається окремо в Help.',
+        : 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂ“Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњ, Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњ, Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РІвЂћвЂ“ Р В Р’В°Р В РўвЂР РЋР вЂљР В Р’ВµР РЋР С“Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В Р’В¶Р В РЎвЂР В Р вЂ Р РЋРЎвЂњР РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ  inbox Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ, Р В Р’В° Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂР РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В РЎВР В РЎвЂќР В Р’В° Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р’В°Р РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В РЎвЂўР В РЎвЂќР РЋР вЂљР В Р’ВµР В РЎВР В РЎвЂў Р В Р вЂ  Help.',
       action_href: '/schedule?panel=messages',
-      action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
+      action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ inbox',
     });
   } else if (inboxMessageSummary && Number(inboxMessageSummary.fresh || 0) > 0) {
     inboxItems.push({
       kind: 'update',
       title: preferredMyDayLang === 'en'
         ? `Recent inbox updates: ${inboxMessageSummary.fresh}`
-        : `Свіжі inbox-оновлення: ${inboxMessageSummary.fresh}`,
+        : `Р В Р Р‹Р В Р вЂ Р РЋРІР‚вЂњР В Р’В¶Р РЋРІР‚вЂњ inbox-Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ: ${inboxMessageSummary.fresh}`,
       meta: preferredMyDayLang === 'en'
         ? 'Check the latest broadcast, group, subject, and direct updates.'
-        : 'Перевір останні загальні, групові, предметні й адресні оновлення.',
+        : 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљ Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚вЂњ Р В Р’В·Р В Р’В°Р В РЎвЂ“Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњ, Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњ, Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РІвЂћвЂ“ Р В Р’В°Р В РўвЂР РЋР вЂљР В Р’ВµР РЋР С“Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ.',
       action_href: '/schedule?panel=messages',
-      action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Відкрити inbox',
+      action_label: preferredMyDayLang === 'en' ? 'Open inbox' : 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ inbox',
     });
   }
 
@@ -19720,100 +19720,100 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       kind: 'focus',
       title: preferredMyDayLang === 'en'
         ? `Support in progress: ${supportSummary.open}`
-        : `Активні звернення: ${supportSummary.open}`,
+        : `Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњ Р В Р’В·Р В Р вЂ Р В Р’ВµР РЋР вЂљР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ: ${supportSummary.open}`,
       meta: preferredMyDayLang === 'en'
         ? 'Reply in the help thread if context changed'
-        : 'Відпиши у треді help, якщо контекст змінився',
+        : 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂР РЋРІвЂљВ¬Р В РЎвЂ Р РЋРЎвЂњ Р РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В РўвЂР РЋРІР‚вЂњ help, Р РЋР РЏР В РЎвЂќР РЋРІР‚В°Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™ Р В Р’В·Р В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂР В Р вЂ Р РЋР С“Р РЋР РЏ',
       action_href: '/help',
-      action_label: preferredMyDayLang === 'en' ? 'Open help' : 'Відкрити help',
+      action_label: preferredMyDayLang === 'en' ? 'Open help' : 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ help',
     });
   }
   if (!inboxItems.length) {
     inboxItems.push({
       kind: 'ok',
-      title: 'Стабільний темп',
-      meta: 'Критичних сигналів зараз немає',
+      title: 'Р В Р Р‹Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С™Р В Р’ВµР В РЎВР В РЎвЂ”',
+      meta: 'Р В РЎв„ўР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋР С“Р В РЎвЂР В РЎвЂ“Р В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В·Р В Р’В°Р РЋР вЂљР В Р’В°Р В Р’В· Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ',
       action_href: '/schedule',
-      action_label: 'Розклад',
+      action_label: 'Р В Р’В Р В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ',
     });
   }
 
   let brief = {
     tone: 'calm',
-    title: 'Твій день під контролем',
-    message: 'Система не бачить критичних ризиків. Тримай темп і закривай задачі в дедлайн.',
-    action_label: 'Відкрити розклад',
+    title: 'Р В РЎС›Р В Р вЂ Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰ Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В Р’В»Р В Р’ВµР В РЎВ',
+    message: 'Р В Р Р‹Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’ВµР В РЎВР В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р’В±Р В Р’В°Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќР РЋРІР‚вЂњР В Р вЂ . Р В РЎС›Р РЋР вЂљР В РЎвЂР В РЎВР В Р’В°Р В РІвЂћвЂ“ Р РЋРІР‚С™Р В Р’ВµР В РЎВР В РЎвЂ” Р РЋРІР‚вЂњ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР В Р вЂ Р В Р’В°Р В РІвЂћвЂ“ Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ Р В Р вЂ  Р В РўвЂР В Р’ВµР В РўвЂР В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦.',
+    action_label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ',
     action_href: '/schedule',
-    reasons: ['Критичних прострочок немає', 'Темп здач стабільний'],
+    reasons: ['Р В РЎв„ўР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В РЎвЂўР В РЎвЂќ Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ', 'Р В РЎС›Р В Р’ВµР В РЎВР В РЎвЂ” Р В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚РЋ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“'],
   };
 
   if (!studentHasOwnSubjects && isStaffRole) {
     brief = {
       tone: 'focus',
-      title: 'Оперативний зріз по дисциплінах',
-      message: `У фокусі ${workloadTargets.length || 0} предметів, найближчих подій: ${deadlinesFocus.length}.`,
-      action_label: 'Відкрити розклад',
+      title: 'Р В РЎвЂєР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В·Р РЋР вЂљР РЋРІР‚вЂњР В Р’В· Р В РЎвЂ”Р В РЎвЂў Р В РўвЂР В РЎвЂР РЋР С“Р РЋРІР‚В Р В РЎвЂР В РЎвЂ”Р В Р’В»Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р РЋРІР‚В¦',
+      message: `Р В Р в‚¬ Р РЋРІР‚С›Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР РЋР С“Р РЋРІР‚вЂњ ${workloadTargets.length || 0} Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ , Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В Р’В±Р В Р’В»Р В РЎвЂР В Р’В¶Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“: ${deadlinesFocus.length}.`,
+      action_label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ',
       action_href: '/schedule',
       reasons: [
-        `Пари на сьогодні/завтра: ${classesToday.length + classesTomorrow.length}`,
-        `Актуальні дедлайни: ${deadlinesFocus.length}`,
+        `Р В РЎСџР В Р’В°Р РЋР вЂљР В РЎвЂ Р В Р вЂ¦Р В Р’В° Р РЋР С“Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂўР В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњ/Р В Р’В·Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р РЋР вЂљР В Р’В°: ${classesToday.length + classesTomorrow.length}`,
+        `Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р РЋРЎвЂњР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р’ВµР В РўвЂР В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В РЎвЂ: ${deadlinesFocus.length}`,
       ],
     };
   } else if (overdueCount > 0) {
     const subjectHint = riskiestSubject && riskiestSubject.subject_name
-      ? `Почни з ${riskiestSubject.subject_name}.`
-      : 'Почни з найближчого простроченого завдання.';
+      ? `Р В РЎСџР В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂ Р В Р’В· ${riskiestSubject.subject_name}.`
+      : 'Р В РЎСџР В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂ Р В Р’В· Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В Р’В±Р В Р’В»Р В РЎвЂР В Р’В¶Р РЋРІР‚РЋР В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р’В·Р В Р’В°Р В Р вЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ.';
     brief = {
       tone: 'risk',
-      title: 'Є ризик по дедлайнах',
-      message: `Маєш ${overdueCount} прострочених завдань. ${subjectHint}`,
-      action_label: 'Закрити дедлайни',
+      title: 'Р В РІР‚С› Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќ Р В РЎвЂ”Р В РЎвЂў Р В РўвЂР В Р’ВµР В РўвЂР В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В Р’В°Р РЋРІР‚В¦',
+      message: `Р В РЎС™Р В Р’В°Р РЋРІР‚СњР РЋРІвЂљВ¬ ${overdueCount} Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В Р’В·Р В Р’В°Р В Р вЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋР Р‰. ${subjectHint}`,
+      action_label: 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РўвЂР В Р’ВµР В РўвЂР В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В РЎвЂ',
       action_href: '/home#deadlinesBlock',
       reasons: [
-        `Прострочені задачі: ${overdueCount}`,
-        `Предметів у ризику: ${riskySubjectCount}`,
+        `Р В РЎСџР РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р РЋРІР‚вЂњ Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ: ${overdueCount}`,
+        `Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќР РЋРЎвЂњ: ${riskySubjectCount}`,
       ],
     };
   } else if (dueSoonCount > 0) {
     brief = {
       tone: 'focus',
-      title: 'Фокус на найближчі 48 год',
-      message: `Попереду ${dueSoonCount} задач до завтра. Закрий їх зараз, щоб зберегти темп.`,
-      action_label: 'Перейти до здачі',
+      title: 'Р В Р’В¤Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР РЋР С“ Р В Р вЂ¦Р В Р’В° Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В Р’В±Р В Р’В»Р В РЎвЂР В Р’В¶Р РЋРІР‚РЋР РЋРІР‚вЂњ 48 Р В РЎвЂ“Р В РЎвЂўР В РўвЂ',
+      message: `Р В РЎСџР В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂР РЋРЎвЂњ ${dueSoonCount} Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ Р В РўвЂР В РЎвЂў Р В Р’В·Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р РЋР вЂљР В Р’В°. Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚вЂќР РЋРІР‚В¦ Р В Р’В·Р В Р’В°Р РЋР вЂљР В Р’В°Р В Р’В·, Р РЋРІР‚В°Р В РЎвЂўР В Р’В± Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎвЂ“Р РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р В Р’ВµР В РЎВР В РЎвЂ”.`,
+      action_label: 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В РІвЂћвЂ“Р РЋРІР‚С™Р В РЎвЂ Р В РўвЂР В РЎвЂў Р В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ',
       action_href: '/home#deadlinesBlock',
       reasons: [
-        `Задачі до завтра: ${dueSoonCount}`,
-        `Вчасні здачі: ${onTimeShare === null ? '-' : `${onTimeShare}%`}`,
+        `Р В РІР‚вЂќР В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ Р В РўвЂР В РЎвЂў Р В Р’В·Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р РЋР вЂљР В Р’В°: ${dueSoonCount}`,
+        `Р В РІР‚в„ўР РЋРІР‚РЋР В Р’В°Р РЋР С“Р В Р вЂ¦Р РЋРІР‚вЂњ Р В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ: ${onTimeShare === null ? '-' : `${onTimeShare}%`}`,
       ],
     };
   } else if (fastestGrowingCompetency && fastestGrowingCompetency.delta >= 1) {
     brief = {
       tone: 'growth',
-      title: 'Помітний прогрес за останній період',
-      message: `Прокачується ${fastestGrowingCompetency.label} (+${fastestGrowingCompetency.delta}). Тримай цей фокус.`,
-      action_label: 'Переглянути прогрес',
+      title: 'Р В РЎСџР В РЎвЂўР В РЎВР РЋРІР‚вЂњР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’ВµР РЋР С“ Р В Р’В·Р В Р’В° Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР В РЎвЂўР В РўвЂ',
+      message: `Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂќР В Р’В°Р РЋРІР‚РЋР РЋРЎвЂњР РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ ${fastestGrowingCompetency.label} (+${fastestGrowingCompetency.delta}). Р В РЎС›Р РЋР вЂљР В РЎвЂР В РЎВР В Р’В°Р В РІвЂћвЂ“ Р РЋРІР‚В Р В Р’ВµР В РІвЂћвЂ“ Р РЋРІР‚С›Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР РЋР С“.`,
+      action_label: 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В РЎвЂ“Р В Р’В»Р РЋР РЏР В Р вЂ¦Р РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’ВµР РЋР С“',
       action_href: '/home#competencyBlock',
       reasons: [
-        `Сильна сторона: ${strongestCompetency ? strongestCompetency.label : 'н/д'}`,
-        `Відміток компетентностей: ${competencyTotalMarks}`,
+        `Р В Р Р‹Р В РЎвЂР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В Р’В° Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В Р вЂ¦Р В Р’В°: ${strongestCompetency ? strongestCompetency.label : 'Р В Р вЂ¦/Р В РўвЂ'}`,
+        `Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎВР РЋРІР‚вЂњР РЋРІР‚С™Р В РЎвЂўР В РЎвЂќ Р В РЎвЂќР В РЎвЂўР В РЎВР В РЎвЂ”Р В Р’ВµР РЋРІР‚С™Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’ВµР В РІвЂћвЂ“: ${competencyTotalMarks}`,
       ],
     };
   } else if (nextClass) {
     brief = {
       tone: 'calm',
-      title: 'Робочий ритм збережено',
-      message: `Наступна пара: ${nextClass.subject_name} о ${nextClass.start}. Підготуй матеріали заздалегідь.`,
-      action_label: 'До розкладу',
+      title: 'Р В Р’В Р В РЎвЂўР В Р’В±Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎВ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+      message: `Р В РЎСљР В Р’В°Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В°: ${nextClass.subject_name} Р В РЎвЂў ${nextClass.start}. Р В РЎСџР РЋРІР‚вЂњР В РўвЂР В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р РЋРЎвЂњР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР В Р’В°Р В Р’В»Р В РЎвЂ Р В Р’В·Р В Р’В°Р В Р’В·Р В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В РЎвЂ“Р РЋРІР‚вЂњР В РўвЂР РЋР Р‰.`,
+      action_label: 'Р В РІР‚СњР В РЎвЂў Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ',
       action_href: '/schedule',
       reasons: [
-        `Критичних прострочок: ${overdueCount}`,
-        `Ближчі дедлайни: ${deadlinesFocus.length}`,
+        `Р В РЎв„ўР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋРІР‚РЋР В РЎвЂўР В РЎвЂќ: ${overdueCount}`,
+        `Р В РІР‚ВР В Р’В»Р В РЎвЂР В Р’В¶Р РЋРІР‚РЋР РЋРІР‚вЂњ Р В РўвЂР В Р’ВµР В РўвЂР В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В РЎвЂ: ${deadlinesFocus.length}`,
       ],
     };
   }
 
   if (strongestCompetency && Number(strongestCompetency.count || 0) > 0 && brief.tone !== 'risk') {
-    brief.message = `${brief.message} Додатково: ${strongestCompetency.label} зараз серед найсильніших напрямів.`;
+    brief.message = `${brief.message} Р В РІР‚СњР В РЎвЂўР В РўвЂР В Р’В°Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂў: ${strongestCompetency.label} Р В Р’В·Р В Р’В°Р РЋР вЂљР В Р’В°Р В Р’В· Р РЋР С“Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р РЋР С“Р В РЎвЂР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњР РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚В¦ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ”Р РЋР вЂљР РЋР РЏР В РЎВР РЋРІР‚вЂњР В Р вЂ .`;
   }
 
   const defaultWhatIfSubjectId = (
@@ -20024,7 +20024,7 @@ async function buildMyDayWhatIfForecast({
   return {
     subject: {
       id: Number(subjectRow.id),
-      name: subjectRow.name || 'Предмет',
+      name: subjectRow.name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
     },
     current_final_score: normalizedCurrentFinal,
     max_reachable_final_score: normalizedMaxReachable,
@@ -20810,7 +20810,7 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
       Number(homework.course_id || courseId),
       homework.semester_id ? Number(homework.semester_id) : null
     );
-    return res.redirect(redirectWith('ok', 'ДЗ здано'));
+    return res.redirect(redirectWith('ok', 'Р В РІР‚СњР В РІР‚вЂќ Р В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў'));
   } catch (err) {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.redirect(redirectWith('err', 'Database error'));
@@ -20819,10 +20819,10 @@ app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('sub
 
 function detectSessionHomeworkType(description) {
   const text = String(description || '').trim().toLowerCase();
-  if (!text.startsWith('[сесія]')) return null;
-  if (text.includes('консультац')) return 'consultation';
-  if (text.includes('залік')) return 'credit';
-  if (text.includes('екзам')) return 'exam';
+  if (!text.startsWith('[Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ]')) return null;
+  if (text.includes('Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В ')) return 'consultation';
+  if (text.includes('Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ')) return 'credit';
+  if (text.includes('Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВ')) return 'exam';
   return 'session';
 }
 
@@ -21492,15 +21492,15 @@ app.get('/schedule', requireLogin, async (req, res) => {
         const isSeminarLike = lessonType === 'seminar' || lessonType === 'lab' || lessonType === 'practice';
         let groupLabel = '';
         if (isSeminarLike && groups.length === 1) {
-          groupLabel = `Група ${groups[0]}`;
+          groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groups[0]}`;
         } else if (isSeminarLike && groups.length > 1) {
-          groupLabel = `Групи: ${groups.join(', ')}`;
+          groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ: ${groups.join(', ')}`;
         } else if (selection && selection.general) {
-          groupLabel = 'Усі групи';
+          groupLabel = 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ';
         } else if (groups.length === 1) {
-          groupLabel = `Група ${groups[0]}`;
+          groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groups[0]}`;
         } else {
-          groupLabel = `Групи: ${groups.join(', ')}`;
+          groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ: ${groups.join(', ')}`;
         }
         const normalized = {
           ...entry,
@@ -22083,7 +22083,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
     ? (viewAsMode === 'self' ? selfFallbackGroupNumber : (parsePreferredGroupNumber(viewAsGroupNumber) || 1))
     : null;
   const viewAsLabel = isAdminViewAs
-    ? (viewAsMode === 'self' ? 'Ваші групи' : `Група ${effectiveViewAsGroupNumber || 1}`)
+    ? (viewAsMode === 'self' ? 'Р В РІР‚в„ўР В Р’В°Р РЋРІвЂљВ¬Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ' : `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${effectiveViewAsGroupNumber || 1}`)
     : null;
 
   const activeSemester = await getActiveSemester(scheduleCourseId);
@@ -22392,7 +22392,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               totalWeeks,
               semester: activeSemester,
               bellSchedule,
-              group: isAdminViewAs ? `Група ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
+              group: isAdminViewAs ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
               username,
               homework: [],
               homeworkMeta: {},
@@ -22598,7 +22598,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 totalWeeks,
                 semester: activeSemester,
                 bellSchedule,
-                group: isAdminViewAs ? `Група ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
+                group: isAdminViewAs ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
                 username,
                 homework,
                 homeworkMeta,
@@ -22926,7 +22926,7 @@ const buildTeamworkTaskAudience = (task, teacherAccess, maxGroupCount = 1) => {
       lessonScope,
       allowAll: lectureAllowAll,
       groups: new Set(lectureAllowAll ? allGroups : baseGroups),
-      label: lectureAllowAll ? 'Усі групи' : `Групи ${baseGroups.join(', ')}`,
+      label: lectureAllowAll ? 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ' : `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ ${baseGroups.join(', ')}`,
     };
   }
 
@@ -22941,7 +22941,7 @@ const buildTeamworkTaskAudience = (task, teacherAccess, maxGroupCount = 1) => {
     lessonScope,
     allowAll: seminarAllowAll,
     groups: new Set(finalGroups),
-    label: seminarAllowAll ? 'Усі групи' : (finalGroups.length ? `Групи ${finalGroups.join(', ')}` : 'Немає груп'),
+    label: seminarAllowAll ? 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ' : (finalGroups.length ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ ${finalGroups.join(', ')}` : 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”'),
   };
 };
 
@@ -22980,59 +22980,59 @@ const normalizeExternalUrl = (rawValue) => {
 const JOURNAL_COLUMN_TYPES = new Set(['homework', 'seminar', 'exam', 'credit', 'custom']);
 const JOURNAL_SCORING_TYPES = ['homework', 'seminar', 'exam', 'credit', 'custom'];
 const JOURNAL_SCORING_TYPE_META = {
-  homework: { key: 'homework', label: 'ДЗ' },
-  seminar: { key: 'seminar', label: 'Семінар' },
-  exam: { key: 'exam', label: 'Екзамен' },
-  credit: { key: 'credit', label: 'Залік' },
-  custom: { key: 'custom', label: 'Кастом' },
+  homework: { key: 'homework', label: 'Р В РІР‚СњР В РІР‚вЂќ' },
+  seminar: { key: 'seminar', label: 'Р В Р Р‹Р В Р’ВµР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р РЋР вЂљ' },
+  exam: { key: 'exam', label: 'Р В РІР‚СћР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦' },
+  credit: { key: 'credit', label: 'Р В РІР‚вЂќР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' },
+  custom: { key: 'custom', label: 'Р В РЎв„ўР В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР В РЎВ' },
 };
 const JOURNAL_GRADE_UNDO_SECONDS = 30;
 const JOURNAL_SUBJECT_CLOSE_EVENT_TYPE = 'closed';
 const JOURNAL_SUBJECT_REOPEN_EVENT_TYPE = 'reopened';
-const JOURNAL_SUBJECT_CLOSED_ERROR = 'Предмет закрито. Редагування журналу вимкнено.';
-const JOURNAL_COLUMN_LOCKED_ERROR = 'Колонка заблокована для редагування';
+const JOURNAL_SUBJECT_CLOSED_ERROR = 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў. Р В Р’В Р В Р’ВµР В РўвЂР В Р’В°Р В РЎвЂ“Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў.';
+const JOURNAL_COLUMN_LOCKED_ERROR = 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В° Р В Р’В·Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р’В° Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР вЂљР В Р’ВµР В РўвЂР В Р’В°Р В РЎвЂ“Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ';
 const SEMESTER_ARCHIVE_UPLOADS_DIR = 'semester-archives';
 const JOURNAL_RETAKE_KINDS = ['retake', 'makeup'];
 const JOURNAL_RETAKE_KIND_META = {
-  retake: { key: 'retake', label: 'Перездача' },
-  makeup: { key: 'makeup', label: 'Відпрацювання' },
+  retake: { key: 'retake', label: 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В·Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’В°' },
+  makeup: { key: 'makeup', label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ' },
 };
 const JOURNAL_RETAKE_STATUSES = ['planned', 'submitted', 'graded', 'cancelled'];
 const JOURNAL_RETAKE_STATUS_META = {
-  planned: { key: 'planned', label: 'Заплановано' },
-  submitted: { key: 'submitted', label: 'Здано' },
-  graded: { key: 'graded', label: 'Оцінено' },
-  cancelled: { key: 'cancelled', label: 'Скасовано' },
+  planned: { key: 'planned', label: 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў' },
+  submitted: { key: 'submitted', label: 'Р В РІР‚вЂќР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў' },
+  graded: { key: 'graded', label: 'Р В РЎвЂєР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' },
+  cancelled: { key: 'cancelled', label: 'Р В Р Р‹Р В РЎвЂќР В Р’В°Р РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў' },
 };
 const JOURNAL_RETAKE_NOTE_MAX_LENGTH = 1200;
 const JOURNAL_RETAKE_COMMENT_MAX_LENGTH = 2000;
 const JOURNAL_APPEAL_STATUSES = ['pending', 'in_review', 'approved', 'rejected'];
 const JOURNAL_APPEAL_STATUS_META = {
-  pending: { key: 'pending', label: 'Нова' },
-  in_review: { key: 'in_review', label: 'На розгляді' },
-  approved: { key: 'approved', label: 'Підтверджено' },
-  rejected: { key: 'rejected', label: 'Відхилено' },
+  pending: { key: 'pending', label: 'Р В РЎСљР В РЎвЂўР В Р вЂ Р В Р’В°' },
+  in_review: { key: 'in_review', label: 'Р В РЎСљР В Р’В° Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂ“Р В Р’В»Р РЋР РЏР В РўвЂР РЋРІР‚вЂњ' },
+  approved: { key: 'approved', label: 'Р В РЎСџР РЋРІР‚вЂњР В РўвЂР РЋРІР‚С™Р В Р вЂ Р В Р’ВµР РЋР вЂљР В РўвЂР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' },
+  rejected: { key: 'rejected', label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР РЋРІР‚В¦Р В РЎвЂР В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' },
 };
 const JOURNAL_APPEAL_REASON_MAX_LENGTH = 2400;
 const JOURNAL_APPEAL_COMMENT_MAX_LENGTH = 2400;
 const JOURNAL_APPEAL_SLA_HOURS = 72;
 const JOURNAL_MODERATION_STATUSES = ['pending', 'approved', 'adjusted', 'rejected'];
 const JOURNAL_MODERATION_STATUS_META = {
-  pending: { key: 'pending', label: 'Очікує другого рецензента' },
-  approved: { key: 'approved', label: 'Підтверджено' },
-  adjusted: { key: 'adjusted', label: 'Скориговано' },
-  rejected: { key: 'rejected', label: 'Відхилено' },
+  pending: { key: 'pending', label: 'Р В РЎвЂєР РЋРІР‚РЋР РЋРІР‚вЂњР В РЎвЂќР РЋРЎвЂњР РЋРІР‚Сњ Р В РўвЂР РЋР вЂљР РЋРЎвЂњР В РЎвЂ“Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР вЂљР В Р’ВµР РЋРІР‚В Р В Р’ВµР В Р вЂ¦Р В Р’В·Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°' },
+  approved: { key: 'approved', label: 'Р В РЎСџР РЋРІР‚вЂњР В РўвЂР РЋРІР‚С™Р В Р вЂ Р В Р’ВµР РЋР вЂљР В РўвЂР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' },
+  adjusted: { key: 'adjusted', label: 'Р В Р Р‹Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР В РЎвЂ“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў' },
+  rejected: { key: 'rejected', label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР РЋРІР‚В¦Р В РЎвЂР В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' },
 };
 const JOURNAL_MODERATION_COMMENT_MAX_LENGTH = 2400;
 const COMPETENCY_DEFINITIONS = [
-  { key: 'leadership', label: 'Лідерство' },
-  { key: 'negotiation', label: 'Перемовини' },
-  { key: 'communication', label: 'Ораторика' },
-  { key: 'analysis', label: 'Аналітика' },
-  { key: 'teamwork', label: 'Командність' },
-  { key: 'self_organization', label: 'Самоорганізація' },
-  { key: 'critical_thinking', label: 'Критичне мислення' },
-  { key: 'resilience', label: 'Стійкість' },
+  { key: 'leadership', label: 'Р В РІР‚С”Р РЋРІР‚вЂњР В РўвЂР В Р’ВµР РЋР вЂљР РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂў' },
+  { key: 'negotiation', label: 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В РЎВР В РЎвЂўР В Р вЂ Р В РЎвЂР В Р вЂ¦Р В РЎвЂ' },
+  { key: 'communication', label: 'Р В РЎвЂєР РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В РЎвЂР В РЎвЂќР В Р’В°' },
+  { key: 'analysis', label: 'Р В РЎвЂ™Р В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В°' },
+  { key: 'teamwork', label: 'Р В РЎв„ўР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰' },
+  { key: 'self_organization', label: 'Р В Р Р‹Р В Р’В°Р В РЎВР В РЎвЂўР В РЎвЂўР РЋР вЂљР В РЎвЂ“Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњР В Р’В·Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ' },
+  { key: 'critical_thinking', label: 'Р В РЎв„ўР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В Р’Вµ Р В РЎВР В РЎвЂР РЋР С“Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ' },
+  { key: 'resilience', label: 'Р В Р Р‹Р РЋРІР‚С™Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В РЎвЂќР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰' },
 ];
 const COMPETENCY_KEYS = new Set(COMPETENCY_DEFINITIONS.map((item) => item.key));
 const COMPETENCY_SCORE_MIN = 0;
@@ -23040,10 +23040,10 @@ const COMPETENCY_SCORE_MAX = 5;
 const COMPETENCY_NOTE_MAX_LENGTH = 1200;
 const ATTENDANCE_STATUS_OPTIONS = ['present', 'late', 'absent', 'excused'];
 const ATTENDANCE_STATUS_META = {
-  present: { key: 'present', label: 'Присутній' },
-  late: { key: 'late', label: 'Запізнення' },
-  absent: { key: 'absent', label: 'Відсутній' },
-  excused: { key: 'excused', label: 'Поважна причина' },
+  present: { key: 'present', label: 'Р В РЎСџР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРЎвЂњР РЋРІР‚С™Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“' },
+  late: { key: 'late', label: 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р’В·Р В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ' },
+  absent: { key: 'absent', label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР РЋР С“Р РЋРЎвЂњР РЋРІР‚С™Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“' },
+  excused: { key: 'excused', label: 'Р В РЎСџР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р’В¶Р В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚РЋР В РЎвЂР В Р вЂ¦Р В Р’В°' },
 };
 const ATTENDANCE_REASON_MAX_LENGTH = 240;
 
@@ -23141,12 +23141,24 @@ const buildExactSemesterCondition = (alias, semesterId) => {
 
 const buildScheduledAtVisibleCondition = (columnExpr = 'scheduled_at') => {
   const expr = String(columnExpr || 'scheduled_at').trim() || 'scheduled_at';
-  return `(NULLIF(TRIM(COALESCE(${expr}::text, '')), '') IS NULL OR ${expr}::timestamptz <= ?::timestamptz)`;
+  const textExpr = `COALESCE(CAST(${expr} AS TEXT), '')`;
+  return `(NULLIF(TRIM(${textExpr}), '') IS NULL OR ${textExpr}::timestamptz <= ?::timestamptz)`;
 };
 
 const buildScheduledAtReachedCondition = (columnExpr = 'scheduled_at') => {
   const expr = String(columnExpr || 'scheduled_at').trim() || 'scheduled_at';
-  return `NULLIF(TRIM(COALESCE(${expr}::text, '')), '') IS NOT NULL AND ${expr}::timestamptz <= ?::timestamptz`;
+  const textExpr = `COALESCE(CAST(${expr} AS TEXT), '')`;
+  return `NULLIF(TRIM(${textExpr}), '') IS NOT NULL AND ${textExpr}::timestamptz <= ?::timestamptz`;
+};
+
+const buildTruthyTextCondition = (columnExpr) => {
+  const expr = String(columnExpr || '').trim();
+  return `LOWER(TRIM(COALESCE(CAST(${expr} AS TEXT), ''))) IN ('1', 'true', 't', 'yes', 'on')`;
+};
+
+const buildFalsyTextCondition = (columnExpr) => {
+  const expr = String(columnExpr || '').trim();
+  return `LOWER(TRIM(COALESCE(CAST(${expr} AS TEXT), ''))) IN ('0', 'false', 'f', 'no', 'off', '')`;
 };
 
 const buildJournalClosedRedirectPath = (subjectId, message = JOURNAL_SUBJECT_CLOSED_ERROR) => {
@@ -23567,7 +23579,7 @@ const getAttendanceClassOptions = () => (
       value: Number(classNumber),
       start: slot.start || '',
       end: slot.end || '',
-      label: `Пара ${classNumber}${slot.start && slot.end ? ` (${slot.start}-${slot.end})` : ''}`,
+      label: `Р В РЎСџР В Р’В°Р РЋР вЂљР В Р’В° ${classNumber}${slot.start && slot.end ? ` (${slot.start}-${slot.end})` : ''}`,
     }))
     .sort((a, b) => a.value - b.value)
 );
@@ -23665,7 +23677,7 @@ async function resolveJournalCurrentAttendanceSlot({
     if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) continue;
     if (nowMinutes < startMinutes || nowMinutes > endMinutes) continue;
     const groups = Array.from(byClass.get(classNumber) || []).sort((a, b) => a - b);
-    const groupLabel = groups.length ? ` · Група ${groups.join(', ')}` : '';
+    const groupLabel = groups.length ? ` Р вЂ™Р’В· Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groups.join(', ')}` : '';
     return {
       available: true,
       class_date: classDate,
@@ -23673,7 +23685,7 @@ async function resolveJournalCurrentAttendanceSlot({
       day_of_week: dayName,
       start: slot.start || '',
       end: slot.end || '',
-      label: `Пара ${classNumber}${slot.start && slot.end ? ` (${slot.start}-${slot.end})` : ''}${groupLabel}`,
+      label: `Р В РЎСџР В Р’В°Р РЋР вЂљР В Р’В° ${classNumber}${slot.start && slot.end ? ` (${slot.start}-${slot.end})` : ''}${groupLabel}`,
       group_numbers: groups,
     };
   }
@@ -24049,7 +24061,7 @@ const buildCompetencyProfileFromSignalRows = ({
 };
 
 const buildHomeworkJournalTitle = (homeworkRow) => {
-  const base = String(homeworkRow?.description || 'Завдання')
+  const base = String(homeworkRow?.description || 'Р В РІР‚вЂќР В Р’В°Р В Р вЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ')
     .replace(/\s+/g, ' ')
     .trim();
   const shortBase = base.length > 78 ? `${base.slice(0, 75)}...` : base;
@@ -24057,8 +24069,8 @@ const buildHomeworkJournalTitle = (homeworkRow) => {
   return dueDate ? `${shortBase} (${dueDate})` : shortBase;
 };
 
-const SESSION_HOMEWORK_PREFIX = '[сесія]';
-const SESSION_HOMEWORK_CONSULTATION_PREFIX = '[сесія] консультація';
+const SESSION_HOMEWORK_PREFIX = '[Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ]';
+const SESSION_HOMEWORK_CONSULTATION_PREFIX = '[Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ] Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ';
 const SESSION_COLUMN_POSITION_BASE = 900000;
 const isSessionHomeworkRow = (row) => {
   const text = String(row?.description || row?.homework_description || row?.source_homework_description || '')
@@ -24482,34 +24494,34 @@ function buildJournalClosureCsv({
   const closedAtIso = closedAt instanceof Date ? closedAt.toISOString() : String(closedAt || new Date().toISOString());
   const lines = [];
   lines.push([
-    'Предмет',
-    String(subjectName || '').trim() || 'Предмет',
+    'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
+    String(subjectName || '').trim() || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
   ].map((value) => escapeCsvValue(value)).join(','));
   lines.push([
-    'Курс',
+    'Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“',
     String(courseName || '').trim() || '-',
   ].map((value) => escapeCsvValue(value)).join(','));
   lines.push([
-    'Семестр',
+    'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ',
     String(semesterTitle || '').trim() || '-',
   ].map((value) => escapeCsvValue(value)).join(','));
   lines.push([
-    'Закрито о',
+    'Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў Р В РЎвЂў',
     closedAtIso,
   ].map((value) => escapeCsvValue(value)).join(','));
   lines.push('');
 
   const header = [
-    'ПІБ',
-    'Група',
+    'Р В РЎСџР В РІР‚В Р В РІР‚В',
+    'Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В°',
     ...safeColumns.map((column) => {
-      const title = String(column?.title || '').trim() || 'Колонка';
+      const title = String(column?.title || '').trim() || 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В°';
       const maxPoints = formatJournalClosureCsvNumber(column?.max_points);
-      return maxPoints ? `${title} (${maxPoints} б.)` : title;
+      return maxPoints ? `${title} (${maxPoints} Р В Р’В±.)` : title;
     }),
-    'Сирі бали',
-    'Сирий максимум',
-    'Підсумок / 100',
+    'Р В Р Р‹Р В РЎвЂР РЋР вЂљР РЋРІР‚вЂњ Р В Р’В±Р В Р’В°Р В Р’В»Р В РЎвЂ',
+    'Р В Р Р‹Р В РЎвЂР РЋР вЂљР В РЎвЂР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р В РЎвЂќР РЋР С“Р В РЎвЂР В РЎВР РЋРЎвЂњР В РЎВ',
+    'Р В РЎСџР РЋРІР‚вЂњР В РўвЂР РЋР С“Р РЋРЎвЂњР В РЎВР В РЎвЂўР В РЎвЂќ / 100',
   ];
   lines.push(header.map((value) => escapeCsvValue(value)).join(','));
 
@@ -24521,7 +24533,7 @@ function buildJournalClosureCsv({
       return Number.isFinite(score) ? formatJournalClosureCsvNumber(score) : '';
     });
     const line = [
-      String(student.full_name || '').trim() || 'Студент',
+      String(student.full_name || '').trim() || 'Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™',
       Number.isInteger(Number(student.group_number)) && Number(student.group_number) > 0
         ? Number(student.group_number)
         : '',
@@ -24699,7 +24711,7 @@ async function buildSemesterJournalArchiveSnapshot({
           subjectId,
           subjectName,
           Number(student.id || 0),
-          String(student.full_name || '').trim() || 'Студент',
+          String(student.full_name || '').trim() || 'Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™',
           Number(student.group_number || 0),
           formatJournalClosureCsvNumber(row?.final_score),
           formatJournalClosureCsvNumber(row?.weighted_earned),
@@ -24778,7 +24790,7 @@ async function syncJournalColumnsFromHomework(subjectId, courseId, semesterId, g
     WHERE h.subject_id = ?
       AND h.course_id = ?
       AND COALESCE(h.status, 'published') = 'published'
-      AND COALESCE(h.is_teacher_homework, 0) = 1
+      AND ${buildTruthyTextCondition('h.is_teacher_homework')}
   `;
   if (semesterId) {
     sql += ' AND (h.semester_id = ? OR h.semester_id IS NULL)';
@@ -25095,7 +25107,7 @@ async function getStudentJournalSubjectOptions(userId) {
     course_name: row.course_name || '',
     has_all_groups: false,
     group_numbers: [Number(row.group_number || 1)],
-    group_label: `Група ${Number(row.group_number || 1)}`,
+    group_label: `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${Number(row.group_number || 1)}`,
   }));
 }
 
@@ -25119,7 +25131,7 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
       course_name: row.course_name || '',
       has_all_groups: true,
       group_numbers: Array.from({ length: Math.max(1, Number(row.group_count || 1)) }, (_v, index) => index + 1),
-      group_label: 'Усі групи',
+      group_label: 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
     }));
   }
 
@@ -25156,10 +25168,10 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
       const groupNumbers = item.has_all_groups
         ? Array.from({ length: item.group_count }, (_v, index) => index + 1)
         : Array.from(item.group_numbers_set).sort((a, b) => a - b);
-      let groupLabel = 'Без груп';
-      if (item.has_all_groups) groupLabel = 'Усі групи';
-      else if (groupNumbers.length === 1) groupLabel = `Група ${groupNumbers[0]}`;
-      else if (groupNumbers.length > 1) groupLabel = `Групи ${groupNumbers.join(', ')}`;
+      let groupLabel = 'Р В РІР‚ВР В Р’ВµР В Р’В· Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”';
+      if (item.has_all_groups) groupLabel = 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ';
+      else if (groupNumbers.length === 1) groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groupNumbers[0]}`;
+      else if (groupNumbers.length > 1) groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ ${groupNumbers.join(', ')}`;
       return {
         subject_id: item.subject_id,
         subject_name: item.subject_name,
@@ -25221,7 +25233,7 @@ async function getJournalColumns(subjectId, courseId, semesterId) {
   }
   sql += `
     ORDER BY
-      CASE WHEN COALESCE(h.description, '') ILIKE '[Сесія]%' THEN 1 ELSE 0 END ASC,
+      CASE WHEN COALESCE(h.description, '') ILIKE '[Р В Р Р‹Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ]%' THEN 1 ELSE 0 END ASC,
       CASE WHEN COALESCE(jc.is_credit, 0) = 1 THEN 1 ELSE 0 END ASC,
       COALESCE(jc.position, 0) ASC,
       COALESCE(
@@ -25419,7 +25431,7 @@ async function buildJournalAttendanceContext({
     ? students
       .map((student) => ({
         id: Number(student?.id || 0),
-        full_name: String(student?.full_name || '').trim() || 'Студент',
+        full_name: String(student?.full_name || '').trim() || 'Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™',
         group_number: Number(student?.group_number || 0),
       }))
       .filter((student) => Number.isFinite(student.id) && student.id > 0)
@@ -25661,7 +25673,7 @@ async function resolveJournalColumnHomeworkForStudent(columnRow, studentGroupNum
       AND h.course_id = ?
       AND h.group_number = ?
       AND COALESCE(h.status, 'published') = 'published'
-      AND COALESCE(h.is_teacher_homework, 0) = 1
+      AND ${buildTruthyTextCondition('h.is_teacher_homework')}
   `;
   if (columnRow.semester_id) {
     sql += ' AND (h.semester_id = ? OR h.semester_id IS NULL)';
@@ -25746,7 +25758,7 @@ async function buildJournalMatrix({
       WHERE h.subject_id = ?
         AND h.course_id = ?
         AND COALESCE(h.status, 'published') = 'published'
-        AND COALESCE(h.is_teacher_homework, 0) = 1
+        AND ${buildTruthyTextCondition('h.is_teacher_homework')}
     `;
     if (semesterId) {
       teacherHomeworkSql += ' AND (h.semester_id = ? OR h.semester_id IS NULL)';
@@ -26216,7 +26228,7 @@ async function buildJournalInsightsContext({
         .map((row) => Number(row.final_score))
         .filter((value) => Number.isFinite(value));
       const subjectDisplayName = scopeType === 'all-courses'
-        ? `${String(subject.course_name || `Course ${Number(subject.course_id || 0)}`)} • ${String(subject.subject_name || '')}`
+        ? `${String(subject.course_name || `Course ${Number(subject.course_id || 0)}`)} Р Р†Р вЂљРЎС› ${String(subject.subject_name || '')}`
         : String(subject.subject_name || '');
       courseSubjectSummaries.push({
         course_id: Number(subject.course_id || 0),
@@ -26737,20 +26749,20 @@ async function buildJournalInsightsContext({
     if (scopeType === 'student-course') {
       if (selectedStudentProfile) {
         return selectedCourse
-          ? `${selectedStudentProfile.full_name} • ${selectedCourse.course_name}`
-          : `${selectedStudentProfile.full_name} • Course`;
+          ? `${selectedStudentProfile.full_name} Р Р†Р вЂљРЎС› ${selectedCourse.course_name}`
+          : `${selectedStudentProfile.full_name} Р Р†Р вЂљРЎС› Course`;
       }
-      return selectedCourse ? `Student • ${selectedCourse.course_name}` : 'Student course scope';
+      return selectedCourse ? `Student Р Р†Р вЂљРЎС› ${selectedCourse.course_name}` : 'Student course scope';
     }
     if (scopeType === 'course') {
       return selectedCourse ? `Course ${selectedCourse.course_name}` : 'Course scope';
     }
     if (scopeType === 'group') {
-      return `${selectedSubject ? selectedSubject.subject_name : 'Subject'} • Group ${selectedGroupNumber || '-'}`;
+      return `${selectedSubject ? selectedSubject.subject_name : 'Subject'} Р Р†Р вЂљРЎС› Group ${selectedGroupNumber || '-'}`;
     }
     if (scopeType === 'student') {
       return selectedStudentProfile
-        ? `${selectedStudentProfile.full_name} • ${selectedSubject ? selectedSubject.subject_name : 'Subject'}`
+        ? `${selectedStudentProfile.full_name} Р Р†Р вЂљРЎС› ${selectedSubject ? selectedSubject.subject_name : 'Subject'}`
         : (selectedSubject ? selectedSubject.subject_name : 'Student scope');
     }
     return selectedSubject ? selectedSubject.subject_name : 'Subject scope';
@@ -27358,7 +27370,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       });
       try {
         if (res.locals && res.locals.messages && !res.locals.messages.error) {
-          res.locals.messages.error = 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).';
+          res.locals.messages.error = 'Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В» Р РЋРІР‚С™Р В РЎвЂР В РЎВР РЋРІР‚РЋР В Р’В°Р РЋР С“Р В РЎвЂўР В Р вЂ Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋР вЂ№Р РЋРІР‚Сњ Р В Р вЂ  Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВР РЋРІР‚вЂњ Р РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ (Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В РЎвЂќР РЋРІР‚С™Р РЋРЎвЂњР РЋР вЂљР РЋРЎвЂњ Р В РІР‚ВР В РІР‚Сњ).';
         }
         await renderViewToResponse(
           res,
@@ -27368,7 +27380,7 @@ app.get('/journal', requireLogin, async (req, res) => {
             subjects: [],
             teacherJournalMode: false,
             canManageAllSubjects: false,
-            compatibilityMessage: 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).',
+            compatibilityMessage: 'Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В» Р РЋРІР‚С™Р В РЎвЂР В РЎВР РЋРІР‚РЋР В Р’В°Р РЋР С“Р В РЎвЂўР В Р вЂ Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋР вЂ№Р РЋРІР‚Сњ Р В Р вЂ  Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВР РЋРІР‚вЂњ Р РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ (Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР В РЎвЂќР РЋРІР‚С™Р РЋРЎвЂњР РЋР вЂљР РЋРЎвЂњ Р В РІР‚ВР В РІР‚Сњ).',
           })
         );
         return;
@@ -27577,7 +27589,7 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
       selectedCourseId,
       semesterId
     );
-    return res.redirect(baseAttendanceRedirect({ ok: 'Відвідуваність збережено' }));
+    return res.redirect(baseAttendanceRedirect({ ok: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' }));
   } catch (err) {
     return res.redirect(baseAttendanceRedirect({ err: 'Database error' }));
   }
@@ -27605,7 +27617,7 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
     }
     if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
       return res.redirect(subjectCloseRedirect({
-        err: 'Для закриття предмета потрібен доступ до всіх груп',
+        err: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р РЋРІР‚С™Р РЋР РЏ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р’ВµР В Р вЂ¦ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ” Р В РўвЂР В РЎвЂў Р В Р вЂ Р РЋР С“Р РЋРІР‚вЂњР РЋРІР‚В¦ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”',
       }));
     }
 
@@ -27615,7 +27627,7 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
     await ensureSubjectGradingSettings(subjectId, selectedCourseId, semesterId, Number(req.session.user.id));
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (subjectClosure.is_closed) {
-      return res.redirect(subjectCloseRedirect({ ok: 'Предмет уже закрито' }));
+      return res.redirect(subjectCloseRedirect({ ok: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў' }));
     }
 
     const matrix = await buildJournalMatrix({
@@ -27879,7 +27891,7 @@ app.post('/journal/subject/close', requireLogin, writeLimiter, async (req, res) 
       semesterId
     );
     return res.redirect(subjectCloseRedirect({
-      ok: 'Предмет закрито. Журнал заблоковано, export snapshot готовий до завантаження.',
+      ok: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў. Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В» Р В Р’В·Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў, export snapshot Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В РЎвЂў Р В Р’В·Р В Р’В°Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ.',
     }));
   } catch (err) {
     return res.redirect(subjectCloseRedirect({ err: 'Database error' }));
@@ -27908,7 +27920,7 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
     }
     if (!journalScope.fullAccess && !selectedSubject.has_all_groups) {
       return res.redirect(subjectReopenRedirect({
-        err: 'Для повторного відкриття предмета потрібен доступ до всіх груп',
+        err: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р РЋРІР‚С™Р РЋР РЏ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р’ВµР В Р вЂ¦ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ” Р В РўвЂР В РЎвЂў Р В Р вЂ Р РЋР С“Р РЋРІР‚вЂњР РЋРІР‚В¦ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”',
       }));
     }
 
@@ -27918,7 +27930,7 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
     await ensureSubjectGradingSettings(subjectId, selectedCourseId, semesterId, Number(req.session.user.id));
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (!subjectClosure.is_closed) {
-      return res.redirect(subjectReopenRedirect({ ok: 'Предмет уже відкрито' }));
+      return res.redirect(subjectReopenRedirect({ ok: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў' }));
     }
 
     const actorUserId = Number(req.session.user.id);
@@ -28087,7 +28099,7 @@ app.post('/journal/subject/reopen', requireLogin, writeLimiter, async (req, res)
       selectedCourseId,
       semesterId
     );
-    return res.redirect(subjectReopenRedirect({ ok: 'Предмет повторно відкрито. Журнал розблоковано' }));
+    return res.redirect(subjectReopenRedirect({ ok: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В Р вЂ¦Р В РЎвЂў Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў. Р В РІР‚вЂњР РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В» Р РЋР вЂљР В РЎвЂўР В Р’В·Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў' }));
   } catch (err) {
     return res.redirect(subjectReopenRedirect({ err: 'Database error' }));
   }
@@ -28120,13 +28132,13 @@ app.get('/journal/subject/close-export', requireLogin, readLimiter, async (req, 
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
     if (!subjectClosure.is_closed || !subjectClosure.latest_export_path) {
       return res.redirect(closeExportRedirect({
-        err: 'Експорт для закритого предмета не знайдено',
+        err: 'Р В РІР‚СћР В РЎвЂќР РЋР С“Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
       }));
     }
     const absolutePath = resolveStoredUploadAbsolutePath(subjectClosure.latest_export_path);
     if (!absolutePath || !fs.existsSync(absolutePath)) {
       return res.redirect(closeExportRedirect({
-        err: 'Файл експорту недоступний',
+        err: 'Р В Р’В¤Р В Р’В°Р В РІвЂћвЂ“Р В Р’В» Р В Р’ВµР В РЎвЂќР РЋР С“Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“',
       }));
     }
 
@@ -28744,7 +28756,7 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
     );
     return res.redirect(gradeRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Оцінку збережено',
+      ok: 'Р В РЎвЂєР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР РЋРЎвЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(gradeRedirect({ err: 'Database error' }));
@@ -29015,7 +29027,7 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     const subjectId = Number(column.subject_id || subjectIdFromBody || 0);
     return res.redirect(bulkRedirect({
       subjectId,
-      ok: `Масове оцінювання збережено (${updatedCount})`,
+      ok: `Р В РЎС™Р В Р’В°Р РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’Вµ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў (${updatedCount})`,
     }));
   } catch (err) {
     return res.redirect(bulkRedirect({ err: 'Database error' }));
@@ -29106,7 +29118,7 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
     if (!activeGrade) {
       return res.redirect(gradeDeleteRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Оцінка не знайдена',
+        err: 'Р В РЎвЂєР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В Р’В°',
       }));
     }
     const beforeGradeState = buildGradeAuditState(activeGrade);
@@ -29170,7 +29182,7 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
       undoColumnId: columnId,
       undoStudentId: studentId,
       undoUntil,
-      ok: 'Оцінку видалено',
+      ok: 'Р В РЎвЂєР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(gradeDeleteRedirect({ err: 'Database error' }));
@@ -29262,7 +29274,7 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
     if (!restorable) {
       return res.redirect(gradeRestoreRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Час на відновлення оцінки минув',
+        err: 'Р В Р’В§Р В Р’В°Р РЋР С“ Р В Р вЂ¦Р В Р’В° Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р В РЎВР В РЎвЂР В Р вЂ¦Р РЋРЎвЂњР В Р вЂ ',
       }));
     }
     const beforeGradeState = buildGradeAuditState(restorable);
@@ -29313,7 +29325,7 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(gradeRestoreRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Оцінку відновлено',
+      ok: 'Р В РЎвЂєР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(gradeRestoreRedirect({ err: 'Database error' }));
@@ -29448,7 +29460,7 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(retakeCreateRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Спробу додано',
+      ok: 'Р В Р Р‹Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р’В±Р РЋРЎвЂњ Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(retakeCreateRedirect({ err: 'Database error' }));
@@ -29482,10 +29494,10 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
     return res.redirect(retakeUpdateRedirect({ err: 'Invalid retake score' }));
   }
   if (status === 'graded' && !Number.isFinite(score)) {
-    return res.redirect(retakeUpdateRedirect({ err: 'Для статусу Оцінено потрібно вказати бал' }));
+    return res.redirect(retakeUpdateRedirect({ err: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚С™Р РЋРЎвЂњР РЋР С“Р РЋРЎвЂњ Р В РЎвЂєР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ Р В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В Р’В±Р В Р’В°Р В Р’В»' }));
   }
   if (countInFinal === 1 && (status !== 'graded' || !Number.isFinite(score))) {
-    return res.redirect(retakeUpdateRedirect({ err: 'Щоб врахувати у фіналі, потрібно вказати оцінений бал' }));
+    return res.redirect(retakeUpdateRedirect({ err: 'Р В Р’В©Р В РЎвЂўР В Р’В± Р В Р вЂ Р РЋР вЂљР В Р’В°Р РЋРІР‚В¦Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р РЋРЎвЂњ Р РЋРІР‚С›Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњ, Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ Р В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В±Р В Р’В°Р В Р’В»' }));
   }
   const dueDate = dueDateRaw && isValidDateString(dueDateRaw) ? dueDateRaw : null;
 
@@ -29570,7 +29582,7 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
     if (!existingAttempt) {
       return res.redirect(retakeUpdateRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Спробу не знайдено',
+        err: 'Р В Р Р‹Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р’В±Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
       }));
     }
 
@@ -29733,7 +29745,7 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(retakeUpdateRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Спробу оновлено',
+      ok: 'Р В Р Р‹Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р’В±Р РЋРЎвЂњ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(retakeUpdateRedirect({ err: 'Database error' }));
@@ -29758,7 +29770,7 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
     return res.redirect(appealCreateRedirect({ err: 'Invalid appeal target' }));
   }
   if (!reason) {
-    return res.redirect(appealCreateRedirect({ err: 'Вкажіть причину апеляції' }));
+    return res.redirect(appealCreateRedirect({ err: 'Р В РІР‚в„ўР В РЎвЂќР В Р’В°Р В Р’В¶Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚РЋР В РЎвЂР В Р вЂ¦Р РЋРЎвЂњ Р В Р’В°Р В РЎвЂ”Р В Р’ВµР В Р’В»Р РЋР РЏР РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ' }));
   }
   if (requestedScoreRaw && !Number.isFinite(requestedScore)) {
     return res.redirect(appealCreateRedirect({ err: 'Invalid requested score' }));
@@ -29821,7 +29833,7 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
     if (!existingGrade || !Number.isFinite(Number(existingGrade.score))) {
       return res.redirect(appealCreateRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Немає оцінки для апеляції',
+        err: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р’В°Р В РЎвЂ”Р В Р’ВµР В Р’В»Р РЋР РЏР РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ',
       }));
     }
 
@@ -29839,7 +29851,7 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
     if (activeAppeal) {
       return res.redirect(appealCreateRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Вже є активна апеляція для цієї клітинки',
+        err: 'Р В РІР‚в„ўР В Р’В¶Р В Р’Вµ Р РЋРІР‚Сњ Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В Р’В° Р В Р’В°Р В РЎвЂ”Р В Р’ВµР В Р’В»Р РЋР РЏР РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚СњР РЋРІР‚вЂќ Р В РЎвЂќР В Р’В»Р РЋРІР‚вЂњР РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В РЎвЂќР В РЎвЂ',
       }));
     }
 
@@ -29882,7 +29894,7 @@ app.post('/journal/appeals/create', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(appealCreateRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Апеляцію подано',
+      ok: 'Р В РЎвЂ™Р В РЎвЂ”Р В Р’ВµР В Р’В»Р РЋР РЏР РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(appealCreateRedirect({ err: 'Database error' }));
@@ -29917,7 +29929,7 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     return res.redirect(appealUpdateRedirect({ err: 'Invalid resolved score' }));
   }
   if (applyResolvedScore && !Number.isFinite(resolvedScore)) {
-    return res.redirect(appealUpdateRedirect({ err: 'Щоб застосувати новий бал, вкажіть коректне значення' }));
+    return res.redirect(appealUpdateRedirect({ err: 'Р В Р’В©Р В РЎвЂўР В Р’В± Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В±Р В Р’В°Р В Р’В», Р В Р вЂ Р В РЎвЂќР В Р’В°Р В Р’В¶Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ' }));
   }
 
   try {
@@ -29994,7 +30006,7 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     if (!appeal) {
       return res.redirect(appealUpdateRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Апеляцію не знайдено',
+        err: 'Р В РЎвЂ™Р В РЎвЂ”Р В Р’ВµР В Р’В»Р РЋР РЏР РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
       }));
     }
 
@@ -30113,7 +30125,7 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(appealUpdateRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Апеляцію оновлено',
+      ok: 'Р В РЎвЂ™Р В РЎвЂ”Р В Р’ВµР В Р’В»Р РЋР РЏР РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(appealUpdateRedirect({ err: 'Database error' }));
@@ -30145,7 +30157,7 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
     return res.redirect(moderationRedirect({ err: 'Invalid moderation score' }));
   }
   if (status === 'adjusted' && !Number.isFinite(moderatedScore)) {
-    return res.redirect(moderationRedirect({ err: 'Для статусу Скориговано потрібно вказати новий бал' }));
+    return res.redirect(moderationRedirect({ err: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚С™Р РЋРЎвЂњР РЋР С“Р РЋРЎвЂњ Р В Р Р‹Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР В РЎвЂ“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ Р В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В±Р В Р’В°Р В Р’В»' }));
   }
 
   try {
@@ -30187,7 +30199,7 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
     if (!isJournalModerationRequiredColumn(column)) {
       return res.redirect(moderationRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Модерація доступна лише для екзаменів та заліків',
+        err: 'Р В РЎС™Р В РЎвЂўР В РўвЂР В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В Р’В° Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р’Вµ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  Р РЋРІР‚С™Р В Р’В° Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚вЂњР В Р вЂ ',
       }));
     }
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
@@ -30235,13 +30247,13 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
     if (!grade || !Number.isFinite(Number(grade.score))) {
       return res.redirect(moderationRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Немає оцінки для модерації',
+        err: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎВР В РЎвЂўР В РўвЂР В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ',
       }));
     }
     if (Number(req.session.user.id) === Number(grade.graded_by || 0)) {
       return res.redirect(moderationRedirect({
         subjectId: Number(column.subject_id || 0),
-        err: 'Той самий викладач не може погодити власну оцінку',
+        err: 'Р В РЎС›Р В РЎвЂўР В РІвЂћвЂ“ Р РЋР С“Р В Р’В°Р В РЎВР В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР В РЎвЂ“Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В Р вЂ Р В Р’В»Р В Р’В°Р РЋР С“Р В Р вЂ¦Р РЋРЎвЂњ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР РЋРЎвЂњ',
       }));
     }
 
@@ -30311,7 +30323,7 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
     );
     return res.redirect(moderationRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Модерацію оцінки оновлено',
+      ok: 'Р В РЎС™Р В РЎвЂўР В РўвЂР В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(moderationRedirect({ err: 'Database error' }));
@@ -30451,7 +30463,7 @@ app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res)
     );
     return res.redirect(competencyRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Компетентнісний сигнал додано',
+      ok: 'Р В РЎв„ўР В РЎвЂўР В РЎВР В РЎвЂ”Р В Р’ВµР РЋРІР‚С™Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В РЎвЂР В РЎвЂ“Р В Р вЂ¦Р В Р’В°Р В Р’В» Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў',
     }));
   } catch (err) {
     return res.redirect(competencyRedirect({ err: 'Database error' }));
@@ -30597,7 +30609,7 @@ app.post('/journal/competency/checklist/save', requireLogin, writeLimiter, async
     );
     return res.redirect(competencyChecklistRedirect({
       subjectId: Number(column.subject_id || 0),
-      ok: 'Компетентності збережено (+1/+0)',
+      ok: 'Р В РЎв„ўР В РЎвЂўР В РЎВР В РЎвЂ”Р В Р’ВµР РЋРІР‚С™Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў (+1/+0)',
     }));
   } catch (err) {
     return res.redirect(competencyChecklistRedirect({ err: 'Database error' }));
@@ -30681,7 +30693,7 @@ app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(finalToggleRedirect({ ok: 'Налаштування колонки оновлено' }));
+    return res.redirect(finalToggleRedirect({ ok: 'Р В РЎСљР В Р’В°Р В Р’В»Р В Р’В°Р РЋРІвЂљВ¬Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В РЎвЂ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' }));
   } catch (err) {
     return res.redirect(finalToggleRedirect({ err: 'Database error' }));
   }
@@ -30766,7 +30778,7 @@ app.post('/journal/columns/lock-toggle', requireLogin, writeLimiter, async (req,
       Number(column.course_id || req.session.user.course_id || 1),
       column.semester_id ? Number(column.semester_id) : null
     );
-    return res.redirect(lockToggleRedirect({ ok: isLocked ? 'Колонку заблоковано' : 'Колонку розблоковано' }));
+    return res.redirect(lockToggleRedirect({ ok: isLocked ? 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР РЋРЎвЂњ Р В Р’В·Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў' : 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР РЋРЎвЂњ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў' }));
   } catch (err) {
     return res.redirect(lockToggleRedirect({ err: 'Database error' }));
   }
@@ -30834,7 +30846,7 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
       WHERE subject_id = ?
         AND course_id = ?
         AND COALESCE(is_archived, 0) = 0
-        AND COALESCE(is_credit, 0) = ?
+        AND 
     `;
     if (semesterId) {
       positionSql += ' AND (semester_id = ? OR semester_id IS NULL)';
@@ -30882,7 +30894,7 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
       courseId,
       semesterId
     );
-    return res.redirect(createColumnRedirect({ ok: 'Колонку додано' }));
+    return res.redirect(createColumnRedirect({ ok: 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР РЋРЎвЂњ Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў' }));
   } catch (err) {
     return res.redirect(createColumnRedirect({ err: 'Database error' }));
   }
@@ -30913,7 +30925,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
     const activeSemester = await getActiveSemester(courseId);
     const semesterId = activeSemester ? Number(activeSemester.id) : null;
     if (!Number.isFinite(semesterId) || semesterId < 1) {
-      return res.redirect(importTemplateRedirect({ err: 'Активний семестр не знайдено' }));
+      return res.redirect(importTemplateRedirect({ err: 'Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў' }));
     }
 
     const subjectClosure = await getJournalSubjectClosureState(subjectId);
@@ -30923,7 +30935,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
 
     const previousSemester = await getPreviousSemesterForCourse(courseId, activeSemester);
     if (!previousSemester || !Number.isFinite(Number(previousSemester.id))) {
-      return res.redirect(importTemplateRedirect({ err: 'Попередній семестр для імпорту не знайдено' }));
+      return res.redirect(importTemplateRedirect({ err: 'Р В РЎСџР В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚вЂњР В РЎВР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў' }));
     }
     const previousSemesterId = Number(previousSemester.id);
 
@@ -30949,7 +30961,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
       [subjectId, courseId, previousSemesterId]
     );
     if (!Array.isArray(sourceColumns) || !sourceColumns.length) {
-      return res.redirect(importTemplateRedirect({ err: 'У попередньому семестрі немає ручних колонок для імпорту' }));
+      return res.redirect(importTemplateRedirect({ err: 'Р В Р в‚¬ Р В РЎвЂ”Р В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂР В Р вЂ¦Р РЋР Р‰Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњ Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В РЎвЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚вЂњР В РЎВР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ' }));
     }
 
     const currentColumns = await db.all(
@@ -31027,7 +31039,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
           subjectId,
           courseId,
           semesterId,
-          String(sourceColumn.title || '').trim() || 'Колонка',
+          String(sourceColumn.title || '').trim() || 'Р В РЎв„ўР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂќР В Р’В°',
           normalizeColumnType(sourceColumn.column_type),
           parsePositiveDecimal(sourceColumn.max_points, 10),
           nextPosition,
@@ -31041,7 +31053,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
     }
 
     if (insertedCount < 1) {
-      return res.redirect(importTemplateRedirect({ ok: 'Шаблон уже актуальний: нових колонок для імпорту немає' }));
+      return res.redirect(importTemplateRedirect({ ok: 'Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р РЋРЎвЂњР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“: Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В РЎвЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚вЂњР В РЎВР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ' }));
     }
 
     logActivity(
@@ -31061,7 +31073,7 @@ app.post('/journal/template/import-previous', requireLogin, writeLimiter, async 
       semesterId
     );
     return res.redirect(importTemplateRedirect({
-      ok: `Імпортовано ${insertedCount} колонок з попереднього семестру`,
+      ok: `Р В РІР‚В Р В РЎВР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў ${insertedCount} Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В РЎвЂќ Р В Р’В· Р В РЎвЂ”Р В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂР В Р вЂ¦Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ`,
     }));
   } catch (err) {
     return res.redirect(importTemplateRedirect({ err: 'Database error' }));
@@ -31214,7 +31226,7 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
       courseId,
       semesterId
     );
-    return res.redirect(configRedirect({ ok: 'Налаштування оцінювання оновлено' }));
+    return res.redirect(configRedirect({ ok: 'Р В РЎСљР В Р’В°Р В Р’В»Р В Р’В°Р РЋРІвЂљВ¬Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў' }));
   } catch (err) {
     return res.redirect(configRedirect({ err: 'Database error' }));
   }
@@ -31304,7 +31316,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
             ...row,
             material_type: normalizeSubjectMaterialType(row.material_type),
             is_syllabus: Number(row.is_syllabus || 0) === 1,
-            group_label: row.group_number ? `Група ${row.group_number}` : 'Усі групи',
+            group_label: row.group_number ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${row.group_number}` : 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
             created_at_label: createdAtLabel,
             can_manage: Number(row.created_by) === Number(userId),
           };
@@ -31363,13 +31375,13 @@ app.get('/subjects', requireLogin, async (req, res) => {
     const subjects = Array.from(subjectMap.values())
       .map((item) => {
         const groups = Array.from(item.group_numbers).sort((a, b) => a - b);
-        let groupLabel = 'Без групи';
+        let groupLabel = 'Р В РІР‚ВР В Р’ВµР В Р’В· Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ';
         if (item.has_all_groups) {
-          groupLabel = 'Усі групи';
+          groupLabel = 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ';
         } else if (groups.length === 1) {
-          groupLabel = `Група ${groups[0]}`;
+          groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groups[0]}`;
         } else if (groups.length > 1) {
-          groupLabel = `Групи ${groups.join(', ')}`;
+          groupLabel = `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ ${groups.join(', ')}`;
         }
         return {
           ...item,
@@ -31430,7 +31442,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
           ...row,
           material_type: normalizeSubjectMaterialType(row.material_type),
           is_syllabus: Number(row.is_syllabus || 0) === 1,
-          group_label: row.group_number ? `Група ${row.group_number}` : 'Усі групи',
+          group_label: row.group_number ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${row.group_number}` : 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
           created_at_label: createdAtLabel,
           can_manage: Number(row.created_by) === Number(userId),
         };
@@ -31444,14 +31456,14 @@ app.get('/subjects', requireLogin, async (req, res) => {
         if (selectedSubject.has_all_groups || sortedGroups.length > 1) {
           materialAudienceOptions.push({
             value: 'all',
-            label: selectedSubject.has_all_groups ? 'Усі групи' : 'Усі мої групи',
+            label: selectedSubject.has_all_groups ? 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ' : 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎВР В РЎвЂўР РЋРІР‚вЂќ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ',
           });
         }
         sortedGroups.forEach((groupNum) => {
-          materialAudienceOptions.push({ value: String(groupNum), label: `Група ${groupNum}` });
+          materialAudienceOptions.push({ value: String(groupNum), label: `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groupNum}` });
         });
         if (!materialAudienceOptions.length) {
-          materialAudienceOptions.push({ value: 'all', label: 'Усі групи' });
+          materialAudienceOptions.push({ value: 'all', label: 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ' });
         }
       }
     }
@@ -31637,7 +31649,7 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
       activeSemester ? activeSemester.id : null
     );
     broadcast('subject_materials_updated', { subject_id: subjectId });
-    return res.redirect(`/subjects?subject_id=${subjectId}&ok=Матеріал%20додано`);
+    return res.redirect(`/subjects?subject_id=${subjectId}&ok=Р В РЎС™Р В Р’В°Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР В Р’В°Р В Р’В»%20Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў`);
   } catch (err) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
@@ -31731,7 +31743,7 @@ app.post('/subjects/materials/:id/delete', requireLogin, writeLimiter, async (re
       Number.isFinite(Number(material.semester_id)) ? Number(material.semester_id) : null
     );
     broadcast('subject_materials_updated', { subject_id: material.subject_id });
-    return res.redirect(`/subjects?subject_id=${material.subject_id}&ok=Матеріал%20видалено`);
+    return res.redirect(`/subjects?subject_id=${material.subject_id}&ok=Р В РЎС™Р В Р’В°Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР В Р’В°Р В Р’В»%20Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў`);
   } catch (err) {
     console.error('Failed to delete subject material', err);
     return res.redirect('/subjects?err=Database%20error');
@@ -31820,8 +31832,8 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       .map((item) => {
         const groups = Array.from(item.group_numbers).sort((a, b) => a - b);
         const groupLabel = item.has_all_groups
-          ? 'Усі групи'
-          : (groups.length ? `Група ${groups.join(', ')}` : '');
+          ? 'Р В Р в‚¬Р РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ'
+          : (groups.length ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groups.join(', ')}` : '');
         return {
           ...item,
           group_numbers: groups,
@@ -32037,7 +32049,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       if (!groupsByTask[group.task_id]) groupsByTask[group.task_id] = [];
       groupsByTask[group.task_id].push({
         ...group,
-        leader_name: String(group.leader_name || '').trim() || '—',
+        leader_name: String(group.leader_name || '').trim() || 'Р Р†Р вЂљРІР‚Сњ',
         members: [],
       });
     });
@@ -32106,7 +32118,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
         return {
           ...task,
-          created_by_name: String(task.created_by_name || '').trim() || '—',
+          created_by_name: String(task.created_by_name || '').trim() || 'Р Р†Р вЂљРІР‚Сњ',
           groups: taskGroups,
           random_distribution: Number(task.random_distribution) === 1 || task.random_distribution === true,
           member_limits_enabled: Number(task.member_limits_enabled) === 1 || task.member_limits_enabled === true,
@@ -32349,7 +32361,7 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
              RETURNING id`,
             [
               taskRow.id,
-              `Команда ${groupIndex + 1}`,
+              `Р В РЎв„ўР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р’В° ${groupIndex + 1}`,
               userId,
               limitsEnabled ? maxMembers : null,
               createdAt,
@@ -32381,7 +32393,7 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
            RETURNING id`,
           [
             taskRow.id,
-            `Команда ${groupIndex + 1}`,
+            `Р В РЎв„ўР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р’В° ${groupIndex + 1}`,
             userId,
             limitsEnabled ? maxMembers : null,
             createdAt,
@@ -32545,7 +32557,7 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
       return res.redirect(`/teamwork?subject_id=${taskRow.subject_id}&err=Group%20limit%20reached`);
     }
 
-    const groupName = name && name.trim().length ? name.trim() : `Команда ${seminarGroupLocalIndex}`;
+    const groupName = name && name.trim().length ? name.trim() : `Р В РЎв„ўР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р’В° ${seminarGroupLocalIndex}`;
     const limitsEnabled = Number(taskRow.member_limits_enabled) === 1 || taskRow.member_limits_enabled === true;
     let resolvedMaxMembers = null;
     if (limitsEnabled) {
@@ -33069,7 +33081,7 @@ app.post('/admin/messages/delete/:id', requireMessagesSectionAccess, writeLimite
             AND created_by_id = ?
             AND created_at = ?
             AND COALESCE(status, 'published') = ?
-            AND COALESCE(scheduled_at, '') = ?
+            AND COALESCE(CAST(scheduled_at AS TEXT), '') = ?
         `,
         [
           message.body,
@@ -33561,7 +33573,7 @@ async function getTeamworkReactionAccess(req, taskId) {
   return canViewTask ? { status: 'ok', task } : { status: 'forbidden', task: null };
 }
 
-const allowedReactions = new Set(['🔥', '👍']);
+const allowedReactions = new Set(['РЎР‚РЎСџРІР‚СњРўС’', 'РЎР‚РЎСџРІР‚ВР РЉ']);
 
 app.post('/homework/react', requireLogin, writeLimiter, async (req, res) => {
   const homeworkId = Number(req.body.homework_id);
@@ -35111,82 +35123,82 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
     const pathwaysLang = getPreferredLang(req);
     const isPathwaysUk = pathwaysLang === 'uk';
     const pathwaysText = isPathwaysUk ? {
-      ready: 'Готово',
-      inactive: 'Неактивна',
-      blocked: 'Заблоковано',
-      needsAttention: 'Потрібна увага',
-      cohortDisabled: 'Когорту вимкнено',
-      noMappedCourses: 'Немає замаплених курсів',
-      noVisibleSubjects: 'Немає видимих предметів',
-      campusConflict: 'Конфлікт кампусу',
-      partialMapping: 'Частковий мапінг',
-      filteredSubjects: 'Відфільтровані предмети',
-      noUsersAssigned: 'Немає призначених користувачів',
-      signalCourseMapping: 'Мапінг курсів',
-      signalSubjectVisibility: 'Видимість предметів',
-      signalCampusRouting: 'Маршрутизація кампусів',
-      signalUserMigration: 'Міграція користувачів',
-      registrationClosed: 'Реєстрація ще закрита',
-      visibleLinkedCourses: 'Видимі прив\'язані курси',
-      studentVisibleScope: 'Студентський видимий контур',
-      oneCoursePerCampus: 'По одному курсу на кампус',
-      noSourceCourses: 'Немає джерельних курсів',
-      selectCompatibleSourceCourses: 'Оберіть сумісні джерельні курси',
-      pickCohortTitle: 'Оберіть когорту, щоб увімкнути фокус-режим',
-      pickCohortBody: 'Спершу оберіть рік вступу, тоді простір зможе показати, чи реально готові мапінг, предмети, кампуси та міграція.',
-      goToAdmissions: 'До років вступу',
-      mappingBlockedTitle: 'Реєстрацію блокує порожній мапінг курсів',
-      mappingBlockedBodyWithLegacy: (count) => `Поки що немає жодного видимого прив\'язаного курсу. Доступний legacy-швидкий мапінг для ${count} відповідних курсів.`,
-      mappingBlockedBody: 'Поки що немає жодного видимого прив\'язаного курсу, тому студенти не зможуть визначити курс для цієї когорти.',
-      openMapping: 'Відкрити мапінг',
-      emptySubjectsTitle: 'Студенти побачать порожній список предметів',
-      emptySubjectsBody: 'У поточному курсі ця когорта зараз приводить до нуля видимих предметів.',
-      openSubjects: 'Відкрити предмети',
-      campusConflictsTitle: 'Маршрутизація кампусів ще має конфлікти',
-      campusConflictsBody: (items) => `Неоднозначні кампуси: ${items}.`,
-      resolveCampuses: 'Вирішити кампуси',
-      campusMissingTitle: 'Маршрутизації кампусів ще немає',
-      campusMissingBody: 'Замаплені курси вже є, але для реєстрації ще не виводиться жодний готовий маршрут по кампусах.',
-      reviewCampuses: 'Перевірити кампуси',
-      existingUsersTitle: 'Наявним користувачам ще треба проставити когорту',
-      existingUsersBody: (pendingUsers, totalCourses) => `${pendingUsers} користувачів у ${totalCourses} сумісних джерельних курсах ще не прив\'язані до цього року вступу.`,
-      openMigration: 'Відкрити міграцію',
-      baseVisibilityTitle: 'Базова видимість курсу все ще фільтрує предмети',
-      baseVisibilityBody: (count) => `${count} предметів приховано глобально в обраному курсі, тому ця когорта не може показати їх навіть через override року вступу.`,
-      reviewSubjects: 'Перевірити предмети',
-      pendingSuffix: 'очікує',
-      alreadyAlignedSuffix: 'вже вирівняно',
-      blockedSuffix: 'заблоковано',
-      readySuffix: 'готово',
-      hiddenInBaseCourse: (count) => `${count} приховано в базовому курсі`,
-      campusKyiv: 'Київ',
-      campusMunich: 'Мюнхен',
-      statusDetailReady: 'Когорта готова: маршрути курсів, предмети й кампуси вирівняні.',
-      statusDetailInactive: 'Когорта вимкнена, тому нова реєстрація для неї не повинна використовуватись.',
-      statusDetailNoMappedCourses: (visible, total) => `Курси реєстрації: ${visible}/${total}. Потрібен хоча б один видимий маршрут.`,
-      statusDetailPartialMapping: (visible, total) => `Курси реєстрації: ${visible}/${total}. Частина маршрутів ще не завершена.`,
-      statusDetailNoVisibleSubjects: (visible, total) => `Предмети: ${visible}/${total}. Студент побачить порожній список, доки не з'явиться хоча б один видимий предмет.`,
-      statusDetailPartialSubjects: (visible, total) => `Предмети: ${visible}/${total}. Частина набору ще відфільтрована або прихована.`,
-      statusDetailCampusConflict: (ambiguous, ready, total) => `Кампуси: ${ready} готово з ${total}, конфліктів ${ambiguous}. Потрібно лишити по одному маршруту на кампус.`,
-      statusDetailCampusReady: (ready, total) => `Кампуси: ${ready} готово з ${total}.`,
-      statusDetailNoUsers: "До цієї когорти ще не прив'язано жодного користувача.",
-      statusDetailUsers: (count) => `Користувачів у когорті: ${count}.`,
+      ready: 'Р В РІР‚СљР В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В РЎвЂў',
+      inactive: 'Р В РЎСљР В Р’ВµР В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В Р’В°',
+      blocked: 'Р В РІР‚вЂќР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+      needsAttention: 'Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В Р’В° Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В РЎвЂ“Р В Р’В°',
+      cohortDisabled: 'Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+      noMappedCourses: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р’В·Р В Р’В°Р В РЎВР В Р’В°Р В РЎвЂ”Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ ',
+      noVisibleSubjects: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ ',
+      campusConflict: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р РЋРЎвЂњ',
+      partialMapping: 'Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“',
+      filteredSubjects: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР РЋРІР‚С›Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ',
+      noUsersAssigned: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ ',
+      signalCourseMapping: 'Р В РЎС™Р В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ ',
+      signalSubjectVisibility: 'Р В РІР‚в„ўР В РЎвЂР В РўвЂР В РЎвЂР В РЎВР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ ',
+      signalCampusRouting: 'Р В РЎС™Р В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р РЋРІР‚вЂњР В Р вЂ ',
+      signalUserMigration: 'Р В РЎС™Р РЋРІР‚вЂњР В РЎвЂ“Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ ',
+      registrationClosed: 'Р В Р’В Р В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р РЋРІР‚В°Р В Р’Вµ Р В Р’В·Р В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В Р’В°',
+      visibleLinkedCourses: 'Р В РІР‚в„ўР В РЎвЂР В РўвЂР В РЎвЂР В РЎВР РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ \'Р РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ',
+      studentVisibleScope: 'Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р РЋР С“Р РЋР Р‰Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋРЎвЂњР РЋР вЂљ',
+      oneCoursePerCampus: 'Р В РЎСџР В РЎвЂў Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’В° Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“',
+      noSourceCourses: 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РўвЂР В Р’В¶Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ ',
+      selectCompatibleSourceCourses: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р’В¶Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ',
+      pickCohortTitle: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ, Р РЋРІР‚В°Р В РЎвЂўР В Р’В± Р РЋРЎвЂњР В Р вЂ Р РЋРІР‚вЂњР В РЎВР В РЎвЂќР В Р вЂ¦Р РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С›Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР РЋР С“-Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВ',
+      pickCohortBody: 'Р В Р Р‹Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР РЋРІвЂљВ¬Р РЋРЎвЂњ Р В РЎвЂўР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋР вЂљР РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ, Р РЋРІР‚С™Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњР РЋР вЂљ Р В Р’В·Р В РЎВР В РЎвЂўР В Р’В¶Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ, Р РЋРІР‚РЋР В РЎвЂ Р РЋР вЂљР В Р’ВµР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњ Р В РЎВР В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“, Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ, Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂ Р РЋРІР‚С™Р В Р’В° Р В РЎВР РЋРІР‚вЂњР В РЎвЂ“Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ.',
+      goToAdmissions: 'Р В РІР‚СњР В РЎвЂў Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ',
+      mappingBlockedTitle: 'Р В Р’В Р В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР РЋРІР‚Сњ Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ ',
+      mappingBlockedBodyWithLegacy: (count) => `Р В РЎСџР В РЎвЂўР В РЎвЂќР В РЎвЂ Р РЋРІР‚В°Р В РЎвЂў Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р’В¶Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ \'Р РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ. Р В РІР‚СњР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ legacy-Р РЋРІвЂљВ¬Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“ Р В РўвЂР В Р’В»Р РЋР РЏ ${count} Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ .`,
+      mappingBlockedBody: 'Р В РЎСџР В РЎвЂўР В РЎвЂќР В РЎвЂ Р РЋРІР‚В°Р В РЎвЂў Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р’В¶Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ \'Р РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ, Р РЋРІР‚С™Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В РЎВР В РЎвЂўР В Р’В¶Р РЋРЎвЂњР РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚СњР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂ.',
+      openMapping: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎВР В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“',
+      emptySubjectsTitle: 'Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂ Р В РЎвЂ”Р В РЎвЂўР В Р’В±Р В Р’В°Р РЋРІР‚РЋР В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р В РЎвЂ”Р В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ ',
+      emptySubjectsBody: 'Р В Р в‚¬ Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњ Р РЋРІР‚В Р РЋР РЏ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В Р’В° Р В Р’В·Р В Р’В°Р РЋР вЂљР В Р’В°Р В Р’В· Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В РўвЂР В РЎвЂў Р В Р вЂ¦Р РЋРЎвЂњР В Р’В»Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .',
+      openSubjects: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ',
+      campusConflictsTitle: 'Р В РЎС™Р В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р РЋРІР‚вЂњР В Р вЂ  Р РЋРІР‚В°Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р В РЎвЂ',
+      campusConflictsBody: (items) => `Р В РЎСљР В Р’ВµР В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂ: ${items}.`,
+      resolveCampuses: 'Р В РІР‚в„ўР В РЎвЂР РЋР вЂљР РЋРІР‚вЂњР РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂ',
+      campusMissingTitle: 'Р В РЎС™Р В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р РЋРІР‚вЂњР В Р вЂ  Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ',
+      campusMissingBody: 'Р В РІР‚вЂќР В Р’В°Р В РЎВР В Р’В°Р В РЎвЂ”Р В Р’В»Р В Р’ВµР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ Р В Р вЂ Р В Р’В¶Р В Р’Вµ Р РЋРІР‚Сњ, Р В Р’В°Р В Р’В»Р В Р’Вµ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р В РЎвЂР В Р вЂ Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р’В¶Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™ Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В Р’В°Р РЋРІР‚В¦.',
+      reviewCampuses: 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂ',
+      existingUsersTitle: 'Р В РЎСљР В Р’В°Р РЋР РЏР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РЎВ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР В Р’В°Р В РЎВ Р РЋРІР‚В°Р В Р’Вµ Р РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В Р’В±Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ',
+      existingUsersBody: (pendingUsers, totalCourses) => `${pendingUsers} Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњ ${totalCourses} Р РЋР С“Р РЋРЎвЂњР В РЎВР РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РўвЂР В Р’В¶Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В Р’В°Р РЋРІР‚В¦ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ \'Р РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В РЎвЂў Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ.`,
+      openMigration: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎВР РЋРІР‚вЂњР В РЎвЂ“Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№',
+      baseVisibilityTitle: 'Р В РІР‚ВР В Р’В°Р В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В° Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р В Р вЂ Р РЋР С“Р В Р’Вµ Р РЋРІР‚В°Р В Р’Вµ Р РЋРІР‚С›Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚Сњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ',
+      baseVisibilityBody: (count) => `${count} Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚В¦Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ“Р В Р’В»Р В РЎвЂўР В Р’В±Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ  Р В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњ, Р РЋРІР‚С™Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р РЋРІР‚В Р РЋР РЏ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В·Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚вЂќР РЋРІР‚В¦ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· override Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ.`,
+      reviewSubjects: 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ',
+      pendingSuffix: 'Р В РЎвЂўР РЋРІР‚РЋР РЋРІР‚вЂњР В РЎвЂќР РЋРЎвЂњР РЋРІР‚Сњ',
+      alreadyAlignedSuffix: 'Р В Р вЂ Р В Р’В¶Р В Р’Вµ Р В Р вЂ Р В РЎвЂР РЋР вЂљР РЋРІР‚вЂњР В Р вЂ Р В Р вЂ¦Р РЋР РЏР В Р вЂ¦Р В РЎвЂў',
+      blockedSuffix: 'Р В Р’В·Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+      readySuffix: 'Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В РЎвЂў',
+      hiddenInBaseCourse: (count) => `${count} Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚В¦Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В Р вЂ  Р В Р’В±Р В Р’В°Р В Р’В·Р В РЎвЂўР В Р вЂ Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњ`,
+      campusKyiv: 'Р В РЎв„ўР В РЎвЂР РЋРІР‚вЂќР В Р вЂ ',
+      campusMunich: 'Р В РЎС™Р РЋР вЂ№Р В Р вЂ¦Р РЋРІР‚В¦Р В Р’ВµР В Р вЂ¦',
+      statusDetailReady: 'Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В Р’В° Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В Р’В°: Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ , Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ Р В РІвЂћвЂ“ Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂ Р В Р вЂ Р В РЎвЂР РЋР вЂљР РЋРІР‚вЂњР В Р вЂ Р В Р вЂ¦Р РЋР РЏР В Р вЂ¦Р РЋРІР‚вЂњ.',
+      statusDetailInactive: 'Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В Р’В° Р В Р вЂ Р В РЎвЂР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В Р’В°, Р РЋРІР‚С™Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В° Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ¦Р В Р’ВµР РЋРІР‚вЂќ Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В РЎвЂР В Р вЂ¦Р В Р вЂ¦Р В Р’В° Р В Р вЂ Р В РЎвЂР В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋР С“Р РЋР Р‰.',
+      statusDetailNoMappedCourses: (visible, total) => `Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ: ${visible}/${total}. Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р’ВµР В Р вЂ¦ Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚РЋР В Р’В° Р В Р’В± Р В РЎвЂўР В РўвЂР В РЎвЂР В Р вЂ¦ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР В РІвЂћвЂ“ Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™.`,
+      statusDetailPartialMapping: (visible, total) => `Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ: ${visible}/${total}. Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р’В°Р В Р вЂ Р В Р’ВµР РЋР вЂљР РЋРІвЂљВ¬Р В Р’ВµР В Р вЂ¦Р В Р’В°.`,
+      statusDetailNoVisibleSubjects: (visible, total) => `Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ: ${visible}/${total}. Р В Р Р‹Р РЋРІР‚С™Р РЋРЎвЂњР В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™ Р В РЎвЂ”Р В РЎвЂўР В Р’В±Р В Р’В°Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р В РЎвЂ”Р В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќ, Р В РўвЂР В РЎвЂўР В РЎвЂќР В РЎвЂ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·'Р РЋР РЏР В Р вЂ Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚РЋР В Р’В° Р В Р’В± Р В РЎвЂўР В РўвЂР В РЎвЂР В Р вЂ¦ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™.`,
+      statusDetailPartialSubjects: (visible, total) => `Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В РЎвЂ: ${visible}/${total}. Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° Р В Р вЂ¦Р В Р’В°Р В Р’В±Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР РЋРІР‚С›Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р’В° Р В Р’В°Р В Р’В±Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚В¦Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р’В°.`,
+      statusDetailCampusConflict: (ambiguous, ready, total) => `Р В РЎв„ўР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂ: ${ready} Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В РЎвЂў Р В Р’В· ${total}, Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  ${ambiguous}. Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’В° Р В РЎвЂќР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“.`,
+      statusDetailCampusReady: (ready, total) => `Р В РЎв„ўР В Р’В°Р В РЎВР В РЎвЂ”Р РЋРЎвЂњР РЋР С“Р В РЎвЂ: ${ready} Р В РЎвЂ“Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В РЎвЂў Р В Р’В· ${total}.`,
+      statusDetailNoUsers: "Р В РІР‚СњР В РЎвЂў Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚СњР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ 'Р РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В Р’В¶Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР В Р’В°.",
+      statusDetailUsers: (count) => `Р В РЎв„ўР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРІР‚вЂњ: ${count}.`,
       statusDetailOverrides: (count) => count === 1
-        ? '1 override видимості предметів уже застосовано.'
-        : `${count} overrides видимості предметів уже застосовано.`,
+        ? '1 override Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў.'
+        : `${count} overrides Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў.`,
       deleteBlockedUsers: (count) => count === 1
-        ? 'Не можна видалити: 1 користувач усе ще прив’язаний до цієї когорти або її контекстів.'
-        : `Не можна видалити: ${count} користувачів усе ще прив’язані до цієї когорти або її контекстів.`,
-      deleteImpactContexts: (count) => count === 1 ? 'Буде видалено 1 live-контекст.' : `Буде видалено ${count} live-контекстів.`,
-      deleteImpactSemesters: (count) => count === 1 ? 'Буде видалено 1 live-semester.' : `Буде видалено ${count} live-semesters.`,
-      deleteImpactOfferings: (count) => count === 1 ? 'Буде видалено 1 offering без інших прив’язок.' : `Буде видалено ${count} offerings без інших прив’язок.`,
+        ? 'Р В РЎСљР В Р’Вµ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р В Р’В° Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ: 1 Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋ Р РЋРЎвЂњР РЋР С“Р В Р’Вµ Р РЋРІР‚В°Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В РЎвЂў Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚СњР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂ Р В Р’В°Р В Р’В±Р В РЎвЂў Р РЋРІР‚вЂќР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .'
+        : `Р В РЎСљР В Р’Вµ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р В Р’В° Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ: ${count} Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњР РЋР С“Р В Р’Вµ Р РЋРІР‚В°Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В РЎвЂў Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚СњР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂ Р В Р’В°Р В Р’В±Р В РЎвЂў Р РЋРІР‚вЂќР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .`,
+      deleteImpactContexts: (count) => count === 1 ? 'Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў 1 live-Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™.' : `Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${count} live-Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .`,
+      deleteImpactSemesters: (count) => count === 1 ? 'Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў 1 live-semester.' : `Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${count} live-semesters.`,
+      deleteImpactOfferings: (count) => count === 1 ? 'Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў 1 offering Р В Р’В±Р В Р’ВµР В Р’В· Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂўР В РЎвЂќ.' : `Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${count} offerings Р В Р’В±Р В Р’ВµР В Р’В· Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂўР В РЎвЂќ.`,
       deleteImpactTeacherAssignments: (count) => count === 1
-        ? 'Буде прибрано 1 teacher assignment.'
-        : `Буде прибрано ${count} teacher assignments.`,
-      deleteImpactMappings: (visible, total) => `Legacy-мапінг курсів: ${visible}/${total} видимих маршрутів.`,
-      deleteImpactVisibility: (visible, total) => `Legacy-видимість предметів: ${visible}/${total} видимих правил.`,
-      deleteImpactNothing: 'Когорта ще не встигла створити live-даних, тому видалення буде майже порожнім.',
-      teacherBadge: 'Викладацький',
+        ? 'Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂў 1 teacher assignment.'
+        : `Р В РІР‚ВР РЋРЎвЂњР В РўвЂР В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂў ${count} teacher assignments.`,
+      deleteImpactMappings: (visible, total) => `Legacy-Р В РЎВР В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ : ${visible}/${total} Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚В¦ Р В РЎВР В Р’В°Р РЋР вЂљР РЋРІвЂљВ¬Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .`,
+      deleteImpactVisibility: (visible, total) => `Legacy-Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : ${visible}/${total} Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂР В Р’В».`,
+      deleteImpactNothing: 'Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В Р’В° Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂ“Р В Р’В»Р В Р’В° Р РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂўР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂ live-Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦, Р РЋРІР‚С™Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В Р’В±Р РЋРЎвЂњР В РўвЂР В Р’Вµ Р В РЎВР В Р’В°Р В РІвЂћвЂ“Р В Р’В¶Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В РЎВ.',
+      teacherBadge: 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“',
     } : {
       ready: 'Ready',
       inactive: 'Inactive',
@@ -36522,71 +36534,71 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
 function getPathwaysRouteMessages(req) {
   const isUk = getPreferredLang(req) === 'uk';
   const messages = isUk ? {
-    databaseError: 'Помилка бази даних',
-    programNameRequired: 'Назва програми обов\'язкова',
-    programAdded: 'Програму додано',
-    programUpdated: 'Програму оновлено',
-    programExistsForTrack: 'Програма для цього треку вже існує',
-    invalidProgram: 'Некоректна програма',
-    selectProgram: 'Оберіть програму',
-    admissionYearRequired: 'Рік вступу обов\'язковий',
-    admissionAdded: 'Рік вступу додано',
-    admissionUpdated: 'Рік вступу оновлено',
-    admissionExistsForProgram: 'Такий рік вступу вже існує для цієї програми',
-    invalidAdmissionYear: 'Некоректний рік вступу',
-    programRequired: 'Програма обов\'язкова',
-    courseMappingSaved: 'Мапінг курсів збережено',
-    courseMappingCopied: 'Мапінг курсів скопійовано',
-    selectSourceAndTargetAdmissions: 'Оберіть джерельний і цільовий роки вступу',
-    sourceTargetAdmissionsDifferent: 'Джерельний і цільовий роки вступу мають відрізнятися',
-    admissionNotFound: 'Рік вступу не знайдено',
-    sourceAdmissionSameProgram: 'Джерельний рік вступу має належати тій самій програмі',
-    cannotResolveLegacyCourseYear: 'Не вдалося визначити legacy-рік для цього року вступу',
-    noTeacherCoursesFound: 'Викладацьких курсів не знайдено',
-    noLegacyCoursesMatchedYear: (year) => `Не знайдено legacy-курсів для року ${year}`,
+    databaseError: 'Р В РЎСџР В РЎвЂўР В РЎВР В РЎвЂР В Р’В»Р В РЎвЂќР В Р’В° Р В Р’В±Р В Р’В°Р В Р’В·Р В РЎвЂ Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦',
+    programNameRequired: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В РЎвЂ Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ \'Р РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    programAdded: 'Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРЎвЂњ Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+    programUpdated: 'Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРЎвЂњ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    programExistsForTrack: 'Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В Р’В° Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р В Р’В¶Р В Р’Вµ Р РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р РЋРЎвЂњР РЋРІР‚Сњ',
+    invalidProgram: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В Р’В°',
+    selectProgram: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРЎвЂњ',
+    admissionYearRequired: 'Р В Р’В Р РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ \'Р РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“',
+    admissionAdded: 'Р В Р’В Р РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+    admissionUpdated: 'Р В Р’В Р РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    admissionExistsForProgram: 'Р В РЎС›Р В Р’В°Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В Р вЂ Р В Р’В¶Р В Р’Вµ Р РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р РЋРЎвЂњР РЋРІР‚Сњ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚СњР РЋРІР‚вЂќ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В РЎвЂ',
+    invalidAdmissionYear: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ',
+    programRequired: 'Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В Р’В° Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ \'Р РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    courseMappingSaved: 'Р В РЎС™Р В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    courseMappingCopied: 'Р В РЎС™Р В Р’В°Р В РЎвЂ”Р РЋРІР‚вЂњР В Р вЂ¦Р В РЎвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ  Р РЋР С“Р В РЎвЂќР В РЎвЂўР В РЎвЂ”Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+    selectSourceAndTargetAdmissions: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РўвЂР В Р’В¶Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚вЂњ Р РЋРІР‚В Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂўР В РЎвЂќР В РЎвЂ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ',
+    sourceTargetAdmissionsDifferent: 'Р В РІР‚СњР В Р’В¶Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚вЂњ Р РЋРІР‚В Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂўР В РЎвЂќР В РЎвЂ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В РЎВР В Р’В°Р РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР РЋР вЂљР РЋРІР‚вЂњР В Р’В·Р В Р вЂ¦Р РЋР РЏР РЋРІР‚С™Р В РЎвЂР РЋР С“Р РЋР РЏ',
+    admissionNotFound: 'Р В Р’В Р РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    sourceAdmissionSameProgram: 'Р В РІР‚СњР В Р’В¶Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В Р’ВµР В Р’В¶Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р В Р’В°Р В РЎВР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРІР‚вЂњ',
+    cannotResolveLegacyCourseYear: 'Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р В РЎвЂ legacy-Р РЋР вЂљР РЋРІР‚вЂњР В РЎвЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ',
+    noTeacherCoursesFound: 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    noLegacyCoursesMatchedYear: (year) => `Р В РЎСљР В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў legacy-Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ  Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ ${year}`,
     mappedTeacherCourses: (count) => count === 1
-      ? 'Замаплено 1 викладацький курс'
-      : `Замаплено ${count} викладацьких курсів`,
-    mappedLegacyYearCourses: (legacyYear, admissionYear) => `Legacy-курси ${legacyYear} замаплено на ${admissionYear}`,
-    selectAtLeastOneSourceCourse: 'Оберіть хоча б один джерельний курс',
-    admissionNotInSelectedProgram: 'Рік вступу не належить вибраній програмі',
-    selectedCoursesDoNotMatchTrack: 'Обрані курси не відповідають треку року вступу',
+      ? 'Р В РІР‚вЂќР В Р’В°Р В РЎВР В Р’В°Р В РЎвЂ”Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў 1 Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“'
+      : `Р В РІР‚вЂќР В Р’В°Р В РЎВР В Р’В°Р В РЎвЂ”Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${count} Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂќР В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРІР‚вЂњР В Р вЂ `,
+    mappedLegacyYearCourses: (legacyYear, admissionYear) => `Legacy-Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ ${legacyYear} Р В Р’В·Р В Р’В°Р В РЎВР В Р’В°Р В РЎвЂ”Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р вЂ¦Р В Р’В° ${admissionYear}`,
+    selectAtLeastOneSourceCourse: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚РЋР В Р’В° Р В Р’В± Р В РЎвЂўР В РўвЂР В РЎвЂР В Р вЂ¦ Р В РўвЂР В Р’В¶Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“',
+    admissionNotInSelectedProgram: 'Р В Р’В Р РЋРІР‚вЂњР В РЎвЂќ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В Р’ВµР В Р’В¶Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРІР‚вЂњ',
+    selectedCoursesDoNotMatchTrack: 'Р В РЎвЂєР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В Р’В°Р РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРЎвЂњ Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ',
     migratedUsers: (count, admissionYear) => count === 1
-      ? `Перенесено 1 користувача до року вступу ${admissionYear}`
-      : `Перенесено ${count} користувачів до року вступу ${admissionYear}`,
-    noEligibleUsersFound: 'У вибраних курсах не знайдено відповідних користувачів',
-    invalidCourse: 'Некоректний курс',
-    subjectVisibilitySaved: 'Видимість предметів збережено',
-    subjectVisibilityCopied: 'Видимість предметів скопійовано',
-    subjectCatalogNameRequired: 'Назва предмета обов\'язкова',
-    subjectCatalogEntryAdded: 'Предмет додано до глобальної бази',
-    subjectCatalogEntryExists: 'Такий предмет уже є в глобальній базі',
-    selectAtLeastOneCatalogSubject: 'Оберіть хоча б один предмет із глобальної бази',
-    selectAtLeastOneTargetCourse: 'Оберіть хоча б один цільовий курс',
+      ? `Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР С“Р В Р’ВµР В Р вЂ¦Р В РЎвЂў 1 Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР В Р’В° Р В РўвЂР В РЎвЂў Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ ${admissionYear}`
+      : `Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР С“Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${count} Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р В РўвЂР В РЎвЂў Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р РЋРЎвЂњ ${admissionYear}`,
+    noEligibleUsersFound: 'Р В Р в‚¬ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В Р’В°Р РЋРІР‚В¦ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ ',
+    invalidCourse: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“',
+    subjectVisibilitySaved: 'Р В РІР‚в„ўР В РЎвЂР В РўвЂР В РЎвЂР В РЎВР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    subjectVisibilityCopied: 'Р В РІР‚в„ўР В РЎвЂР В РўвЂР В РЎвЂР В РЎВР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋР С“Р В РЎвЂќР В РЎвЂўР В РЎвЂ”Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+    subjectCatalogNameRequired: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ \'Р РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    subjectCatalogEntryAdded: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РўвЂР В РЎвЂў Р В РЎвЂ“Р В Р’В»Р В РЎвЂўР В Р’В±Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂўР РЋРІР‚вЂќ Р В Р’В±Р В Р’В°Р В Р’В·Р В РЎвЂ',
+    subjectCatalogEntryExists: 'Р В РЎС›Р В Р’В°Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р РЋРІР‚Сњ Р В Р вЂ  Р В РЎвЂ“Р В Р’В»Р В РЎвЂўР В Р’В±Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р’В±Р В Р’В°Р В Р’В·Р РЋРІР‚вЂњ',
+    selectAtLeastOneCatalogSubject: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚РЋР В Р’В° Р В Р’В± Р В РЎвЂўР В РўвЂР В РЎвЂР В Р вЂ¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р РЋРІР‚вЂњР В Р’В· Р В РЎвЂ“Р В Р’В»Р В РЎвЂўР В Р’В±Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂўР РЋРІР‚вЂќ Р В Р’В±Р В Р’В°Р В Р’В·Р В РЎвЂ',
+    selectAtLeastOneTargetCourse: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚РЋР В Р’В° Р В Р’В± Р В РЎвЂўР В РўвЂР В РЎвЂР В Р вЂ¦ Р РЋРІР‚В Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“',
     subjectCatalogAssignmentsSaved: (bindings, subjects, existing, conflicts) => {
       const parts = [];
-      parts.push(`Прив’язок: ${bindings}`);
-      parts.push(`нових предметів: ${subjects}`);
-      if (existing > 0) parts.push(`вже були в курсах: ${existing}`);
-      if (conflicts > 0) parts.push(`конфліктів: ${conflicts}`);
-      return parts.join(' · ');
+      parts.push(`Р В РЎСџР РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂўР В РЎвЂќ: ${bindings}`);
+      parts.push(`Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : ${subjects}`);
+      if (existing > 0) parts.push(`Р В Р вЂ Р В Р’В¶Р В Р’Вµ Р В Р’В±Р РЋРЎвЂњР В Р’В»Р В РЎвЂ Р В Р вЂ  Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В Р’В°Р РЋРІР‚В¦: ${existing}`);
+      if (conflicts > 0) parts.push(`Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : ${conflicts}`);
+      return parts.join(' Р вЂ™Р’В· ');
     },
-    subjectBindingRemoved: 'Предмет прибрано з курсу',
-    subjectInstanceNotFound: 'Прив’язку предмета не знайдено',
-    invalidStudyContext: 'Некоректний study context',
-    invalidStudyContextSemester: 'Некоректний semester context',
-    studyContextSemesterTitleRequired: 'Назва семестру обов’язкова',
-    invalidStudyContextSemesterNumber: 'Некоректний номер семестру',
-    invalidStudyContextSemesterWeeks: 'Некоректна тривалість семестру',
-    invalidStudyContextSemesterDate: 'Некоректна дата старту семестру',
-    studyContextSemesterExists: 'Семестр з цим номером уже є в context',
-    studyContextSemesterAdded: 'Семестр context додано',
-    studyContextSemesterUpdated: 'Семестр context оновлено',
-    studyContextSemesterDeleted: 'Семестр context видалено',
-    admissionDeleted: 'Когорту видалено',
+    subjectBindingRemoved: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В Р’В· Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ',
+    subjectInstanceNotFound: 'Р В РЎСџР РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР РЋРЎвЂњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    invalidStudyContext: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ study context',
+    invalidStudyContextSemester: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ semester context',
+    studyContextSemesterTitleRequired: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    invalidStudyContextSemesterNumber: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В РЎвЂўР В РЎВР В Р’ВµР РЋР вЂљ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ',
+    invalidStudyContextSemesterWeeks: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В Р’В° Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В Р вЂ Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ',
+    invalidStudyContextSemesterDate: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В Р’В° Р В РўвЂР В Р’В°Р РЋРІР‚С™Р В Р’В° Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ',
+    studyContextSemesterExists: 'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р В Р’В· Р РЋРІР‚В Р В РЎвЂР В РЎВ Р В Р вЂ¦Р В РЎвЂўР В РЎВР В Р’ВµР РЋР вЂљР В РЎвЂўР В РЎВ Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р РЋРІР‚Сњ Р В Р вЂ  context',
+    studyContextSemesterAdded: 'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ context Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў',
+    studyContextSemesterUpdated: 'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ context Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    studyContextSemesterDeleted: 'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ context Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    admissionDeleted: 'Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
     admissionDeleteBlockedUsers: (count) => count === 1
-      ? 'Когорту не можна видалити, доки 1 користувач ще прив’язаний до неї або її context.'
-      : `Когорту не можна видалити, доки ${count} користувачів ще прив’язані до неї або її contexts.`,
+      ? 'Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р В Р’В° Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ, Р В РўвЂР В РЎвЂўР В РЎвЂќР В РЎвЂ 1 Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋ Р РЋРІР‚В°Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В РЎвЂў Р В Р вЂ¦Р В Р’ВµР РЋРІР‚вЂќ Р В Р’В°Р В Р’В±Р В РЎвЂў Р РЋРІР‚вЂќР РЋРІР‚вЂќ context.'
+      : `Р В РЎв„ўР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р В Р’В° Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ, Р В РўвЂР В РЎвЂўР В РЎвЂќР В РЎвЂ ${count} Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р РЋРІР‚В°Р В Р’Вµ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В РЎвЂў Р В Р вЂ¦Р В Р’ВµР РЋРІР‚вЂќ Р В Р’В°Р В Р’В±Р В РЎвЂў Р РЋРІР‚вЂќР РЋРІР‚вЂќ contexts.`,
   } : {
     databaseError: 'Database error',
     programNameRequired: 'Program name is required',
@@ -36631,7 +36643,7 @@ function getPathwaysRouteMessages(req) {
       parts.push(`new subjects: ${subjects}`);
       if (existing > 0) parts.push(`already assigned: ${existing}`);
       if (conflicts > 0) parts.push(`conflicts: ${conflicts}`);
-      return parts.join(' · ');
+      return parts.join(' Р вЂ™Р’В· ');
     },
     subjectBindingRemoved: 'Subject removed from the course',
     subjectInstanceNotFound: 'Subject binding not found',
@@ -36649,26 +36661,26 @@ function getPathwaysRouteMessages(req) {
     admissionDeleteBlockedUsers: (count) => `Cannot delete the cohort while ${count} user${count === 1 ? ' is' : 's are'} still linked to it or its live contexts.`,
   };
   return Object.assign(messages, isUk ? {
-    presetNameRequired: 'Назва шаблону обов’язкова',
-    invalidPreset: 'Некоректний шаблон програми',
-    invalidPresetStage: 'Некоректний stage шаблону',
-    presetSaved: 'Шаблон програми збережено',
-    presetSemesterSaved: 'Семестр шаблону збережено',
-    presetSemesterDeleted: 'Семестр шаблону видалено',
-    invalidSubjectCatalog: 'Некоректний предмет із каталогу',
-    presetSubjectSaved: 'Предмет шаблону збережено',
-    presetSubjectDeleted: 'Предмет шаблону видалено',
-    selectAtLeastOneIntakeProgram: 'Оберіть хоча б одну програму для intake',
-    intakeCreated: (created, existing, applied, year) => `Intake ${year}: створено ${created}, уже існувало ${existing}, застосовано ${applied}`,
-    presetAppliedToContext: (label) => `Шаблон застосовано до ${label}`,
+    presetNameRequired: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р РЋРЎвЂњ Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+    invalidPreset: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В РЎвЂ',
+    invalidPresetStage: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ stage Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р РЋРЎвЂњ',
+    presetSaved: 'Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР В РЎвЂ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    presetSemesterSaved: 'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р РЋРЎвЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    presetSemesterDeleted: 'Р В Р Р‹Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    invalidSubjectCatalog: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р РЋРІР‚вЂњР В Р’В· Р В РЎвЂќР В Р’В°Р РЋРІР‚С™Р В Р’В°Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р РЋРЎвЂњ',
+    presetSubjectSaved: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р РЋРЎвЂњ Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    presetSubjectDeleted: 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р РЋРІвЂљВ¬Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    selectAtLeastOneIntakeProgram: 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚РЋР В Р’В° Р В Р’В± Р В РЎвЂўР В РўвЂР В Р вЂ¦Р РЋРЎвЂњ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РЎВР РЋРЎвЂњ Р В РўвЂР В Р’В»Р РЋР РЏ intake',
+    intakeCreated: (created, existing, applied, year) => `Intake ${year}: Р РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂўР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂў ${created}, Р РЋРЎвЂњР В Р’В¶Р В Р’Вµ Р РЋРІР‚вЂњР РЋР С“Р В Р вЂ¦Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р’В»Р В РЎвЂў ${existing}, Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў ${applied}`,
+    presetAppliedToContext: (label) => `Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РўвЂР В РЎвЂў ${label}`,
     presetAppliedToAdmission: (count) => count === 1
-      ? 'Шаблон застосовано до 1 context'
-      : `Шаблон застосовано до ${count} contexts`,
-    moderationItemNotFound: 'Елемент moderation queue не знайдено',
-    moderationActionInvalid: 'Некоректна дія для moderation queue',
-    moderationAssignContextRequired: 'Для assign context потрібно обрати study context',
-    moderationResolved: 'Елемент moderation queue оновлено',
-    promotedUsers: (promoted, skipped) => `Підвищено ${promoted} користувачів, пропущено ${skipped}`,
+      ? 'Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РўвЂР В РЎвЂў 1 context'
+      : `Р В Р РѓР В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂўР В Р вЂ¦ Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РўвЂР В РЎвЂў ${count} contexts`,
+    moderationItemNotFound: 'Р В РІР‚СћР В Р’В»Р В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™ moderation queue Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    moderationActionInvalid: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В Р’В° Р В РўвЂР РЋРІР‚вЂњР РЋР РЏ Р В РўвЂР В Р’В»Р РЋР РЏ moderation queue',
+    moderationAssignContextRequired: 'Р В РІР‚СњР В Р’В»Р РЋР РЏ assign context Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂ study context',
+    moderationResolved: 'Р В РІР‚СћР В Р’В»Р В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™ moderation queue Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
+    promotedUsers: (promoted, skipped) => `Р В РЎСџР РЋРІР‚вЂњР В РўвЂР В Р вЂ Р В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${promoted} Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ , Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ”Р РЋРЎвЂњР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${skipped}`,
   } : {
     presetNameRequired: 'Preset name is required',
     invalidPreset: 'Invalid program preset',
@@ -36899,7 +36911,7 @@ function getLegacyAcademicWriteMovedMessage(req) {
 function getLegacyAcademicScheduleMovedMessage(req) {
   const isUk = getPreferredLang(req) === 'uk';
   return isUk
-    ? 'Розклад для Academic v2 редагується в /admin/pathways#schedule'
+    ? 'Р В Р’В Р В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ Р В РўвЂР В Р’В»Р РЋР РЏ Academic v2 Р РЋР вЂљР В Р’ВµР В РўвЂР В Р’В°Р В РЎвЂ“Р РЋРЎвЂњР РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р вЂ  /admin/pathways#schedule'
     : 'Academic v2 schedule editing lives in /admin/pathways#schedule';
 }
 
@@ -37349,9 +37361,9 @@ app.post('/admin/pathways/moderation/:id/resolve', requirePathwaysSectionAccess,
       ...redirectState,
       studyContextId: action === 'assign_context' ? assignedStudyContextId : redirectState.studyContextId,
       ok: action === 'reopen'
-        ? (getPreferredLang(req) === 'uk' ? 'Елемент черги знову відкрито' : 'Queue item reopened')
+        ? (getPreferredLang(req) === 'uk' ? 'Р В РІР‚СћР В Р’В»Р В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В РЎвЂ“Р В РЎвЂ Р В Р’В·Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р РЋРЎвЂњ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў' : 'Queue item reopened')
         : (action === 'mark_reviewing'
-          ? (getPreferredLang(req) === 'uk' ? 'Елемент позначено як reviewing' : 'Queue item marked as reviewing')
+          ? (getPreferredLang(req) === 'uk' ? 'Р В РІР‚СћР В Р’В»Р В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™ Р В РЎвЂ”Р В РЎвЂўР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р РЋР РЏР В РЎвЂќ reviewing' : 'Queue item marked as reviewing')
           : msg.moderationResolved),
     }));
   } catch (err) {
@@ -37781,9 +37793,9 @@ app.post('/admin/pathways/contexts/:id/offerings/save', requirePathwaysSectionAc
   const isUk = getPreferredLang(req) === 'uk';
   const offeringText = isUk
     ? {
-        invalid: 'Некоректний context offering',
-        titleRequired: 'Назва offering обов’язкова',
-        saved: 'Context offering збережено',
+        invalid: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ context offering',
+        titleRequired: 'Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В° offering Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°',
+        saved: 'Context offering Р В Р’В·Р В Р’В±Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў',
       }
     : {
         invalid: 'Invalid context offering',
@@ -37882,8 +37894,8 @@ app.post('/admin/pathways/contexts/:contextId/offerings/:offeringId/delete', req
   const isUk = getPreferredLang(req) === 'uk';
   const offeringText = isUk
     ? {
-        invalid: 'Некоректний context offering',
-        deleted: 'Context offering вилучено',
+        invalid: 'Р В РЎСљР В Р’ВµР В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ context offering',
+        deleted: 'Context offering Р В Р вЂ Р В РЎвЂР В Р’В»Р РЋРЎвЂњР РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂў',
       }
     : {
         invalid: 'Invalid context offering',
@@ -38063,7 +38075,7 @@ app.post('/admin/pathways/catalog/assign', requirePathwaysSectionAccess, writeLi
           programId: Number(admissionRow.program_id || 0),
           admissionId,
           error: getPreferredLang(req) === 'uk'
-            ? 'Деякі цільові курси не належать вибраному admission-контексту'
+            ? 'Р В РІР‚СњР В Р’ВµР РЋР РЏР В РЎвЂќР РЋРІР‚вЂњ Р РЋРІР‚В Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В Р’ВµР В Р’В¶Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ admission-Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњ'
             : 'Some target courses do not belong to the selected admission context',
         }));
       }
@@ -39207,7 +39219,7 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
         ...redirectState,
         programId: Number(admissionRow.program_id || 0),
         error: getPreferredLang(req) === 'uk'
-          ? 'Для цієї когорти ще не створено study contexts'
+          ? 'Р В РІР‚СњР В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚СњР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’Вµ Р РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂўР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂў study contexts'
           : 'No study contexts exist for this cohort yet',
       }));
     }
@@ -39279,7 +39291,7 @@ app.post('/admin/pathways/admissions/:id/promote', requirePathwaysSectionAccess,
       programId: Number(admissionRow.program_id || 0),
       admissionId,
       ok: getPreferredLang(req) === 'uk'
-        ? `Підвищено ${promotedCount} користувачів, пропущено ${skippedCount}`
+        ? `Р В РЎСџР РЋРІР‚вЂњР В РўвЂР В Р вЂ Р В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${promotedCount} Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ , Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РЎвЂ”Р РЋРЎвЂњР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${skippedCount}`
         : `Promoted ${promotedCount} users, skipped ${skippedCount}`,
     }));
   } catch (err) {
@@ -39349,7 +39361,7 @@ app.post('/admin/pathways/admissions/:id/subjects/save', requirePathwaysSectionA
         programId: resolvedProgramId,
         admissionId,
         error: getPreferredLang(req) === 'uk'
-          ? 'Обраний курс не належить цьому admission-контексту'
+          ? 'Р В РЎвЂєР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В Р’ВµР В Р’В¶Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂўР В РЎВР РЋРЎвЂњ admission-Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњ'
           : 'Selected course does not belong to this admission context',
       }));
     }
@@ -39489,7 +39501,7 @@ app.post('/admin/pathways/admissions/:id/subjects/copy', requirePathwaysSectionA
         programId: Number(targetRow.program_id || 0),
         admissionId,
         error: getPreferredLang(req) === 'uk'
-          ? 'Обраний курс має бути замаплений і в source, і в target admission'
+          ? 'Р В РЎвЂєР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р’В±Р РЋРЎвЂњР РЋРІР‚С™Р В РЎвЂ Р В Р’В·Р В Р’В°Р В РЎВР В Р’В°Р В РЎвЂ”Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚вЂњ Р В Р вЂ  source, Р РЋРІР‚вЂњ Р В Р вЂ  target admission'
           : 'Selected course must be mapped in both source and target admissions',
       }));
     }
@@ -39927,16 +39939,16 @@ app.post('/admin/schedule-windows', requireScheduleSectionAccess, async (req, re
     for (const courseId of scopedCourseIds) {
       const course = courseMap.get(Number(courseId));
       if (!course) {
-        warnings.push(`Курс ${courseId} не знайдено.`);
+        warnings.push(`Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ ${courseId} Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў.`);
         continue;
       }
       const semester = await getActiveSemester(courseId);
       if (!semester) {
-        warnings.push(`${course.name}: немає активного семестру.`);
+        warnings.push(`${course.name}: Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ.`);
         continue;
       }
       if (Number(weekNumber) > Number(semester.weeks_count || 0)) {
-        warnings.push(`${course.name}: тиждень ${weekNumber} поза межами семестру (${semester.weeks_count}).`);
+        warnings.push(`${course.name}: Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰ ${weekNumber} Р В РЎвЂ”Р В РЎвЂўР В Р’В·Р В Р’В° Р В РЎВР В Р’ВµР В Р’В¶Р В Р’В°Р В РЎВР В РЎвЂ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ (${semester.weeks_count}).`);
       }
       let activeDays = [];
       try {
@@ -39997,8 +40009,8 @@ app.post('/admin/schedule-windows', requireScheduleSectionAccess, async (req, re
         const [day, classNumRaw] = key.split('|');
         const classNum = Number(classNumRaw);
         const time = bellSchedule[classNum]
-          ? `${bellSchedule[classNum].start}–${bellSchedule[classNum].end}`
-          : `${classNum} пара`;
+          ? `${bellSchedule[classNum].start}Р Р†Р вЂљРІР‚Сљ${bellSchedule[classNum].end}`
+          : `${classNum} Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В°`;
         return { day, class_number: classNum, time };
       })
       .sort((a, b) => {
@@ -40017,8 +40029,8 @@ app.post('/admin/schedule-windows', requireScheduleSectionAccess, async (req, re
       if (!grouped.has(day)) return;
       windows.push({ day, slots: grouped.get(day) });
     });
-    const summaryCourses = validCourses.map((c) => c.name).join(' · ');
-    const summary = `Курси: ${summaryCourses} · Тиждень ${weekNumber} · Спільних вікон: ${slots.length}`;
+    const summaryCourses = validCourses.map((c) => c.name).join(' Р вЂ™Р’В· ');
+    const summary = `Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“Р В РЎвЂ: ${summaryCourses} Р вЂ™Р’В· Р В РЎС›Р В РЎвЂР В Р’В¶Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰ ${weekNumber} Р вЂ™Р’В· Р В Р Р‹Р В РЎвЂ”Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В Р вЂ Р РЋРІР‚вЂњР В РЎвЂќР В РЎвЂўР В Р вЂ¦: ${slots.length}`;
     return res.json({
       ok: true,
       summary,
@@ -40104,15 +40116,15 @@ app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res
 });
 
 const SESSION_GENERATOR_MARK_LEGEND = [
-  { code: 'EX', label: 'Екзамен', tone: 'exam' },
-  { code: 'CR', label: 'Залік', tone: 'credit' },
-  { code: 'DIF', label: 'Диференційований залік', tone: 'accent' },
-  { code: 'CONS', label: 'Консультація', tone: 'muted' },
-  { code: 'RES', label: 'Резервний день / перенос', tone: 'warn' },
-  { code: 'RET', label: 'Вікно перескладань', tone: 'danger' },
-  { code: 'OPT', label: 'Необовʼязковий предмет', tone: 'muted' },
-  { code: 'CAP', label: 'Високе навантаження дня', tone: 'warn' },
-  { code: 'G1..Gn', label: 'Окремо по групах', tone: 'info' },
+  { code: 'EX', label: 'Р В РІР‚СћР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦', tone: 'exam' },
+  { code: 'CR', label: 'Р В РІР‚вЂќР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ', tone: 'credit' },
+  { code: 'DIF', label: 'Р В РІР‚СњР В РЎвЂР РЋРІР‚С›Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ¦Р РЋРІР‚В Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ', tone: 'accent' },
+  { code: 'CONS', label: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ', tone: 'muted' },
+  { code: 'RES', label: 'Р В Р’В Р В Р’ВµР В Р’В·Р В Р’ВµР РЋР вЂљР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰ / Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂўР РЋР С“', tone: 'warn' },
+  { code: 'RET', label: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РЎвЂќР В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР РЋР С“Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋР Р‰', tone: 'danger' },
+  { code: 'OPT', label: 'Р В РЎСљР В Р’ВµР В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™', tone: 'muted' },
+  { code: 'CAP', label: 'Р В РІР‚в„ўР В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќР В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РўвЂР В Р вЂ¦Р РЋР РЏ', tone: 'warn' },
+  { code: 'G1..Gn', label: 'Р В РЎвЂєР В РЎвЂќР РЋР вЂљР В Р’ВµР В РЎВР В РЎвЂў Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В°Р РЋРІР‚В¦', tone: 'info' },
 ];
 
 const SESSION_GENERATOR_DEFAULTS = {
@@ -40645,7 +40657,7 @@ const buildSessionAssessmentPlan = ({ subjects = [], gradingBySubject = {} }) =>
     const groupCountRaw = Math.max(1, Number(subject.group_count || 1));
     const groupCount = Math.min(groupUpperCap, groupCountRaw);
     const lowered = String(subject.name || '').toLowerCase();
-    const looksLikePractice = /(семінар|семинар|practice|практик|lab|лаборатор)/i.test(lowered);
+    const looksLikePractice = /(Р РЋР С“Р В Р’ВµР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р РЋР вЂљ|Р РЋР С“Р В Р’ВµР В РЎВР В РЎвЂР В Р вЂ¦Р В Р’В°Р РЋР вЂљ|practice|Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В РЎвЂќ|lab|Р В Р’В»Р В Р’В°Р В Р’В±Р В РЎвЂўР РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљ)/i.test(lowered);
     let assessmentType = 'exam';
     let typeReason = 'fallback_required_subject';
     if (examEnabled && !creditEnabled) {
@@ -40691,7 +40703,7 @@ const buildSessionAssessmentPlan = ({ subjects = [], gradingBySubject = {} }) =>
         subject_id: subjectId,
         subject_name: subject.name,
         group_number: groupNumber,
-        group_label: groupNumber ? `Група ${groupNumber}` : (groupCountRaw > 1 ? `Всі групи (${groupCountRaw})` : 'Всі'),
+        group_label: groupNumber ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groupNumber}` : (groupCountRaw > 1 ? `Р В РІР‚в„ўР РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ (${groupCountRaw})` : 'Р В РІР‚в„ўР РЋР С“Р РЋРІР‚вЂњ'),
         type: assessmentType,
         complexity,
         marks,
@@ -40706,24 +40718,24 @@ const buildSessionAssessmentPlan = ({ subjects = [], gradingBySubject = {} }) =>
       subject_id: subjectId,
       subject_name: subject.name,
       group_count: groupCountRaw,
-      scope_label: splitByGroups ? `Окремо по групах (${groupCountRaw})` : (groupCountRaw > 1 ? `Спільно (${groupCountRaw} групи)` : 'Одна група'),
+      scope_label: splitByGroups ? `Р В РЎвЂєР В РЎвЂќР РЋР вЂљР В Р’ВµР В РЎВР В РЎвЂў Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В°Р РЋРІР‚В¦ (${groupCountRaw})` : (groupCountRaw > 1 ? `Р В Р Р‹Р В РЎвЂ”Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂў (${groupCountRaw} Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ)` : 'Р В РЎвЂєР В РўвЂР В Р вЂ¦Р В Р’В° Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В°'),
       assessment_type: assessmentType,
-      assessment_label: assessmentType === 'exam' ? 'Екзамен' : (isDifferentiatedCredit ? 'Диф. залік' : 'Залік'),
+      assessment_label: assessmentType === 'exam' ? 'Р В РІР‚СћР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦' : (isDifferentiatedCredit ? 'Р В РІР‚СњР В РЎвЂР РЋРІР‚С›. Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' : 'Р В РІР‚вЂќР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ'),
       marks: baseMarks,
       events_count: perGroupQueue.length,
       complexity,
       reason_key: typeReason,
       reason_text:
-        typeReason === 'grading_exam_enabled_only' ? 'Grading: увімкнено лише exam' :
-        typeReason === 'grading_credit_enabled_only' ? 'Grading: увімкнено лише credit' :
-        typeReason === 'grading_weights_exam_gt_credit' ? 'Grading: вага exam > credit' :
-        typeReason === 'grading_weights_credit_gt_exam' ? 'Grading: вага credit > exam' :
-        typeReason === 'optional_subject_bias_credit' ? 'Евристика: необовʼязковий предмет → залік' :
-        typeReason === 'practice_subject_bias_credit' ? 'Евристика: практичний/семінарний предмет → залік' :
-        typeReason === 'required_subject_bias_exam' ? 'Евристика: обовʼязковий предмет → екзамен' :
-        typeReason === 'optional_subject_fallback_credit' ? 'Fallback: необовʼязковий предмет → залік' :
-        typeReason === 'practice_subject_fallback_credit' ? 'Fallback: практичний предмет → залік' :
-        'Fallback: обовʼязковий предмет → екзамен',
+        typeReason === 'grading_exam_enabled_only' ? 'Grading: Р РЋРЎвЂњР В Р вЂ Р РЋРІР‚вЂњР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р’Вµ exam' :
+        typeReason === 'grading_credit_enabled_only' ? 'Grading: Р РЋРЎвЂњР В Р вЂ Р РЋРІР‚вЂњР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р’Вµ credit' :
+        typeReason === 'grading_weights_exam_gt_credit' ? 'Grading: Р В Р вЂ Р В Р’В°Р В РЎвЂ“Р В Р’В° exam > credit' :
+        typeReason === 'grading_weights_credit_gt_exam' ? 'Grading: Р В Р вЂ Р В Р’В°Р В РЎвЂ“Р В Р’В° credit > exam' :
+        typeReason === 'optional_subject_bias_credit' ? 'Р В РІР‚СћР В Р вЂ Р РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В°: Р В Р вЂ¦Р В Р’ВµР В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р Р†РІР‚В РІР‚в„ў Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' :
+        typeReason === 'practice_subject_bias_credit' ? 'Р В РІР‚СћР В Р вЂ Р РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В°: Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“/Р РЋР С“Р В Р’ВµР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р РЋР вЂљР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р Р†РІР‚В РІР‚в„ў Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' :
+        typeReason === 'required_subject_bias_exam' ? 'Р В РІР‚СћР В Р вЂ Р РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В°: Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р Р†РІР‚В РІР‚в„ў Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦' :
+        typeReason === 'optional_subject_fallback_credit' ? 'Fallback: Р В Р вЂ¦Р В Р’ВµР В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р Р†РІР‚В РІР‚в„ў Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' :
+        typeReason === 'practice_subject_fallback_credit' ? 'Fallback: Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р Р†РІР‚В РІР‚в„ў Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' :
+        'Fallback: Р В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р Р†РІР‚В РІР‚в„ў Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦',
     });
     queue.push(...perGroupQueue);
   });
@@ -40877,7 +40889,7 @@ const buildSessionSlotBoard = ({
     );
     busyMap.get(key).push({
       subject_id: Number.isFinite(subjectId) && subjectId > 0 ? subjectId : null,
-      subject_name: row.subject_name || 'Пара',
+      subject_name: row.subject_name || 'Р В РЎСџР В Р’В°Р РЋР вЂљР В Р’В°',
       lesson_type: row.lesson_type || '',
       group_number: row.group_number,
       room_id: Number.isFinite(Number(row.room_id)) && Number(row.room_id) > 0 ? Number(row.room_id) : null,
@@ -41151,7 +41163,7 @@ const getSessionTeacherBusyMap = async (teacherIds = [], teacherMapBySubject = n
       SELECT DISTINCT
         se.id AS source_id,
         se.course_id,
-        COALESCE(c.name, ('Курс ' || se.course_id::TEXT)) AS course_name,
+        COALESCE(c.name, ('Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ ' || se.course_id::TEXT)) AS course_name,
         se.subject_id,
         s.name AS subject_name,
         se.group_number,
@@ -41217,9 +41229,9 @@ const getSessionTeacherBusyMap = async (teacherIds = [], teacherMapBySubject = n
       SELECT DISTINCT
         h.id AS source_id,
         h.course_id,
-        COALESCE(c.name, ('Курс ' || h.course_id::TEXT)) AS course_name,
+        COALESCE(c.name, ('Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ ' || h.course_id::TEXT)) AS course_name,
         h.subject_id,
-        COALESCE(NULLIF(TRIM(s.name), ''), NULLIF(TRIM(h.subject), ''), 'Подія') AS subject_name,
+        COALESCE(NULLIF(TRIM(s.name), ''), NULLIF(TRIM(h.subject), ''), 'Р В РЎСџР В РЎвЂўР В РўвЂР РЋРІР‚вЂњР РЋР РЏ') AS subject_name,
         h.group_number,
         h.class_number,
         h.class_date
@@ -41230,10 +41242,10 @@ const getSessionTeacherBusyMap = async (teacherIds = [], teacherMapBySubject = n
         AND h.class_date IS NOT NULL
         AND h.class_number BETWEEN 1 AND 7
         AND COALESCE(h.status, 'published') IN ('draft', 'scheduled', 'published')
-        AND COALESCE(h.is_teacher_homework, 0) = 1
+        AND ${buildTruthyTextCondition('h.is_teacher_homework')}
         AND (
-          COALESCE(h.is_control, 0) = 1
-          OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[сесія]%'
+          ${buildTruthyTextCondition('h.is_control')}
+          OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ]%'
         )
     `,
     [safeSubjectIds]
@@ -41384,33 +41396,33 @@ const buildSessionTeacherConflictReport = async ({
 };
 
 const formatSessionTeacherConflictMessage = (report) => {
-  if (!report) return 'Невідома помилка перевірки конфліктів.';
+  if (!report) return 'Р В РЎСљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂўР В РЎВР В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РЎВР В РЎвЂР В Р’В»Р В РЎвЂќР В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂќР В РЎвЂ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .';
   const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
   const unresolvedRows = Array.isArray(report.unresolvedRows) ? report.unresolvedRows : [];
   if (!conflicts.length && !unresolvedRows.length) {
-    return `Конфліктів викладачів не знайдено (${Number(report.checkedRows || 0)} перевірених подій).`;
+    return `Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў (${Number(report.checkedRows || 0)} Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“).`;
   }
   const samples = conflicts.slice(0, 4).map((row) => {
     if (row.type === 'draft') {
-      return `${row.teacher_name}: ${row.date}, пара ${row.class_number} (дубль у плані)`;
+      return `${row.teacher_name}: ${row.date}, Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В° ${row.class_number} (Р В РўвЂР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋР Р‰ Р РЋРЎвЂњ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ)`;
     }
     const busy = row.details && row.details.busy ? row.details.busy : null;
-    const courseLabel = busy && busy.course_name ? busy.course_name : (busy && busy.course_id ? `Курс ${busy.course_id}` : 'інший курс');
-    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша пара';
+    const courseLabel = busy && busy.course_name ? busy.course_name : (busy && busy.course_id ? `Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ ${busy.course_id}` : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“');
+    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В Р’В° Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В°';
     const groupLabel = busy && Number.isFinite(Number(busy.group_number)) && Number(busy.group_number) > 0
-      ? `, група ${busy.group_number}`
+      ? `, Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${busy.group_number}`
       : '';
-    return `${row.teacher_name}: ${row.date}, пара ${row.class_number} (${courseLabel} · ${subjectLabel}${groupLabel})`;
+    return `${row.teacher_name}: ${row.date}, Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В° ${row.class_number} (${courseLabel} Р вЂ™Р’В· ${subjectLabel}${groupLabel})`;
   });
   const parts = [];
   if (conflicts.length) {
-    parts.push(`Знайдено конфліктів: ${conflicts.length}.`);
+    parts.push(`Р В РІР‚вЂќР В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : ${conflicts.length}.`);
   }
   if (samples.length) {
-    parts.push(`Приклади: ${samples.join('; ')}.`);
+    parts.push(`Р В РЎСџР РЋР вЂљР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В РЎвЂ: ${samples.join('; ')}.`);
   }
   if (unresolvedRows.length) {
-    parts.push(`Без привʼязаного викладача: ${unresolvedRows.length} подій.`);
+    parts.push(`Р В РІР‚ВР В Р’ВµР В Р’В· Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’В°: ${unresolvedRows.length} Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“.`);
   }
   return parts.join(' ').trim();
 };
@@ -41457,7 +41469,7 @@ async function getSessionGeneratorCleanupPreview({
     FROM homework
     WHERE course_id = ?
       AND LOWER(TRIM(COALESCE(description, ''))) LIKE ?
-      AND COALESCE(is_teacher_homework, 0) = 1
+      AND ${buildTruthyTextCondition('is_teacher_homework')}
       AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
       ${homeworkSemesterFilter.clause}
   `;
@@ -41551,8 +41563,8 @@ async function purgeSessionGeneratorHomework({
     SELECT id, subject_id
     FROM homework
     WHERE course_id = ?
-      AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія]%'
-      AND COALESCE(is_teacher_homework, 0) = 1
+      AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ]%'
+      AND ${buildTruthyTextCondition('is_teacher_homework')}
       AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
       ${homeworkSemesterFilter.clause}
   `;
@@ -41610,8 +41622,8 @@ async function purgeSessionGeneratorHomework({
           AND COALESCE(jc.is_archived, 0) = 0
           ${columnSemesterFilter.clause}
           AND (
-            LOWER(TRIM(COALESCE(jc.title, ''))) LIKE '[сесія]%'
-            OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[сесія]%'
+            LOWER(TRIM(COALESCE(jc.title, ''))) LIKE '[Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ]%'
+            OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ]%'
           )
       `,
       [normalizedCourseId, ...columnSemesterFilter.params]
@@ -41687,13 +41699,13 @@ const buildSessionConflictSlotMap = (report) => {
     slotRow.conflicts_total += 1;
     if (conflict.type === 'draft') {
       slotRow.draft_conflicts += 1;
-      slotRow.reasons.push(`${conflict.teacher_name || 'Викладач'}: дубль у ручному плані`);
+      slotRow.reasons.push(`${conflict.teacher_name || 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ'}: Р В РўвЂР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋР Р‰ Р РЋРЎвЂњ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ`);
     } else {
       slotRow.occupied_conflicts += 1;
       const busy = conflict.details && conflict.details.busy ? conflict.details.busy : null;
-      const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша подія';
-      const courseLabel = busy && busy.course_name ? busy.course_name : 'інший курс';
-      slotRow.reasons.push(`${conflict.teacher_name || 'Викладач'}: зайнятий (${courseLabel} · ${subjectLabel})`);
+      const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР РЋР РЏ';
+      const courseLabel = busy && busy.course_name ? busy.course_name : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“';
+      slotRow.reasons.push(`${conflict.teacher_name || 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ'}: Р В Р’В·Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р РЋР РЏР РЋРІР‚С™Р В РЎвЂР В РІвЂћвЂ“ (${courseLabel} Р вЂ™Р’В· ${subjectLabel})`);
     }
   });
   Object.values(slotMap).forEach((slotRow) => {
@@ -41705,35 +41717,35 @@ const buildSessionConflictSlotMap = (report) => {
 };
 
 const formatSessionConflictSummary = (report) => {
-  if (!report) return 'Невідома помилка перевірки конфліктів.';
+  if (!report) return 'Р В РЎСљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂўР В РЎВР В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РЎВР В РЎвЂР В Р’В»Р В РЎвЂќР В Р’В° Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂќР В РЎвЂ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ .';
   const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
   const unresolvedRows = Array.isArray(report.unresolvedRows) ? report.unresolvedRows : [];
   if (!conflicts.length && !unresolvedRows.length) {
-    return `Конфліктів викладачів або кабінетів не знайдено (${Number(report.checkedRows || 0)} перевірених подій).`;
+    return `Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњР В Р вЂ  Р В Р’В°Р В Р’В±Р В РЎвЂў Р В РЎвЂќР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў (${Number(report.checkedRows || 0)} Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“).`;
   }
   const samples = conflicts.slice(0, 4).map((row) => {
     const resourceLabel = String(row.resource_kind || '') === 'room'
-      ? (row.room_label || 'Кабінет')
-      : (row.teacher_name || 'Викладач');
+      ? (row.room_label || 'Р В РЎв„ўР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™')
+      : (row.teacher_name || 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ');
     if (row.type === 'draft') {
-      return `${resourceLabel}: ${row.date}, пара ${row.class_number} (дубль у плані)`;
+      return `${resourceLabel}: ${row.date}, Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В° ${row.class_number} (Р В РўвЂР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋР Р‰ Р РЋРЎвЂњ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ)`;
     }
     const busy = row.details && row.details.busy ? row.details.busy : null;
-    const courseLabel = busy && busy.course_name ? busy.course_name : (busy && busy.course_id ? `Курс ${busy.course_id}` : 'інший курс');
-    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша подія';
+    const courseLabel = busy && busy.course_name ? busy.course_name : (busy && busy.course_id ? `Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ ${busy.course_id}` : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“');
+    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР РЋР РЏ';
     const groupLabel = busy && Number.isFinite(Number(busy.group_number)) && Number(busy.group_number) > 0
-      ? `, група ${busy.group_number}`
+      ? `, Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${busy.group_number}`
       : '';
-    return `${resourceLabel}: ${row.date}, пара ${row.class_number} (${courseLabel} · ${subjectLabel}${groupLabel})`;
+    return `${resourceLabel}: ${row.date}, Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В° ${row.class_number} (${courseLabel} Р вЂ™Р’В· ${subjectLabel}${groupLabel})`;
   });
   const teacherConflicts = conflicts.filter((row) => String(row.resource_kind || 'teacher') !== 'room').length;
   const roomConflicts = conflicts.filter((row) => String(row.resource_kind || '') === 'room').length;
   const parts = [];
-  if (conflicts.length) parts.push(`Знайдено конфліктів: ${conflicts.length}.`);
-  if (teacherConflicts) parts.push(`Викладачі: ${teacherConflicts}.`);
-  if (roomConflicts) parts.push(`Кабінети: ${roomConflicts}.`);
-  if (samples.length) parts.push(`Приклади: ${samples.join('; ')}.`);
-  if (unresolvedRows.length) parts.push(`Без прив’язаного викладача: ${unresolvedRows.length} подій.`);
+  if (conflicts.length) parts.push(`Р В РІР‚вЂќР В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : ${conflicts.length}.`);
+  if (teacherConflicts) parts.push(`Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР РЋРІР‚вЂњ: ${teacherConflicts}.`);
+  if (roomConflicts) parts.push(`Р В РЎв„ўР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р В РЎвЂ: ${roomConflicts}.`);
+  if (samples.length) parts.push(`Р В РЎСџР РЋР вЂљР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В РЎвЂ: ${samples.join('; ')}.`);
+  if (unresolvedRows.length) parts.push(`Р В РІР‚ВР В Р’ВµР В Р’В· Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р Р†Р вЂљРІвЂћСћР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’В°: ${unresolvedRows.length} Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“.`);
   return parts.join(' ').trim();
 };
 
@@ -41757,19 +41769,19 @@ const buildSessionConflictSlotMapV2 = (report) => {
     }
     const slotRow = slotMap[key];
     const resourceLabel = String(conflict.resource_kind || '') === 'room'
-      ? (conflict.room_label || 'Кабінет')
-      : (conflict.teacher_name || 'Викладач');
+      ? (conflict.room_label || 'Р В РЎв„ўР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™')
+      : (conflict.teacher_name || 'Р В РІР‚в„ўР В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋ');
     slotRow.conflicts_total += 1;
     if (conflict.type === 'draft') {
       slotRow.draft_conflicts += 1;
-      slotRow.reasons.push(`${resourceLabel}: дубль у ручному плані`);
+      slotRow.reasons.push(`${resourceLabel}: Р В РўвЂР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋР Р‰ Р РЋРЎвЂњ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ`);
       return;
     }
     slotRow.occupied_conflicts += 1;
     const busy = conflict.details && conflict.details.busy ? conflict.details.busy : null;
-    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'інша подія';
-    const courseLabel = busy && busy.course_name ? busy.course_name : 'інший курс';
-    slotRow.reasons.push(`${resourceLabel}: зайнятий (${courseLabel} · ${subjectLabel})`);
+    const subjectLabel = busy && busy.subject_name ? busy.subject_name : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР РЋР РЏ';
+    const courseLabel = busy && busy.course_name ? busy.course_name : 'Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“';
+    slotRow.reasons.push(`${resourceLabel}: Р В Р’В·Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р РЋР РЏР РЋРІР‚С™Р В РЎвЂР В РІвЂћвЂ“ (${courseLabel} Р вЂ™Р’В· ${subjectLabel})`);
   });
   Object.values(slotMap).forEach((slotRow) => {
     const uniqueReasons = Array.from(new Set((slotRow.reasons || []).map((text) => String(text).trim()).filter(Boolean)));
@@ -41832,9 +41844,9 @@ async function buildSessionRoomConflictState({
             SELECT
               se.id,
               se.course_id,
-              COALESCE(c.name, ('Курс ' || se.course_id::TEXT)) AS course_name,
+              COALESCE(c.name, ('Р В РЎв„ўР РЋРЎвЂњР РЋР вЂљР РЋР С“ ' || se.course_id::TEXT)) AS course_name,
               se.subject_id,
-              COALESCE(s.name, 'Подія') AS subject_name,
+              COALESCE(s.name, 'Р В РЎСџР В РЎвЂўР В РўвЂР РЋРІР‚вЂњР РЋР РЏ') AS subject_name,
               se.group_number,
               se.room_id,
               se.week_number,
@@ -41891,10 +41903,10 @@ async function buildSessionRoomConflictState({
 
 const sessionEventTitleLabel = (event) => {
   if (!event) return '';
-  if (event.kind === 'consultation') return 'Консультація';
-  if (event.kind === 'reserve') return 'Резерв / перенос';
-  if (event.kind === 'retake') return 'Вікно перескладань';
-  return event.type === 'exam' ? 'Екзамен' : 'Залік';
+  if (event.kind === 'consultation') return 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ';
+  if (event.kind === 'reserve') return 'Р В Р’В Р В Р’ВµР В Р’В·Р В Р’ВµР РЋР вЂљР В Р вЂ  / Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂўР РЋР С“';
+  if (event.kind === 'retake') return 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РЎвЂќР В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР РЋР С“Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋР Р‰';
+  return event.type === 'exam' ? 'Р В РІР‚СћР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦' : 'Р В РІР‚вЂќР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ';
 };
 
 const buildSessionGeneratorPreview = ({
@@ -41921,15 +41933,15 @@ const buildSessionGeneratorPreview = ({
   const warnings = [];
   const notes = [];
   const assumptions = [
-    'Тип контролю визначається за grading settings (якщо є) + fallback правилами класифікації.',
-    'Опублікувати можна як авто-план, так і ручний план із вибраних слотів; заліки синхронізуються в журнал.',
+    'Р В РЎС›Р В РЎвЂР В РЎвЂ” Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В Р’В»Р РЋР вЂ№ Р В Р вЂ Р В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’В°Р РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р’В·Р В Р’В° grading settings (Р РЋР РЏР В РЎвЂќР РЋРІР‚В°Р В РЎвЂў Р РЋРІР‚Сњ) + fallback Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂР В Р’В»Р В Р’В°Р В РЎВР В РЎвЂ Р В РЎвЂќР В Р’В»Р В Р’В°Р РЋР С“Р В РЎвЂР РЋРІР‚С›Р РЋРІР‚вЂњР В РЎвЂќР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ.',
+    'Р В РЎвЂєР В РЎвЂ”Р РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В РЎВР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р В Р’В° Р РЋР РЏР В РЎвЂќ Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂў-Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦, Р РЋРІР‚С™Р В Р’В°Р В РЎвЂќ Р РЋРІР‚вЂњ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦ Р РЋРІР‚вЂњР В Р’В· Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ ; Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В РЎвЂ Р РЋР С“Р В РЎвЂР В Р вЂ¦Р РЋРІР‚В¦Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋРІР‚вЂњР В Р’В·Р РЋРЎвЂњР РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р вЂ  Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В».',
   ];
   if (!subjects.length) {
     return {
       dayBuckets: [],
       timelineItems: [],
       sourceRows: [],
-      warnings: ['Немає видимих предметів для вибраного курсу.'],
+      warnings: ['Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р вЂ Р В РЎвЂР В РўвЂР В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ.'],
       notes,
       assumptions,
       stats: {
@@ -41962,7 +41974,7 @@ const buildSessionGeneratorPreview = ({
   });
 
   if (!dayBuckets.length) {
-    warnings.push('Не вдалося побудувати календарні дні для сесії (перевірте дату старту та фільтр днів).');
+    warnings.push('Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР РЏ Р В РЎвЂ”Р В РЎвЂўР В Р’В±Р РЋРЎвЂњР В РўвЂР РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РўвЂР В Р’В°Р РЋР вЂљР В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ (Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ Р В РўвЂР В Р’В°Р РЋРІР‚С™Р РЋРЎвЂњ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ Р РЋРІР‚С™Р В Р’В° Р РЋРІР‚С›Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р РЋР вЂљ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ ).');
   }
 
   const lastExamByScope = {};
@@ -42062,7 +42074,7 @@ const buildSessionGeneratorPreview = ({
     const bucket = chooseBucketForAssessment(assessment);
     if (!bucket) {
       overflowCount += 1;
-      warnings.push(`Не вистачило слотів для "${assessment.subject_name}" (${assessment.group_label}).`);
+      warnings.push(`Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚РЋР В РЎвЂР В Р’В»Р В РЎвЂў Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В РўвЂР В Р’В»Р РЋР РЏ "${assessment.subject_name}" (${assessment.group_label}).`);
       return;
     }
     const isHeavy = assessment.type === 'exam' && assessment.complexity >= 4;
@@ -42078,7 +42090,7 @@ const buildSessionGeneratorPreview = ({
       marks,
       complexity: assessment.complexity,
       title: sessionEventTitleLabel(assessment),
-      note: assessment.is_required ? '' : 'Необовʼязковий предмет',
+      note: assessment.is_required ? '' : 'Р В РЎСљР В Р’ВµР В РЎвЂўР В Р’В±Р В РЎвЂўР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В РЎвЂќР В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™',
     };
     addEventToBucket(bucket, event);
     scheduledAssessments += 1;
@@ -42099,15 +42111,15 @@ const buildSessionGeneratorPreview = ({
             subject_name: assessment.subject_name,
             group_label: assessment.group_label,
             marks: ['CONS'],
-            title: 'Консультація',
-            note: `Перед "${assessment.subject_name}"`,
+            title: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ',
+            note: `Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ "${assessment.subject_name}"`,
             complexity: 0,
           },
         });
         if (placedConsult) {
           consultCount += 1;
         } else {
-          notes.push(`Не вдалося вставити консультацію перед "${assessment.subject_name}" (немає вільного дня/слота).`);
+          notes.push(`Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР РЏ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ "${assessment.subject_name}" (Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В Р вЂ Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РўвЂР В Р вЂ¦Р РЋР РЏ/Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В Р’В°).`);
         }
       }
       if (examSequence === 'consult_exam_credit') {
@@ -42123,15 +42135,15 @@ const buildSessionGeneratorPreview = ({
             group_number: assessment.group_number,
             marks: Array.from(new Set([...(assessment.marks || []).filter((m) => m !== 'EX'), 'CR'])),
             complexity: Math.max(0, Number(assessment.complexity || 0) - 1),
-            title: 'Залік',
-            note: 'Після екзамену',
+            title: 'Р В РІР‚вЂќР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ',
+            note: 'Р В РЎСџР РЋРІР‚вЂњР РЋР С“Р В Р’В»Р РЋР РЏ Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРЎвЂњ',
           },
         });
         if (placedCreditAfterExam) {
           scheduledAssessments += 1;
           creditCount += 1;
         } else {
-          notes.push(`Не вдалося вставити залік після екзамену для "${assessment.subject_name}".`);
+          notes.push(`Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР РЏ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ Р В РЎвЂ”Р РЋРІР‚вЂњР РЋР С“Р В Р’В»Р РЋР РЏ Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРЎвЂњ Р В РўвЂР В Р’В»Р РЋР РЏ "${assessment.subject_name}".`);
         }
       }
     } else {
@@ -42146,15 +42158,15 @@ const buildSessionGeneratorPreview = ({
             subject_name: assessment.subject_name,
             group_label: assessment.group_label,
             marks: ['CONS'],
-            title: 'Консультація',
-            note: `Перед заліком "${assessment.subject_name}"`,
+            title: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ',
+            note: `Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В РЎвЂўР В РЎВ "${assessment.subject_name}"`,
             complexity: 0,
           },
         });
         if (placedConsult) {
           consultCount += 1;
         } else {
-          notes.push(`Не вдалося вставити консультацію перед заліком "${assessment.subject_name}".`);
+          notes.push(`Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР РЏ Р В Р вЂ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР вЂ№ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В РЎвЂўР В РЎВ "${assessment.subject_name}".`);
         }
       }
     }
@@ -42168,13 +42180,13 @@ const buildSessionGeneratorPreview = ({
       assessmentsSeen += assessmentsOnDay;
       if (assessmentsSeen > 0 && assessmentsSeen % reserveEvery === 0) {
         bucket.is_reserved = true;
-        bucket.capacity_note = 'Після цього дня бажано мати резерв/перенос';
+        bucket.capacity_note = 'Р В РЎСџР РЋРІР‚вЂњР РЋР С“Р В Р’В»Р РЋР РЏ Р РЋРІР‚В Р РЋР Р‰Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РўвЂР В Р вЂ¦Р РЋР РЏ Р В Р’В±Р В Р’В°Р В Р’В¶Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р РЋР вЂљР В Р’ВµР В Р’В·Р В Р’ВµР РЋР вЂљР В Р вЂ /Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂўР РЋР С“';
         bucket.items.push({
           kind: 'reserve',
           type: 'reserve',
           marks: ['RES'],
-          title: 'Резерв / перенос',
-          note: 'Рекомендується закласти буфер після блоку контрольних',
+          title: 'Р В Р’В Р В Р’ВµР В Р’В·Р В Р’ВµР РЋР вЂљР В Р вЂ  / Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂўР РЋР С“',
+          note: 'Р В Р’В Р В Р’ВµР В РЎвЂќР В РЎвЂўР В РЎВР В Р’ВµР В Р вЂ¦Р В РўвЂР РЋРЎвЂњР РЋРІР‚СњР РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р’В·Р В Р’В°Р В РЎвЂќР В Р’В»Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂ Р В Р’В±Р РЋРЎвЂњР РЋРІР‚С›Р В Р’ВµР РЋР вЂљ Р В РЎвЂ”Р РЋРІР‚вЂњР РЋР С“Р В Р’В»Р РЋР РЏ Р В Р’В±Р В Р’В»Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦',
           complexity: 0,
         });
         reserveCount += 1;
@@ -42194,8 +42206,8 @@ const buildSessionGeneratorPreview = ({
         kind: 'retake',
         type: 'retake',
         marks: ['RET'],
-        title: 'Вікно перескладань',
-        note: retakeEnd && retakeEnd !== retakeStart ? `${retakeStart} → ${retakeEnd}` : retakeStart,
+        title: 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РЎвЂќР В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР РЋР С“Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋР Р‰',
+        note: retakeEnd && retakeEnd !== retakeStart ? `${retakeStart} Р Р†РІР‚В РІР‚в„ў ${retakeEnd}` : retakeStart,
         complexity: 0,
       };
       if (existing) {
@@ -42242,22 +42254,22 @@ const buildSessionGeneratorPreview = ({
     bucket.items.filter((item) => item.kind === 'assessment').length >= Math.max(1, Number(bucket.capacity || 1))
   ).length;
   if (usedAssessmentSlots > capacityTotal) {
-    warnings.push(`Потрібно більше слотів: оцінювань ${usedAssessmentSlots}, місткість ${capacityTotal}.`);
+    warnings.push(`Р В РЎСџР В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р’В±Р В Р вЂ¦Р В РЎвЂў Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : Р В РЎвЂўР РЋРІР‚В Р РЋРІР‚вЂњР В Р вЂ¦Р РЋР вЂ№Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋР Р‰ ${usedAssessmentSlots}, Р В РЎВР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р В РЎвЂќР РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ ${capacityTotal}.`);
   }
   if (overloadedDays && usedAssessmentSlots) {
-    notes.push(`Днів з повним навантаженням: ${overloadedDays}. Можна збільшити тривалість сесії або зменшити max подій/день.`);
+    notes.push(`Р В РІР‚СњР В Р вЂ¦Р РЋРІР‚вЂњР В Р вЂ  Р В Р’В· Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РЎВ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏР В РЎВ: ${overloadedDays}. Р В РЎС™Р В РЎвЂўР В Р’В¶Р В Р вЂ¦Р В Р’В° Р В Р’В·Р В Р’В±Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂР В Р вЂ Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р В Р’В°Р В Р’В±Р В РЎвЂў Р В Р’В·Р В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІвЂљВ¬Р В РЎвЂР РЋРІР‚С™Р В РЎвЂ max Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“/Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰.`);
   }
   if (overflowCount > 0) {
-    warnings.push(`Частина подій не потрапила в календар (${overflowCount}).`);
+    warnings.push(`Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’Вµ Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В РЎвЂ”Р В РЎвЂР В Р’В»Р В Р’В° Р В Р вЂ  Р В РЎвЂќР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РўвЂР В Р’В°Р РЋР вЂљ (${overflowCount}).`);
   }
   if (respectStudyDays && !activeStudyDayNames.length) {
-    notes.push('Увімкнено "лише навчальні дні", але активні дні курсу не знайдені — використано звичайний календарний фільтр.');
+    notes.push('Р В Р в‚¬Р В Р вЂ Р РЋРІР‚вЂњР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂў "Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњ", Р В Р’В°Р В Р’В»Р В Р’Вµ Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚вЂњ Р Р†Р вЂљРІР‚Сњ Р В Р вЂ Р В РЎвЂР В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В Р’В·Р В Р вЂ Р В РЎвЂР РЋРІР‚РЋР В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РўвЂР В Р’В°Р РЋР вЂљР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРІР‚С›Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р РЋР вЂљ.');
   }
 
   const timelineItems = [];
   dayBuckets.forEach((bucket) => {
     bucket.date_label = bucket.date;
-    bucket.day_label = bucket.day_name ? `${bucket.day_short} · ${bucket.day_name}` : bucket.day_short;
+    bucket.day_label = bucket.day_name ? `${bucket.day_short} Р вЂ™Р’В· ${bucket.day_name}` : bucket.day_short;
     bucket.assessment_count = bucket.items.filter((item) => item.kind === 'assessment').length;
     timelineItems.push(...bucket.items.map((item) => ({
       ...item,
@@ -42305,7 +42317,7 @@ app.post('/admin/session-generator/rooms/save', requireScheduleGeneratorSectionA
   const courseId = parseSessionGeneratorInt(req.body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
   const redirect = (messageKind, messageText) => res.redirect(buildSessionGeneratorReturnHref(req.body || {}, messageKind, messageText));
   if (!courseId) {
-    return redirect('err', 'Оберіть курс перед редагуванням кабінетного фонду.');
+    return redirect('err', 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РўвЂ Р РЋР вЂљР В Р’ВµР В РўвЂР В Р’В°Р В РЎвЂ“Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР РЏР В РЎВ Р В РЎвЂќР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋРІР‚С›Р В РЎвЂўР В Р вЂ¦Р В РўвЂР РЋРЎвЂњ.');
   }
 
   const normalizedRoom = roomHelpers.normalizeRoomInput(req.body || {}, {
@@ -42313,7 +42325,7 @@ app.post('/admin/session-generator/rooms/save', requireScheduleGeneratorSectionA
     campus: normalizeGeneratorLocation(req.body.location || 'kyiv'),
   });
   if (!normalizedRoom.ok) {
-    return redirect('err', normalizedRoom.error || 'Перевірте дані кабінету.');
+    return redirect('err', normalizedRoom.error || 'Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р РЋРЎвЂњ.');
   }
 
   try {
@@ -42324,7 +42336,7 @@ app.post('/admin/session-generator/rooms/save', requireScheduleGeneratorSectionA
         [roomId, courseId]
       );
       if (!existingRoom) {
-        return redirect('err', 'Кабінет не знайдено.');
+        return redirect('err', 'Р В РЎв„ўР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў.');
       }
       await db.run(
         `
@@ -42354,7 +42366,7 @@ app.post('/admin/session-generator/rooms/save', requireScheduleGeneratorSectionA
           courseId,
         ]
       );
-      return redirect('ok', 'Кабінет оновлено.');
+      return redirect('ok', 'Р В РЎв„ўР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™ Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў.');
     }
 
     await db.run(
@@ -42375,10 +42387,10 @@ app.post('/admin/session-generator/rooms/save', requireScheduleGeneratorSectionA
         Boolean(Number(normalizedRoom.value.is_active || 0)),
       ]
     );
-    return redirect('ok', 'Кабінет додано.');
+    return redirect('ok', 'Р В РЎв„ўР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™ Р В РўвЂР В РЎвЂўР В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂў.');
   } catch (err) {
     if (isDbSchemaCompatibilityError(err)) {
-      return redirect('err', 'Таблиця rooms ще недоступна у цій схемі БД.');
+      return redirect('err', 'Р В РЎС›Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р РЋР РЏ rooms Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В Р’В° Р РЋРЎвЂњ Р РЋРІР‚В Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р РЋРІР‚В¦Р В Р’ВµР В РЎВР РЋРІР‚вЂњ Р В РІР‚ВР В РІР‚Сњ.');
     }
     return handleDbError(res, err, 'admin.sessionGenerator.rooms.save');
   }
@@ -42395,7 +42407,7 @@ app.post('/admin/session-generator/rooms/:id/delete', requireScheduleGeneratorSe
   const courseId = parseSessionGeneratorInt(req.body.course_id, null, 1, Number.MAX_SAFE_INTEGER);
   const redirect = (messageKind, messageText) => res.redirect(buildSessionGeneratorReturnHref(req.body || {}, messageKind, messageText));
   if (!roomId || !courseId) {
-    return redirect('err', 'Не вдалося визначити кабінет для архівації.');
+    return redirect('err', 'Р В РЎСљР В Р’Вµ Р В Р вЂ Р В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р В РЎвЂ Р В РЎвЂќР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р’В°Р РЋР вЂљР РЋРІР‚В¦Р РЋРІР‚вЂњР В Р вЂ Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ.');
   }
 
   try {
@@ -42407,10 +42419,10 @@ app.post('/admin/session-generator/rooms/:id/delete', requireScheduleGeneratorSe
       `,
       [roomId, courseId]
     );
-    return redirect('ok', 'Кабінет архівовано.');
+    return redirect('ok', 'Р В РЎв„ўР В Р’В°Р В Р’В±Р РЋРІР‚вЂњР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™ Р В Р’В°Р РЋР вЂљР РЋРІР‚В¦Р РЋРІР‚вЂњР В Р вЂ Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў.');
   } catch (err) {
     if (isDbSchemaCompatibilityError(err)) {
-      return redirect('err', 'Таблиця rooms ще недоступна у цій схемі БД.');
+      return redirect('err', 'Р В РЎС›Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р РЋР РЏ rooms Р РЋРІР‚В°Р В Р’Вµ Р В Р вЂ¦Р В Р’ВµР В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р вЂ¦Р В Р’В° Р РЋРЎвЂњ Р РЋРІР‚В Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р РЋРІР‚В¦Р В Р’ВµР В РЎВР РЋРІР‚вЂњ Р В РІР‚ВР В РІР‚Сњ.');
     }
     return handleDbError(res, err, 'admin.sessionGenerator.rooms.delete');
   }
@@ -42809,19 +42821,19 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
     const selectedCourse = selectedCourseId ? await getCourseById(selectedCourseId) : null;
     const uiHints = [];
     if (draftAction === 'new') {
-      uiHints.push(`Створено новий план генератора сесій #${draftRecord ? draftRecord.id : '—'}.`);
+      uiHints.push(`Р В Р Р‹Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂўР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦ Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В Р’В° Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР В РІвЂћвЂ“ #${draftRecord ? draftRecord.id : 'Р Р†Р вЂљРІР‚Сњ'}.`);
     }
     if (previewCleared) {
-      uiHints.push(`План #${draftRecord ? draftRecord.id : '—'} очищено до базових параметрів.`);
+      uiHints.push(`Р В РЎСџР В Р’В»Р В Р’В°Р В Р вЂ¦ #${draftRecord ? draftRecord.id : 'Р Р†Р вЂљРІР‚Сњ'} Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РўвЂР В РЎвЂў Р В Р’В±Р В Р’В°Р В Р’В·Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В Р’В°Р В РЎВР В Р’ВµР РЋРІР‚С™Р РЋР вЂљР РЋРІР‚вЂњР В Р вЂ .`);
     }
     if (!selectedSemesterId) {
-      uiHints.push('Активний семестр не знайдено. Сесійні слоти формуються в fallback-режимі за датою старту.');
+      uiHints.push('Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў. Р В Р Р‹Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ Р РЋРІР‚С›Р В РЎвЂўР РЋР вЂљР В РЎВР РЋРЎвЂњР РЋР вЂ№Р РЋРІР‚С™Р РЋР Р‰Р РЋР С“Р РЋР РЏ Р В Р вЂ  fallback-Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВР РЋРІР‚вЂњ Р В Р’В·Р В Р’В° Р В РўвЂР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂ№ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ.');
     }
     if (form.respect_study_days && !activeStudyDayNames.length) {
-      uiHints.push('Активні навчальні дні курсу не задані — фільтр по навчальних днях не застосовано.');
+      uiHints.push('Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњ Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚вЂњ Р В РўвЂР В Р вЂ¦Р РЋРІР‚вЂњ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“Р РЋРЎвЂњ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ Р Р†Р вЂљРІР‚Сњ Р РЋРІР‚С›Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р РЋР вЂљ Р В РЎвЂ”Р В РЎвЂў Р В Р вЂ¦Р В Р’В°Р В Р вЂ Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РўвЂР В Р вЂ¦Р РЋР РЏР РЋРІР‚В¦ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў.');
     }
     if (form.window_mode === 'weeks' && !activeSemester) {
-      uiHints.push('Режим "сесійні тижні" потребує активного семестру з датою старту. Зараз використано звичайний режим за днями.');
+      uiHints.push('Р В Р’В Р В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВ "Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњ" Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В Р’В±Р РЋРЎвЂњР РЋРІР‚Сњ Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ Р В Р’В· Р В РўвЂР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂ№ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ. Р В РІР‚вЂќР В Р’В°Р РЋР вЂљР В Р’В°Р В Р’В· Р В Р вЂ Р В РЎвЂР В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В Р’В·Р В Р вЂ Р В РЎвЂР РЋРІР‚РЋР В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВ Р В Р’В·Р В Р’В° Р В РўвЂР В Р вЂ¦Р РЋР РЏР В РЎВР В РЎвЂ.');
     }
 
     draftEntries = Number.isFinite(userId) && userId > 0
@@ -42871,27 +42883,27 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       sessionTeacherMapPayload,
       sessionMarkLegend: SESSION_GENERATOR_MARK_LEGEND,
       strategyOptions: [
-        { value: 'exams_first', label: 'Екзамени спочатку' },
-        { value: 'balanced', label: 'Змішано' },
-        { value: 'credits_first', label: 'Заліки спочатку' },
+        { value: 'exams_first', label: 'Р В РІР‚СћР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р В РЎвЂ Р РЋР С“Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚РЋР В Р’В°Р РЋРІР‚С™Р В РЎвЂќР РЋРЎвЂњ' },
+        { value: 'balanced', label: 'Р В РІР‚вЂќР В РЎВР РЋРІР‚вЂњР РЋРІвЂљВ¬Р В Р’В°Р В Р вЂ¦Р В РЎвЂў' },
+        { value: 'credits_first', label: 'Р В РІР‚вЂќР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В РЎвЂ Р РЋР С“Р В РЎвЂ”Р В РЎвЂўР РЋРІР‚РЋР В Р’В°Р РЋРІР‚С™Р В РЎвЂќР РЋРЎвЂњ' },
       ],
       sessionWindowOptions: [
-        { value: 'days', label: 'Дні (від дати старту)' },
-        { value: 'weeks', label: 'Сесійні тижні семестру' },
+        { value: 'days', label: 'Р В РІР‚СњР В Р вЂ¦Р РЋРІР‚вЂњ (Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂ Р В РўвЂР В Р’В°Р РЋРІР‚С™Р В РЎвЂ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРЎвЂњ)' },
+        { value: 'weeks', label: 'Р В Р Р‹Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР В РІвЂћвЂ“Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР РЋРЎвЂњ' },
       ],
       sessionGroupingOptions: [
-        { value: 'none', label: 'Без обмеження по днях' },
-        { value: 'subject_per_day', label: 'Один предмет на день' },
-        { value: 'activity_per_day', label: 'Один тип активності на день' },
+        { value: 'none', label: 'Р В РІР‚ВР В Р’ВµР В Р’В· Р В РЎвЂўР В Р’В±Р В РЎВР В Р’ВµР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В РЎвЂ”Р В РЎвЂў Р В РўвЂР В Р вЂ¦Р РЋР РЏР РЋРІР‚В¦' },
+        { value: 'subject_per_day', label: 'Р В РЎвЂєР В РўвЂР В РЎвЂР В Р вЂ¦ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В Р вЂ¦Р В Р’В° Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰' },
+        { value: 'activity_per_day', label: 'Р В РЎвЂєР В РўвЂР В РЎвЂР В Р вЂ¦ Р РЋРІР‚С™Р В РЎвЂР В РЎвЂ” Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРІР‚вЂњ Р В Р вЂ¦Р В Р’В° Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰' },
       ],
       examSequenceOptions: [
-        { value: 'exam_only', label: 'Лише екзамен' },
-        { value: 'consult_exam', label: 'Консультація + екзамен' },
-        { value: 'consult_exam_credit', label: 'Консультація + екзамен + залік' },
+        { value: 'exam_only', label: 'Р В РІР‚С”Р В РЎвЂР РЋРІвЂљВ¬Р В Р’Вµ Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦' },
+        { value: 'consult_exam', label: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ + Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦' },
+        { value: 'consult_exam_credit', label: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ + Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦ + Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' },
       ],
       creditSequenceOptions: [
-        { value: 'credit_only', label: 'Лише залік (мінімум)' },
-        { value: 'consult_credit', label: 'Консультація + залік' },
+        { value: 'credit_only', label: 'Р В РІР‚С”Р В РЎвЂР РЋРІвЂљВ¬Р В Р’Вµ Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ (Р В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р РЋРІР‚вЂњР В РЎВР РЋРЎвЂњР В РЎВ)' },
+        { value: 'consult_credit', label: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ + Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' },
       ],
     });
   } catch (err) {
@@ -43080,7 +43092,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
     };
 
     if (!selectedCourseId) {
-      return redirectToGenerator('err', 'Оберіть курс для публікації сесії.');
+      return redirectToGenerator('err', 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ”Р РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ.');
     }
 
     const semesters = await getSemestersCached(selectedCourseId);
@@ -43095,7 +43107,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       activeSemester = semesters[0];
     }
     if (!activeSemester) {
-      return redirectToGenerator('err', 'Активний семестр не знайдено.');
+      return redirectToGenerator('err', 'Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў.');
     }
 
     const selectedSemesterId = Number(activeSemester.id);
@@ -43106,7 +43118,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
 
     const subjects = await getSubjectsCached(selectedCourseId, { visibleOnly: true });
     if (!subjects || !subjects.length) {
-      return redirectToGenerator('err', 'Немає предметів для генерації сесії.');
+      return redirectToGenerator('err', 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ.');
     }
     let courseStudyDays = [];
     try {
@@ -43141,7 +43153,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       }
     }
     if (!rawManualAssignments.length) {
-      return redirectToGenerator('err', 'Ручний план порожній. Додайте екзамени/заліки у слотах розкладу.');
+      return redirectToGenerator('err', 'Р В Р’В Р РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦ Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР В РЎвЂўР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“. Р В РІР‚СњР В РЎвЂўР В РўвЂР В Р’В°Р В РІвЂћвЂ“Р РЋРІР‚С™Р В Р’Вµ Р В Р’ВµР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦Р В РЎвЂ/Р В Р’В·Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В РЎвЂ Р РЋРЎвЂњ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В Р’В°Р РЋРІР‚В¦ Р РЋР вЂљР В РЎвЂўР В Р’В·Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР РЋРЎвЂњ.');
     }
     const allowedDateSet = new Set(explicitSessionDates || []);
     const outOfWindowRows = [];
@@ -43177,7 +43189,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
           class_number: Number(item.class_number),
           group_number: safeGroupNumber,
           room_id: Number(item.room_id || 0) || null,
-          group_label: safeGroupNumber ? `Група ${safeGroupNumber}` : (groupCount > 1 ? `Всі групи (${groupCount})` : 'Всі'),
+          group_label: safeGroupNumber ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${safeGroupNumber}` : (groupCount > 1 ? `Р В РІР‚в„ўР РЋР С“Р РЋРІР‚вЂњ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ (${groupCount})` : 'Р В РІР‚в„ўР РЋР С“Р РЋРІР‚вЂњ'),
           note: item.note || '',
           marks: [item.type === 'credit' ? 'CR' : 'EX'],
         };
@@ -43197,15 +43209,15 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
     if (outOfWindowRows.length) {
       return redirectToGenerator(
         'err',
-        `Частина подій поза вікном сесії (${outOfWindowRows.length}). Перевірте тижні сесії та слоти.`
+        `Р В Р’В§Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р В РЎвЂР В Р вЂ¦Р В Р’В° Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РЎвЂ”Р В РЎвЂўР В Р’В·Р В Р’В° Р В Р вЂ Р РЋРІР‚вЂњР В РЎвЂќР В Р вЂ¦Р В РЎвЂўР В РЎВ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ (${outOfWindowRows.length}). Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р РЋРІР‚С™Р В Р’В° Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ.`
       );
     }
     if (!assessments.length) {
-      return redirectToGenerator('err', 'Немає коректних подій для публікації.');
+      return redirectToGenerator('err', 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ”Р РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ.');
     }
     const expandedAssignments = buildSessionExpandedAssignments(assessments, subjectById);
     if (!expandedAssignments.length) {
-      return redirectToGenerator('err', 'Немає коректних призначень у ручному плані.');
+      return redirectToGenerator('err', 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В Р’ВµР В РЎвЂќР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р РЋР Р‰ Р РЋРЎвЂњ Р РЋР вЂљР РЋРЎвЂњР РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В Р вЂ¦Р РЋРІР‚вЂњ.');
     }
     const conflictReport = await buildSessionTeacherConflictReport({
       expandedAssignments,
@@ -43261,13 +43273,13 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
       if (!isConsultation) {
         touchedSubjectIds.add(subjectId);
       }
-      const typeLabel = isConsultation ? 'Консультація' : (isCredit ? 'Залік' : 'Екзамен');
-      const descriptionBase = `[Сесія] ${typeLabel} · ${subject.name || assignment.subject_name || ''}`.trim();
+      const typeLabel = isConsultation ? 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋР С“Р РЋРЎвЂњР В Р’В»Р РЋР Р‰Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋР РЏ' : (isCredit ? 'Р В РІР‚вЂќР В Р’В°Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќ' : 'Р В РІР‚СћР В РЎвЂќР В Р’В·Р В Р’В°Р В РЎВР В Р’ВµР В Р вЂ¦');
+      const descriptionBase = `[Р В Р Р‹Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ] ${typeLabel} Р вЂ™Р’В· ${subject.name || assignment.subject_name || ''}`.trim();
       const description = assignment.note
-        ? `${descriptionBase} · ${String(assignment.note).trim().slice(0, 120)}`
+        ? `${descriptionBase} Р вЂ™Р’В· ${String(assignment.note).trim().slice(0, 120)}`
         : descriptionBase;
       const slot = bellSchedule[classNumber] || null;
-      const timeLabel = slot ? `${slot.start}-${slot.end}` : `Пара ${classNumber}`;
+      const timeLabel = slot ? `${slot.start}-${slot.end}` : `Р В РЎСџР В Р’В°Р РЋР вЂљР В Р’В° ${classNumber}`;
       const isControlFlag = isConsultation ? 0 : 1;
 
       let existingSql = `
@@ -43278,16 +43290,15 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
           AND course_id = ?
           AND class_date = ?
           AND class_number = ?
-          AND COALESCE(is_teacher_homework, 0) = 1
-          AND COALESCE(is_custom_deadline, 0) = 0
+          AND ${buildTruthyTextCondition('is_teacher_homework')}
+          AND ${buildFalsyTextCondition('is_custom_deadline')}
           AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
       `;
       const existingParams = [subjectId, groupNumber, selectedCourseId, assessmentDate, classNumber];
       if (isConsultation) {
-        existingSql += " AND COALESCE(is_control, 0) = 0 AND COALESCE(is_credit, 0) = 0 AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія] консультація%'";
+        existingSql += ` AND ${buildFalsyTextCondition('is_control')} AND ${buildFalsyTextCondition('is_credit')} AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія] консультація%'`;
       } else {
-        existingSql += ' AND COALESCE(is_control, 0) = 1 AND COALESCE(is_credit, 0) = ?';
-        existingParams.push(isCredit);
+        existingSql += ` AND ${buildTruthyTextCondition('is_control')} AND ${isCredit ? buildTruthyTextCondition('is_credit') : buildFalsyTextCondition('is_credit')}`;
       }
       if (selectedSemesterId) {
         existingSql += ' AND (semester_id = ? OR semester_id IS NULL)';
@@ -43314,7 +43325,7 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL, ?, ?, 1, ?, ?)
         `,
         [
-          `Група ${groupNumber}`,
+          `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groupNumber}`,
           subject.name || assignment.subject_name || '',
           dayName,
           timeLabel,
@@ -43367,11 +43378,11 @@ app.post('/admin/session-generator/publish', requireScheduleGeneratorSectionAcce
     }
 
     const unresolvedSuffix = combinedReport.unresolvedRows.length
-    ? ` Перевірка конфліктів неповна: для ${conflictReport.unresolvedRows.length} подій не знайдено привʼязаного викладача в compatibility mirror.`
+    ? ` Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В РЎвЂќР В Р’В° Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р В Р вЂ¦Р В Р’ВµР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В Р’В°: Р В РўвЂР В Р’В»Р РЋР РЏ ${conflictReport.unresolvedRows.length} Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р вЂ Р С™РЎВР РЋР РЏР В Р’В·Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В Р вЂ Р В РЎвЂР В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’В° Р В Р вЂ  compatibility mirror.`
       : '';
     const message = createdCount > 0
-      ? `Опубліковано ${createdCount} подій сесії. Пропущено дублікатів: ${skippedCount}. Синхронізовано предметів у журналі: ${syncedSubjects}.${unresolvedSuffix}`
-      : `Нових подій не створено (дублікатів: ${skippedCount}).${unresolvedSuffix}`;
+      ? `Р В РЎвЂєР В РЎвЂ”Р РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў ${createdCount} Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ. Р В РЎСџР РЋР вЂљР В РЎвЂўР В РЎвЂ”Р РЋРЎвЂњР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РўвЂР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В Р’В°Р РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : ${skippedCount}. Р В Р Р‹Р В РЎвЂР В Р вЂ¦Р РЋРІР‚В¦Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋРІР‚вЂњР В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњ: ${syncedSubjects}.${unresolvedSuffix}`
+      : `Р В РЎСљР В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚В¦ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р вЂ¦Р В Р’Вµ Р РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂўР РЋР вЂљР В Р’ВµР В Р вЂ¦Р В РЎвЂў (Р В РўвЂР РЋРЎвЂњР В Р’В±Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР В Р’В°Р РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ : ${skippedCount}).${unresolvedSuffix}`;
     return redirectToGenerator('ok', message.trim());
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.publish');
@@ -43398,7 +43409,7 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
     };
 
     if (!selectedCourseId) {
-      return redirectToGenerator('err', 'Оберіть курс для видалення сесії.');
+      return redirectToGenerator('err', 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ.');
     }
 
     const semesters = await getSemestersCached(selectedCourseId);
@@ -43413,7 +43424,7 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
       activeSemester = semesters[0];
     }
     if (!activeSemester) {
-      return redirectToGenerator('err', 'Активний семестр не знайдено.');
+      return redirectToGenerator('err', 'Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў.');
     }
     const selectedSemesterId = Number(activeSemester.id);
     form.semester_id = selectedSemesterId;
@@ -43440,7 +43451,7 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
     const explicitSessionDates = windowDates.explicitSessionDates;
     const targetDates = Array.from(new Set((explicitSessionDates || []).filter((date) => isValidDateString(date)))).sort();
     if (!targetDates.length) {
-      return redirectToGenerator('err', 'Немає дат сесії для видалення. Перевірте тижні сесії.');
+      return redirectToGenerator('err', 'Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РўвЂР В Р’В°Р РЋРІР‚С™ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ. Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР РЋРІР‚С™Р В Р’Вµ Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ.');
     }
 
     const actorUserId = Number(req.session.user?.id || 0) || null;
@@ -43476,16 +43487,16 @@ app.post('/admin/session-generator/delete', requireScheduleGeneratorSectionAcces
     }
     if (!Number(cleanupResult.deletedHomeworkCount || 0)) {
       const draftSuffix = draftCleanup.removedAssignmentsCount
-        ? ` З чернетки прибрано призначень: ${draftCleanup.removedAssignmentsCount}.`
+        ? ` Р В РІР‚вЂќ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р В РЎвЂќР В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р РЋР Р‰: ${draftCleanup.removedAssignmentsCount}.`
         : '';
-      return redirectToGenerator('ok', `У вибраному вікні сесії немає подій для видалення.${draftSuffix}`.trim());
+      return redirectToGenerator('ok', `Р В Р в‚¬ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В Р вЂ Р РЋРІР‚вЂњР В РЎвЂќР В Р вЂ¦Р РЋРІР‚вЂњ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р В Р вЂ¦Р В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ.${draftSuffix}`.trim());
     }
     const draftSuffix = draftCleanup.removedAssignmentsCount
-      ? ` З чернетки прибрано призначень: ${draftCleanup.removedAssignmentsCount}.`
+      ? ` Р В РІР‚вЂќ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р В РЎвЂќР В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р РЋР Р‰: ${draftCleanup.removedAssignmentsCount}.`
       : '';
     return redirectToGenerator(
       'ok',
-      `Видалено ${cleanupResult.deletedHomeworkCount} подій сесії у вибраному вікні. Очищено колонок журналу: ${cleanupResult.deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.${draftSuffix}`.trim()
+      `Р В РІР‚в„ўР В РЎвЂР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў ${cleanupResult.deletedHomeworkCount} Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р РЋРЎвЂњ Р В Р вЂ Р В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В Р вЂ Р РЋРІР‚вЂњР В РЎвЂќР В Р вЂ¦Р РЋРІР‚вЂњ. Р В РЎвЂєР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В РЎвЂќ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ: ${cleanupResult.deletedJournalColumnsCount}. Р В Р Р‹Р В РЎвЂР В Р вЂ¦Р РЋРІР‚В¦Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋРІР‚вЂњР В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњ: ${cleanupResult.syncedSubjects}.${draftSuffix}`.trim()
     );
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.delete');
@@ -43512,7 +43523,7 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
     };
 
     if (!selectedCourseId) {
-      return redirectToGenerator('err', 'Оберіть курс для повного очищення сесії.');
+      return redirectToGenerator('err', 'Р В РЎвЂєР В Р’В±Р В Р’ВµР РЋР вЂљР РЋРІР‚вЂњР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ”Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ.');
     }
 
     const semesters = await getSemestersCached(selectedCourseId);
@@ -43527,7 +43538,7 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
       activeSemester = semesters[0];
     }
     if (!activeSemester) {
-      return redirectToGenerator('err', 'Активний семестр не знайдено.');
+      return redirectToGenerator('err', 'Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР вЂљ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў.');
     }
     const selectedSemesterId = Number(activeSemester.id);
     form.semester_id = selectedSemesterId;
@@ -43566,17 +43577,17 @@ app.post('/admin/session-generator/delete-all-active', requireScheduleGeneratorS
     }
     if (!deletedHomeworkCount && !deletedJournalColumnsCount) {
       const draftSuffix = draftCleanup.removedAssignmentsCount
-        ? ` Чернетку очищено: ${draftCleanup.removedAssignmentsCount} призначень прибрано.`
+        ? ` Р В Р’В§Р В Р’ВµР РЋР вЂљР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р В РЎвЂќР РЋРЎвЂњ Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў: ${draftCleanup.removedAssignmentsCount} Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂў.`
         : '';
-      return redirectToGenerator('ok', `Активних сесій для очищення не знайдено.${draftSuffix}`.trim());
+      return redirectToGenerator('ok', `Р В РЎвЂ™Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋР РЏ Р В Р вЂ¦Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў.${draftSuffix}`.trim());
     }
     const draftSuffix = draftCleanup.removedAssignmentsCount
-      ? ` Чернетку очищено: ${draftCleanup.removedAssignmentsCount} призначень прибрано.`
+      ? ` Р В Р’В§Р В Р’ВµР РЋР вЂљР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™Р В РЎвЂќР РЋРЎвЂњ Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў: ${draftCleanup.removedAssignmentsCount} Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂў.`
       : '';
 
     return redirectToGenerator(
       'ok',
-      `Повністю очищено активну сесію: подій ${deletedHomeworkCount}, колонок журналу ${deletedJournalColumnsCount}. Синхронізовано предметів у журналі: ${cleanupResult.syncedSubjects}.${draftSuffix}`.trim()
+      `Р В РЎСџР В РЎвЂўР В Р вЂ Р В Р вЂ¦Р РЋРІР‚вЂњР РЋР С“Р РЋРІР‚С™Р РЋР вЂ№ Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂў Р В Р’В°Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂР В Р вЂ Р В Р вЂ¦Р РЋРЎвЂњ Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР вЂ№: Р В РЎвЂ”Р В РЎвЂўР В РўвЂР РЋРІР‚вЂњР В РІвЂћвЂ“ ${deletedHomeworkCount}, Р В РЎвЂќР В РЎвЂўР В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В РЎвЂќ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРЎвЂњ ${deletedJournalColumnsCount}. Р В Р Р‹Р В РЎвЂР В Р вЂ¦Р РЋРІР‚В¦Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋРІР‚вЂњР В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚вЂњР В Р вЂ  Р РЋРЎвЂњ Р В Р’В¶Р РЋРЎвЂњР РЋР вЂљР В Р вЂ¦Р В Р’В°Р В Р’В»Р РЋРІР‚вЂњ: ${cleanupResult.syncedSubjects}.${draftSuffix}`.trim()
     );
   } catch (err) {
     return handleDbError(res, err, 'admin.sessionGenerator.deleteAll');
@@ -43773,7 +43784,7 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
     };
     const isSeminarType = (lessonType) => {
       const raw = String(lessonType || '').toLowerCase();
-      return raw.includes('seminar') || raw.includes('сем');
+      return raw.includes('seminar') || raw.includes('Р РЋР С“Р В Р’ВµР В РЎВ');
     };
     const autoMirrorCandidatesByLocation = { kyiv: [], munich: [] };
     const autoMirrorExclusionsByLocation = { kyiv: [], munich: [] };
@@ -43836,16 +43847,16 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
         const reasons = [];
         const groupNum = Number(item.group_number);
         const generalFlag = item.is_general === true || Number(item.is_general) === 1;
-        if (!isSeminarType(item.lesson_type)) reasons.push('Не семінар');
-        if (!(groupNum === 1 || groupNum === 2)) reasons.push('Не група 1/2');
-        if (item.mirror_key) reasons.push('Вже має ключ дзеркала');
-        if (item.fixed_day || item.fixed_class_number || item.weeks_set) reasons.push('Є фіксований день/слот/тижні');
-        if (!generalFlag) reasons.push('Не загальний предмет');
+        if (!isSeminarType(item.lesson_type)) reasons.push('Р В РЎСљР В Р’Вµ Р РЋР С“Р В Р’ВµР В РЎВР РЋРІР‚вЂњР В Р вЂ¦Р В Р’В°Р РЋР вЂљ');
+        if (!(groupNum === 1 || groupNum === 2)) reasons.push('Р В РЎСљР В Р’Вµ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° 1/2');
+        if (item.mirror_key) reasons.push('Р В РІР‚в„ўР В Р’В¶Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋ Р В РўвЂР В Р’В·Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В°Р В Р’В»Р В Р’В°');
+        if (item.fixed_day || item.fixed_class_number || item.weeks_set) reasons.push('Р В РІР‚С› Р РЋРІР‚С›Р РЋРІР‚вЂњР В РЎвЂќР РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰/Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™/Р РЋРІР‚С™Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р РЋРІР‚вЂњ');
+        if (!generalFlag) reasons.push('Р В РЎСљР В Р’Вµ Р В Р’В·Р В Р’В°Р В РЎвЂ“Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™');
         if (!reasons.length && !matchedIds.has(item.id)) {
           if (sameSubjectOnly.has(item.id)) {
-            reasons.push('У іншій групі лише такий самий предмет');
+            reasons.push('Р В Р в‚¬ Р РЋРІР‚вЂњР В Р вЂ¦Р РЋРІвЂљВ¬Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р РЋРІР‚вЂњ Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р’Вµ Р РЋРІР‚С™Р В Р’В°Р В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р РЋР С“Р В Р’В°Р В РЎВР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™');
           } else {
-            reasons.push('Немає пари для групи 1/2');
+            reasons.push('Р В РЎСљР В Р’ВµР В РЎВР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В РЎвЂ Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ 1/2');
           }
         }
         if (!reasons.length) return;
@@ -44248,7 +44259,7 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
       return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Semester not found', runId));
     }
     const lessonTypeLower = String(lessonType || '').toLowerCase();
-    const isSeminar = lessonTypeLower.includes('seminar') || lessonTypeLower.includes('сем');
+    const isSeminar = lessonTypeLower.includes('seminar') || lessonTypeLower.includes('Р РЋР С“Р В Р’ВµР В РЎВ');
     const totalGroups = Math.max(1, Number(subjectRow.group_count || 1));
     const shouldSplitAllGroups = !groupNumber && isSeminar && totalGroups > 1;
     if (shouldSplitAllGroups) {
@@ -44352,7 +44363,7 @@ app.post('/admin/schedule-generator/mirror-auto', requireScheduleGeneratorSectio
     if (b.fixed_day || b.fixed_class_number || b.weeks_set) continue;
     if (a.mirror_key || b.mirror_key) continue;
     const lessonType = String(a.lesson_type || '').toLowerCase();
-    if (!(lessonType.includes('seminar') || lessonType.includes('сем'))) continue;
+    if (!(lessonType.includes('seminar') || lessonType.includes('Р РЋР С“Р В Р’ВµР В РЎВ'))) continue;
     if (Number(a.subject_id) === Number(b.subject_id)) continue;
     const key = `AUTO-${aId.toString(36).toUpperCase()}${bId.toString(36).toUpperCase()}`;
     await db.run(
@@ -44926,7 +44937,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
     });
     grouped.forEach((entry) => {
       const groups = Array.from(entry.group_numbers).sort((a, b) => a - b);
-      const groupLabel = groups.length === 1 ? `Група ${groups[0]}` : `Групи: ${groups.join(', ')}`;
+      const groupLabel = groups.length === 1 ? `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° ${groups[0]}` : `Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂ: ${groups.join(', ')}`;
       const normalized = {
         ...entry,
         group_numbers: groups,
@@ -47845,7 +47856,7 @@ app.post('/admin/users/:id/sessions/revoke-all', requireUsersSectionAccess, writ
       alertKey: 'sessions-revoked',
       severity: 'medium',
       title: 'User sessions revoked',
-      message: `Сесії користувача ${targetUser.full_name || targetUserId} скасовано (${revokedCount})`,
+      message: `Р В Р Р‹Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋРІР‚вЂќ Р В РЎвЂќР В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В Р вЂ Р В Р’В°Р РЋРІР‚РЋР В Р’В° ${targetUser.full_name || targetUserId} Р РЋР С“Р В РЎвЂќР В Р’В°Р РЋР С“Р В РЎвЂўР В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂў (${revokedCount})`,
       userId: targetUserId,
       courseId: Number(targetUser.course_id || scopedCourseId || 0) || null,
       details: {
@@ -48072,7 +48083,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
     const value = String(sessionId || '').trim();
     if (!value) return 'session';
     if (value.length <= 14) return value;
-    return `${value.slice(0, 10)}…`;
+    return `${value.slice(0, 10)}Р Р†Р вЂљР’В¦`;
   };
 
   try {
@@ -48220,7 +48231,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         const courseReason = 'meta:same-course';
         if (!entry.reason_keys.has(courseReason)) {
           entry.reason_keys.add(courseReason);
-          entry.reasons.push('Той самий курс');
+          entry.reasons.push('Р В РЎС›Р В РЎвЂўР В РІвЂћвЂ“ Р РЋР С“Р В Р’В°Р В РЎВР В РЎвЂР В РІвЂћвЂ“ Р В РЎвЂќР РЋРЎвЂњР РЋР вЂљР РЋР С“');
           entry.score += 4;
         }
       }
@@ -48263,7 +48274,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         addMatch(row, {
           points: 82,
           reason_key: `session:${row.session_id}`,
-          reason: `Спільна сесія браузера (${shortSessionLabel(row.session_id)})`,
+          reason: `Р В Р Р‹Р В РЎвЂ”Р РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В Р’В° Р РЋР С“Р В Р’ВµР РЋР С“Р РЋРІР‚вЂњР РЋР РЏ Р В Р’В±Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р’В·Р В Р’ВµР РЋР вЂљР В Р’В° (${shortSessionLabel(row.session_id)})`,
           session_id: row.session_id,
           occurred_at: row.last_seen_at,
         });
@@ -48298,7 +48309,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         addMatch(row, {
           points: 36,
           reason_key: `users-last-ip:${row.ip}`,
-          reason: `Збіг по останньому IP (${row.ip})`,
+          reason: `Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“ Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋР Р‰Р В РЎвЂўР В РЎВР РЋРЎвЂњ IP (${row.ip})`,
           ip: row.ip,
           occurred_at: row.last_seen_at,
         });
@@ -48329,7 +48340,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         addMatch(row, {
           points: 42,
           reason_key: `login-ip:${row.ip}`,
-          reason: `Збіг по IP у login history (${row.ip})`,
+          reason: `Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“ Р В РЎвЂ”Р В РЎвЂў IP Р РЋРЎвЂњ login history (${row.ip})`,
           ip: row.ip,
           occurred_at: row.last_seen_at,
         });
@@ -48361,7 +48372,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         addMatch(row, {
           points: 28,
           reason_key: `visit-ip:${row.ip}`,
-          reason: `Збіг по IP у візитах (${row.ip})`,
+          reason: `Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“ Р В РЎвЂ”Р В РЎвЂў IP Р РЋРЎвЂњ Р В Р вЂ Р РЋРІР‚вЂњР В Р’В·Р В РЎвЂР РЋРІР‚С™Р В Р’В°Р РЋРІР‚В¦ (${row.ip})`,
           ip: row.ip,
           occurred_at: row.last_seen_at,
         });
@@ -48393,7 +48404,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           addMatch(row, {
             points: 45,
             reason_key: `registration-ip:${row.ip}`,
-            reason: `Збіг по IP під час реєстрації (${row.ip})`,
+            reason: `Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“ Р В РЎвЂ”Р В РЎвЂў IP Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂ Р РЋРІР‚РЋР В Р’В°Р РЋР С“ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ (${row.ip})`,
             ip: row.ip,
             occurred_at: row.last_seen_at,
           });
@@ -48431,7 +48442,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         addMatch(row, {
           points: 18,
           reason_key: `users-agent:${row.user_agent}`,
-          reason: 'Збіг по пристрою (останній логін)',
+          reason: 'Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“ Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋР вЂ№ (Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚вЂњР В РІвЂћвЂ“ Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р РЋРІР‚вЂњР В Р вЂ¦)',
           user_agent: row.user_agent,
           occurred_at: row.last_seen_at,
         });
@@ -48462,7 +48473,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         addMatch(row, {
           points: 16,
           reason_key: `login-agent:${row.user_agent}`,
-          reason: 'Збіг по пристрою в login history',
+          reason: 'Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“ Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР РЋР вЂ№ Р В Р вЂ  login history',
           user_agent: row.user_agent,
           occurred_at: row.last_seen_at,
         });
@@ -48498,7 +48509,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           addMatch(row, {
             points: 24,
             reason_key: `registration-fingerprint:${row.device_fingerprint}`,
-            reason: 'Збіг device fingerprint під час реєстрації',
+            reason: 'Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“ device fingerprint Р В РЎвЂ”Р РЋРІР‚вЂњР В РўвЂ Р РЋРІР‚РЋР В Р’В°Р РЋР С“ Р РЋР вЂљР В Р’ВµР РЋРІР‚СњР РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р РЋРІР‚В Р РЋРІР‚вЂњР РЋРІР‚вЂќ',
             occurred_at: row.last_seen_at,
           });
         });
@@ -48543,22 +48554,22 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
     let riskScore = 0;
     if (suspectedOwner) {
       riskScore += Number(suspectedOwner.score || 0) >= 110 ? 62 : 36;
-      riskReasons.push(`Ймовірний власник: ${suspectedOwner.full_name}`);
+      riskReasons.push(`Р В РІвЂћСћР В РЎВР В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ Р В Р’В»Р В Р’В°Р РЋР С“Р В Р вЂ¦Р В РЎвЂР В РЎвЂќ: ${suspectedOwner.full_name}`);
     }
     if (strongMatches >= 2) {
       riskScore += 24;
-      riskReasons.push(`Кілька сильних збігів (${strongMatches})`);
+      riskReasons.push(`Р В РЎв„ўР РЋРІР‚вЂњР В Р’В»Р РЋР Р‰Р В РЎвЂќР В Р’В° Р РЋР С“Р В РЎвЂР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР РЋРІР‚В¦ Р В Р’В·Р В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“Р РЋРІР‚вЂњР В Р вЂ  (${strongMatches})`);
     }
     if (evidenceSessions.length) {
       riskScore += 14;
-      riskReasons.push(`Є збіги по session (${evidenceSessions.length})`);
+      riskReasons.push(`Р В РІР‚С› Р В Р’В·Р В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“Р В РЎвЂ Р В РЎвЂ”Р В РЎвЂў session (${evidenceSessions.length})`);
     }
     if (evidenceIps.length) {
       riskScore += 10;
-      riskReasons.push(`Є збіги по IP (${evidenceIps.length})`);
+      riskReasons.push(`Р В РІР‚С› Р В Р’В·Р В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“Р В РЎвЂ Р В РЎвЂ”Р В РЎвЂў IP (${evidenceIps.length})`);
     }
     if (allowlistedEvidenceIps.length) {
-      riskReasons.push(`IP у allowlist (ігнор): ${allowlistedEvidenceIps.join(', ')}`);
+      riskReasons.push(`IP Р РЋРЎвЂњ allowlist (Р РЋРІР‚вЂњР В РЎвЂ“Р В Р вЂ¦Р В РЎвЂўР РЋР вЂљ): ${allowlistedEvidenceIps.join(', ')}`);
     }
     const hasSuppressedOnly =
       allowlistedEvidenceIps.length > 0 &&
@@ -48567,7 +48578,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
       !strongMatches;
     const resolvedRisk = resolveForensicsRiskState(riskScore);
     const riskLevel = hasSuppressedOnly ? 'suppressed' : resolvedRisk.key;
-    const riskLabel = hasSuppressedOnly ? 'Збіги приглушено (allowlist)' : resolvedRisk.label;
+    const riskLabel = hasSuppressedOnly ? 'Р В РІР‚вЂќР В Р’В±Р РЋРІР‚вЂњР В РЎвЂ“Р В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР В РЎвЂ“Р В Р’В»Р РЋРЎвЂњР РЋРІвЂљВ¬Р В Р’ВµР В Р вЂ¦Р В РЎвЂў (allowlist)' : resolvedRisk.label;
     const securityAlertWindowMs = SYSTEM_INCIDENT_WINDOW_HOURS * 60 * 60 * 1000;
     const securityAlertsForTarget = runtimeErrorEvents
       .filter((event) => {
@@ -48632,10 +48643,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
 
     const caseRiskLevel = normalizedSecurityCase ? normalizedSecurityCase.risk_level : null;
     const caseRiskLabel = caseRiskLevel === 'high-risk'
-      ? 'Високий ризик'
+      ? 'Р В РІР‚в„ўР В РЎвЂР РЋР С“Р В РЎвЂўР В РЎвЂќР В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќ'
       : (caseRiskLevel === 'watch'
-        ? 'Під наглядом'
-        : 'Нормальний ризик');
+        ? 'Р В РЎСџР РЋРІР‚вЂњР В РўвЂ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р В Р’В»Р РЋР РЏР В РўвЂР В РЎвЂўР В РЎВ'
+        : 'Р В РЎСљР В РЎвЂўР РЋР вЂљР В РЎВР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋР вЂљР В РЎвЂР В Р’В·Р В РЎвЂР В РЎвЂќ');
     const finalRiskLevel = caseRiskLevel && caseRiskLevel !== 'normal'
       ? caseRiskLevel
       : riskLevel;
@@ -48646,7 +48657,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
       ? Math.max(Number(normalizedSecurityCase.risk_score || 0), Number(riskScore || 0))
       : Number(riskScore || 0);
     if (normalizedSecurityCase && normalizedSecurityCase.reason) {
-      riskReasons.unshift(`Кейс: ${normalizedSecurityCase.reason}`);
+      riskReasons.unshift(`Р В РЎв„ўР В Р’ВµР В РІвЂћвЂ“Р РЋР С“: ${normalizedSecurityCase.reason}`);
     }
 
     return res.json({
@@ -49890,10 +49901,10 @@ async function buildDeanerySubjectMonitoringRows(courseId, semesterId) {
       const closedFlag = Number(gradingRow.is_closed || 0) === 1;
       return {
         subject_id: subjectId,
-        subject_name: String(subjectRow.name || 'Предмет'),
+        subject_name: String(subjectRow.name || 'Р В РЎСџР РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™'),
         group_count: Number(subjectRow.group_count || 1),
         is_closed: closedFlag,
-        status_label: closedFlag ? 'Закрито' : 'Відкрито',
+        status_label: closedFlag ? 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў' : 'Р В РІР‚в„ўР РЋРІР‚вЂњР В РўвЂР В РЎвЂќР РЋР вЂљР В РЎвЂР РЋРІР‚С™Р В РЎвЂў',
         closed_at: gradingRow.closed_at || null,
         closed_by_name: gradingRow.closed_by_name || '',
         students_total: Number(studentRow.students_total || 0),
@@ -51954,7 +51965,7 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
         issues.push({
           type: 'invalid_class_number',
           severity: 'error',
-          message: 'Невірний номер пари',
+          message: 'Р В РЎСљР В Р’ВµР В Р вЂ Р РЋРІР‚вЂњР РЋР вЂљР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В Р вЂ¦Р В РЎвЂўР В РЎВР В Р’ВµР РЋР вЂљ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљР В РЎвЂ',
           context: {
             week: row.week_number,
             day_of_week: row.day_of_week,
@@ -51974,7 +51985,7 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
         issues.push({
           type: 'day_disabled',
           severity: 'warning',
-          message: 'Пара на вимкнений день',
+          message: 'Р В РЎСџР В Р’В°Р РЋР вЂљР В Р’В° Р В Р вЂ¦Р В Р’В° Р В Р вЂ Р В РЎвЂР В РЎВР В РЎвЂќР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰',
           context: {
             week: row.week_number,
             day_of_week: row.day_of_week,
@@ -51995,7 +52006,7 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
         issues.push({
           type: 'subject_group_missing',
           severity: 'warning',
-          message: 'Група не відповідає предмету',
+          message: 'Р В РІР‚СљР РЋР вЂљР РЋРЎвЂњР В РЎвЂ”Р В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В РЎвЂ”Р В РЎвЂўР В Р вЂ Р РЋРІР‚вЂњР В РўвЂР В Р’В°Р РЋРІР‚Сњ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРЎвЂњ',
           context: {
             week: row.week_number,
             day_of_week: row.day_of_week,
@@ -52018,7 +52029,7 @@ app.get('/admin/api/schedule/validate', requireScheduleSectionAccess, async (req
         issues.push({
           type: 'collision',
           severity: 'error',
-          message: 'Конфлікт пар в одному слоті',
+          message: 'Р В РЎв„ўР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С›Р В Р’В»Р РЋРІР‚вЂњР В РЎвЂќР РЋРІР‚С™ Р В РЎвЂ”Р В Р’В°Р РЋР вЂљ Р В Р вЂ  Р В РЎвЂўР В РўвЂР В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚вЂњ',
           context: {
             week: sample.week_number,
             day_of_week: sample.day_of_week,
