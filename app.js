@@ -34636,8 +34636,11 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
     return next();
   }
   const focus = parseAcademicV2Focus(req.query);
+  const pageRole = normalizeRoleKey(
+    (req && req.session && (req.session.role || (req.session.user && req.session.user.role))) || 'admin'
+  );
   const renderPage = (pageData) => res.render('admin-academic-v2', {
-    role: getAcademicV2PageRole(req),
+    role: pageRole,
     username: req.session.user.username,
     settings: settingsCache,
     error: String(req.query.err || ''),
