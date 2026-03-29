@@ -34635,6 +34635,16 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
   if (String(req.query.legacy || '').trim() === '1') {
     return next();
   }
+  const focus = parseAcademicV2Focus(req.query);
+  const renderPage = (pageData) => res.render('admin-academic-v2', {
+    role: getAcademicV2PageRole(req),
+    username: req.session.user.username,
+    settings: settingsCache,
+    error: String(req.query.err || ''),
+    success: String(req.query.ok || ''),
+    warning: String(req.query.warn || ''),
+    ...pageData,
+  });
   try {
     await ensureDbReady();
   } catch (err) {
@@ -34643,23 +34653,23 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
   try {
     const pageData = await academicV2Helpers.loadAcademicSetupPage(
       getAcademicV2Store(),
-      parseAcademicV2Focus(req.query),
+      focus,
       {
         previewCohortId: parsePositiveIntStrict(req.query.preview_cohort_id),
         previewTargetStageNumber: parsePositiveIntStrict(req.query.preview_target_stage),
       }
     );
-    return res.render('admin-academic-v2', {
-      role: getAcademicV2PageRole(req),
-      username: req.session.user.username,
-      settings: settingsCache,
-      error: String(req.query.err || ''),
-      success: String(req.query.ok || ''),
-      warning: String(req.query.warn || ''),
-      ...pageData,
-    });
+    return renderPage(pageData);
   } catch (err) {
-    return handleDbError(res, err, 'admin.pathways.v2.render');
+    const degradedMessage = normalizeRuntimeErrorMessage(err && err.message ? err.message : err);
+    pushRuntimeErrorEvent('db', 'admin.pathways.v2.render.degraded', degradedMessage);
+    console.error('Academic Setup v2 degraded render', err);
+    try {
+      const fallbackPageData = academicV2Helpers.buildAcademicSetupPageFallback(focus, degradedMessage);
+      return renderPage(fallbackPageData);
+    } catch (fallbackErr) {
+      return handleDbError(res, fallbackErr, 'admin.pathways.v2.render');
+    }
   }
 });
 
@@ -53449,4 +53459,3 @@ app.use((err, req, res, next) => {
 });
 
 startServer();
-
