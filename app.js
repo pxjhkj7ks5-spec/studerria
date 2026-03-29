@@ -9927,6 +9927,40 @@ function buildAdminScopedNoticeUrl(req, kind, message, options = {}) {
   return appendQueryParamToUrl(baseUrl, normalizedKind, String(message || ''));
 }
 
+function parseAcademicV2Focus(source = {}) {
+  const payload = source && typeof source === 'object' ? source : {};
+  return {
+    programId: parsePositiveIntStrict(payload.focus_program_id || payload.program_id || payload.programId),
+    cohortId: parsePositiveIntStrict(payload.focus_cohort_id || payload.cohort_id || payload.cohortId),
+    groupId: parsePositiveIntStrict(payload.focus_group_id || payload.group_id || payload.groupId),
+    termId: parsePositiveIntStrict(payload.focus_term_id || payload.term_id || payload.termId),
+    templateStageNumber: parsePositiveIntStrict(
+      payload.focus_template_stage || payload.template_stage || payload.templateStageNumber
+    ),
+  };
+}
+
+function buildAcademicV2NoticeUrl(kind, message, focus = {}, extraParams = {}) {
+  const normalizedFocus = parseAcademicV2Focus(focus);
+  const query = new URLSearchParams();
+  if (normalizedFocus.programId) query.set('program_id', String(normalizedFocus.programId));
+  if (normalizedFocus.cohortId) query.set('cohort_id', String(normalizedFocus.cohortId));
+  if (normalizedFocus.groupId) query.set('group_id', String(normalizedFocus.groupId));
+  if (normalizedFocus.termId) query.set('term_id', String(normalizedFocus.termId));
+  if (normalizedFocus.templateStageNumber) query.set('template_stage', String(normalizedFocus.templateStageNumber));
+  Object.entries(extraParams && typeof extraParams === 'object' ? extraParams : {}).forEach(([key, value]) => {
+    if (!key || typeof value === 'undefined' || value === null || value === '') {
+      return;
+    }
+    query.set(String(key), String(value));
+  });
+  if (message) {
+    query.set(String(kind || '').trim().toLowerCase() === 'ok' ? 'ok' : 'err', String(message));
+  }
+  const queryString = query.toString();
+  return `/admin/pathways${queryString ? `?${queryString}` : ''}`;
+}
+
 function buildScheduleGeneratorUrl(req, runId = null, extraParams = {}) {
   return buildAdminScopedPathUrl(req, '/admin/schedule-generator', {}, {
     run: parsePositiveIntStrict(runId) || null,
@@ -9981,6 +10015,41 @@ function appendQueryParamToUrl(url, key, value) {
   }
   const separator = String(url).includes('?') ? '&' : '?';
   return `${url}${separator}${encodeURIComponent(String(key))}=${encodeURIComponent(String(value))}`;
+}
+
+async function loadAcademicV2LegacyStudentRows(userOrId, options = {}) {
+  const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+    getAcademicV2Store(),
+    userOrId,
+    {
+      selectedOnly: options && options.selectedOnly === true,
+    }
+  );
+  const sourceRows = Array.isArray(subjectState && subjectState.subjects)
+    ? subjectState.subjects
+    : [];
+  const teamworkOnly = options && options.teamworkOnly === true;
+  const rows = sourceRows
+    .filter((row) => !teamworkOnly || row.show_in_teamwork === true)
+    .map((row) => ({
+      ...row,
+      group_number: row.has_all_groups
+        ? null
+        : parsePositiveIntStrict(
+          row.selected_group
+          || row.default_group
+          || (Array.isArray(row.group_numbers) && row.group_numbers.length ? row.group_numbers[0] : null)
+        ),
+      owner_course_id: parsePositiveIntStrict(row.owner_course_id || row.course_id),
+      course_id: parsePositiveIntStrict(row.course_id || row.owner_course_id),
+      course_name: String(row.course_name || ''),
+      subject_name: String(row.subject_name || row.name || ''),
+      show_in_teamwork: row.show_in_teamwork === true,
+    }));
+  return {
+    state: subjectState || { scope: null, term: null, projectionIssues: {} },
+    rows,
+  };
 }
 
 function formatAdminAcademicTrackLabel(trackKey = '') {
