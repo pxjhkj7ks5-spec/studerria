@@ -451,6 +451,82 @@
     });
   }
 
+  function applyRegisterCourseTweaks() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement) || !body.classList.contains('page-register-course')) {
+      return;
+    }
+
+    if (!document.getElementById('registerCourseTweaksStyle')) {
+      const style = document.createElement('style');
+      style.id = 'registerCourseTweaksStyle';
+      style.textContent = `
+        body.page-register-course #academicContextSummaryCard {
+          border-radius: 18px;
+        }
+        body.theme-light.page-register-course #academicContextSummaryCard {
+          background: rgba(255, 255, 255, 0.5);
+          border: 1px solid rgba(148, 163, 184, 0.24);
+          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+        }
+        body.theme-dark.page-register-course #academicContextSummaryCard {
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
+          border: 1px solid rgba(191, 219, 254, 0.18);
+          color: #f8fafc;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 28px rgba(5, 8, 24, 0.18);
+        }
+        body.theme-light.page-register-course #academicContextSummaryCard .text-muted {
+          color: rgba(51, 65, 85, 0.68) !important;
+        }
+        body.theme-dark.page-register-course #academicContextSummaryCard .text-muted {
+          color: rgba(191, 219, 254, 0.82) !important;
+        }
+        body.theme-light.page-register-course #academicContextSummary {
+          color: #0f172a;
+        }
+        body.theme-dark.page-register-course #academicContextSummary {
+          color: rgba(248, 250, 252, 0.96);
+          text-shadow: 0 1px 0 rgba(8, 12, 28, 0.22);
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const summaryValue = document.getElementById('academicContextSummary');
+    const programSelect = document.getElementById('studyProgramSelect');
+    const admissionInput = document.getElementById('selectedAdmissionInput');
+    const campusInput = document.getElementById('selectedCampusInput');
+    const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
+    const defaultSummary = document.documentElement.lang === 'en'
+      ? 'Select track, program, admission year, and campus.'
+      : 'Оберіть рівень, програму, рік вступу та кампус.';
+    const trackOnlyLabels = new Set(['Bachelor', "Master's", 'Teacher', 'Бакалаврат', 'Магістратура', 'Викладач']);
+
+    const syncSummary = () => {
+      if (!(summaryValue instanceof HTMLElement)) {
+        return;
+      }
+      const hasProgram = Boolean(programSelect && String(programSelect.value || '').trim());
+      const hasAdmission = Boolean(admissionInput && String(admissionInput.value || '').trim());
+      const hasCampus = Boolean(campusInput && String(campusInput.value || '').trim());
+      const summaryText = normalizeText(summaryValue.textContent);
+      if (!hasProgram && !hasAdmission && !hasCampus && trackOnlyLabels.has(summaryText)) {
+        summaryValue.textContent = defaultSummary;
+      }
+    };
+
+    trackInputs.forEach((input) => {
+      input.addEventListener('change', () => window.setTimeout(syncSummary, 0));
+    });
+    if (programSelect instanceof HTMLElement) {
+      programSelect.addEventListener('change', () => window.setTimeout(syncSummary, 0));
+    }
+    if (admissionInput instanceof HTMLElement) {
+      admissionInput.addEventListener('change', () => window.setTimeout(syncSummary, 0));
+    }
+    syncSummary();
+  }
+
   function init() {
     syncThemeAttribute();
     const ambientLayer = ensureAmbientLayer();
@@ -470,6 +546,7 @@
     observeThemeChanges();
     observeDynamicBadges();
     initModalBehavior();
+    applyRegisterCourseTweaks();
 
     document.addEventListener('focusin', (event) => {
       if (!(event.target instanceof HTMLElement)) {
