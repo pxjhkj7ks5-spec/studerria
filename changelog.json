@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.34",
+      "date": "2026-03-29",
+      "items": [
+        "fix(register-course-empty-state-and-copy): adjust `views/register-course.ejs` so disabled campus cards keep their stacked layout instead of collapsing text into one row, localize the summary card in Ukrainian, and replace the remaining student-facing registration copy that still described campus selection as resolving a legacy `course` instead of the academic-v2 group"
+      ]
+    },
+    {
       "version": "1.3.33",
       "date": "2026-03-29",
       "items": [

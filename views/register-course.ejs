@@ -378,7 +378,7 @@
       body.theme-dark.page-register-course .pathway-hint {
         color: rgba(226, 232, 240, 0.74);
       }
-      body.page-register-course .track-option span,
+      body.page-register-course .track-option > span,
       body.page-register-course .course-option .course-option-title {
         display: inline-block;
         color: inherit;
@@ -584,10 +584,10 @@
                   <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
-                <p class="pathway-hint mb-3" id="campusHint"><%= registerCourseText.campusReadyStudentHint %></p>
+                <p class="pathway-hint mb-3" id="campusHint"><%= lang === 'en' ? 'The admission year defines the cohort. Choosing a campus automatically selects the academic group.' : '\u0420\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0432\u0438\u0437\u043d\u0430\u0447\u0430\u0454 \u043a\u043e\u0433\u043e\u0440\u0442\u0443. \u0412\u0438\u0431\u0456\u0440 \u043a\u0430\u043c\u043f\u0443\u0441\u0443 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u043e \u043e\u0431\u0438\u0440\u0430\u0454 \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443.' %></p>
                 <div class="glass mb-3 p-3" id="academicContextSummaryCard">
-                  <div class="small text-muted mb-1">Academic context preview</div>
-                  <div class="fw-semibold" id="academicContextSummary">Select track, program, admission year, and campus.</div>
+                  <div class="small text-muted mb-1"><%= lang === 'en' ? 'Academic group preview' : '\u0410\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0430 \u0433\u0440\u0443\u043f\u0430' %></div>
+                  <div class="fw-semibold" id="academicContextSummary"><%= lang === 'en' ? 'Select track, program, admission year, and campus.' : '\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0440\u0456\u0432\u0435\u043d\u044c, \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u0443, \u0440\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0442\u0430 \u043a\u0430\u043c\u043f\u0443\u0441.' %></div>
                 </div>
                 <div class="auth-action-stack auth-action-stack--grid">
                   <button type="submit" class="btn btn-primary register-action-btn auth-action-btn"><%= t('registerCourse.continue') %></button>
@@ -609,6 +609,18 @@
     <script>
       const isEnglishRegisterCourse = <%- JSON.stringify(lang === 'en') %>;
       const registerCourseText = <%- JSON.stringify(registerCourseText) %>;
+      const academicGroupSummaryDefault = isEnglishRegisterCourse
+        ? 'Select track, program, admission year, and campus.'
+        : '\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0440\u0456\u0432\u0435\u043d\u044c, \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u0443, \u0440\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0442\u0430 \u043a\u0430\u043c\u043f\u0443\u0441.';
+      registerCourseText.campusReadyStudentHint = isEnglishRegisterCourse
+        ? 'The admission year defines the cohort. Choosing a campus automatically selects the academic group.'
+        : '\u0420\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0432\u0438\u0437\u043d\u0430\u0447\u0430\u0454 \u043a\u043e\u0433\u043e\u0440\u0442\u0443. \u0412\u0438\u0431\u0456\u0440 \u043a\u0430\u043c\u043f\u0443\u0441\u0443 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u043e \u043e\u0431\u0438\u0440\u0430\u0454 \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443.';
+      registerCourseText.readyToRegister = isEnglishRegisterCourse
+        ? 'Ready: Studerria can resolve one stable academic group for this campus.'
+        : '\u0413\u043e\u0442\u043e\u0432\u043e: Studerria \u043c\u043e\u0436\u0435 \u0432\u0438\u0437\u043d\u0430\u0447\u0438\u0442\u0438 \u043e\u0434\u043d\u0443 \u0441\u0442\u0430\u0431\u0456\u043b\u044c\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443 \u0434\u043b\u044f \u0446\u044c\u043e\u0433\u043e \u043a\u0430\u043c\u043f\u0443\u0441\u0443.';
+      registerCourseText.chooseValidCampus = isEnglishRegisterCourse
+        ? 'Choose a valid campus before continuing, otherwise Studerria cannot resolve the correct academic group.'
+        : '\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u043a\u043e\u0440\u0435\u043a\u0442\u043d\u0438\u0439 \u043a\u0430\u043c\u043f\u0443\u0441 \u043f\u0435\u0440\u0435\u0434 \u043f\u0440\u043e\u0434\u043e\u0432\u0436\u0435\u043d\u043d\u044f\u043c, \u0456\u043d\u0430\u043a\u0448\u0435 Studerria \u043d\u0435 \u0432\u0438\u0437\u043d\u0430\u0447\u0438\u0442\u044c \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443.';
       const pathwayPayload = <%- JSON.stringify(pathways) %>;
       const pathwayPrograms = Array.isArray(pathwayPayload.programs) ? pathwayPayload.programs : [];
       const pathwayAdmissions = Array.isArray(pathwayPayload.admissions) ? pathwayPayload.admissions : [];
@@ -728,7 +740,7 @@
         } else if (course) {
           parts.push(`${course.name || 'Course'} / ${formatCampusLabelClient(course.location)}`);
         }
-        academicContextSummaryEl.textContent = parts.filter(Boolean).join(' / ') || 'Select track, program, admission year, and campus to resolve the academic context.';
+        academicContextSummaryEl.textContent = parts.filter(Boolean).join(' / ') || academicGroupSummaryDefault;
       }
 
       function syncTrackCards() {
