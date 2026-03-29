@@ -9954,7 +9954,15 @@ async function syncAcademicV2GroupStudyContextCompatibility(groupLike = {}) {
     `,
     [legacyAdmissionId, legacyCourseId, stageNumber, campusKey]
   );
-  const studyContextId = parsePositiveIntStrict(studyContext && studyContext.id);
+  let studyContextId = parsePositiveIntStrict(studyContext && studyContext.id);
+  if (!studyContextId) {
+    studyContextId = parsePositiveIntStrict(await ensureStudyContextForLegacyPlacement({
+      courseId: legacyCourseId,
+      admissionId: legacyAdmissionId,
+      preferredCampus: campusKey,
+      preferredStage: stageNumber,
+    }));
+  }
   if (!studyContextId) {
     return { warningMessageKey: 'groupStudyContextSyncDeferred' };
   }

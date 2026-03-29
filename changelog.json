@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.61",
+      "date": "2026-03-30",
+      "items": [
+        "fix(academic-v2-group-study-context-bridge): let Academic Setup v2 course edits auto-create or reuse the exact legacy study context for the saved `course + admission + stage + campus` before showing a compatibility warning, so normal course updates stop tripping the deferred study-context bridge banner"
+      ]
+    },
+    {
       "version": "1.3.60",
       "date": "2026-03-30",
       "items": [
