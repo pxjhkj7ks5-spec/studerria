@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.49",
+      "date": "2026-03-29",
+      "items": [
+        "fix(admin-pathways-v2-render-warning-normalizer): replace the missing render-warning message helper in `lib/academicV2.js` so Academic Setup no longer crashes with a `ReferenceError` when one of its optional data queries fails and the page falls back to degraded rendering"
+      ]
+    },
+    {
       "version": "1.3.48",
       "date": "2026-03-29",
       "items": [
