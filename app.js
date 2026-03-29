@@ -9980,11 +9980,16 @@ function getAcademicV2ExtendedRouteMessages(req) {
     groupSubjectSaved: 'Course subject saved',
     groupSubjectDeleted: 'Course subject deleted',
     GROUP_LABEL_REQUIRED: 'Course label is required',
+    GROUP_LABEL_DUPLICATE: 'Course label is already used for this cohort, stage, and campus.',
     GROUP_REQUIRED: 'Select a course first',
     GROUP_SUBJECT_TARGET_REQUIRED: 'Course subject requires both course and subject template',
     USER_ASSIGNMENT_TARGET_REQUIRED: 'Select a target course and at least one user',
     COURSE_STAGE_CAMPUS_DUPLICATE: 'Only one live course per cohort stage and campus is allowed.',
     projectionSyncDeferred: 'Saved in Academic v2, but the legacy projection did not sync. Review Projection Health and run Resync.',
+    groupStudyContextSyncDeferred: 'Saved in Academic v2, but the legacy study-context bridge did not sync. Review the course compatibility mapping.',
+    compatibilityCacheRefreshDeferred: 'Saved in Academic v2, but one or more compatibility caches did not refresh immediately.',
+    postSaveFollowupDeferred: 'Saved in Academic v2, but a non-blocking follow-up step did not complete.',
+    focusRestoreDeferred: 'Saved in Academic v2, but the admin focus could not be restored automatically.',
     stageTermTemplateSaved: 'Stage term template saved',
     stageTermTemplateDeleted: 'Stage term template deleted',
     stageSubjectTemplateSaved: 'Stage subject template saved',
@@ -10002,9 +10007,13 @@ function getAcademicV2ExtendedRouteMessages(req) {
     programDeleted: 'Program deleted',
     cohortDeleted: 'Cohort deleted',
     templateDeleted: 'Subject template deleted',
+    ACADEMIC_V2_SCHEMA_INCOMPATIBLE: 'Academic v2 schema is missing a required migration.',
     PROGRAM_NOT_FOUND: 'Program not found',
     COHORT_NOT_FOUND: 'Cohort not found',
     GROUP_NOT_FOUND: 'Group not found',
+    GROUP_INVALID: 'Course data is invalid for the Academic v2 schema.',
+    GROUP_SAVE_RETRY: 'Course save hit a concurrent write. Retry the save.',
+    GROUP_SAVE_FAILED: 'Course save hit an unexpected Academic v2 database constraint.',
     PROGRAM_DELETE_BLOCKED: 'Archive the program instead. Delete is blocked while cohorts, legacy admissions, or users still depend on it.',
     COHORT_DELETE_BLOCKED: 'Archive the cohort instead. Delete is blocked while groups, legacy mappings, or users still depend on it.',
     GROUP_DELETE_BLOCKED: 'Archive the group instead. Delete is blocked while terms, subjects, enrollments, or legacy compatibility bindings still depend on it.',
@@ -10016,6 +10025,73 @@ function resolveAcademicV2RouteMessage(req, rawError, fallbackKey = 'unknown') {
   const messages = getAcademicV2ExtendedRouteMessages(req);
   const errorKey = rawError && rawError.message ? String(rawError.message).trim() : '';
   return messages[errorKey] || messages[fallbackKey] || messages.unknown;
+}
+
+async function syncAcademicV2GroupStudyContextCompatibility(groupLike = {}) {
+  const groupId = parsePositiveIntStrict(groupLike && (groupLike.id || groupLike.group_id));
+  if (!groupId) {
+    return { warningMessageKey: 'groupStudyContextSyncDeferred' };
+  }
+
+  const groupRow = await db.get(
+    `
+      SELECT
+        g.id,
+        g.cohort_id,
+        g.stage_number,
+        g.campus_key,
+        g.legacy_course_id,
+        c.legacy_admission_id
+      FROM academic_v2_groups g
+      JOIN academic_v2_cohorts c ON c.id = g.cohort_id
+      WHERE g.id = ?
+      LIMIT 1
+    `,
+    [groupId]
+  );
+  const legacyCourseId = parsePositiveIntStrict(groupRow && groupRow.legacy_course_id);
+  const legacyAdmissionId = parsePositiveIntStrict(groupRow && groupRow.legacy_admission_id);
+  const stageNumber = Math.max(1, Number(groupRow && groupRow.stage_number ? groupRow.stage_number : 0) || 1);
+  const campusKey = normalizeCourseCampus(groupRow && groupRow.campus_key);
+
+  if (!legacyCourseId || !legacyAdmissionId) {
+    return { warningMessageKey: 'groupStudyContextSyncDeferred' };
+  }
+
+  await syncStudyContextsForAdmission(legacyAdmissionId);
+
+  const studyContext = await db.get(
+    `
+      SELECT sc.id
+      FROM study_contexts sc
+      JOIN cohorts coh ON coh.id = sc.cohort_id
+      JOIN study_context_course_bindings sccb ON sccb.study_context_id = sc.id
+      WHERE coh.legacy_admission_id = ?
+        AND sccb.course_id = ?
+        AND sc.stage_number = ?
+        AND LOWER(COALESCE(NULLIF(TRIM(sc.campus_key), ''), 'kyiv')) = ?
+      ORDER BY sccb.is_primary DESC, sc.id ASC
+      LIMIT 1
+    `,
+    [legacyAdmissionId, legacyCourseId, stageNumber, campusKey]
+  );
+  const studyContextId = parsePositiveIntStrict(studyContext && studyContext.id);
+  if (!studyContextId) {
+    return { warningMessageKey: 'groupStudyContextSyncDeferred' };
+  }
+
+  await db.run(
+    `
+      UPDATE academic_v2_groups
+      SET legacy_study_context_id = ?,
+          updated_at = NOW()
+      WHERE id = ?
+        AND COALESCE(legacy_study_context_id, 0) <> ?
+    `,
+    [studyContextId, groupId, studyContextId]
+  );
+
+  return {};
 }
 
 function getTeacherTemplateStore() {
@@ -34568,6 +34644,7 @@ async function handleAcademicV2MutationRoute(req, res, {
   successMessageKey,
   successMessage = '',
   focusBuilder = null,
+  afterSuccess = null,
   logContext = 'admin.pathways.v2.mutation',
 } = {}) {
   try {
@@ -34576,16 +34653,47 @@ async function handleAcademicV2MutationRoute(req, res, {
     return handleDbError(res, err, `${logContext}.init`);
   }
   const baseFocus = parseAcademicV2Focus(req.body);
+  const routeMessages = getAcademicV2ExtendedRouteMessages(req);
   try {
     const result = await run();
-    invalidateAcademicV2CompatibilityCaches();
-    const focus = typeof focusBuilder === 'function' ? (focusBuilder(result, baseFocus) || baseFocus) : baseFocus;
-    const routeMessages = getAcademicV2ExtendedRouteMessages(req);
-    const warningMessage = String(
-      (result && result.warningMessage)
-      || (result && result.warningMessageKey && routeMessages[result.warningMessageKey])
-      || ''
-    ).trim();
+    const warningMessages = [];
+    const pushWarning = (message = '', messageKey = '') => {
+      const resolved = String(message || (messageKey && routeMessages[messageKey]) || '').trim();
+      if (resolved && !warningMessages.includes(resolved)) {
+        warningMessages.push(resolved);
+      }
+    };
+
+    pushWarning(result && result.warningMessage, result && result.warningMessageKey);
+
+    try {
+      invalidateAcademicV2CompatibilityCaches();
+    } catch (cacheErr) {
+      console.error(`${logContext}.compatibility-cache`, cacheErr);
+      pushWarning('', 'compatibilityCacheRefreshDeferred');
+    }
+
+    if (typeof afterSuccess === 'function') {
+      try {
+        const afterResult = await afterSuccess(result, baseFocus);
+        pushWarning(afterResult && afterResult.warningMessage, afterResult && afterResult.warningMessageKey);
+      } catch (afterErr) {
+        console.error(`${logContext}.after-success`, afterErr);
+        pushWarning('', 'postSaveFollowupDeferred');
+      }
+    }
+
+    let focus = baseFocus;
+    if (typeof focusBuilder === 'function') {
+      try {
+        focus = focusBuilder(result, baseFocus) || baseFocus;
+      } catch (focusErr) {
+        console.error(`${logContext}.focus`, focusErr);
+        pushWarning('', 'focusRestoreDeferred');
+      }
+    }
+
+    const warningMessage = warningMessages.join(' ').trim();
     return res.redirect(buildAcademicV2NoticeUrl(
       'ok',
       String(successMessage || '').trim() || routeMessages[successMessageKey] || routeMessages.unknown,
@@ -34698,6 +34806,11 @@ app.post('/admin/pathways/v2/groups/save', requirePathwaysSectionAccess, writeLi
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.saveGroup(getAcademicV2Store(), req.body),
     successMessageKey: 'groupSaved',
+    afterSuccess: (result) => (
+      result && result.warningMessageKey === 'projectionSyncDeferred'
+        ? {}
+        : syncAcademicV2GroupStudyContextCompatibility(result && result.row)
+    ),
     focusBuilder: (result, focus) => ({
       ...focus,
       programId: Number(result && result.row && result.row.program_id) || focus.programId,

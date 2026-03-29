@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.38",
+      "date": "2026-03-29",
+      "items": [
+        "fix(academic-v2-course-save-followups-and-error-mapping): harden `handleAcademicV2MutationRoute(...)` in `app.js` so cache refresh, focus restore, and legacy study-context compatibility follow-ups for `/admin/pathways/v2/groups/save` now degrade into warnings instead of flipping a successful course save back into the generic `Action failed` state, while `saveGroup(...)` in `lib/academicV2.js` now normalizes raw Academic V2 DB/schema write errors from both precheck and write phases into explicit route errors such as `GROUP_LABEL_DUPLICATE`, `GROUP_INVALID`, `GROUP_SAVE_RETRY`, `ACADEMIC_V2_SCHEMA_INCOMPATIBLE`, and `GROUP_SAVE_FAILED`"
+      ]
+    },
+    {
       "version": "1.3.37",
       "date": "2026-03-29",
       "items": [
