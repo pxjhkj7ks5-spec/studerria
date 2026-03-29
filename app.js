@@ -33923,22 +33923,108 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         }
         const homeworkTags = Array.isArray(tagRows) ? tagRows.map((row) => row.name) : [];
         ensureUsersSchema(() => {
-        const userFilters = [
-          `
-            (
-              u.course_id = ?
-              OR EXISTS (
-                SELECT 1
-                FROM academic_v2_groups v2_group
-                WHERE v2_group.id = u.group_id
-                  AND v2_group.legacy_course_id = ?
+        const userFilters = [];
+        const userParams = [];
+        if (adminAcademicScope && adminAcademicScope.studyContextId) {
+          userFilters.push(
+            `
+              (
+                u.study_context_id = ?
+                OR COALESCE(v2_group.legacy_study_context_id, 0) = ?
+                OR (
+                  u.study_context_id IS NULL
+                  AND (
+                    u.course_id = ?
+                    OR COALESCE(v2_group.legacy_course_id, 0) = ?
+                  )
+                  AND COALESCE(v2_program.id, coh.program_id, u.study_program_id, 0) = ?
+                  AND COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id, 0) = ?
+                  AND LOWER(
+                    COALESCE(
+                      NULLIF(TRIM(v2_program.track_key), ''),
+                      NULLIF(TRIM(p.track_key), ''),
+                      NULLIF(TRIM(u.study_track), ''),
+                      ?
+                    )
+                  ) = ?
+                )
               )
-            )
-          `,
-        ];
-        const userParams = [courseId, courseId];
+            `
+          );
+          userParams.push(
+            Number(adminAcademicScope.studyContextId || 0),
+            Number(adminAcademicScope.studyContextId || 0),
+            Number(courseId || 0),
+            Number(courseId || 0),
+            Number(adminAcademicScope.programId || 0),
+            Number(adminAcademicScope.admissionId || 0),
+            String(adminAcademicScope.track || 'bachelor'),
+            String(adminAcademicScope.track || 'bachelor')
+          );
+        } else {
+          userFilters.push(
+            `
+              (
+                u.course_id = ?
+                OR EXISTS (
+                  SELECT 1
+                  FROM academic_v2_groups v2_group
+                  WHERE v2_group.id = u.group_id
+                    AND v2_group.legacy_course_id = ?
+                )
+              )
+            `
+          );
+          userParams.push(courseId, courseId);
+        }
         if (usersHasIsActive) {
           userFilters.push('u.is_active = 1');
+        }
+        if (adminAcademicScope && adminAcademicScope.programId && !adminAcademicScope.studyContextId) {
+          userFilters.push('COALESCE(v2_program.id, coh.program_id, u.study_program_id) = ?');
+          userParams.push(Number(adminAcademicScope.programId || 0));
+        }
+        if (adminAcademicScope && adminAcademicScope.admissionId && !adminAcademicScope.studyContextId) {
+          userFilters.push('COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id) = ?');
+          userParams.push(Number(adminAcademicScope.admissionId || 0));
+        }
+        if (adminAcademicScope && adminAcademicScope.track && !adminAcademicScope.studyContextId) {
+          userFilters.push(
+            `
+              LOWER(
+                COALESCE(
+                  NULLIF(TRIM(v2_program.track_key), ''),
+                  NULLIF(TRIM(p.track_key), ''),
+                  NULLIF(TRIM(u.study_track), ''),
+                  CASE
+                    WHEN COALESCE(group_course_meta.is_teacher_course, course_meta.is_teacher_course, 0) = 1 THEN 'teacher'
+                    ELSE 'bachelor'
+                  END
+                )
+              ) = ?
+            `
+          );
+          userParams.push(String(adminAcademicScope.track || 'bachelor'));
+        }
+        if (adminAcademicScope && adminAcademicScope.stage && !adminAcademicScope.studyContextId) {
+          userFilters.push('COALESCE(v2_group.stage_number, sc.stage_number, ?) = ?');
+          userParams.push(Number(adminAcademicScope.stage || 1), Number(adminAcademicScope.stage || 1));
+        }
+        if (adminAcademicScope && adminAcademicScope.campus && !adminAcademicScope.studyContextId) {
+          userFilters.push(
+            `
+              LOWER(
+                COALESCE(
+                  NULLIF(TRIM(v2_group.campus_key), ''),
+                  NULLIF(TRIM(sc.campus_key), ''),
+                  NULLIF(TRIM(group_course_meta.location), ''),
+                  NULLIF(TRIM(course_meta.location), ''),
+                  'kyiv'
+                )
+              ) = ?
+            `
+          );
+          userParams.push(String(adminAcademicScope.campus || 'kyiv'));
         }
         if (users_q) {
           userFilters.push('u.full_name ILIKE ?');
@@ -33966,6 +34052,14 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
               COALESCE(usc.risk_score, 0)::int AS security_risk_score,
               usc.updated_at AS security_case_updated_at
             FROM users u
+            LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+            LEFT JOIN academic_v2_cohorts v2_cohort ON v2_cohort.id = v2_group.cohort_id
+            LEFT JOIN academic_v2_programs v2_program ON v2_program.id = v2_cohort.program_id
+            LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
+            LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
+            LEFT JOIN study_programs p ON p.id = coh.program_id
+            LEFT JOIN courses group_course_meta ON group_course_meta.id = v2_group.legacy_course_id
+            LEFT JOIN courses course_meta ON course_meta.id = u.course_id
             LEFT JOIN LATERAL (
               SELECT re.ip, re.user_agent
               FROM user_registration_events re
@@ -46456,18 +46550,23 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
         `
           (
             u.study_context_id = ?
-            OR EXISTS (
-              SELECT 1
-              FROM academic_v2_groups v2_group
-              WHERE v2_group.id = u.group_id
-                AND v2_group.legacy_study_context_id = ?
-            )
+            OR COALESCE(v2_group.legacy_study_context_id, 0) = ?
             OR (
               u.study_context_id IS NULL
-              AND u.course_id = ?
-              AND COALESCE(u.study_program_id, 0) = ?
-              AND COALESCE(u.admission_id, 0) = ?
-              AND LOWER(COALESCE(NULLIF(TRIM(u.study_track), ''), ?)) = ?
+              AND (
+                u.course_id = ?
+                OR COALESCE(v2_group.legacy_course_id, 0) = ?
+              )
+              AND COALESCE(v2_program.id, coh.program_id, u.study_program_id, 0) = ?
+              AND COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id, 0) = ?
+              AND LOWER(
+                COALESCE(
+                  NULLIF(TRIM(v2_program.track_key), ''),
+                  NULLIF(TRIM(p.track_key), ''),
+                  NULLIF(TRIM(u.study_track), ''),
+                  ?
+                )
+              ) = ?
             )
           )
         `
@@ -46475,6 +46574,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
       userParams.push(
         Number(adminAcademicScope.studyContextId || 0),
         Number(adminAcademicScope.studyContextId || 0),
+        Number(courseId || 0),
         Number(courseId || 0),
         Number(adminAcademicScope.programId || 0),
         Number(adminAcademicScope.admissionId || 0),
@@ -46505,11 +46605,11 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
       }
     }
     if (adminAcademicScope && adminAcademicScope.programId && !adminAcademicScope.studyContextId) {
-      userFilters.push('COALESCE(coh.program_id, u.study_program_id) = ?');
+      userFilters.push('COALESCE(v2_program.id, coh.program_id, u.study_program_id) = ?');
       userParams.push(Number(adminAcademicScope.programId || 0));
     }
     if (adminAcademicScope && adminAcademicScope.admissionId && !adminAcademicScope.studyContextId) {
-      userFilters.push('COALESCE(coh.legacy_admission_id, u.admission_id) = ?');
+      userFilters.push('COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id) = ?');
       userParams.push(Number(adminAcademicScope.admissionId || 0));
     }
     if (adminAcademicScope && adminAcademicScope.track && !adminAcademicScope.studyContextId) {
@@ -46517,9 +46617,13 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
         `
           LOWER(
             COALESCE(
+              NULLIF(TRIM(v2_program.track_key), ''),
               NULLIF(TRIM(p.track_key), ''),
               NULLIF(TRIM(u.study_track), ''),
-              CASE WHEN COALESCE(course_meta.is_teacher_course, 0) = 1 THEN 'teacher' ELSE 'bachelor' END
+              CASE
+                WHEN COALESCE(group_course_meta.is_teacher_course, course_meta.is_teacher_course, 0) = 1 THEN 'teacher'
+                ELSE 'bachelor'
+              END
             )
           ) = ?
         `
@@ -46527,7 +46631,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
       userParams.push(String(adminAcademicScope.track || 'bachelor'));
     }
     if (adminAcademicScope && adminAcademicScope.stage && !adminAcademicScope.studyContextId) {
-      userFilters.push('COALESCE(sc.stage_number, ?) = ?');
+      userFilters.push('COALESCE(v2_group.stage_number, sc.stage_number, ?) = ?');
       userParams.push(Number(adminAcademicScope.stage || 1), Number(adminAcademicScope.stage || 1));
     }
     if (adminAcademicScope && adminAcademicScope.campus && !adminAcademicScope.studyContextId) {
@@ -46535,7 +46639,9 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
         `
           LOWER(
             COALESCE(
+              NULLIF(TRIM(v2_group.campus_key), ''),
               NULLIF(TRIM(sc.campus_key), ''),
+              NULLIF(TRIM(group_course_meta.location), ''),
               NULLIF(TRIM(course_meta.location), ''),
               'kyiv'
             )
@@ -46576,9 +46682,13 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
           COALESCE(usc.risk_score, 0)::int AS security_risk_score,
           usc.updated_at AS security_case_updated_at
         FROM users u
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        LEFT JOIN academic_v2_cohorts v2_cohort ON v2_cohort.id = v2_group.cohort_id
+        LEFT JOIN academic_v2_programs v2_program ON v2_program.id = v2_cohort.program_id
         LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
         LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
         LEFT JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN courses group_course_meta ON group_course_meta.id = v2_group.legacy_course_id
         LEFT JOIN courses course_meta ON course_meta.id = u.course_id
         LEFT JOIN LATERAL (
           SELECT re.ip, re.user_agent
