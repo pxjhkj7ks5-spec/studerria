@@ -6115,6 +6115,7 @@ async function resolveSubjectCourseContext(subjectId, courseId, options = {}) {
       const ownerCourseId = Number(runtimeSubject.owner_course_id || runtimeSubject.course_id || normalizedCourseId || 0) || null;
       return {
         ...runtimeSubject,
+        source: runtimeScope.source || 'academic_v2',
         owner_course_id: ownerCourseId,
         bound_course_ids: ownerCourseId ? [ownerCourseId] : [],
         catalog_name: runtimeSubject.subject_name || runtimeSubject.name || '',
@@ -6147,6 +6148,7 @@ async function resolveSubjectCourseContext(subjectId, courseId, options = {}) {
   const boundCourseIds = await getSubjectBindingCourseIds(normalizedSubjectId);
   return {
     ...scopedSubject,
+    source: 'legacy',
     owner_course_id: ownerCourseId,
     bound_course_ids: boundCourseIds.length
       ? boundCourseIds
@@ -21388,30 +21390,41 @@ app.get('/schedule', requireLogin, async (req, res) => {
             })
             .filter((value) => Number.isInteger(value) && value > 0)
         ));
-        const params = [selectedWeek];
-        let sql = `
-          SELECT
-            se.*,
-            s.name AS subject_name,
-            r.label AS room_name,
-            r.code AS room_code,
-            r.building AS room_building
-          FROM schedule_entries se
-          JOIN subjects s ON s.id = se.subject_id
-          LEFT JOIN rooms r ON r.id = se.room_id
-          WHERE se.week_number = ?
-        `;
-        if (ownerCourseIds.length) {
-          sql += ' AND se.course_id = ANY(?::int[])';
-          params.push(ownerCourseIds);
+        let rows = [];
+        const courseScope = await getCourseSubjectAccessScope(cid, { visibleOnly: false }).catch(() => null);
+        if (courseScope && courseScope.source === 'academic_v2') {
+          const scheduleState = await academicV2RuntimeHelpers.loadCourseScheduleRows(
+            getAcademicV2Store(),
+            cid,
+            { weekNumber: selectedWeek, visibleOnly: true }
+          ).catch(() => null);
+          rows = Array.isArray(scheduleState && scheduleState.scheduleRows) ? scheduleState.scheduleRows : [];
+        } else {
+          const params = [selectedWeek];
+          let sql = `
+            SELECT
+              se.*,
+              s.name AS subject_name,
+              r.label AS room_name,
+              r.code AS room_code,
+              r.building AS room_building
+            FROM schedule_entries se
+            JOIN subjects s ON s.id = se.subject_id
+            LEFT JOIN rooms r ON r.id = se.room_id
+            WHERE se.week_number = ?
+          `;
+          if (ownerCourseIds.length) {
+            sql += ' AND se.course_id = ANY(?::int[])';
+            params.push(ownerCourseIds);
+          }
+          if (ownerSemesterIds.length) {
+            sql += ' AND (se.semester_id IS NULL OR se.semester_id = ANY(?::int[]))';
+            params.push(ownerSemesterIds);
+          }
+          sql += ` AND se.subject_id IN (${placeholders})`;
+          params.push(...subjectIds);
+          rows = await db.all(sql, params);
         }
-        if (ownerSemesterIds.length) {
-          sql += ' AND (se.semester_id IS NULL OR se.semester_id = ANY(?::int[]))';
-          params.push(ownerSemesterIds);
-        }
-        sql += ` AND se.subject_id IN (${placeholders})`;
-        params.push(...subjectIds);
-        const rows = await db.all(sql, params);
         rows.forEach((row) => {
           const selection = selectionMap.get(row.subject_id);
           if (!selection) return;
@@ -22708,7 +22721,6 @@ app.get('/schedule', requireLogin, async (req, res) => {
           })
           .filter((value) => Number.isInteger(value) && value > 0)
       ));
-      const params = [selectedWeek];
       const scopeParams = [];
       if (studentGroups.length) {
         conditionParts.push(
@@ -22719,6 +22731,17 @@ app.get('/schedule', requireLogin, async (req, res) => {
         });
       }
 
+      const useAcademicV2Schedule = courseSubjectScope && courseSubjectScope.source === 'academic_v2';
+      let rows = [];
+      if (useAcademicV2Schedule) {
+        const scheduleState = await academicV2RuntimeHelpers.loadCourseScheduleRows(
+          getAcademicV2Store(),
+          scheduleCourseId,
+          { weekNumber: selectedWeek, visibleOnly: true }
+        ).catch(() => null);
+        rows = Array.isArray(scheduleState && scheduleState.scheduleRows) ? scheduleState.scheduleRows : [];
+      } else {
+        const params = [selectedWeek];
         let sql = `
           SELECT
             se.*,
@@ -22730,25 +22753,23 @@ app.get('/schedule', requireLogin, async (req, res) => {
           JOIN subjects s ON s.id = se.subject_id
           LEFT JOIN rooms r ON r.id = se.room_id
           WHERE se.week_number = ? AND s.visible = 1
-      `;
-      if (ownerCourseIds.length) {
-        sql += ' AND se.course_id = ANY(?::int[])';
-        params.push(ownerCourseIds);
-      }
-      if (ownerSemesterIds.length) {
-        sql += ' AND (se.semester_id IS NULL OR se.semester_id = ANY(?::int[]))';
-        params.push(ownerSemesterIds);
-      }
-      if (conditionParts.length) {
-        sql += ` AND (${conditionParts.join(' OR ')})`;
-        params.push(...scopeParams);
+        `;
+        if (ownerCourseIds.length) {
+          sql += ' AND se.course_id = ANY(?::int[])';
+          params.push(ownerCourseIds);
+        }
+        if (ownerSemesterIds.length) {
+          sql += ' AND (se.semester_id IS NULL OR se.semester_id = ANY(?::int[]))';
+          params.push(ownerSemesterIds);
+        }
+        if (conditionParts.length) {
+          sql += ` AND (${conditionParts.join(' OR ')})`;
+          params.push(...scopeParams);
+        }
+        rows = await db.all(sql, params);
       }
 
-      db.all(sql, params, (scheduleErr, rows) => {
-        if (scheduleErr) {
-          return res.status(500).send('Database error');
-        }
-        rows.forEach((row) => {
+      rows.forEach((row) => {
           row.owner_course_id = Number(row.course_id || 0) || null;
           row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
           row.use_local_time = useLocalTime;
@@ -22766,7 +22787,6 @@ app.get('/schedule', requireLogin, async (req, res) => {
         });
         const homeworkTargets = buildHomeworkTargets(studentGroups, rows || []);
         return loadHomework(homeworkTargets);
-      });
     }
   );
 });
@@ -34554,12 +34574,13 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         semesters,
         semestersByCourse,
         activeSemester,
-        selectedCourseId: courseId,
-        adminAcademicScope,
-        adminHomeHref: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
-        allowCourseSelect: isAdminPanelOwner && Array.isArray(courses) && courses.length > 1,
-        limitedStaffView: !isAdminPanelOwner,
-        allowedSections,
+                                      selectedCourseId: courseId,
+                                      adminAcademicScope,
+                                      academicV2ScheduleLocked: courseSubjectScope && courseSubjectScope.source === 'academic_v2',
+                                      adminHomeHref: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
+                                      allowCourseSelect: isAdminPanelOwner && Array.isArray(courses) && courses.length > 1,
+                                      limitedStaffView: !isAdminPanelOwner,
+                                      allowedSections,
         projectionAlert,
         weeklyLabels,
         weeklyHomework,
@@ -36875,10 +36896,25 @@ function getLegacyAcademicWriteMovedMessage(req) {
   return isUk ? 'Academic config moved to /admin/pathways' : 'Academic config moved to /admin/pathways';
 }
 
+function getLegacyAcademicScheduleMovedMessage(req) {
+  const isUk = getPreferredLang(req) === 'uk';
+  return isUk
+    ? 'Розклад для Academic v2 редагується в /admin/pathways#schedule'
+    : 'Academic v2 schedule editing lives in /admin/pathways#schedule';
+}
+
 function redirectLegacyAcademicWriteToV2(req, res) {
   return res.redirect(buildAcademicV2NoticeUrl(
     'err',
     getLegacyAcademicWriteMovedMessage(req),
+    parseAcademicV2Focus(req.body)
+  ));
+}
+
+function redirectLegacyAcademicScheduleToV2(req, res) {
+  return res.redirect(buildAcademicV2NoticeUrl(
+    'err',
+    getLegacyAcademicScheduleMovedMessage(req),
     parseAcademicV2Focus(req.body)
   ));
 }
@@ -39699,6 +39735,13 @@ app.get('/admin/schedule-list', requireScheduleSectionAccess, async (req, res) =
     courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleList.subjectScope');
+  }
+  if (courseSubjectScope.source === 'academic_v2') {
+    return res.redirect(buildAcademicV2NoticeUrl(
+      'err',
+      getLegacyAcademicScheduleMovedMessage(req),
+      parseAcademicV2Focus(req.query)
+    ));
   }
   const scheduleFilters = [];
   const scheduleParams = [];
@@ -44625,6 +44668,21 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
 
     const courseContexts = new Map();
     const courseIds = Array.from(new Set(items.map((item) => String(item.course_id))));
+    const blockedCourseIds = [];
+    for (const courseId of courseIds) {
+      const courseScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
+      if (courseScope && courseScope.source === 'academic_v2') {
+        blockedCourseIds.push(Number(courseId));
+      }
+    }
+    if (blockedCourseIds.length) {
+      return res.redirect(buildScheduleGeneratorNoticeUrl(
+        req,
+        'err',
+        'Academic v2 courses use the Academic Setup v2 schedule editor.',
+        runId
+      ));
+    }
     for (const courseId of courseIds) {
       const configuredSemesterId = getConfiguredCourseSemesterId(config, courseId, activeLocation);
       let semester = null;
@@ -44976,6 +45034,16 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
     );
     if (!entries.length) {
       return res.redirect(buildPreviewRedirect('No entries'));
+    }
+    const blockedCourseIds = [];
+    for (const courseId of Array.from(new Set(entries.map((entry) => Number(entry.course_id || 0)).filter((value) => Number.isInteger(value) && value > 0)))) {
+      const courseScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
+      if (courseScope && courseScope.source === 'academic_v2') {
+        blockedCourseIds.push(courseId);
+      }
+    }
+    if (blockedCourseIds.length) {
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Academic v2 courses use the Academic Setup v2 schedule editor.', runId));
     }
     const diffResult = await buildScheduleDiff(entries);
     const overwriteCount = diffResult.diff.overwrite;
@@ -50138,6 +50206,10 @@ app.post('/admin/schedule/add', requireScheduleSectionAccess, async (req, res) =
   const panelBase = getStaffPanelBase(req, courseId);
   const withStatus = (status) => `${panelBase}&${status}`;
   const semesterId = Number(semester_id);
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
+  if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+    return redirectLegacyAcademicScheduleToV2(req, res);
+  }
 
   if (!subject_id || !day_of_week || !week_numbers || Number.isNaN(classNum) || Number.isNaN(semesterId)) {
     return res.redirect(withStatus('err=Missing%20fields'));
@@ -50251,6 +50323,10 @@ app.post('/admin/schedule/edit/:id', requireScheduleSectionAccess, async (req, r
   const panelBase = getStaffPanelBase(req, courseId);
   const withStatus = (status) => `${panelBase}&${status}`;
   const semesterId = Number(semester_id);
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
+  if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+    return redirectLegacyAcademicScheduleToV2(req, res);
+  }
 
   if (!subject_id || !day_of_week || Number.isNaN(groupNum) || Number.isNaN(classNum) || Number.isNaN(weekNum) || Number.isNaN(semesterId)) {
     return res.redirect(withStatus('err=Missing%20fields'));
@@ -50312,6 +50388,10 @@ app.post('/admin/schedule/edit/:id', requireScheduleSectionAccess, async (req, r
 app.post('/admin/schedule/delete/:id', requireScheduleSectionAccess, async (req, res) => {
   const { id } = req.params;
   const courseId = getStaffCourse(req);
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
+  if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+    return redirectLegacyAcademicScheduleToV2(req, res);
+  }
   const referer = req.get('referer');
   const fallbackBase = getStaffPanelBase(req, courseId);
   const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
@@ -50352,6 +50432,10 @@ app.post('/admin/schedule/delete-multiple', requireScheduleSectionAccess, async 
   const returnTo = req.body.return_to || req.query.return_to || '';
   const referer = req.get('referer');
   const courseId = getStaffCourse(req);
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
+  if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+    return redirectLegacyAcademicScheduleToV2(req, res);
+  }
   const fallback = getStaffPanelBase(req, courseId);
   const redirectBase =
     (returnTo && returnTo.startsWith('/admin/schedule-list') ? returnTo : null) ||
@@ -50403,6 +50487,10 @@ app.post('/admin/schedule/delete-multiple', requireScheduleSectionAccess, async 
 
 app.post('/admin/schedule/clear-all', requireScheduleSectionAccess, async (req, res) => {
   const courseId = getStaffCourse(req);
+  const courseSubjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
+  if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
+    return redirectLegacyAcademicScheduleToV2(req, res);
+  }
   const referer = req.get('referer');
   const fallbackBase = getStaffPanelBase(req, courseId);
   const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;

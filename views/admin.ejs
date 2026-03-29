@@ -1796,6 +1796,12 @@
                   <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-summary') %>">Сводка семестру</a>
                 </div>
               </div>
+              <% if (academicV2ScheduleLocked) { %>
+                <div class="alert alert-info mb-0">
+                  Legacy schedule editing is disabled for Academic v2 courses.
+                  <a href="<%= `${pathwaysPanelHref || '/admin/pathways'}#schedule` %>">Open the Academic v2 schedule editor</a>.
+                </div>
+              <% } else { %>
               <form method="POST" action="/admin/schedule/add">
                 <div class="row g-2">
                   <div class="col-12 col-md-3">
@@ -1868,6 +1874,7 @@
                   </div>
                 </div>
               </form>
+              <% } %>
             </div>
           </div>
         </div>
