@@ -7626,6 +7626,35 @@
       let usersRefreshController = null;
       let usersRefreshRequestToken = 0;
 
+      function getUsersFilterFormState() {
+        const filterForm = document.querySelector('#admin-users form[method="GET"]');
+        if (!filterForm) return {};
+        const formData = new FormData(filterForm);
+        const readValue = (name) => String(formData.get(name) || '').trim();
+        return {
+          courseId: readValue('course'),
+          track: readValue('track'),
+          programId: readValue('program_id'),
+          admissionId: readValue('admission_id'),
+          stage: readValue('stage'),
+          campus: readValue('campus'),
+          studyContextId: readValue('study_context_id'),
+          search: readValue('users_q'),
+          group: readValue('users_group'),
+        };
+      }
+
+      function isAcademicV2UsersScope(scope) {
+        return Boolean(
+          String(scope && scope.studyContextId ? scope.studyContextId : '').trim()
+          || String(scope && scope.programId ? scope.programId : '').trim()
+          || String(scope && scope.admissionId ? scope.admissionId : '').trim()
+          || String(scope && scope.stage ? scope.stage : '').trim()
+          || String(scope && scope.campus ? scope.campus : '').trim()
+          || String(scope && scope.track ? scope.track : '').trim()
+        );
+      }
+
       function renderUsersTable(data) {
         const tbody = document.getElementById('usersTableBody');
         if (!tbody) return;
@@ -7839,18 +7868,22 @@
         try {
           if (!tbodyEl) return;
           const status = tbodyEl.dataset.status || 'active';
-          const courseId = tbodyEl.dataset.courseId || '1';
-          const track = tbodyEl.dataset.track || '';
-          const programId = tbodyEl.dataset.programId || '';
-          const admissionId = tbodyEl.dataset.admissionId || '';
-          const stage = tbodyEl.dataset.stage || '';
-          const campus = tbodyEl.dataset.campus || '';
-          const studyContextId = tbodyEl.dataset.studyContextId || '';
-          const q = tbodyEl.dataset.search || '';
-          const group = tbodyEl.dataset.group || '';
+          const scopeState = getUsersFilterFormState();
+          const hasAcademicV2Scope = isAcademicV2UsersScope(scopeState);
+          const courseId = !hasAcademicV2Scope
+            ? (scopeState.courseId || tbodyEl.dataset.courseId || '1')
+            : '';
+          const track = scopeState.track || tbodyEl.dataset.track || '';
+          const programId = scopeState.programId || tbodyEl.dataset.programId || '';
+          const admissionId = scopeState.admissionId || tbodyEl.dataset.admissionId || '';
+          const stage = scopeState.stage || tbodyEl.dataset.stage || '';
+          const campus = scopeState.campus || tbodyEl.dataset.campus || '';
+          const studyContextId = scopeState.studyContextId || tbodyEl.dataset.studyContextId || '';
+          const q = scopeState.search || tbodyEl.dataset.search || '';
+          const group = scopeState.group || tbodyEl.dataset.group || '';
           const params = new URLSearchParams();
           params.set('status', status);
-          params.set('course', courseId);
+          if (courseId) params.set('course', courseId);
           if (track) params.set('track', track);
           if (programId) params.set('program_id', programId);
           if (admissionId) params.set('admission_id', admissionId);

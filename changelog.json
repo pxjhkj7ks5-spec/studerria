@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.40",
+      "date": "2026-03-29",
+      "items": [
+        "fix(admin-users-refresh-scope-preservation): make `/admin/users.json` refreshes read live users filter form state and keep Academic V2 scope anchored without falling back to a legacy `course` query, so switching status/role filters or opening the user modal no longer collapses the table into the wrong empty state"
+      ]
+    },
+    {
       "version": "1.3.39",
       "date": "2026-03-29",
       "items": [
