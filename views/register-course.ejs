@@ -1055,37 +1055,33 @@
           const campusMap = new Map();
           contextRows.forEach((context) => {
             const campusKey = normalizeCampusKey(context.campus_key || context.course_location || context.location);
-            const courseId = Number(context.course_id || 0);
-            const contextId = Number(context.id || 0);
             if (!campusMap.has(campusKey)) {
               campusMap.set(campusKey, {
                 campusKey,
                 campusLabel: formatCampusLabelClient(campusKey),
-                courseIds: [],
-                contextIds: [],
+                contexts: [],
               });
             }
-            if (courseId) {
-              campusMap.get(campusKey).courseIds.push(courseId);
-            }
-            if (contextId) {
-              campusMap.get(campusKey).contextIds.push(contextId);
-            }
+            campusMap.get(campusKey).contexts.push(context);
           });
 
           return ['kyiv', 'munich']
             .map((campusKey) => campusMap.get(campusKey))
             .filter(Boolean)
             .map((entry) => {
-              const uniqueCourseIds = Array.from(new Set(entry.courseIds));
-              const uniqueContextIds = Array.from(new Set(entry.contextIds));
+              const uniqueContexts = Array.from(new Map(
+                (Array.isArray(entry.contexts) ? entry.contexts : [])
+                  .map((context) => [Number(context && context.id || 0), context])
+                  .filter(([contextId]) => contextId > 0)
+              ).values());
+              const chosenContext = uniqueContexts.length === 1 ? uniqueContexts[0] : null;
               return {
                 campusKey: entry.campusKey,
                 campusLabel: entry.campusLabel,
-                courseCount: uniqueContextIds.length || uniqueCourseIds.length,
-                courseId: uniqueCourseIds.length === 1 ? uniqueCourseIds[0] : null,
-                studyContextId: uniqueContextIds.length === 1 ? uniqueContextIds[0] : null,
-                isAmbiguous: uniqueContextIds.length !== 1 || uniqueCourseIds.length !== 1,
+                courseCount: uniqueContexts.length,
+                courseId: chosenContext ? (Number(chosenContext.course_id || 0) || null) : null,
+                studyContextId: chosenContext ? (Number(chosenContext.id || 0) || null) : null,
+                isAmbiguous: uniqueContexts.length !== 1,
               };
             });
         }
@@ -1130,21 +1126,10 @@
             readyByCampus.set(campusKey, {
               campusKey,
               campusLabel: formatCampusLabelClient(campusKey),
-              courseIds: [],
-              contextIds: [],
-              cohortIds: [],
-              groupLabels: [],
+              contexts: [],
             });
           }
-          const bucket = readyByCampus.get(campusKey);
-          const courseId = Number(context.course_id || 0);
-          const contextId = Number(context.id || 0);
-          const cohortId = Number(context.admission_id || 0);
-          const groupLabel = String(context.label_uk || context.label || '').trim();
-          if (courseId) bucket.courseIds.push(courseId);
-          if (contextId) bucket.contextIds.push(contextId);
-          if (cohortId) bucket.cohortIds.push(cohortId);
-          if (groupLabel) bucket.groupLabels.push(groupLabel);
+          readyByCampus.get(campusKey).contexts.push(context);
         });
 
         const issueByCampus = new Map();
@@ -1168,30 +1153,70 @@
 
         return campusKeys.map((campusKey) => {
           const readyBucket = readyByCampus.get(campusKey);
+          const issue = issueByCampus.get(campusKey) || null;
           if (readyBucket) {
-            const uniqueCourseIds = Array.from(new Set(readyBucket.courseIds));
-            const uniqueContextIds = Array.from(new Set(readyBucket.contextIds));
-            const uniqueCohortIds = Array.from(new Set(readyBucket.cohortIds));
-            const uniqueGroupLabels = Array.from(new Set(readyBucket.groupLabels));
-            const isAmbiguous = uniqueContextIds.length !== 1 || uniqueCourseIds.length !== 1;
-            const fallbackCopy = getTeacherCampusIssueCopy('registration_teacher_default_required');
+            const uniqueContexts = Array.from(new Map(
+              (Array.isArray(readyBucket.contexts) ? readyBucket.contexts : [])
+                .map((context) => [Number(context && context.id || 0), context])
+                .filter(([contextId]) => contextId > 0)
+            ).values());
+            const blockingIssueCode = issue
+              && (
+                String(issue.issue_code || '') === 'registration_teacher_multiple_defaults'
+                || String(issue.issue_code || '') === 'registration_teacher_default_required'
+              )
+              ? String(issue.issue_code || '')
+              : '';
+            const defaultContexts = uniqueContexts.filter((context) => (
+              context
+              && (context.is_teacher_registration_default === true || Number(context.is_teacher_registration_default) === 1)
+            ));
+            let chosenContext = null;
+            let resolvedIssueCode = blockingIssueCode;
+            if (!resolvedIssueCode) {
+              if (defaultContexts.length === 1) {
+                chosenContext = defaultContexts[0];
+              } else if (defaultContexts.length > 1) {
+                resolvedIssueCode = 'registration_teacher_multiple_defaults';
+              } else if (uniqueContexts.length === 1) {
+                chosenContext = uniqueContexts[0];
+              } else if (uniqueContexts.length > 1) {
+                resolvedIssueCode = 'registration_teacher_default_required';
+              }
+            }
+            if (resolvedIssueCode || !chosenContext) {
+              const issueCopy = getTeacherCampusIssueCopy(resolvedIssueCode || 'registration_teacher_default_required');
+              return {
+                campusKey,
+                campusLabel: readyBucket.campusLabel,
+                courseCount: uniqueContexts.length,
+                courseId: null,
+                studyContextId: null,
+                cohortId: null,
+                groupLabel: '',
+                isAmbiguous: true,
+                issueCode: resolvedIssueCode || 'registration_teacher_default_required',
+                issueTitle: issueCopy.title,
+                issueSubtitle: issueCopy.subtitle,
+                issueHint: issueCopy.hint,
+              };
+            }
             return {
               campusKey,
               campusLabel: readyBucket.campusLabel,
-              courseCount: uniqueContextIds.length || uniqueCourseIds.length,
-              courseId: isAmbiguous ? null : uniqueCourseIds[0],
-              studyContextId: isAmbiguous ? null : uniqueContextIds[0],
-              cohortId: uniqueCohortIds.length === 1 ? uniqueCohortIds[0] : null,
-              groupLabel: uniqueGroupLabels[0] || '',
-              isAmbiguous,
-              issueCode: isAmbiguous ? 'registration_teacher_default_required' : '',
-              issueTitle: isAmbiguous ? fallbackCopy.title : '',
-              issueSubtitle: isAmbiguous ? fallbackCopy.subtitle : '',
-              issueHint: isAmbiguous ? fallbackCopy.hint : '',
+              courseCount: uniqueContexts.length,
+              courseId: Number(chosenContext.course_id || 0) || null,
+              studyContextId: Number(chosenContext.id || 0) || null,
+              cohortId: Number(chosenContext.admission_id || 0) || null,
+              groupLabel: String(chosenContext.label_uk || chosenContext.label || '').trim(),
+              isAmbiguous: false,
+              issueCode: '',
+              issueTitle: '',
+              issueSubtitle: '',
+              issueHint: '',
             };
           }
 
-          const issue = issueByCampus.get(campusKey) || null;
           const issueCopy = getTeacherCampusIssueCopy(issue && issue.issue_code);
           return {
             campusKey,

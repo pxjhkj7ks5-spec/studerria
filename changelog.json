@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.62",
+      "date": "2026-03-30",
+      "items": [
+        "fix(registration-catalog-fail-open-for-repairable-v2-groups): let `/register/course` build tracks, programs, cohorts, and campuses from stage-1 Academic V2 groups that already have visible subjects even when legacy compat bridge ids or mapped subject projection are still missing, keep only true campus blockers such as duplicate student groups or unresolved teacher defaults disabled in the UI, and move the final projection plus legacy study-context repair to `POST /register/course` before placement is persisted"
+      ]
+    },
+    {
       "version": "1.3.61",
       "date": "2026-03-30",
       "items": [

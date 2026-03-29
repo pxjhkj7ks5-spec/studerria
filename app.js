@@ -3144,7 +3144,12 @@ function buildAcademicV2RegistrationCatalog(groups = []) {
       legacy_admission_id: parsePositiveIntStrict(group && group.legacy_admission_id) || null,
       is_teacher_registration_default: group && (group.is_teacher_registration_default === true || Number(group.is_teacher_registration_default) === 1),
       has_active_term: Boolean(group && group.has_active_term),
+      visible_subject_count: Math.max(0, Number(group && group.visible_subject_count ? group.visible_subject_count : 0) || 0),
       visible_mapped_subject_count: Math.max(0, Number(group && group.visible_mapped_subject_count ? group.visible_mapped_subject_count : 0) || 0),
+      catalog_candidate: Boolean(group && group.catalog_candidate),
+      selection_blocked: Boolean(group && group.selection_blocked),
+      selection_blocked_issue_code: sanitizeCompactText(group && group.selection_blocked_issue_code, 80),
+      final_ready: Boolean(group && group.final_ready),
     })).filter((group) => group.group_id && group.program_id && group.cohort_id),
   };
 }
@@ -3152,6 +3157,7 @@ function buildAcademicV2RegistrationCatalog(groups = []) {
 function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk', options = {}) {
   const isEn = lang === 'en';
   const isTeacher = normalizeRegistrationTrack(options && options.trackKey, 'bachelor') === 'teacher';
+  const blockingIssueCode = sanitizeCompactText(options && options.blockingIssueCode, 80);
   const copy = {
     missing_selection: isEn
       ? (isTeacher
@@ -3177,8 +3183,124 @@ function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk', options 
       : (isTeacher
         ? 'Спершу завершіть вибір викладацької академічної групи. Legacy-реєстрацію вимкнено.'
         : 'Спершу завершіть вибір академічного курсу. Legacy-реєстрацію вимкнено.'),
+    selection_blocked: isEn
+      ? (
+        blockingIssueCode === 'registration_teacher_multiple_defaults'
+          ? 'This teacher campus has multiple default academic groups. Ask an administrator to leave exactly one.'
+          : blockingIssueCode === 'registration_teacher_default_required'
+            ? 'This teacher campus still needs one default academic group before registration can continue.'
+            : 'This registration path is currently blocked by an unresolved academic-group conflict.'
+      )
+      : (
+        blockingIssueCode === 'registration_teacher_multiple_defaults'
+          ? 'Для цього кампусу позначено кілька default-викладацьких груп. Адміністратор має залишити лише одну.'
+          : blockingIssueCode === 'registration_teacher_default_required'
+            ? 'Для цього викладацького кампусу потрібно визначити одну default-академічну групу перед продовженням реєстрації.'
+            : 'Цей шлях реєстрації зараз заблокований через нерозв’язаний конфлікт академічних груп.'
+      ),
+    repair_missing_mapped_subjects: isEn
+      ? 'The selected academic group still has no mapped visible subjects after repair. Ask an administrator to resync subject projection.'
+      : 'Після repair в обраної академічної групи все ще немає спроєктованих видимих предметів. Попросіть адміністратора пересинхронізувати subject projection.',
+    repair_missing_compat_bridge: isEn
+      ? 'The selected academic group could not rebuild the required legacy compatibility ids during registration.'
+      : 'Під час реєстрації не вдалося відновити потрібні legacy compatibility ids для обраної академічної групи.',
+    repair_missing_study_context: isEn
+      ? 'The selected academic group could not rebuild its legacy study context during registration.'
+      : 'Під час реєстрації не вдалося відновити legacy study context для обраної академічної групи.',
+    repair_failed: isEn
+      ? 'The selected academic group could not finish compatibility repair during registration.'
+      : 'Під час реєстрації не вдалося завершити compatibility repair для обраної академічної групи.',
   };
   return copy[issue] || copy.invalid_group;
+}
+
+function getRegistrationRepairFailureIssue(group = {}) {
+  const missingCompatFields = Array.isArray(group && group.missing_compat_fields)
+    ? group.missing_compat_fields.map((field) => sanitizeCompactText(field, 80)).filter(Boolean)
+    : [];
+  if (missingCompatFields.includes('legacy_study_context_id')) {
+    return 'repair_missing_study_context';
+  }
+  if (missingCompatFields.length) {
+    return 'repair_missing_compat_bridge';
+  }
+  if (Math.max(0, Number(group && group.visible_mapped_subject_count ? group.visible_mapped_subject_count : 0) || 0) < 1) {
+    return 'repair_missing_mapped_subjects';
+  }
+  if (group && group.selection_blocked) {
+    return 'selection_blocked';
+  }
+  return 'repair_failed';
+}
+
+async function repairRegistrationCatalogGroup(group = {}) {
+  const groupId = parsePositiveIntStrict(group && group.group_id);
+  if (!groupId) {
+    return { group: null, catalogGroup: null, error: 'invalid_group' };
+  }
+  const store = getAcademicV2Store();
+  try {
+    await academicV2Helpers.resyncGroupProjection(store, groupId);
+  } catch (err) {
+    console.error('Registration group projection repair failed', { groupId, error: err });
+    return { group: null, catalogGroup: group || null, error: 'repair_failed' };
+  }
+
+  let repairedCatalogGroup = ((await academicV2Helpers.listRegistrationCatalogGroups(store)) || [])
+    .find((row) => Number(row.group_id || 0) === groupId) || null;
+  if (!repairedCatalogGroup) {
+    return { group: null, catalogGroup: null, error: 'invalid_group' };
+  }
+
+  const legacyCourseId = parsePositiveIntStrict(repairedCatalogGroup.legacy_course_id);
+  const legacyAdmissionId = parsePositiveIntStrict(repairedCatalogGroup.legacy_admission_id);
+  if (legacyCourseId && legacyAdmissionId) {
+    let legacyStudyContextId = null;
+    try {
+      legacyStudyContextId = parsePositiveIntStrict(await ensureStudyContextForLegacyPlacement({
+        courseId: legacyCourseId,
+        admissionId: legacyAdmissionId,
+        programId: parsePositiveIntStrict(repairedCatalogGroup.legacy_program_id) || parsePositiveIntStrict(repairedCatalogGroup.program_id),
+        trackKey: normalizeRegistrationTrack(repairedCatalogGroup.track_key, 'bachelor'),
+        preferredCampus: normalizeCourseCampus(repairedCatalogGroup.campus_key),
+        preferredStage: Math.max(1, Number(repairedCatalogGroup.stage_number || 0) || 1),
+      }));
+    } catch (err) {
+      console.error('Registration group study-context repair failed', { groupId, error: err });
+      return { group: null, catalogGroup: repairedCatalogGroup, error: 'repair_missing_study_context' };
+    }
+    if (legacyStudyContextId) {
+      await db.run(
+        `
+          UPDATE academic_v2_groups
+          SET legacy_study_context_id = ?,
+              updated_at = NOW()
+          WHERE id = ?
+            AND COALESCE(legacy_study_context_id, 0) <> ?
+        `,
+        [legacyStudyContextId, groupId, legacyStudyContextId]
+      );
+    }
+  }
+
+  const [catalogGroupsAfterRepair, readyGroups] = await Promise.all([
+    academicV2Helpers.listRegistrationCatalogGroups(store),
+    academicV2Helpers.listRegistrationReadyGroups(store),
+  ]);
+  repairedCatalogGroup = (catalogGroupsAfterRepair || []).find((row) => Number(row.group_id || 0) === groupId) || repairedCatalogGroup;
+  const readyGroup = (readyGroups || []).find((row) => Number(row.group_id || 0) === groupId) || null;
+  if (readyGroup) {
+    return {
+      group: readyGroup,
+      catalogGroup: repairedCatalogGroup,
+      error: '',
+    };
+  }
+  return {
+    group: null,
+    catalogGroup: repairedCatalogGroup,
+    error: getRegistrationRepairFailureIssue(repairedCatalogGroup),
+  };
 }
 
 async function resolveStrictAcademicV2RegistrationScope(userOrId) {
@@ -14603,12 +14725,12 @@ app.get('/register/course', async (req, res) => {
   }
   try {
     await ensureDbReady();
-    const [pendingUser, readyGroups, registrationAuditIssues] = await Promise.all([
+    const [pendingUser, catalogGroups, registrationAuditIssues] = await Promise.all([
       db.get(
         'SELECT group_id, course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
         [req.session.pendingUserId]
       ),
-      academicV2Helpers.listRegistrationReadyGroups(getAcademicV2Store()),
+      academicV2Helpers.listRegistrationCatalogGroups(getAcademicV2Store()),
       academicV2Helpers.listRegistrationGroupAuditIssues(getAcademicV2Store()),
     ]);
     if (!pendingUser) {
@@ -14619,7 +14741,7 @@ app.get('/register/course', async (req, res) => {
     auditRegistrationAcademicV2Groups().catch((auditErr) => {
       console.error('Registration academic group audit failed', auditErr);
     });
-    const registrationCatalog = buildAcademicV2RegistrationCatalog(readyGroups);
+    const registrationCatalog = buildAcademicV2RegistrationCatalog(catalogGroups);
     const groupById = new Map(
       (registrationCatalog.groups || []).map((group) => [Number(group.group_id || 0), group])
     );
@@ -14650,6 +14772,11 @@ app.get('/register/course', async (req, res) => {
       label: sanitizeCompactText(group.group_label, 160),
       label_uk: sanitizeCompactText(group.group_label, 160),
       label_en: sanitizeCompactText(group.group_label, 160),
+      is_teacher_registration_default: Boolean(group.is_teacher_registration_default),
+      selection_blocked: Boolean(group.selection_blocked),
+      selection_blocked_issue_code: sanitizeCompactText(group.selection_blocked_issue_code, 80),
+      visible_subject_count: Math.max(0, Number(group.visible_subject_count || 0) || 0),
+      visible_mapped_subject_count: Math.max(0, Number(group.visible_mapped_subject_count || 0) || 0),
     }));
     return res.render('register-course', {
       registrationPathways,
@@ -14717,16 +14844,16 @@ app.post('/register/course', registerLimiter, async (req, res) => {
 
     await ensureDbReady();
 
-    const [pendingUser, readyGroups] = await Promise.all([
+    const [pendingUser, catalogGroups] = await Promise.all([
       db.get('SELECT id FROM users WHERE id = ?', [userId]),
-      academicV2Helpers.listRegistrationReadyGroups(getAcademicV2Store()),
+      academicV2Helpers.listRegistrationCatalogGroups(getAcademicV2Store()),
     ]);
     if (!pendingUser) {
       req.session.pendingUserId = null;
       req.session.rememberMe = null;
       return res.redirect('/register?error=Session%20expired');
     }
-    const selectedGroup = (readyGroups || []).find((group) => Number(group.group_id || 0) === requestedGroupId) || null;
+    const selectedGroup = (catalogGroups || []).find((group) => Number(group.group_id || 0) === requestedGroupId) || null;
     if (!selectedGroup) {
       logAction(db, req, 'register_group_rejected', {
         user_id: userId,
@@ -14765,29 +14892,73 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       );
     }
 
+    if (selectedGroup.selection_blocked) {
+      logAction(db, req, 'register_group_rejected', {
+        user_id: userId,
+        group_id: requestedGroupId,
+        program_id: requestedProgramId,
+        cohort_id: requestedCohortId,
+        campus_key: requestedCampus,
+        track_key: trackFromBody,
+        blocking_issue_code: sanitizeCompactText(selectedGroup.selection_blocked_issue_code, 80) || null,
+        reason: 'selection_blocked',
+      });
+      return redirectRegisterCourseError(
+        buildRegistrationAcademicGroupErrorMessage('selection_blocked', lang, {
+          trackKey: trackFromBody,
+          blockingIssueCode: selectedGroup.selection_blocked_issue_code,
+        })
+      );
+    }
+
+    const repairedSelection = await repairRegistrationCatalogGroup(selectedGroup);
+    if (!repairedSelection.group) {
+      logAction(db, req, 'register_group_rejected', {
+        user_id: userId,
+        group_id: requestedGroupId,
+        program_id: requestedProgramId,
+        cohort_id: requestedCohortId,
+        campus_key: requestedCampus,
+        track_key: trackFromBody,
+        repair_error: repairedSelection.error || 'repair_failed',
+        blocking_issue_code: sanitizeCompactText(
+          repairedSelection.catalogGroup && repairedSelection.catalogGroup.selection_blocked_issue_code,
+          80
+        ) || null,
+        reason: 'repair_incomplete',
+      });
+      return redirectRegisterCourseError(
+        buildRegistrationAcademicGroupErrorMessage(repairedSelection.error || 'repair_failed', lang, {
+          trackKey: trackFromBody,
+          blockingIssueCode: repairedSelection.catalogGroup && repairedSelection.catalogGroup.selection_blocked_issue_code,
+        })
+      );
+    }
+
+    const repairedGroup = repairedSelection.group;
     await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
       group_id: requestedGroupId,
       user_ids: [userId],
     });
-    await persistRegistrationAcademicGroupPlacement(userId, selectedGroup);
+    await persistRegistrationAcademicGroupPlacement(userId, repairedGroup);
     await db.run(
       'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
-      [parsePositiveIntStrict(selectedGroup.legacy_course_id), userId]
+      [parsePositiveIntStrict(repairedGroup.legacy_course_id), userId]
     );
     logAction(db, req, 'register_group_selected', {
       user_id: userId,
-      group_id: Number(selectedGroup.group_id || 0) || null,
-      campus_key: normalizeCourseCampus(selectedGroup.campus_key),
-      track_key: normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor'),
-      program_id: Number(selectedGroup.program_id || 0) || null,
-      cohort_id: Number(selectedGroup.cohort_id || 0) || null,
-      legacy_program_id: parsePositiveIntStrict(selectedGroup.legacy_program_id) || null,
-      legacy_admission_id: parsePositiveIntStrict(selectedGroup.legacy_admission_id) || null,
-      course_id: parsePositiveIntStrict(selectedGroup.legacy_course_id) || null,
-      study_context_id: parsePositiveIntStrict(selectedGroup.legacy_study_context_id) || null,
+      group_id: Number(repairedGroup.group_id || 0) || null,
+      campus_key: normalizeCourseCampus(repairedGroup.campus_key),
+      track_key: normalizeRegistrationTrack(repairedGroup.track_key, 'bachelor'),
+      program_id: Number(repairedGroup.program_id || 0) || null,
+      cohort_id: Number(repairedGroup.cohort_id || 0) || null,
+      legacy_program_id: parsePositiveIntStrict(repairedGroup.legacy_program_id) || null,
+      legacy_admission_id: parsePositiveIntStrict(repairedGroup.legacy_admission_id) || null,
+      course_id: parsePositiveIntStrict(repairedGroup.legacy_course_id) || null,
+      study_context_id: parsePositiveIntStrict(repairedGroup.legacy_study_context_id) || null,
     });
 
-    if (normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor') === 'teacher') {
+    if (normalizeRegistrationTrack(repairedGroup.track_key, 'bachelor') === 'teacher') {
       return res.redirect('/register/teacher-subjects');
     }
     return res.redirect('/register/subjects');
