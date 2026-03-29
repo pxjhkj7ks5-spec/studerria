@@ -777,7 +777,11 @@
                       <label for="groupCohort">Cohort</label>
                       <select id="groupCohort" class="form-select" name="cohort_id" data-editor-input="group.cohort_id">
                         <% (scopedCohorts || cohorts || []).forEach((cohort) => { %>
-                          <option value="<%= cohort.id %>" <%= Number(cohort.id) === activeCohortId ? 'selected' : '' %>><%= cohort.label %> - <%= cohort.admission_year %></option>
+                          <option
+                            value="<%= cohort.id %>"
+                            data-track-key="<%= cohort.track_key %>"
+                            <%= Number(cohort.id) === activeCohortId ? 'selected' : '' %>
+                          ><%= cohort.label %> - <%= cohort.admission_year %></option>
                         <% }); %>
                       </select>
                     </div>
@@ -806,6 +810,19 @@
                   <div class="form-check mt-3">
                     <input id="groupActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="group.is_active" checked />
                     <label class="form-check-label" for="groupActive">Active course</label>
+                  </div>
+                  <input type="hidden" name="is_teacher_registration_default" value="0" data-preserve-reset />
+                  <div class="form-check mt-2" id="groupTeacherDefaultField" style="display: none;">
+                    <input
+                      id="groupTeacherDefault"
+                      class="form-check-input"
+                      type="checkbox"
+                      name="is_teacher_registration_default"
+                      value="1"
+                      data-editor-input="group.is_teacher_registration_default"
+                    />
+                    <label class="form-check-label" for="groupTeacherDefault">Default for teacher registration</label>
+                    <div class="academic-v2-muted">If several teacher groups share one campus, registration will use this one.</div>
                   </div>
                   <div class="academic-v2-actions mt-3">
                     <button type="submit" class="btn btn-primary">Save course</button>
@@ -837,6 +854,9 @@
                                 <span class="academic-v2-chip"><%= group.term_count %> terms</span>
                                 <span class="academic-v2-chip"><%= group.group_subject_count %> subjects</span>
                                 <span class="academic-v2-chip academic-v2-chip--ok"><%= group.enrolled_users %> users</span>
+                                <% if (group.track_key === 'teacher' && group.is_teacher_registration_default) { %>
+                                  <span class="academic-v2-chip academic-v2-chip--ok">teacher default</span>
+                                <% } %>
                                 <% if (health) { %>
                                   <span class="academic-v2-chip <%= health.is_healthy ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= health.is_healthy ? 'projection ok' : 'needs review' %></span>
                                   <% (health.issues || []).slice(0, 2).forEach((issue) => { %>
@@ -1224,6 +1244,22 @@
         document.querySelectorAll('[data-editor-form]').forEach((form) => {
           forms.set(form.getAttribute('data-editor-form'), form);
         });
+        const groupCohort = document.getElementById('groupCohort');
+        const groupTeacherDefaultField = document.getElementById('groupTeacherDefaultField');
+        const groupTeacherDefault = document.getElementById('groupTeacherDefault');
+
+        const syncGroupTeacherDefaultVisibility = () => {
+          if (!groupTeacherDefaultField || !groupTeacherDefault || !groupCohort) {
+            return;
+          }
+          const selectedOption = groupCohort.options[groupCohort.selectedIndex] || null;
+          const trackKey = String(selectedOption?.dataset.trackKey || '').trim().toLowerCase();
+          const isTeacherTrack = trackKey === 'teacher';
+          groupTeacherDefaultField.style.display = isTeacherTrack ? '' : 'none';
+          if (!isTeacherTrack) {
+            groupTeacherDefault.checked = false;
+          }
+        };
 
         const applyPayload = (target, payload) => {
           const form = forms.get(target);
@@ -1251,6 +1287,9 @@
             }
             field.value = value == null ? '' : String(value);
           });
+          if (target === 'group') {
+            syncGroupTeacherDefaultVisibility();
+          }
         };
 
         document.querySelectorAll('[data-editor-target]').forEach((button) => {
@@ -1286,8 +1325,16 @@
               }
               input.value = '';
             });
+            if (target === 'group') {
+              syncGroupTeacherDefaultVisibility();
+            }
           });
         });
+
+        if (groupCohort) {
+          groupCohort.addEventListener('change', syncGroupTeacherDefaultVisibility);
+        }
+        syncGroupTeacherDefaultVisibility();
       })();
     </script>
   </body>

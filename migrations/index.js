@@ -41,6 +41,7 @@ const ratingPublicationSnapshots = require('./040_rating_publication_snapshots')
 const academicSetupContexts = require('./041_academic_setup_contexts');
 const academicV2Core = require('./042_academic_v2_core');
 const academicV2StageTemplates = require('./043_academic_v2_stage_templates');
+const academicV2TeacherRegistrationDefaults = require('./044_academic_v2_teacher_registration_defaults');
 
 module.exports = [
   init,
@@ -86,4 +87,5 @@ module.exports = [
   academicSetupContexts,
   academicV2Core,
   academicV2StageTemplates,
+  academicV2TeacherRegistrationDefaults,
 ];

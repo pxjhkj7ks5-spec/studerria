@@ -19,27 +19,37 @@
         chooseProgram: 'Choose a program',
         admissionYear: 'Admission year',
         campus: 'Campus',
-        campusReadyTeacherHint: 'Choosing a campus automatically links the correct teacher course.',
+        academicGroupPreview: 'Academic group',
+        summaryDefaultStudent: 'Select track, program, admission year, and campus.',
+        summaryDefaultTeacher: 'Select track, program, and campus.',
+        campusReadyTeacherHint: 'Choosing a campus automatically resolves the correct teacher academic group.',
         campusReadyStudentHint: 'The admission year defines the cohort. Choosing a campus automatically resolves the academic context.',
         chooseProgramFirstTitle: 'Choose a program first',
         chooseProgramFirstSubtitle: 'Available admission years will appear after that.',
-        chooseProgramFirstTeacherSubtitle: 'For teachers, the campus is determined within the selected program.',
+        chooseProgramFirstTeacherSubtitle: 'Available teacher campuses will appear after that.',
         noAdmissionYearsTitle: 'No admission years configured',
         noAdmissionYearsSubtitle: 'Without an admission year, Studerria cannot resolve the cohort and registration stops before subjects.',
         noTeacherPathTitle: 'No teacher pathway configured',
-        noTeacherPathSubtitle: 'Without one active teacher path, Studerria cannot resolve the teacher workspace or subject flow for this program.',
-        teacherPathRequiredHint: 'Teacher registration needs one active path for the selected program, otherwise the subject step cannot open correctly.',
+        noTeacherPathSubtitle: 'Studerria cannot find one ready teacher academic group for this program yet.',
+        teacherPathRequiredHint: 'Teacher registration needs one ready teacher academic group per campus, otherwise the subject step cannot open correctly.',
         noAvailableAdmissionTitle: 'No admission year available',
         noAvailableAdmissionSubtitle: 'Ask an administrator to open one admission year, otherwise the student cohort cannot be resolved.',
         noCampusesTitle: 'No campuses configured',
-        noCampusesTeacherSubtitle: 'Ask an administrator to link one teacher course per campus, otherwise the teacher route cannot be resolved.',
+        noCampusesTeacherSubtitle: 'Ask an administrator to configure at least one teacher academic group, otherwise the teacher route cannot be resolved.',
         noCampusesStudentSubtitle: 'Ask an administrator to link one visible course per campus, otherwise the student cannot move to subjects.',
         noCampusesTeacherHint: 'There are no campuses available for this teacher program yet.',
         noCampusesStudentHint: 'There are no campuses available for this admission year yet.',
-        oneLinkedCourse: '1 linked course',
-        linkedCoursesSuffix: 'linked courses',
+        oneLinkedCourse: '1 linked group',
+        linkedCoursesSuffix: 'linked groups',
         oneVisibleCourseNeeded: 'Exactly one visible course per campus is required, otherwise the student can land in the wrong subject flow.',
         readyToRegister: 'Ready: Studerria can resolve one stable academic context for this campus.',
+        readyTeacherToRegister: 'Ready: Studerria can open the teacher subject flow for this campus.',
+        teacherDefaultRequiredTitle: 'Default teacher group required',
+        teacherDefaultRequiredSubtitle: 'Several teacher groups share this campus. Mark exactly one of them as the default registration group.',
+        teacherDefaultRequiredHint: 'Teacher registration stays blocked until this campus has one default teacher group.',
+        teacherMultipleDefaultsTitle: 'Too many default teacher groups',
+        teacherMultipleDefaultsSubtitle: 'Several teacher groups on this campus are marked as default. Leave only one.',
+        teacherMultipleDefaultsHint: 'Teacher registration stays blocked until this campus keeps exactly one default teacher group.',
         ambiguousCampusHint: 'Campus mapping is ambiguous. Ask an administrator to leave one visible course per campus, otherwise subject registration becomes unstable.',
         chooseValidCampus: 'Choose a valid campus before continuing, otherwise Studerria cannot resolve the correct academic context.',
       }
@@ -61,24 +71,72 @@
         chooseProgramFirstSubtitle: 'Після цього зʼявляться доступні роки вступу.',
         chooseProgramFirstTeacherSubtitle: 'Для викладача кампус визначається в межах обраної програми.',
         noAdmissionYearsTitle: 'Немає налаштованих років вступу',
-        noAdmissionYearsSubtitle: '��� ���� ������ Studerria �� ��������� �������, ���� ��������� ���������� �� �� ��������.',
+        noAdmissionYearsSubtitle: '??? ???? ?????? Studerria ?? ????????? ???????, ???? ?????????? ?????????? ?? ?? ?????????.',
         noTeacherPathTitle: 'Немає налаштованого викладацького шляху',
-        noTeacherPathSubtitle: '��� ������ ��������� teacher-path Studerria �� ��������� ������������ workspace � ��������� subject flow.',
-        teacherPathRequiredHint: '��� ��������� ��������� ������� ���� �������� ����, ������ ���� � ���������� �� ��������� ��������.',
+        noTeacherPathSubtitle: '??? ?????? ????????? teacher-path Studerria ?? ????????? ???????????? workspace ? ????????? subject flow.',
+        teacherPathRequiredHint: '??? ?????????? ????????? ???????? ???? ???????? ????, ?????? ???? ? ?????????? ?? ??????????? ????????.',
         noAvailableAdmissionTitle: 'Немає доступного року вступу',
-        noAvailableAdmissionSubtitle: '�������� ������������� ������� ���� �� ������, ������ ������� �� �����������.',
+        noAvailableAdmissionSubtitle: '????????? ?????????????? ???????? ???? ??? ??????, ?????? ??????? ?? ???????????.',
         noCampusesTitle: 'Немає налаштованих кампусів',
-        noCampusesTeacherSubtitle: '�������� ������������� ����?����� �� ������ teacher-course �� ������, ������ ������� �� �����������.',
-        noCampusesStudentSubtitle: '�������� ������������� ����?����� �� ������ �������� ����� �� ������, ������ ������� �� ���� �� ��������.',
+        noCampusesTeacherSubtitle: '????????? ?????????????? ?????????? ?? ?????? teacher-course ?? ??????, ?????? ??????? ?? ???????????.',
+        noCampusesStudentSubtitle: '????????? ?????????????? ?????????? ?? ?????? ???????? ????? ?? ??????, ?????? ??????? ?? ????? ?? ?????????.',
         noCampusesTeacherHint: 'Для цієї викладацької програми ще немає доступних кампусів.',
         noCampusesStudentHint: 'Для цього року вступу ще немає доступних кампусів.',
         oneLinkedCourse: '1 привʼязаний курс',
         linkedCoursesSuffix: 'привʼязані курси',
-        oneVisibleCourseNeeded: '������� ���� ���� ������� ���� �� ������, ������ ������� ���� ��������� �� � ��� subject flow.',
-        readyToRegister: '������: Studerria ���� ��������� ���� ��������� ���� ��� ����� �������.',
-        ambiguousCampusHint: '����?���� ������� ������������. �������� ������������� �������� �� ������ �������� ����� �� ������, ������ subject registration ���� �����������.',
-        chooseValidCampus: '������ ��������� ������ ����� ������������, ������ Studerria �� ��������� �������� ����.',
+        oneVisibleCourseNeeded: '???????? ????? ???? ??????? ???? ?? ??????, ?????? ??????? ???? ????????? ?? ? ??? subject flow.',
+        readyToRegister: '??????: Studerria ???? ????????? ???? ?????????? ???? ??? ????? ???????.',
+        ambiguousCampusHint: '????????? ???????? ????????????. ????????? ?????????????? ???????? ?? ?????? ???????? ????? ?? ??????, ?????? subject registration ???? ????????????.',
+        chooseValidCampus: '??????? ????????? ?????? ????? ????????????, ?????? Studerria ?? ????????? ????????? ????.',
       };
+  if (lang !== 'en') {
+    Object.assign(registerCourseText, {
+      themeToggleAria: 'Змінити тему',
+      campusKyiv: 'Київ',
+      campusMunich: 'Мюнхен',
+      trackBachelor: 'Бакалаврат',
+      trackMaster: 'Магістратура',
+      trackTeacher: 'Викладач',
+      level: 'Рівень',
+      program: 'Програма',
+      chooseProgram: 'Оберіть програму',
+      admissionYear: 'Рік вступу',
+      campus: 'Кампус',
+      academicGroupPreview: 'Академічна група',
+      summaryDefaultStudent: 'Оберіть рівень, програму, рік вступу та кампус.',
+      summaryDefaultTeacher: 'Оберіть рівень, програму та кампус.',
+      campusReadyTeacherHint: 'Вибір кампусу автоматично визначає потрібну викладацьку академічну групу.',
+      campusReadyStudentHint: 'Рік вступу визначає когорту. Вибір кампусу автоматично обирає потрібну академічну групу.',
+      chooseProgramFirstTitle: 'Спершу оберіть програму',
+      chooseProgramFirstSubtitle: "Після цього з'являться доступні роки вступу.",
+      chooseProgramFirstTeacherSubtitle: "Після вибору програми з'являться доступні кампуси для викладача.",
+      noAdmissionYearsTitle: 'Немає налаштованих років вступу',
+      noAdmissionYearsSubtitle: 'Без року вступу Studerria не зможе визначити когорту, тож реєстрація не перейде до предметів.',
+      noTeacherPathTitle: 'Немає налаштованого викладацького шляху',
+      noTeacherPathSubtitle: 'Studerria поки не бачить жодної готової викладацької академічної групи для цієї програми.',
+      teacherPathRequiredHint: 'Для викладацької реєстрації потрібна одна готова академічна група на обраний кампус.',
+      noAvailableAdmissionTitle: 'Немає доступного року вступу',
+      noAvailableAdmissionSubtitle: 'Попросіть адміністратора відкрити хоча б один рік вступу, інакше когорту неможливо визначити.',
+      noCampusesTitle: 'Немає налаштованих кампусів',
+      noCampusesTeacherSubtitle: 'Попросіть адміністратора налаштувати викладацьку академічну групу хоча б для одного кампусу.',
+      noCampusesStudentSubtitle: 'Попросіть адміністратора налаштувати видиму академічну групу хоча б для одного кампусу.',
+      noCampusesTeacherHint: 'Для цієї викладацької програми ще немає доступних кампусів.',
+      noCampusesStudentHint: 'Для цього року вступу ще немає доступних кампусів.',
+      oneLinkedCourse: "1 пов'язана група",
+      linkedCoursesSuffix: "пов'язані групи",
+      oneVisibleCourseNeeded: 'Потрібна рівно одна готова академічна група на кампус, інакше реєстрація буде неоднозначною.',
+      readyToRegister: 'Готово: Studerria може визначити одну стабільну академічну групу для цього кампусу.',
+      readyTeacherToRegister: 'Готово: Studerria може відкрити викладацький маршрут для цього кампусу.',
+      teacherDefaultRequiredTitle: 'Потрібна типова викладацька група',
+      teacherDefaultRequiredSubtitle: 'Для цього кампусу існує кілька викладацьких груп. Адміністратор має позначити одну як default для реєстрації.',
+      teacherDefaultRequiredHint: 'Поки для цього кампусу не позначено одну типову викладацьку групу, реєстрація викладача недоступна.',
+      teacherMultipleDefaultsTitle: 'Кілька типових викладацьких груп',
+      teacherMultipleDefaultsSubtitle: 'Для цього кампусу позначено кілька default-груп. Адміністратор має залишити лише одну.',
+      teacherMultipleDefaultsHint: 'Поки для цього кампусу не залишиться одна default-викладацька група, реєстрація викладача недоступна.',
+      ambiguousCampusHint: "Прив'язка кампусу неоднозначна. Попросіть адміністратора залишити один коректний маршрут для цього кампусу.",
+      chooseValidCampus: 'Оберіть коректний кампус перед продовженням, інакше Studerria не визначить потрібну академічну групу.',
+    });
+  }
   const isTeacherCourse = (course) => course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
   const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich'
     ? registerCourseText.campusMunich
@@ -584,10 +642,10 @@
                   <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
                   <div class="pathway-grid" id="campusOptions"></div>
                 </div>
-                <p class="pathway-hint mb-3" id="campusHint"><%= lang === 'en' ? 'The admission year defines the cohort. Choosing a campus automatically selects the academic group.' : '\u0420\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0432\u0438\u0437\u043d\u0430\u0447\u0430\u0454 \u043a\u043e\u0433\u043e\u0440\u0442\u0443. \u0412\u0438\u0431\u0456\u0440 \u043a\u0430\u043c\u043f\u0443\u0441\u0443 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u043e \u043e\u0431\u0438\u0440\u0430\u0454 \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443.' %></p>
+                <p class="pathway-hint mb-3" id="campusHint"><%= selectedTrackValue === 'teacher' ? registerCourseText.campusReadyTeacherHint : registerCourseText.campusReadyStudentHint %></p>
                 <div class="glass mb-3 p-3" id="academicContextSummaryCard">
-                  <div class="small text-muted mb-1"><%= lang === 'en' ? 'Academic group preview' : '\u0410\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0430 \u0433\u0440\u0443\u043f\u0430' %></div>
-                  <div class="fw-semibold" id="academicContextSummary"><%= lang === 'en' ? 'Select track, program, admission year, and campus.' : '\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0440\u0456\u0432\u0435\u043d\u044c, \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u0443, \u0440\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0442\u0430 \u043a\u0430\u043c\u043f\u0443\u0441.' %></div>
+                  <div class="small text-muted mb-1"><%= registerCourseText.academicGroupPreview %></div>
+                  <div class="fw-semibold" id="academicContextSummary"><%= selectedTrackValue === 'teacher' ? registerCourseText.summaryDefaultTeacher : registerCourseText.summaryDefaultStudent %></div>
                 </div>
                 <div class="auth-action-stack auth-action-stack--grid">
                   <button type="submit" class="btn btn-primary register-action-btn auth-action-btn"><%= t('registerCourse.continue') %></button>
@@ -609,9 +667,8 @@
     <script>
       const isEnglishRegisterCourse = <%- JSON.stringify(lang === 'en') %>;
       const registerCourseText = <%- JSON.stringify(registerCourseText) %>;
-      const academicGroupSummaryDefault = isEnglishRegisterCourse
-        ? 'Select track, program, admission year, and campus.'
-        : '\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0440\u0456\u0432\u0435\u043d\u044c, \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u0443, \u0440\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0442\u0430 \u043a\u0430\u043c\u043f\u0443\u0441.';
+      const academicStudentGroupSummaryDefault = registerCourseText.summaryDefaultStudent;
+      const academicTeacherGroupSummaryDefault = registerCourseText.summaryDefaultTeacher;
       registerCourseText.campusReadyStudentHint = isEnglishRegisterCourse
         ? 'The admission year defines the cohort. Choosing a campus automatically selects the academic group.'
         : '\u0420\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0432\u0438\u0437\u043d\u0430\u0447\u0430\u0454 \u043a\u043e\u0433\u043e\u0440\u0442\u0443. \u0412\u0438\u0431\u0456\u0440 \u043a\u0430\u043c\u043f\u0443\u0441\u0443 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u043e \u043e\u0431\u0438\u0440\u0430\u0454 \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443.';
@@ -627,6 +684,7 @@
       const pathwayLinks = Array.isArray(pathwayPayload.links) ? pathwayPayload.links : [];
       const pathwayCourses = Array.isArray(pathwayPayload.courses) ? pathwayPayload.courses : [];
       const registrationContextPayload = <%- JSON.stringify(registrationContexts) %>;
+      const registrationAuditIssuesPayload = <%- JSON.stringify(registrationAuditIssues || []) %>;
       const programById = new Map(pathwayPrograms.map((program) => [Number(program.id || 0), program]));
       const admissionById = new Map(pathwayAdmissions.map((admission) => [Number(admission.id || 0), admission]));
       const academicContextSummaryEl = document.getElementById('academicContextSummary');
@@ -710,10 +768,24 @@
         return String(trackKey || '').trim().toLowerCase() === 'teacher';
       }
 
+      function localizeAdmissionLabel(rawLabel) {
+        const normalized = String(rawLabel || '').trim();
+        if (isEnglishRegisterCourse) return normalized;
+        return normalized
+          .replace(/^Cohort\b/i, 'Когорта')
+          .replace(/\bCohort\b/gi, 'Когорта');
+      }
+
       function getCampusReadyHint(trackKey) {
         return isTeacherTrack(trackKey)
           ? registerCourseText.campusReadyTeacherHint
           : registerCourseText.campusReadyStudentHint;
+      }
+
+      function getAcademicSummaryDefault(trackKey) {
+        return isTeacherTrack(trackKey)
+          ? academicTeacherGroupSummaryDefault
+          : academicStudentGroupSummaryDefault;
       }
 
       function updateAcademicContextSummary() {
@@ -728,19 +800,30 @@
         const studyContext = contextById.get(studyContextId);
         const course = courseById.get(courseId);
         const parts = [];
+        const isTeacher = isTeacherTrack(trackKey);
         parts.push(formatTrackLabelClient(trackKey));
         if (program) {
           parts.push(program.code ? `${program.name} (${program.code})` : program.name);
         }
-        if (admission) {
-          parts.push(`Cohort ${admission.admission_year}`);
+        if (!isTeacher && admission) {
+          parts.push(isEnglishRegisterCourse ? `Cohort ${admission.admission_year}` : `Когорта ${admission.admission_year}`);
         }
         if (studyContext) {
-          parts.push(String(studyContext.label_uk || studyContext.label || '').trim() || `${formatCampusLabelClient(studyContext.campus_key)} / Year ${Number(studyContext.stage || studyContext.stage_number || 1)}`);
+          const studyContextLabel = String(studyContext.label_uk || studyContext.label || '').trim();
+          if (isTeacher) {
+            parts.push(formatCampusLabelClient(studyContext.campus_key || campusInput?.value));
+            if (studyContextLabel) {
+              parts.push(studyContextLabel);
+            }
+          } else {
+            parts.push(studyContextLabel || `${formatCampusLabelClient(studyContext.campus_key)} / Year ${Number(studyContext.stage || studyContext.stage_number || 1)}`);
+          }
         } else if (course) {
           parts.push(`${course.name || 'Course'} / ${formatCampusLabelClient(course.location)}`);
+        } else if (isTeacher && campusInput?.value) {
+          parts.push(formatCampusLabelClient(campusInput.value));
         }
-        academicContextSummaryEl.textContent = parts.filter(Boolean).join(' / ') || academicGroupSummaryDefault;
+        academicContextSummaryEl.textContent = parts.filter(Boolean).join(' / ') || getAcademicSummaryDefault(trackKey);
       }
 
       function syncTrackCards() {
@@ -799,6 +882,18 @@
       function refreshAdmissionOptions() {
         const trackKey = getSelectedTrack();
         const programId = Number(programSelect?.value || 0);
+        if (admissionField) {
+          admissionField.style.display = isTeacherTrack(trackKey) ? 'none' : '';
+        }
+        if (isTeacherTrack(trackKey)) {
+          if (admissionInput) {
+            admissionInput.value = '';
+          }
+          if (admissionOptions) {
+            admissionOptions.innerHTML = '';
+          }
+          return;
+        }
         const options = pathwayAdmissions
           .filter((admission) => Number(admission.program_id) === programId)
           .map((admission) => ({
@@ -813,14 +908,8 @@
         if (admissionInput) {
           admissionInput.value = resolvedValue ? String(resolvedValue) : '';
         }
-        if (admissionField) {
-          admissionField.style.display = isTeacherTrack(trackKey) ? 'none' : '';
-        }
         if (!admissionOptions) return;
         admissionOptions.innerHTML = '';
-        if (isTeacherTrack(trackKey)) {
-          return;
-        }
         if (!programId) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option admission-option is-disabled';
@@ -898,7 +987,69 @@
         });
       }
 
-      function buildCampusChoices(admissionId, programId, trackKey) {
+      function getTeacherRegistrationContexts(programId) {
+        const targetProgramId = Number(programId || 0);
+        if (!targetProgramId) return [];
+        return (Array.isArray(registrationContextPayload) ? registrationContextPayload : []).filter((context) => {
+          const contextStage = Number(context.stage || context.stage_number || 0);
+          const contextTrack = String(context.track_key || context.track || '').trim().toLowerCase();
+          return Number(context.program_id || 0) === targetProgramId
+            && contextTrack === 'teacher'
+            && contextStage === 1;
+        });
+      }
+
+      function getTeacherCampusIssuePriority(issueCode) {
+        switch (String(issueCode || '').trim()) {
+          case 'registration_teacher_multiple_defaults':
+            return 40;
+          case 'registration_teacher_default_required':
+            return 30;
+          case 'registration_group_missing_compat_bridge':
+            return 20;
+          case 'registration_group_missing_visible_subjects':
+            return 10;
+          default:
+            return 0;
+        }
+      }
+
+      function getTeacherCampusIssueCopy(issueCode) {
+        switch (String(issueCode || '').trim()) {
+          case 'registration_teacher_multiple_defaults':
+            return {
+              title: registerCourseText.teacherMultipleDefaultsTitle,
+              subtitle: registerCourseText.teacherMultipleDefaultsSubtitle,
+              hint: registerCourseText.teacherMultipleDefaultsHint,
+            };
+          case 'registration_teacher_default_required':
+            return {
+              title: registerCourseText.teacherDefaultRequiredTitle,
+              subtitle: registerCourseText.teacherDefaultRequiredSubtitle,
+              hint: registerCourseText.teacherDefaultRequiredHint,
+            };
+          default:
+            return {
+              title: registerCourseText.noTeacherPathTitle,
+              subtitle: registerCourseText.noTeacherPathSubtitle,
+              hint: registerCourseText.teacherPathRequiredHint,
+            };
+        }
+      }
+
+      function getTeacherRegistrationIssues(programId) {
+        const targetProgramId = Number(programId || 0);
+        if (!targetProgramId) return [];
+        return (Array.isArray(registrationAuditIssuesPayload) ? registrationAuditIssuesPayload : []).filter((issue) => {
+          const issueTrack = String(issue && issue.track_key || '').trim().toLowerCase();
+          const issueStage = Number(issue && issue.stage_number || 0);
+          return Number(issue && issue.program_id || 0) === targetProgramId
+            && issueTrack === 'teacher'
+            && issueStage === 1;
+        });
+      }
+
+      function buildStudentCampusChoices(admissionId, programId, trackKey) {
         const contextRows = getRegistrationContextsForAdmission(admissionId, programId, trackKey);
         if (contextRows.length) {
           const campusMap = new Map();
@@ -970,6 +1121,127 @@
           });
       }
 
+      function buildTeacherCampusChoices(programId) {
+        const readyContexts = getTeacherRegistrationContexts(programId);
+        const readyByCampus = new Map();
+        readyContexts.forEach((context) => {
+          const campusKey = normalizeCampusKey(context.campus_key || context.course_location || context.location);
+          if (!readyByCampus.has(campusKey)) {
+            readyByCampus.set(campusKey, {
+              campusKey,
+              campusLabel: formatCampusLabelClient(campusKey),
+              courseIds: [],
+              contextIds: [],
+              cohortIds: [],
+              groupLabels: [],
+            });
+          }
+          const bucket = readyByCampus.get(campusKey);
+          const courseId = Number(context.course_id || 0);
+          const contextId = Number(context.id || 0);
+          const cohortId = Number(context.admission_id || 0);
+          const groupLabel = String(context.label_uk || context.label || '').trim();
+          if (courseId) bucket.courseIds.push(courseId);
+          if (contextId) bucket.contextIds.push(contextId);
+          if (cohortId) bucket.cohortIds.push(cohortId);
+          if (groupLabel) bucket.groupLabels.push(groupLabel);
+        });
+
+        const issueByCampus = new Map();
+        getTeacherRegistrationIssues(programId).forEach((issue) => {
+          const campusKey = normalizeCampusKey(issue && issue.campus_key);
+          const currentIssue = issueByCampus.get(campusKey);
+          if (!currentIssue || getTeacherCampusIssuePriority(issue.issue_code) > getTeacherCampusIssuePriority(currentIssue.issue_code)) {
+            issueByCampus.set(campusKey, issue);
+          }
+        });
+
+        const campusKeys = Array.from(new Set([
+          ...Array.from(readyByCampus.keys()),
+          ...Array.from(issueByCampus.keys()),
+        ])).sort((left, right) => {
+          if (left === right) return 0;
+          if (left === 'kyiv') return -1;
+          if (right === 'kyiv') return 1;
+          return String(left || '').localeCompare(String(right || ''));
+        });
+
+        return campusKeys.map((campusKey) => {
+          const readyBucket = readyByCampus.get(campusKey);
+          if (readyBucket) {
+            const uniqueCourseIds = Array.from(new Set(readyBucket.courseIds));
+            const uniqueContextIds = Array.from(new Set(readyBucket.contextIds));
+            const uniqueCohortIds = Array.from(new Set(readyBucket.cohortIds));
+            const uniqueGroupLabels = Array.from(new Set(readyBucket.groupLabels));
+            const isAmbiguous = uniqueContextIds.length !== 1 || uniqueCourseIds.length !== 1;
+            const fallbackCopy = getTeacherCampusIssueCopy('registration_teacher_default_required');
+            return {
+              campusKey,
+              campusLabel: readyBucket.campusLabel,
+              courseCount: uniqueContextIds.length || uniqueCourseIds.length,
+              courseId: isAmbiguous ? null : uniqueCourseIds[0],
+              studyContextId: isAmbiguous ? null : uniqueContextIds[0],
+              cohortId: uniqueCohortIds.length === 1 ? uniqueCohortIds[0] : null,
+              groupLabel: uniqueGroupLabels[0] || '',
+              isAmbiguous,
+              issueCode: isAmbiguous ? 'registration_teacher_default_required' : '',
+              issueTitle: isAmbiguous ? fallbackCopy.title : '',
+              issueSubtitle: isAmbiguous ? fallbackCopy.subtitle : '',
+              issueHint: isAmbiguous ? fallbackCopy.hint : '',
+            };
+          }
+
+          const issue = issueByCampus.get(campusKey) || null;
+          const issueCopy = getTeacherCampusIssueCopy(issue && issue.issue_code);
+          return {
+            campusKey,
+            campusLabel: formatCampusLabelClient(campusKey),
+            courseCount: Array.isArray(issue && issue.duplicate_group_ids) ? issue.duplicate_group_ids.length : 0,
+            courseId: null,
+            studyContextId: null,
+            cohortId: null,
+            groupLabel: '',
+            isAmbiguous: true,
+            issueCode: issue ? String(issue.issue_code || '') : 'registration_teacher_missing_path',
+            issueTitle: issueCopy.title,
+            issueSubtitle: issueCopy.subtitle,
+            issueHint: issueCopy.hint,
+          };
+        });
+      }
+
+      function buildCampusChoices(admissionId, programId, trackKey) {
+        if (isTeacherTrack(trackKey)) {
+          return buildTeacherCampusChoices(programId);
+        }
+        return buildStudentCampusChoices(admissionId, programId, trackKey);
+      }
+
+      function getCampusChoiceSubtitle(choice, trackKey) {
+        if (choice && choice.isAmbiguous) {
+          if (isTeacherTrack(trackKey)) {
+            return choice.issueSubtitle || registerCourseText.noTeacherPathSubtitle;
+          }
+          return `${formatLinkedCourseCount(choice.courseCount)}. ${registerCourseText.oneVisibleCourseNeeded}`;
+        }
+        if (isTeacherTrack(trackKey)) {
+          return choice && choice.groupLabel
+            ? `${choice.groupLabel}. ${registerCourseText.readyTeacherToRegister}`
+            : registerCourseText.readyTeacherToRegister;
+        }
+        return `${formatLinkedCourseCount(choice && choice.courseCount)}. ${registerCourseText.readyToRegister}`;
+      }
+
+      function getCampusChoiceHint(choice, trackKey) {
+        if (choice && choice.isAmbiguous) {
+          if (isTeacherTrack(trackKey)) {
+            return choice.issueHint || registerCourseText.teacherPathRequiredHint;
+          }
+          return registerCourseText.ambiguousCampusHint;
+        }
+        return getCampusReadyHint(trackKey);
+      }
+
       function setCampusHint(message, isError = false) {
         if (!campusHint) return;
         campusHint.textContent = message;
@@ -987,6 +1259,7 @@
         const activeCourseId = Number(courseIdInput.value || 0);
         const activeStudyContextId = Number(studyContextInput?.value || 0);
         const activeCampusKey = String(campusInput.value || preferredCampus || '').trim().toLowerCase();
+        const isTeacher = isTeacherTrack(trackKey);
 
         campusOptions.innerHTML = '';
         courseIdInput.value = '';
@@ -994,22 +1267,22 @@
           studyContextInput.value = '';
         }
         campusInput.value = '';
+        if (isTeacher && admissionInput) {
+          admissionInput.value = '';
+        }
 
-        if (!admissionId) {
+        if (isTeacher && !programId) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option campus-option is-disabled';
-          if (isTeacherTrack(trackKey)) {
-            if (!programId) {
-              emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstTeacherSubtitle}</span></span>`;
-              campusOptions.appendChild(emptyState);
-              setCampusHint(registerCourseText.campusReadyTeacherHint, true);
-              return;
-            }
-            emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noTeacherPathTitle}</span><span class="course-option-subtitle">${registerCourseText.noTeacherPathSubtitle}</span></span>`;
-            campusOptions.appendChild(emptyState);
-            setCampusHint(registerCourseText.teacherPathRequiredHint, true);
-            return;
-          }
+          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstTeacherSubtitle}</span></span>`;
+          campusOptions.appendChild(emptyState);
+          setCampusHint(registerCourseText.chooseProgramFirstTeacherSubtitle, true);
+          return;
+        }
+
+        if (!isTeacher && !admissionId) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'track-option campus-option is-disabled';
           if (!programId) {
             emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstSubtitle}</span></span>`;
           } else {
@@ -1023,10 +1296,10 @@
         if (!campusChoices.length) {
           const emptyState = document.createElement('div');
           emptyState.className = 'track-option campus-option is-disabled';
-          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noCampusesTitle}</span><span class="course-option-subtitle">${isTeacherTrack(trackKey) ? registerCourseText.noCampusesTeacherSubtitle : registerCourseText.noCampusesStudentSubtitle}</span></span>`;
+          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noCampusesTitle}</span><span class="course-option-subtitle">${isTeacher ? registerCourseText.noCampusesTeacherSubtitle : registerCourseText.noCampusesStudentSubtitle}</span></span>`;
           campusOptions.appendChild(emptyState);
           setCampusHint(
-            isTeacherTrack(trackKey)
+            isTeacher
               ? registerCourseText.noCampusesTeacherHint
               : registerCourseText.noCampusesStudentHint,
             true
@@ -1057,13 +1330,13 @@
             if (studyContextInput) {
               studyContextInput.value = String(choice.studyContextId || '');
             }
+            if (isTeacher && admissionInput) {
+              admissionInput.value = String(choice.cohortId || '');
+            }
             campusInput.value = choice.campusKey;
           }
 
-          const courseCountLabel = formatLinkedCourseCount(choice.courseCount);
-          const subtitle = choice.isAmbiguous
-            ? `${courseCountLabel}. ${registerCourseText.oneVisibleCourseNeeded}`
-            : `${courseCountLabel}. ${registerCourseText.readyToRegister}`;
+          const subtitle = getCampusChoiceSubtitle(choice, trackKey);
           button.innerHTML = `
             <span class="course-option-content">
               <span class="course-option-title">${choice.campusLabel}</span>
@@ -1079,6 +1352,9 @@
               if (studyContextInput) {
                 studyContextInput.value = String(choice.studyContextId || '');
               }
+              if (isTeacher && admissionInput) {
+                admissionInput.value = String(choice.cohortId || '');
+              }
               campusInput.value = choice.campusKey;
               setCampusHint(getCampusReadyHint(trackKey));
             });
@@ -1088,7 +1364,8 @@
         });
 
         if (!campusInput.value || (studyContextInput && !studyContextInput.value)) {
-          setCampusHint(registerCourseText.ambiguousCampusHint, true);
+          const issueChoice = campusChoices.find((choice) => choice.isAmbiguous) || null;
+          setCampusHint(getCampusChoiceHint(issueChoice, trackKey), true);
         } else {
           setCampusHint(getCampusReadyHint(trackKey));
         }

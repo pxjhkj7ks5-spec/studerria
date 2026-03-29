@@ -3133,27 +3133,41 @@ function buildAcademicV2RegistrationCatalog(groups = []) {
       legacy_study_context_id: parsePositiveIntStrict(group && group.legacy_study_context_id) || null,
       legacy_program_id: parsePositiveIntStrict(group && group.legacy_program_id) || null,
       legacy_admission_id: parsePositiveIntStrict(group && group.legacy_admission_id) || null,
+      is_teacher_registration_default: group && (group.is_teacher_registration_default === true || Number(group.is_teacher_registration_default) === 1),
       has_active_term: Boolean(group && group.has_active_term),
       visible_mapped_subject_count: Math.max(0, Number(group && group.visible_mapped_subject_count ? group.visible_mapped_subject_count : 0) || 0),
     })).filter((group) => group.group_id && group.program_id && group.cohort_id),
   };
 }
 
-function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk') {
+function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk', options = {}) {
   const isEn = lang === 'en';
+  const isTeacher = normalizeRegistrationTrack(options && options.trackKey, 'bachelor') === 'teacher';
   const copy = {
     missing_selection: isEn
-      ? 'Choose program, admission year, campus, and academic course before continuing.'
-      : 'Оберіть програму, рік вступу, кампус і академічний курс перед продовженням.',
+      ? (isTeacher
+        ? 'Choose program, campus, and teacher academic group before continuing.'
+        : 'Choose program, admission year, campus, and academic course before continuing.')
+      : (isTeacher
+        ? 'Оберіть програму, кампус і викладацьку академічну групу перед продовженням.'
+        : 'Оберіть програму, рік вступу, кампус і академічний курс перед продовженням.'),
     invalid_group: isEn
       ? 'The selected academic course is no longer available for registration.'
       : 'Обраний академічний курс більше недоступний для реєстрації.',
     invalid_scope: isEn
-      ? 'The selected academic course no longer matches this registration path.'
-      : 'Обраний академічний курс більше не відповідає цьому шляху реєстрації.',
+      ? (isTeacher
+        ? 'The selected teacher academic group no longer matches this program and campus.'
+        : 'The selected academic course no longer matches this registration path.')
+      : (isTeacher
+        ? 'Обрана викладацька академічна група більше не відповідає цій програмі та кампусу.'
+        : 'Обраний академічний курс більше не відповідає цьому шляху реєстрації.'),
     group_required: isEn
-      ? 'Finish academic course selection first. Legacy-only registration is disabled.'
-      : 'Спершу завершіть вибір академічного курсу. Legacy-реєстрацію вимкнено.',
+      ? (isTeacher
+        ? 'Finish teacher academic group selection first. Legacy-only registration is disabled.'
+        : 'Finish academic course selection first. Legacy-only registration is disabled.')
+      : (isTeacher
+        ? 'Спершу завершіть вибір викладацької академічної групи. Legacy-реєстрацію вимкнено.'
+        : 'Спершу завершіть вибір академічного курсу. Legacy-реєстрацію вимкнено.'),
   };
   return copy[issue] || copy.invalid_group;
 }
@@ -14572,12 +14586,13 @@ app.get('/register/course', async (req, res) => {
   }
   try {
     await ensureDbReady();
-    const [pendingUser, readyGroups] = await Promise.all([
+    const [pendingUser, readyGroups, registrationAuditIssues] = await Promise.all([
       db.get(
         'SELECT group_id, course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
         [req.session.pendingUserId]
       ),
       academicV2Helpers.listRegistrationReadyGroups(getAcademicV2Store()),
+      academicV2Helpers.listRegistrationGroupAuditIssues(getAcademicV2Store()),
     ]);
     if (!pendingUser) {
       req.session.pendingUserId = null;
@@ -14623,6 +14638,7 @@ app.get('/register/course', async (req, res) => {
       registrationPathways,
       registrationStudyContexts,
       registrationCatalog,
+      registrationAuditIssues: Array.isArray(registrationAuditIssues) ? registrationAuditIssues : [],
       selectedCourseId: selectedGroup && selectedGroup.legacy_course_id ? Number(selectedGroup.legacy_course_id) : null,
       selectedAdmissionId: selectedGroup && selectedGroup.cohort_id ? Number(selectedGroup.cohort_id) : null,
       selectedStudyContextId: selectedGroup && selectedGroup.group_id ? Number(selectedGroup.group_id) : null,
@@ -14655,12 +14671,19 @@ app.post('/register/course', registerLimiter, async (req, res) => {
   const requestedProgramId = parsePositiveIntStrict(req.body.program_id || req.body.study_program_id);
   const requestedCohortId = parsePositiveIntStrict(req.body.cohort_id);
   const requestedGroupId = parsePositiveIntStrict(req.body.group_id);
+  const requiresCohortSelection = trackFromBody !== 'teacher';
   const hasLegacyPlacementInput = Boolean(
     parsePositiveIntStrict(req.body.course_id) || parsePositiveIntStrict(req.body.study_context_id)
   );
 
   try {
-    if (!trackFromBody || !requestedProgramId || !requestedCohortId || !requestedCampus || !requestedGroupId) {
+    if (
+      !trackFromBody
+      || !requestedProgramId
+      || !requestedCampus
+      || !requestedGroupId
+      || (requiresCohortSelection && !requestedCohortId)
+    ) {
       if (hasLegacyPlacementInput) {
         logAction(db, req, 'register_legacy_placement_rejected', {
           user_id: userId,
@@ -14671,7 +14694,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
         });
       }
       return redirectRegisterCourseError(
-        buildRegistrationAcademicGroupErrorMessage('missing_selection', lang)
+        buildRegistrationAcademicGroupErrorMessage('missing_selection', lang, { trackKey: trackFromBody })
       );
     }
 
@@ -14699,11 +14722,11 @@ app.post('/register/course', registerLimiter, async (req, res) => {
         reason: 'missing_or_not_ready',
       });
       return redirectRegisterCourseError(
-        buildRegistrationAcademicGroupErrorMessage('invalid_group', lang)
+        buildRegistrationAcademicGroupErrorMessage('invalid_group', lang, { trackKey: trackFromBody })
       );
     }
     const hasScopeMismatch = Number(selectedGroup.program_id || 0) !== Number(requestedProgramId)
-      || Number(selectedGroup.cohort_id || 0) !== Number(requestedCohortId)
+      || (requiresCohortSelection && Number(selectedGroup.cohort_id || 0) !== Number(requestedCohortId))
       || normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor') !== trackFromBody
       || normalizeCourseCampus(selectedGroup.campus_key) !== requestedCampus;
     if (hasScopeMismatch) {
@@ -14721,7 +14744,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
         reason: 'payload_mismatch',
       });
       return redirectRegisterCourseError(
-        buildRegistrationAcademicGroupErrorMessage('invalid_scope', lang)
+        buildRegistrationAcademicGroupErrorMessage('invalid_scope', lang, { trackKey: trackFromBody })
       );
     }
 
@@ -14789,7 +14812,9 @@ app.get('/register/subjects', async (req, res) => {
     );
     if (!subjectState.scope || String(subjectState.scope.resolved_via || '') !== 'group_id') {
       return res.redirect(
-        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req)))}`
+        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req), {
+          trackKey: user && user.study_track,
+        }))}`
       );
     }
     if (normalizeRegistrationTrack(subjectState.scope.track_key, 'bachelor') === 'teacher') {
@@ -14940,7 +14965,9 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
     );
     if (!subjectState.scope || String(subjectState.scope.resolved_via || '') !== 'group_id') {
       return res.redirect(
-        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req)))}`
+        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req), {
+          trackKey: 'teacher',
+        }))}`
       );
     }
     if (normalizeRegistrationTrack(subjectState.scope.track_key, 'bachelor') === 'teacher') {
@@ -15113,7 +15140,9 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
     const { scope } = await resolveStrictAcademicV2RegistrationScope(userRow);
     if (!scope) {
       return res.redirect(
-        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req)))}`
+        `/register/course?error=${encodeURIComponent(buildRegistrationAcademicGroupErrorMessage('group_required', getPreferredLang(req), {
+          trackKey: 'teacher',
+        }))}`
       );
     }
     if (normalizeRegistrationTrack(scope.track_key, 'bachelor') !== 'teacher') {
