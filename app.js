@@ -52899,9 +52899,6 @@ app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
     if (!user) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
     }
-    if (normalizeRoleKey(user.role) === 'admin') {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot change admin course'));
-    }
     await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
       group_id: Number(targetGroup.group_id || 0),
       user_ids: [userId],
@@ -52984,7 +52981,7 @@ app.post('/admin/users/group/batch', requireUsersSectionAccess, async (req, res)
       `,
       [userIds]
     );
-    const movableUsers = (users || []).filter((user) => normalizeRoleKey(user.role || 'student') !== 'admin');
+    const movableUsers = (users || []).filter((user) => Number.isInteger(Number(user.id)) && Number(user.id) > 0);
     if (!movableUsers.length) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No movable users selected'));
     }
