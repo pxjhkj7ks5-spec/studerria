@@ -24,8 +24,22 @@
     { value: 'munich', label: 'Munich' },
   ];
   const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const lessonTypeOptions = ['lecture', 'seminar', 'practice', 'lab'];
+  const activityTypeOptions = [
+    { value: 'lecture', label: 'Lecture' },
+    { value: 'seminar', label: 'Seminar' },
+    { value: 'practice', label: 'Practice' },
+    { value: 'lab', label: 'Lab' },
+  ];
+  const activityPresetOptions = [
+    { value: 'lecture_seminar', label: 'Lecture + seminar' },
+    { value: 'lecture_practice', label: 'Lecture + practice' },
+    { value: 'lecture_seminar_lab', label: 'Lecture + seminar + lab' },
+  ];
   const selectedGroupUsers = (users || []).filter((item) => Number(item.group_id || 0) === activeGroupId);
+  const scopedGroupSubjectsList = Array.isArray(scopedGroupSubjects) ? scopedGroupSubjects : [];
+  const scopedGroupSubjectActivitiesList = Array.isArray(scopedGroupSubjectActivities) ? scopedGroupSubjectActivities : [];
+  const scopedStageSubjectTemplatesList = Array.isArray(scopedStageSubjectTemplates) ? scopedStageSubjectTemplates : [];
+  const scopedStageSubjectActivitiesList = Array.isArray(scopedStageSubjectActivities) ? scopedStageSubjectActivities : [];
   const buildFocusHref = (overrides = {}) => {
     const merged = Object.assign({}, {
       program_id: activeProgramId,
@@ -717,9 +731,9 @@
                   </form>
                   <div class="academic-v2-subcard">
                     <h3 class="h5 mb-3">Current stage subject templates</h3>
-                    <% if ((scopedStageSubjectTemplates || []).length) { %>
+                    <% if (scopedStageSubjectTemplatesList.length) { %>
                       <div class="academic-v2-stack">
-                        <% (scopedStageSubjectTemplates || []).forEach((stageSubject) => { %>
+                        <% scopedStageSubjectTemplatesList.forEach((stageSubject) => { %>
                           <div class="academic-v2-subcard">
                             <div class="d-flex flex-wrap justify-content-between gap-2">
                               <div>
@@ -728,6 +742,9 @@
                                 <div class="academic-v2-chip-row mt-2">
                                   <span class="academic-v2-chip"><%= stageSubject.stage_term_titles.length ? stageSubject.stage_term_titles.join(', ') : 'All stage terms' %></span>
                                   <span class="academic-v2-chip"><%= stageSubject.teacher_names.length ? stageSubject.teacher_names.join(', ') : 'No teacher defaults' %></span>
+                                  <% (stageSubject.activity_types || []).forEach((activityType) => { %>
+                                    <span class="academic-v2-chip"><%= activityType %></span>
+                                  <% }); %>
                                 </div>
                               </div>
                               <div class="academic-v2-actions">
@@ -743,6 +760,76 @@
                       </div>
                     <% } else { %>
                       <div class="academic-v2-empty">No stage subjects yet for the selected program and stage.</div>
+                    <% } %>
+                  </div>
+                  <form method="post" action="/admin/pathways/v2/stage-subject-activities/save" class="academic-v2-subcard" data-editor-form="stage-subject-activity">
+                    <%- renderFocusFields() %>
+                    <input type="hidden" name="stage_subject_activity_id" value="" data-editor-input="stage-subject-activity.id" />
+                    <h3 class="h5 mb-3">Stage subject activities</h3>
+                    <div class="academic-v2-form-grid">
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectActivityTemplate">Stage subject</label>
+                        <select id="stageSubjectActivityTemplate" class="form-select" name="stage_subject_template_id" data-editor-input="stage-subject-activity.stage_subject_template_id">
+                          <% scopedStageSubjectTemplatesList.forEach((stageSubject) => { %>
+                            <option value="<%= stageSubject.id %>"><%= stageSubject.title %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectActivityType">Activity type</label>
+                        <select id="stageSubjectActivityType" class="form-select" name="activity_type" data-editor-input="stage-subject-activity.activity_type">
+                          <% activityTypeOptions.forEach((activityType) => { %>
+                            <option value="<%= activityType.value %>"><%= activityType.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="stageSubjectActivitySortOrder">Sort order</label>
+                        <input id="stageSubjectActivitySortOrder" class="form-control" type="number" name="sort_order" data-editor-input="stage-subject-activity.sort_order" value="0" />
+                      </div>
+                    </div>
+                    <div class="academic-v2-muted mt-3">Lecture activities are shared across all groups. Seminar, practice, and lab activities are scheduled by subgroup.</div>
+                    <div class="academic-v2-actions mt-3">
+                      <button type="submit" class="btn btn-primary">Save stage activity</button>
+                      <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject-activity">Reset</button>
+                    </div>
+                    <div class="academic-v2-chip-row mt-3">
+                      <% activityPresetOptions.forEach((preset) => { %>
+                        <button
+                          type="submit"
+                          class="btn btn-sm btn-outline-secondary"
+                          formaction="/admin/pathways/v2/stage-subject-activities/preset"
+                          formmethod="post"
+                          name="preset_key"
+                          value="<%= preset.value %>"
+                        ><%= preset.label %></button>
+                      <% }); %>
+                    </div>
+                  </form>
+                  <div class="academic-v2-subcard">
+                    <h3 class="h5 mb-3">Current stage activity templates</h3>
+                    <% if (scopedStageSubjectActivitiesList.length) { %>
+                      <div class="academic-v2-stack">
+                        <% scopedStageSubjectActivitiesList.forEach((activity) => { %>
+                          <div class="academic-v2-subcard">
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                              <div>
+                                <strong><%= activity.subject_title %></strong>
+                                <div class="academic-v2-muted"><%= activity.activity_type %> · <%= Number(activity.sort_order || 0) %></div>
+                              </div>
+                              <div class="academic-v2-actions">
+                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject-activity" data-editor-payload='<%- toAttr(activity) %>'>Edit</button>
+                                <form method="post" action="/admin/pathways/v2/stage-subject-activities/<%= activity.id %>/delete">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                        <% }); %>
+                      </div>
+                    <% } else { %>
+                      <div class="academic-v2-empty">No stage activity templates yet for the selected stage subject scope.</div>
                     <% } %>
                   </div>
                 </div>
@@ -912,7 +999,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Subjects & Teachers</h2>
-                  <p class="academic-v2-section-copy">Templates are the global catalog. Course subjects are the live course-owned instances that define visibility, teachers, teamwork presence, and term coverage.</p>
+                  <p class="academic-v2-section-copy">Templates are the global catalog. Course subjects hold teachers, terms, and subgroup defaults. Lecture, seminar, practice, and lab live as separate activities inside each course subject.</p>
                 </div>
               </div>
               <div class="academic-v2-grid-3">
@@ -1021,11 +1108,83 @@
                     </div>
                 </form>
 
+                <form method="post" action="/admin/pathways/v2/group-subject-activities/save" class="academic-v2-subcard" data-editor-form="group-subject-activity">
+                  <%- renderFocusFields() %>
+                  <input type="hidden" name="group_subject_activity_id" value="" data-editor-input="group-subject-activity.id" />
+                  <h3 class="h5 mb-3">Subject activities</h3>
+                  <div class="academic-v2-form-grid">
+                    <div class="academic-v2-field">
+                      <label for="groupSubjectActivitySubject">Course subject</label>
+                      <select id="groupSubjectActivitySubject" class="form-select" name="group_subject_id" data-editor-input="group-subject-activity.group_subject_id">
+                        <% scopedGroupSubjectsList.forEach((subject) => { %>
+                          <option value="<%= subject.id %>"><%= subject.title %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="academic-v2-field">
+                      <label for="groupSubjectActivityType">Activity type</label>
+                      <select id="groupSubjectActivityType" class="form-select" name="activity_type" data-editor-input="group-subject-activity.activity_type">
+                        <% activityTypeOptions.forEach((activityType) => { %>
+                          <option value="<%= activityType.value %>"><%= activityType.label %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="academic-v2-field">
+                      <label for="groupSubjectActivitySortOrder">Sort order</label>
+                      <input id="groupSubjectActivitySortOrder" class="form-control" type="number" name="sort_order" data-editor-input="group-subject-activity.sort_order" value="0" />
+                    </div>
+                  </div>
+                  <div class="academic-v2-muted mt-3">Lecture uses all groups. Seminar, practice, and lab rows target one or more subject subgroups in the schedule editor.</div>
+                  <div class="academic-v2-actions mt-3">
+                    <button type="submit" class="btn btn-primary">Save activity</button>
+                    <button type="button" class="btn btn-outline-secondary" data-editor-reset="group-subject-activity">Reset</button>
+                  </div>
+                  <div class="academic-v2-chip-row mt-3">
+                    <% activityPresetOptions.forEach((preset) => { %>
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-outline-secondary"
+                        formaction="/admin/pathways/v2/group-subject-activities/preset"
+                        formmethod="post"
+                        name="preset_key"
+                          value="<%= preset.value %>"
+                      ><%= preset.label %></button>
+                    <% }); %>
+                  </div>
+                </form>
+
+                <div class="academic-v2-subcard">
+                  <h3 class="h5 mb-3">Current subject activities</h3>
+                  <% if (scopedGroupSubjectActivitiesList.length) { %>
+                    <div class="academic-v2-stack">
+                      <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
+                        <div class="academic-v2-subcard">
+                          <div class="d-flex flex-wrap justify-content-between gap-2">
+                            <div>
+                              <strong><%= activity.subject_title %></strong>
+                              <div class="academic-v2-muted"><%= activity.activity_type %> · <%= Number(activity.sort_order || 0) %></div>
+                            </div>
+                            <div class="academic-v2-actions">
+                              <button type="button" class="btn btn-sm btn-primary" data-editor-target="group-subject-activity" data-editor-payload='<%- toAttr(activity) %>'>Edit</button>
+                              <form method="post" action="/admin/pathways/v2/group-subject-activities/<%= activity.id %>/delete">
+                                <%- renderFocusFields() %>
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% } else { %>
+                    <div class="academic-v2-empty"><%= activeGroupId ? 'No subject activities for the current course yet.' : 'Pick or create a course subject first.' %></div>
+                  <% } %>
+                </div>
+
                 <div class="academic-v2-subcard">
                   <h3 class="h5 mb-3">Selected course live subjects</h3>
-                  <% if ((scopedGroupSubjects || []).length) { %>
+                  <% if (scopedGroupSubjectsList.length) { %>
                     <div class="academic-v2-stack">
-                      <% (scopedGroupSubjects || []).forEach((subject) => { %>
+                      <% scopedGroupSubjectsList.forEach((subject) => { %>
                         <div class="academic-v2-subcard">
                           <div class="d-flex flex-wrap justify-content-between gap-2">
                             <div>
@@ -1034,6 +1193,9 @@
                               <div class="academic-v2-chip-row mt-2">
                                 <span class="academic-v2-chip"><%= subject.term_titles.length ? subject.term_titles.join(', ') : 'No terms' %></span>
                                 <span class="academic-v2-chip"><%= subject.teacher_names.length ? subject.teacher_names.join(', ') : 'No teachers' %></span>
+                                <% (subject.activity_types || []).forEach((activityType) => { %>
+                                  <span class="academic-v2-chip"><%= activityType %></span>
+                                <% }); %>
                               </div>
                             </div>
                             <div class="academic-v2-actions">
@@ -1058,7 +1220,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Terms & Schedule</h2>
-                  <p class="academic-v2-section-copy">Term objects stay on the course. Manual schedule rows attach to <span class="academic-v2-code">group_subject_id + term_id</span> and mirror into legacy schedule entries for compatibility.</p>
+                  <p class="academic-v2-section-copy">Term objects stay on the course. Manual schedule rows now attach to <span class="academic-v2-code">group_subject_activity_id + term_id</span>. Lecture rows target all groups, while seminar, practice, and lab rows target one or more subgroups.</p>
                 </div>
               </div>
               <div class="academic-v2-grid-3">
@@ -1116,10 +1278,10 @@
                       </select>
                     </div>
                     <div class="academic-v2-field">
-                      <label for="scheduleSubject">Course subject</label>
-                      <select id="scheduleSubject" class="form-select" name="group_subject_id" data-editor-input="schedule.group_subject_id">
-                        <% (scopedGroupSubjects || []).forEach((subject) => { %>
-                          <option value="<%= subject.id %>"><%= subject.title %></option>
+                      <label for="scheduleActivity">Subject activity</label>
+                      <select id="scheduleActivity" class="form-select" name="group_subject_activity_id" data-editor-input="schedule.group_subject_activity_id">
+                        <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
+                          <option value="<%= activity.id %>"><%= activity.subject_title %> · <%= activity.activity_type %></option>
                         <% }); %>
                       </select>
                     </div>
@@ -1132,12 +1294,8 @@
                       </select>
                     </div>
                     <div class="academic-v2-field">
-                      <label for="scheduleType">Lesson type</label>
-                      <select id="scheduleType" class="form-select" name="lesson_type" data-editor-input="schedule.lesson_type">
-                        <% lessonTypeOptions.forEach((type) => { %>
-                          <option value="<%= type %>"><%= type %></option>
-                        <% }); %>
-                      </select>
+                      <label for="scheduleActivityTypeDisplay">Activity mode</label>
+                      <input id="scheduleActivityTypeDisplay" class="form-control" type="text" value="" readonly />
                     </div>
                     <div class="academic-v2-field">
                       <label for="scheduleClassNumber">Class #</label>
@@ -1148,8 +1306,9 @@
                       <input id="scheduleWeekNumber" class="form-control" type="number" name="week_number" data-editor-input="schedule.week_number" value="1" />
                     </div>
                     <div class="academic-v2-field">
-                      <label for="scheduleGroupNumber">Subgroup #</label>
-                      <input id="scheduleGroupNumber" class="form-control" type="number" name="group_number" data-editor-input="schedule.group_number" value="1" />
+                      <label for="scheduleTargetGroups">Target groups</label>
+                      <select id="scheduleTargetGroups" class="form-select" name="target_group_numbers" multiple size="4" data-editor-input="schedule.target_group_numbers"></select>
+                      <div id="scheduleTargetGroupsHint" class="academic-v2-muted mt-2">Lecture activities use all groups automatically.</div>
                     </div>
                   </div>
                   <div class="academic-v2-actions mt-3">
@@ -1194,7 +1353,7 @@
                             <div class="d-flex flex-wrap justify-content-between gap-2">
                               <div>
                                 <strong><%= entry.subject_title %></strong>
-                                <div class="academic-v2-muted"><%= entry.term_title %> - <%= entry.day_of_week %> - class <%= entry.class_number %> - week <%= entry.week_number %> - subgroup <%= entry.group_number %> - <%= entry.lesson_type %></div>
+                                <div class="academic-v2-muted"><%= entry.term_title %> - <%= entry.day_of_week %> - class <%= entry.class_number %> - week <%= entry.week_number %> - <%= entry.activity_label || entry.lesson_type %> - <%= entry.target_group_label || ('group ' + entry.group_number) %></div>
                               </div>
                               <div class="academic-v2-actions">
                                 <button type="button" class="btn btn-sm btn-primary" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>Edit</button>
@@ -1240,6 +1399,8 @@
     ></script>
     <script>
       (function academicV2Editors() {
+        const scopedGroupSubjectsData = <%- JSON.stringify(scopedGroupSubjectsList || []) %>;
+        const scopedGroupSubjectActivitiesData = <%- JSON.stringify(scopedGroupSubjectActivitiesList || []) %>;
         const forms = new Map();
         document.querySelectorAll('[data-editor-form]').forEach((form) => {
           forms.set(form.getAttribute('data-editor-form'), form);
@@ -1247,6 +1408,18 @@
         const groupCohort = document.getElementById('groupCohort');
         const groupTeacherDefaultField = document.getElementById('groupTeacherDefaultField');
         const groupTeacherDefault = document.getElementById('groupTeacherDefault');
+        const scheduleActivity = document.getElementById('scheduleActivity');
+        const scheduleActivityTypeDisplay = document.getElementById('scheduleActivityTypeDisplay');
+        const scheduleTargetGroups = document.getElementById('scheduleTargetGroups');
+        const scheduleTargetGroupsHint = document.getElementById('scheduleTargetGroupsHint');
+
+        const capitalize = (value) => {
+          const text = String(value || '').trim();
+          return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+        };
+
+        const getScopedSubjectById = (subjectId) => scopedGroupSubjectsData.find((subject) => Number(subject.id || 0) === Number(subjectId || 0)) || null;
+        const getScopedActivityById = (activityId) => scopedGroupSubjectActivitiesData.find((activity) => Number(activity.id || 0) === Number(activityId || 0)) || null;
 
         const syncGroupTeacherDefaultVisibility = () => {
           if (!groupTeacherDefaultField || !groupTeacherDefault || !groupCohort) {
@@ -1258,6 +1431,63 @@
           groupTeacherDefaultField.style.display = isTeacherTrack ? '' : 'none';
           if (!isTeacherTrack) {
             groupTeacherDefault.checked = false;
+          }
+        };
+
+        const syncScheduleActivityState = (payload = null) => {
+          if (!scheduleActivity || !scheduleTargetGroups || !scheduleActivityTypeDisplay || !scheduleTargetGroupsHint) {
+            return;
+          }
+          const selectedActivityId = Number(
+            scheduleActivity.value
+            || (payload && (payload.group_subject_activity_id || payload.activity_id))
+            || 0
+          );
+          const activity = getScopedActivityById(selectedActivityId);
+          const subject = activity ? getScopedSubjectById(activity.group_subject_id) : null;
+          const activityType = String(
+            (activity && activity.activity_type)
+            || (payload && (payload.activity_type || payload.lesson_type))
+            || ''
+          ).trim().toLowerCase();
+          const isLecture = activityType === 'lecture';
+          const groupCount = Math.max(1, Number(subject && subject.group_count ? subject.group_count : 1) || 1);
+          const defaultGroup = Math.max(1, Number(subject && subject.default_group ? subject.default_group : 1) || 1);
+          const requestedGroups = Array.isArray(payload && payload.target_group_numbers)
+            ? payload.target_group_numbers.map((value) => String(value))
+            : (payload && payload.group_number ? [String(payload.group_number)] : []);
+
+          scheduleTargetGroups.innerHTML = '';
+          if (activityType) {
+            scheduleActivityTypeDisplay.value = isLecture
+              ? `${capitalize(activityType)} · all groups`
+              : `${capitalize(activityType)} · by subgroup`;
+          } else {
+            scheduleActivityTypeDisplay.value = '';
+          }
+
+          if (!activity) {
+            scheduleTargetGroups.disabled = true;
+            scheduleTargetGroupsHint.textContent = 'Select a subject activity first.';
+            return;
+          }
+
+          if (isLecture) {
+            scheduleTargetGroups.disabled = true;
+            scheduleTargetGroupsHint.textContent = 'Lecture activities always target all groups.';
+            return;
+          }
+
+          scheduleTargetGroups.disabled = false;
+          scheduleTargetGroupsHint.textContent = 'Pick one or more subgroups for this activity.';
+          for (let groupNumber = 1; groupNumber <= groupCount; groupNumber += 1) {
+            const option = document.createElement('option');
+            option.value = String(groupNumber);
+            option.textContent = `Group ${groupNumber}`;
+            option.selected = requestedGroups.length
+              ? requestedGroups.includes(option.value)
+              : groupNumber === defaultGroup;
+            scheduleTargetGroups.appendChild(option);
           }
         };
 
@@ -1289,6 +1519,9 @@
           });
           if (target === 'group') {
             syncGroupTeacherDefaultVisibility();
+          }
+          if (target === 'schedule') {
+            syncScheduleActivityState(payload);
           }
         };
 
@@ -1328,13 +1561,20 @@
             if (target === 'group') {
               syncGroupTeacherDefaultVisibility();
             }
+            if (target === 'schedule') {
+              syncScheduleActivityState();
+            }
           });
         });
 
         if (groupCohort) {
           groupCohort.addEventListener('change', syncGroupTeacherDefaultVisibility);
         }
+        if (scheduleActivity) {
+          scheduleActivity.addEventListener('change', () => syncScheduleActivityState());
+        }
         syncGroupTeacherDefaultVisibility();
+        syncScheduleActivityState();
       })();
     </script>
   </body>

@@ -9939,7 +9939,7 @@ function getAcademicV2RouteMessages(req) {
     GROUP_SUBJECT_TARGET_REQUIRED: 'Для предмета групи треба вибрати групу і шаблон',
     GROUP_SUBJECT_NOT_FOUND: 'Предмет групи не знайдено',
     USER_ASSIGNMENT_TARGET_REQUIRED: 'Виберіть групу і хоча б одного користувача',
-    SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм і предмет групи',
+    SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм і activity предмета',
     SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
   } : {
@@ -9966,7 +9966,7 @@ function getAcademicV2RouteMessages(req) {
     GROUP_SUBJECT_TARGET_REQUIRED: 'Group subject requires both group and template',
     GROUP_SUBJECT_NOT_FOUND: 'Group subject not found',
     USER_ASSIGNMENT_TARGET_REQUIRED: 'Select a target group and at least one user',
-    SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires both term and group subject',
+    SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires both term and subject activity',
     SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Subject template not found',
   };
@@ -9995,13 +9995,20 @@ function getAcademicV2ExtendedRouteMessages(req) {
     stageTermTemplateDeleted: 'Stage term template deleted',
     stageSubjectTemplateSaved: 'Stage subject template saved',
     stageSubjectTemplateDeleted: 'Stage subject template deleted',
+    stageSubjectActivitySaved: 'Stage subject activity saved',
+    stageSubjectActivityDeleted: 'Stage subject activity deleted',
+    stageSubjectActivityPresetApplied: 'Stage subject activity preset applied',
     courseTemplateApplied: 'Stage template applied to the course',
     cohortPromoted: 'Cohort promoted to the next stage',
+    groupSubjectActivitySaved: 'Course subject activity saved',
+    groupSubjectActivityDeleted: 'Course subject activity deleted',
+    groupSubjectActivityPresetApplied: 'Course subject activity preset applied',
     STAGE_TEMPLATE_NOT_FOUND: 'No stage template exists for this program and stage yet.',
     STAGE_TEMPLATE_TERMS_REQUIRED: 'Add at least one stage term template before applying this stage.',
     STAGE_TEMPLATE_SUBJECTS_REQUIRED: 'Add at least one stage subject template before applying this stage.',
     STAGE_TERM_TEMPLATE_NOT_FOUND: 'Stage term template not found',
     STAGE_SUBJECT_TEMPLATE_NOT_FOUND: 'Stage subject template not found',
+    STAGE_SUBJECT_ACTIVITY_NOT_FOUND: 'Stage subject activity not found',
     COHORT_STAGE_ALREADY_ACTIVE: 'This cohort is already on the selected stage.',
     COHORT_CURRENT_STAGE_EMPTY: 'No active source courses exist for the cohort current stage.',
     allGroupProjectionsRebuilt: 'All course projections rebuilt',
@@ -10015,6 +10022,10 @@ function getAcademicV2ExtendedRouteMessages(req) {
     GROUP_INVALID: 'Course data is invalid for the Academic v2 schema.',
     GROUP_SAVE_RETRY: 'Course save hit a concurrent write. Retry the save.',
     GROUP_SAVE_FAILED: 'Course save hit an unexpected Academic v2 database constraint.',
+    GROUP_SUBJECT_ACTIVITY_NOT_FOUND: 'Course subject activity not found',
+    SCHEDULE_SCOPE_MISMATCH: 'Schedule entry must use a term from the same course as the selected activity.',
+    SCHEDULE_TARGET_GROUP_INVALID: 'One or more selected subgroups are outside the course subject group count.',
+    SCHEDULE_LECTURE_GROUPS_LOCKED: 'Lecture activities always target all groups.',
     PROGRAM_DELETE_BLOCKED: 'Archive the program instead. Delete is blocked while cohorts, legacy admissions, or users still depend on it.',
     COHORT_DELETE_BLOCKED: 'Archive the cohort instead. Delete is blocked while groups, legacy mappings, or users still depend on it.',
     GROUP_DELETE_BLOCKED: 'Archive the group instead. Delete is blocked while terms, subjects, enrollments, or legacy compatibility bindings still depend on it.',
@@ -35181,6 +35192,45 @@ app.post('/admin/pathways/v2/stage-subjects/:stageSubjectTemplateId/delete', req
   })
 ));
 
+app.post('/admin/pathways/v2/stage-subject-activities/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveProgramStageSubjectActivity(getAcademicV2Store(), req.body),
+    successMessageKey: 'stageSubjectActivitySaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.stage-subject-activity.save',
+  })
+));
+
+app.post('/admin/pathways/v2/stage-subject-activities/:stageSubjectActivityId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteProgramStageSubjectActivity(getAcademicV2Store(), req.params.stageSubjectActivityId),
+    successMessageKey: 'stageSubjectActivityDeleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.stage-subject-activity.delete',
+  })
+));
+
+app.post('/admin/pathways/v2/stage-subject-activities/preset', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.applyProgramStageSubjectActivityPreset(getAcademicV2Store(), req.body),
+    successMessageKey: 'stageSubjectActivityPresetApplied',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
+    }),
+    logContext: 'admin.pathways.v2.stage-subject-activity.preset',
+  })
+));
+
 app.post('/admin/pathways/v2/group-subjects/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.saveGroupSubject(getAcademicV2Store(), req.body),
@@ -35202,6 +35252,42 @@ app.post('/admin/pathways/v2/group-subjects/:groupSubjectId/delete', requirePath
       groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
     }),
     logContext: 'admin.pathways.v2.group-subject.delete',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subject-activities/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveGroupSubjectActivity(getAcademicV2Store(), req.body),
+    successMessageKey: 'groupSubjectActivitySaved',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+    }),
+    logContext: 'admin.pathways.v2.group-subject-activity.save',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subject-activities/:groupSubjectActivityId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.deleteGroupSubjectActivity(getAcademicV2Store(), req.params.groupSubjectActivityId),
+    successMessageKey: 'groupSubjectActivityDeleted',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+    }),
+    logContext: 'admin.pathways.v2.group-subject-activity.delete',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subject-activities/preset', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.applyGroupSubjectActivityPreset(getAcademicV2Store(), req.body),
+    successMessageKey: 'groupSubjectActivityPresetApplied',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+    }),
+    logContext: 'admin.pathways.v2.group-subject-activity.preset',
   })
 ));
 

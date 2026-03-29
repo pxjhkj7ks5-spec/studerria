@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.63",
+      "date": "2026-03-30",
+      "items": [
+        "feat(academic-v2-subject-activities-and-schedule): add stage and live `lecture|seminar|practice|lab` activity entities for Academic Setup v2 subjects, let stage templates seed activity sets into courses, move manual schedule editing to `group_subject_activity_id + target_group_numbers`, and update student/course schedule runtime plus legacy schedule projection to treat lectures as all-groups rows and grouped activities as subgroup-targeted rows"
+      ]
+    },
+    {
       "version": "1.3.62",
       "date": "2026-03-30",
       "items": [
