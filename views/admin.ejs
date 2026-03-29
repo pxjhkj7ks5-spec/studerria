@@ -7606,17 +7606,17 @@
             contextForm.action = '/admin/users/group';
           }
           if (uaAcademicCourseSaveBtn) {
-            uaAcademicCourseSaveBtn.disabled = true;
+            uaAcademicCourseSaveBtn.disabled = false;
           }
           contextSelect.style.display = 'none';
           courseSelect.style.display = '';
-          courseSelect.disabled = true;
-          courseSelect.required = false;
+          courseSelect.disabled = false;
+          courseSelect.required = true;
           courseSelect.value = String(contextCourseId || courseSelect.value || '');
           if (contextHint) {
             contextHint.textContent = contextLabel
-              ? `Current academic course: ${contextLabel}. Reassignment is blocked until this scope has an academic v2 course option.`
-              : 'No academic v2 course options exist for this scope yet. Create or map the course in Academic Setup v2 first.';
+              ? `Current academic course: ${contextLabel}. Choose a target course and it will resolve to the matching Academic V2 group automatically.`
+              : 'Choose a target course. The save action will resolve it to the matching Academic V2 group if one exists.';
           }
           contextIdInput.value = '';
           contextSelect.onchange = null;
@@ -7869,18 +7869,19 @@
           if (!tbodyEl) return;
           const status = tbodyEl.dataset.status || 'active';
           const scopeState = getUsersFilterFormState();
+          const currentUrlParams = new URLSearchParams(window.location.search);
           const hasAcademicV2Scope = isAcademicV2UsersScope(scopeState);
           const courseId = !hasAcademicV2Scope
-            ? (scopeState.courseId || tbodyEl.dataset.courseId || '1')
+            ? (scopeState.courseId || currentUrlParams.get('course') || tbodyEl.dataset.courseId || '')
             : '';
-          const track = scopeState.track || tbodyEl.dataset.track || '';
-          const programId = scopeState.programId || tbodyEl.dataset.programId || '';
-          const admissionId = scopeState.admissionId || tbodyEl.dataset.admissionId || '';
-          const stage = scopeState.stage || tbodyEl.dataset.stage || '';
-          const campus = scopeState.campus || tbodyEl.dataset.campus || '';
-          const studyContextId = scopeState.studyContextId || tbodyEl.dataset.studyContextId || '';
-          const q = scopeState.search || tbodyEl.dataset.search || '';
-          const group = scopeState.group || tbodyEl.dataset.group || '';
+          const track = scopeState.track || currentUrlParams.get('track') || tbodyEl.dataset.track || '';
+          const programId = scopeState.programId || currentUrlParams.get('program_id') || tbodyEl.dataset.programId || '';
+          const admissionId = scopeState.admissionId || currentUrlParams.get('admission_id') || tbodyEl.dataset.admissionId || '';
+          const stage = scopeState.stage || currentUrlParams.get('stage') || tbodyEl.dataset.stage || '';
+          const campus = scopeState.campus || currentUrlParams.get('campus') || tbodyEl.dataset.campus || '';
+          const studyContextId = scopeState.studyContextId || currentUrlParams.get('study_context_id') || tbodyEl.dataset.studyContextId || '';
+          const q = scopeState.search || currentUrlParams.get('users_q') || tbodyEl.dataset.search || '';
+          const group = scopeState.group || currentUrlParams.get('users_group') || tbodyEl.dataset.group || '';
           const params = new URLSearchParams();
           params.set('status', status);
           if (courseId) params.set('course', courseId);

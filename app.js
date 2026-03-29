@@ -52839,12 +52839,13 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
 
 app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
   const userId = parsePositiveIntStrict(req.body.user_id);
-  const groupId = parsePositiveIntStrict(req.body.group_id || req.body.target_group_id);
+  const explicitGroupId = parsePositiveIntStrict(req.body.group_id || req.body.target_group_id);
+  const fallbackCourseId = parsePositiveIntStrict(req.body.course_id || req.body.course || req.body.target_course_id);
   try {
     await ensureDbReady();
     const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
     const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
-    if (!userId || !groupId) {
+    if (!userId || (!explicitGroupId && !fallbackCourseId)) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid academic course'));
     }
     const allowedGroups = adminAcademicScope && Array.isArray(adminAcademicScope.availableAcademicGroups)
@@ -52855,8 +52856,9 @@ app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
         .map((group) => Number(group && group.group_id ? group.group_id : 0))
         .filter((value) => Number.isInteger(value) && value > 0)
     );
-    const [targetGroup, user] = await Promise.all([
-      db.get(
+    let targetGroup = null;
+    if (explicitGroupId) {
+      targetGroup = await db.get(
         `
           SELECT
             g.id AS group_id,
@@ -52878,17 +52880,20 @@ app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
           WHERE g.id = ?
           LIMIT 1
         `,
-        [groupId]
-      ),
-      db.get(
-        'SELECT id, role, full_name, course_id, study_context_id, group_id FROM users WHERE id = ?',
-        [userId]
-      ),
-    ]);
+        [explicitGroupId]
+      );
+    } else if (fallbackCourseId) {
+      const courseGroups = await listAssignableAdminAcademicGroups({ courseId: fallbackCourseId });
+      targetGroup = courseGroups.find((group) => Number(group && group.stage_number) === 1) || courseGroups[0] || null;
+    }
+    const user = await db.get(
+      'SELECT id, role, full_name, course_id, study_context_id, group_id FROM users WHERE id = ?',
+      [userId]
+    );
     if (!targetGroup) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course not found'));
     }
-    if (allowedGroupIds.size && !allowedGroupIds.has(Number(targetGroup.group_id || 0))) {
+    if (explicitGroupId && allowedGroupIds.size && !allowedGroupIds.has(Number(targetGroup.group_id || 0))) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course outside current scope'));
     }
     if (!user) {
