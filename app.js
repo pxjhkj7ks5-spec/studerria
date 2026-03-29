@@ -13768,7 +13768,7 @@ async function listVisibleMessagesForUser({
       LEFT JOIN subjects s ON s.id = m.subject_id
       LEFT JOIN users u ON u.id = m.created_by_id
       LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
-      ${baseWhere}${courseFilter}${semesterFilter}${subjectFilter}${statusFilter}
+      ${baseWhere}${subjectFilter}${statusFilter}
       ORDER BY COALESCE(m.published_at, m.created_at) DESC, m.id DESC
       LIMIT ${safeLimit}
     `,
