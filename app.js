@@ -9767,6 +9767,66 @@ function buildAcademicV2TeacherProjectionAlert(req, rows = [], context = 'subjec
     body: `${reasons.join('. ')}.`,
   };
 }
+
+function getAcademicV2RouteMessages(req) {
+  const isUk = getPreferredLang(req) === 'uk';
+  return isUk ? {
+    unknown: 'Не вдалося зберегти academic v2 зміни',
+    programSaved: 'Програму збережено',
+    cohortSaved: 'Когорту збережено',
+    groupSaved: 'Групу збережено',
+    groupProjectionRebuilt: 'Сумісну legacy-проекцію перебудовано',
+    termSaved: 'Терм збережено',
+    termDeleted: 'Терм видалено',
+    templateSaved: 'Шаблон предмета збережено',
+    groupSubjectSaved: 'Предмет групи збережено',
+    groupSubjectDeleted: 'Предмет групи видалено',
+    usersAssigned: 'Користувачів перепризначено',
+    scheduleSaved: 'Рядок розкладу збережено',
+    scheduleDeleted: 'Рядок розкладу видалено',
+    PROGRAM_NAME_REQUIRED: 'Назва програми обов’язкова',
+    PROGRAM_REQUIRED: 'Спочатку виберіть програму',
+    COHORT_REQUIRED: 'Спочатку виберіть когорту',
+    GROUP_LABEL_REQUIRED: 'Назва групи обов’язкова',
+    GROUP_REQUIRED: 'Спочатку виберіть групу',
+    TERM_NOT_FOUND: 'Терм не знайдено',
+    TEMPLATE_NAME_REQUIRED: 'Назва шаблону предмета обов’язкова',
+    GROUP_SUBJECT_TARGET_REQUIRED: 'Для предмета групи треба вибрати групу і шаблон',
+    GROUP_SUBJECT_NOT_FOUND: 'Предмет групи не знайдено',
+    USER_ASSIGNMENT_TARGET_REQUIRED: 'Виберіть групу і хоча б одного користувача',
+    SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм і предмет групи',
+    SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
+    SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
+  } : {
+    unknown: 'Unable to save academic v2 changes',
+    programSaved: 'Program saved',
+    cohortSaved: 'Cohort saved',
+    groupSaved: 'Group saved',
+    groupProjectionRebuilt: 'Legacy compatibility projection rebuilt',
+    termSaved: 'Term saved',
+    termDeleted: 'Term deleted',
+    templateSaved: 'Subject template saved',
+    groupSubjectSaved: 'Group subject saved',
+    groupSubjectDeleted: 'Group subject deleted',
+    usersAssigned: 'Users reassigned',
+    scheduleSaved: 'Schedule entry saved',
+    scheduleDeleted: 'Schedule entry deleted',
+    PROGRAM_NAME_REQUIRED: 'Program name is required',
+    PROGRAM_REQUIRED: 'Select a program first',
+    COHORT_REQUIRED: 'Select a cohort first',
+    GROUP_LABEL_REQUIRED: 'Group label is required',
+    GROUP_REQUIRED: 'Select a group first',
+    TERM_NOT_FOUND: 'Term not found',
+    TEMPLATE_NAME_REQUIRED: 'Subject template name is required',
+    GROUP_SUBJECT_TARGET_REQUIRED: 'Group subject requires both group and template',
+    GROUP_SUBJECT_NOT_FOUND: 'Group subject not found',
+    USER_ASSIGNMENT_TARGET_REQUIRED: 'Select a target group and at least one user',
+    SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires both term and group subject',
+    SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
+    SUBJECT_TEMPLATE_NOT_FOUND: 'Subject template not found',
+  };
+}
+
 function getAcademicV2ExtendedRouteMessages(req) {
   return {
     ...getAcademicV2RouteMessages(req),
