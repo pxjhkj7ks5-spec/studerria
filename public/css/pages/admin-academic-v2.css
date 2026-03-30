@@ -359,9 +359,39 @@ body.theme-dark .academic-v2-subcard {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.academic-v2-form-grid--schedule-placement {
+  grid-template-columns:
+    minmax(150px, 0.9fr)
+    minmax(0, 1.45fr)
+    minmax(0, 1.1fr)
+    minmax(132px, 0.72fr);
+  align-items: start;
+}
+
+.academic-v2-form-grid--schedule-advanced {
+  grid-template-columns:
+    minmax(150px, 0.9fr)
+    minmax(0, 1.35fr)
+    minmax(0, 1.1fr)
+    minmax(132px, 0.72fr);
+  align-items: start;
+}
+
 .academic-v2-field {
   display: grid;
   gap: 8px;
+}
+
+.academic-v2-field--wide {
+  grid-column: span 2;
+}
+
+.academic-v2-field--full {
+  grid-column: 1 / -1;
+}
+
+.academic-v2-field--compact {
+  min-width: 0;
 }
 
 .academic-v2-field label,
@@ -380,6 +410,11 @@ body.theme-dark .academic-v2-subcard {
 .academic-v2-field .form-control[multiple],
 .academic-v2-field .form-select[multiple] {
   min-height: 152px;
+}
+
+.academic-v2-field--schedule-groups .form-control[multiple],
+.academic-v2-field--schedule-groups .form-select[multiple] {
+  min-height: 116px;
 }
 
 body.theme-light .academic-v2-field .form-control,
@@ -566,7 +601,9 @@ body.theme-dark .academic-v2-empty {
   .academic-v2-grid-3,
   .academic-v2-focus-grid,
   .academic-v2-form-grid,
-  .academic-v2-form-grid--compact {
+  .academic-v2-form-grid--compact,
+  .academic-v2-form-grid--schedule-placement,
+  .academic-v2-form-grid--schedule-advanced {
     grid-template-columns: 1fr;
   }
 
@@ -884,6 +921,19 @@ body.theme-dark .academic-v2-schedule-slot-empty {
   font-size: 0.72rem;
   background: rgba(255, 122, 89, 0.14);
   color: #b45309;
+}
+
+.academic-v2-schedule-placement {
+  display: grid;
+  gap: 16px;
+}
+
+.academic-v2-schedule-placement .academic-v2-actions {
+  align-items: stretch;
+}
+
+.academic-v2-schedule-placement .academic-v2-actions .btn {
+  min-height: 44px;
 }
 
 .academic-v2-advanced-block {

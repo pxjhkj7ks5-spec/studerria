@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.73",
+      "date": "2026-03-30",
+      "items": [
+        "fix(academic-v2-schedule-field-sizing): normalize control sizing in the `/admin/pathways` schedule workspace by introducing dedicated calendar and advanced-editor form grids, widening long activity/mode selectors, moving subgroup multiselects onto their own full-width row with a shorter fixed height, and aligning schedule action buttons so the tab reads as one consistent editing surface on desktop while still collapsing cleanly on smaller screens"
+      ]
+    },
+    {
       "version": "1.3.72",
       "date": "2026-03-30",
       "items": [

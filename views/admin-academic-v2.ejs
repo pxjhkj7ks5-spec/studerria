@@ -1880,7 +1880,7 @@
                     <div class="academic-v2-subcard" data-schedule-view-panel="calendar">
                       <div class="academic-v2-subcard-topline">Календар</div>
                       <div class="academic-v2-schedule-placement">
-                        <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                        <div class="academic-v2-form-grid academic-v2-form-grid--compact academic-v2-form-grid--schedule-placement">
                           <div class="academic-v2-field">
                             <label for="schedulePlacementTerm">Терм</label>
                             <select id="schedulePlacementTerm" class="form-select">
@@ -1889,7 +1889,7 @@
                               <% }); %>
                             </select>
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--wide">
                             <label for="schedulePlacementActivity">Активність</label>
                             <select id="schedulePlacementActivity" class="form-select">
                               <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
@@ -1897,7 +1897,7 @@
                               <% }); %>
                             </select>
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--compact">
                             <label for="schedulePlacementWeek">Тиждень</label>
                             <select id="schedulePlacementWeek" class="form-select">
                               <% scheduleWeekOptions.forEach((weekNumber) => { %>
@@ -1905,7 +1905,7 @@
                               <% }); %>
                             </select>
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--full academic-v2-field--schedule-groups">
                             <label for="schedulePlacementTargetGroups">Підгрупи</label>
                             <select id="schedulePlacementTargetGroups" class="form-select" multiple size="4"></select>
                           </div>
@@ -2034,7 +2034,7 @@
                       <form method="post" action="/admin/pathways/v2/schedule/save" class="academic-v2-subcard mt-3" data-editor-form="schedule">
                         <%- renderFocusFields() %>
                         <input type="hidden" name="schedule_entry_id" value="" data-editor-input="schedule.id" />
-                        <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                        <div class="academic-v2-form-grid academic-v2-form-grid--compact academic-v2-form-grid--schedule-advanced">
                           <div class="academic-v2-field">
                             <label for="scheduleTerm">Терм</label>
                             <select id="scheduleTerm" class="form-select" name="term_id" data-editor-input="schedule.term_id">
@@ -2043,7 +2043,7 @@
                               <% }); %>
                             </select>
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--wide">
                             <label for="scheduleActivity">Активність</label>
                             <select id="scheduleActivity" class="form-select" name="group_subject_activity_id" data-editor-input="schedule.group_subject_activity_id">
                               <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
@@ -2059,19 +2059,19 @@
                               <% }); %>
                             </select>
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--wide">
                             <label for="scheduleActivityTypeDisplay">Режим активності</label>
                             <input id="scheduleActivityTypeDisplay" class="form-control" type="text" value="" readonly />
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--compact">
                             <label for="scheduleClassNumber">Пара</label>
                             <input id="scheduleClassNumber" class="form-control" type="number" name="class_number" data-editor-input="schedule.class_number" value="1" />
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--compact">
                             <label for="scheduleWeekNumber">Тиждень</label>
                             <input id="scheduleWeekNumber" class="form-control" type="number" name="week_number" data-editor-input="schedule.week_number" value="1" />
                           </div>
-                          <div class="academic-v2-field">
+                          <div class="academic-v2-field academic-v2-field--full academic-v2-field--schedule-groups">
                             <label for="scheduleTargetGroups">Підгрупи</label>
                             <select id="scheduleTargetGroups" class="form-select" name="target_group_numbers" multiple size="4" data-editor-input="schedule.target_group_numbers"></select>
                             <div id="scheduleTargetGroupsHint" class="academic-v2-muted mt-2">Lecture activities використовують усі підгрупи автоматично.</div>
