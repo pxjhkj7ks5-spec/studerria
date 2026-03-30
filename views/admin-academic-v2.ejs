@@ -148,6 +148,7 @@
     };
   });
   const subjectCardsById = new Map(subjectCards.map((subject) => [Number(subject.id || 0), subject]));
+  const schedulableSubjects = subjectCards.filter((subject) => Number(subject.activity_count || 0) > 0);
   const initialSubjectCard = subjectCards[0] || null;
   const maxCourseGroupCount = subjectCards.reduce((maxValue, subject) => (
     Math.max(maxValue, Math.max(1, Number(subject.group_count || 0) || 1))
@@ -1890,20 +1891,21 @@
                             </select>
                           </div>
                           <div class="academic-v2-field academic-v2-field--wide">
-                            <label for="schedulePlacementActivity">Активність</label>
-                            <select id="schedulePlacementActivity" class="form-select">
-                              <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
-                                <option value="<%= activity.id %>"><%= activity.subject_title %> · <%= activity.activity_label || activity.activity_type %></option>
+                            <label for="schedulePlacementSubject">Предмет</label>
+                            <select id="schedulePlacementSubject" class="form-select">
+                              <% schedulableSubjects.forEach((subject) => { %>
+                                <option value="<%= subject.id %>"><%= subject.title %></option>
                               <% }); %>
                             </select>
                           </div>
+                          <div class="academic-v2-field">
+                            <label for="schedulePlacementActivityType">Режим активності</label>
+                            <select id="schedulePlacementActivityType" class="form-select"></select>
+                            <input id="schedulePlacementActivity" type="hidden" value="" />
+                          </div>
                           <div class="academic-v2-field academic-v2-field--compact">
-                            <label for="schedulePlacementWeek">Тиждень</label>
-                            <select id="schedulePlacementWeek" class="form-select">
-                              <% scheduleWeekOptions.forEach((weekNumber) => { %>
-                                <option value="<%= weekNumber %>"><%= weekNumber %></option>
-                              <% }); %>
-                            </select>
+                            <label for="schedulePlacementWeek">Тижні</label>
+                            <input id="schedulePlacementWeek" class="form-control" type="text" value="<%= scheduleWeekOptions[0] || 1 %>" placeholder="1 або 1, 3, 5" />
                           </div>
                           <div class="academic-v2-field academic-v2-field--full academic-v2-field--schedule-groups">
                             <label for="schedulePlacementTargetGroups">Підгрупи</label>
@@ -1911,7 +1913,7 @@
                           </div>
                         </div>
                         <div class="academic-v2-chip-row mt-3">
-                          <span class="academic-v2-chip" id="schedulePlacementSummary">Оберіть активність і натисніть на слот у таблиці.</span>
+                          <span class="academic-v2-chip" id="schedulePlacementSummary">Оберіть предмет, режим і натисніть на слот у таблиці.</span>
                           <span class="academic-v2-chip academic-v2-chip--warm" id="schedulePlacementWarning">Лекції ставляться на всі підгрупи автоматично.</span>
                         </div>
                         <div class="academic-v2-actions mt-3">
@@ -2034,6 +2036,7 @@
                       <form method="post" action="/admin/pathways/v2/schedule/save" class="academic-v2-subcard mt-3" data-editor-form="schedule">
                         <%- renderFocusFields() %>
                         <input type="hidden" name="schedule_entry_id" value="" data-editor-input="schedule.id" />
+                        <input id="scheduleActivity" type="hidden" name="group_subject_activity_id" value="" data-editor-input="schedule.group_subject_activity_id" />
                         <div class="academic-v2-form-grid academic-v2-form-grid--compact academic-v2-form-grid--schedule-advanced">
                           <div class="academic-v2-field">
                             <label for="scheduleTerm">Терм</label>
@@ -2044,10 +2047,10 @@
                             </select>
                           </div>
                           <div class="academic-v2-field academic-v2-field--wide">
-                            <label for="scheduleActivity">Активність</label>
-                            <select id="scheduleActivity" class="form-select" name="group_subject_activity_id" data-editor-input="schedule.group_subject_activity_id">
-                              <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
-                                <option value="<%= activity.id %>"><%= activity.subject_title %> · <%= activity.activity_label || activity.activity_type %></option>
+                            <label for="scheduleSubject">Предмет</label>
+                            <select id="scheduleSubject" class="form-select">
+                              <% schedulableSubjects.forEach((subject) => { %>
+                                <option value="<%= subject.id %>"><%= subject.title %></option>
                               <% }); %>
                             </select>
                           </div>
@@ -2059,22 +2062,22 @@
                               <% }); %>
                             </select>
                           </div>
-                          <div class="academic-v2-field academic-v2-field--wide">
-                            <label for="scheduleActivityTypeDisplay">Режим активності</label>
-                            <input id="scheduleActivityTypeDisplay" class="form-control" type="text" value="" readonly />
+                          <div class="academic-v2-field">
+                            <label for="scheduleActivityType">Режим активності</label>
+                            <select id="scheduleActivityType" class="form-select"></select>
                           </div>
                           <div class="academic-v2-field academic-v2-field--compact">
                             <label for="scheduleClassNumber">Пара</label>
                             <input id="scheduleClassNumber" class="form-control" type="number" name="class_number" data-editor-input="schedule.class_number" value="1" />
                           </div>
-                          <div class="academic-v2-field academic-v2-field--compact">
-                            <label for="scheduleWeekNumber">Тиждень</label>
-                            <input id="scheduleWeekNumber" class="form-control" type="number" name="week_number" data-editor-input="schedule.week_number" value="1" />
+                          <div class="academic-v2-field academic-v2-field--wide">
+                            <label for="scheduleWeekNumber">Тижні</label>
+                            <input id="scheduleWeekNumber" class="form-control" type="text" name="week_number" data-editor-input="schedule.week_number" value="1" placeholder="1 або 1, 3, 5" />
                           </div>
                           <div class="academic-v2-field academic-v2-field--full academic-v2-field--schedule-groups">
                             <label for="scheduleTargetGroups">Підгрупи</label>
                             <select id="scheduleTargetGroups" class="form-select" name="target_group_numbers" multiple size="4" data-editor-input="schedule.target_group_numbers"></select>
-                            <div id="scheduleTargetGroupsHint" class="academic-v2-muted mt-2">Lecture activities використовують усі підгрупи автоматично.</div>
+                            <div id="scheduleTargetGroupsHint" class="academic-v2-muted mt-2">Спершу вибери предмет і режим активності. Лекції використовують усі підгрупи автоматично.</div>
                           </div>
                         </div>
                         <div class="academic-v2-actions mt-3">
@@ -2269,8 +2272,9 @@
         const subjectDetailTeachers = document.querySelector('[data-subject-detail-teachers]');
         const subjectDetailActivities = document.querySelector('[data-subject-detail-activities]');
         const subjectDetailReadiness = document.querySelector('[data-subject-detail-readiness]');
+        const scheduleSubject = document.getElementById('scheduleSubject');
         const scheduleActivity = document.getElementById('scheduleActivity');
-        const scheduleActivityTypeDisplay = document.getElementById('scheduleActivityTypeDisplay');
+        const scheduleActivityType = document.getElementById('scheduleActivityType');
         const scheduleTargetGroups = document.getElementById('scheduleTargetGroups');
         const scheduleTargetGroupsHint = document.getElementById('scheduleTargetGroupsHint');
         const scheduleTerm = document.getElementById('scheduleTerm');
@@ -2278,7 +2282,9 @@
         const scheduleDay = document.getElementById('scheduleDay');
         const scheduleClassNumber = document.getElementById('scheduleClassNumber');
         const schedulePlacementTerm = document.getElementById('schedulePlacementTerm');
+        const schedulePlacementSubject = document.getElementById('schedulePlacementSubject');
         const schedulePlacementActivity = document.getElementById('schedulePlacementActivity');
+        const schedulePlacementActivityType = document.getElementById('schedulePlacementActivityType');
         const schedulePlacementWeek = document.getElementById('schedulePlacementWeek');
         const schedulePlacementTargetGroups = document.getElementById('schedulePlacementTargetGroups');
         const schedulePlacementSummary = document.getElementById('schedulePlacementSummary');
@@ -2306,7 +2312,7 @@
         let activeMode = workspaceDefaultMode;
         let activeWorkspaceTab = 'overview';
         let activeScheduleView = 'calendar';
-        let activeScheduleWeek = Number((schedulePlacementWeek && schedulePlacementWeek.value) || 1);
+        let activeScheduleWeek = 1;
         let activeSubjectId = defaultSubjectId;
         let selectedSlot = {
           dayOfWeek: '',
@@ -2321,10 +2327,192 @@
         const getSubjectCardById = (subjectId) => subjectCardsData.find((subject) => Number(subject.id || 0) === Number(subjectId || 0)) || null;
         const getScopedSubjectById = (subjectId) => scopedGroupSubjectsData.find((subject) => Number(subject.id || 0) === Number(subjectId || 0)) || null;
         const getScopedActivityById = (activityId) => scopedGroupSubjectActivitiesData.find((activity) => Number(activity.id || 0) === Number(activityId || 0)) || null;
+        const activitiesBySubjectId = scopedGroupSubjectActivitiesData.reduce((map, activity) => {
+          const subjectId = Number(activity.group_subject_id || 0);
+          if (!subjectId) {
+            return map;
+          }
+          if (!map.has(subjectId)) {
+            map.set(subjectId, []);
+          }
+          map.get(subjectId).push(activity);
+          return map;
+        }, new Map());
+        activitiesBySubjectId.forEach((activities, subjectId) => {
+          const sorted = activities.slice().sort((left, right) => {
+            const typeDiff = Number(
+              {
+                lecture: 10,
+                seminar: 20,
+                practice: 30,
+                lab: 40,
+              }[String(left.activity_type || '').trim().toLowerCase()] || 999
+            ) - Number(
+              {
+                lecture: 10,
+                seminar: 20,
+                practice: 30,
+                lab: 40,
+              }[String(right.activity_type || '').trim().toLowerCase()] || 999
+            );
+            if (typeDiff !== 0) {
+              return typeDiff;
+            }
+            return Number(left.id || 0) - Number(right.id || 0);
+          });
+          activitiesBySubjectId.set(subjectId, sorted);
+        });
+        const schedulableSubjectsData = subjectCardsData.filter((subject) => (
+          (activitiesBySubjectId.get(Number(subject.id || 0)) || []).length > 0
+        ));
         const getRequestedValues = (selectElement) => (
           selectElement instanceof HTMLSelectElement
             ? Array.from(selectElement.selectedOptions).map((option) => option.value)
             : []
+        );
+        const parseWeekNumberList = (value) => {
+          const tokens = (Array.isArray(value) ? value : [value])
+            .flatMap((item) => String(item == null ? '' : item).split(','))
+            .map((item) => item.trim())
+            .filter(Boolean);
+          if (!tokens.length) {
+            return [];
+          }
+          const weeks = [];
+          tokens.forEach((token) => {
+            if (!/^\d+$/.test(token)) {
+              return;
+            }
+            const normalized = Number(token || 0);
+            if (Number.isInteger(normalized) && normalized > 0) {
+              weeks.push(normalized);
+            }
+          });
+          return Array.from(new Set(weeks));
+        };
+        const buildWeekNumberValue = (value, fallback = 1) => {
+          const weeks = parseWeekNumberList(value);
+          if (weeks.length) {
+            return weeks.join(', ');
+          }
+          return String(Math.max(1, Number(fallback || 0) || 1));
+        };
+        const getPrimaryWeekNumber = (value, fallback = 1) => {
+          const weeks = parseWeekNumberList(value);
+          return weeks[0] || Math.max(1, Number(fallback || 0) || 1);
+        };
+        const shiftWeekNumberValue = (value, delta = 1) => {
+          const weeks = parseWeekNumberList(value);
+          if (!weeks.length) {
+            return String(Math.max(1, Number(delta || 0) + 1));
+          }
+          return weeks.map((weekNumber) => Math.max(1, weekNumber + delta)).join(', ');
+        };
+        const formatWeekNumberLabel = (value, fallback = 1) => {
+          const weeks = parseWeekNumberList(value);
+          const effectiveWeeks = weeks.length ? weeks : [Math.max(1, Number(fallback || 0) || 1)];
+          return effectiveWeeks.length === 1
+            ? `тиждень ${effectiveWeeks[0]}`
+            : `тижні ${effectiveWeeks.join(', ')}`;
+        };
+        const hasSelectOptionValue = (selectElement, value) => (
+          !!selectElement
+          && Array.from(selectElement.options).some((option) => option.value === String(value || ''))
+        );
+        const getActivitiesForSubject = (subjectId) => activitiesBySubjectId.get(Number(subjectId || 0)) || [];
+        const syncScheduleActivitySelector = ({
+          subjectSelect,
+          activityTypeSelect,
+          activityInput,
+          preferredSubjectId = null,
+          preferredActivityId = null,
+          preferredActivityType = '',
+        } = {}) => {
+          if (!subjectSelect || !activityTypeSelect || !activityInput) {
+            return { activity: null, subject: null };
+          }
+          const fallbackSubjectId = Number(
+            preferredSubjectId
+            || subjectSelect.value
+            || (schedulableSubjectsData[0] && schedulableSubjectsData[0].id)
+            || 0
+          );
+          let subjectId = fallbackSubjectId;
+          if (subjectId && !hasSelectOptionValue(subjectSelect, subjectId)) {
+            subjectId = Number((schedulableSubjectsData[0] && schedulableSubjectsData[0].id) || 0);
+          }
+          if (subjectId) {
+            subjectSelect.value = String(subjectId);
+          }
+          const activities = getActivitiesForSubject(subjectId);
+          activityTypeSelect.innerHTML = '';
+          if (!activities.length) {
+            activityTypeSelect.disabled = true;
+            activityInput.value = '';
+            return {
+              activity: null,
+              subject: getScopedSubjectById(subjectId),
+            };
+          }
+          const normalizedPreferredType = String(preferredActivityType || '').trim().toLowerCase();
+          const resolvedActivity = activities.find((activity) => Number(activity.id || 0) === Number(preferredActivityId || activityInput.value || 0))
+            || activities.find((activity) => String(activity.activity_type || '').trim().toLowerCase() === normalizedPreferredType)
+            || activities[0];
+          activities.forEach((activity) => {
+            const option = document.createElement('option');
+            option.value = String(activity.activity_type || '');
+            option.textContent = String(activity.activity_label || capitalize(activity.activity_type) || '').trim();
+            option.selected = Number(activity.id || 0) === Number(resolvedActivity.id || 0);
+            activityTypeSelect.appendChild(option);
+          });
+          activityTypeSelect.disabled = false;
+          activityTypeSelect.value = String(resolvedActivity.activity_type || '');
+          activityInput.value = String(resolvedActivity.id || '');
+          return {
+            activity: resolvedActivity,
+            subject: getScopedSubjectById(subjectId),
+          };
+        };
+        const syncAllScheduleActivitySelectors = ({
+          subjectId = null,
+          activityId = null,
+          activityType = '',
+        } = {}) => {
+          const resolvedActivity = getScopedActivityById(Number(activityId || 0));
+          const resolvedSubjectId = Number(
+            (resolvedActivity && resolvedActivity.group_subject_id)
+            || subjectId
+            || (scheduleSubject && scheduleSubject.value)
+            || (schedulePlacementSubject && schedulePlacementSubject.value)
+            || (schedulableSubjectsData[0] && schedulableSubjectsData[0].id)
+            || 0
+          );
+          const resolvedActivityType = String(
+            (resolvedActivity && resolvedActivity.activity_type)
+            || activityType
+            || ''
+          ).trim().toLowerCase();
+          const placementState = syncScheduleActivitySelector({
+            subjectSelect: schedulePlacementSubject,
+            activityTypeSelect: schedulePlacementActivityType,
+            activityInput: schedulePlacementActivity,
+            preferredSubjectId: resolvedSubjectId,
+            preferredActivityId: activityId,
+            preferredActivityType: resolvedActivityType,
+          });
+          const advancedState = syncScheduleActivitySelector({
+            subjectSelect: scheduleSubject,
+            activityTypeSelect: scheduleActivityType,
+            activityInput: scheduleActivity,
+            preferredSubjectId: resolvedSubjectId,
+            preferredActivityId: Number((placementState.activity && placementState.activity.id) || activityId || 0),
+            preferredActivityType: resolvedActivityType || String(placementState.activity && placementState.activity.activity_type || ''),
+          });
+          return advancedState.activity || placementState.activity || null;
+        };
+        activeScheduleWeek = getPrimaryWeekNumber(
+          schedulePlacementWeek ? schedulePlacementWeek.value : 1,
+          1
         );
         const normalizePlacementGroups = (activity, values = []) => {
           const activityType = String(activity && activity.activity_type || '').trim().toLowerCase();
@@ -2346,10 +2534,6 @@
             return null;
           }
         };
-        const hasSelectOptionValue = (selectElement, value) => (
-          !!selectElement
-          && Array.from(selectElement.options).some((option) => option.value === String(value || ''))
-        );
         const buildScheduleDraft = () => {
           const termId = Number(
             (schedulePlacementTerm && schedulePlacementTerm.value)
@@ -2366,12 +2550,12 @@
             group_subject_activity_id: activityId || '',
             day_of_week: String(selectedSlot.dayOfWeek || (scheduleDay && scheduleDay.value) || '').trim(),
             class_number: Number(selectedSlot.classNumber || (scheduleClassNumber && scheduleClassNumber.value) || 0) || '',
-            week_number: Number(
+            week_number: buildWeekNumberValue(
               (schedulePlacementWeek && schedulePlacementWeek.value)
               || (scheduleWeekNumber && scheduleWeekNumber.value)
-              || activeScheduleWeek
-              || 1
-            ) || 1,
+              || activeScheduleWeek,
+              activeScheduleWeek || 1
+            ),
             target_group_numbers: getRequestedValues(schedulePlacementTargetGroups).length
               ? getRequestedValues(schedulePlacementTargetGroups)
               : getRequestedValues(scheduleTargetGroups),
@@ -2425,8 +2609,7 @@
           const normalizedSubjectId = requestedSubjectId && getSubjectCardById(requestedSubjectId)
             ? requestedSubjectId
             : defaultSubjectId;
-          const requestedWeek = Number(rawState.scheduleWeek || 0);
-          const normalizedWeek = requestedWeek > 0 ? requestedWeek : activeScheduleWeek;
+          const normalizedWeek = getPrimaryWeekNumber(rawState.scheduleWeek, activeScheduleWeek || 1);
           let normalizedScheduleDraft = null;
           if (rawState.scheduleDraft && typeof rawState.scheduleDraft === 'object') {
             const draft = rawState.scheduleDraft;
@@ -2439,7 +2622,7 @@
                 group_subject_activity_id: draftActivityId || '',
                 day_of_week: String(draft.day_of_week || '').trim(),
                 class_number: Number(draft.class_number || 0) || '',
-                week_number: Number(draft.week_number || normalizedWeek || 1) || normalizedWeek || 1,
+                week_number: buildWeekNumberValue(draft.week_number, normalizedWeek || 1),
                 target_group_numbers: Array.isArray(draft.target_group_numbers)
                   ? draft.target_group_numbers.map((value) => String(value))
                   : [],
@@ -2499,10 +2682,16 @@
           activeScheduleWeek = initialWorkspaceState.scheduleWeek;
           activeSubjectId = initialWorkspaceState.subjectId;
           if (schedulePlacementWeek) {
-            schedulePlacementWeek.value = String(activeScheduleWeek || 1);
+            schedulePlacementWeek.value = buildWeekNumberValue(
+              initialWorkspaceState.scheduleDraft && initialWorkspaceState.scheduleDraft.week_number,
+              activeScheduleWeek || 1
+            );
           }
           if (scheduleWeekNumber) {
-            scheduleWeekNumber.value = String(activeScheduleWeek || 1);
+            scheduleWeekNumber.value = buildWeekNumberValue(
+              initialWorkspaceState.scheduleDraft && initialWorkspaceState.scheduleDraft.week_number,
+              activeScheduleWeek || 1
+            );
           }
         }
 
@@ -2519,7 +2708,7 @@
           }
         };
 
-        const renderTargetGroupOptions = ({ selectElement, hintElement, modeElement, activityId, payload = null }) => {
+        const renderTargetGroupOptions = ({ selectElement, hintElement, activityId, payload = null }) => {
           if (!selectElement) {
             return { activity: null, subject: null, isLecture: false };
           }
@@ -2545,18 +2734,10 @@
               : getRequestedValues(selectElement));
 
           selectElement.innerHTML = '';
-          if (activityType && modeElement) {
-            modeElement.value = isLecture
-              ? `${capitalize(activityType)} · all groups`
-              : `${capitalize(activityType)} · by subgroup`;
-          } else if (modeElement) {
-            modeElement.value = '';
-          }
-
           if (!activity) {
             selectElement.disabled = true;
             if (hintElement) {
-              hintElement.textContent = 'Спершу вибери активність.';
+              hintElement.textContent = 'Спершу вибери предмет і режим активності.';
             }
             return { activity: null, subject: null, isLecture: false };
           }
@@ -2589,7 +2770,6 @@
           renderTargetGroupOptions({
             selectElement: scheduleTargetGroups,
             hintElement: scheduleTargetGroupsHint,
-            modeElement: scheduleActivityTypeDisplay,
             activityId: scheduleActivity && scheduleActivity.value,
             payload,
           });
@@ -2597,7 +2777,7 @@
 
         const buildPlacementWarnings = () => {
           const activityId = Number(schedulePlacementActivity && schedulePlacementActivity.value || 0);
-          const weekNumber = Number(schedulePlacementWeek && schedulePlacementWeek.value || 0) || 1;
+          const weekNumber = getPrimaryWeekNumber(schedulePlacementWeek && schedulePlacementWeek.value, activeScheduleWeek || 1);
           const dayOfWeek = String(selectedSlot.dayOfWeek || '').trim();
           const classNumber = Number(selectedSlot.classNumber || 0);
           const termId = Number(schedulePlacementTerm && schedulePlacementTerm.value || 0);
@@ -2651,10 +2831,10 @@
             }
           }
           if (payload && schedulePlacementWeek) {
-            const nextWeek = String(payload.week_number || '');
+            const nextWeek = buildWeekNumberValue(payload.week_number, activeScheduleWeek || 1);
             if (nextWeek) {
               schedulePlacementWeek.value = nextWeek;
-              activeScheduleWeek = Number(nextWeek || 1);
+              activeScheduleWeek = getPrimaryWeekNumber(nextWeek, activeScheduleWeek || 1);
             }
           }
           renderTargetGroupOptions({
@@ -2667,10 +2847,10 @@
           const activity = getScopedActivityById(Number(schedulePlacementActivity && schedulePlacementActivity.value || 0));
           const activityLabel = activity
             ? `${activity.subject_title} · ${activity.activity_label || activity.activity_type}`
-            : 'Активність не вибрана';
+            : 'Предмет або режим не вибрано';
           if (schedulePlacementSummary) {
             schedulePlacementSummary.textContent = selectedSlot.dayOfWeek && selectedSlot.classNumber
-              ? `${activityLabel} → ${selectedSlot.dayOfWeek}, пара ${selectedSlot.classNumber}, тиждень ${schedulePlacementWeek ? schedulePlacementWeek.value : activeScheduleWeek}`
+              ? `${activityLabel} → ${selectedSlot.dayOfWeek}, пара ${selectedSlot.classNumber}, ${formatWeekNumberLabel(schedulePlacementWeek ? schedulePlacementWeek.value : activeScheduleWeek, activeScheduleWeek)}`
               : `${activityLabel}. Обери слот у таблиці.`;
           }
           if (schedulePlacementWarning) {
@@ -2826,9 +3006,16 @@
               classNumber: Number(payload.class_number || 0),
             };
             if (schedulePlacementWeek) {
-              activeScheduleWeek = Number(payload.week_number || schedulePlacementWeek.value || 1);
-              schedulePlacementWeek.value = String(activeScheduleWeek);
+              activeScheduleWeek = getPrimaryWeekNumber(payload.week_number || schedulePlacementWeek.value, activeScheduleWeek || 1);
+              schedulePlacementWeek.value = buildWeekNumberValue(payload.week_number, activeScheduleWeek || 1);
             }
+            if (scheduleWeekNumber) {
+              scheduleWeekNumber.value = buildWeekNumberValue(payload.week_number, activeScheduleWeek || 1);
+            }
+            syncAllScheduleActivitySelectors({
+              activityId: Number(payload.group_subject_activity_id || payload.activity_id || 0),
+              activityType: String(payload.activity_type || payload.lesson_type || ''),
+            });
             syncScheduleActivityState(payload);
             syncSchedulePlacementState(payload);
             setWorkspaceTab('schedule');
@@ -2880,6 +3067,13 @@
             if (target === 'schedule') {
               selectedScheduleEntryPayload = null;
               selectedSlot = { dayOfWeek: '', classNumber: 0 };
+              if (schedulePlacementWeek) {
+                schedulePlacementWeek.value = buildWeekNumberValue(activeScheduleWeek || 1, activeScheduleWeek || 1);
+              }
+              if (scheduleWeekNumber) {
+                scheduleWeekNumber.value = buildWeekNumberValue(activeScheduleWeek || 1, activeScheduleWeek || 1);
+              }
+              syncAllScheduleActivitySelectors();
               syncScheduleActivityState();
               syncSchedulePlacementState();
             }
@@ -2920,10 +3114,10 @@
             const nextWeek = Number(button.getAttribute('data-schedule-week') || 1);
             activeScheduleWeek = nextWeek;
             if (schedulePlacementWeek) {
-              schedulePlacementWeek.value = String(nextWeek);
+              schedulePlacementWeek.value = buildWeekNumberValue(nextWeek, nextWeek);
             }
             if (scheduleWeekNumber) {
-              scheduleWeekNumber.value = String(nextWeek);
+              scheduleWeekNumber.value = buildWeekNumberValue(nextWeek, nextWeek);
             }
             syncSchedulePlacementState();
             persistWorkspaceState();
@@ -3002,11 +3196,23 @@
           });
         });
 
-        if (schedulePlacementActivity) {
-          schedulePlacementActivity.addEventListener('change', () => {
-            if (scheduleActivity) {
-              scheduleActivity.value = schedulePlacementActivity.value;
-            }
+        if (schedulePlacementSubject) {
+          schedulePlacementSubject.addEventListener('change', () => {
+            syncAllScheduleActivitySelectors({
+              subjectId: Number(schedulePlacementSubject.value || 0),
+              activityType: schedulePlacementActivityType ? schedulePlacementActivityType.value : '',
+            });
+            syncScheduleActivityState();
+            syncSchedulePlacementState();
+            persistWorkspaceState();
+          });
+        }
+        if (schedulePlacementActivityType) {
+          schedulePlacementActivityType.addEventListener('change', () => {
+            syncAllScheduleActivitySelectors({
+              subjectId: Number(schedulePlacementSubject && schedulePlacementSubject.value || 0),
+              activityType: schedulePlacementActivityType.value,
+            });
             syncScheduleActivityState();
             syncSchedulePlacementState();
             persistWorkspaceState();
@@ -3023,9 +3229,9 @@
         }
         if (schedulePlacementWeek) {
           schedulePlacementWeek.addEventListener('change', () => {
-            activeScheduleWeek = Number(schedulePlacementWeek.value || 1);
+            activeScheduleWeek = getPrimaryWeekNumber(schedulePlacementWeek.value, activeScheduleWeek || 1);
             if (scheduleWeekNumber) {
-              scheduleWeekNumber.value = schedulePlacementWeek.value;
+              scheduleWeekNumber.value = buildWeekNumberValue(schedulePlacementWeek.value, activeScheduleWeek || 1);
             }
             syncSchedulePlacementState();
             persistWorkspaceState();
@@ -3051,7 +3257,7 @@
             }
             if (!schedulePlacementActivity || !schedulePlacementActivity.value) {
               if (schedulePlacementWarning) {
-                schedulePlacementWarning.textContent = 'Спершу вибери активність.';
+                schedulePlacementWarning.textContent = 'Спершу вибери предмет і режим активності.';
               }
               return;
             }
@@ -3061,7 +3267,7 @@
             scheduleActivity.value = schedulePlacementActivity.value;
             scheduleDay.value = selectedSlot.dayOfWeek;
             scheduleClassNumber.value = String(selectedSlot.classNumber);
-            scheduleWeekNumber.value = String(schedulePlacementWeek ? schedulePlacementWeek.value : activeScheduleWeek);
+            scheduleWeekNumber.value = buildWeekNumberValue(schedulePlacementWeek ? schedulePlacementWeek.value : activeScheduleWeek, activeScheduleWeek || 1);
             Array.from(scheduleTargetGroups.options).forEach((option) => {
               option.selected = getRequestedValues(schedulePlacementTargetGroups).includes(option.value);
             });
@@ -3085,12 +3291,15 @@
             basePayload.id = '';
             basePayload.schedule_entry_id = '';
             if (action === 'copy-next-week') {
-              basePayload.week_number = Math.max(1, Number(basePayload.week_number || 0) || 1) + 1;
+              basePayload.week_number = shiftWeekNumberValue(basePayload.week_number, 1);
             }
             selectedScheduleEntryPayload = basePayload;
             if (schedulePlacementWeek) {
-              schedulePlacementWeek.value = String(basePayload.week_number || 1);
-              activeScheduleWeek = Number(schedulePlacementWeek.value || 1);
+              schedulePlacementWeek.value = buildWeekNumberValue(basePayload.week_number, activeScheduleWeek || 1);
+              activeScheduleWeek = getPrimaryWeekNumber(schedulePlacementWeek.value, activeScheduleWeek || 1);
+            }
+            if (scheduleWeekNumber) {
+              scheduleWeekNumber.value = buildWeekNumberValue(basePayload.week_number, activeScheduleWeek || 1);
             }
             selectedSlot = {
               dayOfWeek: String(basePayload.day_of_week || ''),
@@ -3104,11 +3313,23 @@
           });
         });
 
-        if (scheduleActivity) {
-          scheduleActivity.addEventListener('change', () => {
-            if (schedulePlacementActivity) {
-              schedulePlacementActivity.value = scheduleActivity.value;
-            }
+        if (scheduleSubject) {
+          scheduleSubject.addEventListener('change', () => {
+            syncAllScheduleActivitySelectors({
+              subjectId: Number(scheduleSubject.value || 0),
+              activityType: scheduleActivityType ? scheduleActivityType.value : '',
+            });
+            syncScheduleActivityState();
+            syncSchedulePlacementState();
+            persistWorkspaceState();
+          });
+        }
+        if (scheduleActivityType) {
+          scheduleActivityType.addEventListener('change', () => {
+            syncAllScheduleActivitySelectors({
+              subjectId: Number(scheduleSubject && scheduleSubject.value || 0),
+              activityType: scheduleActivityType.value,
+            });
             syncScheduleActivityState();
             syncSchedulePlacementState();
             persistWorkspaceState();
@@ -3158,6 +3379,13 @@
         window.addEventListener('beforeunload', persistScrollPosition);
         window.addEventListener('pagehide', persistScrollPosition);
         syncGroupTeacherDefaultVisibility();
+        syncAllScheduleActivitySelectors({
+          activityId: Number(
+            (restoredScheduleDraft && restoredScheduleDraft.group_subject_activity_id)
+            || (scheduleActivity && scheduleActivity.value)
+            || 0
+          ),
+        });
         syncScheduleActivityState();
         syncSchedulePlacementState();
         updateSubjectDetail(activeSubjectId);
