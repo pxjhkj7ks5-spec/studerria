@@ -2251,6 +2251,7 @@
         document.querySelectorAll('[data-editor-form]').forEach((form) => {
           forms.set(form.getAttribute('data-editor-form'), form);
         });
+        const scheduleForm = forms.get('schedule') || null;
 
         const groupCohort = document.getElementById('groupCohort');
         const groupTeacherDefaultField = document.getElementById('groupTeacherDefaultField');
@@ -2455,8 +2456,11 @@
             };
           }
           const normalizedPreferredType = String(preferredActivityType || '').trim().toLowerCase();
-          const resolvedActivity = activities.find((activity) => Number(activity.id || 0) === Number(preferredActivityId || activityInput.value || 0))
-            || activities.find((activity) => String(activity.activity_type || '').trim().toLowerCase() === normalizedPreferredType)
+          const resolvedActivity = (normalizedPreferredType
+            ? activities.find((activity) => String(activity.activity_type || '').trim().toLowerCase() === normalizedPreferredType)
+            : null)
+            || activities.find((activity) => Number(activity.id || 0) === Number(preferredActivityId || 0))
+            || activities.find((activity) => Number(activity.id || 0) === Number(activityInput.value || 0))
             || activities[0];
           activities.forEach((activity) => {
             const option = document.createElement('option');
@@ -2548,8 +2552,8 @@
           const draft = {
             term_id: termId || '',
             group_subject_activity_id: activityId || '',
-            day_of_week: String(selectedSlot.dayOfWeek || (scheduleDay && scheduleDay.value) || '').trim(),
-            class_number: Number(selectedSlot.classNumber || (scheduleClassNumber && scheduleClassNumber.value) || 0) || '',
+            day_of_week: String((scheduleDay && scheduleDay.value) || selectedSlot.dayOfWeek || '').trim(),
+            class_number: Number((scheduleClassNumber && scheduleClassNumber.value) || selectedSlot.classNumber || 0) || '',
             week_number: buildWeekNumberValue(
               (schedulePlacementWeek && schedulePlacementWeek.value)
               || (scheduleWeekNumber && scheduleWeekNumber.value)
@@ -2773,6 +2777,50 @@
             activityId: scheduleActivity && scheduleActivity.value,
             payload,
           });
+        };
+        const buildScheduleFormStatePayload = () => {
+          const resolvedActivity = getScopedActivityById(Number(scheduleActivity && scheduleActivity.value || 0));
+          const normalizedWeekValue = buildWeekNumberValue(
+            scheduleWeekNumber ? scheduleWeekNumber.value : activeScheduleWeek,
+            activeScheduleWeek || 1
+          );
+          const normalizedClassNumber = Math.max(1, Number(scheduleClassNumber && scheduleClassNumber.value || 0) || 1);
+          const scheduleEntryId = scheduleForm
+            ? String((scheduleForm.querySelector('[data-editor-input="schedule.id"]') || {}).value || '')
+            : '';
+          return {
+            id: scheduleEntryId,
+            schedule_entry_id: scheduleEntryId,
+            term_id: scheduleTerm ? String(scheduleTerm.value || '') : '',
+            group_subject_activity_id: scheduleActivity ? String(scheduleActivity.value || '') : '',
+            activity_id: scheduleActivity ? String(scheduleActivity.value || '') : '',
+            activity_type: resolvedActivity ? String(resolvedActivity.activity_type || '') : '',
+            day_of_week: String(scheduleDay && scheduleDay.value || '').trim(),
+            class_number: normalizedClassNumber,
+            week_number: normalizedWeekValue,
+            target_group_numbers: getRequestedValues(scheduleTargetGroups),
+          };
+        };
+        const syncSchedulePlacementFromAdvancedFields = () => {
+          const payload = buildScheduleFormStatePayload();
+          if (schedulePlacementTerm && payload.term_id) {
+            schedulePlacementTerm.value = payload.term_id;
+          }
+          selectedSlot = {
+            dayOfWeek: String(payload.day_of_week || '').trim(),
+            classNumber: Math.max(0, Number(payload.class_number || 0) || 0),
+          };
+          if (payload.week_number) {
+            activeScheduleWeek = getPrimaryWeekNumber(payload.week_number, activeScheduleWeek || 1);
+          }
+          if (selectedScheduleEntryPayload && payload.schedule_entry_id) {
+            selectedScheduleEntryPayload = {
+              ...selectedScheduleEntryPayload,
+              ...payload,
+            };
+          }
+          syncSchedulePlacementState(payload);
+          persistWorkspaceState();
         };
 
         const buildPlacementWarnings = () => {
@@ -3320,8 +3368,7 @@
               activityType: scheduleActivityType ? scheduleActivityType.value : '',
             });
             syncScheduleActivityState();
-            syncSchedulePlacementState();
-            persistWorkspaceState();
+            syncSchedulePlacementFromAdvancedFields();
           });
         }
         if (scheduleActivityType) {
@@ -3331,8 +3378,27 @@
               activityType: scheduleActivityType.value,
             });
             syncScheduleActivityState();
-            syncSchedulePlacementState();
-            persistWorkspaceState();
+            syncSchedulePlacementFromAdvancedFields();
+          });
+        }
+        if (scheduleTerm) {
+          scheduleTerm.addEventListener('change', syncSchedulePlacementFromAdvancedFields);
+        }
+        if (scheduleDay) {
+          scheduleDay.addEventListener('change', syncSchedulePlacementFromAdvancedFields);
+        }
+        if (scheduleClassNumber) {
+          scheduleClassNumber.addEventListener('change', syncSchedulePlacementFromAdvancedFields);
+        }
+        if (scheduleWeekNumber) {
+          scheduleWeekNumber.addEventListener('change', syncSchedulePlacementFromAdvancedFields);
+        }
+        if (scheduleTargetGroups) {
+          scheduleTargetGroups.addEventListener('change', syncSchedulePlacementFromAdvancedFields);
+        }
+        if (scheduleForm) {
+          scheduleForm.addEventListener('submit', () => {
+            syncSchedulePlacementFromAdvancedFields();
           });
         }
 

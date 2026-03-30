@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.75",
+      "date": "2026-03-30",
+      "items": [
+        "fix(academic-v2-advanced-schedule-sync): make the `/admin/pathways` advanced schedule editor honor explicit activity-mode changes instead of sticking to the previous hidden activity id, and sync advanced term/day/class/week/group edits back into the calendar workspace state before submit so newly added or edited rows reopen in the correct term, week, and slot instead of disappearing behind a stale schedule view"
+      ]
+    },
+    {
       "version": "1.3.74",
       "date": "2026-03-30",
       "items": [
