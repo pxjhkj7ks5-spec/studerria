@@ -322,6 +322,7 @@
                     Cleanup runs only from CLI:
                     <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --normalize-users</span>,
                     <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --archive-legacy-config</span>,
+                    <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --activity-integrity --write-snapshot</span>,
                     then repeat with <span class="academic-v2-code">--apply</span> after reviewing the dry-run snapshot.
                   </div>
                 </div>
@@ -348,9 +349,17 @@
                           <th>Selected stage template scope</th>
                           <td>
                             <% if (scopedStageSubjectsWithoutActivities.length) { %>
-                              <div class="academic-v2-chip-row">
+                              <div class="academic-v2-stack">
                                 <% scopedStageSubjectsWithoutActivities.forEach((item) => { %>
-                                  <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                                  <div class="academic-v2-subcard">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center">
+                                      <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                                      <div class="academic-v2-actions">
+                                        <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: item.program_id, cohort_id: '', group_id: '', term_id: '', template_stage: item.stage_number }) %>">Focus</a>
+                                        <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject" data-editor-payload='<%- toAttr(item) %>'>Edit</button>
+                                      </div>
+                                    </div>
+                                  </div>
                                 <% }); %>
                               </div>
                             <% } else { %>
@@ -362,9 +371,17 @@
                           <th>Selected course scope</th>
                           <td>
                             <% if (scopedGroupSubjectsWithoutActivities.length) { %>
-                              <div class="academic-v2-chip-row">
+                              <div class="academic-v2-stack">
                                 <% scopedGroupSubjectsWithoutActivities.forEach((item) => { %>
-                                  <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                                  <div class="academic-v2-subcard">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center">
+                                      <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                                      <div class="academic-v2-actions">
+                                        <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: '', cohort_id: '', group_id: item.group_id, term_id: '' }) %>">Focus</a>
+                                        <button type="button" class="btn btn-sm btn-primary" data-editor-target="group-subject" data-editor-payload='<%- toAttr(item) %>'>Edit</button>
+                                      </div>
+                                    </div>
+                                  </div>
                                 <% }); %>
                               </div>
                             <% } else { %>

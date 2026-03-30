@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.66",
+      "date": "2026-03-30",
+      "items": [
+        "feat(academic-v2-activity-integrity-actions): add direct Focus and Edit actions for missing-activity subjects in the Academic Setup v2 Activity integrity panel, preserve full subject payloads for those diagnostics so the existing editors can open in-place, and extend `scripts/academic-v2-cleanup.js` with an `--activity-integrity` audit mode plus optional `--program-id`, `--template-stage`, `--group-id`, and `--write-snapshot` flags for CLI snapshots"
+      ]
+    },
+    {
       "version": "1.3.65",
       "date": "2026-03-30",
       "items": [

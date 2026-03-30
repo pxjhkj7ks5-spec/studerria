@@ -59,6 +59,11 @@ function readFlagValue(flagName) {
   return '';
 }
 
+function parsePositiveInt(value) {
+  const normalized = Number(value || 0);
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+}
+
 function buildDefaultSnapshotPath() {
   const now = new Date();
   const stamp = [
@@ -77,6 +82,7 @@ async function main() {
   const args = process.argv.slice(2);
   const applyChanges = args.includes('--apply');
   const runResyncAll = args.includes('--resync-all');
+  const runActivityIntegrity = args.includes('--activity-integrity');
   const explicitActions = args.includes('--normalize-users') || args.includes('--archive-legacy-config');
   const runNormalizeUsers = explicitActions ? args.includes('--normalize-users') : true;
   const runArchiveLegacyConfig = explicitActions ? args.includes('--archive-legacy-config') : true;
@@ -105,6 +111,7 @@ async function main() {
       mode: applyChanges ? 'apply' : 'dry-run',
       requestedActions: {
         resyncAll: runResyncAll,
+        activityIntegrity: runActivityIntegrity,
         normalizeUsers: runNormalizeUsers,
         archiveLegacyConfig: runArchiveLegacyConfig,
       },
@@ -113,6 +120,13 @@ async function main() {
 
     if (runResyncAll) {
       payload.resyncAllResult = await academicV2Helpers.resyncAllGroupProjections(store);
+    }
+    if (runActivityIntegrity) {
+      payload.activityIntegrityResult = await academicV2Helpers.loadActivityIntegrityReport(store, {
+        programId: parsePositiveInt(readFlagValue('--program-id')),
+        templateStageNumber: parsePositiveInt(readFlagValue('--template-stage')),
+        groupId: parsePositiveInt(readFlagValue('--group-id')),
+      });
     }
     if (runNormalizeUsers) {
       payload.normalizeUsersResult = await academicV2Helpers.normalizeUsersIntoAcademicV2Groups(store, {
