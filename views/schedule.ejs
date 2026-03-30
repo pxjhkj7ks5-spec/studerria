@@ -1326,6 +1326,9 @@
         backdrop-filter: none;
         --subject-h: 220;
       }
+      .schedule-card--readonly {
+        cursor: default;
+      }
       body.theme-light .schedule-card {
         background: rgba(255, 255, 255, 0.92);
         border-color: rgba(15, 23, 42, 0.15);
@@ -1364,6 +1367,12 @@
       body.theme-light .schedule-card:hover {
         background: hsla(var(--subject-h), 60%, 90%, 0.98);
         color: #0f172a;
+      }
+      .schedule-card--readonly:hover,
+      body.theme-dark .schedule-card--readonly:hover,
+      body.theme-light .schedule-card--readonly:hover {
+        transform: none;
+        box-shadow: none;
       }
       body.theme-dark .schedule-card:hover {
         box-shadow: 0 18px 34px rgba(0, 0, 0, 0.4);
@@ -1533,13 +1542,108 @@
         background: rgba(255, 255, 255, 0.12);
         color: #e2e8f0;
       }
+      .lesson-pill--debug {
+        background: rgba(251, 191, 36, 0.18);
+        color: #fcd34d;
+      }
       body.theme-light .lesson-pill {
         background: rgba(15, 23, 42, 0.08);
         color: #1e293b;
       }
+      body.theme-light .lesson-pill--debug {
+        background: rgba(245, 158, 11, 0.14);
+        color: #92400e;
+      }
       .schedule-meta {
         font-size: 0.82rem;
         color: var(--text-muted);
+      }
+      .schedule-card-note {
+        color: rgba(248, 250, 252, 0.78);
+      }
+      body.theme-light .schedule-card-note {
+        color: rgba(15, 23, 42, 0.68);
+      }
+      .schedule-debug-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .schedule-debug-stat {
+        border-radius: 18px;
+        padding: 14px 16px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: rgba(15, 23, 42, 0.34);
+      }
+      body.theme-light .schedule-debug-stat {
+        background: rgba(255, 255, 255, 0.72);
+        border-color: rgba(15, 23, 42, 0.08);
+      }
+      .schedule-debug-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .schedule-debug-value {
+        font-size: 0.96rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .schedule-debug-meta {
+        margin-top: 6px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+      .schedule-debug-note {
+        margin-bottom: 14px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+      .schedule-debug-table-wrap {
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        background: rgba(15, 23, 42, 0.3);
+      }
+      body.theme-light .schedule-debug-table-wrap {
+        background: rgba(255, 255, 255, 0.78);
+        border-color: rgba(15, 23, 42, 0.08);
+      }
+      .schedule-debug-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 720px;
+      }
+      .schedule-debug-table th,
+      .schedule-debug-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        font-size: 0.82rem;
+        vertical-align: top;
+      }
+      .schedule-debug-table th {
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        background: rgba(15, 23, 42, 0.24);
+      }
+      body.theme-light .schedule-debug-table th {
+        background: rgba(241, 245, 249, 0.88);
+      }
+      .schedule-debug-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .schedule-debug-table tbody tr.is-included td:last-child {
+        color: #34d399;
+      }
+      .schedule-debug-table tbody tr.is-dropped td:last-child {
+        color: #fca5a5;
       }
       .schedule-aside {
         display: flex;
@@ -1908,6 +2012,90 @@
             <%= projectionAlert.body %>
           </div>
         <% } %>
+        <% if (scheduleDebug && scheduleDebug.enabled) { %>
+          <% const debugScope = scheduleDebug.resolved_scope || {}; %>
+          <% const debugTerm = scheduleDebug.resolved_term || null; %>
+          <% const debugSummary = scheduleDebug.summary || {}; %>
+          <% const debugCatalog = scheduleDebug.subject_catalog || {}; %>
+          <% const debugDecisions = Array.isArray(scheduleDebug.row_decisions) ? scheduleDebug.row_decisions : []; %>
+          <div class="glass schedule-panel liquid-card mb-4">
+            <div class="panel-section">
+              <div class="panel-title">Academic V2 schedule debug</div>
+              <div class="panel-body">
+                <div class="schedule-debug-grid">
+                  <div class="schedule-debug-stat">
+                    <div class="schedule-debug-label">Scope</div>
+                    <div class="schedule-debug-value"><%= debugScope.academic_group_label || 'Немає academic scope' %></div>
+                    <div class="schedule-debug-meta">
+                      user.group_id: <%= debugScope.user_group_id || '—' %> ·
+                      user.study_context_id: <%= debugScope.user_study_context_id || '—' %><br />
+                      academic_v2_group: <%= debugScope.academic_group_id || '—' %> ·
+                      resolved via: <%= debugScope.resolved_via || '—' %>
+                    </div>
+                  </div>
+                  <div class="schedule-debug-stat">
+                    <div class="schedule-debug-label">Term</div>
+                    <div class="schedule-debug-value"><%= debugTerm ? (debugTerm.title || `Терм ${debugTerm.term_number || 1}`) : 'Немає активного терму' %></div>
+                    <div class="schedule-debug-meta">
+                      week: <%= scheduleDebug.selected_week || currentWeek %> ·
+                      term_id: <%= debugTerm ? (debugTerm.term_id || '—') : '—' %> ·
+                      legacy_semester_id: <%= debugTerm ? (debugTerm.legacy_semester_id || '—') : '—' %><br />
+                      weeks_count: <%= debugTerm ? (debugTerm.weeks_count || '—') : '—' %> ·
+                      start: <%= debugTerm ? (debugTerm.start_date || '—') : '—' %>
+                    </div>
+                  </div>
+                  <div class="schedule-debug-stat">
+                    <div class="schedule-debug-label">Rows</div>
+                    <div class="schedule-debug-value">
+                      raw <%= debugSummary.raw_rows_total || 0 %> · included <%= debugSummary.included_rows_total || 0 %> · dropped <%= debugSummary.dropped_rows_total || 0 %>
+                    </div>
+                    <div class="schedule-debug-meta">
+                      visible subjects: <%= Array.isArray(debugCatalog.all_visible_subjects) ? debugCatalog.all_visible_subjects.length : 0 %> ·
+                      selected subjects: <%= Array.isArray(debugCatalog.selected_subjects) ? debugCatalog.selected_subjects.length : 0 %><br />
+                      unmapped subjects: <%= Array.isArray(debugCatalog.unmapped_subjects) ? debugCatalog.unmapped_subjects.length : 0 %>
+                    </div>
+                  </div>
+                </div>
+                <% if (debugSummary.note) { %>
+                  <div class="schedule-debug-note"><%= debugSummary.note %></div>
+                <% } %>
+                <div class="schedule-debug-table-wrap">
+                  <table class="schedule-debug-table">
+                    <thead>
+                      <tr>
+                        <th>Предмет</th>
+                        <th>Активність</th>
+                        <th>Тиждень</th>
+                        <th>День</th>
+                        <th>Пара</th>
+                        <th>Mapping</th>
+                        <th>Рішення</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% if (!debugDecisions.length) { %>
+                        <tr>
+                          <td colspan="7">Для цього тижня сирих `academic_v2_schedule_entries` не знайдено.</td>
+                        </tr>
+                      <% } %>
+                      <% debugDecisions.forEach(function(debugRow) { %>
+                        <tr class="<%= debugRow.included ? 'is-included' : 'is-dropped' %>">
+                          <td><%= debugRow.subject_title || '—' %></td>
+                          <td><%= debugRow.activity_type || '—' %></td>
+                          <td><%= debugRow.week_number || '—' %></td>
+                          <td><%= debugRow.day_of_week || '—' %></td>
+                          <td><%= debugRow.class_number || '—' %></td>
+                          <td><%= debugRow.mapping_state || '—' %></td>
+                          <td><%= debugRow.reason_code || '—' %></td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% } %>
 
         <div id="scheduleWeekGrid">
         <% daysOfWeek.forEach(function(day) { %>
@@ -1964,16 +2152,22 @@
                   <% const inlineType = /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/.test(subjectNameLower); %>
                   <% const typeLabel = cls.lesson_type === 'lecture' ? scheduleViewText.lessonTypeLecture : cls.lesson_type === 'seminar' ? scheduleViewText.lessonTypeSeminar : cls.lesson_type === 'lab' ? scheduleViewText.lessonTypeLab : cls.lesson_type === 'practice' ? scheduleViewText.lessonTypePractice : ''; %>
                   <% const showTypeBadge = cls.lesson_type && !inlineType && typeLabel; %>
-                  <% const legacyKey = `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}`; %>
-                  <% const datedKey = cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
-                  <% const baseKey = cls.class_date ? `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}|${cls.class_date}` : `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
-                  <% const generalFallbackKey = `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`; %>
-                  <% const hwMetaGeneral = cls.is_general && homeworkMetaAll ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey]) : null; %>
-                  <% const hwMetaGroup = homeworkMeta ? ((datedKey ? homeworkMeta[datedKey] : null) || homeworkMeta[legacyKey]) : null; %>
-                  <% const hwMetaAnyGroup = (!cls.is_general && ((role === 'admin' || viewAs === 'student') || cls.lesson_type === 'lecture') && homeworkMetaAll)
+                  <% const compatHomeworkEnabled = cls.compat_homework_enabled !== false
+                    && Number(cls.legacy_subject_id || cls.subject_id || 0) > 0
+                    && Number(cls.course_id || cls.owner_course_id || 0) > 0; %>
+                  <% const mappingState = String(cls.mapping_state || 'mapped'); %>
+                  <% const legacyKey = compatHomeworkEnabled ? `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}` : null; %>
+                  <% const datedKey = compatHomeworkEnabled && cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
+                  <% const baseKey = compatHomeworkEnabled
+                    ? (cls.class_date ? `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}|${cls.class_date}` : `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}`)
+                    : null; %>
+                  <% const generalFallbackKey = compatHomeworkEnabled ? `${cls.subject_id}|${cls.day_of_week}|${cls.class_number}` : null; %>
+                  <% const hwMetaGeneral = compatHomeworkEnabled && cls.is_general && homeworkMetaAll ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey]) : null; %>
+                  <% const hwMetaGroup = compatHomeworkEnabled && homeworkMeta ? ((datedKey ? homeworkMeta[datedKey] : null) || homeworkMeta[legacyKey]) : null; %>
+                  <% const hwMetaAnyGroup = (compatHomeworkEnabled && !cls.is_general && ((role === 'admin' || viewAs === 'student') || cls.lesson_type === 'lecture') && homeworkMetaAll)
                     ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey])
                     : null; %>
-                  <% const hwMeta = hwMetaGeneral || hwMetaGroup || hwMetaAnyGroup; %>
+                  <% const hwMeta = compatHomeworkEnabled ? (hwMetaGeneral || hwMetaGroup || hwMetaAnyGroup) : null; %>
                   <% const sessionKindRaw = hwMeta && hwMeta.session_kind ? String(hwMeta.session_kind) : ''; %>
                   <% const sessionKind = ['exam', 'credit', 'consultation', 'mixed', 'session'].includes(sessionKindRaw) ? sessionKindRaw : ''; %>
                   <% const sessionChipText = sessionKind === 'exam'
@@ -1997,12 +2191,18 @@
                   <% if (showTypeBadge) { tooltipParts.push(typeLabel); } %>
                   <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
                   <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
+                  <% if (!compatHomeworkEnabled) { tooltipParts.push('Предмет ще не має legacy binding'); } %>
                   <div
-                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %> <%= hwMeta && hwMeta.credit ? 'has-credit' : '' %> <%= sessionCardClass %>"
-                    role="button"
-                    tabindex="0"
-                    data-bs-toggle="modal"
-                    data-bs-target="#homeworkModal"
+                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %> <%= hwMeta && hwMeta.credit ? 'has-credit' : '' %> <%= sessionCardClass %> <%= !compatHomeworkEnabled ? 'schedule-card--readonly' : '' %>"
+                    <% if (compatHomeworkEnabled) { %>
+                      role="button"
+                      tabindex="0"
+                      data-bs-toggle="modal"
+                      data-bs-target="#homeworkModal"
+                    <% } else { %>
+                      role="article"
+                      aria-disabled="true"
+                    <% } %>
                     data-class="<%= cls.subject_name %>"
                     data-subject="<%= subjectName %>"
                     data-subjectid="<%= cls.subject_id %>"
@@ -2027,11 +2227,17 @@
                           <% if (showTypeBadge) { %>
                             <span class="lesson-pill"><%= typeLabel %></span>
                           <% } %>
+                          <% if (scheduleDebug && scheduleDebug.enabled && mappingState === 'unmapped') { %>
+                            <span class="lesson-pill lesson-pill--debug">Academic V2 only</span>
+                          <% } %>
                         </div>
                         <% if (cls.room_label) { %>
                           <div class="schedule-meta classMeta"><%= lang === 'en' ? 'Room' : 'Кабінет' %>: <%= cls.room_label %></div>
                         <% } %>
                         <div class="schedule-meta classMeta"><%= groupLabel %> · <%= scheduleViewText.classLabel %> <%= cls.class_number %><%= courseLabel %></div>
+                        <% if (!compatHomeworkEnabled) { %>
+                          <div class="schedule-meta classMeta schedule-card-note">Предмет ще не має legacy binding.</div>
+                        <% } %>
                       </div>
                       <div class="schedule-aside">
                         <div class="schedule-time classTime"><%= timeLabel %></div>

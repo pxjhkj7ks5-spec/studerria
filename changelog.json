@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.78",
+      "date": "2026-03-30",
+      "items": [
+        "fix(student-schedule-debug-and-unmapped-slots): add deterministic Academic V2 student schedule diagnostics with resolved scope, active term, raw row decisions, and reason codes behind `?debug_schedule=1`; stop treating selected legacy subjects as the only render source so visible lecture rows can render even without explicit subgroup selections; keep unmapped Academic V2 slots visible as normal schedule cards with homework compatibility disabled instead of hiding them; and prevent synthetic or compat-disabled schedule rows from being used to build legacy homework lookups"
+      ]
+    },
+    {
       "version": "1.3.77",
       "date": "2026-03-30",
       "items": [

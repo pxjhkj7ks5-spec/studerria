@@ -21599,6 +21599,9 @@ function buildStudentScheduleHomeworkTargets(subjects = [], scheduleRows = []) {
   });
 
   (scheduleRows || []).forEach((row) => {
+    if (row && row.compat_homework_enabled === false) {
+      return;
+    }
     const subjectId = parsePositiveIntStrict(row && row.subject_id);
     const groupNumber = parsePositiveIntStrict(row && row.group_number);
     const courseId = parsePositiveIntStrict(row && (row.course_id || row.owner_course_id));
@@ -21974,6 +21977,8 @@ async function loadStudentLegacyScheduleCompatData({
 app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   const canCreateHomework = canSessionCreateHomework(req);
+  const scheduleDebugRequested = String(req.query.debug_schedule || '').trim() === '1';
+  const scheduleDebugEnabled = scheduleDebugRequested && (hasSessionRole(req, 'admin') || isPlainStudentSession(req));
   const scheduleViewRole = hasSessionRole(req, 'teacher')
     ? 'teacher'
     : (req.session.viewAs || req.session.role || '');
@@ -22556,6 +22561,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         canCreateHomework,
         canUseCustomDeadlinesUi,
         projectionAlert,
+        scheduleDebug: null,
       });
     } catch (err) {
       return handleDbError(res, err, 'teacher.schedule');
@@ -22585,17 +22591,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
       if (selectedWeek < 1) selectedWeek = 1;
       if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
 
-      const scheduleState = baseState.scope && baseState.term
-        ? await academicV2StudentHelpers.loadStudentScheduleData(
-            getAcademicV2Store(),
-            userId,
-            { weekNumber: selectedWeek }
-          )
-        : {
-            ...baseState,
-            scheduleRows: [],
-            projectionIssues: baseState.projectionIssues,
-          };
+      const scheduleState = await academicV2StudentHelpers.loadStudentScheduleData(
+        getAcademicV2Store(),
+        userId,
+        { weekNumber: selectedWeek, debug: scheduleDebugEnabled }
+      );
       const projectionAlert = buildAcademicV2StudentProjectionAlert(
         req,
         scheduleState.projectionIssues,
@@ -22731,6 +22731,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         canCreateHomework,
         canUseCustomDeadlinesUi,
         projectionAlert,
+        scheduleDebug: scheduleDebugEnabled ? (scheduleState.debug || null) : null,
       });
     } catch (err) {
       return handleDbError(res, err, 'student.schedule.v2');
@@ -23142,6 +23143,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               canCreateHomework,
               canUseCustomDeadlinesUi,
               projectionAlert: null,
+              scheduleDebug: null,
             })
           );
         }
@@ -23349,6 +23351,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 canCreateHomework,
                 canUseCustomDeadlinesUi,
                 projectionAlert: null,
+                scheduleDebug: null,
               });
             };
 
