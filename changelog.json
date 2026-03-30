@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.76",
+      "date": "2026-03-30",
+      "items": [
+        "fix(academic-v2-student-schedule-visibility): stop student schedule rows from disappearing when a lecture belongs to a visible all-groups subject that has no explicit subgroup-selection row, reuse the broader Academic V2 subject catalog as a safe fallback for lecture/general schedule rendering, and no longer hard-block week cards only because the scope is missing a legacy course id so valid Academic V2 slots still render in “Твій тиждень”"
+      ]
+    },
+    {
       "version": "1.3.75",
       "date": "2026-03-30",
       "items": [
