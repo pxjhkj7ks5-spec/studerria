@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.64",
+      "date": "2026-03-30",
+      "items": [
+        "fix(academic-v2-activity-baselines): backfill a default `lecture` activity for existing stage subject templates and live course subjects that still have none, auto-seed that baseline on future subject saves and stage-template application, and block deleting the last remaining activity so the new activity-based schedule editor never falls back to an empty target set"
+      ]
+    },
+    {
       "version": "1.3.63",
       "date": "2026-03-30",
       "items": [

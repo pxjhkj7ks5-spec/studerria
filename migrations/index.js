@@ -43,6 +43,7 @@ const academicV2Core = require('./042_academic_v2_core');
 const academicV2StageTemplates = require('./043_academic_v2_stage_templates');
 const academicV2TeacherRegistrationDefaults = require('./044_academic_v2_teacher_registration_defaults');
 const academicV2SubjectActivities = require('./045_academic_v2_subject_activities');
+const academicV2ActivityBaselines = require('./046_academic_v2_activity_baselines');
 
 module.exports = [
   init,
@@ -90,4 +91,5 @@ module.exports = [
   academicV2StageTemplates,
   academicV2TeacherRegistrationDefaults,
   academicV2SubjectActivities,
+  academicV2ActivityBaselines,
 ];

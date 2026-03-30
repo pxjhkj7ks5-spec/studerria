@@ -9942,6 +9942,8 @@ function getAcademicV2RouteMessages(req) {
     SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм і activity предмета',
     SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
+    STAGE_SUBJECT_ACTIVITY_REQUIRED: 'У stage subject має залишатися хоча б одна activity',
+    GROUP_SUBJECT_ACTIVITY_REQUIRED: 'У предмета курсу має залишатися хоча б одна activity',
   } : {
     unknown: 'Unable to save academic v2 changes',
     programSaved: 'Program saved',
@@ -9969,6 +9971,8 @@ function getAcademicV2RouteMessages(req) {
     SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires both term and subject activity',
     SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Subject template not found',
+    STAGE_SUBJECT_ACTIVITY_REQUIRED: 'Stage subject must keep at least one activity',
+    GROUP_SUBJECT_ACTIVITY_REQUIRED: 'Course subject must keep at least one activity',
   };
 }
 
