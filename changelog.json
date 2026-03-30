@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.69",
+      "date": "2026-03-30",
+      "items": [
+        "fix(registration-postgres-subject-flow): make Academic V2 registration and student subject loaders Postgres-safe by replacing legacy `COALESCE(..., TRUE/FALSE)` filters with text-normalized boolean checks, removing nullable `? IS NULL` subject-term predicates from `/register/subjects`, skipping `user_registration_events.course_id` updates when the repaired legacy course is missing, and hardening one remaining typed-null retake update so registration no longer trips the reported database errors after course selection"
+      ]
+    },
+    {
       "version": "1.3.68",
       "date": "2026-03-30",
       "items": [

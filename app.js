@@ -10819,10 +10819,14 @@ async function listAssignableAdminAcademicGroups(scopeState = {}) {
   const stage = parsePositiveIntStrict(normalizedScope.stage || normalizedScope.stage_number);
   const campus = String(normalizedScope.campus || normalizedScope.campusKey || normalizedScope.campus_key || '').trim().toLowerCase();
   const courseId = parsePositiveIntStrict(normalizedScope.courseId || normalizedScope.course || normalizedScope.course_id);
+  const activeGroupFilter = "COALESCE(NULLIF(LOWER(TRIM(CAST(g.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')";
+  const activeCohortFilter = "COALESCE(NULLIF(LOWER(TRIM(CAST(c.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')";
+  const activeProgramFilter = "COALESCE(NULLIF(LOWER(TRIM(CAST(p.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')";
+  const activeLegacyGroupFilter = "COALESCE(NULLIF(LOWER(TRIM(CAST(is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')";
   const filters = [
-    'COALESCE(g.is_active, TRUE) = TRUE',
-    'COALESCE(c.is_active, TRUE) = TRUE',
-    'COALESCE(p.is_active, TRUE) = TRUE',
+    activeGroupFilter,
+    activeCohortFilter,
+    activeProgramFilter,
   ];
   const params = [];
   if (studyContextId) {
@@ -10851,7 +10855,7 @@ async function listAssignableAdminAcademicGroups(scopeState = {}) {
         SELECT cohort_id
         FROM academic_v2_groups
         WHERE legacy_course_id = ?
-          AND COALESCE(is_active, TRUE) = TRUE
+          AND ${activeLegacyGroupFilter}
         ORDER BY id ASC
         LIMIT 1
       `,
@@ -15484,15 +15488,24 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     }
 
     const repairedGroup = repairedSelection.group;
+    const repairedLegacyCourseId = parsePositiveIntStrict(repairedGroup.legacy_course_id);
     await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
       group_id: requestedGroupId,
       user_ids: [userId],
     });
     await persistRegistrationAcademicGroupPlacement(userId, repairedGroup);
-    await db.run(
-      'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
-      [parsePositiveIntStrict(repairedGroup.legacy_course_id), userId]
-    );
+    if (repairedLegacyCourseId) {
+      const legacyCourseRow = await db.get(
+        'SELECT id FROM courses WHERE id = ? LIMIT 1',
+        [repairedLegacyCourseId]
+      );
+      if (legacyCourseRow && Number(legacyCourseRow.id || 0) === repairedLegacyCourseId) {
+        await db.run(
+          'UPDATE user_registration_events SET course_id = COALESCE(course_id, ?) WHERE user_id = ?',
+          [repairedLegacyCourseId, userId]
+        );
+      }
+    }
     logAction(db, req, 'register_group_selected', {
       user_id: userId,
       group_id: Number(repairedGroup.group_id || 0) || null,
@@ -30326,7 +30339,7 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
               score = ?,
               teacher_comment = ?,
               graded_by = ?,
-              graded_at = CASE WHEN ? IS NULL THEN NULL ELSE NOW() END,
+              graded_at = CASE WHEN ?::int IS NULL THEN NULL ELSE NOW() END,
               count_in_final = ?,
               updated_at = NOW()
           WHERE id = ?
