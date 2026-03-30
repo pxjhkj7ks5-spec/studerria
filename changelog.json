@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.72",
+      "date": "2026-03-30",
+      "items": [
+        "fix(academic-v2-subject-alphabetical-order): remove manual sort-order inputs from stage and live course subject editors in `/admin/pathways`, sort Academic Setup subject lists alphabetically by subject title as the primary order, and preserve existing `sort_order` values on backend updates when no explicit order is submitted so legacy compatibility data stays intact"
+      ]
+    },
+    {
       "version": "1.3.71",
       "date": "2026-03-30",
       "items": [

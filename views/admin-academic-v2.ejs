@@ -1098,9 +1098,8 @@
                         <label for="stageSubjectDefaultGroup">Default group</label>
                         <input id="stageSubjectDefaultGroup" class="form-control" type="number" name="default_group" data-editor-input="stage-subject.default_group" value="1" />
                       </div>
-                      <div class="academic-v2-field">
-                        <label for="stageSubjectSortOrder">Sort order</label>
-                        <input id="stageSubjectSortOrder" class="form-control" type="number" name="sort_order" data-editor-input="stage-subject.sort_order" value="0" />
+                      <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                        <span class="academic-v2-muted">Предмети в шаблоні впорядковуються за абеткою. Окремий порядок задавати не потрібно.</span>
                       </div>
                       <div class="academic-v2-field">
                         <label for="stageSubjectTerms">Stage terms</label>
@@ -1595,13 +1594,12 @@
                           <% }); %>
                         </select>
                       </div>
-                      <div class="academic-v2-field">
-                        <label for="groupSubjectSortOrder">Порядок</label>
-                        <input id="groupSubjectSortOrder" class="form-control" type="number" name="sort_order" data-editor-input="group-subject.sort_order" value="0" />
-                      </div>
                       <div class="academic-v2-field" style="grid-column: 1 / -1;">
                         <label for="groupSubjectTitle">Жива назва</label>
                         <input id="groupSubjectTitle" class="form-control" type="text" name="title" data-editor-input="group-subject.title" placeholder="За замовчуванням буде назва шаблону" />
+                      </div>
+                      <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                        <span class="academic-v2-muted">Предмети курсу впорядковуються за назвою автоматично.</span>
                       </div>
                       <div class="academic-v2-field">
                         <label for="groupSubjectGroups">Кількість підгруп</label>
