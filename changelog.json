@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.81",
+      "date": "2026-03-30",
+      "items": [
+        "chore(schedule-debug-hardening): keep Academic V2 schedule debug as an admin-only hidden mode instead of exposing it in regular student sessions, and normalize course-level Academic V2 schedule row sorting by real weekday order so Monday-through-Sunday grids stay stable across admin, teacher, and view-as schedule surfaces"
+      ]
+    },
+    {
       "version": "1.3.80",
       "date": "2026-03-30",
       "items": [

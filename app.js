@@ -21978,7 +21978,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   const canCreateHomework = canSessionCreateHomework(req);
   const scheduleDebugRequested = String(req.query.debug_schedule || '').trim() === '1';
-  const scheduleDebugEnabled = scheduleDebugRequested && (hasSessionRole(req, 'admin') || isPlainStudentSession(req));
+  const scheduleDebugEnabled = scheduleDebugRequested && hasSessionRole(req, 'admin');
   const scheduleViewRole = hasSessionRole(req, 'teacher')
     ? 'teacher'
     : (req.session.viewAs || req.session.role || '');
