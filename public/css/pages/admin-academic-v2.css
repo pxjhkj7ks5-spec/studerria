@@ -591,3 +591,354 @@ body.theme-dark .academic-v2-empty {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.academic-v2-sidebar-group {
+  margin-top: 18px;
+}
+
+.academic-v2-sidebar-group-title,
+.academic-v2-subcard-topline {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--academic-muted-light);
+}
+
+body.theme-dark .academic-v2-sidebar-group-title,
+body.theme-dark .academic-v2-subcard-topline {
+  color: var(--academic-muted-dark);
+}
+
+.academic-v2-mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.academic-v2-mode-button,
+.academic-v2-workspace-tab,
+.academic-v2-nav-link--button {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.62);
+  border-radius: 18px;
+  color: inherit;
+  min-height: 46px;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+body.theme-dark .academic-v2-mode-button,
+body.theme-dark .academic-v2-workspace-tab,
+body.theme-dark .academic-v2-nav-link--button {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.academic-v2-mode-button:hover,
+.academic-v2-workspace-tab:hover,
+.academic-v2-nav-link--button:hover {
+  transform: translateY(-1px);
+}
+
+.academic-v2-mode-button.is-active,
+.academic-v2-workspace-tab.is-active,
+.academic-v2-nav-link.is-active,
+.btn.is-active[data-schedule-view-target],
+.btn.is-active[data-schedule-week] {
+  background: rgba(47, 109, 246, 0.14);
+  border-color: rgba(47, 109, 246, 0.28);
+  color: var(--academic-accent-strong);
+}
+
+body.theme-dark .academic-v2-mode-button.is-active,
+body.theme-dark .academic-v2-workspace-tab.is-active,
+body.theme-dark .academic-v2-nav-link.is-active,
+body.theme-dark .btn.is-active[data-schedule-view-target],
+body.theme-dark .btn.is-active[data-schedule-week] {
+  color: rgba(219, 234, 254, 0.96);
+  background: rgba(96, 165, 250, 0.16);
+  border-color: rgba(147, 197, 253, 0.28);
+}
+
+.academic-v2-grid-2--workspace {
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+}
+
+.academic-v2-grid-2--subjects {
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+}
+
+.academic-v2-grid-2--terms,
+.academic-v2-grid-2--schedule,
+.academic-v2-grid-2--students {
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
+}
+
+.academic-v2-grid-3--overview {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.academic-v2-scope-summary-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.academic-v2-scope-summary-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+}
+
+body.theme-light .academic-v2-scope-summary-item {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+body.theme-dark .academic-v2-scope-summary-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.academic-v2-workspace-header-card {
+  position: sticky;
+  top: 18px;
+  z-index: 7;
+}
+
+.academic-v2-workspace-header {
+  display: grid;
+  gap: 16px;
+}
+
+.academic-v2-workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.academic-v2-workspace-tab {
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+.academic-v2-section-head--tight {
+  margin-bottom: 12px;
+}
+
+.academic-v2-template-row,
+.academic-v2-course-subject-card,
+.academic-v2-term-card,
+.academic-v2-activity-row,
+.academic-v2-schedule-list-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid transparent;
+}
+
+body.theme-light .academic-v2-template-row,
+body.theme-light .academic-v2-course-subject-card,
+body.theme-light .academic-v2-term-card,
+body.theme-light .academic-v2-activity-row,
+body.theme-light .academic-v2-schedule-list-card {
+  background: rgba(255, 255, 255, 0.66);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+body.theme-dark .academic-v2-template-row,
+body.theme-dark .academic-v2-course-subject-card,
+body.theme-dark .academic-v2-term-card,
+body.theme-dark .academic-v2-activity-row,
+body.theme-dark .academic-v2-schedule-list-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.academic-v2-course-subject-card {
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.academic-v2-course-subject-card:hover {
+  transform: translateY(-1px);
+}
+
+.academic-v2-course-subject-card.is-active {
+  border-color: rgba(47, 109, 246, 0.32);
+  box-shadow: 0 18px 40px rgba(47, 109, 246, 0.12);
+}
+
+.academic-v2-course-subject-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.academic-v2-detail-shell {
+  display: grid;
+  gap: 14px;
+  align-self: start;
+  position: sticky;
+  top: 152px;
+}
+
+.academic-v2-detail-summary {
+  overflow: hidden;
+}
+
+.academic-v2-timetable {
+  display: grid;
+  grid-template-columns: 76px repeat(7, minmax(140px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+}
+
+.academic-v2-timetable-corner,
+.academic-v2-timetable-day,
+.academic-v2-timetable-row-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border-radius: 18px;
+  font-weight: 700;
+}
+
+body.theme-light .academic-v2-timetable-corner,
+body.theme-light .academic-v2-timetable-day,
+body.theme-light .academic-v2-timetable-row-label {
+  background: rgba(255, 255, 255, 0.76);
+}
+
+body.theme-dark .academic-v2-timetable-corner,
+body.theme-dark .academic-v2-timetable-day,
+body.theme-dark .academic-v2-timetable-row-label {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.academic-v2-timetable-slot {
+  min-height: 168px;
+  padding: 12px;
+  border-radius: 22px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+body.theme-light .academic-v2-timetable-slot {
+  background: rgba(255, 255, 255, 0.48);
+}
+
+body.theme-dark .academic-v2-timetable-slot {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.academic-v2-timetable-slot:hover,
+.academic-v2-timetable-slot.is-selected {
+  border-color: rgba(47, 109, 246, 0.35);
+  transform: translateY(-1px);
+}
+
+.academic-v2-schedule-card,
+.academic-v2-inline-card-button {
+  border: 0;
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(47, 109, 246, 0.12);
+  color: inherit;
+}
+
+body.theme-dark .academic-v2-schedule-card,
+body.theme-dark .academic-v2-inline-card-button {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.academic-v2-schedule-slot-empty {
+  align-self: end;
+  font-size: 0.88rem;
+  color: var(--academic-muted-light);
+}
+
+body.theme-dark .academic-v2-schedule-slot-empty {
+  color: var(--academic-muted-dark);
+}
+
+.academic-v2-schedule-warning {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: rgba(255, 122, 89, 0.14);
+  color: #b45309;
+}
+
+.academic-v2-advanced-block {
+  border-radius: 22px;
+  padding: 16px 18px;
+}
+
+body.theme-light .academic-v2-advanced-block {
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.theme-dark .academic-v2-advanced-block {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.academic-v2-advanced-block summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.academic-v2-student-table-wrap {
+  overflow: auto;
+  max-height: 620px;
+}
+
+.academic-v2-mode-panel[hidden],
+.academic-v2-card[hidden],
+.academic-v2-subcard[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 1200px) {
+  .academic-v2-grid-2--workspace,
+  .academic-v2-grid-2--subjects,
+  .academic-v2-grid-2--terms,
+  .academic-v2-grid-2--schedule,
+  .academic-v2-grid-2--students,
+  .academic-v2-grid-3--overview {
+    grid-template-columns: 1fr;
+  }
+
+  .academic-v2-detail-shell,
+  .academic-v2-workspace-header-card {
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .academic-v2-timetable {
+    grid-template-columns: 70px repeat(7, minmax(170px, 1fr));
+  }
+
+  .academic-v2-scope-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
