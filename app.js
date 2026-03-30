@@ -9944,6 +9944,8 @@ function getAcademicV2RouteMessages(req) {
     SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
     STAGE_SUBJECT_ACTIVITY_REQUIRED: 'У stage subject має залишатися хоча б одна activity',
     GROUP_SUBJECT_ACTIVITY_REQUIRED: 'У предмета курсу має залишатися хоча б одна activity',
+    STAGE_SUBJECT_ACTIVITY_DUPLICATE: 'Для цього stage subject такий тип activity вже існує',
+    GROUP_SUBJECT_ACTIVITY_DUPLICATE: 'Для цього предмета курсу такий тип activity вже існує',
   } : {
     unknown: 'Unable to save academic v2 changes',
     programSaved: 'Program saved',
@@ -9973,6 +9975,8 @@ function getAcademicV2RouteMessages(req) {
     SUBJECT_TEMPLATE_NOT_FOUND: 'Subject template not found',
     STAGE_SUBJECT_ACTIVITY_REQUIRED: 'Stage subject must keep at least one activity',
     GROUP_SUBJECT_ACTIVITY_REQUIRED: 'Course subject must keep at least one activity',
+    STAGE_SUBJECT_ACTIVITY_DUPLICATE: 'This stage subject already has that activity type',
+    GROUP_SUBJECT_ACTIVITY_DUPLICATE: 'This course subject already has that activity type',
   };
 }
 

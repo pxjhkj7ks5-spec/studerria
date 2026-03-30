@@ -12,6 +12,16 @@
   const projectionHealthList = Array.isArray(projectionHealth) ? projectionHealth : [];
   const projectionHealthByGroup = new Map(projectionHealthList.map((item) => [Number(item.group_id || 0), item]));
   const projectionHealthTotals = projectionHealthSummary && typeof projectionHealthSummary === 'object' ? projectionHealthSummary : {};
+  const activityIntegrityState = activityIntegrity && typeof activityIntegrity === 'object' ? activityIntegrity : {};
+  const activityIntegritySummary = activityIntegrityState.summary && typeof activityIntegrityState.summary === 'object'
+    ? activityIntegrityState.summary
+    : {};
+  const scopedStageSubjectsWithoutActivities = Array.isArray(activityIntegrityState.scopedStageSubjectTemplatesWithoutActivities)
+    ? activityIntegrityState.scopedStageSubjectTemplatesWithoutActivities
+    : [];
+  const scopedGroupSubjectsWithoutActivities = Array.isArray(activityIntegrityState.scopedGroupSubjectsWithoutActivities)
+    ? activityIntegrityState.scopedGroupSubjectsWithoutActivities
+    : [];
   const cleanupAudit = auditSummary && typeof auditSummary === 'object' ? auditSummary : {};
   const stageOptions = [1, 2, 3, 4];
   const trackOptions = [
@@ -315,6 +325,60 @@
                     then repeat with <span class="academic-v2-code">--apply</span> after reviewing the dry-run snapshot.
                   </div>
                 </div>
+                <div class="academic-v2-subcard">
+                  <h3 class="h5 mb-3">Activity integrity</h3>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip <%= Number(activityIntegritySummary.stage_subject_templates_without_activities || 0) === 0 ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
+                      <%= Number(activityIntegritySummary.stage_subject_templates_without_activities || 0) %> stage subjects missing activity
+                    </span>
+                    <span class="academic-v2-chip <%= Number(activityIntegritySummary.group_subjects_without_activities || 0) === 0 ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
+                      <%= Number(activityIntegritySummary.group_subjects_without_activities || 0) %> course subjects missing activity
+                    </span>
+                    <span class="academic-v2-chip">
+                      <%= Number(activityIntegritySummary.scoped_stage_subject_templates_without_activities || 0) %> missing in selected stage scope
+                    </span>
+                    <span class="academic-v2-chip">
+                      <%= Number(activityIntegritySummary.scoped_group_subjects_without_activities || 0) %> missing in selected course scope
+                    </span>
+                  </div>
+                  <div class="academic-v2-table-wrap mt-3">
+                    <table class="table academic-v2-table">
+                      <tbody>
+                        <tr>
+                          <th>Selected stage template scope</th>
+                          <td>
+                            <% if (scopedStageSubjectsWithoutActivities.length) { %>
+                              <div class="academic-v2-chip-row">
+                                <% scopedStageSubjectsWithoutActivities.forEach((item) => { %>
+                                  <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                                <% }); %>
+                              </div>
+                            <% } else { %>
+                              <span class="academic-v2-muted">No missing activities in the selected stage template scope.</span>
+                            <% } %>
+                          </td>
+                        </tr>
+                        <tr>
+                          <th>Selected course scope</th>
+                          <td>
+                            <% if (scopedGroupSubjectsWithoutActivities.length) { %>
+                              <div class="academic-v2-chip-row">
+                                <% scopedGroupSubjectsWithoutActivities.forEach((item) => { %>
+                                  <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                                <% }); %>
+                              </div>
+                            <% } else { %>
+                              <span class="academic-v2-muted">No missing activities in the selected course scope.</span>
+                            <% } %>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="academic-v2-muted mt-3">
+                    Every stage subject template and live course subject should keep at least one activity so the activity-based schedule editor always has a valid target.
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -570,6 +634,11 @@
                   <h2 class="academic-v2-section-title">Stage templates</h2>
                   <p class="academic-v2-section-copy">Templates define which terms and subjects belong to each program stage. They do not create live course data until you explicitly apply them to a course or promote a cohort.</p>
                 </div>
+                <% if (scopedStageSubjectsWithoutActivities.length) { %>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip academic-v2-chip--warm"><%= scopedStageSubjectsWithoutActivities.length %> stage subjects missing activity</span>
+                  </div>
+                <% } %>
               </div>
               <div class="academic-v2-subcard mb-4">
                 <form method="get" action="/admin/pathways" class="academic-v2-focus-grid">
@@ -1001,6 +1070,11 @@
                   <h2 class="academic-v2-section-title">Subjects & Teachers</h2>
                   <p class="academic-v2-section-copy">Templates are the global catalog. Course subjects hold teachers, terms, and subgroup defaults. Lecture, seminar, practice, and lab live as separate activities inside each course subject.</p>
                 </div>
+                <% if (scopedGroupSubjectsWithoutActivities.length) { %>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip academic-v2-chip--warm"><%= scopedGroupSubjectsWithoutActivities.length %> course subjects missing activity</span>
+                  </div>
+                <% } %>
               </div>
               <div class="academic-v2-grid-3">
                 <form method="post" action="/admin/pathways/v2/templates/save" class="academic-v2-subcard" data-editor-form="template">
