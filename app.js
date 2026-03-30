@@ -22969,6 +22969,37 @@ app.get('/schedule', requireLogin, async (req, res) => {
         if (!ownerCourseId || ownerSemesterMap.has(ownerCourseId)) continue;
         ownerSemesterMap.set(ownerCourseId, await getActiveSemester(ownerCourseId));
       }
+      const normalizeDebugBoolean = (value, fallback = false) => {
+        if (value === true || value === false) return value;
+        if (typeof value === 'number') return value === 1;
+        const normalized = String(value || '').trim().toLowerCase();
+        if (['1', 'true', 't', 'yes', 'on'].includes(normalized)) return true;
+        if (['0', 'false', 'f', 'no', 'off'].includes(normalized)) return false;
+        return fallback === true;
+      };
+      const normalizeDebugGroupNumbers = (value, fallback = []) => {
+        if (Array.isArray(value)) {
+          return Array.from(new Set(
+            value
+              .map((item) => Number(item || 0))
+              .filter((item) => Number.isInteger(item) && item > 0)
+          )).sort((a, b) => a - b);
+        }
+        const raw = String(value || '').trim();
+        if (!raw) {
+          return Array.isArray(fallback) ? fallback : [];
+        }
+        const normalizedRaw = raw.startsWith('{') && raw.endsWith('}')
+          ? raw.slice(1, -1)
+          : raw;
+        return Array.from(new Set(
+          normalizedRaw
+            .split(',')
+            .map((item) => Number(String(item || '').trim()))
+            .filter((item) => Number.isInteger(item) && item > 0)
+        )).sort((a, b) => a - b);
+      };
+      let scheduleDebug = null;
 
       const buildHomeworkTargets = (baseGroups = [], scheduleRows = []) => {
         const map = new Map();
@@ -23143,7 +23174,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
               canCreateHomework,
               canUseCustomDeadlinesUi,
               projectionAlert: null,
-              scheduleDebug: null,
+              scheduleDebug,
             })
           );
         }
@@ -23351,7 +23382,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 canCreateHomework,
                 canUseCustomDeadlinesUi,
                 projectionAlert: null,
-                scheduleDebug: null,
+                scheduleDebug,
               });
             };
 
@@ -23471,6 +23502,177 @@ app.get('/schedule', requireLogin, async (req, res) => {
           { weekNumber: selectedWeek, visibleOnly: true }
         ).catch(() => null);
         rows = Array.isArray(scheduleState && scheduleState.scheduleRows) ? scheduleState.scheduleRows : [];
+        if (scheduleDebugEnabled && hasSessionRole(req, 'admin')) {
+          const runtimeScope = scheduleState && scheduleState.scope ? scheduleState.scope : null;
+          const runtimeTerm = scheduleState && scheduleState.term ? scheduleState.term : null;
+          const rawRows = (runtimeScope && runtimeTerm)
+            ? await getAcademicV2Store().all(
+              `
+                SELECT
+                  se.id AS schedule_entry_id,
+                  se.group_subject_id,
+                  se.group_subject_activity_id,
+                  se.group_number,
+                  se.target_group_numbers,
+                  se.day_of_week,
+                  se.class_number,
+                  se.week_number,
+                  se.lesson_type,
+                  activity.activity_type,
+                  gs.legacy_subject_id,
+                  gs.title AS subject_title,
+                  gs.is_visible,
+                  gs.group_count,
+                  gs.default_group,
+                  st.name AS template_name
+                FROM academic_v2_schedule_entries se
+                JOIN academic_v2_group_subject_activities activity ON activity.id = se.group_subject_activity_id
+                JOIN academic_v2_group_subjects gs ON gs.id = activity.group_subject_id
+                JOIN academic_v2_subject_templates st ON st.id = gs.subject_template_id
+                WHERE gs.group_id = ?
+                  AND se.term_id = ?
+                  AND se.week_number = ?
+                ORDER BY se.day_of_week ASC, se.class_number ASC, COALESCE(se.group_number, 1) ASC, se.id ASC
+              `,
+              [runtimeScope.group_id, runtimeTerm.id, selectedWeek]
+            ).catch(() => [])
+            : [];
+          const runtimeRowIds = new Set(
+            (rows || [])
+              .map((row) => Number(row && row.schedule_entry_id || 0))
+              .filter((value) => Number.isInteger(value) && value > 0)
+          );
+          const visibleSubjectIds = new Set(
+            ((courseSubjectScope && courseSubjectScope.subjects) || [])
+              .map((subject) => parsePositiveIntStrict(subject && (subject.subject_id || subject.id)))
+              .filter((value) => Number.isInteger(value) && value > 0)
+          );
+          const selectedGroupsBySubject = new Map();
+          (studentGroups || []).forEach((row) => {
+            const subjectId = parsePositiveIntStrict(row && row.subject_id);
+            const groupNumber = parsePositiveIntStrict(row && row.group_number);
+            if (!subjectId || !groupNumber) return;
+            if (!selectedGroupsBySubject.has(subjectId)) {
+              selectedGroupsBySubject.set(subjectId, new Set());
+            }
+            selectedGroupsBySubject.get(subjectId).add(groupNumber);
+          });
+          const debugRowDecisions = (rawRows || []).map((row) => {
+            const scheduleEntryId = Number(row && row.schedule_entry_id || 0);
+            const legacySubjectId = parsePositiveIntStrict(row && row.legacy_subject_id);
+            const activityType = String(row && (row.activity_type || row.lesson_type) || 'lecture').trim().toLowerCase() || 'lecture';
+            const isVisible = normalizeDebugBoolean(row && row.is_visible, true);
+            const mapped = Boolean(legacySubjectId);
+            const targetGroupNumbers = activityType === 'lecture'
+              ? []
+              : normalizeDebugGroupNumbers(
+                row && row.target_group_numbers,
+                [parsePositiveIntStrict(row && row.group_number)].filter(Boolean)
+              );
+            const selectedGroups = legacySubjectId && selectedGroupsBySubject.has(legacySubjectId)
+              ? Array.from(selectedGroupsBySubject.get(legacySubjectId)).sort((a, b) => a - b)
+              : [];
+            const included = runtimeRowIds.has(scheduleEntryId);
+            let reasonCode = included ? 'included_course_runtime' : 'dropped_course_runtime';
+            if (!isVisible) {
+              reasonCode = 'dropped_subject_invisible';
+            } else if (!mapped || !visibleSubjectIds.has(legacySubjectId)) {
+              reasonCode = 'dropped_missing_mapping';
+            } else if (activityType !== 'lecture' && selectedGroups.length && !selectedGroups.some((groupNumber) => targetGroupNumbers.includes(groupNumber))) {
+              reasonCode = 'dropped_subgroup_mismatch';
+            } else if (activityType !== 'lecture' && !selectedGroups.length) {
+              reasonCode = 'dropped_subject_not_selected';
+            }
+            return {
+              schedule_entry_id: scheduleEntryId,
+              group_subject_id: Number(row && row.group_subject_id || 0),
+              group_subject_activity_id: Number(row && row.group_subject_activity_id || 0),
+              legacy_subject_id: legacySubjectId,
+              subject_title: sanitizeCompactText((row && (row.subject_title || row.template_name)) || '', 160),
+              activity_type: activityType,
+              week_number: Number(row && row.week_number || 0) || selectedWeek,
+              day_of_week: normalizeWeekdayName(row && row.day_of_week) || String(row && row.day_of_week || ''),
+              class_number: Number(row && row.class_number || 0) || 0,
+              group_number: Number(row && row.group_number || 0) || 0,
+              target_group_numbers: targetGroupNumbers,
+              selected_group: selectedGroups.length ? selectedGroups[0] : null,
+              included,
+              reason_code: reasonCode,
+              mapping_state: mapped ? 'mapped' : 'unmapped',
+              compat_homework_enabled: included,
+            };
+          });
+          scheduleDebug = {
+            enabled: true,
+            resolved_scope: {
+              mode: isAdminViewAs ? 'admin_view_as_student' : 'admin_schedule',
+              requested_course_id: parsePositiveIntStrict(scheduleCourseId),
+              requested_group_number: parsePositiveIntStrict(effectiveViewAsGroupNumber || adminFallbackGroupNumber),
+              academic_group_id: runtimeScope ? parsePositiveIntStrict(runtimeScope.group_id) : null,
+              academic_group_label: runtimeScope ? sanitizeCompactText(runtimeScope.group_label || runtimeScope.group_code || '', 160) : '',
+              academic_group_code: runtimeScope ? sanitizeCompactText(runtimeScope.group_code || '', 80) : '',
+              legacy_course_id: runtimeScope ? parsePositiveIntStrict(runtimeScope.legacy_course_id) : null,
+              legacy_course_name: runtimeScope ? sanitizeCompactText(runtimeScope.legacy_course_name || '', 160) : '',
+              resolved_via: 'admin_schedule_scope',
+            },
+            resolved_term: runtimeTerm ? {
+              term_id: Number(runtimeTerm.id || 0),
+              title: sanitizeCompactText(runtimeTerm.title || '', 160),
+              term_number: Number(runtimeTerm.term_number || 0) || 1,
+              start_date: String(runtimeTerm.start_date || ''),
+              weeks_count: Number(runtimeTerm.weeks_count || 0) || 16,
+              legacy_semester_id: parsePositiveIntStrict(runtimeTerm.legacy_semester_id),
+            } : null,
+            selected_week: selectedWeek,
+            subject_catalog: {
+              all_visible_subjects: ((courseSubjectScope && courseSubjectScope.subjects) || []).map((subject) => ({
+                subject_id: parsePositiveIntStrict(subject && (subject.subject_id || subject.id)),
+                group_subject_id: Number(subject && subject.group_subject_id || 0),
+                subject_title: sanitizeCompactText((subject && (subject.subject_name || subject.title || subject.name)) || '', 160),
+                is_selected: false,
+                is_required: normalizeDebugBoolean(subject && subject.is_required, true),
+                is_general: normalizeDebugBoolean(subject && subject.is_general, true),
+                selected_group: null,
+              })),
+              selected_subjects: (studentGroups || []).map((subject) => ({
+                subject_id: parsePositiveIntStrict(subject && subject.subject_id),
+                group_subject_id: 0,
+                subject_title: sanitizeCompactText((subject && subject.subject_name) || '', 160),
+                selected_group: parsePositiveIntStrict(subject && subject.group_number),
+                is_required: true,
+                is_general: false,
+              })),
+              unmapped_subjects: Array.isArray(scheduleState && scheduleState.projectionIssues && scheduleState.projectionIssues.unmapped_subjects)
+                ? scheduleState.projectionIssues.unmapped_subjects.map((subject) => ({
+                  group_subject_id: Number(subject && subject.group_subject_id || 0),
+                  subject_title: sanitizeCompactText(subject && subject.subject_title, 160),
+                }))
+                : [],
+            },
+            raw_schedule_rows: (rawRows || []).map((row) => ({
+              schedule_entry_id: Number(row && row.schedule_entry_id || 0),
+              group_subject_id: Number(row && row.group_subject_id || 0),
+              group_subject_activity_id: Number(row && row.group_subject_activity_id || 0),
+              legacy_subject_id: parsePositiveIntStrict(row && row.legacy_subject_id),
+              subject_title: sanitizeCompactText((row && (row.subject_title || row.template_name)) || '', 160),
+              activity_type: String(row && (row.activity_type || row.lesson_type) || 'lecture').trim().toLowerCase() || 'lecture',
+              week_number: Number(row && row.week_number || 0) || selectedWeek,
+              day_of_week: normalizeWeekdayName(row && row.day_of_week) || String(row && row.day_of_week || ''),
+              class_number: Number(row && row.class_number || 0) || 0,
+              group_number: Number(row && row.group_number || 0) || 0,
+              target_group_numbers: normalizeDebugGroupNumbers(row && row.target_group_numbers),
+              is_visible: normalizeDebugBoolean(row && row.is_visible, true),
+              mapping_state: parsePositiveIntStrict(row && row.legacy_subject_id) ? 'mapped' : 'unmapped',
+            })),
+            row_decisions: debugRowDecisions,
+            summary: {
+              raw_rows_total: Array.isArray(rawRows) ? rawRows.length : 0,
+              included_rows_total: debugRowDecisions.filter((row) => row && row.included === true).length,
+              dropped_rows_total: debugRowDecisions.filter((row) => row && row.included !== true).length,
+              note: 'Admin debug follows the current /schedule course scope and selected subgroup. It does not use resolveStudentAcademicScope(user).',
+            },
+          };
+        }
       } else {
         const params = [selectedWeek];
         let sql = `
