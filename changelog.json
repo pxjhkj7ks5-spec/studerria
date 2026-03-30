@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.82",
+      "date": "2026-03-30",
+      "items": [
+        "fix(academic-v2-schedule-multiweek-replace): make Academic Setup v2 schedule saves treat the week list as the full desired state for the current slot/activity combination by cleaning up stale sibling rows outside the submitted week set, including after slot edits that change activity, day, class, or subgroup scope, and clarify this replace behavior directly in both the grid placement panel and advanced schedule editor"
+      ]
+    },
+    {
       "version": "1.3.81",
       "date": "2026-03-30",
       "items": [
