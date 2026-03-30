@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.77",
+      "date": "2026-03-30",
+      "items": [
+        "fix(student-schedule-lecture-fallback): broaden Academic V2 student schedule fallback so lecture rows can still render when the subject is required but missing an explicit subgroup-selection row, and even when the live course subject still lacks a legacy subject binding by assigning a synthetic local subject key for schedule-card rendering while keeping homework bindings disabled for those unmapped slots"
+      ]
+    },
+    {
       "version": "1.3.76",
       "date": "2026-03-30",
       "items": [
