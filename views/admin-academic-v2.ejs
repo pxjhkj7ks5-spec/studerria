@@ -2294,12 +2294,22 @@
         const studentSelectionCount = document.getElementById('studentSelectionCount');
         const studentBulkConfirmText = document.getElementById('studentBulkConfirmText');
         const bulkGroupId = document.getElementById('bulkGroupId');
+        const defaultSubjectId = Number(subjectCardsData[0] && subjectCardsData[0].id || 0);
+        const workspaceScopeKey = [
+          'admin-pathways',
+          <%- JSON.stringify(activeProgramId) %>,
+          <%- JSON.stringify(activeCohortId) %>,
+          <%- JSON.stringify(activeGroupId) %>,
+          <%- JSON.stringify(activeTermId) %>,
+          <%- JSON.stringify(activeTemplateStage) %>,
+        ].join(':');
+        const workspaceStateStorageKey = `academic-v2-workspace:${workspaceScopeKey}`;
 
         let activeMode = workspaceDefaultMode;
         let activeWorkspaceTab = 'overview';
         let activeScheduleView = 'calendar';
         let activeScheduleWeek = Number((schedulePlacementWeek && schedulePlacementWeek.value) || 1);
-        let activeSubjectId = Number(subjectCardsData[0] && subjectCardsData[0].id || 0);
+        let activeSubjectId = defaultSubjectId;
         let selectedSlot = {
           dayOfWeek: '',
           classNumber: 0,
@@ -2331,6 +2341,172 @@
             ? values
             : [String(Math.max(1, Number(activity.default_group || 0) || 1))];
         };
+        const getSessionStorage = () => {
+          try {
+            return window.sessionStorage;
+          } catch (_error) {
+            return null;
+          }
+        };
+        const hasSelectOptionValue = (selectElement, value) => (
+          !!selectElement
+          && Array.from(selectElement.options).some((option) => option.value === String(value || ''))
+        );
+        const buildScheduleDraft = () => {
+          const termId = Number(
+            (schedulePlacementTerm && schedulePlacementTerm.value)
+            || (scheduleTerm && scheduleTerm.value)
+            || 0
+          );
+          const activityId = Number(
+            (schedulePlacementActivity && schedulePlacementActivity.value)
+            || (scheduleActivity && scheduleActivity.value)
+            || 0
+          );
+          const draft = {
+            term_id: termId || '',
+            group_subject_activity_id: activityId || '',
+            day_of_week: String(selectedSlot.dayOfWeek || (scheduleDay && scheduleDay.value) || '').trim(),
+            class_number: Number(selectedSlot.classNumber || (scheduleClassNumber && scheduleClassNumber.value) || 0) || '',
+            week_number: Number(
+              (schedulePlacementWeek && schedulePlacementWeek.value)
+              || (scheduleWeekNumber && scheduleWeekNumber.value)
+              || activeScheduleWeek
+              || 1
+            ) || 1,
+            target_group_numbers: getRequestedValues(schedulePlacementTargetGroups).length
+              ? getRequestedValues(schedulePlacementTargetGroups)
+              : getRequestedValues(scheduleTargetGroups),
+          };
+          if (!draft.term_id && !draft.group_subject_activity_id && !draft.day_of_week && !draft.class_number) {
+            return null;
+          }
+          return draft;
+        };
+        const buildWorkspaceState = () => ({
+          mode: activeMode,
+          workspaceTab: activeWorkspaceTab,
+          scheduleView: activeScheduleView,
+          scheduleWeek: Number(activeScheduleWeek || 1) || 1,
+          subjectId: Number(activeSubjectId || 0) || 0,
+          scheduleDraft: buildScheduleDraft(),
+          scrollY: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0)),
+        });
+        const persistWorkspaceState = () => {
+          const storage = getSessionStorage();
+          if (!storage) {
+            return;
+          }
+          try {
+            storage.setItem(workspaceStateStorageKey, JSON.stringify(buildWorkspaceState()));
+          } catch (_error) {
+            // ignore storage failures
+          }
+        };
+        const persistScrollPosition = () => persistWorkspaceState();
+        const normalizeWorkspaceState = (rawState) => {
+          if (!rawState || typeof rawState !== 'object') {
+            return null;
+          }
+          const allowedModes = new Set(
+            modeButtons
+              .map((button) => String(button.getAttribute('data-mode-button') || '').trim())
+              .filter(Boolean)
+          );
+          const allowedTabs = new Set(
+            workspaceTabButtons
+              .map((button) => String(button.getAttribute('data-workspace-tab-target') || '').trim())
+              .filter(Boolean)
+          );
+          const allowedScheduleViews = new Set(
+            scheduleViewButtons
+              .map((button) => String(button.getAttribute('data-schedule-view-target') || '').trim())
+              .filter(Boolean)
+          );
+          const requestedSubjectId = Number(rawState.subjectId || 0);
+          const normalizedSubjectId = requestedSubjectId && getSubjectCardById(requestedSubjectId)
+            ? requestedSubjectId
+            : defaultSubjectId;
+          const requestedWeek = Number(rawState.scheduleWeek || 0);
+          const normalizedWeek = requestedWeek > 0 ? requestedWeek : activeScheduleWeek;
+          let normalizedScheduleDraft = null;
+          if (rawState.scheduleDraft && typeof rawState.scheduleDraft === 'object') {
+            const draft = rawState.scheduleDraft;
+            const draftActivityId = Number(draft.group_subject_activity_id || draft.activity_id || 0);
+            const draftTermId = Number(draft.term_id || 0);
+            if ((!draftActivityId || getScopedActivityById(draftActivityId))
+              && (!draftTermId || hasSelectOptionValue(schedulePlacementTerm || scheduleTerm, draftTermId))) {
+              normalizedScheduleDraft = {
+                term_id: draftTermId || '',
+                group_subject_activity_id: draftActivityId || '',
+                day_of_week: String(draft.day_of_week || '').trim(),
+                class_number: Number(draft.class_number || 0) || '',
+                week_number: Number(draft.week_number || normalizedWeek || 1) || normalizedWeek || 1,
+                target_group_numbers: Array.isArray(draft.target_group_numbers)
+                  ? draft.target_group_numbers.map((value) => String(value))
+                  : [],
+              };
+            }
+          }
+          return {
+            mode: allowedModes.has(String(rawState.mode || '').trim())
+              ? String(rawState.mode || '').trim()
+              : workspaceDefaultMode,
+            workspaceTab: allowedTabs.has(String(rawState.workspaceTab || '').trim())
+              ? String(rawState.workspaceTab || '').trim()
+              : 'overview',
+            scheduleView: allowedScheduleViews.has(String(rawState.scheduleView || '').trim())
+              ? String(rawState.scheduleView || '').trim()
+              : 'calendar',
+            scheduleWeek: normalizedWeek,
+            subjectId: normalizedSubjectId,
+            scheduleDraft: normalizedScheduleDraft,
+            scrollY: Math.max(0, Number(rawState.scrollY || 0) || 0),
+          };
+        };
+        const readWorkspaceState = () => {
+          const storage = getSessionStorage();
+          if (!storage) {
+            return null;
+          }
+          try {
+            const raw = storage.getItem(workspaceStateStorageKey);
+            return raw ? normalizeWorkspaceState(JSON.parse(raw)) : null;
+          } catch (_error) {
+            return null;
+          }
+        };
+        const restoreScrollPosition = (scrollY) => {
+          const target = Math.max(0, Number(scrollY || 0) || 0);
+          if (!target) {
+            return;
+          }
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              window.scrollTo({ top: target, left: 0, behavior: 'auto' });
+            });
+          });
+        };
+        const initialWorkspaceState = readWorkspaceState();
+        const restoredScheduleDraft = initialWorkspaceState
+          && initialWorkspaceState.workspaceTab === 'schedule'
+          && initialWorkspaceState.scheduleView === 'advanced'
+          ? initialWorkspaceState.scheduleDraft
+          : null;
+        const restoredScrollY = initialWorkspaceState ? initialWorkspaceState.scrollY : 0;
+        if (initialWorkspaceState) {
+          activeMode = initialWorkspaceState.mode;
+          activeWorkspaceTab = initialWorkspaceState.workspaceTab;
+          activeScheduleView = initialWorkspaceState.scheduleView;
+          activeScheduleWeek = initialWorkspaceState.scheduleWeek;
+          activeSubjectId = initialWorkspaceState.subjectId;
+          if (schedulePlacementWeek) {
+            schedulePlacementWeek.value = String(activeScheduleWeek || 1);
+          }
+          if (scheduleWeekNumber) {
+            scheduleWeekNumber.value = String(activeScheduleWeek || 1);
+          }
+        }
 
         const syncGroupTeacherDefaultVisibility = () => {
           if (!groupTeacherDefaultField || !groupTeacherDefault || !groupCohort) {
@@ -2567,6 +2743,7 @@
             subjectDetailReadiness.classList.toggle('academic-v2-chip--ok', Boolean(subject && subject.readiness && subject.readiness.tone === 'ok'));
             subjectDetailReadiness.classList.toggle('academic-v2-chip--warm', !subject || !subject.readiness || subject.readiness.tone !== 'ok');
           }
+          persistWorkspaceState();
         };
 
         const setMode = (mode) => {
@@ -2577,6 +2754,7 @@
           modeButtons.forEach((button) => {
             button.classList.toggle('is-active', String(button.getAttribute('data-mode-button') || '') === activeMode);
           });
+          persistWorkspaceState();
         };
 
         const setWorkspaceTab = (tab) => {
@@ -2588,6 +2766,7 @@
             button.classList.toggle('is-active', String(button.getAttribute('data-workspace-tab-target') || '') === activeWorkspaceTab);
           });
           setMode('workspace');
+          persistWorkspaceState();
         };
 
         const setScheduleView = (view) => {
@@ -2601,6 +2780,7 @@
           if (scheduleAdvancedBlock) {
             scheduleAdvancedBlock.open = activeScheduleView === 'advanced';
           }
+          persistWorkspaceState();
         };
 
         const applyPayload = (target, payload) => {
@@ -2656,6 +2836,7 @@
             setWorkspaceTab('schedule');
             setScheduleView('advanced');
           }
+          persistWorkspaceState();
         };
 
         document.querySelectorAll('[data-editor-target]').forEach((button) => {
@@ -2704,6 +2885,7 @@
               syncScheduleActivityState();
               syncSchedulePlacementState();
             }
+            persistWorkspaceState();
           });
         });
 
@@ -2746,6 +2928,7 @@
               scheduleWeekNumber.value = String(nextWeek);
             }
             syncSchedulePlacementState();
+            persistWorkspaceState();
           });
         });
 
@@ -2761,6 +2944,7 @@
               applyPayload('group-subject', subject);
             }
             setWorkspaceTab('subjects');
+            persistWorkspaceState();
           });
         });
 
@@ -2796,6 +2980,7 @@
             if (subjectForm) {
               subjectForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+            persistWorkspaceState();
           });
         });
 
@@ -2815,6 +3000,7 @@
               scheduleClassNumber.value = String(selectedSlot.classNumber);
             }
             syncSchedulePlacementState();
+            persistWorkspaceState();
           });
         });
 
@@ -2825,6 +3011,7 @@
             }
             syncScheduleActivityState();
             syncSchedulePlacementState();
+            persistWorkspaceState();
           });
         }
         if (schedulePlacementTerm) {
@@ -2833,6 +3020,7 @@
               scheduleTerm.value = schedulePlacementTerm.value;
             }
             syncSchedulePlacementState();
+            persistWorkspaceState();
           });
         }
         if (schedulePlacementWeek) {
@@ -2842,10 +3030,14 @@
               scheduleWeekNumber.value = schedulePlacementWeek.value;
             }
             syncSchedulePlacementState();
+            persistWorkspaceState();
           });
         }
         if (schedulePlacementTargetGroups) {
-          schedulePlacementTargetGroups.addEventListener('change', () => syncSchedulePlacementState());
+          schedulePlacementTargetGroups.addEventListener('change', () => {
+            syncSchedulePlacementState();
+            persistWorkspaceState();
+          });
         }
         if (schedulePlacementSave) {
           schedulePlacementSave.addEventListener('click', () => {
@@ -2910,6 +3102,7 @@
             syncSchedulePlacementState(basePayload);
             setWorkspaceTab('schedule');
             setScheduleView('advanced');
+            persistWorkspaceState();
           });
         });
 
@@ -2920,6 +3113,7 @@
             }
             syncScheduleActivityState();
             syncSchedulePlacementState();
+            persistWorkspaceState();
           });
         }
 
@@ -2963,6 +3157,8 @@
         if (groupCohort) {
           groupCohort.addEventListener('change', syncGroupTeacherDefaultVisibility);
         }
+        window.addEventListener('beforeunload', persistScrollPosition);
+        window.addEventListener('pagehide', persistScrollPosition);
         syncGroupTeacherDefaultVisibility();
         syncScheduleActivityState();
         syncSchedulePlacementState();
@@ -2970,6 +3166,19 @@
         setWorkspaceTab(activeWorkspaceTab);
         setScheduleView(activeScheduleView);
         setMode(activeMode);
+        if (activeWorkspaceTab === 'subjects' && activeSubjectId) {
+          const persistedSubject = getSubjectCardById(activeSubjectId);
+          if (persistedSubject) {
+            applyPayload('group-subject', persistedSubject);
+          }
+        }
+        if (restoredScheduleDraft) {
+          applyPayload('schedule', restoredScheduleDraft);
+          setWorkspaceTab('schedule');
+          setScheduleView('advanced');
+        }
+        restoreScrollPosition(restoredScrollY);
+        persistWorkspaceState();
       })();
     </script>
   </body>
