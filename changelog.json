@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.68",
+      "date": "2026-03-30",
+      "items": [
+        "feat(registration-cohort-scope-selector): rebuild `/register/course` into an explicit level -> program -> cohort -> campus selector backed by a richer Academic V2 `registrationScopeMatrix`, show all cohorts for the selected program with readiness and blocked setup reasons instead of silently auto-selecting the first ready path, keep blocked campuses visible with inline conflict/setup labels, hydrate only already-valid saved selections on revisit, and disable Continue until the academic group is explicitly confirmed"
+      ]
+    },
+    {
       "version": "1.3.67",
       "date": "2026-03-30",
       "items": [

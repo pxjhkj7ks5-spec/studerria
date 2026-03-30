@@ -1,153 +1,116 @@
 <%
-  const pathways = registrationPathways || { tracks: [], programs: [], admissions: [], links: [], courses: [] };
-  const selectedTrackValue = typeof selectedTrack === 'string' && selectedTrack ? selectedTrack : 'bachelor';
-  const selectedProgramValue = Number.isFinite(Number(selectedProgramId)) ? Number(selectedProgramId) : null;
-  const selectedAdmissionValue = Number.isFinite(Number(selectedAdmissionId)) ? Number(selectedAdmissionId) : null;
-  const selectedCampusValue = typeof selectedCampus === 'string' ? selectedCampus : '';
-  const selectedStudyContextValue = Number.isFinite(Number(selectedStudyContextId)) ? Number(selectedStudyContextId) : null;
-  const registrationContexts = Array.isArray(registrationStudyContexts) ? registrationStudyContexts : [];
+  const scopeMatrix = registrationScopeMatrix || {
+    tracks: [],
+    programs: [],
+    cohortsByProgram: {},
+    campusesByCohort: {},
+    teacherCampusesByProgram: {},
+    initialSelection: {},
+  };
+  const initialSelection = scopeMatrix.initialSelection || {};
+  const selectedTrackValue = typeof initialSelection.trackKey === 'string' && initialSelection.trackKey
+    ? initialSelection.trackKey
+    : (typeof selectedTrack === 'string' && selectedTrack ? selectedTrack : 'bachelor');
+  const formatTrackLabel = (trackKey, fallback) => {
+    const normalized = String(trackKey || '').trim().toLowerCase();
+    if (normalized === 'bachelor') return lang === 'en' ? 'Bachelor' : 'Бакалаврат';
+    if (normalized === 'master') return lang === 'en' ? "Master's" : 'Магістратура';
+    if (normalized === 'teacher') return lang === 'en' ? 'Teacher' : 'Викладач';
+    return fallback || normalized;
+  };
   const registerCourseText = lang === 'en'
     ? {
         themeToggleAria: 'Change theme',
+        introLabel: 'Academic scope',
+        introTitle: 'Choose the registration route',
+        introSubtitle: 'Studerria uses one explicit academic scope for the next registration step. Cohort and campus stay visible and never auto-confirm silently.',
+        stepTrack: 'Level',
+        stepTrackCopy: 'Choose the route you register into. The next steps will rebuild around this academic level.',
+        stepProgram: 'Program',
+        stepProgramCopy: 'Program sets the working context. Cohort and campus remain a separate explicit choice.',
+        stepCohort: 'Cohort',
+        stepCohortCopy: 'Pick the cohort you want to join. Blocked cohorts stay visible with setup reasons.',
+        stepCampus: 'Campus',
+        stepCampusCopyStudent: 'After the cohort is confirmed, choose the campus that resolves the exact academic group.',
+        stepCampusCopyTeacher: 'Choose the campus that resolves the teacher academic group for this program.',
+        chooseProgram: 'Choose a program',
+        chooseProgramFirst: 'Choose a program first to unlock cohort choices.',
+        noPrograms: 'No programs available for this route yet.',
+        noCohorts: 'No cohort is available for this program yet.',
+        noReadyCohorts: 'This program has no ready cohort for registration yet.',
+        chooseCohortFirst: 'Choose a cohort to review available campuses.',
+        noCampuses: 'No campuses are available for this scope yet.',
+        noReadyCampuses: 'This scope has no ready campus for registration yet.',
+        chooseCampus: 'Choose a campus to confirm the academic scope.',
+        summaryLabel: 'Confirmed academic scope',
+        summaryEmptyStudent: 'Choose program, cohort, and campus to continue.',
+        summaryEmptyTeacher: 'Choose program and campus to continue.',
+        summaryPending: 'Selection in progress',
+        summaryReady: 'Scope confirmed',
+        ready: 'Ready',
+        blocked: 'Blocked',
+        needsSetup: 'Needs setup',
+        cohortLabel: 'Cohort',
+        admissionYearLabel: 'Admission year',
+        campusLabel: 'Campus',
         campusKyiv: 'Kyiv',
         campusMunich: 'Munich',
-        trackBachelor: 'Bachelor',
-        trackMaster: "Master's",
-        trackTeacher: 'Teacher',
-        level: 'Level',
-        program: 'Program',
-        chooseProgram: 'Choose a program',
-        admissionYear: 'Admission year',
-        campus: 'Campus',
-        academicGroupPreview: 'Academic group',
-        summaryDefaultStudent: 'Select track, program, admission year, and campus.',
-        summaryDefaultTeacher: 'Select track, program, and campus.',
-        campusReadyTeacherHint: 'Choosing a campus automatically resolves the correct teacher academic group.',
-        campusReadyStudentHint: 'The admission year defines the cohort. Choosing a campus automatically resolves the academic context.',
-        chooseProgramFirstTitle: 'Choose a program first',
-        chooseProgramFirstSubtitle: 'Available admission years will appear after that.',
-        chooseProgramFirstTeacherSubtitle: 'Available teacher campuses will appear after that.',
-        noAdmissionYearsTitle: 'No admission years configured',
-        noAdmissionYearsSubtitle: 'Without an admission year, Studerria cannot resolve the cohort and registration stops before subjects.',
-        noTeacherPathTitle: 'No teacher pathway configured',
-        noTeacherPathSubtitle: 'Studerria cannot find one ready teacher academic group for this program yet.',
-        teacherPathRequiredHint: 'Teacher registration needs one ready teacher academic group per campus, otherwise the subject step cannot open correctly.',
-        noAvailableAdmissionTitle: 'No admission year available',
-        noAvailableAdmissionSubtitle: 'Ask an administrator to open one admission year, otherwise the student cohort cannot be resolved.',
-        noCampusesTitle: 'No campuses configured',
-        noCampusesTeacherSubtitle: 'Ask an administrator to configure at least one teacher academic group, otherwise the teacher route cannot be resolved.',
-        noCampusesStudentSubtitle: 'Ask an administrator to link one visible course per campus, otherwise the student cannot move to subjects.',
-        noCampusesTeacherHint: 'There are no campuses available for this teacher program yet.',
-        noCampusesStudentHint: 'There are no campuses available for this admission year yet.',
-        oneLinkedCourse: '1 linked group',
-        linkedCoursesSuffix: 'linked groups',
-        oneVisibleCourseNeeded: 'Exactly one visible course per campus is required, otherwise the student can land in the wrong subject flow.',
-        readyToRegister: 'Ready: Studerria can resolve one stable academic context for this campus.',
-        readyTeacherToRegister: 'Ready: Studerria can open the teacher subject flow for this campus.',
-        teacherDefaultRequiredTitle: 'Default teacher group required',
-        teacherDefaultRequiredSubtitle: 'Several teacher groups share this campus. Mark exactly one of them as the default registration group.',
-        teacherDefaultRequiredHint: 'Teacher registration stays blocked until this campus has one default teacher group.',
-        teacherMultipleDefaultsTitle: 'Too many default teacher groups',
-        teacherMultipleDefaultsSubtitle: 'Several teacher groups on this campus are marked as default. Leave only one.',
-        teacherMultipleDefaultsHint: 'Teacher registration stays blocked until this campus keeps exactly one default teacher group.',
-        ambiguousCampusHint: 'Campus mapping is ambiguous. Ask an administrator to leave one visible course per campus, otherwise subject registration becomes unstable.',
-        chooseValidCampus: 'Choose a valid campus before continuing, otherwise Studerria cannot resolve the correct academic context.',
+        availableCampusesOne: '1 campus ready',
+        availableCampusesMany: 'campuses ready',
+        totalCampusesLabel: 'campuses total',
+        scopeProgram: 'Program',
+        scopeCohort: 'Cohort',
+        scopeRoute: 'Route',
+        scopeGroup: 'Academic group',
+        continueLockedStudent: 'Choose cohort and campus before continuing.',
+        continueLockedTeacher: 'Choose campus before continuing.',
       }
     : {
         themeToggleAria: 'Змінити тему',
+        introLabel: 'Академічний контекст',
+        introTitle: 'Оберіть маршрут реєстрації',
+        introSubtitle: 'Studerria продовжує реєстрацію лише в межах одного явного академічного контексту. Когорта й кампус залишаються видимими та не підтверджуються автоматично.',
+        stepTrack: 'Рівень',
+        stepTrackCopy: 'Оберіть маршрут, у який ви реєструєтесь. Далі сторінка перебудується під цей академічний рівень.',
+        stepProgram: 'Програма',
+        stepProgramCopy: 'Програма задає робочий контекст. Когорта і кампус нижче залишаються окремим явним вибором.',
+        stepCohort: 'Когорта',
+        stepCohortCopy: 'Оберіть когорту, до якої хочете приєднатись. Заблоковані когорти залишаються видимими з причиною.',
+        stepCampus: 'Кампус',
+        stepCampusCopyStudent: 'Після підтвердження когорти оберіть кампус, який привʼязує точну академічну групу.',
+        stepCampusCopyTeacher: 'Оберіть кампус, який привʼязує викладацьку академічну групу для цієї програми.',
+        chooseProgram: 'Оберіть програму',
+        chooseProgramFirst: 'Спершу оберіть програму, щоб побачити когорти.',
+        noPrograms: 'Для цього маршруту ще немає доступних програм.',
+        noCohorts: 'Для цієї програми поки немає жодної когорти.',
+        noReadyCohorts: 'Для цієї програми поки немає готової когорти для реєстрації.',
+        chooseCohortFirst: 'Оберіть когорту, щоб переглянути доступні кампуси.',
+        noCampuses: 'Для цього контексту поки немає доступних кампусів.',
+        noReadyCampuses: 'Для цього контексту поки немає готового кампусу для реєстрації.',
+        chooseCampus: 'Оберіть кампус, щоб підтвердити академічний маршрут.',
+        summaryLabel: 'Підтверджений академічний контекст',
+        summaryEmptyStudent: 'Оберіть програму, когорту й кампус, щоб продовжити.',
+        summaryEmptyTeacher: 'Оберіть програму й кампус, щоб продовжити.',
+        summaryPending: 'Вибір ще не завершено',
+        summaryReady: 'Контекст підтверджено',
+        ready: 'Готово',
+        blocked: 'Заблоковано',
+        needsSetup: 'Потрібне налаштування',
+        cohortLabel: 'Когорта',
+        admissionYearLabel: 'Рік вступу',
+        campusLabel: 'Кампус',
         campusKyiv: 'Київ',
         campusMunich: 'Мюнхен',
-        trackBachelor: 'Бакалаврат',
-        trackMaster: 'Магістратура',
-        trackTeacher: 'Викладач',
-        level: 'Рівень',
-        program: 'Програма',
-        chooseProgram: 'Оберіть програму',
-        admissionYear: 'Рік вступу',
-        campus: 'Кампус',
-        campusReadyTeacherHint: 'Вибір кампусу автоматично привʼязує потрібний викладацький курс.',
-        campusReadyStudentHint: 'Рік вступу визначає когорту. Вибір кампусу автоматично привʼязує потрібний курс.',
-        chooseProgramFirstTitle: 'Спершу оберіть програму',
-        chooseProgramFirstSubtitle: 'Після цього зʼявляться доступні роки вступу.',
-        chooseProgramFirstTeacherSubtitle: 'Для викладача кампус визначається в межах обраної програми.',
-        noAdmissionYearsTitle: 'Немає налаштованих років вступу',
-        noAdmissionYearsSubtitle: '??? ???? ?????? Studerria ?? ????????? ???????, ???? ?????????? ?????????? ?? ?? ?????????.',
-        noTeacherPathTitle: 'Немає налаштованого викладацького шляху',
-        noTeacherPathSubtitle: '??? ?????? ????????? teacher-path Studerria ?? ????????? ???????????? workspace ? ????????? subject flow.',
-        teacherPathRequiredHint: '??? ?????????? ????????? ???????? ???? ???????? ????, ?????? ???? ? ?????????? ?? ??????????? ????????.',
-        noAvailableAdmissionTitle: 'Немає доступного року вступу',
-        noAvailableAdmissionSubtitle: '????????? ?????????????? ???????? ???? ??? ??????, ?????? ??????? ?? ???????????.',
-        noCampusesTitle: 'Немає налаштованих кампусів',
-        noCampusesTeacherSubtitle: '????????? ?????????????? ?????????? ?? ?????? teacher-course ?? ??????, ?????? ??????? ?? ???????????.',
-        noCampusesStudentSubtitle: '????????? ?????????????? ?????????? ?? ?????? ???????? ????? ?? ??????, ?????? ??????? ?? ????? ?? ?????????.',
-        noCampusesTeacherHint: 'Для цієї викладацької програми ще немає доступних кампусів.',
-        noCampusesStudentHint: 'Для цього року вступу ще немає доступних кампусів.',
-        oneLinkedCourse: '1 привʼязаний курс',
-        linkedCoursesSuffix: 'привʼязані курси',
-        oneVisibleCourseNeeded: '???????? ????? ???? ??????? ???? ?? ??????, ?????? ??????? ???? ????????? ?? ? ??? subject flow.',
-        readyToRegister: '??????: Studerria ???? ????????? ???? ?????????? ???? ??? ????? ???????.',
-        ambiguousCampusHint: '????????? ???????? ????????????. ????????? ?????????????? ???????? ?? ?????? ???????? ????? ?? ??????, ?????? subject registration ???? ????????????.',
-        chooseValidCampus: '??????? ????????? ?????? ????? ????????????, ?????? Studerria ?? ????????? ????????? ????.',
+        availableCampusesOne: '1 кампус готовий',
+        availableCampusesMany: 'кампусів готово',
+        totalCampusesLabel: 'кампусів у маршруті',
+        scopeProgram: 'Програма',
+        scopeCohort: 'Когорта',
+        scopeRoute: 'Маршрут',
+        scopeGroup: 'Академічна група',
+        continueLockedStudent: 'Оберіть когорту і кампус перед продовженням.',
+        continueLockedTeacher: 'Оберіть кампус перед продовженням.',
       };
-  if (lang !== 'en') {
-    Object.assign(registerCourseText, {
-      themeToggleAria: 'Змінити тему',
-      campusKyiv: 'Київ',
-      campusMunich: 'Мюнхен',
-      trackBachelor: 'Бакалаврат',
-      trackMaster: 'Магістратура',
-      trackTeacher: 'Викладач',
-      level: 'Рівень',
-      program: 'Програма',
-      chooseProgram: 'Оберіть програму',
-      admissionYear: 'Рік вступу',
-      campus: 'Кампус',
-      academicGroupPreview: 'Академічна група',
-      summaryDefaultStudent: 'Оберіть рівень, програму, рік вступу та кампус.',
-      summaryDefaultTeacher: 'Оберіть рівень, програму та кампус.',
-      campusReadyTeacherHint: 'Вибір кампусу автоматично визначає потрібну викладацьку академічну групу.',
-      campusReadyStudentHint: 'Рік вступу визначає когорту. Вибір кампусу автоматично обирає потрібну академічну групу.',
-      chooseProgramFirstTitle: 'Спершу оберіть програму',
-      chooseProgramFirstSubtitle: "Після цього з'являться доступні роки вступу.",
-      chooseProgramFirstTeacherSubtitle: "Після вибору програми з'являться доступні кампуси для викладача.",
-      noAdmissionYearsTitle: 'Немає налаштованих років вступу',
-      noAdmissionYearsSubtitle: 'Без року вступу Studerria не зможе визначити когорту, тож реєстрація не перейде до предметів.',
-      noTeacherPathTitle: 'Немає налаштованого викладацького шляху',
-      noTeacherPathSubtitle: 'Studerria поки не бачить жодної готової викладацької академічної групи для цієї програми.',
-      teacherPathRequiredHint: 'Для викладацької реєстрації потрібна одна готова академічна група на обраний кампус.',
-      noAvailableAdmissionTitle: 'Немає доступного року вступу',
-      noAvailableAdmissionSubtitle: 'Попросіть адміністратора відкрити хоча б один рік вступу, інакше когорту неможливо визначити.',
-      noCampusesTitle: 'Немає налаштованих кампусів',
-      noCampusesTeacherSubtitle: 'Попросіть адміністратора налаштувати викладацьку академічну групу хоча б для одного кампусу.',
-      noCampusesStudentSubtitle: 'Попросіть адміністратора налаштувати видиму академічну групу хоча б для одного кампусу.',
-      noCampusesTeacherHint: 'Для цієї викладацької програми ще немає доступних кампусів.',
-      noCampusesStudentHint: 'Для цього року вступу ще немає доступних кампусів.',
-      oneLinkedCourse: "1 пов'язана група",
-      linkedCoursesSuffix: "пов'язані групи",
-      oneVisibleCourseNeeded: 'Потрібна рівно одна готова академічна група на кампус, інакше реєстрація буде неоднозначною.',
-      readyToRegister: 'Готово: Studerria може визначити одну стабільну академічну групу для цього кампусу.',
-      readyTeacherToRegister: 'Готово: Studerria може відкрити викладацький маршрут для цього кампусу.',
-      teacherDefaultRequiredTitle: 'Потрібна типова викладацька група',
-      teacherDefaultRequiredSubtitle: 'Для цього кампусу існує кілька викладацьких груп. Адміністратор має позначити одну як default для реєстрації.',
-      teacherDefaultRequiredHint: 'Поки для цього кампусу не позначено одну типову викладацьку групу, реєстрація викладача недоступна.',
-      teacherMultipleDefaultsTitle: 'Кілька типових викладацьких груп',
-      teacherMultipleDefaultsSubtitle: 'Для цього кампусу позначено кілька default-груп. Адміністратор має залишити лише одну.',
-      teacherMultipleDefaultsHint: 'Поки для цього кампусу не залишиться одна default-викладацька група, реєстрація викладача недоступна.',
-      ambiguousCampusHint: "Прив'язка кампусу неоднозначна. Попросіть адміністратора залишити один коректний маршрут для цього кампусу.",
-      chooseValidCampus: 'Оберіть коректний кампус перед продовженням, інакше Studerria не визначить потрібну академічну групу.',
-    });
-  }
-  const isTeacherCourse = (course) => course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
-  const formatCampusLabel = (location) => String(location || 'kyiv').trim().toLowerCase() === 'munich'
-    ? registerCourseText.campusMunich
-    : registerCourseText.campusKyiv;
-  const formatTrackLabel = (trackKey, fallback) => {
-    const normalized = String(trackKey || '').trim().toLowerCase();
-    if (normalized === 'bachelor') return registerCourseText.trackBachelor;
-    if (normalized === 'master') return registerCourseText.trackMaster;
-    if (normalized === 'teacher') return registerCourseText.trackTeacher;
-    return fallback || normalized;
-  };
 %>
 <!doctype html>
 <html lang="<%= lang %>">
@@ -165,29 +128,30 @@
     />
     <style>
       :root {
-        --accent: #3b82f6;
-        --accent-dark: #2563eb;
-        --card-radius: 20px;
-        --glass-border-dark: rgba(255, 255, 255, 0.14);
-        --glass-border-light: rgba(15, 23, 42, 0.08);
-        --glass-bg-dark: rgba(255, 255, 255, 0.06);
-        --glass-bg-light: rgba(255, 255, 255, 0.7);
+        --accent: #2583ff;
+        --accent-strong: #1068de;
+        --accent-soft: rgba(37, 131, 255, 0.14);
+        --success: #118a56;
+        --warning: #b86b00;
+        --danger: #cf3c44;
+        --card-radius: 28px;
       }
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-          "Helvetica Neue", "Inter", Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
         min-height: 100vh;
       }
       body.theme-light {
-        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.35), transparent 60%),
-          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.35), transparent 60%),
-          linear-gradient(135deg, #eef2ff 0%, #f0f9ff 50%, #fdf4ff 100%);
+        background:
+          radial-gradient(1200px 900px at 10% 10%, rgba(96, 165, 250, 0.28), transparent 60%),
+          radial-gradient(1000px 800px at 92% 12%, rgba(34, 211, 238, 0.2), transparent 58%),
+          linear-gradient(160deg, #eef6ff 0%, #f7fbff 54%, #f6f7fb 100%);
         color: #0f172a;
       }
       body.theme-dark {
-        background: radial-gradient(1200px 800px at 15% 10%, rgba(139, 92, 246, 0.3), transparent 60%),
-          radial-gradient(1000px 700px at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%),
-          linear-gradient(160deg, #050508 0%, #12061a 45%, #1b0f26 100%);
+        background:
+          radial-gradient(1200px 900px at 8% 10%, rgba(32, 124, 229, 0.28), transparent 62%),
+          radial-gradient(1000px 780px at 88% 10%, rgba(14, 165, 233, 0.16), transparent 60%),
+          linear-gradient(180deg, #07111d 0%, #0a1727 48%, #0d1d31 100%);
         color: #f8fafc;
       }
       .glass {
@@ -196,295 +160,339 @@
         overflow: clip;
         background-clip: padding-box;
         border-radius: var(--card-radius);
-        backdrop-filter: blur(20px);
-        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
-      }
-      body.theme-dark .glass {
-        background: var(--glass-bg-dark);
-        border: 1px solid var(--glass-border-dark);
-        box-shadow: 0 18px 45px rgba(8, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(22px) saturate(160%);
+        -webkit-backdrop-filter: blur(22px) saturate(160%);
+        transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease, transform 180ms ease;
       }
       body.theme-light .glass {
-        background: var(--glass-bg-light);
-        border: 1px solid var(--glass-border-light);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(244, 249, 255, 0.78));
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        box-shadow: 0 28px 64px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      }
+      body.theme-dark .glass {
+        background: linear-gradient(180deg, rgba(16, 29, 46, 0.78), rgba(13, 25, 42, 0.72));
+        border: 1px solid rgba(148, 191, 255, 0.14);
+        box-shadow: 0 34px 72px rgba(1, 8, 20, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
       }
       body.page-register-course .auth-card {
-        border-radius: 28px;
-        border: 1px solid rgba(191, 219, 254, 0.16);
+        border-radius: 34px;
         overflow: hidden;
       }
-      body.theme-dark.page-register-course .auth-card {
-        background: linear-gradient(180deg, rgba(61, 70, 146, 0.9), rgba(44, 49, 126, 0.94)) !important;
-        border-color: rgba(191, 219, 254, 0.18);
-        box-shadow: 0 32px 72px rgba(5, 8, 24, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-      }
-      body.theme-light.page-register-course .auth-card {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 245, 255, 0.88)) !important;
-        border-color: rgba(148, 163, 184, 0.22);
-        box-shadow: 0 26px 54px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72);
-      }
       body.page-register-course .auth-card .card-body {
-        padding: 1.65rem 1.5rem !important;
-      }
-      body.theme-dark .auth-card h1 {
-        color: #f8fafc;
+        padding: 1.8rem 1.6rem !important;
       }
       body.page-register-course .auth-card h1 {
-        font-weight: 700;
-        letter-spacing: -0.03em;
-        margin-bottom: 1rem !important;
+        margin: 0;
+        font-size: clamp(1.45rem, 3vw, 1.95rem);
+        line-height: 1.06;
+        letter-spacing: -0.04em;
+        font-weight: 760;
       }
-      .course-option {
-        position: relative;
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        border-radius: 14px;
-        padding: 0.85rem 1rem;
-        cursor: pointer;
-        justify-content: space-between;
-        gap: 0.85rem;
-        transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+      .registration-intro {
+        margin-bottom: 1.15rem;
+        padding: 1.1rem 1.15rem 1.05rem;
+        border-radius: 24px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
       }
-      .course-option input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
+      body.theme-light .registration-intro {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(238, 247, 255, 0.78));
       }
-      .course-option-content {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        min-width: 0;
+      body.theme-dark .registration-intro {
+        background: linear-gradient(135deg, rgba(17, 32, 53, 0.74), rgba(10, 24, 41, 0.78));
       }
-      .campus-option .course-option-content {
+      .registration-eyebrow {
+        display: inline-flex;
         align-items: center;
-        text-align: center;
+        gap: 0.4rem;
+        min-height: 1.8rem;
+        padding: 0.2rem 0.72rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
       }
-      .course-option-subtitle {
-        font-size: 0.78rem;
-        line-height: 1.35;
-        opacity: 0.76;
+      body.theme-light .registration-eyebrow {
+        background: rgba(37, 131, 255, 0.1);
+        color: rgba(17, 76, 149, 0.9);
       }
-      .course-option-title {
-        font-weight: 650;
-        line-height: 1.26;
+      body.theme-dark .registration-eyebrow {
+        background: rgba(96, 165, 250, 0.12);
+        color: rgba(191, 219, 254, 0.92);
       }
-      .course-option-meta {
+      .registration-intro-copy {
+        margin-top: 0.8rem;
+      }
+      .registration-intro-copy p {
+        margin: 0.5rem 0 0;
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+      body.theme-light .registration-intro-copy p {
+        color: rgba(51, 65, 85, 0.84);
+      }
+      body.theme-dark .registration-intro-copy p {
+        color: rgba(226, 232, 240, 0.8);
+      }
+      .registration-step {
+        padding: 1rem 0 1.05rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.14);
+      }
+      .registration-step:first-of-type {
+        border-top: 0;
+        padding-top: 0.25rem;
+      }
+      .registration-step-header {
         display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
+        align-items: flex-start;
+        gap: 0.85rem;
+        margin-bottom: 0.8rem;
       }
-      .course-option-pill {
+      .registration-step-index {
+        flex: 0 0 auto;
+        width: 1.9rem;
+        height: 1.9rem;
+        border-radius: 999px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 1.55rem;
-        padding: 0.18rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 600;
-        letter-spacing: -0.01em;
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        background: rgba(255, 255, 255, 0.52);
-        color: rgba(30, 41, 59, 0.78);
+        font-size: 0.82rem;
+        font-weight: 700;
       }
-      .course-option span {
-        font-weight: 600;
+      body.theme-light .registration-step-index {
+        background: rgba(37, 131, 255, 0.09);
+        color: rgba(17, 76, 149, 0.9);
       }
-      .course-option:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+      body.theme-dark .registration-step-index {
+        background: rgba(96, 165, 250, 0.12);
+        color: rgba(191, 219, 254, 0.92);
       }
-      .course-option.is-disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
+      .registration-step-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
       }
-      .course-option.is-selected {
-        border-color: rgba(59, 130, 246, 0.9);
-        background: rgba(59, 130, 246, 0.12);
-        box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
+      .registration-step-copy {
+        margin: 0.28rem 0 0;
+        font-size: 0.82rem;
+        line-height: 1.5;
       }
-      .campus-option {
-        min-height: 78px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.75rem 0.85rem;
+      body.theme-light .registration-step-copy {
+        color: rgba(51, 65, 85, 0.78);
       }
-      .campus-option .course-option-title {
-        font-size: 0.98rem;
+      body.theme-dark .registration-step-copy {
+        color: rgba(226, 232, 240, 0.72);
       }
-      .campus-option .course-option-subtitle {
-        font-size: 0.74rem;
-        max-width: 20ch;
-        line-height: 1.34;
-      }
-      .admission-option {
-        min-height: 78px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.75rem 0.85rem;
-      }
-      .admission-option .course-option-content {
-        align-items: center;
-        text-align: center;
-      }
-      .admission-option .course-option-title {
-        font-size: 0.98rem;
-      }
-      .admission-option .course-option-subtitle {
-        font-size: 0.74rem;
-        line-height: 1.34;
-      }
-      body.theme-dark .course-option {
-        border-color: rgba(255, 255, 255, 0.15);
-        background: rgba(255, 255, 255, 0.04);
-      }
-      body.theme-dark .course-option span {
-        color: #f8fafc;
-      }
-      body.theme-dark .course-option .course-option-pill {
-        border-color: rgba(191, 219, 254, 0.18);
-        background: rgba(15, 23, 42, 0.34);
-        color: rgba(226, 232, 240, 0.88);
-      }
-      body.theme-dark .course-option.is-selected {
-        background: rgba(59, 130, 246, 0.2);
-        border-color: rgba(59, 130, 246, 0.9);
-      }
-      body.page-register-course .course-option.is-selected .course-option-pill {
-        border-color: rgba(99, 102, 241, 0.34);
-        background: rgba(255, 255, 255, 0.22);
-      }
-      .pathway-grid {
+      .track-grid,
+      .scope-grid {
         display: grid;
-        gap: 12px;
+        gap: 0.78rem;
+      }
+      .track-grid {
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       }
-      .track-option {
+      .scope-grid--cohorts {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+      .scope-grid--campuses {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+      .track-option,
+      .scope-option,
+      .registration-empty {
         position: relative;
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        border-radius: 14px;
-        padding: 0.65rem 0.8rem;
-        cursor: pointer;
+        border-radius: 20px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, background 150ms ease, opacity 150ms ease;
+      }
+      body.theme-light .track-option,
+      body.theme-light .scope-option,
+      body.theme-light .registration-empty {
+        background: rgba(255, 255, 255, 0.58);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+      }
+      body.theme-dark .track-option,
+      body.theme-dark .scope-option,
+      body.theme-dark .registration-empty {
+        background: rgba(255, 255, 255, 0.05);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+      .track-option {
+        padding: 0.85rem 0.95rem;
         text-align: center;
-        font-weight: 600;
-        transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+        cursor: pointer;
+        font-weight: 700;
       }
       .track-option input {
         position: absolute;
         opacity: 0;
         pointer-events: none;
       }
-      .track-option:hover {
+      .track-option:hover,
+      .scope-option:hover {
         transform: translateY(-1px);
-        box-shadow: 0 10px 18px rgba(15, 23, 42, 0.1);
       }
-      .track-option.is-selected {
-        border-color: rgba(59, 130, 246, 0.9);
-        background: rgba(59, 130, 246, 0.14);
-        box-shadow: 0 10px 22px rgba(59, 130, 246, 0.2);
+      .track-option.is-selected,
+      .scope-option.is-selected {
+        border-color: rgba(37, 131, 255, 0.58);
       }
-      .track-option.is-disabled {
-        opacity: 0.45;
+      body.theme-light .track-option.is-selected,
+      body.theme-light .scope-option.is-selected {
+        background: linear-gradient(135deg, rgba(37, 131, 255, 0.14), rgba(78, 205, 196, 0.12));
+        box-shadow: 0 18px 34px rgba(37, 131, 255, 0.12);
+      }
+      body.theme-dark .track-option.is-selected,
+      body.theme-dark .scope-option.is-selected {
+        background: linear-gradient(135deg, rgba(37, 131, 255, 0.18), rgba(18, 182, 201, 0.14));
+        box-shadow: 0 18px 34px rgba(6, 20, 42, 0.26);
+      }
+      .track-option.is-disabled,
+      .scope-option.is-disabled {
+        cursor: not-allowed;
+        opacity: 0.58;
+      }
+      .scope-option {
+        width: 100%;
+        padding: 0.95rem 1rem;
+        text-align: left;
+        cursor: pointer;
+      }
+      .scope-option[disabled] {
         cursor: not-allowed;
       }
-      .pathway-label {
-        display: block;
-        font-size: 0.85rem;
-        opacity: 1;
-        margin-bottom: 6px;
-        font-weight: 600;
-        letter-spacing: -0.01em;
+      .scope-option-head,
+      .scope-option-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.7rem;
       }
-      body.theme-light.page-register-course .pathway-label {
+      .scope-option-head {
+        margin-bottom: 0.55rem;
+      }
+      .scope-option-title {
+        font-size: 0.98rem;
+        font-weight: 700;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+      .scope-option-subtitle {
+        font-size: 0.78rem;
+        line-height: 1.42;
+        margin-top: 0.24rem;
+      }
+      body.theme-light .scope-option-subtitle,
+      body.theme-light .registration-empty-copy,
+      body.theme-light .registration-hint,
+      body.theme-light .program-static-copy,
+      body.theme-light .registration-summary-copy {
         color: rgba(51, 65, 85, 0.78);
       }
-      body.theme-dark.page-register-course .pathway-label {
-        color: rgba(226, 232, 240, 0.86);
-      }
-      body.theme-dark .track-option {
-        border-color: rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.05);
-      }
-      body.theme-dark .track-option.is-selected {
-        border-color: rgba(59, 130, 246, 0.9);
-        background: rgba(59, 130, 246, 0.2);
-      }
-      .pathway-select {
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.42);
-        min-height: 44px;
-        font-weight: 600;
-      }
-      body.theme-dark .pathway-select {
-        border-color: rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.06);
-        color: #f8fafc;
-      }
-      .pathway-hint {
-        font-size: 0.8rem;
-        opacity: 1;
-        line-height: 1.45;
-      }
-      body.theme-light.page-register-course .pathway-hint {
-        color: rgba(51, 65, 85, 0.72);
-      }
-      body.theme-dark.page-register-course .pathway-hint {
+      body.theme-dark .scope-option-subtitle,
+      body.theme-dark .registration-empty-copy,
+      body.theme-dark .registration-hint,
+      body.theme-dark .program-static-copy,
+      body.theme-dark .registration-summary-copy {
         color: rgba(226, 232, 240, 0.74);
       }
-      body.page-register-course .track-option > span,
-      body.page-register-course .course-option .course-option-title {
-        display: inline-block;
-        color: inherit;
+      .scope-option-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.42rem;
       }
-      body.theme-light.page-register-course .track-option,
-      body.theme-light.page-register-course .course-option {
-        background: rgba(255, 255, 255, 0.42);
-        border-color: rgba(148, 163, 184, 0.28);
-        color: #0f172a;
+      .scope-pill,
+      .scope-status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.65rem;
+        padding: 0.2rem 0.62rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
       }
-      body.theme-light.page-register-course .track-option.is-selected,
-      body.theme-light.page-register-course .course-option.is-selected {
-        background: linear-gradient(135deg, rgba(79, 70, 229, 0.18), rgba(168, 85, 247, 0.16));
-        border-color: rgba(79, 70, 229, 0.46);
-        box-shadow: 0 14px 28px rgba(99, 102, 241, 0.16);
+      .scope-pill {
+        border: 1px solid rgba(148, 163, 184, 0.22);
       }
-      body.theme-dark.page-register-course .track-option,
-      body.theme-dark.page-register-course .course-option {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
-        border-color: rgba(191, 219, 254, 0.14);
-        color: rgba(248, 250, 252, 0.94);
+      body.theme-light .scope-pill {
+        background: rgba(255, 255, 255, 0.72);
+        color: rgba(30, 41, 59, 0.76);
       }
-      body.theme-dark.page-register-course .track-option:hover,
-      body.theme-dark.page-register-course .course-option:hover {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.07));
-        box-shadow: 0 14px 28px rgba(8, 12, 28, 0.24);
+      body.theme-dark .scope-pill {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(226, 232, 240, 0.84);
       }
-      body.theme-dark.page-register-course .track-option.is-selected,
-      body.theme-dark.page-register-course .course-option.is-selected {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.24), rgba(139, 92, 246, 0.28));
-        border-color: rgba(96, 165, 250, 0.72);
-        box-shadow: 0 16px 32px rgba(37, 99, 235, 0.22);
+      .scope-status--ready {
+        color: var(--success);
+        background: rgba(17, 138, 86, 0.12);
       }
-      body.theme-dark.page-register-course .track-option.is-selected span,
-      body.theme-dark.page-register-course .course-option.is-selected span {
-        color: #ffffff;
+      .scope-status--blocked {
+        color: var(--danger);
+        background: rgba(207, 60, 68, 0.12);
       }
-      body.theme-light.page-register-course .pathway-select {
+      .scope-status--needs_setup {
+        color: var(--warning);
+        background: rgba(184, 107, 0, 0.14);
+      }
+      body.theme-dark .scope-status--ready {
+        color: #86efac;
+        background: rgba(17, 138, 86, 0.16);
+      }
+      body.theme-dark .scope-status--blocked {
+        color: #fda4af;
+        background: rgba(207, 60, 68, 0.18);
+      }
+      body.theme-dark .scope-status--needs_setup {
+        color: #fdba74;
+        background: rgba(184, 107, 0, 0.18);
+      }
+      .registration-empty {
+        padding: 0.95rem 1rem;
+      }
+      .registration-empty-title {
+        font-size: 0.94rem;
+        font-weight: 700;
+        line-height: 1.25;
+      }
+      .registration-empty-copy {
+        margin-top: 0.28rem;
+        font-size: 0.79rem;
+        line-height: 1.45;
+      }
+      .program-static {
+        padding: 0.9rem 1rem;
+        border-radius: 20px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      body.theme-light .program-static {
+        background: rgba(255, 255, 255, 0.58);
+      }
+      body.theme-dark .program-static {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .program-static-title {
+        font-size: 0.96rem;
+        font-weight: 700;
+      }
+      .program-static-copy {
+        margin-top: 0.24rem;
+        font-size: 0.79rem;
+      }
+      .pathway-select {
+        min-height: 48px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        font-weight: 650;
+      }
+      body.theme-light .pathway-select {
         background: rgba(255, 255, 255, 0.76);
-        border-color: rgba(148, 163, 184, 0.26);
         color: #0f172a;
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
       }
-      body.theme-dark.page-register-course .pathway-select {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
-        border-color: rgba(191, 219, 254, 0.16);
+      body.theme-dark .pathway-select {
+        background: rgba(255, 255, 255, 0.08);
         color: #f8fafc;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 26px rgba(5, 8, 24, 0.18);
       }
       body.page-register-course .pathway-select option {
         color: #0f172a;
@@ -492,23 +500,106 @@
       }
       body.theme-dark.page-register-course .pathway-select option {
         color: #f8fafc;
-        background: #1b2342;
+        background: #0f2238;
+      }
+      .registration-hint {
+        margin: 0.65rem 0 0;
+        font-size: 0.79rem;
+        line-height: 1.45;
+      }
+      .registration-hint.is-error {
+        color: var(--danger) !important;
+      }
+      .registration-summary {
+        margin-top: 1rem;
+        padding: 1rem 1.05rem 1.05rem;
+        border-radius: 24px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+      }
+      body.theme-light .registration-summary {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(241, 248, 255, 0.8));
+      }
+      body.theme-dark .registration-summary {
+        background: linear-gradient(135deg, rgba(13, 28, 46, 0.84), rgba(10, 24, 39, 0.8));
+      }
+      .registration-summary-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.7rem;
+      }
+      .registration-summary-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+      }
+      body.theme-light .registration-summary-label {
+        color: rgba(51, 65, 85, 0.68);
+      }
+      body.theme-dark .registration-summary-label {
+        color: rgba(226, 232, 240, 0.62);
+      }
+      .registration-summary-title {
+        margin: 0.75rem 0 0;
+        font-size: 1.02rem;
+        line-height: 1.38;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .registration-summary-copy {
+        margin: 0.35rem 0 0;
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+      .summary-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.85rem;
+      }
+      .summary-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.38rem;
+        min-height: 1.75rem;
+        padding: 0.24rem 0.68rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 650;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      body.theme-light .summary-chip {
+        background: rgba(255, 255, 255, 0.72);
+        color: rgba(30, 41, 59, 0.84);
+      }
+      body.theme-dark .summary-chip {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(226, 232, 240, 0.88);
+      }
+      .auth-action-stack {
+        margin-top: 1.15rem;
       }
       body.page-register-course .register-action-btn {
-        height: 46px;
-        border-radius: 14px;
-        font-weight: 600;
+        height: 48px;
+        border-radius: 16px;
+        font-weight: 700;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.75rem 1rem;
+        padding: 0.78rem 1rem;
       }
       body.page-register-course .btn-primary.register-action-btn {
-        background: #3b82f6;
-        border: 1px solid rgba(59, 130, 246, 0.6);
+        background: linear-gradient(180deg, #2d8cff, #1973e8);
+        border: 1px solid rgba(37, 131, 255, 0.52);
+        box-shadow: 0 18px 34px rgba(37, 131, 255, 0.18);
+      }
+      body.page-register-course .btn-primary.register-action-btn:disabled {
+        opacity: 0.58;
+        box-shadow: none;
       }
       body.page-register-course .btn-outline-primary.register-action-btn {
-        border-radius: 14px;
+        border-radius: 16px;
       }
       .theme-toggle-floating {
         position: fixed;
@@ -517,45 +608,52 @@
         z-index: 10;
       }
       .theme-toggle-min {
-        width: 40px;
-        height: 40px;
+        width: 42px;
+        height: 42px;
         border-radius: 999px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.22);
         background: rgba(255, 255, 255, 0.08);
         color: inherit;
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(12px);
       }
       body.theme-light .theme-toggle-min {
         border-color: rgba(15, 23, 42, 0.12);
-        background: rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.74);
       }
       .btn {
         transition: transform 140ms ease, box-shadow 140ms ease;
       }
-      .btn:hover {
+      .btn:hover:not(:disabled) {
         transform: translateY(-1px);
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
       }
-      body.theme-dark .btn:hover {
-        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4);
-      }
-      .btn:active {
+      .btn:active:not(:disabled) {
         transform: translateY(0);
-        box-shadow: none;
       }
       .app-footer {
         font-size: 0.8rem;
       }
       body.theme-dark .app-footer {
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba(255, 255, 255, 0.62);
       }
       body.theme-light .app-footer {
         color: rgba(15, 23, 42, 0.6);
       }
-</style>
+      @media (max-width: 767px) {
+        body.page-register-course .auth-card .card-body {
+          padding: 1.35rem 1.05rem !important;
+        }
+        .registration-step-header {
+          gap: 0.7rem;
+        }
+        .scope-grid--cohorts,
+        .scope-grid--campuses {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
@@ -581,22 +679,31 @@
     </div>
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
-        <div class="col-11 col-sm-8 col-md-6 col-lg-4">
+        <div class="col-11 col-md-10 col-lg-8 col-xl-7">
           <div class="card auth-card glass">
-            <div class="card-body p-4">
-              <h1 class="h4 mb-3 text-center"><%= t('registerCourse.title') %></h1>
+            <div class="card-body">
+              <div class="registration-intro glass">
+                <span class="registration-eyebrow"><%= registerCourseText.introLabel %></span>
+                <div class="registration-intro-copy">
+                  <h1><%= registerCourseText.introTitle %></h1>
+                  <p><%= registerCourseText.introSubtitle %></p>
+                </div>
+              </div>
               <% if (error) { %>
               <div class="alert alert-danger" role="alert"><%= error %></div>
               <% } %>
-              <form method="POST" action="/register/course">
-                <div class="mb-3">
-                  <span class="pathway-label"><%= registerCourseText.level %></span>
-                  <div class="pathway-grid" id="trackGrid">
-                    <% (pathways.tracks || []).forEach((track) => { %>
-                      <label
-                        class="track-option <%= track.enabled ? '' : 'is-disabled' %>"
-                        data-track-card="<%= track.key %>"
-                      >
+              <form method="POST" action="/register/course" id="registerCourseForm">
+                <section class="registration-step">
+                  <div class="registration-step-header">
+                    <span class="registration-step-index">1</span>
+                    <div>
+                      <h2 class="registration-step-title"><%= registerCourseText.stepTrack %></h2>
+                      <p class="registration-step-copy"><%= registerCourseText.stepTrackCopy %></p>
+                    </div>
+                  </div>
+                  <div class="track-grid" id="trackGrid">
+                    <% (scopeMatrix.tracks || []).forEach((track) => { %>
+                      <label class="track-option <%= track.enabled ? '' : 'is-disabled' %>" data-track-card="<%= track.key %>">
                         <input
                           type="radio"
                           name="study_track"
@@ -609,46 +716,74 @@
                       </label>
                     <% }) %>
                   </div>
-                </div>
+                </section>
 
-                <div class="mb-3" id="programField">
-                  <label class="pathway-label" for="studyProgramSelect"><%= registerCourseText.program %></label>
-                  <select
-                    id="studyProgramSelect"
-                    name="program_id"
-                    class="form-select pathway-select"
-                    data-selected-program="<%= selectedProgramValue || '' %>"
-                  >
-                    <option value=""><%= registerCourseText.chooseProgram %></option>
-                  </select>
-                </div>
-                <div class="mb-3" id="programStaticField" style="display: none;">
-                  <span class="pathway-label"><%= registerCourseText.program %></span>
-                  <div class="track-option is-selected">
-                    <span id="programStaticLabel"></span>
+                <section class="registration-step">
+                  <div class="registration-step-header">
+                    <span class="registration-step-index">2</span>
+                    <div>
+                      <h2 class="registration-step-title"><%= registerCourseText.stepProgram %></h2>
+                      <p class="registration-step-copy"><%= registerCourseText.stepProgramCopy %></p>
+                    </div>
                   </div>
+                  <div id="programField">
+                    <label class="visually-hidden" for="studyProgramSelect"><%= registerCourseText.stepProgram %></label>
+                    <select id="studyProgramSelect" name="program_id" class="form-select pathway-select"></select>
+                  </div>
+                  <div id="programStaticField" style="display:none;">
+                    <div class="program-static">
+                      <div class="program-static-title" id="programStaticLabel"></div>
+                      <div class="program-static-copy" id="programStaticCopy"><%= registerCourseText.stepProgramCopy %></div>
+                    </div>
+                  </div>
+                  <p class="registration-hint" id="programHint"></p>
+                </section>
+
+                <section class="registration-step" id="cohortStep">
+                  <div class="registration-step-header">
+                    <span class="registration-step-index">3</span>
+                    <div>
+                      <h2 class="registration-step-title"><%= registerCourseText.stepCohort %></h2>
+                      <p class="registration-step-copy"><%= registerCourseText.stepCohortCopy %></p>
+                    </div>
+                  </div>
+                  <input type="hidden" name="cohort_id" id="selectedCohortInput" value="" />
+                  <div class="scope-grid scope-grid--cohorts" id="cohortOptions"></div>
+                  <p class="registration-hint" id="cohortHint"></p>
+                </section>
+
+                <section class="registration-step" id="campusStep">
+                  <div class="registration-step-header">
+                    <span class="registration-step-index">4</span>
+                    <div>
+                      <h2 class="registration-step-title"><%= registerCourseText.stepCampus %></h2>
+                      <p class="registration-step-copy" id="campusStepCopy"><%= registerCourseText.stepCampusCopyStudent %></p>
+                    </div>
+                  </div>
+                  <input type="hidden" name="group_id" id="selectedGroupInput" value="" />
+                  <input type="hidden" name="campus" id="selectedCampusInput" value="" />
+                  <div class="scope-grid scope-grid--campuses" id="campusOptions"></div>
+                  <p class="registration-hint" id="campusHint"></p>
+                </section>
+
+                <div class="registration-summary glass" id="academicContextSummaryCard">
+                  <div class="registration-summary-head">
+                    <span class="registration-summary-label"><%= registerCourseText.summaryLabel %></span>
+                    <span class="scope-status scope-status--needs_setup" id="summaryStatusBadge"><%= registerCourseText.summaryPending %></span>
+                  </div>
+                  <div class="registration-summary-title" id="academicContextSummary">
+                    <%= selectedTrackValue === 'teacher' ? registerCourseText.summaryEmptyTeacher : registerCourseText.summaryEmptyStudent %>
+                  </div>
+                  <p class="registration-summary-copy" id="academicContextSummaryCopy">
+                    <%= selectedTrackValue === 'teacher' ? registerCourseText.continueLockedTeacher : registerCourseText.continueLockedStudent %>
+                  </p>
+                  <div class="summary-chip-row" id="summaryChips"></div>
                 </div>
 
-                <div class="mb-3" id="admissionField">
-                  <label class="pathway-label"><%= registerCourseText.admissionYear %></label>
-                  <input type="hidden" name="cohort_id" id="selectedAdmissionInput" value="<%= selectedAdmissionValue || '' %>" />
-                  <div class="pathway-grid" id="admissionOptions"></div>
-                </div>
-
-                <div class="mb-3">
-                  <label class="pathway-label"><%= registerCourseText.campus %></label>
-                  <input type="hidden" data-legacy-field="course_id" id="selectedCourseIdInput" value="<%= Number(selectedCourseId || 0) || '' %>" />
-                  <input type="hidden" name="group_id" id="selectedStudyContextInput" value="<%= selectedStudyContextValue || '' %>" />
-                  <input type="hidden" name="campus" id="selectedCampusInput" value="<%= selectedCampusValue %>" />
-                  <div class="pathway-grid" id="campusOptions"></div>
-                </div>
-                <p class="pathway-hint mb-3" id="campusHint"><%= selectedTrackValue === 'teacher' ? registerCourseText.campusReadyTeacherHint : registerCourseText.campusReadyStudentHint %></p>
-                <div class="glass mb-3 p-3" id="academicContextSummaryCard">
-                  <div class="small text-muted mb-1"><%= registerCourseText.academicGroupPreview %></div>
-                  <div class="fw-semibold" id="academicContextSummary"><%= selectedTrackValue === 'teacher' ? registerCourseText.summaryDefaultTeacher : registerCourseText.summaryDefaultStudent %></div>
-                </div>
                 <div class="auth-action-stack auth-action-stack--grid">
-                  <button type="submit" class="btn btn-primary register-action-btn auth-action-btn"><%= t('registerCourse.continue') %></button>
+                  <button type="submit" class="btn btn-primary register-action-btn auth-action-btn" id="registerContinueButton" disabled>
+                    <%= t('registerCourse.continue') %>
+                  </button>
                   <a href="/register" class="btn btn-outline-primary register-action-btn auth-action-btn"><%= t('registerCourse.backToRegister') %></a>
                 </div>
               </form>
@@ -665,770 +800,551 @@
       crossorigin="anonymous"
     ></script>
     <script>
-      const isEnglishRegisterCourse = <%- JSON.stringify(lang === 'en') %>;
+      const currentLang = <%- JSON.stringify(lang) %>;
       const registerCourseText = <%- JSON.stringify(registerCourseText) %>;
-      const academicStudentGroupSummaryDefault = registerCourseText.summaryDefaultStudent;
-      const academicTeacherGroupSummaryDefault = registerCourseText.summaryDefaultTeacher;
-      registerCourseText.campusReadyStudentHint = isEnglishRegisterCourse
-        ? 'The admission year defines the cohort. Choosing a campus automatically selects the academic group.'
-        : '\u0420\u0456\u043a \u0432\u0441\u0442\u0443\u043f\u0443 \u0432\u0438\u0437\u043d\u0430\u0447\u0430\u0454 \u043a\u043e\u0433\u043e\u0440\u0442\u0443. \u0412\u0438\u0431\u0456\u0440 \u043a\u0430\u043c\u043f\u0443\u0441\u0443 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u043e \u043e\u0431\u0438\u0440\u0430\u0454 \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443.';
-      registerCourseText.readyToRegister = isEnglishRegisterCourse
-        ? 'Ready: Studerria can resolve one stable academic group for this campus.'
-        : '\u0413\u043e\u0442\u043e\u0432\u043e: Studerria \u043c\u043e\u0436\u0435 \u0432\u0438\u0437\u043d\u0430\u0447\u0438\u0442\u0438 \u043e\u0434\u043d\u0443 \u0441\u0442\u0430\u0431\u0456\u043b\u044c\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443 \u0434\u043b\u044f \u0446\u044c\u043e\u0433\u043e \u043a\u0430\u043c\u043f\u0443\u0441\u0443.';
-      registerCourseText.chooseValidCampus = isEnglishRegisterCourse
-        ? 'Choose a valid campus before continuing, otherwise Studerria cannot resolve the correct academic group.'
-        : '\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u043a\u043e\u0440\u0435\u043a\u0442\u043d\u0438\u0439 \u043a\u0430\u043c\u043f\u0443\u0441 \u043f\u0435\u0440\u0435\u0434 \u043f\u0440\u043e\u0434\u043e\u0432\u0436\u0435\u043d\u043d\u044f\u043c, \u0456\u043d\u0430\u043a\u0448\u0435 Studerria \u043d\u0435 \u0432\u0438\u0437\u043d\u0430\u0447\u0438\u0442\u044c \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u0443 \u0430\u043a\u0430\u0434\u0435\u043c\u0456\u0447\u043d\u0443 \u0433\u0440\u0443\u043f\u0443.';
-      const pathwayPayload = <%- JSON.stringify(pathways) %>;
-      const pathwayPrograms = Array.isArray(pathwayPayload.programs) ? pathwayPayload.programs : [];
-      const pathwayAdmissions = Array.isArray(pathwayPayload.admissions) ? pathwayPayload.admissions : [];
-      const pathwayLinks = Array.isArray(pathwayPayload.links) ? pathwayPayload.links : [];
-      const pathwayCourses = Array.isArray(pathwayPayload.courses) ? pathwayPayload.courses : [];
-      const registrationContextPayload = <%- JSON.stringify(registrationContexts) %>;
-      const registrationAuditIssuesPayload = <%- JSON.stringify(registrationAuditIssues || []) %>;
-      const programById = new Map(pathwayPrograms.map((program) => [Number(program.id || 0), program]));
-      const admissionById = new Map(pathwayAdmissions.map((admission) => [Number(admission.id || 0), admission]));
-      const academicContextSummaryEl = document.getElementById('academicContextSummary');
+      const scopeMatrix = <%- JSON.stringify(scopeMatrix) %>;
       const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
       const programSelect = document.getElementById('studyProgramSelect');
       const programField = document.getElementById('programField');
       const programStaticField = document.getElementById('programStaticField');
       const programStaticLabel = document.getElementById('programStaticLabel');
-      const admissionField = document.getElementById('admissionField');
-      const admissionInput = document.getElementById('selectedAdmissionInput');
-      const admissionOptions = document.getElementById('admissionOptions');
-      const courseIdInput = document.getElementById('selectedCourseIdInput');
-      const studyContextInput = document.getElementById('selectedStudyContextInput');
-      const campusInput = document.getElementById('selectedCampusInput');
+      const programHint = document.getElementById('programHint');
+      const cohortStep = document.getElementById('cohortStep');
+      const cohortOptions = document.getElementById('cohortOptions');
+      const cohortHint = document.getElementById('cohortHint');
+      const cohortInput = document.getElementById('selectedCohortInput');
+      const campusStep = document.getElementById('campusStep');
+      const campusStepCopy = document.getElementById('campusStepCopy');
       const campusOptions = document.getElementById('campusOptions');
       const campusHint = document.getElementById('campusHint');
-      const registerCourseForm = document.querySelector('form[action="/register/course"]');
-      const selectedProgramSeed = Number(programSelect?.dataset.selectedProgram || 0);
-      const selectedAdmissionSeed = Number(admissionInput?.value || 0);
-      const selectedCourseSeed = Number(courseIdInput?.value || 0);
-      const selectedStudyContextSeed = Number(studyContextInput?.value || 0);
-      const selectedCampusSeed = String(campusInput?.value || '').trim().toLowerCase();
-      const courseById = new Map(
-        pathwayCourses.map((course) => [Number(course.id || 0), course])
-      );
-      const contextById = new Map(
-        (Array.isArray(registrationContextPayload) ? registrationContextPayload : []).map((context) => [Number(context.id || 0), context])
-      );
+      const groupInput = document.getElementById('selectedGroupInput');
+      const campusInput = document.getElementById('selectedCampusInput');
+      const academicContextSummaryEl = document.getElementById('academicContextSummary');
+      const academicContextSummaryCopyEl = document.getElementById('academicContextSummaryCopy');
+      const summaryStatusBadge = document.getElementById('summaryStatusBadge');
+      const summaryChips = document.getElementById('summaryChips');
+      const continueButton = document.getElementById('registerContinueButton');
+      const registerCourseForm = document.getElementById('registerCourseForm');
 
-      function formatLinkedCourseCount(count) {
-        return Number(count || 0) === 1
-          ? registerCourseText.oneLinkedCourse
-          : `${count} ${registerCourseText.linkedCoursesSuffix}`;
+      const state = {
+        trackKey: '',
+        programId: null,
+        cohortId: null,
+        campusKey: '',
+        groupId: null,
+        studyContextId: null,
+        courseId: null,
+        cohortConfirmed: false,
+        campusConfirmed: false,
+      };
+
+      function escapeHtml(rawValue) {
+        return String(rawValue || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
       }
 
-      function getSelectedTrack() {
-        const checked = trackInputs.find((input) => input.checked);
-        if (checked) return checked.value;
-        const firstEnabled = trackInputs.find((input) => !input.disabled);
-        if (firstEnabled) {
-          firstEnabled.checked = true;
-          return firstEnabled.value;
-        }
+      function normalizeTrackKey(rawValue) {
+        const normalized = String(rawValue || '').trim().toLowerCase();
+        if (normalized === 'master') return 'master';
+        if (normalized === 'teacher') return 'teacher';
         return 'bachelor';
-      }
-
-      function isTeacherCourseClient(course) {
-        return Boolean(course) && (
-          course.is_teacher_course === true
-          || Number(course.is_teacher_course) === 1
-        );
       }
 
       function normalizeCampusKey(rawValue) {
         return String(rawValue || '').trim().toLowerCase() === 'munich' ? 'munich' : 'kyiv';
       }
 
-      function formatCampusLabelClient(location) {
-        return normalizeCampusKey(location) === 'munich'
+      function isTeacherTrack(trackKey) {
+        return normalizeTrackKey(trackKey) === 'teacher';
+      }
+
+      function formatTrackLabelClient(trackKey) {
+        const normalized = normalizeTrackKey(trackKey);
+        if (normalized === 'master') return currentLang === 'en' ? "Master's" : 'Магістратура';
+        if (normalized === 'teacher') return currentLang === 'en' ? 'Teacher' : 'Викладач';
+        return currentLang === 'en' ? 'Bachelor' : 'Бакалаврат';
+      }
+
+      function formatCampusLabelClient(campusKey) {
+        return normalizeCampusKey(campusKey) === 'munich'
           ? registerCourseText.campusMunich
           : registerCourseText.campusKyiv;
       }
 
-      function formatTrackLabelClient(trackKey) {
-        const normalized = String(trackKey || '').trim().toLowerCase();
-        if (normalized === 'bachelor') return registerCourseText.trackBachelor;
-        if (normalized === 'master') return registerCourseText.trackMaster;
-        if (normalized === 'teacher') return registerCourseText.trackTeacher;
-        return trackKey || normalized;
+      function getTrackOptions() {
+        return Array.isArray(scopeMatrix.tracks) ? scopeMatrix.tracks : [];
       }
 
-      function localizeAdmissionLabel(rawLabel) {
-        const normalized = String(rawLabel || '').trim();
-        if (isEnglishRegisterCourse) return normalized;
-        return normalized
-          .replace(/^Cohort\b/i, 'Когорта')
-          .replace(/\bCohort\b/gi, 'Когорта');
+      function getProgramsForTrack(trackKey) {
+        return (Array.isArray(scopeMatrix.programs) ? scopeMatrix.programs : [])
+          .filter((program) => normalizeTrackKey(program && program.track_key) === normalizeTrackKey(trackKey));
       }
 
-      function isTeacherTrack(trackKey) {
-        return String(trackKey || '').trim().toLowerCase() === 'teacher';
+      function getProgramById(programId) {
+        return (Array.isArray(scopeMatrix.programs) ? scopeMatrix.programs : [])
+          .find((program) => Number(program.id || 0) === Number(programId || 0)) || null;
       }
 
-      function localizeAdmissionLabel(rawLabel) {
-        const normalized = String(rawLabel || '').trim();
-        if (isEnglishRegisterCourse) return normalized;
-        return normalized
-          .replace(/^Cohort\b/i, 'Когорта')
-          .replace(/\bCohort\b/gi, 'Когорта');
+      function getCohortsForProgram(programId) {
+        return (scopeMatrix && scopeMatrix.cohortsByProgram && scopeMatrix.cohortsByProgram[String(programId)]) || [];
       }
 
-      function getCampusReadyHint(trackKey) {
-        return isTeacherTrack(trackKey)
-          ? registerCourseText.campusReadyTeacherHint
-          : registerCourseText.campusReadyStudentHint;
+      function getCampusesForCohort(cohortId) {
+        return (scopeMatrix && scopeMatrix.campusesByCohort && scopeMatrix.campusesByCohort[String(cohortId)]) || [];
       }
 
-      function getAcademicSummaryDefault(trackKey) {
-        return isTeacherTrack(trackKey)
-          ? academicTeacherGroupSummaryDefault
-          : academicStudentGroupSummaryDefault;
+      function getTeacherCampusesForProgram(programId) {
+        return (scopeMatrix && scopeMatrix.teacherCampusesByProgram && scopeMatrix.teacherCampusesByProgram[String(programId)]) || [];
       }
 
-      function updateAcademicContextSummary() {
-        if (!academicContextSummaryEl) return;
-        const trackKey = getSelectedTrack();
-        const programId = Number(programSelect?.value || selectedProgramSeed || 0);
-        const admissionId = Number(admissionInput?.value || selectedAdmissionSeed || 0);
-        const studyContextId = Number(studyContextInput?.value || 0);
-        const courseId = Number(courseIdInput?.value || 0);
-        const program = programById.get(programId);
-        const admission = admissionById.get(admissionId);
-        const studyContext = contextById.get(studyContextId);
-        const course = courseById.get(courseId);
-        const parts = [];
-        const isTeacher = isTeacherTrack(trackKey);
-        parts.push(formatTrackLabelClient(trackKey));
-        if (program) {
-          parts.push(program.code ? `${program.name} (${program.code})` : program.name);
+      function resolveTrackKey(preferredTrack) {
+        const normalizedPreferred = normalizeTrackKey(preferredTrack);
+        const trackRows = getTrackOptions();
+        if (trackRows.some((track) => track && track.enabled && normalizeTrackKey(track.key) === normalizedPreferred)) {
+          return normalizedPreferred;
         }
-        if (!isTeacher && admission) {
-          parts.push(isEnglishRegisterCourse ? `Cohort ${admission.admission_year}` : `Когорта ${admission.admission_year}`);
+        return normalizeTrackKey((trackRows.find((track) => track && track.enabled) || {}).key || 'bachelor');
+      }
+
+      function resolveProgramId(trackKey, preferredProgramId) {
+        const programs = getProgramsForTrack(trackKey);
+        if (programs.some((program) => Number(program.id || 0) === Number(preferredProgramId || 0))) {
+          return Number(preferredProgramId || 0);
         }
-        if (studyContext) {
-          const studyContextLabel = String(studyContext.label_uk || studyContext.label || '').trim();
-          if (isTeacher) {
-            parts.push(formatCampusLabelClient(studyContext.campus_key || campusInput?.value));
-            if (studyContextLabel) {
-              parts.push(studyContextLabel);
-            }
-          } else {
-            parts.push(studyContextLabel || `${formatCampusLabelClient(studyContext.campus_key)} / Year ${Number(studyContext.stage || studyContext.stage_number || 1)}`);
-          }
-        } else if (course) {
-          parts.push(`${course.name || 'Course'} / ${formatCampusLabelClient(course.location)}`);
-        } else if (isTeacher && campusInput?.value) {
-          parts.push(formatCampusLabelClient(campusInput.value));
+        return programs[0] ? Number(programs[0].id || 0) : null;
+      }
+
+      function formatProgramLabel(program) {
+        if (!program) return '';
+        return program.code ? `${program.name} (${program.code})` : String(program.name || '').trim();
+      }
+
+      function getCampusReadyLabel(count, total) {
+        if (Number(count || 0) <= 0) {
+          return registerCourseText.noReadyCampuses;
         }
-        academicContextSummaryEl.textContent = parts.filter(Boolean).join(' / ') || getAcademicSummaryDefault(trackKey);
+        if (Number(count || 0) === 1) {
+          return `${registerCourseText.availableCampusesOne} / ${total} ${registerCourseText.totalCampusesLabel}`;
+        }
+        return `${count} ${registerCourseText.availableCampusesMany} / ${total} ${registerCourseText.totalCampusesLabel}`;
+      }
+
+      function setHint(target, message, isError = false) {
+        if (!(target instanceof HTMLElement)) return;
+        target.textContent = message || '';
+        target.classList.toggle('is-error', Boolean(isError));
+      }
+
+      function clearSelectionBelowProgram() {
+        state.cohortId = null;
+        state.campusKey = '';
+        state.groupId = null;
+        state.studyContextId = null;
+        state.courseId = null;
+        state.cohortConfirmed = false;
+        state.campusConfirmed = false;
+      }
+
+      function clearCampusSelection() {
+        state.campusKey = '';
+        state.groupId = null;
+        state.studyContextId = null;
+        state.courseId = null;
+        state.campusConfirmed = false;
+      }
+
+      function isSelectionComplete() {
+        if (isTeacherTrack(state.trackKey)) {
+          return Boolean(state.programId && state.campusConfirmed && state.groupId);
+        }
+        return Boolean(state.programId && state.cohortConfirmed && state.campusConfirmed && state.groupId);
       }
 
       function syncTrackCards() {
         document.querySelectorAll('[data-track-card]').forEach((card) => {
-          const key = card.dataset.trackCard;
-          const input = card.querySelector(`input[name="study_track"][value="${key}"]`);
-          card.classList.toggle('is-selected', Boolean(input && input.checked));
-          card.classList.toggle('is-disabled', Boolean(input && input.disabled));
+          const trackKey = normalizeTrackKey(card.dataset.trackCard);
+          const selected = trackKey === normalizeTrackKey(state.trackKey);
+          card.classList.toggle('is-selected', selected);
+          const input = card.querySelector('input[name="study_track"]');
+          if (input) {
+            input.checked = selected;
+          }
         });
       }
 
-      function setOptions(selectEl, options, selectedValue, emptyLabel) {
-        if (!selectEl) return;
-        selectEl.innerHTML = '';
-        const emptyOption = document.createElement('option');
-        emptyOption.value = '';
-        emptyOption.textContent = emptyLabel;
-        selectEl.appendChild(emptyOption);
-        options.forEach((option) => {
-          const node = document.createElement('option');
-          node.value = String(option.value);
-          node.textContent = option.label;
-          if (String(selectedValue || '') === String(option.value)) {
-            node.selected = true;
+      function renderProgramField() {
+        const programs = getProgramsForTrack(state.trackKey);
+        if (!programSelect || !programField || !programStaticField) return;
+        const resolvedProgramId = resolveProgramId(state.trackKey, state.programId);
+        if (Number(resolvedProgramId || 0) !== Number(state.programId || 0)) {
+          state.programId = resolvedProgramId;
+          clearSelectionBelowProgram();
+        }
+        if (!programs.length) {
+          programField.style.display = '';
+          programStaticField.style.display = 'none';
+          programSelect.innerHTML = '';
+          setHint(programHint, registerCourseText.noPrograms, true);
+          return;
+        }
+        if (programs.length === 1) {
+          const onlyProgram = programs[0];
+          programSelect.innerHTML = '';
+          const option = document.createElement('option');
+          option.value = String(onlyProgram.id || '');
+          option.textContent = formatProgramLabel(onlyProgram);
+          option.selected = true;
+          programSelect.appendChild(option);
+          programField.style.display = 'none';
+          programStaticField.style.display = '';
+          if (programStaticLabel) {
+            programStaticLabel.textContent = formatProgramLabel(onlyProgram);
           }
-          selectEl.appendChild(node);
+          state.programId = Number(onlyProgram.id || 0);
+          setHint(programHint, '');
+          return;
+        }
+        programField.style.display = '';
+        programStaticField.style.display = 'none';
+        programSelect.innerHTML = '';
+        programs.forEach((program) => {
+          const option = document.createElement('option');
+          option.value = String(program.id || '');
+          option.textContent = formatProgramLabel(program);
+          if (Number(program.id || 0) === Number(state.programId || 0)) {
+            option.selected = true;
+          }
+          programSelect.appendChild(option);
         });
+        setHint(programHint, '');
       }
 
-      function refreshProgramOptions() {
-        const trackKey = getSelectedTrack();
-        const options = pathwayPrograms
-          .filter((program) => program.track_key === trackKey)
-          .map((program) => ({
-            value: Number(program.id),
-            label: program.code ? `${program.name} (${program.code})` : program.name,
-          }));
-        const currentValue = Number(programSelect?.value || selectedProgramSeed || 0);
-        const resolvedValue = options.some((option) => Number(option.value) === currentValue)
-          ? currentValue
-          : (options[0] ? Number(options[0].value) : null);
-        setOptions(programSelect, options, resolvedValue, registerCourseText.chooseProgram);
-        if (programField && programStaticField && programStaticLabel) {
-          if (options.length === 1) {
-            programField.style.display = 'none';
-            programStaticField.style.display = '';
-            programStaticLabel.textContent = options[0].label;
-          } else {
-            programField.style.display = '';
-            programStaticField.style.display = 'none';
-            programStaticLabel.textContent = '';
-          }
-        }
+      function createEmptyCard(title, copy) {
+        const empty = document.createElement('div');
+        empty.className = 'registration-empty';
+        empty.innerHTML = `
+          <div class="registration-empty-title">${escapeHtml(title)}</div>
+          ${copy ? `<div class="registration-empty-copy">${escapeHtml(copy)}</div>` : ''}
+        `;
+        return empty;
       }
 
-      function refreshAdmissionOptions() {
-        const trackKey = getSelectedTrack();
-        const programId = Number(programSelect?.value || 0);
-        if (admissionField) {
-          admissionField.style.display = isTeacherTrack(trackKey) ? 'none' : '';
-        }
-        if (isTeacherTrack(trackKey)) {
-          if (admissionInput) {
-            admissionInput.value = '';
-          }
-          if (admissionOptions) {
-            admissionOptions.innerHTML = '';
-          }
+      function renderCohorts() {
+        if (!(cohortOptions instanceof HTMLElement) || !(cohortStep instanceof HTMLElement)) return;
+        const teacherMode = isTeacherTrack(state.trackKey);
+        cohortStep.style.display = teacherMode ? 'none' : '';
+        cohortOptions.innerHTML = '';
+        if (teacherMode) {
+          setHint(cohortHint, '');
           return;
         }
-        const options = pathwayAdmissions
-          .filter((admission) => Number(admission.program_id) === programId)
-          .map((admission) => ({
-            value: Number(admission.id),
-            title: String(admission.admission_year || registerCourseText.admissionYear),
-            subtitle: localizeAdmissionLabel(admission.label),
-          }));
-        const currentValue = Number(admissionInput?.value || selectedAdmissionSeed || 0);
-        const resolvedValue = options.some((option) => Number(option.value) === currentValue)
-          ? currentValue
-          : (options[0] ? Number(options[0].value) : null);
-        if (admissionInput) {
-          admissionInput.value = resolvedValue ? String(resolvedValue) : '';
-        }
-        if (!admissionOptions) return;
-        admissionOptions.innerHTML = '';
-        if (!programId) {
-          const emptyState = document.createElement('div');
-          emptyState.className = 'track-option admission-option is-disabled';
-          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstSubtitle}</span></span>`;
-          admissionOptions.appendChild(emptyState);
+        const cohorts = getCohortsForProgram(state.programId);
+        if (!state.programId) {
+          cohortOptions.appendChild(createEmptyCard(registerCourseText.chooseProgram, registerCourseText.chooseProgramFirst));
+          setHint(cohortHint, registerCourseText.chooseProgramFirst);
+          clearSelectionBelowProgram();
           return;
         }
-        if (!options.length) {
-          const emptyState = document.createElement('div');
-          emptyState.className = 'track-option admission-option is-disabled';
-          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noAdmissionYearsTitle}</span><span class="course-option-subtitle">${registerCourseText.noAdmissionYearsSubtitle}</span></span>`;
-          admissionOptions.appendChild(emptyState);
+        if (!cohorts.length) {
+          cohortOptions.appendChild(createEmptyCard(registerCourseText.noCohorts, registerCourseText.noReadyCohorts));
+          setHint(cohortHint, registerCourseText.noReadyCohorts, true);
+          clearSelectionBelowProgram();
           return;
         }
-
-        options.forEach((option) => {
+        const hasReadyCohort = cohorts.some((cohort) => cohort && cohort.is_ready);
+        if (!hasReadyCohort) {
+          setHint(cohortHint, registerCourseText.noReadyCohorts, true);
+        } else if (!state.cohortConfirmed) {
+          setHint(cohortHint, registerCourseText.chooseCohortFirst);
+        } else {
+          const activeCohort = cohorts.find((cohort) => Number(cohort.id || 0) === Number(state.cohortId || 0)) || null;
+          setHint(cohortHint, activeCohort ? activeCohort.reason_copy : registerCourseText.chooseCohortFirst);
+        }
+        cohorts.forEach((cohort) => {
           const button = document.createElement('button');
+          const isSelectable = Boolean(cohort && cohort.is_ready);
+          const isSelected = state.cohortConfirmed && Number(cohort.id || 0) === Number(state.cohortId || 0);
           button.type = 'button';
-          button.className = 'course-option admission-option';
-          if (Number(option.value) === Number(resolvedValue)) {
-            button.classList.add('is-selected');
-          }
+          button.className = `scope-option ${isSelected ? 'is-selected' : ''} ${isSelectable ? '' : 'is-disabled'}`;
+          button.disabled = !isSelectable;
+          const statusClass = String(cohort.status_key || 'needs_setup').replace('-', '_');
+          const cohortLabel = String(cohort.label || '').trim() || `${registerCourseText.cohortLabel} ${Number(cohort.admission_year || 0) || ''}`;
+          const availableLabel = getCampusReadyLabel(cohort.available_campuses_count, cohort.total_campuses_count);
           button.innerHTML = `
-            <span class="course-option-content">
-              <span class="course-option-title">${option.title}</span>
-              ${option.subtitle ? `<span class="course-option-subtitle">${option.subtitle}</span>` : ''}
-            </span>
+            <div class="scope-option-head">
+              <div class="scope-option-title">${escapeHtml(cohortLabel)}</div>
+              <span class="scope-status scope-status--${escapeHtml(statusClass)}">${escapeHtml(cohort.status_label || registerCourseText.needsSetup)}</span>
+            </div>
+            <div class="scope-option-subtitle">${escapeHtml(`${registerCourseText.admissionYearLabel} ${Number(cohort.admission_year || 0) || ''}`)}</div>
+            <div class="scope-option-subtitle">${escapeHtml(cohort.reason_copy || '')}</div>
+            <div class="scope-option-foot">
+              <div class="scope-option-meta">
+                <span class="scope-pill">${escapeHtml(availableLabel)}</span>
+              </div>
+            </div>
           `;
-          button.addEventListener('click', () => {
-            admissionOptions.querySelectorAll('.admission-option').forEach((item) => item.classList.remove('is-selected'));
-            button.classList.add('is-selected');
-            if (admissionInput) {
-              admissionInput.value = String(option.value);
-            }
-            renderCampusOptions();
-          });
-          admissionOptions.appendChild(button);
-        });
-      }
-
-      function getAdmissionCourses(admissionId, trackKey) {
-        const targetAdmissionId = Number(admissionId || 0);
-        if (!targetAdmissionId) return [];
-        const courseIds = [];
-        pathwayLinks.forEach((link) => {
-          const linkAdmissionId = Number(link.admission_id || 0);
-          const courseId = Number(link.course_id || 0);
-          if (linkAdmissionId !== targetAdmissionId || !courseId) return;
-          if (!courseById.has(courseId)) return;
-          if (!courseIds.includes(courseId)) {
-            courseIds.push(courseId);
-          }
-        });
-
-        return courseIds
-          .map((courseId) => courseById.get(courseId))
-          .filter((course) => {
-            const teacherCourse = isTeacherCourseClient(course);
-            return trackKey === 'teacher' ? teacherCourse : !teacherCourse;
-          });
-      }
-
-      function getRegistrationContextsForAdmission(admissionId, programId, trackKey) {
-        const targetAdmissionId = Number(admissionId || 0);
-        const targetProgramId = Number(programId || 0);
-        const normalizedTrack = String(trackKey || '').trim().toLowerCase();
-        if (!targetAdmissionId || !targetProgramId) return [];
-        return (Array.isArray(registrationContextPayload) ? registrationContextPayload : []).filter((context) => {
-          const contextStage = Number(context.stage || context.stage_number || 0);
-          const contextTrack = String(context.track_key || context.track || '').trim().toLowerCase();
-          return Number(context.admission_id || 0) === targetAdmissionId
-            && Number(context.program_id || 0) === targetProgramId
-            && contextTrack === normalizedTrack
-            && contextStage === 1;
-        });
-      }
-
-      function getTeacherRegistrationContexts(programId) {
-        const targetProgramId = Number(programId || 0);
-        if (!targetProgramId) return [];
-        return (Array.isArray(registrationContextPayload) ? registrationContextPayload : []).filter((context) => {
-          const contextStage = Number(context.stage || context.stage_number || 0);
-          const contextTrack = String(context.track_key || context.track || '').trim().toLowerCase();
-          return Number(context.program_id || 0) === targetProgramId
-            && contextTrack === 'teacher'
-            && contextStage === 1;
-        });
-      }
-
-      function getTeacherCampusIssuePriority(issueCode) {
-        switch (String(issueCode || '').trim()) {
-          case 'registration_teacher_multiple_defaults':
-            return 40;
-          case 'registration_teacher_default_required':
-            return 30;
-          case 'registration_group_missing_compat_bridge':
-            return 20;
-          case 'registration_group_missing_visible_subjects':
-            return 10;
-          default:
-            return 0;
-        }
-      }
-
-      function getTeacherCampusIssueCopy(issueCode) {
-        switch (String(issueCode || '').trim()) {
-          case 'registration_teacher_multiple_defaults':
-            return {
-              title: registerCourseText.teacherMultipleDefaultsTitle,
-              subtitle: registerCourseText.teacherMultipleDefaultsSubtitle,
-              hint: registerCourseText.teacherMultipleDefaultsHint,
-            };
-          case 'registration_teacher_default_required':
-            return {
-              title: registerCourseText.teacherDefaultRequiredTitle,
-              subtitle: registerCourseText.teacherDefaultRequiredSubtitle,
-              hint: registerCourseText.teacherDefaultRequiredHint,
-            };
-          default:
-            return {
-              title: registerCourseText.noTeacherPathTitle,
-              subtitle: registerCourseText.noTeacherPathSubtitle,
-              hint: registerCourseText.teacherPathRequiredHint,
-            };
-        }
-      }
-
-      function getTeacherRegistrationIssues(programId) {
-        const targetProgramId = Number(programId || 0);
-        if (!targetProgramId) return [];
-        return (Array.isArray(registrationAuditIssuesPayload) ? registrationAuditIssuesPayload : []).filter((issue) => {
-          const issueTrack = String(issue && issue.track_key || '').trim().toLowerCase();
-          const issueStage = Number(issue && issue.stage_number || 0);
-          return Number(issue && issue.program_id || 0) === targetProgramId
-            && issueTrack === 'teacher'
-            && issueStage === 1;
-        });
-      }
-
-      function buildStudentCampusChoices(admissionId, programId, trackKey) {
-        const contextRows = getRegistrationContextsForAdmission(admissionId, programId, trackKey);
-        if (contextRows.length) {
-          const campusMap = new Map();
-          contextRows.forEach((context) => {
-            const campusKey = normalizeCampusKey(context.campus_key || context.course_location || context.location);
-            if (!campusMap.has(campusKey)) {
-              campusMap.set(campusKey, {
-                campusKey,
-                campusLabel: formatCampusLabelClient(campusKey),
-                contexts: [],
-              });
-            }
-            campusMap.get(campusKey).contexts.push(context);
-          });
-
-          return ['kyiv', 'munich']
-            .map((campusKey) => campusMap.get(campusKey))
-            .filter(Boolean)
-            .map((entry) => {
-              const uniqueContexts = Array.from(new Map(
-                (Array.isArray(entry.contexts) ? entry.contexts : [])
-                  .map((context) => [Number(context && context.id || 0), context])
-                  .filter(([contextId]) => contextId > 0)
-              ).values());
-              const chosenContext = uniqueContexts.length === 1 ? uniqueContexts[0] : null;
-              return {
-                campusKey: entry.campusKey,
-                campusLabel: entry.campusLabel,
-                courseCount: uniqueContexts.length,
-                courseId: chosenContext ? (Number(chosenContext.course_id || 0) || null) : null,
-                studyContextId: chosenContext ? (Number(chosenContext.id || 0) || null) : null,
-                isAmbiguous: uniqueContexts.length !== 1,
-              };
-            });
-        }
-
-        const campusMap = new Map();
-        getAdmissionCourses(admissionId, trackKey).forEach((course) => {
-          const courseId = Number(course.id || 0);
-          if (!courseId) return;
-          const campusKey = normalizeCampusKey(course.location);
-          if (!campusMap.has(campusKey)) {
-            campusMap.set(campusKey, {
-              campusKey,
-              campusLabel: formatCampusLabelClient(campusKey),
-              courseIds: [],
+          if (isSelectable) {
+            button.addEventListener('click', () => {
+              state.cohortId = Number(cohort.id || 0) || null;
+              state.cohortConfirmed = true;
+              clearCampusSelection();
+              renderAll();
             });
           }
-          campusMap.get(campusKey).courseIds.push(courseId);
-        });
-
-        return ['kyiv', 'munich']
-          .map((campusKey) => campusMap.get(campusKey))
-          .filter(Boolean)
-          .map((entry) => {
-            const uniqueIds = Array.from(new Set(entry.courseIds));
-            return {
-              campusKey: entry.campusKey,
-              campusLabel: entry.campusLabel,
-              courseCount: uniqueIds.length,
-              courseId: uniqueIds.length === 1 ? uniqueIds[0] : null,
-              studyContextId: null,
-              isAmbiguous: uniqueIds.length !== 1,
-            };
-          });
-      }
-
-      function buildTeacherCampusChoices(programId) {
-        const readyContexts = getTeacherRegistrationContexts(programId);
-        const readyByCampus = new Map();
-        readyContexts.forEach((context) => {
-          const campusKey = normalizeCampusKey(context.campus_key || context.course_location || context.location);
-          if (!readyByCampus.has(campusKey)) {
-            readyByCampus.set(campusKey, {
-              campusKey,
-              campusLabel: formatCampusLabelClient(campusKey),
-              contexts: [],
-            });
-          }
-          readyByCampus.get(campusKey).contexts.push(context);
-        });
-
-        const issueByCampus = new Map();
-        getTeacherRegistrationIssues(programId).forEach((issue) => {
-          const campusKey = normalizeCampusKey(issue && issue.campus_key);
-          const currentIssue = issueByCampus.get(campusKey);
-          if (!currentIssue || getTeacherCampusIssuePriority(issue.issue_code) > getTeacherCampusIssuePriority(currentIssue.issue_code)) {
-            issueByCampus.set(campusKey, issue);
-          }
-        });
-
-        const campusKeys = Array.from(new Set([
-          ...Array.from(readyByCampus.keys()),
-          ...Array.from(issueByCampus.keys()),
-        ])).sort((left, right) => {
-          if (left === right) return 0;
-          if (left === 'kyiv') return -1;
-          if (right === 'kyiv') return 1;
-          return String(left || '').localeCompare(String(right || ''));
-        });
-
-        return campusKeys.map((campusKey) => {
-          const readyBucket = readyByCampus.get(campusKey);
-          const issue = issueByCampus.get(campusKey) || null;
-          if (readyBucket) {
-            const uniqueContexts = Array.from(new Map(
-              (Array.isArray(readyBucket.contexts) ? readyBucket.contexts : [])
-                .map((context) => [Number(context && context.id || 0), context])
-                .filter(([contextId]) => contextId > 0)
-            ).values());
-            const blockingIssueCode = issue
-              && (
-                String(issue.issue_code || '') === 'registration_teacher_multiple_defaults'
-                || String(issue.issue_code || '') === 'registration_teacher_default_required'
-              )
-              ? String(issue.issue_code || '')
-              : '';
-            const defaultContexts = uniqueContexts.filter((context) => (
-              context
-              && (context.is_teacher_registration_default === true || Number(context.is_teacher_registration_default) === 1)
-            ));
-            let chosenContext = null;
-            let resolvedIssueCode = blockingIssueCode;
-            if (!resolvedIssueCode) {
-              if (defaultContexts.length === 1) {
-                chosenContext = defaultContexts[0];
-              } else if (defaultContexts.length > 1) {
-                resolvedIssueCode = 'registration_teacher_multiple_defaults';
-              } else if (uniqueContexts.length === 1) {
-                chosenContext = uniqueContexts[0];
-              } else if (uniqueContexts.length > 1) {
-                resolvedIssueCode = 'registration_teacher_default_required';
-              }
-            }
-            if (resolvedIssueCode || !chosenContext) {
-              const issueCopy = getTeacherCampusIssueCopy(resolvedIssueCode || 'registration_teacher_default_required');
-              return {
-                campusKey,
-                campusLabel: readyBucket.campusLabel,
-                courseCount: uniqueContexts.length,
-                courseId: null,
-                studyContextId: null,
-                cohortId: null,
-                groupLabel: '',
-                isAmbiguous: true,
-                issueCode: resolvedIssueCode || 'registration_teacher_default_required',
-                issueTitle: issueCopy.title,
-                issueSubtitle: issueCopy.subtitle,
-                issueHint: issueCopy.hint,
-              };
-            }
-            return {
-              campusKey,
-              campusLabel: readyBucket.campusLabel,
-              courseCount: uniqueContexts.length,
-              courseId: Number(chosenContext.course_id || 0) || null,
-              studyContextId: Number(chosenContext.id || 0) || null,
-              cohortId: Number(chosenContext.admission_id || 0) || null,
-              groupLabel: String(chosenContext.label_uk || chosenContext.label || '').trim(),
-              isAmbiguous: false,
-              issueCode: '',
-              issueTitle: '',
-              issueSubtitle: '',
-              issueHint: '',
-            };
-          }
-
-          const issueCopy = getTeacherCampusIssueCopy(issue && issue.issue_code);
-          return {
-            campusKey,
-            campusLabel: formatCampusLabelClient(campusKey),
-            courseCount: Array.isArray(issue && issue.duplicate_group_ids) ? issue.duplicate_group_ids.length : 0,
-            courseId: null,
-            studyContextId: null,
-            cohortId: null,
-            groupLabel: '',
-            isAmbiguous: true,
-            issueCode: issue ? String(issue.issue_code || '') : 'registration_teacher_missing_path',
-            issueTitle: issueCopy.title,
-            issueSubtitle: issueCopy.subtitle,
-            issueHint: issueCopy.hint,
-          };
+          cohortOptions.appendChild(button);
         });
       }
 
-      function buildCampusChoices(admissionId, programId, trackKey) {
-        if (isTeacherTrack(trackKey)) {
-          return buildTeacherCampusChoices(programId);
-        }
-        return buildStudentCampusChoices(admissionId, programId, trackKey);
-      }
-
-      function getCampusChoiceSubtitle(choice, trackKey) {
-        if (choice && choice.isAmbiguous) {
-          if (isTeacherTrack(trackKey)) {
-            return choice.issueSubtitle || registerCourseText.noTeacherPathSubtitle;
-          }
-          return `${formatLinkedCourseCount(choice.courseCount)}. ${registerCourseText.oneVisibleCourseNeeded}`;
-        }
-        if (isTeacherTrack(trackKey)) {
-          return choice && choice.groupLabel
-            ? `${choice.groupLabel}. ${registerCourseText.readyTeacherToRegister}`
-            : registerCourseText.readyTeacherToRegister;
-        }
-        return `${formatLinkedCourseCount(choice && choice.courseCount)}. ${registerCourseText.readyToRegister}`;
-      }
-
-      function getCampusChoiceHint(choice, trackKey) {
-        if (choice && choice.isAmbiguous) {
-          if (isTeacherTrack(trackKey)) {
-            return choice.issueHint || registerCourseText.teacherPathRequiredHint;
-          }
-          return registerCourseText.ambiguousCampusHint;
-        }
-        return getCampusReadyHint(trackKey);
-      }
-
-      function setCampusHint(message, isError = false) {
-        if (!campusHint) return;
-        campusHint.textContent = message;
-        campusHint.style.color = isError ? '#dc2626' : '';
-      }
-
-      function renderCampusOptions() {
-        if (!campusOptions || !courseIdInput || !campusInput) return;
-        const trackKey = getSelectedTrack();
-        const programId = Number(programSelect?.value || 0);
-        const admissionId = Number(admissionInput?.value || 0);
-        const campusChoices = buildCampusChoices(admissionId, programId, trackKey);
-        const preferredCourse = courseById.get(selectedCourseSeed);
-        const preferredCampus = selectedCampusSeed || (preferredCourse ? normalizeCampusKey(preferredCourse.location) : '');
-        const activeCourseId = Number(courseIdInput.value || 0);
-        const activeStudyContextId = Number(studyContextInput?.value || 0);
-        const activeCampusKey = String(campusInput.value || preferredCampus || '').trim().toLowerCase();
-        const isTeacher = isTeacherTrack(trackKey);
-
+      function renderCampuses() {
+        if (!(campusOptions instanceof HTMLElement)) return;
+        const teacherMode = isTeacherTrack(state.trackKey);
         campusOptions.innerHTML = '';
-        courseIdInput.value = '';
-        if (studyContextInput) {
-          studyContextInput.value = '';
+        if (campusStepCopy) {
+          campusStepCopy.textContent = teacherMode
+            ? registerCourseText.stepCampusCopyTeacher
+            : registerCourseText.stepCampusCopyStudent;
         }
-        campusInput.value = '';
-        if (isTeacher && admissionInput) {
-          admissionInput.value = '';
-        }
-
-        if (isTeacher && !programId) {
-          const emptyState = document.createElement('div');
-          emptyState.className = 'track-option campus-option is-disabled';
-          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstTeacherSubtitle}</span></span>`;
-          campusOptions.appendChild(emptyState);
-          setCampusHint(registerCourseText.chooseProgramFirstTeacherSubtitle, true);
-          return;
-        }
-
-        if (!isTeacher && !admissionId) {
-          const emptyState = document.createElement('div');
-          emptyState.className = 'track-option campus-option is-disabled';
-          if (!programId) {
-            emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.chooseProgramFirstTitle}</span><span class="course-option-subtitle">${registerCourseText.chooseProgramFirstSubtitle}</span></span>`;
-          } else {
-            emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noAvailableAdmissionTitle}</span><span class="course-option-subtitle">${registerCourseText.noAvailableAdmissionSubtitle}</span></span>`;
+        if (teacherMode) {
+          if (!state.programId) {
+            campusOptions.appendChild(createEmptyCard(registerCourseText.chooseProgram, registerCourseText.chooseProgramFirst));
+            setHint(campusHint, registerCourseText.chooseProgramFirst);
+            clearCampusSelection();
+            return;
           }
-          campusOptions.appendChild(emptyState);
-          setCampusHint(getCampusReadyHint(trackKey));
+        } else if (!state.cohortConfirmed || !state.cohortId) {
+          campusOptions.appendChild(createEmptyCard(registerCourseText.cohortLabel, registerCourseText.chooseCohortFirst));
+          setHint(campusHint, registerCourseText.chooseCohortFirst);
+          clearCampusSelection();
           return;
         }
+
+        const campusChoices = teacherMode
+          ? getTeacherCampusesForProgram(state.programId)
+          : getCampusesForCohort(state.cohortId);
 
         if (!campusChoices.length) {
-          const emptyState = document.createElement('div');
-          emptyState.className = 'track-option campus-option is-disabled';
-          emptyState.innerHTML = `<span class="course-option-content"><span class="course-option-title">${registerCourseText.noCampusesTitle}</span><span class="course-option-subtitle">${isTeacher ? registerCourseText.noCampusesTeacherSubtitle : registerCourseText.noCampusesStudentSubtitle}</span></span>`;
-          campusOptions.appendChild(emptyState);
-          setCampusHint(
-            isTeacher
-              ? registerCourseText.noCampusesTeacherHint
-              : registerCourseText.noCampusesStudentHint,
-            true
-          );
+          campusOptions.appendChild(createEmptyCard(registerCourseText.noCampuses, registerCourseText.noReadyCampuses));
+          setHint(campusHint, registerCourseText.noReadyCampuses, true);
+          clearCampusSelection();
           return;
         }
 
-        let selectedChoice = campusChoices.find((choice) => Number(choice.studyContextId || 0) === activeStudyContextId)
-          || campusChoices.find((choice) => choice.courseId === activeCourseId)
-          || null;
-        if (!selectedChoice && activeCampusKey) {
-          selectedChoice = campusChoices.find((choice) => choice.campusKey === activeCampusKey && !choice.isAmbiguous) || null;
-        }
-        if (!selectedChoice && preferredCampus) {
-          selectedChoice = campusChoices.find((choice) => choice.campusKey === preferredCampus && !choice.isAmbiguous) || null;
-        }
-        if (!selectedChoice) {
-          selectedChoice = campusChoices.find((choice) => !choice.isAmbiguous) || null;
+        const hasSelectableCampus = campusChoices.some((choice) => choice && choice.is_selectable);
+        if (!hasSelectableCampus) {
+          setHint(campusHint, registerCourseText.noReadyCampuses, true);
+        } else if (!state.campusConfirmed) {
+          setHint(campusHint, registerCourseText.chooseCampus);
+        } else {
+          const activeChoice = campusChoices.find((choice) => normalizeCampusKey(choice.campus_key) === normalizeCampusKey(state.campusKey)) || null;
+          setHint(campusHint, activeChoice ? activeChoice.reason_copy : registerCourseText.chooseCampus);
         }
 
         campusChoices.forEach((choice) => {
           const button = document.createElement('button');
+          const isSelectable = Boolean(choice && choice.is_selectable);
+          const isSelected = state.campusConfirmed
+            && normalizeCampusKey(choice.campus_key) === normalizeCampusKey(state.campusKey)
+            && Number(choice.group_id || 0) === Number(state.groupId || 0);
+          const statusClass = isSelectable ? 'ready' : (choice.reason_tone === 'blocked' ? 'blocked' : 'needs_setup');
           button.type = 'button';
-          button.className = `track-option campus-option ${choice.isAmbiguous ? 'is-disabled' : ''}`;
-          if (selectedChoice && selectedChoice.campusKey === choice.campusKey && !choice.isAmbiguous) {
-            button.classList.add('is-selected');
-            courseIdInput.value = String(choice.courseId || '');
-            if (studyContextInput) {
-              studyContextInput.value = String(choice.studyContextId || '');
-            }
-            if (isTeacher && admissionInput) {
-              admissionInput.value = String(choice.cohortId || '');
-            }
-            campusInput.value = choice.campusKey;
-          }
-
-          const subtitle = getCampusChoiceSubtitle(choice, trackKey);
+          button.className = `scope-option ${isSelected ? 'is-selected' : ''} ${isSelectable ? '' : 'is-disabled'}`;
+          button.disabled = !isSelectable;
           button.innerHTML = `
-            <span class="course-option-content">
-              <span class="course-option-title">${choice.campusLabel}</span>
-              <span class="course-option-subtitle">${subtitle}</span>
-            </span>
+            <div class="scope-option-head">
+              <div class="scope-option-title">${escapeHtml(choice.campus_label || formatCampusLabelClient(choice.campus_key))}</div>
+              <span class="scope-status scope-status--${escapeHtml(statusClass)}">${escapeHtml(isSelectable ? registerCourseText.ready : (choice.reason_short || registerCourseText.needsSetup))}</span>
+            </div>
+            <div class="scope-option-subtitle">${escapeHtml(choice.reason_copy || '')}</div>
+            <div class="scope-option-foot">
+              <div class="scope-option-meta">
+                ${choice.group_label ? `<span class="scope-pill">${escapeHtml(choice.group_label)}</span>` : ''}
+              </div>
+            </div>
           `;
-
-          if (!choice.isAmbiguous) {
+          if (isSelectable) {
             button.addEventListener('click', () => {
-              campusOptions.querySelectorAll('.campus-option').forEach((item) => item.classList.remove('is-selected'));
-              button.classList.add('is-selected');
-              courseIdInput.value = String(choice.courseId || '');
-              if (studyContextInput) {
-                studyContextInput.value = String(choice.studyContextId || '');
+              state.campusKey = normalizeCampusKey(choice.campus_key);
+              state.groupId = Number(choice.group_id || 0) || null;
+              state.studyContextId = Number(choice.study_context_id || choice.group_id || 0) || null;
+              state.courseId = Number(choice.course_id || 0) || null;
+              if (!teacherMode) {
+                state.cohortId = Number(choice.cohort_id || state.cohortId || 0) || state.cohortId;
+                state.cohortConfirmed = true;
               }
-              if (isTeacher && admissionInput) {
-                admissionInput.value = String(choice.cohortId || '');
-              }
-              campusInput.value = choice.campusKey;
-              setCampusHint(getCampusReadyHint(trackKey));
+              state.campusConfirmed = true;
+              renderAll();
             });
           }
-
           campusOptions.appendChild(button);
         });
-
-        if (!campusInput.value || (studyContextInput && !studyContextInput.value)) {
-          const issueChoice = campusChoices.find((choice) => choice.isAmbiguous) || null;
-          setCampusHint(getCampusChoiceHint(issueChoice, trackKey), true);
-        } else {
-          setCampusHint(getCampusReadyHint(trackKey));
-        }
-        updateAcademicContextSummary();
       }
 
-      function refreshPathwaySelections() {
+      function syncFormFields() {
+        if (cohortInput) {
+          cohortInput.value = !isTeacherTrack(state.trackKey) && state.cohortConfirmed
+            ? String(state.cohortId || '')
+            : '';
+        }
+        if (groupInput) {
+          groupInput.value = state.campusConfirmed ? String(state.groupId || '') : '';
+        }
+        if (campusInput) {
+          campusInput.value = state.campusConfirmed ? String(state.campusKey || '') : '';
+        }
+        if (programSelect && programField.style.display !== 'none') {
+          programSelect.value = state.programId ? String(state.programId) : '';
+        }
+        if (continueButton) {
+          continueButton.disabled = !isSelectionComplete();
+        }
+      }
+
+      function renderSummary() {
+        if (!(academicContextSummaryEl instanceof HTMLElement) || !(summaryStatusBadge instanceof HTMLElement)) return;
+        const program = getProgramById(state.programId);
+        const teacherMode = isTeacherTrack(state.trackKey);
+        const defaultTitle = teacherMode
+          ? registerCourseText.summaryEmptyTeacher
+          : registerCourseText.summaryEmptyStudent;
+        const chips = [];
+        chips.push(`${registerCourseText.scopeRoute}: ${formatTrackLabelClient(state.trackKey)}`);
+        if (program) {
+          chips.push(`${registerCourseText.scopeProgram}: ${formatProgramLabel(program)}`);
+        }
+        if (!teacherMode && state.cohortConfirmed && state.cohortId) {
+          const cohort = getCohortsForProgram(state.programId)
+            .find((item) => Number(item.id || 0) === Number(state.cohortId || 0)) || null;
+          if (cohort) {
+            chips.push(`${registerCourseText.scopeCohort}: ${cohort.label || `${registerCourseText.cohortLabel} ${cohort.admission_year}`}`);
+          }
+        }
+        if (state.campusConfirmed && state.campusKey) {
+          chips.push(`${registerCourseText.campusLabel}: ${formatCampusLabelClient(state.campusKey)}`);
+        }
+
+        let groupLabel = '';
+        if (state.campusConfirmed && state.groupId) {
+          const campusChoices = teacherMode
+            ? getTeacherCampusesForProgram(state.programId)
+            : getCampusesForCohort(state.cohortId);
+          const activeChoice = campusChoices.find((choice) => Number(choice.group_id || 0) === Number(state.groupId || 0)) || null;
+          if (activeChoice && activeChoice.group_label) {
+            groupLabel = activeChoice.group_label;
+            chips.push(`${registerCourseText.scopeGroup}: ${activeChoice.group_label}`);
+          }
+        }
+
+        if (isSelectionComplete()) {
+          const summaryParts = [
+            formatTrackLabelClient(state.trackKey),
+            program ? formatProgramLabel(program) : '',
+            !teacherMode && state.cohortConfirmed && state.cohortId
+              ? (() => {
+                const cohort = getCohortsForProgram(state.programId)
+                  .find((item) => Number(item.id || 0) === Number(state.cohortId || 0)) || null;
+                return cohort ? (cohort.label || `${registerCourseText.cohortLabel} ${cohort.admission_year}`) : '';
+              })()
+              : '',
+            state.campusConfirmed ? formatCampusLabelClient(state.campusKey) : '',
+            groupLabel,
+          ].filter(Boolean);
+          academicContextSummaryEl.textContent = summaryParts.join(' / ');
+          academicContextSummaryCopyEl.textContent = teacherMode
+            ? registerCourseText.ready
+            : registerCourseText.ready;
+          summaryStatusBadge.textContent = registerCourseText.summaryReady;
+          summaryStatusBadge.className = 'scope-status scope-status--ready';
+        } else {
+          academicContextSummaryEl.textContent = defaultTitle;
+          academicContextSummaryCopyEl.textContent = teacherMode
+            ? registerCourseText.continueLockedTeacher
+            : registerCourseText.continueLockedStudent;
+          summaryStatusBadge.textContent = registerCourseText.summaryPending;
+          summaryStatusBadge.className = 'scope-status scope-status--needs_setup';
+        }
+
+        if (summaryChips) {
+          summaryChips.innerHTML = '';
+          chips.forEach((label) => {
+            const chip = document.createElement('span');
+            chip.className = 'summary-chip';
+            chip.textContent = label;
+            summaryChips.appendChild(chip);
+          });
+        }
+      }
+
+      function renderAll() {
         syncTrackCards();
-        refreshProgramOptions();
-        refreshAdmissionOptions();
-        renderCampusOptions();
-        updateAcademicContextSummary();
+        renderProgramField();
+        renderCohorts();
+        renderCampuses();
+        syncFormFields();
+        renderSummary();
+      }
+
+      function hydrateInitialState() {
+        const initial = scopeMatrix && scopeMatrix.initialSelection ? scopeMatrix.initialSelection : {};
+        state.trackKey = resolveTrackKey(initial.trackKey || selectedTrackValue);
+        state.programId = resolveProgramId(state.trackKey, initial.programId);
+        if (initial && initial.campusConfirmed && Number(initial.groupId || 0) > 0) {
+          state.cohortId = Number(initial.cohortId || 0) || null;
+          state.campusKey = normalizeCampusKey(initial.campusKey);
+          state.groupId = Number(initial.groupId || 0) || null;
+          state.studyContextId = Number(initial.studyContextId || initial.groupId || 0) || null;
+          state.courseId = Number(initial.courseId || 0) || null;
+          state.campusConfirmed = true;
+          state.cohortConfirmed = !isTeacherTrack(state.trackKey);
+          if (isTeacherTrack(state.trackKey)) {
+            state.cohortConfirmed = false;
+          }
+        }
       }
 
       trackInputs.forEach((input) => {
-        input.addEventListener('change', refreshPathwaySelections);
+        input.addEventListener('change', () => {
+          const nextTrackKey = resolveTrackKey(input.value);
+          if (normalizeTrackKey(nextTrackKey) === normalizeTrackKey(state.trackKey)) {
+            return;
+          }
+          state.trackKey = nextTrackKey;
+          state.programId = resolveProgramId(state.trackKey, null);
+          clearSelectionBelowProgram();
+          renderAll();
+        });
       });
 
       if (programSelect) {
         programSelect.addEventListener('change', () => {
-          refreshAdmissionOptions();
-          renderCampusOptions();
-          updateAcademicContextSummary();
+          const nextProgramId = Number(programSelect.value || 0) || null;
+          if (Number(nextProgramId || 0) === Number(state.programId || 0)) {
+            return;
+          }
+          state.programId = nextProgramId;
+          clearSelectionBelowProgram();
+          renderAll();
         });
       }
 
       if (registerCourseForm) {
         registerCourseForm.addEventListener('submit', (event) => {
-          if ((studyContextInput && !studyContextInput.value) || (campusInput && !campusInput.value)) {
+          if (!isSelectionComplete()) {
             event.preventDefault();
-            setCampusHint(registerCourseText.chooseValidCampus, true);
+            setHint(
+              campusHint,
+              isTeacherTrack(state.trackKey) ? registerCourseText.continueLockedTeacher : registerCourseText.continueLockedStudent,
+              true
+            );
           }
         });
       }
 
-      updateAcademicContextSummary();
-
-      refreshPathwaySelections();
+      hydrateInitialState();
+      renderAll();
 
       const themeToggle = document.getElementById('themeToggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
@@ -1443,7 +1359,7 @@
         themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       });
     </script>
-      <script src="/js/design-system.js" defer></script>
-      <script src="/js/dynamic-bg.js" defer></script>
+    <script src="/js/design-system.js" defer></script>
+    <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>

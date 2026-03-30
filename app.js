@@ -3154,6 +3154,512 @@ function buildAcademicV2RegistrationCatalog(groups = []) {
   };
 }
 
+const REGISTRATION_SCOPE_ISSUE_PRIORITY = new Map([
+  ['duplicate_stage_campus', 100],
+  ['registration_group_duplicate_stage_campus', 100],
+  ['registration_teacher_multiple_defaults', 95],
+  ['registration_teacher_default_required', 90],
+  ['registration_teacher_not_default', 85],
+  ['missing_visible_subjects', 70],
+  ['missing_mapped_subjects', 60],
+  ['missing_compat_bridge', 50],
+  ['missing_active_term', 30],
+  ['registration_path_missing', 10],
+]);
+
+function sortRegistrationScopeCodes(codes = []) {
+  return Array.from(new Set((Array.isArray(codes) ? codes : [])
+    .map((code) => sanitizeCompactText(code, 80))
+    .filter(Boolean)))
+    .sort((left, right) => {
+      const priorityDiff = Number(REGISTRATION_SCOPE_ISSUE_PRIORITY.get(right) || 0)
+        - Number(REGISTRATION_SCOPE_ISSUE_PRIORITY.get(left) || 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      return String(left || '').localeCompare(String(right || ''), 'uk', { sensitivity: 'base' });
+    });
+}
+
+function pickRegistrationScopeIssueCode(issueCodes = [], warningCodes = []) {
+  const rankedIssues = sortRegistrationScopeCodes(issueCodes);
+  if (rankedIssues.length) {
+    return rankedIssues[0];
+  }
+  const rankedWarnings = sortRegistrationScopeCodes(warningCodes);
+  return rankedWarnings[0] || 'registration_path_missing';
+}
+
+function formatRegistrationScopeCampusLabel(campusKey, lang = 'uk') {
+  const normalizedCampus = normalizeCourseCampus(campusKey);
+  if (lang === 'en') {
+    return normalizedCampus === 'munich' ? 'Munich' : 'Kyiv';
+  }
+  return normalizedCampus === 'munich' ? 'Мюнхен' : 'Київ';
+}
+
+function getRegistrationScopeStatusLabel(statusKey, lang = 'uk') {
+  const normalizedStatus = sanitizeCompactText(statusKey, 40) || 'needs_setup';
+  if (lang === 'en') {
+    if (normalizedStatus === 'ready') return 'Ready';
+    if (normalizedStatus === 'blocked') return 'Blocked';
+    return 'Needs setup';
+  }
+  if (normalizedStatus === 'ready') return 'Готова';
+  if (normalizedStatus === 'blocked') return 'Заблоковано';
+  return 'Потрібне налаштування';
+}
+
+function getRegistrationScopeIssueMeta(issueCode, lang = 'uk') {
+  const normalizedCode = sanitizeCompactText(issueCode, 80) || 'registration_path_missing';
+  const isEn = lang === 'en';
+  const fallback = isEn
+    ? {
+        code: normalizedCode,
+        label: 'Registration path needs setup.',
+        shortLabel: 'Needs setup',
+        tone: 'warning',
+      }
+    : {
+        code: normalizedCode,
+        label: 'Маршрут реєстрації потребує налаштування.',
+        shortLabel: 'Потрібне налаштування',
+        tone: 'warning',
+      };
+  const dictionary = {
+    duplicate_stage_campus: isEn
+      ? {
+          code: normalizedCode,
+          label: 'No unambiguous academic group is available for this campus.',
+          shortLabel: 'Campus conflict',
+          tone: 'blocked',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Немає однозначної академічної групи для цього кампусу.',
+          shortLabel: 'Конфлікт кампусу',
+          tone: 'blocked',
+        },
+    registration_group_duplicate_stage_campus: isEn
+      ? {
+          code: normalizedCode,
+          label: 'No unambiguous academic group is available for this campus.',
+          shortLabel: 'Campus conflict',
+          tone: 'blocked',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Немає однозначної академічної групи для цього кампусу.',
+          shortLabel: 'Конфлікт кампусу',
+          tone: 'blocked',
+        },
+    registration_teacher_multiple_defaults: isEn
+      ? {
+          code: normalizedCode,
+          label: 'This campus has several default teacher groups.',
+          shortLabel: 'Multiple defaults',
+          tone: 'blocked',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Для цього кампусу позначено кілька default-викладацьких груп.',
+          shortLabel: 'Кілька default-груп',
+          tone: 'blocked',
+        },
+    registration_teacher_default_required: isEn
+      ? {
+          code: normalizedCode,
+          label: 'This campus still needs one default teacher group.',
+          shortLabel: 'Default required',
+          tone: 'blocked',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Для цього кампусу потрібно визначити одну default-викладацьку групу.',
+          shortLabel: 'Потрібен default',
+          tone: 'blocked',
+        },
+    registration_teacher_not_default: isEn
+      ? {
+          code: normalizedCode,
+          label: 'This campus resolves through another default teacher group.',
+          shortLabel: 'Another default active',
+          tone: 'warning',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Цей кампус уже маршрутизується через іншу default-викладацьку групу.',
+          shortLabel: 'Інша default-група',
+          tone: 'warning',
+        },
+    missing_visible_subjects: isEn
+      ? {
+          code: normalizedCode,
+          label: 'No visible subjects are ready for registration yet.',
+          shortLabel: 'No subjects',
+          tone: 'warning',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Для реєстрації ще немає готових видимих предметів.',
+          shortLabel: 'Немає предметів',
+          tone: 'warning',
+        },
+    missing_mapped_subjects: isEn
+      ? {
+          code: normalizedCode,
+          label: 'Visible subjects still are not mapped into legacy projection.',
+          shortLabel: 'No mapped subjects',
+          tone: 'warning',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Видимі предмети ще не спроєктовані в legacy mapping.',
+          shortLabel: 'Немає mapped subjects',
+          tone: 'warning',
+        },
+    missing_compat_bridge: isEn
+      ? {
+          code: normalizedCode,
+          label: 'Legacy compatibility ids still are not ready for this path.',
+          shortLabel: 'No legacy bridge',
+          tone: 'warning',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Для цього маршруту ще не підготовлено legacy compatibility ids.',
+          shortLabel: 'Немає legacy bridge',
+          tone: 'warning',
+        },
+    missing_active_term: isEn
+      ? {
+          code: normalizedCode,
+          label: 'The path has no active term yet.',
+          shortLabel: 'No active term',
+          tone: 'warning',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Для цього маршруту ще немає активного терму.',
+          shortLabel: 'Немає активного терму',
+          tone: 'warning',
+        },
+    registration_path_missing: isEn
+      ? {
+          code: normalizedCode,
+          label: 'No ready registration path is available yet.',
+          shortLabel: 'No ready path',
+          tone: 'warning',
+        }
+      : {
+          code: normalizedCode,
+          label: 'Поки немає готового маршруту реєстрації.',
+          shortLabel: 'Немає готового маршруту',
+          tone: 'warning',
+        },
+  };
+  return dictionary[normalizedCode] || fallback;
+}
+
+function collectRegistrationScopeCodes(rows = []) {
+  const issueCodes = [];
+  const warningCodes = [];
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    if (row && row.selection_blocked_issue_code) {
+      issueCodes.push(row.selection_blocked_issue_code);
+    }
+    if (Array.isArray(row && row.catalog_blocking_issue_codes)) {
+      issueCodes.push(...row.catalog_blocking_issue_codes);
+    }
+    if (Array.isArray(row && row.final_ready_blocking_issue_codes)) {
+      issueCodes.push(...row.final_ready_blocking_issue_codes);
+    }
+    if (Array.isArray(row && row.catalog_warning_issue_codes)) {
+      warningCodes.push(...row.catalog_warning_issue_codes);
+    }
+    if (Array.isArray(row && row.final_ready_warning_issue_codes)) {
+      warningCodes.push(...row.final_ready_warning_issue_codes);
+    }
+  });
+  const sortedIssues = sortRegistrationScopeCodes(issueCodes);
+  const sortedWarnings = sortRegistrationScopeCodes(warningCodes)
+    .filter((code) => !sortedIssues.includes(code));
+  return {
+    issueCodes: sortedIssues,
+    warningCodes: sortedWarnings,
+  };
+}
+
+function buildRegistrationCampusChoices(rows = [], options = {}) {
+  const lang = options.lang === 'en' ? 'en' : 'uk';
+  const campusRows = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const campusKey = normalizeCourseCampus(row && row.campus_key);
+    if (!campusRows.has(campusKey)) {
+      campusRows.set(campusKey, []);
+    }
+    campusRows.get(campusKey).push(row);
+  });
+  return Array.from(campusRows.entries())
+    .map(([campusKey, bucket]) => {
+      const { issueCodes, warningCodes } = collectRegistrationScopeCodes(bucket);
+      const selectableRows = bucket.filter((row) => (
+        row
+        && row.catalog_candidate
+        && row.final_ready
+        && !row.selection_blocked
+      ));
+      const selectedRow = selectableRows.length === 1 ? selectableRows[0] : null;
+      const topIssueCode = selectedRow ? 'ready' : pickRegistrationScopeIssueCode(issueCodes, warningCodes);
+      const issueMeta = selectedRow
+        ? null
+        : getRegistrationScopeIssueMeta(topIssueCode, lang);
+      return {
+        campus_key: campusKey,
+        campus_label: formatRegistrationScopeCampusLabel(campusKey, lang),
+        track_key: normalizeRegistrationTrack(bucket[0] && bucket[0].track_key, 'bachelor'),
+        program_id: parsePositiveIntStrict(bucket[0] && bucket[0].program_id) || null,
+        cohort_id: parsePositiveIntStrict(
+          (selectedRow && selectedRow.cohort_id)
+          || (bucket[0] && bucket[0].cohort_id)
+        ) || null,
+        group_id: parsePositiveIntStrict(selectedRow && selectedRow.group_id) || null,
+        study_context_id: parsePositiveIntStrict(selectedRow && selectedRow.group_id) || null,
+        course_id: parsePositiveIntStrict(selectedRow && selectedRow.legacy_course_id) || null,
+        group_label: sanitizeCompactText(selectedRow && selectedRow.group_label, 160) || '',
+        is_selectable: Boolean(selectedRow),
+        is_candidate: bucket.some((row) => row && row.catalog_candidate),
+        is_ready: Boolean(selectedRow),
+        selection_blocked: !selectedRow && bucket.some((row) => row && row.selection_blocked),
+        issue_codes: issueCodes,
+        warning_codes: warningCodes,
+        reason_code: selectedRow ? 'ready' : topIssueCode,
+        reason_copy: selectedRow
+          ? (lang === 'en' ? 'Ready to continue.' : 'Готово до продовження.')
+          : issueMeta.label,
+        reason_short: selectedRow
+          ? (lang === 'en' ? 'Ready' : 'Готово')
+          : issueMeta.shortLabel,
+        reason_tone: selectedRow ? 'ready' : issueMeta.tone,
+      };
+    })
+    .sort((left, right) => {
+      if (left.campus_key === right.campus_key) return 0;
+      if (left.campus_key === 'kyiv') return -1;
+      if (right.campus_key === 'kyiv') return 1;
+      return String(left.campus_key || '').localeCompare(String(right.campus_key || ''), 'uk', { sensitivity: 'base' });
+    });
+}
+
+function buildRegistrationScopeInitialSelection(scopeMatrix = {}, options = {}) {
+  const pendingUser = options && typeof options === 'object' ? options.pendingUser || {} : {};
+  const selectedGroup = options && typeof options === 'object' ? options.selectedGroup || null : null;
+  const tracks = Array.isArray(scopeMatrix && scopeMatrix.tracks) ? scopeMatrix.tracks : [];
+  const programs = Array.isArray(scopeMatrix && scopeMatrix.programs) ? scopeMatrix.programs : [];
+  const defaultTrack = (tracks.find((track) => track && track.enabled) || {}).key || 'bachelor';
+  const resolvedTrack = normalizeRegistrationTrack(
+    selectedGroup && selectedGroup.track_key ? selectedGroup.track_key : pendingUser.study_track,
+    defaultTrack
+  );
+  const preferredProgramId = parsePositiveIntStrict(
+    (selectedGroup && selectedGroup.program_id)
+    || pendingUser.study_program_id
+  );
+  const resolvedProgramId = programs.some((program) => (
+    normalizeRegistrationTrack(program && program.track_key, 'bachelor') === resolvedTrack
+    && Number(program.id || 0) === Number(preferredProgramId || 0)
+  ))
+    ? preferredProgramId
+    : (programs.find((program) => normalizeRegistrationTrack(program && program.track_key, 'bachelor') === resolvedTrack) || {}).id || null;
+  const baseSelection = {
+    trackKey: resolvedTrack,
+    programId: parsePositiveIntStrict(resolvedProgramId) || null,
+    cohortId: null,
+    campusKey: '',
+    groupId: null,
+    studyContextId: null,
+    courseId: null,
+    cohortConfirmed: false,
+    campusConfirmed: false,
+  };
+  const selectedGroupId = parsePositiveIntStrict(selectedGroup && selectedGroup.group_id);
+  if (!selectedGroupId || !baseSelection.programId) {
+    return baseSelection;
+  }
+  if (resolvedTrack === 'teacher') {
+    const teacherChoices = scopeMatrix && scopeMatrix.teacherCampusesByProgram
+      ? scopeMatrix.teacherCampusesByProgram[String(baseSelection.programId)] || []
+      : [];
+    const matchedTeacherChoice = teacherChoices.find((choice) => Number(choice.group_id || 0) === Number(selectedGroupId)) || null;
+    if (!matchedTeacherChoice || !matchedTeacherChoice.is_selectable) {
+      return baseSelection;
+    }
+    return {
+      ...baseSelection,
+      cohortId: parsePositiveIntStrict(matchedTeacherChoice.cohort_id) || null,
+      campusKey: normalizeCourseCampus(matchedTeacherChoice.campus_key),
+      groupId: selectedGroupId,
+      studyContextId: selectedGroupId,
+      courseId: parsePositiveIntStrict(matchedTeacherChoice.course_id) || null,
+      campusConfirmed: true,
+    };
+  }
+  const selectedCohortId = parsePositiveIntStrict(selectedGroup && selectedGroup.cohort_id);
+  const studentChoices = scopeMatrix && scopeMatrix.campusesByCohort
+    ? scopeMatrix.campusesByCohort[String(selectedCohortId)] || []
+    : [];
+  const matchedStudentChoice = studentChoices.find((choice) => Number(choice.group_id || 0) === Number(selectedGroupId)) || null;
+  if (!matchedStudentChoice || !matchedStudentChoice.is_selectable) {
+    return baseSelection;
+  }
+  return {
+    ...baseSelection,
+    cohortId: selectedCohortId,
+    campusKey: normalizeCourseCampus(matchedStudentChoice.campus_key),
+    groupId: selectedGroupId,
+    studyContextId: selectedGroupId,
+    courseId: parsePositiveIntStrict(matchedStudentChoice.course_id) || null,
+    cohortConfirmed: true,
+    campusConfirmed: true,
+  };
+}
+
+function buildRegistrationScopeMatrix(rows = [], options = {}) {
+  const lang = options.lang === 'en' ? 'en' : 'uk';
+  const pendingUser = options && typeof options === 'object' ? options.pendingUser || {} : {};
+  const selectedGroup = options && typeof options === 'object' ? options.selectedGroup || null : null;
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const programsById = new Map();
+  const enabledTracks = new Set();
+  safeRows.forEach((row) => {
+    const programId = parsePositiveIntStrict(row && row.program_id);
+    const trackKey = normalizeRegistrationTrack(row && row.track_key, 'bachelor');
+    if (trackKey) {
+      enabledTracks.add(trackKey);
+    }
+    if (!programId || programsById.has(programId)) {
+      return;
+    }
+    programsById.set(programId, {
+      id: programId,
+      track_key: trackKey,
+      name: sanitizeCompactText(row && row.program_name, 160) || `Program ${programId}`,
+      code: sanitizeCompactText(row && row.program_code, 80) || '',
+    });
+  });
+  const programs = Array.from(programsById.values()).sort((left, right) => {
+    const trackDiff = Number(REGISTRATION_TRACK_ORDER.get(left.track_key) ?? 99)
+      - Number(REGISTRATION_TRACK_ORDER.get(right.track_key) ?? 99);
+    if (trackDiff !== 0) return trackDiff;
+    return String(left.name || '').localeCompare(String(right.name || ''), 'uk', { sensitivity: 'base' });
+  });
+  const tracks = REGISTRATION_TRACK_OPTIONS.map((track) => ({
+    ...track,
+    enabled: enabledTracks.has(track.key),
+  }));
+
+  const studentRowsByCohort = new Map();
+  const teacherRowsByProgram = new Map();
+  safeRows.forEach((row) => {
+    const normalizedTrack = normalizeRegistrationTrack(row && row.track_key, 'bachelor');
+    const cohortId = parsePositiveIntStrict(row && row.cohort_id);
+    const programId = parsePositiveIntStrict(row && row.program_id);
+    if (normalizedTrack === 'teacher') {
+      if (!programId) return;
+      if (!teacherRowsByProgram.has(programId)) {
+        teacherRowsByProgram.set(programId, []);
+      }
+      teacherRowsByProgram.get(programId).push(row);
+      return;
+    }
+    if (!cohortId || !programId) {
+      return;
+    }
+    if (!studentRowsByCohort.has(cohortId)) {
+      studentRowsByCohort.set(cohortId, []);
+    }
+    studentRowsByCohort.get(cohortId).push(row);
+  });
+
+  const campusesByCohort = {};
+  const cohortsByProgramBuckets = new Map();
+  studentRowsByCohort.forEach((bucket, cohortId) => {
+    const sample = bucket[0] || {};
+    const programId = parsePositiveIntStrict(sample.program_id);
+    if (!programId) {
+      return;
+    }
+    const campusChoices = buildRegistrationCampusChoices(bucket, { lang });
+    campusesByCohort[String(cohortId)] = campusChoices;
+    const { issueCodes, warningCodes } = collectRegistrationScopeCodes(bucket);
+    const availableCampusesCount = campusChoices.filter((choice) => choice.is_selectable).length;
+    const totalCampusesCount = campusChoices.length;
+    const statusKey = availableCampusesCount > 0
+      ? 'ready'
+      : (campusChoices.some((choice) => choice.selection_blocked || choice.reason_tone === 'blocked') ? 'blocked' : 'needs_setup');
+    const topIssueCode = pickRegistrationScopeIssueCode(issueCodes, warningCodes);
+    const topIssueMeta = getRegistrationScopeIssueMeta(topIssueCode, lang);
+    const reasonCopy = statusKey === 'ready'
+      ? (
+        availableCampusesCount === totalCampusesCount
+          ? (lang === 'en' ? 'All campuses are ready for registration.' : 'Усі кампуси готові до реєстрації.')
+          : (lang === 'en'
+            ? `Ready on ${availableCampusesCount} of ${totalCampusesCount} campuses.`
+            : `Готово для ${availableCampusesCount} з ${totalCampusesCount} кампусів.`)
+      )
+      : topIssueMeta.label;
+    const entry = {
+      id: parsePositiveIntStrict(sample.cohort_id) || null,
+      program_id: programId,
+      track_key: normalizeRegistrationTrack(sample.track_key, 'bachelor'),
+      label: sanitizeCompactText(sample.cohort_label, 160) || '',
+      admission_year: Number(sample.admission_year || 0) || null,
+      is_candidate: bucket.some((row) => row && row.catalog_candidate),
+      is_ready: availableCampusesCount > 0,
+      selection_blocked: statusKey === 'blocked',
+      issue_codes: issueCodes,
+      warning_codes: warningCodes,
+      available_campuses_count: availableCampusesCount,
+      total_campuses_count: totalCampusesCount,
+      status_key: statusKey,
+      status_label: getRegistrationScopeStatusLabel(statusKey, lang),
+      reason_code: statusKey === 'ready'
+        ? (availableCampusesCount === totalCampusesCount ? 'ready_all_campuses' : 'ready_partial_campuses')
+        : topIssueCode,
+      reason_copy: reasonCopy,
+    };
+    if (!cohortsByProgramBuckets.has(programId)) {
+      cohortsByProgramBuckets.set(programId, []);
+    }
+    cohortsByProgramBuckets.get(programId).push(entry);
+  });
+
+  const cohortsByProgram = {};
+  cohortsByProgramBuckets.forEach((bucket, programId) => {
+    cohortsByProgram[String(programId)] = bucket.sort((left, right) => {
+      const yearDiff = Number(right.admission_year || 0) - Number(left.admission_year || 0);
+      if (yearDiff !== 0) return yearDiff;
+      return Number(left.id || 0) - Number(right.id || 0);
+    });
+  });
+
+  const teacherCampusesByProgram = {};
+  teacherRowsByProgram.forEach((bucket, programId) => {
+    teacherCampusesByProgram[String(programId)] = buildRegistrationCampusChoices(bucket, { lang });
+  });
+
+  const scopeMatrix = {
+    tracks,
+    programs,
+    cohortsByProgram,
+    campusesByCohort,
+    teacherCampusesByProgram,
+  };
+  scopeMatrix.initialSelection = buildRegistrationScopeInitialSelection(scopeMatrix, {
+    pendingUser,
+    selectedGroup,
+  });
+  return scopeMatrix;
+}
+
 function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk', options = {}) {
   const isEn = lang === 'en';
   const isTeacher = normalizeRegistrationTrack(options && options.trackKey, 'bachelor') === 'teacher';
@@ -3162,10 +3668,10 @@ function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk', options 
     missing_selection: isEn
       ? (isTeacher
         ? 'Choose program, campus, and teacher academic group before continuing.'
-        : 'Choose program, admission year, campus, and academic course before continuing.')
+        : 'Choose program, cohort, campus, and academic course before continuing.')
       : (isTeacher
         ? 'Оберіть програму, кампус і викладацьку академічну групу перед продовженням.'
-        : 'Оберіть програму, рік вступу, кампус і академічний курс перед продовженням.'),
+        : 'Оберіть програму, когорту, кампус і академічний курс перед продовженням.'),
     invalid_group: isEn
       ? 'The selected academic course is no longer available for registration.'
       : 'Обраний академічний курс більше недоступний для реєстрації.',
@@ -14744,12 +15250,14 @@ app.get('/register/course', async (req, res) => {
   }
   try {
     await ensureDbReady();
-    const [pendingUser, catalogGroups, registrationAuditIssues] = await Promise.all([
+    const lang = getPreferredLang(req);
+    const [pendingUser, catalogGroups, registrationScopeRows, registrationAuditIssues] = await Promise.all([
       db.get(
         'SELECT group_id, course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
         [req.session.pendingUserId]
       ),
       academicV2Helpers.listRegistrationCatalogGroups(getAcademicV2Store()),
+      academicV2Helpers.listRegistrationScopeRows(getAcademicV2Store()),
       academicV2Helpers.listRegistrationGroupAuditIssues(getAcademicV2Store()),
     ]);
     if (!pendingUser) {
@@ -14761,11 +15269,26 @@ app.get('/register/course', async (req, res) => {
       console.error('Registration academic group audit failed', auditErr);
     });
     const registrationCatalog = buildAcademicV2RegistrationCatalog(catalogGroups);
+    const scopeRows = Array.isArray(registrationScopeRows) ? registrationScopeRows : [];
     const groupById = new Map(
       (registrationCatalog.groups || []).map((group) => [Number(group.group_id || 0), group])
     );
-    const selectedGroup = groupById.get(Number(pendingUser.group_id || 0)) || null;
-    const defaultTrack = (registrationCatalog.tracks || []).find((track) => track.enabled)?.key || 'bachelor';
+    const scopeGroupById = new Map(
+      scopeRows.map((group) => [Number(group.group_id || 0), group])
+    );
+    const selectedScopeGroup = scopeGroupById.get(Number(pendingUser.group_id || 0)) || null;
+    const selectedGroup = groupById.get(Number(pendingUser.group_id || 0)) || selectedScopeGroup || null;
+    const registrationScopeMatrix = buildRegistrationScopeMatrix(scopeRows, {
+      lang,
+      pendingUser,
+      selectedGroup: selectedScopeGroup,
+    });
+    const initialSelection = registrationScopeMatrix && registrationScopeMatrix.initialSelection
+      ? registrationScopeMatrix.initialSelection
+      : {};
+    const defaultTrack = (registrationScopeMatrix.tracks || []).find((track) => track.enabled)?.key
+      || (registrationCatalog.tracks || []).find((track) => track.enabled)?.key
+      || 'bachelor';
     const selectedTrack = normalizeRegistrationTrack(
       selectedGroup && selectedGroup.track_key ? selectedGroup.track_key : pendingUser.study_track,
       defaultTrack
@@ -14801,17 +15324,23 @@ app.get('/register/course', async (req, res) => {
       registrationPathways,
       registrationStudyContexts,
       registrationCatalog,
+      registrationScopeMatrix,
       registrationAuditIssues: Array.isArray(registrationAuditIssues) ? registrationAuditIssues : [],
-      selectedCourseId: selectedGroup && selectedGroup.legacy_course_id ? Number(selectedGroup.legacy_course_id) : null,
-      selectedAdmissionId: selectedGroup && selectedGroup.cohort_id ? Number(selectedGroup.cohort_id) : null,
-      selectedStudyContextId: selectedGroup && selectedGroup.group_id ? Number(selectedGroup.group_id) : null,
-      selectedGroupId: selectedGroup && selectedGroup.group_id ? Number(selectedGroup.group_id) : null,
-      selectedCampus: selectedGroup && selectedGroup.campus_key
-        ? normalizeCourseCampus(selectedGroup.campus_key)
-        : '',
-      selectedTrack,
-      selectedProgramId: selectedGroup && selectedGroup.program_id ? Number(selectedGroup.program_id) : null,
-      selectedCohortId: selectedGroup && selectedGroup.cohort_id ? Number(selectedGroup.cohort_id) : null,
+      selectedCourseId: parsePositiveIntStrict(initialSelection.courseId)
+        || (selectedGroup && selectedGroup.legacy_course_id ? Number(selectedGroup.legacy_course_id) : null),
+      selectedAdmissionId: parsePositiveIntStrict(initialSelection.cohortId)
+        || (selectedGroup && selectedGroup.cohort_id ? Number(selectedGroup.cohort_id) : null),
+      selectedStudyContextId: parsePositiveIntStrict(initialSelection.studyContextId)
+        || (selectedGroup && selectedGroup.group_id ? Number(selectedGroup.group_id) : null),
+      selectedGroupId: parsePositiveIntStrict(initialSelection.groupId)
+        || (selectedGroup && selectedGroup.group_id ? Number(selectedGroup.group_id) : null),
+      selectedCampus: sanitizeCompactText(initialSelection.campusKey, 40)
+        || (selectedGroup && selectedGroup.campus_key ? normalizeCourseCampus(selectedGroup.campus_key) : ''),
+      selectedTrack: sanitizeCompactText(initialSelection.trackKey, 40) || selectedTrack,
+      selectedProgramId: parsePositiveIntStrict(initialSelection.programId)
+        || (selectedGroup && selectedGroup.program_id ? Number(selectedGroup.program_id) : null),
+      selectedCohortId: parsePositiveIntStrict(initialSelection.cohortId)
+        || (selectedGroup && selectedGroup.cohort_id ? Number(selectedGroup.cohort_id) : null),
       error: req.query.error || '',
     });
   } catch (err) {
