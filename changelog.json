@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.89",
+      "date": "2026-03-31",
+      "items": [
+        "feat(academic-v2-schedule-report): make schedule warnings understandable inside `/admin/pathways` by turning the old raw warning count into a detailed breakdown with reason chips and example slots, move the full heavy slot list out of the main schedule workspace into a dedicated Academic V2 schedule-list screen with week and warning-only filters, and trim the in-workspace subject/group/advanced slot rendering down to fast previews so the main schedule tab opens lighter while keeping the complete slot audit available separately"
+      ]
+    },
+    {
       "version": "1.3.88",
       "date": "2026-03-31",
       "items": [

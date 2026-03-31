@@ -1,0 +1,469 @@
+<%
+  const numberOrZero = (value) => {
+    const normalized = Number(value || 0);
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : 0;
+  };
+  const focusState = focus && typeof focus === 'object' ? focus : {};
+  const activeProgramId = numberOrZero(focusState.programId);
+  const activeCohortId = numberOrZero(focusState.cohortId);
+  const activeGroupId = numberOrZero(focusState.groupId);
+  const activeTermId = numberOrZero(focusState.termId);
+  const activeTemplateStage = numberOrZero(focusState.templateStageNumber) || 1;
+  const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const campusOptions = [
+    { value: 'kyiv', label: 'Kyiv' },
+    { value: 'munich', label: 'Munich' },
+  ];
+  const campusLabelByKey = new Map(campusOptions.map((campus) => [campus.value, campus.label]));
+  const scopedTermsList = Array.isArray(scopedTerms) ? scopedTerms : [];
+  const scopedGroupSubjectsList = Array.isArray(scopedGroupSubjects) ? scopedGroupSubjects : [];
+  const scopedGroupSubjectActivitiesList = Array.isArray(scopedGroupSubjectActivities) ? scopedGroupSubjectActivities : [];
+  const scopedScheduleEntriesList = Array.isArray(scopedScheduleEntries) ? scopedScheduleEntries : [];
+  const selectedTermRecord = selectedTerm
+    || scopedTermsList.find((term) => Number(term.id || 0) === Number(activeTermId || 0))
+    || scopedTermsList.find((term) => term.is_active && !term.is_archived)
+    || scopedTermsList[0]
+    || null;
+  const selectedWorkspaceTermId = Number(selectedTermRecord && selectedTermRecord.id || 0);
+  const filterState = scheduleListFilters && typeof scheduleListFilters === 'object' ? scheduleListFilters : {};
+  const activeWeekFilter = numberOrZero(filterState.week);
+  const warningOnly = filterState.warningOnly === true;
+  const buildWorkspaceHref = (overrides = {}) => {
+    const merged = Object.assign({}, {
+      program_id: activeProgramId,
+      cohort_id: activeCohortId,
+      group_id: activeGroupId,
+      term_id: activeTermId,
+      template_stage: activeTemplateStage,
+    }, overrides || {});
+    const params = new URLSearchParams();
+    Object.entries(merged).forEach(([key, rawValue]) => {
+      const value = numberOrZero(rawValue);
+      if (value > 0) {
+        params.set(key, String(value));
+      }
+    });
+    const query = params.toString();
+    return query ? `/admin/pathways?${query}` : '/admin/pathways';
+  };
+  const buildSelfHref = (overrides = {}) => {
+    const merged = Object.assign({}, {
+      program_id: activeProgramId,
+      cohort_id: activeCohortId,
+      group_id: activeGroupId,
+      term_id: activeTermId,
+      template_stage: activeTemplateStage,
+      week: activeWeekFilter,
+      warning_only: warningOnly ? 1 : '',
+    }, overrides || {});
+    const params = new URLSearchParams();
+    Object.entries(merged).forEach(([key, rawValue]) => {
+      if (['program_id', 'cohort_id', 'group_id', 'term_id', 'template_stage', 'week'].includes(String(key))) {
+        const value = numberOrZero(rawValue);
+        if (value > 0) {
+          params.set(key, String(value));
+        }
+        return;
+      }
+      if (String(key) === 'warning_only') {
+        if (String(rawValue || '').trim() === '1') {
+          params.set('warning_only', '1');
+        }
+        return;
+      }
+      if (typeof rawValue === 'undefined' || rawValue === null || rawValue === '') {
+        return;
+      }
+      params.set(String(key), String(rawValue));
+    });
+    const query = params.toString();
+    return query ? `/admin/pathways/schedule-list?${query}` : '/admin/pathways/schedule-list';
+  };
+  const activityOptionsBySubjectId = scopedGroupSubjectActivitiesList.reduce((map, activity) => {
+    const subjectId = Number(activity.group_subject_id || 0);
+    if (!subjectId) {
+      return map;
+    }
+    if (!map.has(subjectId)) {
+      map.set(subjectId, []);
+    }
+    map.get(subjectId).push(activity);
+    return map;
+  }, new Map());
+  const buildSubjectReadiness = (subject, activities) => {
+    const issues = [];
+    if (!((subject && subject.teacher_names) || []).length) issues.push('teacher');
+    if (!((subject && subject.term_ids) || []).length) issues.push('term');
+    if (!(activities || []).length) issues.push('activity');
+    return { issues };
+  };
+  const subjectCards = scopedGroupSubjectsList.map((subject) => {
+    const activities = activityOptionsBySubjectId.get(Number(subject.id || 0)) || [];
+    return {
+      ...subject,
+      activities,
+      teacher_count: Array.isArray(subject.teacher_names) ? subject.teacher_names.length : 0,
+      term_count: Array.isArray(subject.term_titles) ? subject.term_titles.length : 0,
+      readiness: buildSubjectReadiness(subject, activities),
+    };
+  });
+  const subjectCardsById = new Map(subjectCards.map((subject) => [Number(subject.id || 0), subject]));
+  const resolveEntryGroupNumbers = (entry) => {
+    const activityType = String(entry && (entry.activity_type || entry.lesson_type) || '').trim().toLowerCase();
+    if (activityType === 'lecture') {
+      return Array.from({ length: Math.max(1, Number(entry && entry.group_count || 0) || 1) }, (_value, index) => index + 1);
+    }
+    const requested = Array.isArray(entry && entry.target_group_numbers)
+      ? entry.target_group_numbers.map((value) => Number(value || 0)).filter((value) => value > 0)
+      : [];
+    if (requested.length) {
+      return requested;
+    }
+    return [Math.max(1, Number(entry && entry.group_number || 0) || 1)];
+  };
+  const selectedTermScheduleEntries = selectedWorkspaceTermId
+    ? scopedScheduleEntriesList.filter((entry) => Number(entry.term_id || 0) === selectedWorkspaceTermId)
+    : scopedScheduleEntriesList.slice();
+  const scheduleEntriesWithMeta = selectedTermScheduleEntries.map((entry) => {
+    const subject = subjectCardsById.get(Number(entry.group_subject_id || 0)) || null;
+    return {
+      ...entry,
+      teacher_names: subject && Array.isArray(subject.teacher_names) ? subject.teacher_names : [],
+      resolved_group_numbers: resolveEntryGroupNumbers(entry),
+      subject_flags: subject ? {
+        hasTeacher: Number(subject.teacher_count || 0) > 0,
+        hasTerm: Number(subject.term_count || 0) > 0,
+      } : {
+        hasTeacher: false,
+        hasTerm: false,
+      },
+    };
+  });
+  const scheduleConflictsByEntryId = new Map();
+  const slotEntriesMap = scheduleEntriesWithMeta.reduce((map, entry) => {
+    const key = [entry.week_number, entry.day_of_week, entry.class_number].join('::');
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(entry);
+    return map;
+  }, new Map());
+  slotEntriesMap.forEach((entries) => {
+    entries.forEach((entry) => {
+      const reasons = new Set();
+      if (!(entry.teacher_names || []).length) {
+        reasons.add('Немає викладача');
+      }
+      if (!(subjectCardsById.get(Number(entry.group_subject_id || 0)) || { term_count: 0 }).term_count) {
+        reasons.add('Предмет не привʼязаний до терму');
+      }
+      scheduleConflictsByEntryId.set(Number(entry.id || 0), reasons);
+    });
+    for (let index = 0; index < entries.length; index += 1) {
+      for (let innerIndex = index + 1; innerIndex < entries.length; innerIndex += 1) {
+        const current = entries[index];
+        const next = entries[innerIndex];
+        const currentReasons = scheduleConflictsByEntryId.get(Number(current.id || 0)) || new Set();
+        const nextReasons = scheduleConflictsByEntryId.get(Number(next.id || 0)) || new Set();
+        const teacherConflict = (current.teacher_names || []).some((teacherName) => (next.teacher_names || []).includes(teacherName));
+        const groupConflict = (current.resolved_group_numbers || []).some((groupNumber) => (next.resolved_group_numbers || []).includes(groupNumber));
+        if (teacherConflict) {
+          currentReasons.add('Викладач уже зайнятий');
+          nextReasons.add('Викладач уже зайнятий');
+        }
+        if (groupConflict) {
+          currentReasons.add('Перетин підгруп');
+          nextReasons.add('Перетин підгруп');
+        }
+        scheduleConflictsByEntryId.set(Number(current.id || 0), currentReasons);
+        scheduleConflictsByEntryId.set(Number(next.id || 0), nextReasons);
+      }
+    }
+  });
+  const scheduleEntriesForViews = scheduleEntriesWithMeta.map((entry) => ({
+    ...entry,
+    warning_labels: Array.from(scheduleConflictsByEntryId.get(Number(entry.id || 0)) || []),
+  }));
+  const availableWeekOptions = Array.from(new Set(
+    scheduleEntriesForViews.map((entry) => Math.max(1, Number(entry.week_number || 0) || 1))
+  )).sort((left, right) => left - right);
+  const scheduleWarningEntries = scheduleEntriesForViews.filter((entry) => Array.isArray(entry.warning_labels) && entry.warning_labels.length);
+  const scheduleWarningReasonBreakdown = Array.from(scheduleWarningEntries.reduce((map, entry) => {
+    (entry.warning_labels || []).forEach((label) => {
+      const key = String(label || '').trim();
+      if (!key) {
+        return;
+      }
+      map.set(key, Number(map.get(key) || 0) + 1);
+    });
+    return map;
+  }, new Map()).entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((left, right) => (
+      Number(right.count || 0) - Number(left.count || 0)
+      || String(left.label || '').localeCompare(String(right.label || ''), 'uk')
+    ));
+  const filteredWarningEntries = scheduleWarningEntries.filter((entry) => !activeWeekFilter || Number(entry.week_number || 0) === activeWeekFilter);
+  const filteredScheduleEntries = scheduleEntriesForViews.filter((entry) => {
+    if (activeWeekFilter && Number(entry.week_number || 0) !== activeWeekFilter) {
+      return false;
+    }
+    if (warningOnly && !(entry.warning_labels || []).length) {
+      return false;
+    }
+    return true;
+  });
+  const workspaceScopeSummary = [
+    { label: 'Програма', value: selectedProgram ? selectedProgram.name : 'Не вибрано' },
+    { label: 'Когорта', value: selectedCohort ? `${selectedCohort.label} · ${selectedCohort.admission_year}` : 'Не вибрано' },
+    { label: 'Курс', value: selectedGroup ? selectedGroup.label : 'Не вибрано' },
+    { label: 'Етап', value: selectedGroup ? `Stage ${selectedGroup.stage_number}` : `Template ${activeTemplateStage}` },
+    { label: 'Кампус', value: selectedGroup ? (campusLabelByKey.get(selectedGroup.campus_key) || selectedGroup.campus_key) : 'Не вибрано' },
+    { label: 'Терм', value: selectedTermRecord ? selectedTermRecord.title : 'Усі терми' },
+  ];
+  const warningLegend = [
+    {
+      label: 'Немає викладача',
+      description: 'У слоті стоїть предмет або активність, але на самому предметі ще не призначено жодного викладача.',
+    },
+    {
+      label: 'Предмет не привʼязаний до терму',
+      description: 'Слот стоїть у термі, до якого сам live-предмет ще не прив’язаний у налаштуваннях курсу.',
+    },
+    {
+      label: 'Викладач уже зайнятий',
+      description: 'У цей самий тиждень, день і пару той самий викладач уже веде інший слот у межах курсу.',
+    },
+    {
+      label: 'Перетин підгруп',
+      description: 'Дві активності претендують на ту саму підгрупу в один і той самий слот.',
+    },
+  ];
+%>
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
+    <title>Academic Setup v2 · Усі слоти розкладу</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/pages/admin-academic-v2.css" />
+  </head>
+  <body>
+    <%- include('partials/theme-bootstrap-body') %>
+
+    <main class="academic-v2-page">
+      <div class="academic-v2-shell">
+        <section class="academic-v2-hero">
+          <div class="academic-v2-hero-grid">
+            <div>
+              <span class="academic-v2-kicker">Studerria Academic Operations</span>
+              <h1 class="academic-v2-title">Усі слоти розкладу окремо від workspace.</h1>
+              <p class="academic-v2-subtitle">
+                Це окремий список для повного перегляду слотів і детального розбору попереджень. Основний `/admin/pathways#schedule` лишається швидким grid-first редактором, а важкий перелік слотів більше не вантажиться там повністю.
+              </p>
+              <div class="academic-v2-list-hero-actions">
+                <a class="btn btn-primary btn-lg" href="<%= `${buildWorkspaceHref()}#schedule` %>">Назад у workspace розкладу</a>
+                <a class="btn btn-outline-secondary btn-lg" href="#warning-report">Попередження</a>
+                <a class="btn btn-outline-secondary btn-lg" href="#all-slots">Усі слоти</a>
+              </div>
+            </div>
+            <div class="academic-v2-summary-grid">
+              <div class="academic-v2-stat">
+                <span class="academic-v2-stat-label">Слоти</span>
+                <span class="academic-v2-stat-value"><%= scheduleEntriesForViews.length %></span>
+              </div>
+              <div class="academic-v2-stat">
+                <span class="academic-v2-stat-label">Слотів із попередженнями</span>
+                <span class="academic-v2-stat-value"><%= scheduleWarningEntries.length %></span>
+              </div>
+              <div class="academic-v2-stat">
+                <span class="academic-v2-stat-label">Терм</span>
+                <span class="academic-v2-stat-value" style="font-size: 1.2rem; line-height: 1.25;"><%= selectedTermRecord ? selectedTermRecord.title : 'Не вибрано' %></span>
+              </div>
+              <div class="academic-v2-stat">
+                <span class="academic-v2-stat-label">Активний фільтр</span>
+                <span class="academic-v2-stat-value" style="font-size: 1.2rem; line-height: 1.25;"><%= warningOnly ? 'Лише проблемні' : (activeWeekFilter ? `Тиждень ${activeWeekFilter}` : 'Усі слоти терму') %></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <% if (success) { %>
+          <div class="academic-v2-alert academic-v2-alert--success"><strong>Збережено.</strong> <%= success %></div>
+        <% } %>
+        <% if (error) { %>
+          <div class="academic-v2-alert academic-v2-alert--error"><strong>Помилка дії.</strong> <%= error %></div>
+        <% } %>
+        <% if (warning) { %>
+          <div class="academic-v2-alert academic-v2-alert--warning"><strong>Збережено з попередженням.</strong> <%= warning %></div>
+        <% } %>
+        <% if (Array.isArray(renderWarnings) && renderWarnings.length) { %>
+          <% renderWarnings.forEach((item) => { %>
+            <div class="academic-v2-alert academic-v2-alert--warning"><strong>Render warning.</strong> <%= item.message %></div>
+          <% }); %>
+        <% } %>
+
+        <section class="academic-v2-card">
+          <div class="academic-v2-section-head">
+            <div>
+              <h2 class="academic-v2-section-title">Поточний контекст</h2>
+              <p class="academic-v2-section-copy">Це той самий scope, з якого відкрився schedule workspace. Новий список не змінює focus, лише показує детальніший і легший для браузера зріз.</p>
+            </div>
+            <div class="academic-v2-chip-row">
+              <% workspaceScopeSummary.forEach((item) => { %>
+                <span class="academic-v2-chip"><%= item.label %>: <%= item.value %></span>
+              <% }); %>
+            </div>
+          </div>
+          <div class="academic-v2-chip-row">
+            <a class="academic-v2-chip <%= warningOnly ? 'academic-v2-chip--warm' : '' %>" href="<%= buildSelfHref({ warning_only: warningOnly ? '' : 1 }) %>#warning-report">
+              <%= warningOnly ? 'Показуємо лише проблемні слоти' : 'Показати тільки проблемні слоти' %>
+            </a>
+            <a class="academic-v2-chip" href="<%= buildSelfHref({ week: '' }) %>#all-slots">Усі тижні</a>
+            <% availableWeekOptions.forEach((weekNumber) => { %>
+              <a class="academic-v2-chip <%= activeWeekFilter === weekNumber ? 'academic-v2-chip--ok' : '' %>" href="<%= buildSelfHref({ week: weekNumber }) %>#all-slots">Тиждень <%= weekNumber %></a>
+            <% }); %>
+          </div>
+        </section>
+
+        <div class="academic-v2-list-grid academic-v2-list-grid--two mt-4">
+          <section class="academic-v2-list-card" id="warning-report">
+            <div class="academic-v2-subcard-topline">Детальний warning-report</div>
+            <% if (scheduleWarningEntries.length) { %>
+              <h2 class="h4 mb-2">Що означають попередження</h2>
+              <div class="academic-v2-warning-legend">
+                <% warningLegend.forEach((item) => { %>
+                  <div class="academic-v2-warning-legend-item">
+                    <strong><%= item.label %></strong>
+                    <div class="academic-v2-muted mt-1"><%= item.description %></div>
+                  </div>
+                <% }); %>
+              </div>
+              <div class="academic-v2-chip-row mt-3">
+                <% scheduleWarningReasonBreakdown.forEach((item) => { %>
+                  <span class="academic-v2-chip"><%= item.label %> · <%= item.count %></span>
+                <% }); %>
+              </div>
+              <div class="academic-v2-stack mt-3">
+                <% filteredWarningEntries.forEach((entry) => { %>
+                  <div class="academic-v2-warning-row">
+                    <div class="academic-v2-warning-row-head">
+                      <strong><%= entry.subject_title %></strong>
+                      <span class="academic-v2-chip academic-v2-chip--warm"><%= entry.warning_labels.length %> причин</span>
+                    </div>
+                    <div class="academic-v2-muted mt-2">
+                      <%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %> · <%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %>
+                    </div>
+                    <div class="academic-v2-muted mt-1">
+                      <%= entry.teacher_names.length ? entry.teacher_names.join(', ') : 'Викладача не призначено' %>
+                    </div>
+                    <div class="academic-v2-chip-row mt-2">
+                      <% entry.warning_labels.forEach((label) => { %>
+                        <span class="academic-v2-schedule-warning"><%= label %></span>
+                      <% }); %>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+              <% if (!filteredWarningEntries.length) { %>
+                <div class="academic-v2-empty mt-3">Для цього фільтра warning-rows не знайдено.</div>
+              <% } %>
+            <% } else { %>
+              <div class="academic-v2-alert academic-v2-alert--success mb-0">
+                У вибраному термі попереджень зараз немає.
+              </div>
+            <% } %>
+          </section>
+
+          <section class="academic-v2-list-card">
+            <div class="academic-v2-subcard-topline">Пояснення</div>
+            <h2 class="h4 mb-2">Чому цей екран окремий</h2>
+            <div class="academic-v2-list-card-meta">
+              <span>Основний workspace `Розклад` потрібен для швидкого placement і редагування.</span>
+              <span>Повний перелік слотів, grouped views і warning audit дають багато важкого HTML, тому вони винесені сюди окремо.</span>
+              <span>Дані лишаються тими самими: джерело правди тут і в workspace одне й те саме, `academic_v2_schedule_entries`.</span>
+            </div>
+            <div class="academic-v2-list-card-actions">
+              <a class="btn btn-outline-secondary" href="<%= `${buildWorkspaceHref()}#schedule` %>">Повернутись до календаря</a>
+              <a class="btn btn-outline-secondary" href="<%= buildSelfHref({ warning_only: 1 }) %>#warning-report">Проблемні слоти</a>
+              <a class="btn btn-outline-secondary" href="<%= buildSelfHref({ warning_only: '', week: '' }) %>#all-slots">Скинути фільтри</a>
+            </div>
+          </section>
+        </div>
+
+        <section class="academic-v2-card mt-4" id="all-slots">
+          <div class="academic-v2-section-head">
+            <div>
+              <h2 class="academic-v2-section-title">Усі слоти</h2>
+              <p class="academic-v2-section-copy">Повний перелік слотів для вибраного курсу і терму. Тут видно day/class/week/activity/groups/teachers без урізання preview.</p>
+            </div>
+            <div class="academic-v2-chip-row">
+              <span class="academic-v2-chip"><%= filteredScheduleEntries.length %> слотів у поточному фільтрі</span>
+              <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів у термі загалом</span>
+            </div>
+          </div>
+          <% if (filteredScheduleEntries.length) { %>
+            <div class="academic-v2-list-grid">
+              <% filteredScheduleEntries.forEach((entry) => { %>
+                <article class="academic-v2-list-card">
+                  <div class="academic-v2-list-card-head">
+                    <div>
+                      <strong><%= entry.subject_title %></strong>
+                      <div class="academic-v2-chip-row mt-2">
+                        <span class="academic-v2-chip"><%= entry.activity_label || entry.activity_type %></span>
+                        <span class="academic-v2-chip">Тиждень <%= entry.week_number %></span>
+                        <span class="academic-v2-chip"><%= entry.day_of_week %></span>
+                        <span class="academic-v2-chip">Пара <%= entry.class_number %></span>
+                      </div>
+                    </div>
+                    <div class="academic-v2-chip-row">
+                      <% if (entry.warning_labels.length) { %>
+                        <span class="academic-v2-chip academic-v2-chip--warm"><%= entry.warning_labels.length %> попереджень</span>
+                      <% } else { %>
+                        <span class="academic-v2-chip academic-v2-chip--ok">Без попереджень</span>
+                      <% } %>
+                    </div>
+                  </div>
+                  <div class="academic-v2-list-card-meta">
+                    <span>Підгрупи: <%= entry.target_group_label %></span>
+                    <span>Викладачі: <%= entry.teacher_names.length ? entry.teacher_names.join(', ') : 'Не призначено' %></span>
+                    <span>Терм: <%= entry.term_title || (selectedTermRecord ? selectedTermRecord.title : '—') %></span>
+                  </div>
+                  <% if (entry.warning_labels.length) { %>
+                    <div class="academic-v2-chip-row mt-3">
+                      <% entry.warning_labels.forEach((label) => { %>
+                        <span class="academic-v2-schedule-warning"><%= label %></span>
+                      <% }); %>
+                    </div>
+                  <% } %>
+                  <div class="academic-v2-list-card-actions">
+                    <a class="btn btn-outline-secondary btn-sm" href="<%= `${buildWorkspaceHref()}#schedule` %>">Редагувати у workspace</a>
+                  </div>
+                </article>
+              <% }); %>
+            </div>
+          <% } else { %>
+            <div class="academic-v2-empty">Для поточного фільтра слотів не знайдено.</div>
+          <% } %>
+        </section>
+      </div>
+    </main>
+
+    <%- include('partials/app-footer') %>
+    <%- include('partials/changelog-modal') %>
+  </body>
+</html>

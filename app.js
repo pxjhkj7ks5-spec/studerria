@@ -35856,6 +35856,59 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
   }
 });
 
+app.get('/admin/pathways/schedule-list', requirePathwaysSectionAccess, async (req, res) => {
+  const focus = parseAcademicV2Focus(req.query);
+  const pageRole = normalizeRoleKey(
+    (req && req.session && (req.session.role || (req.session.user && req.session.user.role))) || 'admin'
+  );
+  if (!focus.groupId) {
+    return res.redirect(buildAcademicV2NoticeUrl(
+      'err',
+      'Оберіть курс у Academic Setup, щоб відкрити повний список слотів.',
+      focus
+    ));
+  }
+  const renderPage = (pageData) => res.render('admin-academic-v2-schedule-list', {
+    role: pageRole,
+    username: req.session.user.username,
+    settings: settingsCache,
+    error: String(req.query.err || ''),
+    success: String(req.query.ok || ''),
+    warning: String(req.query.warn || ''),
+    scheduleListFilters: {
+      warningOnly: String(req.query.warning_only || '').trim() === '1',
+      week: parsePositiveIntStrict(req.query.week),
+    },
+    ...pageData,
+  });
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.v2.schedule-list.init');
+  }
+  try {
+    const pageData = await academicV2Helpers.loadAcademicSetupPage(
+      getAcademicV2Store(),
+      focus,
+      {
+        previewCohortId: parsePositiveIntStrict(req.query.preview_cohort_id),
+        previewTargetStageNumber: parsePositiveIntStrict(req.query.preview_target_stage),
+      }
+    );
+    return renderPage(pageData);
+  } catch (err) {
+    const degradedMessage = normalizeRuntimeErrorMessage(err && err.message ? err.message : err);
+    pushRuntimeErrorEvent('db', 'admin.pathways.v2.schedule-list.degraded', degradedMessage);
+    console.error('Academic Setup v2 schedule list degraded render', err);
+    try {
+      const fallbackPageData = academicV2Helpers.buildAcademicSetupPageFallback(focus, degradedMessage);
+      return renderPage(fallbackPageData);
+    } catch (fallbackErr) {
+      return handleDbError(res, fallbackErr, 'admin.pathways.v2.schedule-list.render');
+    }
+  }
+});
+
 app.post('/admin/pathways/v2/programs/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.saveProgram(getAcademicV2Store(), req.body),

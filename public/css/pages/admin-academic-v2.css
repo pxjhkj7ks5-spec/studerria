@@ -923,6 +923,130 @@ body.theme-dark .academic-v2-schedule-slot-empty {
   color: #b45309;
 }
 
+.academic-v2-grid-2--schedule-summary {
+  margin-bottom: 18px;
+}
+
+.academic-v2-warning-row {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+}
+
+body.theme-light .academic-v2-warning-row {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+body.theme-dark .academic-v2-warning-row {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.academic-v2-warning-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.academic-v2-list-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.academic-v2-list-grid {
+  display: grid;
+  gap: 22px;
+}
+
+.academic-v2-list-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.academic-v2-list-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--academic-radius-lg);
+  padding: 20px;
+  border: 1px solid transparent;
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+body.theme-light .academic-v2-list-card {
+  background: rgba(255, 255, 255, 0.68);
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+body.theme-dark .academic-v2-list-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.academic-v2-list-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 42%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 34%);
+}
+
+.academic-v2-list-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.academic-v2-list-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.academic-v2-list-card-meta {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--academic-muted-light);
+}
+
+body.theme-dark .academic-v2-list-card-meta {
+  color: var(--academic-muted-dark);
+}
+
+.academic-v2-list-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.academic-v2-warning-legend {
+  display: grid;
+  gap: 10px;
+}
+
+.academic-v2-warning-legend-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+body.theme-light .academic-v2-warning-legend-item {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+body.theme-dark .academic-v2-warning-legend-item {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .academic-v2-schedule-placement {
   display: grid;
   gap: 16px;
@@ -972,8 +1096,10 @@ body.theme-dark .academic-v2-advanced-block {
   .academic-v2-grid-2--subjects,
   .academic-v2-grid-2--terms,
   .academic-v2-grid-2--schedule,
+  .academic-v2-grid-2--schedule-summary,
   .academic-v2-grid-2--students,
-  .academic-v2-grid-3--overview {
+  .academic-v2-grid-3--overview,
+  .academic-v2-list-grid--two {
     grid-template-columns: 1fr;
   }
 

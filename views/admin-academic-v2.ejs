@@ -68,6 +68,31 @@
     const query = params.toString();
     return query ? `/admin/pathways?${query}` : '/admin/pathways';
   };
+  const buildScheduleListHref = (overrides = {}) => {
+    const focusOverrides = Object.assign({}, {
+      program_id: activeProgramId,
+      cohort_id: activeCohortId,
+      group_id: activeGroupId,
+      term_id: activeTermId,
+      template_stage: activeTemplateStage,
+    }, overrides || {});
+    const params = new URLSearchParams();
+    Object.entries(focusOverrides).forEach(([key, rawValue]) => {
+      if (['program_id', 'cohort_id', 'group_id', 'term_id', 'template_stage'].includes(String(key))) {
+        const value = numberOrZero(rawValue);
+        if (value > 0) {
+          params.set(key, String(value));
+        }
+        return;
+      }
+      if (typeof rawValue === 'undefined' || rawValue === null || rawValue === '') {
+        return;
+      }
+      params.set(String(key), String(rawValue));
+    });
+    const query = params.toString();
+    return query ? `/admin/pathways/schedule-list?${query}` : '/admin/pathways/schedule-list';
+  };
   const renderFocusFields = () => `
     <input type="hidden" name="focus_program_id" value="${activeProgramId || ''}" />
     <input type="hidden" name="focus_cohort_id" value="${activeCohortId || ''}" />
@@ -229,6 +254,14 @@
     ...entry,
     warning_labels: Array.from(scheduleConflictsByEntryId.get(Number(entry.id || 0)) || []),
   }));
+  const scheduleEntriesBySlotKey = scheduleEntriesForViews.reduce((map, entry) => {
+    const key = `${String(entry.day_of_week || '')}::${Number(entry.class_number || 0)}`;
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(entry);
+    return map;
+  }, new Map());
   const scheduleWeekOptions = Array.from(new Set(
     scheduleEntriesForViews.map((entry) => Math.max(1, Number(entry.week_number || 0) || 1))
   )).sort((left, right) => left - right);
@@ -285,6 +318,43 @@
   const scheduleByGroup = Array.from({ length: maxCourseGroupCount }, (_value, index) => index + 1).map((groupNumber) => ({
     group_number: groupNumber,
     entries: scheduleEntriesForViews.filter((entry) => (entry.resolved_group_numbers || []).includes(groupNumber)),
+  }));
+  const scheduleWarningEntries = scheduleEntriesForViews.filter((entry) => Array.isArray(entry.warning_labels) && entry.warning_labels.length);
+  const scheduleWarningReasonBreakdown = Array.from(scheduleWarningEntries.reduce((map, entry) => {
+    (entry.warning_labels || []).forEach((label) => {
+      const key = String(label || '').trim();
+      if (!key) {
+        return;
+      }
+      map.set(key, Number(map.get(key) || 0) + 1);
+    });
+    return map;
+  }, new Map()).entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((left, right) => (
+      Number(right.count || 0) - Number(left.count || 0)
+      || String(left.label || '').localeCompare(String(right.label || ''), 'uk')
+    ));
+  const scheduleWarningPreviewLimit = 8;
+  const scheduleWarningPreview = scheduleWarningEntries.slice(0, scheduleWarningPreviewLimit);
+  const scheduleWarningHiddenCount = Math.max(0, scheduleWarningEntries.length - scheduleWarningPreview.length);
+  const scheduleWarningReasonTotal = scheduleWarningEntries.reduce((sum, entry) => sum + (entry.warning_labels || []).length, 0);
+  const schedulePreviewLimit = 12;
+  const schedulePreviewEntries = scheduleEntriesForViews.slice(0, schedulePreviewLimit);
+  const schedulePreviewHiddenCount = Math.max(0, scheduleEntriesForViews.length - schedulePreviewEntries.length);
+  const scheduleBySubjectPreviewLimit = 8;
+  const scheduleBySubjectEntryPreviewLimit = 4;
+  const scheduleBySubjectPreview = scheduleBySubject.slice(0, scheduleBySubjectPreviewLimit).map((item) => ({
+    ...item,
+    preview_entries: item.entries.slice(0, scheduleBySubjectEntryPreviewLimit),
+    hidden_entry_count: Math.max(0, item.entries.length - Math.min(item.entries.length, scheduleBySubjectEntryPreviewLimit)),
+  }));
+  const scheduleBySubjectHiddenCount = Math.max(0, scheduleBySubject.length - scheduleBySubjectPreview.length);
+  const scheduleByGroupPreviewEntryLimit = 6;
+  const scheduleByGroupPreview = scheduleByGroup.map((groupView) => ({
+    ...groupView,
+    preview_entries: groupView.entries.slice(0, scheduleByGroupPreviewEntryLimit),
+    hidden_entry_count: Math.max(0, groupView.entries.length - Math.min(groupView.entries.length, scheduleByGroupPreviewEntryLimit)),
   }));
   const termCards = scopedTermsList.map((term) => {
     const entries = scopedScheduleEntriesList.filter((entry) => Number(entry.term_id || 0) === Number(term.id || 0));
@@ -1851,10 +1921,76 @@
                 <div class="academic-v2-chip-row">
                   <span class="academic-v2-chip"><%= selectedTermRecord ? selectedTermRecord.title : 'Терм не вибрано' %></span>
                   <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів у вибраному термі</span>
-                  <span class="academic-v2-chip <%= workspaceReadiness.scheduleConflictCount ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= workspaceReadiness.scheduleConflictCount %> попереджень</span>
+                  <a class="academic-v2-chip <%= workspaceReadiness.scheduleConflictCount ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>" href="<%= buildScheduleListHref({ warning_only: workspaceReadiness.scheduleConflictCount ? 1 : '' }) %>#warning-report">
+                    <%= workspaceReadiness.scheduleConflictCount ? `${workspaceReadiness.scheduleConflictCount} слотів із попередженнями` : 'Без попереджень' %>
+                  </a>
+                  <a class="academic-v2-chip" href="<%= buildScheduleListHref() %>">Усі слоти окремо</a>
                 </div>
               </div>
               <% if (selectedGroup) { %>
+                <div class="academic-v2-grid-2 academic-v2-grid-2--schedule-summary">
+                  <div class="academic-v2-subcard" id="schedule-warning-preview">
+                    <div class="academic-v2-subcard-topline">Попередження розкладу</div>
+                    <% if (scheduleWarningEntries.length) { %>
+                      <h3 class="h5 mb-2">Що саме означає <%= workspaceReadiness.scheduleConflictCount %> попереджень</h3>
+                      <div class="academic-v2-muted">
+                        Лічильник показує кількість слотів, у яких є хоча б одна проблема. Нижче є розбивка по причинах і кілька перших прикладів.
+                      </div>
+                      <div class="academic-v2-chip-row mt-3">
+                        <span class="academic-v2-chip academic-v2-chip--warm"><%= scheduleWarningEntries.length %> слотів з проблемами</span>
+                        <span class="academic-v2-chip"><%= scheduleWarningReasonTotal %> окремих причин</span>
+                        <% scheduleWarningReasonBreakdown.slice(0, 4).forEach((item) => { %>
+                          <span class="academic-v2-chip"><%= item.label %> · <%= item.count %></span>
+                        <% }); %>
+                      </div>
+                      <div class="academic-v2-stack mt-3">
+                        <% scheduleWarningPreview.forEach((entry) => { %>
+                          <div class="academic-v2-warning-row">
+                            <div class="academic-v2-warning-row-head">
+                              <strong><%= entry.subject_title %></strong>
+                              <span class="academic-v2-chip academic-v2-chip--warm"><%= entry.warning_labels.length %> причин</span>
+                            </div>
+                            <div class="academic-v2-muted">
+                              <%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %> · <%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %>
+                            </div>
+                            <div class="academic-v2-chip-row mt-2">
+                              <% entry.warning_labels.forEach((label) => { %>
+                                <span class="academic-v2-schedule-warning"><%= label %></span>
+                              <% }); %>
+                            </div>
+                          </div>
+                        <% }); %>
+                      </div>
+                      <% if (scheduleWarningHiddenCount > 0) { %>
+                        <div class="academic-v2-muted mt-3">Ще <%= scheduleWarningHiddenCount %> слотів із попередженнями винесені в детальний список.</div>
+                      <% } %>
+                      <div class="academic-v2-actions mt-3">
+                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Відкрити детальний розбір</a>
+                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Усі слоти окремою сторінкою</a>
+                      </div>
+                    <% } else { %>
+                      <div class="academic-v2-alert academic-v2-alert--success mb-0">
+                        У вибраному термі зараз немає слотів із конфліктами, браком викладача або term-binding помилками.
+                      </div>
+                    <% } %>
+                  </div>
+                  <div class="academic-v2-subcard">
+                    <div class="academic-v2-subcard-topline">Окремий список слотів</div>
+                    <h3 class="h5 mb-2">Повний перелік пар більше не вантажиться в цьому workspace цілком</h3>
+                    <div class="academic-v2-muted">
+                      Основний робочий екран лишається grid-first. Повний список усіх слотів і детальний warning-report відкриваються окремо, щоб вкладка `Розклад` не гальмувала.
+                    </div>
+                    <div class="academic-v2-chip-row mt-3">
+                      <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів</span>
+                      <span class="academic-v2-chip"><%= schedulePreviewEntries.length %> слотів у швидкому preview</span>
+                      <span class="academic-v2-chip"><%= scheduleBySubject.length %> предметів із розкладом</span>
+                    </div>
+                    <div class="academic-v2-actions mt-3">
+                      <a class="btn btn-primary" href="<%= buildScheduleListHref() %>">Відкрити повний список слотів</a>
+                      <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Тільки проблемні слоти</a>
+                    </div>
+                  </div>
+                </div>
                 <div class="academic-v2-grid-2 academic-v2-grid-2--schedule">
                   <div class="academic-v2-stack">
                     <div class="academic-v2-subcard">
@@ -1932,7 +2068,7 @@
                         <% scheduleGridRows.forEach((classNumber) => { %>
                           <div class="academic-v2-timetable-row-label"><%= classNumber %></div>
                           <% dayOptions.forEach((day) => { %>
-                            <% const slotEntries = scheduleEntriesForViews.filter((entry) => Number(entry.class_number || 0) === classNumber && String(entry.day_of_week || '') === day); %>
+                            <% const slotEntries = scheduleEntriesBySlotKey.get(`${day}::${classNumber}`) || []; %>
                             <div class="academic-v2-timetable-slot" data-schedule-slot data-day-of-week="<%= day %>" data-class-number="<%= classNumber %>">
                               <% slotEntries.forEach((entry) => { %>
                                 <button
@@ -1964,7 +2100,7 @@
                       <div class="academic-v2-subcard-topline">За предметом</div>
                       <% if (scheduleBySubject.length) { %>
                         <div class="academic-v2-stack">
-                          <% scheduleBySubject.forEach((item) => { %>
+                          <% scheduleBySubjectPreview.forEach((item) => { %>
                             <div class="academic-v2-schedule-list-card">
                               <strong><%= item.subject.title %></strong>
                               <div class="academic-v2-chip-row mt-2">
@@ -1972,15 +2108,24 @@
                                 <span class="academic-v2-chip"><%= item.subject.teacher_count %> викладачів</span>
                               </div>
                               <div class="academic-v2-stack mt-3">
-                                <% item.entries.forEach((entry) => { %>
+                                <% item.preview_entries.forEach((entry) => { %>
                                   <button type="button" class="academic-v2-inline-card-button" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>
                                     <span><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %></span>
                                     <span><%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %></span>
                                   </button>
                                 <% }); %>
                               </div>
+                              <% if (item.hidden_entry_count > 0) { %>
+                                <div class="academic-v2-muted mt-2">Ще <%= item.hidden_entry_count %> слотів цього предмета винесено в окремий список.</div>
+                              <% } %>
                             </div>
                           <% }); %>
+                        </div>
+                        <% if (scheduleBySubjectHiddenCount > 0) { %>
+                          <div class="academic-v2-muted mt-3">Ще <%= scheduleBySubjectHiddenCount %> предметів із розкладом винесені на окрему сторінку.</div>
+                        <% } %>
+                        <div class="academic-v2-actions mt-3">
+                          <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Усі предмети і всі слоти</a>
                         </div>
                       <% } else { %>
                         <div class="academic-v2-empty">У вибраному термі ще немає слотів.</div>
@@ -2010,23 +2155,29 @@
                     <div class="academic-v2-subcard" data-schedule-view-panel="group">
                       <div class="academic-v2-subcard-topline">За підгрупою</div>
                       <div class="academic-v2-stack">
-                        <% scheduleByGroup.forEach((groupView) => { %>
+                        <% scheduleByGroupPreview.forEach((groupView) => { %>
                           <div class="academic-v2-schedule-list-card">
                             <strong>Підгрупа G<%= groupView.group_number %></strong>
                             <% if (groupView.entries.length) { %>
                               <div class="academic-v2-stack mt-3">
-                                <% groupView.entries.forEach((entry) => { %>
+                                <% groupView.preview_entries.forEach((entry) => { %>
                                   <button type="button" class="academic-v2-inline-card-button" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>
                                     <span><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %></span>
                                     <span><%= entry.subject_title %> · <%= entry.activity_label || entry.activity_type %></span>
                                   </button>
                                 <% }); %>
                               </div>
+                              <% if (groupView.hidden_entry_count > 0) { %>
+                                <div class="academic-v2-muted mt-2">Ще <%= groupView.hidden_entry_count %> слотів цієї підгрупи є в окремому списку.</div>
+                              <% } %>
                             <% } else { %>
                               <div class="academic-v2-muted mt-2">На цю підгрупу поки нічого не поставлено.</div>
                             <% } %>
                           </div>
                         <% }); %>
+                      </div>
+                      <div class="academic-v2-actions mt-3">
+                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Повний список по підгрупах</a>
                       </div>
                     </div>
                   </div>
@@ -2090,10 +2241,10 @@
                     </details>
 
                     <div class="academic-v2-subcard" data-schedule-view-panel="advanced">
-                      <div class="academic-v2-subcard-topline">Ручні рядки</div>
-                      <% if (scheduleEntriesForViews.length) { %>
+                      <div class="academic-v2-subcard-topline">Швидкий список слотів</div>
+                      <% if (schedulePreviewEntries.length) { %>
                         <div class="academic-v2-stack">
-                          <% scheduleEntriesForViews.forEach((entry) => { %>
+                          <% schedulePreviewEntries.forEach((entry) => { %>
                             <div class="academic-v2-schedule-list-card">
                               <div class="d-flex flex-wrap justify-content-between gap-2">
                                 <div>
@@ -2110,6 +2261,13 @@
                               </div>
                             </div>
                           <% }); %>
+                        </div>
+                        <% if (schedulePreviewHiddenCount > 0) { %>
+                          <div class="academic-v2-muted mt-3">Ще <%= schedulePreviewHiddenCount %> слотів винесено на окрему сторінку, щоб ця вкладка відкривалась швидше.</div>
+                        <% } %>
+                        <div class="academic-v2-actions mt-3">
+                          <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Відкрити повний список слотів</a>
+                          <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Проблемні слоти</a>
                         </div>
                       <% } else { %>
                         <div class="academic-v2-empty">У цьому термі ще немає manual rows.</div>
