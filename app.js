@@ -23028,6 +23028,36 @@ app.get('/schedule', requireLogin, async (req, res) => {
         }
         selectedGroupsBySubjectForDisplay.get(subjectId).add(groupNumber);
       });
+      const getSelectedGroupsForSubjectDisplay = (subjectId) => {
+        const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+        if (!normalizedSubjectId || !selectedGroupsBySubjectForDisplay.has(normalizedSubjectId)) {
+          return [];
+        }
+        return Array.from(selectedGroupsBySubjectForDisplay.get(normalizedSubjectId)).sort((a, b) => a - b);
+      };
+      const shouldIncludeAcademicV2PersonalRow = (row) => {
+        const subjectId = parsePositiveIntStrict(row && row.subject_id);
+        if (!subjectId) {
+          return false;
+        }
+        const lessonType = String(row && (row.lesson_type || row.activity_type) || '').trim().toLowerCase();
+        if (lessonType === 'lecture') {
+          return true;
+        }
+        const selectedGroups = getSelectedGroupsForSubjectDisplay(subjectId);
+        if (!selectedGroups.length) {
+          return false;
+        }
+        const targetGroups = normalizeDebugGroupNumbers(
+          row && row.target_group_numbers,
+          [parsePositiveIntStrict(row && row.group_number)].filter(Boolean)
+        );
+        if (targetGroups.length) {
+          return selectedGroups.some((groupNumber) => targetGroups.includes(groupNumber));
+        }
+        const rowGroupNumber = parsePositiveIntStrict(row && row.group_number);
+        return Boolean(rowGroupNumber && selectedGroups.includes(rowGroupNumber));
+      };
       let scheduleDebug = null;
 
       const buildHomeworkTargets = (baseGroups = [], scheduleRows = []) => {
@@ -23531,6 +23561,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           { weekNumber: selectedWeek, visibleOnly: true }
         ).catch(() => null);
         rows = Array.isArray(scheduleState && scheduleState.scheduleRows) ? scheduleState.scheduleRows : [];
+        rows = rows.filter((row) => shouldIncludeAcademicV2PersonalRow(row));
         if (scheduleDebugEnabled && hasSessionRole(req, 'admin')) {
           const runtimeScope = scheduleState && scheduleState.scope ? scheduleState.scope : null;
           const runtimeTerm = scheduleState && scheduleState.term ? scheduleState.term : null;

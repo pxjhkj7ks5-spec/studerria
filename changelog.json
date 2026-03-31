@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.86",
+      "date": "2026-03-31",
+      "items": [
+        "fix(admin-view-as-student-seminar-filter): apply the selected-group filter to Academic V2 schedule rows in the admin `view-as self` schedule branch as well, so seminar, practice, and lab slots from other subgroups no longer leak into the student's personal timetable while lectures remain visible course-wide"
+      ]
+    },
+    {
       "version": "1.3.85",
       "date": "2026-03-31",
       "items": [
