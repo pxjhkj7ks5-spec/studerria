@@ -10266,6 +10266,12 @@ function isPlainStudentSession(req) {
     && !hasSessionRole(req, 'deanery');
 }
 
+function isAdminViewingStudentSelf(req) {
+  return hasSessionRole(req, 'admin')
+    && String(req && req.session && req.session.viewAs || '').trim().toLowerCase() === 'student'
+    && String(req && req.session && req.session.viewAsMode || 'manual').trim().toLowerCase() === 'self';
+}
+
 function summarizeAcademicV2ProjectionItems(items = [], key = 'subject_title', limit = 3) {
   const names = (Array.isArray(items) ? items : [])
     .map((item) => sanitizeCompactText(item && item[key], 120))
@@ -19314,14 +19320,15 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const isStaffRole = normalizedRoleList.some((roleKey) => ['teacher', 'admin', 'deanery'].includes(roleKey));
   const requestedCompetencySubjectId = Number(options && options.competencySubjectId ? options.competencySubjectId : 0);
   const request = options && options.request ? options.request : null;
-  const studentCompat = !isStaffRole
+  const useStudentAcademicScope = !isStaffRole || isAdminViewingStudentSelf(request);
+  const studentCompat = useStudentAcademicScope
     ? await loadAcademicV2LegacyStudentRows(user, {
         selectedOnly: true,
         routeKey: 'myday.student',
       })
     : { state: null, rows: [] };
   const courseId = parsePositiveIntStrict(
-    (!isStaffRole && studentCompat.state && studentCompat.state.scope && studentCompat.state.scope.legacy_course_id)
+    (useStudentAcademicScope && studentCompat.state && studentCompat.state.scope && studentCompat.state.scope.legacy_course_id)
     || (request && isStaffRole && getSessionAcademicCourseId(request))
     || user.course_id
     || null
@@ -19348,9 +19355,9 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
   const deadlinesWindowStart = formatLocalDate(addDays(now, -7));
 
-  const studentGroups = isStaffRole
-    ? []
-    : Array.from(studentCompat.rows || []);
+  const studentGroups = useStudentAcademicScope
+    ? Array.from(studentCompat.rows || [])
+    : [];
 
   let workloadTargets = (studentGroups || []).map((row) => ({
     subject_id: Number(row.subject_id),
@@ -19359,7 +19366,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     owner_course_id: Number(row.owner_course_id || courseId || 0) || null,
   }));
 
-  if (!workloadTargets.length && isStaffRole) {
+  if (!workloadTargets.length && isStaffRole && !useStudentAcademicScope) {
     const teacherTargets = (await getTeacherAssignedSubjects(user.id))
       .filter((row) => !courseId || Number(row.course_id || 0) === Number(courseId || 0));
     workloadTargets = (teacherTargets || []).map((row) => ({
@@ -32245,6 +32252,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
     ? requestedSubjectId
     : null;
   const isTeacherMode = hasSessionRole(req, 'teacher');
+  const useStudentAcademicView = !isTeacherMode && isAdminViewingStudentSelf(req);
 
   try {
     await ensureDbReady();
@@ -32343,15 +32351,28 @@ app.get('/subjects', requireLogin, async (req, res) => {
       });
     }
 
-    const subjectRows = isTeacherMode
-      ? await getTeacherAssignedSubjects(userId)
-      : await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-          studentId: userId,
-          includeHidden: false,
-        });
-    const projectionAlert = isTeacherMode
-      ? buildAcademicV2TeacherProjectionAlert(req, subjectRows, 'subjects')
-      : null;
+    let subjectRows;
+    let projectionAlert = null;
+    if (isTeacherMode) {
+      subjectRows = await getTeacherAssignedSubjects(userId);
+      projectionAlert = buildAcademicV2TeacherProjectionAlert(req, subjectRows, 'subjects');
+    } else if (useStudentAcademicView) {
+      const studentCompat = await loadAcademicV2LegacyStudentRows(req.session.user, {
+        selectedOnly: true,
+        routeKey: 'subjects.student-view-as-self',
+      });
+      subjectRows = studentCompat.rows || [];
+      projectionAlert = buildAcademicV2StudentProjectionAlert(
+        req,
+        studentCompat && studentCompat.state ? studentCompat.state.projectionIssues : {},
+        'subjects'
+      );
+    } else {
+      subjectRows = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+        studentId: userId,
+        includeHidden: false,
+      });
+    }
 
     const subjectMap = new Map();
     (subjectRows || []).forEach((row) => {
@@ -32761,6 +32782,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
   const selectedSubjectIdRaw = req.query.subject_id ? Number(req.query.subject_id) : null;
   const selectedSubjectId = Number.isFinite(selectedSubjectIdRaw) ? selectedSubjectIdRaw : null;
   const isTeacherMode = hasSessionRole(req, 'teacher');
+  const useStudentAcademicView = !isTeacherMode && isAdminViewingStudentSelf(req);
   const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
 
   try {
@@ -32775,6 +32797,18 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         selectedOnly: true,
         teamworkOnly: true,
         routeKey: 'teamwork.student',
+      });
+      subjectRows = studentCompat.rows || [];
+      projectionAlert = buildAcademicV2StudentProjectionAlert(
+        req,
+        studentCompat && studentCompat.state ? studentCompat.state.projectionIssues : {},
+        'teamwork'
+      );
+    } else if (useStudentAcademicView) {
+      const studentCompat = await loadAcademicV2LegacyStudentRows(req.session.user, {
+        selectedOnly: true,
+        teamworkOnly: true,
+        routeKey: 'teamwork.student-view-as-self',
       });
       subjectRows = studentCompat.rows || [];
       projectionAlert = buildAcademicV2StudentProjectionAlert(
