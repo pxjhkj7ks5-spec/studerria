@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.91",
+      "date": "2026-03-31",
+      "items": [
+        "feat(academic-v2-course-subject-reuse): add a new \"Призначити в інший курс\" flow inside the `/admin/pathways` course-subject detail editor that clones the selected live subject into another course as a separate Academic V2 row, blocks template duplicates in the target course up front, copies flags, teacher assignments, and activity setup, maps term bindings by matching `term_number`, keeps schedule rows out of the transfer, and surfaces a warning if some source terms do not exist in the target course"
+      ]
+    },
+    {
       "version": "1.3.90",
       "date": "2026-03-31",
       "items": [

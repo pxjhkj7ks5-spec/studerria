@@ -10437,6 +10437,7 @@ function getAcademicV2RouteMessages(req) {
     termDeleted: 'Терм видалено',
     templateSaved: 'Шаблон предмета збережено',
     groupSubjectSaved: 'Предмет групи збережено',
+    groupSubjectAssignedToCourse: 'Предмет призначено в інший курс',
     groupSubjectDeleted: 'Предмет групи видалено',
     usersAssigned: 'Користувачів перепризначено',
     scheduleSaved: 'Рядок розкладу збережено',
@@ -10450,6 +10451,12 @@ function getAcademicV2RouteMessages(req) {
     TEMPLATE_NAME_REQUIRED: 'Назва шаблону предмета обов’язкова',
     GROUP_SUBJECT_TARGET_REQUIRED: 'Для предмета групи треба вибрати групу і шаблон',
     GROUP_SUBJECT_NOT_FOUND: 'Предмет групи не знайдено',
+    GROUP_SUBJECT_ASSIGN_SOURCE_REQUIRED: 'Спочатку виберіть предмет, який треба призначити',
+    GROUP_SUBJECT_ASSIGN_TARGET_REQUIRED: 'Виберіть цільовий курс для предмета',
+    GROUP_SUBJECT_ASSIGN_SOURCE_NOT_FOUND: 'Вихідний предмет не знайдено',
+    GROUP_SUBJECT_ASSIGN_TARGET_NOT_FOUND: 'Цільовий курс не знайдено',
+    GROUP_SUBJECT_ASSIGN_TARGET_SAME: 'Предмет уже належить цьому курсу',
+    GROUP_SUBJECT_ASSIGN_DUPLICATE: 'У цільовому курсі вже є предмет на базі цього шаблону',
     USER_ASSIGNMENT_TARGET_REQUIRED: 'Виберіть групу і хоча б одного користувача',
     SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм, предмет і режим активності',
     SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
@@ -10469,6 +10476,7 @@ function getAcademicV2RouteMessages(req) {
     termDeleted: 'Term deleted',
     templateSaved: 'Subject template saved',
     groupSubjectSaved: 'Group subject saved',
+    groupSubjectAssignedToCourse: 'Subject assigned to another course',
     groupSubjectDeleted: 'Group subject deleted',
     usersAssigned: 'Users reassigned',
     scheduleSaved: 'Schedule entry saved',
@@ -10482,6 +10490,12 @@ function getAcademicV2RouteMessages(req) {
     TEMPLATE_NAME_REQUIRED: 'Subject template name is required',
     GROUP_SUBJECT_TARGET_REQUIRED: 'Group subject requires both group and template',
     GROUP_SUBJECT_NOT_FOUND: 'Group subject not found',
+    GROUP_SUBJECT_ASSIGN_SOURCE_REQUIRED: 'Select a source subject first',
+    GROUP_SUBJECT_ASSIGN_TARGET_REQUIRED: 'Select a target course for the subject',
+    GROUP_SUBJECT_ASSIGN_SOURCE_NOT_FOUND: 'Source subject not found',
+    GROUP_SUBJECT_ASSIGN_TARGET_NOT_FOUND: 'Target course not found',
+    GROUP_SUBJECT_ASSIGN_TARGET_SAME: 'The subject already belongs to that course',
+    GROUP_SUBJECT_ASSIGN_DUPLICATE: 'The target course already has a subject based on this template',
     USER_ASSIGNMENT_TARGET_REQUIRED: 'Select a target group and at least one user',
     SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires a term, subject, and activity mode',
     SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
@@ -36189,6 +36203,14 @@ app.post('/admin/pathways/v2/group-subjects/save', requirePathwaysSectionAccess,
       groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
     }),
     logContext: 'admin.pathways.v2.group-subject.save',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subjects/assign', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.assignGroupSubjectToAnotherGroup(getAcademicV2Store(), req.body),
+    successMessageKey: 'groupSubjectAssignedToCourse',
+    logContext: 'admin.pathways.v2.group-subject.assign',
   })
 ));
 

@@ -102,6 +102,7 @@
   `;
   const toAttr = (value) => JSON.stringify(value || {}).replace(/'/g, '&#39;');
   const campusLabelByKey = new Map(campusOptions.map((campus) => [campus.value, campus.label]));
+  const allGroupsList = Array.isArray(groups) ? groups : [];
   const scopedTermsList = Array.isArray(scopedTerms) ? scopedTerms : [];
   const scopedScheduleEntriesList = Array.isArray(scopedScheduleEntries) ? scopedScheduleEntries : [];
   const selectedTermRecord = selectedTerm
@@ -173,6 +174,37 @@
     };
   });
   const subjectCardsById = new Map(subjectCards.map((subject) => [Number(subject.id || 0), subject]));
+  const subjectTemplateIdsByGroup = (Array.isArray(groupSubjects) ? groupSubjects : []).reduce((map, subject) => {
+    const groupId = numberOrZero(subject && subject.group_id);
+    const subjectTemplateId = numberOrZero(subject && subject.subject_template_id);
+    if (!groupId || !subjectTemplateId) {
+      return map;
+    }
+    if (!map[groupId]) {
+      map[groupId] = [];
+    }
+    if (!map[groupId].includes(subjectTemplateId)) {
+      map[groupId].push(subjectTemplateId);
+    }
+    return map;
+  }, {});
+  const assignableCourseOptions = allGroupsList
+    .filter((group) => Number(group.id || 0) !== activeGroupId && Boolean(group && group.is_active))
+    .map((group) => {
+      const cohortSuffix = String(group.cohort_label || '').trim() || String(group.admission_year || '').trim();
+      const campusLabel = campusLabelByKey.get(String(group.campus_key || '').trim()) || String(group.campus_key || '').trim();
+      const parts = [
+        String(group.label || '').trim(),
+        String(group.program_name || '').trim(),
+        cohortSuffix ? `Когорта ${cohortSuffix}` : '',
+        `Етап ${numberOrZero(group.stage_number) || 1}`,
+        campusLabel,
+      ].filter(Boolean);
+      return {
+        ...group,
+        option_label: parts.join(' · '),
+      };
+    });
   const schedulableSubjects = subjectCards.filter((subject) => Number(subject.activity_count || 0) > 0);
   const initialSubjectCard = subjectCards[0] || null;
   const maxCourseGroupCount = subjectCards.reduce((maxValue, subject) => (
@@ -1713,6 +1745,44 @@
                     </div>
                   </form>
 
+                  <form method="post" action="/admin/pathways/v2/group-subjects/assign" class="academic-v2-subcard" id="subject-assign-form">
+                    <%- renderFocusFields() %>
+                    <input type="hidden" name="source_group_subject_id" value="" data-group-subject-assign-source />
+                    <div class="academic-v2-section-head academic-v2-section-head--tight">
+                      <div>
+                        <div class="academic-v2-subcard-topline">Повторне використання предмета</div>
+                        <h3 class="h5 mb-1">Призначити в інший курс</h3>
+                        <p class="academic-v2-section-copy">Створює окремий live subject у вибраному курсі на базі поточного предмета. Копіюються назва, прапорці, терми за номером, викладачі й активності. Розклад не переноситься.</p>
+                      </div>
+                    </div>
+                    <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                      <div class="academic-v2-field">
+                        <label for="groupSubjectAssignTarget">Цільовий курс</label>
+                        <select id="groupSubjectAssignTarget" class="form-select" name="target_group_id" data-group-subject-assign-target required>
+                          <option value="">Оберіть курс…</option>
+                          <% assignableCourseOptions.forEach((group) => { %>
+                            <option value="<%= group.id %>"><%= group.option_label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-field">
+                        <label>Що буде перенесено</label>
+                        <div class="academic-v2-muted" data-group-subject-assign-summary>Вибери живий предмет зліва, щоб підготувати копію в інший курс.</div>
+                      </div>
+                    </div>
+                    <div class="academic-v2-chip-row mt-3">
+                      <span class="academic-v2-chip">Назва і прапорці</span>
+                      <span class="academic-v2-chip">Терми за номером</span>
+                      <span class="academic-v2-chip">Викладачі</span>
+                      <span class="academic-v2-chip">Активності</span>
+                      <span class="academic-v2-chip academic-v2-chip--warm">Розклад не копіюється</span>
+                    </div>
+                    <p class="academic-v2-section-copy mt-3 mb-0" data-group-subject-assign-feedback>Вибери предмет і цільовий курс. Якщо в курсі вже є предмет на базі цього шаблону, опція буде заблокована.</p>
+                    <div class="academic-v2-actions mt-3">
+                      <button type="submit" class="btn btn-primary" data-group-subject-assign-submit disabled>Призначити в інший курс</button>
+                    </div>
+                  </form>
+
                   <form method="post" action="/admin/pathways/v2/group-subject-activities/save" class="academic-v2-subcard" data-editor-form="group-subject-activity" id="subject-detail-activities">
                     <%- renderFocusFields() %>
                     <input type="hidden" name="group_subject_activity_id" value="" data-editor-input="group-subject-activity.id" />
@@ -2406,6 +2476,7 @@
         const subjectCardsData = <%- JSON.stringify(subjectCards || []) %>;
         const scopedGroupSubjectsData = <%- JSON.stringify(subjectCards || []) %>;
         const scopedGroupSubjectActivitiesData = <%- JSON.stringify(scopedGroupSubjectActivitiesList || []) %>;
+        const subjectTemplateIdsByGroupData = <%- JSON.stringify(subjectTemplateIdsByGroup || {}) %>;
         const scheduleEntriesData = <%- JSON.stringify(scheduleEntriesForViews || []) %>;
         const requestedScheduleEntryId = Number(<%- JSON.stringify(numberOrZero(requestedScheduleEntryId)) %> || 0);
         const forms = new Map();
@@ -2434,6 +2505,12 @@
         const subjectDetailTeachers = document.querySelector('[data-subject-detail-teachers]');
         const subjectDetailActivities = document.querySelector('[data-subject-detail-activities]');
         const subjectDetailReadiness = document.querySelector('[data-subject-detail-readiness]');
+        const groupSubjectAssignForm = document.getElementById('subject-assign-form');
+        const groupSubjectAssignSource = document.querySelector('[data-group-subject-assign-source]');
+        const groupSubjectAssignTarget = document.querySelector('[data-group-subject-assign-target]');
+        const groupSubjectAssignSummary = document.querySelector('[data-group-subject-assign-summary]');
+        const groupSubjectAssignFeedback = document.querySelector('[data-group-subject-assign-feedback]');
+        const groupSubjectAssignSubmit = document.querySelector('[data-group-subject-assign-submit]');
         const scheduleSubject = document.getElementById('scheduleSubject');
         const scheduleActivity = document.getElementById('scheduleActivity');
         const scheduleActivityType = document.getElementById('scheduleActivityType');
@@ -2489,6 +2566,16 @@
         const getSubjectCardById = (subjectId) => subjectCardsData.find((subject) => Number(subject.id || 0) === Number(subjectId || 0)) || null;
         const getScopedSubjectById = (subjectId) => scopedGroupSubjectsData.find((subject) => Number(subject.id || 0) === Number(subjectId || 0)) || null;
         const getScopedActivityById = (activityId) => scopedGroupSubjectActivitiesData.find((activity) => Number(activity.id || 0) === Number(activityId || 0)) || null;
+        const courseSubjectTemplateIdsByGroup = new Map(
+          Object.entries(subjectTemplateIdsByGroupData || {}).map(([groupId, subjectTemplateIds]) => ([
+            Number(groupId || 0),
+            new Set(
+              (Array.isArray(subjectTemplateIds) ? subjectTemplateIds : [])
+                .map((value) => Number(value || 0))
+                .filter((value) => Number.isInteger(value) && value > 0)
+            ),
+          ]))
+        );
         const activitiesBySubjectId = scopedGroupSubjectActivitiesData.reduce((map, activity) => {
           const subjectId = Number(activity.group_subject_id || 0);
           if (!subjectId) {
@@ -3089,6 +3176,67 @@
           });
         };
 
+        const syncGroupSubjectAssignState = () => {
+          const subject = getSubjectCardById(activeSubjectId);
+          const subjectTemplateId = Number(subject && subject.subject_template_id || 0);
+          if (groupSubjectAssignSource) {
+            groupSubjectAssignSource.value = subject ? String(subject.id || '') : '';
+          }
+          if (groupSubjectAssignSummary) {
+            groupSubjectAssignSummary.textContent = subject
+              ? `Буде створено окремий предмет для «${subject.title}» на базі шаблону «${subject.template_name}».`
+              : 'Вибери живий предмет зліва, щоб підготувати копію в інший курс.';
+          }
+          if (!groupSubjectAssignTarget || !groupSubjectAssignSubmit) {
+            return;
+          }
+          const hasSubject = Boolean(subject && subject.id);
+          const baseOptions = Array.from(groupSubjectAssignTarget.options || []);
+          let availableTargetCount = 0;
+          baseOptions.forEach((option) => {
+            if (!option.value) {
+              option.disabled = false;
+              return;
+            }
+            if (!option.dataset.baseLabel) {
+              option.dataset.baseLabel = option.textContent.trim();
+            }
+            const targetGroupId = Number(option.value || 0);
+            const targetTemplateIds = courseSubjectTemplateIdsByGroup.get(targetGroupId) || new Set();
+            const isDuplicate = hasSubject && subjectTemplateId && targetTemplateIds.has(subjectTemplateId);
+            option.disabled = !hasSubject || isDuplicate;
+            option.textContent = isDuplicate
+              ? `${option.dataset.baseLabel} · уже має цей предмет`
+              : option.dataset.baseLabel;
+            if (!option.disabled) {
+              availableTargetCount += 1;
+            }
+          });
+          if (!hasSubject || (groupSubjectAssignTarget.value && groupSubjectAssignTarget.selectedOptions[0] && groupSubjectAssignTarget.selectedOptions[0].disabled)) {
+            groupSubjectAssignTarget.value = '';
+          }
+          groupSubjectAssignTarget.disabled = !hasSubject || availableTargetCount < 1;
+          const selectedOption = groupSubjectAssignTarget.selectedOptions[0] || null;
+          const selectedTargetGroupId = Number(groupSubjectAssignTarget.value || 0);
+          const hasSelectedTarget = selectedTargetGroupId > 0;
+          const selectedTargetTemplateIds = courseSubjectTemplateIdsByGroup.get(selectedTargetGroupId) || new Set();
+          const selectedTargetBlocked = Boolean(selectedTargetGroupId && subjectTemplateId && selectedTargetTemplateIds.has(subjectTemplateId));
+          groupSubjectAssignSubmit.disabled = !hasSubject || !selectedTargetGroupId || selectedTargetBlocked;
+          if (groupSubjectAssignFeedback) {
+            if (!hasSubject) {
+              groupSubjectAssignFeedback.textContent = 'Спочатку вибери живий предмет у поточному курсі. Лише після цього можна призначити його в інший курс.';
+            } else if (!availableTargetCount) {
+              groupSubjectAssignFeedback.textContent = 'Для цього предмета немає доступного цільового курсу: у всіх інших курсах уже є live subject на базі цього шаблону.';
+            } else if (selectedTargetBlocked) {
+              groupSubjectAssignFeedback.textContent = `У курсі «${selectedOption ? selectedOption.dataset.baseLabel || selectedOption.textContent.trim() : ''}» уже є предмет на базі шаблону «${subject.template_name}».`;
+            } else if (hasSelectedTarget && selectedOption) {
+              groupSubjectAssignFeedback.textContent = `Буде створено окремий предмет у курсі «${selectedOption.dataset.baseLabel || selectedOption.textContent.trim()}». Скопіюються терми за номером, викладачі й активності; розклад не переноситься.`;
+            } else {
+              groupSubjectAssignFeedback.textContent = 'Вибери цільовий курс. Дублікати за шаблоном предмета вже заблоковані в списку.';
+            }
+          }
+        };
+
         const updateSubjectDetail = (subjectId) => {
           activeSubjectId = Number(subjectId || 0);
           const subject = getSubjectCardById(activeSubjectId);
@@ -3130,6 +3278,7 @@
             subjectDetailReadiness.classList.toggle('academic-v2-chip--ok', Boolean(subject && subject.readiness && subject.readiness.tone === 'ok'));
             subjectDetailReadiness.classList.toggle('academic-v2-chip--warm', !subject || !subject.readiness || subject.readiness.tone !== 'ok');
           }
+          syncGroupSubjectAssignState();
           persistWorkspaceState();
         };
 
@@ -3399,6 +3548,28 @@
             persistWorkspaceState();
           });
         });
+
+        if (groupSubjectAssignTarget) {
+          groupSubjectAssignTarget.addEventListener('change', () => {
+            syncGroupSubjectAssignState();
+          });
+        }
+        if (groupSubjectAssignForm) {
+          groupSubjectAssignForm.addEventListener('submit', (event) => {
+            const subject = getSubjectCardById(activeSubjectId);
+            const targetGroupId = Number(groupSubjectAssignTarget && groupSubjectAssignTarget.value || 0);
+            const targetLabel = targetGroupId && groupSubjectAssignTarget && groupSubjectAssignTarget.selectedOptions[0]
+              ? (groupSubjectAssignTarget.selectedOptions[0].dataset.baseLabel || groupSubjectAssignTarget.selectedOptions[0].textContent.trim())
+              : '';
+            if (!subject || !targetLabel) {
+              event.preventDefault();
+              return;
+            }
+            if (!window.confirm(`Створити окремий предмет «${subject.title}» у курсі «${targetLabel}»? Розклад не буде скопійовано.`)) {
+              event.preventDefault();
+            }
+          });
+        }
 
         scheduleSlots.forEach((slot) => {
           slot.addEventListener('click', (event) => {
