@@ -2407,6 +2407,7 @@
         const scopedGroupSubjectsData = <%- JSON.stringify(subjectCards || []) %>;
         const scopedGroupSubjectActivitiesData = <%- JSON.stringify(scopedGroupSubjectActivitiesList || []) %>;
         const scheduleEntriesData = <%- JSON.stringify(scheduleEntriesForViews || []) %>;
+        const requestedScheduleEntryId = Number(<%- JSON.stringify(numberOrZero(requestedScheduleEntryId)) %> || 0);
         const forms = new Map();
         document.querySelectorAll('[data-editor-form]').forEach((form) => {
           forms.set(form.getAttribute('data-editor-form'), form);
@@ -3231,6 +3232,21 @@
           }
           persistWorkspaceState();
         };
+        const openRequestedScheduleEntry = () => {
+          if (!requestedScheduleEntryId) {
+            return false;
+          }
+          const entry = scheduleEntriesData.find((item) => Number(item && item.id ? item.id : 0) === requestedScheduleEntryId);
+          if (!entry) {
+            return false;
+          }
+          applyPayload('schedule', entry);
+          const form = forms.get('schedule');
+          if (form) {
+            form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return true;
+        };
 
         document.querySelectorAll('[data-editor-target]').forEach((button) => {
           button.addEventListener('click', (event) => {
@@ -3629,7 +3645,10 @@
           setWorkspaceTab('schedule');
           setScheduleView('advanced');
         }
-        restoreScrollPosition(restoredScrollY);
+        const didOpenRequestedScheduleEntry = openRequestedScheduleEntry();
+        if (!didOpenRequestedScheduleEntry) {
+          restoreScrollPosition(restoredScrollY);
+        }
         persistWorkspaceState();
       })();
     </script>

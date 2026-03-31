@@ -28,6 +28,9 @@
   const filterState = scheduleListFilters && typeof scheduleListFilters === 'object' ? scheduleListFilters : {};
   const activeWeekFilter = numberOrZero(filterState.week);
   const warningOnly = filterState.warningOnly === true;
+  const activeSubjectFilter = numberOrZero(filterState.subjectId);
+  const activeTeacherFilter = String(filterState.teacherName || '').trim();
+  const requestedScheduleEntryId = numberOrZero(filterState.scheduleEntryId);
   const buildWorkspaceHref = (overrides = {}) => {
     const merged = Object.assign({}, {
       program_id: activeProgramId,
@@ -55,10 +58,13 @@
       template_stage: activeTemplateStage,
       week: activeWeekFilter,
       warning_only: warningOnly ? 1 : '',
+      subject_id: activeSubjectFilter,
+      teacher: activeTeacherFilter,
+      schedule_entry_id: requestedScheduleEntryId,
     }, overrides || {});
     const params = new URLSearchParams();
     Object.entries(merged).forEach(([key, rawValue]) => {
-      if (['program_id', 'cohort_id', 'group_id', 'term_id', 'template_stage', 'week'].includes(String(key))) {
+      if (['program_id', 'cohort_id', 'group_id', 'term_id', 'template_stage', 'week', 'subject_id', 'schedule_entry_id'].includes(String(key))) {
         const value = numberOrZero(rawValue);
         if (value > 0) {
           params.set(key, String(value));
@@ -71,6 +77,13 @@
         }
         return;
       }
+      if (String(key) === 'teacher') {
+        const value = String(rawValue || '').trim();
+        if (value) {
+          params.set('teacher', value);
+        }
+        return;
+      }
       if (typeof rawValue === 'undefined' || rawValue === null || rawValue === '') {
         return;
       }
@@ -78,6 +91,23 @@
     });
     const query = params.toString();
     return query ? `/admin/pathways/schedule-list?${query}` : '/admin/pathways/schedule-list';
+  };
+  const buildWorkspaceEditorHref = (entry) => {
+    const params = new URLSearchParams();
+    if (activeProgramId) params.set('program_id', String(activeProgramId));
+    if (activeCohortId) params.set('cohort_id', String(activeCohortId));
+    if (activeGroupId) params.set('group_id', String(activeGroupId));
+    if (numberOrZero(entry && entry.term_id)) {
+      params.set('term_id', String(numberOrZero(entry.term_id)));
+    } else if (activeTermId) {
+      params.set('term_id', String(activeTermId));
+    }
+    if (activeTemplateStage) params.set('template_stage', String(activeTemplateStage));
+    if (numberOrZero(entry && entry.id)) {
+      params.set('schedule_entry_id', String(numberOrZero(entry.id)));
+    }
+    const query = params.toString();
+    return `${query ? `/admin/pathways?${query}` : '/admin/pathways'}#schedule`;
   };
   const activityOptionsBySubjectId = scopedGroupSubjectActivitiesList.reduce((map, activity) => {
     const subjectId = Number(activity.group_subject_id || 0);
@@ -184,6 +214,14 @@
     ...entry,
     warning_labels: Array.from(scheduleConflictsByEntryId.get(Number(entry.id || 0)) || []),
   }));
+  const scheduleTeacherOptions = Array.from(new Set(
+    scheduleEntriesForViews.flatMap((entry) => Array.isArray(entry.teacher_names) ? entry.teacher_names : [])
+      .map((name) => String(name || '').trim())
+      .filter(Boolean)
+  )).sort((left, right) => left.localeCompare(right, 'uk'));
+  const scheduleSubjectOptions = subjectCards
+    .filter((subject) => scheduleEntriesForViews.some((entry) => Number(entry.group_subject_id || 0) === Number(subject.id || 0)))
+    .sort((left, right) => String(left.title || '').localeCompare(String(right.title || ''), 'uk'));
   const availableWeekOptions = Array.from(new Set(
     scheduleEntriesForViews.map((entry) => Math.max(1, Number(entry.week_number || 0) || 1))
   )).sort((left, right) => left - right);
@@ -203,9 +241,26 @@
       Number(right.count || 0) - Number(left.count || 0)
       || String(left.label || '').localeCompare(String(right.label || ''), 'uk')
     ));
-  const filteredWarningEntries = scheduleWarningEntries.filter((entry) => !activeWeekFilter || Number(entry.week_number || 0) === activeWeekFilter);
+  const filteredWarningEntries = scheduleWarningEntries.filter((entry) => {
+    if (activeWeekFilter && Number(entry.week_number || 0) !== activeWeekFilter) {
+      return false;
+    }
+    if (activeSubjectFilter && Number(entry.group_subject_id || 0) !== activeSubjectFilter) {
+      return false;
+    }
+    if (activeTeacherFilter && !(entry.teacher_names || []).includes(activeTeacherFilter)) {
+      return false;
+    }
+    return true;
+  });
   const filteredScheduleEntries = scheduleEntriesForViews.filter((entry) => {
     if (activeWeekFilter && Number(entry.week_number || 0) !== activeWeekFilter) {
+      return false;
+    }
+    if (activeSubjectFilter && Number(entry.group_subject_id || 0) !== activeSubjectFilter) {
+      return false;
+    }
+    if (activeTeacherFilter && !(entry.teacher_names || []).includes(activeTeacherFilter)) {
       return false;
     }
     if (warningOnly && !(entry.warning_labels || []).length) {
@@ -334,10 +389,61 @@
               <%= warningOnly ? 'Показуємо лише проблемні слоти' : 'Показати тільки проблемні слоти' %>
             </a>
             <a class="academic-v2-chip" href="<%= buildSelfHref({ week: '' }) %>#all-slots">Усі тижні</a>
+            <% if (activeSubjectFilter) { %>
+              <span class="academic-v2-chip">Предмет: <%= (scheduleSubjectOptions.find((subject) => Number(subject.id || 0) === activeSubjectFilter) || {}).title || 'Фільтр' %></span>
+            <% } %>
+            <% if (activeTeacherFilter) { %>
+              <span class="academic-v2-chip">Викладач: <%= activeTeacherFilter %></span>
+            <% } %>
             <% availableWeekOptions.forEach((weekNumber) => { %>
               <a class="academic-v2-chip <%= activeWeekFilter === weekNumber ? 'academic-v2-chip--ok' : '' %>" href="<%= buildSelfHref({ week: weekNumber }) %>#all-slots">Тиждень <%= weekNumber %></a>
             <% }); %>
           </div>
+          <form class="academic-v2-form-grid academic-v2-form-grid--compact mt-3" method="get" action="/admin/pathways/schedule-list">
+            <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
+            <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+            <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+            <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
+            <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
+            <div class="academic-v2-field">
+              <label for="scheduleListWeek">Тиждень</label>
+              <select id="scheduleListWeek" class="form-select" name="week">
+                <option value="">Усі тижні</option>
+                <% availableWeekOptions.forEach((weekNumber) => { %>
+                  <option value="<%= weekNumber %>" <%= activeWeekFilter === weekNumber ? 'selected' : '' %>>Тиждень <%= weekNumber %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="academic-v2-field academic-v2-field--wide">
+              <label for="scheduleListSubject">Предмет</label>
+              <select id="scheduleListSubject" class="form-select" name="subject_id">
+                <option value="">Усі предмети</option>
+                <% scheduleSubjectOptions.forEach((subject) => { %>
+                  <option value="<%= subject.id %>" <%= Number(subject.id || 0) === activeSubjectFilter ? 'selected' : '' %>><%= subject.title %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="academic-v2-field academic-v2-field--wide">
+              <label for="scheduleListTeacher">Викладач</label>
+              <select id="scheduleListTeacher" class="form-select" name="teacher">
+                <option value="">Усі викладачі</option>
+                <% scheduleTeacherOptions.forEach((teacherName) => { %>
+                  <option value="<%= teacherName %>" <%= teacherName === activeTeacherFilter ? 'selected' : '' %>><%= teacherName %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="academic-v2-field">
+              <label for="scheduleListWarningOnly">Проблемні</label>
+              <select id="scheduleListWarningOnly" class="form-select" name="warning_only">
+                <option value="">Усі слоти</option>
+                <option value="1" <%= warningOnly ? 'selected' : '' %>>Лише з попередженнями</option>
+              </select>
+            </div>
+            <div class="academic-v2-actions">
+              <button type="submit" class="btn btn-primary">Застосувати фільтри</button>
+              <a class="btn btn-outline-secondary" href="<%= buildSelfHref({ week: '', subject_id: '', teacher: '', warning_only: '', schedule_entry_id: '' }) %>#all-slots">Скинути</a>
+            </div>
+          </form>
         </section>
 
         <div class="academic-v2-list-grid academic-v2-list-grid--two mt-4">
@@ -451,7 +557,7 @@
                     </div>
                   <% } %>
                   <div class="academic-v2-list-card-actions">
-                    <a class="btn btn-outline-secondary btn-sm" href="<%= `${buildWorkspaceHref()}#schedule` %>">Редагувати у workspace</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="<%= buildWorkspaceEditorHref(entry) %>">Редагувати у workspace</a>
                   </div>
                 </article>
               <% }); %>

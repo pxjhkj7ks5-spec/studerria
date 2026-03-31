@@ -35826,6 +35826,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
     error: String(req.query.err || ''),
     success: String(req.query.ok || ''),
     warning: String(req.query.warn || ''),
+    requestedScheduleEntryId: parsePositiveIntStrict(req.query.schedule_entry_id),
     ...pageData,
   });
   try {
@@ -35878,6 +35879,9 @@ app.get('/admin/pathways/schedule-list', requirePathwaysSectionAccess, async (re
     scheduleListFilters: {
       warningOnly: String(req.query.warning_only || '').trim() === '1',
       week: parsePositiveIntStrict(req.query.week),
+      subjectId: parsePositiveIntStrict(req.query.subject_id),
+      teacherName: sanitizeCompactText(req.query.teacher, 160),
+      scheduleEntryId: parsePositiveIntStrict(req.query.schedule_entry_id),
     },
     ...pageData,
   });
