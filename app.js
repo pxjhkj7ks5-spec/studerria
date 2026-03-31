@@ -22909,7 +22909,19 @@ app.get('/schedule', requireLogin, async (req, res) => {
     }
     if (viewAsMode === 'self') {
       if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
-        return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
+        return loadAcademicV2LegacyStudentRows(userId, {
+          selectedOnly: true,
+        }).then((studentCompat) => {
+          const scopedRows = (studentCompat && Array.isArray(studentCompat.rows) ? studentCompat.rows : [])
+            .filter((row) => {
+              const ownerCourseId = Number(row && (row.owner_course_id || row.course_id) || 0);
+              return !scheduleCourseId || ownerCourseId === Number(scheduleCourseId);
+            });
+          if (scopedRows.length) {
+            return cb(null, scopedRows);
+          }
+          return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
+        }).catch((err) => cb(err));
       }
       return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
         studentId: userId,
@@ -23004,6 +23016,18 @@ app.get('/schedule', requireLogin, async (req, res) => {
             .filter((item) => Number.isInteger(item) && item > 0)
         )).sort((a, b) => a - b);
       };
+      const selectedGroupsBySubjectForDisplay = new Map();
+      (studentGroups || []).forEach((row) => {
+        const subjectId = parsePositiveIntStrict(row && row.subject_id);
+        const groupNumber = parsePositiveIntStrict(row && (row.selected_group || row.group_number));
+        if (!subjectId || !groupNumber) {
+          return;
+        }
+        if (!selectedGroupsBySubjectForDisplay.has(subjectId)) {
+          selectedGroupsBySubjectForDisplay.set(subjectId, new Set());
+        }
+        selectedGroupsBySubjectForDisplay.get(subjectId).add(groupNumber);
+      });
       let scheduleDebug = null;
 
       const buildHomeworkTargets = (baseGroups = [], scheduleRows = []) => {
@@ -23011,7 +23035,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         const baseGroupsBySubject = new Map();
         (baseGroups || []).forEach((item) => {
           const subjectId = Number(item.subject_id);
-          const groupNumber = Number(item.group_number);
+          const groupNumber = Number(item.selected_group || item.group_number);
           if (!Number.isFinite(subjectId) || !Number.isFinite(groupNumber)) return;
           if (!baseGroupsBySubject.has(subjectId)) {
             baseGroupsBySubject.set(subjectId, new Set());
@@ -23555,7 +23579,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           const selectedGroupsBySubject = new Map();
           (studentGroups || []).forEach((row) => {
             const subjectId = parsePositiveIntStrict(row && row.subject_id);
-            const groupNumber = parsePositiveIntStrict(row && row.group_number);
+            const groupNumber = parsePositiveIntStrict(row && (row.selected_group || row.group_number));
             if (!subjectId || !groupNumber) return;
             if (!selectedGroupsBySubject.has(subjectId)) {
               selectedGroupsBySubject.set(subjectId, new Set());
@@ -23708,16 +23732,29 @@ app.get('/schedule', requireLogin, async (req, res) => {
       }
 
       rows.forEach((row) => {
-          row.owner_course_id = Number(row.course_id || 0) || null;
-          row.class_date = getDateForWeekDay(selectedWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null);
-          row.use_local_time = useLocalTime;
-          row.room_label = row.room_id ? roomHelpers.buildRoomLabel({
-            label: row.room_name,
-            code: row.room_code,
-            building: row.room_building,
-          }) : '';
-          if (scheduleByDay[row.day_of_week]) {
-            scheduleByDay[row.day_of_week].push(row);
+          const normalizedRow = {
+            ...row,
+            owner_course_id: Number(row.course_id || 0) || null,
+            class_date: getDateForWeekDay(selectedWeek, row.day_of_week, activeSemester ? activeSemester.start_date : null),
+            use_local_time: useLocalTime,
+            room_label: row.room_id ? roomHelpers.buildRoomLabel({
+              label: row.room_name,
+              code: row.room_code,
+              building: row.room_building,
+            }) : '',
+          };
+          const subjectId = Number(normalizedRow.subject_id || 0);
+          const selectedGroups = selectedGroupsBySubjectForDisplay.has(subjectId)
+            ? Array.from(selectedGroupsBySubjectForDisplay.get(subjectId)).sort((a, b) => a - b)
+            : [];
+          const selectedGroup = selectedGroups.length === 1 ? selectedGroups[0] : null;
+          const lessonType = String(normalizedRow.lesson_type || normalizedRow.activity_type || '').trim().toLowerCase();
+          if (lessonType === 'lecture' && selectedGroup) {
+            normalizedRow.selected_group = selectedGroup;
+            normalizedRow.group_label = `Група ${selectedGroup}`;
+          }
+          if (scheduleByDay[normalizedRow.day_of_week]) {
+            scheduleByDay[normalizedRow.day_of_week].push(normalizedRow);
           }
         });
         activeDays.forEach((day) => {

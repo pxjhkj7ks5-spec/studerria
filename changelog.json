@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.85",
+      "date": "2026-03-31",
+      "items": [
+        "fix(admin-view-as-student-schedule-groups): make the admin `/schedule` view-as-self Academic V2 path load the student's actual selected subject groups instead of a single fallback group for every subject, reuse `selected_group` when building homework scope and debug decisions, and relabel lecture cards in that personal schedule view to the student's chosen subgroup instead of the course-wide `Усі групи` marker"
+      ]
+    },
+    {
       "version": "1.3.84",
       "date": "2026-03-31",
       "items": [
