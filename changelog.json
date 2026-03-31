@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.83",
+      "date": "2026-03-31",
+      "items": [
+        "fix(academic-v2-schedule-new-slot-persistence): keep newly inserted Academic Setup v2 schedule rows alive during multi-week cleanup by tracking the ids returned from each insert or update instead of only pre-existing row ids, so brand-new lecture or seminar slots for newly added subjects are no longer immediately deleted as stale siblings"
+      ]
+    },
+    {
       "version": "1.3.82",
       "date": "2026-03-30",
       "items": [
