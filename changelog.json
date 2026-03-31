@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.84",
+      "date": "2026-03-31",
+      "items": [
+        "fix(schedule-personal-group-labels): keep lecture slots shared internally while showing the student's own selected subgroup label in personal and view-as schedules whenever a single subgroup is chosen for that subject, instead of rendering those lecture cards as \"Усі групи\" / \"All groups\""
+      ]
+    },
+    {
       "version": "1.3.83",
       "date": "2026-03-31",
       "items": [

@@ -22196,6 +22196,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
       groupedMap.forEach((entry) => {
         const groups = Array.from(entry.group_numbers).sort((a, b) => a - b);
         const selection = selectionMap.get(entry.subject_id);
+        const selectedGroups = selection ? Array.from(selection.groups).sort((a, b) => a - b) : [];
+        const selectedGroup = selectedGroups.length === 1 ? selectedGroups[0] : null;
         const lessonType = String(entry.lesson_type || '').toLowerCase();
         const isSeminarLike = lessonType === 'seminar' || lessonType === 'lab' || lessonType === 'practice';
         let groupLabel = '';
@@ -22203,6 +22205,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
           groupLabel = `Група ${groups[0]}`;
         } else if (isSeminarLike && groups.length > 1) {
           groupLabel = `Групи: ${groups.join(', ')}`;
+        } else if (selectedGroup) {
+          groupLabel = `Група ${selectedGroup}`;
         } else if (selection && selection.general) {
           groupLabel = 'Усі групи';
         } else if (groups.length === 1) {
@@ -22214,6 +22218,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           ...entry,
           group_numbers: groups,
           group_number: groups[0] || null,
+          selected_group: selectedGroup,
           group_label: groupLabel,
           is_general: selection ? selection.general : false,
         };
