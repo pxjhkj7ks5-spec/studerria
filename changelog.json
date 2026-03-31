@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.88",
+      "date": "2026-03-31",
+      "items": [
+        "fix(my-day-student-group-scope): tighten the Academic V2 student `My Day` scope builder so a shared lecture subject no longer expands to every subgroup-specific seminar on the home page, and reuse the same subgroup-aware rule for homework lookups so personal dashboard cards only include lecture rows plus the student's own selected subgroup content"
+      ]
+    },
+    {
       "version": "1.3.87",
       "date": "2026-03-31",
       "items": [

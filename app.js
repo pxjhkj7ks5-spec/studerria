@@ -19362,6 +19362,12 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   let workloadTargets = (studentGroups || []).map((row) => ({
     subject_id: Number(row.subject_id),
     group_number: Number(row.group_number),
+    selected_group: parsePositiveIntStrict(
+      row.selected_group
+      || row.default_group
+      || row.group_number
+    ),
+    has_all_groups: row.has_all_groups === true || row.group_number === null,
     subject_name: row.subject_name,
     owner_course_id: Number(row.owner_course_id || courseId || 0) || null,
   }));
@@ -19388,6 +19394,8 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
       targetMap.set(key, {
         subject_id: subjectId,
         group_number: normalizedGroup,
+        selected_group: parsePositiveIntStrict(target.selected_group || normalizedGroup),
+        has_all_groups: target.has_all_groups === true || normalizedGroup === null,
         subject_name: target.subject_name || '',
         owner_course_id: Number(target.owner_course_id || courseId || 0) || null,
       });
@@ -19444,11 +19452,31 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     String(a.subject_name || '').localeCompare(String(b.subject_name || ''))
   ));
 
-  const buildScope = (alias) => {
+  const buildScope = (alias, options = {}) => {
+    const scopeKind = String(options && options.kind || 'default').trim().toLowerCase();
     const chunks = [];
     const params = [];
     workloadTargets.forEach((target) => {
       if (target.group_number === null) {
+        if (useStudentAcademicScope) {
+          const selectedGroup = parsePositiveIntStrict(target.selected_group);
+          if (scopeKind === 'schedule') {
+            if (selectedGroup) {
+              chunks.push(`(${alias}.subject_id = ? AND (LOWER(COALESCE(NULLIF(TRIM(CAST(${alias}.lesson_type AS TEXT)), ''), '')) = 'lecture' OR ${alias}.group_number = ?))`);
+              params.push(target.subject_id, selectedGroup);
+            } else {
+              chunks.push(`(${alias}.subject_id = ? AND LOWER(COALESCE(NULLIF(TRIM(CAST(${alias}.lesson_type AS TEXT)), ''), '')) = 'lecture')`);
+              params.push(target.subject_id);
+            }
+          } else if (selectedGroup) {
+            chunks.push(`(${alias}.subject_id = ? AND (${alias}.group_number = ? OR ${alias}.group_number IS NULL))`);
+            params.push(target.subject_id, selectedGroup);
+          } else {
+            chunks.push(`(${alias}.subject_id = ? AND ${alias}.group_number IS NULL)`);
+            params.push(target.subject_id);
+          }
+          return;
+        }
         chunks.push(`${alias}.subject_id = ?`);
         params.push(target.subject_id);
       } else {
@@ -19486,7 +19514,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
     ) {
       weekForDate = clampAcademicWeek(Number(weekNumber) + 1);
     }
-	    const scope = buildScope('se');
+	    const scope = buildScope('se', { kind: 'schedule' });
 	    const params = [weekForDate, targetDayName];
 	    if (workloadOwnerCourseIds.length) {
 	      params.push(workloadOwnerCourseIds);
@@ -19586,7 +19614,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const includeStudentHomeworkInMyDay = Boolean(settingsCache.myday_show_student_homework);
   let homeworkItems = [];
 	  if (workloadTargets.length) {
-	    const scope = buildScope('h');
+	    const scope = buildScope('h', { kind: 'homework' });
 	    const params = [user.id, user.id];
 	    if (workloadOwnerCourseIds.length) {
 	      params.push(workloadOwnerCourseIds);
