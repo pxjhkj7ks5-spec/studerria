@@ -103,6 +103,8 @@
   const toAttr = (value) => JSON.stringify(value || {}).replace(/'/g, '&#39;');
   const campusLabelByKey = new Map(campusOptions.map((campus) => [campus.value, campus.label]));
   const allGroupsList = Array.isArray(groups) ? groups : [];
+  const allGroupSubjectsList = Array.isArray(groupSubjects) ? groupSubjects : [];
+  const sharedGroupSubjectLinksList = Array.isArray(sharedGroupSubjectLinks) ? sharedGroupSubjectLinks : [];
   const scopedTermsList = Array.isArray(scopedTerms) ? scopedTerms : [];
   const scopedScheduleEntriesList = Array.isArray(scopedScheduleEntries) ? scopedScheduleEntries : [];
   const selectedTermRecord = selectedTerm
@@ -174,7 +176,100 @@
     };
   });
   const subjectCardsById = new Map(subjectCards.map((subject) => [Number(subject.id || 0), subject]));
-  const subjectTemplateIdsByGroup = (Array.isArray(groupSubjects) ? groupSubjects : []).reduce((map, subject) => {
+  const allGroupsById = new Map(allGroupsList.map((group) => [numberOrZero(group && group.id), group]));
+  const allGroupSubjectsById = new Map(allGroupSubjectsList.map((subject) => [numberOrZero(subject && subject.id), subject]));
+  const buildCourseContextLabel = (groupLike) => {
+    const group = groupLike && typeof groupLike === 'object' ? groupLike : {};
+    const cohortSuffix = String(group.cohort_label || '').trim() || String(group.admission_year || '').trim();
+    const campusLabel = campusLabelByKey.get(String(group.campus_key || '').trim()) || String(group.campus_key || '').trim();
+    return [
+      String(group.label || '').trim(),
+      String(group.program_name || '').trim(),
+      cohortSuffix ? `Когорта ${cohortSuffix}` : '',
+      `Етап ${numberOrZero(group.stage_number) || 1}`,
+      campusLabel,
+    ].filter(Boolean).join(' · ');
+  };
+  const buildSubjectWorkspaceHref = (subjectLike, groupLike) => {
+    const subjectId = numberOrZero(subjectLike && (subjectLike.id || subjectLike.linked_group_subject_id || subjectLike.source_group_subject_id));
+    const group = groupLike && typeof groupLike === 'object' ? groupLike : {};
+    const params = new URLSearchParams();
+    if (numberOrZero(group.program_id)) params.set('program_id', String(numberOrZero(group.program_id)));
+    if (numberOrZero(group.cohort_id)) params.set('cohort_id', String(numberOrZero(group.cohort_id)));
+    if (numberOrZero(group.id)) params.set('group_id', String(numberOrZero(group.id)));
+    if (numberOrZero(group.stage_number)) params.set('template_stage', String(numberOrZero(group.stage_number)));
+    if (subjectId) params.set('subject_id', String(subjectId));
+    params.set('workspace_tab', 'subjects');
+    const query = params.toString();
+    return query ? `/admin/pathways?${query}` : '/admin/pathways';
+  };
+  const sharedSubjectMetaById = {};
+  sharedGroupSubjectLinksList.forEach((link) => {
+    const sourceSubjectId = numberOrZero(link.source_group_subject_id);
+    const linkedSubjectId = numberOrZero(link.linked_group_subject_id);
+    if (sourceSubjectId) {
+      if (!sharedSubjectMetaById[sourceSubjectId]) {
+        sharedSubjectMetaById[sourceSubjectId] = {
+          mode: 'standalone',
+          outbound_links: [],
+          inbound_link: null,
+        };
+      }
+      const linkedGroup = allGroupsById.get(numberOrZero(link.linked_group_id)) || {
+        id: numberOrZero(link.linked_group_id),
+        label: link.linked_group_label,
+        stage_number: numberOrZero(link.linked_stage_number) || 1,
+        campus_key: link.linked_campus_key,
+        cohort_id: numberOrZero(link.linked_cohort_id),
+        cohort_label: link.linked_cohort_label,
+        program_id: numberOrZero(link.linked_program_id),
+        program_name: link.linked_program_name,
+      };
+      sharedSubjectMetaById[sourceSubjectId].mode = 'source';
+      sharedSubjectMetaById[sourceSubjectId].outbound_links.push({
+        id: numberOrZero(link.id),
+        linked_group_subject_id: linkedSubjectId,
+        linked_group_id: numberOrZero(link.linked_group_id),
+        linked_group_label: buildCourseContextLabel(linkedGroup),
+        linked_subject_title: String(link.linked_subject_title || '').trim(),
+        workspace_href: buildSubjectWorkspaceHref({ id: linkedSubjectId }, linkedGroup),
+      });
+    }
+    if (linkedSubjectId) {
+      const sourceGroup = allGroupsById.get(numberOrZero(link.source_group_id)) || {
+        id: numberOrZero(link.source_group_id),
+        label: link.source_group_label,
+        stage_number: numberOrZero(link.source_stage_number) || 1,
+        campus_key: link.source_campus_key,
+        cohort_id: numberOrZero(link.source_cohort_id),
+        cohort_label: link.source_cohort_label,
+        program_id: numberOrZero(link.source_program_id),
+        program_name: link.source_program_name,
+      };
+      sharedSubjectMetaById[linkedSubjectId] = {
+        mode: 'linked',
+        outbound_links: [],
+        inbound_link: {
+          id: numberOrZero(link.id),
+          source_group_subject_id: sourceSubjectId,
+          source_group_id: numberOrZero(link.source_group_id),
+          source_group_label: buildCourseContextLabel(sourceGroup),
+          source_subject_title: String(link.source_subject_title || '').trim(),
+          workspace_href: buildSubjectWorkspaceHref({ id: sourceSubjectId }, sourceGroup),
+        },
+      };
+    }
+  });
+  subjectCards.forEach((subject) => {
+    if (!sharedSubjectMetaById[subject.id]) {
+      sharedSubjectMetaById[subject.id] = {
+        mode: 'standalone',
+        outbound_links: [],
+        inbound_link: null,
+      };
+    }
+  });
+  const subjectTemplateIdsByGroup = allGroupSubjectsList.reduce((map, subject) => {
     const groupId = numberOrZero(subject && subject.group_id);
     const subjectTemplateId = numberOrZero(subject && subject.subject_template_id);
     if (!groupId || !subjectTemplateId) {
@@ -191,22 +286,18 @@
   const assignableCourseOptions = allGroupsList
     .filter((group) => Number(group.id || 0) !== activeGroupId && Boolean(group && group.is_active))
     .map((group) => {
-      const cohortSuffix = String(group.cohort_label || '').trim() || String(group.admission_year || '').trim();
-      const campusLabel = campusLabelByKey.get(String(group.campus_key || '').trim()) || String(group.campus_key || '').trim();
-      const parts = [
-        String(group.label || '').trim(),
-        String(group.program_name || '').trim(),
-        cohortSuffix ? `Когорта ${cohortSuffix}` : '',
-        `Етап ${numberOrZero(group.stage_number) || 1}`,
-        campusLabel,
-      ].filter(Boolean);
       return {
         ...group,
-        option_label: parts.join(' · '),
+        option_label: buildCourseContextLabel(group),
       };
     });
   const schedulableSubjects = subjectCards.filter((subject) => Number(subject.activity_count || 0) > 0);
   const initialSubjectCard = subjectCards[0] || null;
+  const initialSubjectSharedMeta = sharedSubjectMetaById[numberOrZero(initialSubjectCard && initialSubjectCard.id)] || {
+    mode: 'standalone',
+    outbound_links: [],
+    inbound_link: null,
+  };
   const maxCourseGroupCount = subjectCards.reduce((maxValue, subject) => (
     Math.max(maxValue, Math.max(1, Number(subject.group_count || 0) || 1))
   ), 1);
@@ -1621,6 +1712,8 @@
                     <% if (subjectCards.length) { %>
                       <div class="academic-v2-stack">
                         <% subjectCards.forEach((subject) => { %>
+                          <% const subjectSharedMeta = sharedSubjectMetaById[numberOrZero(subject.id)] || { mode: 'standalone', outbound_links: [], inbound_link: null }; %>
+                          <% const subjectHasLinkedCopies = subjectSharedMeta.mode === 'source' && Array.isArray(subjectSharedMeta.outbound_links) && subjectSharedMeta.outbound_links.length > 0; %>
                           <div class="academic-v2-course-subject-card" data-subject-card data-subject-id="<%= subject.id %>" data-subject-card-payload='<%- toAttr(subject) %>'>
                             <div class="academic-v2-course-subject-card-head">
                               <div>
@@ -1635,6 +1728,8 @@
                               <span class="academic-v2-chip"><%= subject.teacher_count %> викладачів</span>
                               <span class="academic-v2-chip"><%= subject.term_count %> термів</span>
                               <span class="academic-v2-chip"><%= subject.activity_count %> активностей</span>
+                              <% if (subjectSharedMeta.mode === 'source') { %><span class="academic-v2-chip academic-v2-chip--ok">Shared-джерело</span><% } %>
+                              <% if (subjectSharedMeta.mode === 'linked') { %><span class="academic-v2-chip academic-v2-chip--warm">Linked-копія</span><% } %>
                               <% if (subject.is_visible) { %><span class="academic-v2-chip academic-v2-chip--ok">Видимий</span><% } %>
                               <% if (subject.is_required) { %><span class="academic-v2-chip">Обовʼязковий</span><% } %>
                               <% if (subject.is_general) { %><span class="academic-v2-chip">General</span><% } %>
@@ -1653,7 +1748,7 @@
                               <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="group-subject" data-editor-payload='<%- toAttr(subject) %>' data-subject-focus-id="<%= subject.id %>" data-subject-focus-section="activities">Активності</button>
                               <form method="post" action="/admin/pathways/v2/group-subjects/<%= subject.id %>/delete">
                                 <%- renderFocusFields() %>
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Вилучити</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" <%= subjectHasLinkedCopies ? 'disabled' : '' %> title="<%= subjectHasLinkedCopies ? 'Спочатку прибери linked-копії або перенеси їх на інше джерело.' : '' %>">Вилучити</button>
                               </form>
                             </div>
                           </div>
@@ -1691,11 +1786,13 @@
                     <div class="academic-v2-form-grid">
                       <div class="academic-v2-field">
                         <label for="groupSubjectTemplate">Шаблон предмета</label>
+                        <input type="hidden" name="subject_template_id" value="" data-group-subject-template-hidden-lock disabled />
                         <select id="groupSubjectTemplate" class="form-select" name="subject_template_id" data-editor-input="group-subject.subject_template_id">
                           <% (subjectTemplates || []).forEach((template) => { %>
                             <option value="<%= template.id %>"><%= template.name %></option>
                           <% }); %>
                         </select>
+                        <div class="academic-v2-muted mt-2" data-group-subject-template-lock></div>
                       </div>
                       <div class="academic-v2-field" style="grid-column: 1 / -1;">
                         <label for="groupSubjectTitle">Жива назва</label>
@@ -1745,6 +1842,123 @@
                     </div>
                   </form>
 
+                  <div class="academic-v2-subcard" id="subject-shared-card">
+                    <div class="academic-v2-section-head academic-v2-section-head--tight">
+                      <div>
+                        <div class="academic-v2-subcard-topline">Спільний предмет</div>
+                        <h3 class="h5 mb-1">Shared-копії між курсами</h3>
+                        <p class="academic-v2-section-copy" data-group-subject-shared-copy>
+                          <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
+                            Цей предмет є linked-копією і керується з курсу «<%= initialSubjectSharedMeta.inbound_link.source_group_label %>».
+                          <% } else if (initialSubjectSharedMeta.mode === 'source') { %>
+                            Цей предмет є базовим shared-джерелом для <%= initialSubjectSharedMeta.outbound_links.length %> курсів. Можна створювати нові linked-копії та вручну синхронізувати їхні налаштування.
+                          <% } else { %>
+                            Перетворює поточний предмет на базове shared-джерело для інших курсів, але лишає окремі live rows у кожному курсі. Розклад лишається локальним для кожної копії.
+                          <% } %>
+                        </p>
+                      </div>
+                    </div>
+
+                    <form method="post" action="/admin/pathways/v2/group-subjects/share" id="subject-share-form">
+                      <%- renderFocusFields() %>
+                      <input type="hidden" name="source_group_subject_id" value="<%= initialSubjectCard ? initialSubjectCard.id : '' %>" data-group-subject-share-source />
+                      <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                        <div class="academic-v2-field">
+                          <label for="groupSubjectShareTarget">Цільовий курс для shared-копії</label>
+                          <select id="groupSubjectShareTarget" class="form-select" name="target_group_id" data-group-subject-share-target>
+                            <option value="">Оберіть курс…</option>
+                            <% assignableCourseOptions.forEach((group) => { %>
+                              <option value="<%= group.id %>"><%= group.option_label %></option>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="academic-v2-field">
+                          <label>Як це працює</label>
+                          <div class="academic-v2-muted" data-group-subject-shared-summary>
+                            <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
+                              Linked-копія не може створювати власні shared-гілки. Відкрий базовий предмет, щоб керувати shared-звʼязками.
+                            <% } else { %>
+                              Буде створено linked-копію або підʼєднано наявний предмет з тим самим шаблоном у вибраному курсі. Далі його можна оновлювати з цього джерела вручну.
+                            <% } %>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="academic-v2-chip-row mt-3">
+                        <span class="academic-v2-chip">Setup синхронізується вручну</span>
+                        <span class="academic-v2-chip">Терми мапляться за номером</span>
+                        <span class="academic-v2-chip">Викладачі й активності копіюються</span>
+                        <span class="academic-v2-chip academic-v2-chip--warm">Розклад лишається локальним</span>
+                      </div>
+                      <div class="academic-v2-checkboxes mt-3">
+                        <input type="hidden" name="open_target_course" value="0" />
+                        <div class="form-check">
+                          <input id="groupSubjectShareOpenTarget" class="form-check-input" type="checkbox" name="open_target_course" value="1" checked />
+                          <label class="form-check-label" for="groupSubjectShareOpenTarget">Після створення відкрити цільовий курс і linked-копію</label>
+                        </div>
+                      </div>
+                      <p class="academic-v2-section-copy mt-3 mb-0" data-group-subject-shared-feedback>
+                        <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
+                          Цей предмет уже керується з іншого курсу, тому створення shared-копій тут заблоковано.
+                        <% } else { %>
+                          Вибери курс, у якому треба створити shared-копію або підʼєднати наявний предмет того самого шаблону.
+                        <% } %>
+                      </p>
+                      <div class="academic-v2-actions mt-3">
+                        <button type="submit" class="btn btn-primary" data-group-subject-share-submit disabled>Створити shared-копію</button>
+                        <button
+                          type="button"
+                          class="btn btn-outline-secondary <%= initialSubjectSharedMeta.inbound_link ? '' : 'd-none' %>"
+                          data-group-subject-shared-open-source
+                          data-shared-open-href="<%= initialSubjectSharedMeta.inbound_link ? initialSubjectSharedMeta.inbound_link.workspace_href : '' %>"
+                        >
+                          Відкрити базовий предмет
+                        </button>
+                      </div>
+                    </form>
+
+                    <form method="post" action="/admin/pathways/v2/group-subjects/shared-sync" class="mt-3" id="subject-shared-sync-form">
+                      <%- renderFocusFields() %>
+                      <input type="hidden" name="source_group_subject_id" value="<%= initialSubjectCard ? initialSubjectCard.id : '' %>" data-group-subject-shared-sync-source />
+                      <div class="academic-v2-actions">
+                        <button type="submit" class="btn btn-outline-secondary" data-group-subject-shared-sync-submit <%= initialSubjectSharedMeta.mode === 'source' && initialSubjectSharedMeta.outbound_links.length ? '' : 'disabled' %>>Синхронізувати linked-копії</button>
+                      </div>
+                    </form>
+
+                    <div class="academic-v2-stack mt-3" data-group-subject-shared-links>
+                      <% if (initialSubjectSharedMeta.mode === 'source' && initialSubjectSharedMeta.outbound_links.length) { %>
+                        <% initialSubjectSharedMeta.outbound_links.forEach((link) => { %>
+                          <div class="academic-v2-course-subject-card academic-v2-course-subject-card--compact">
+                            <div class="academic-v2-course-subject-card-head">
+                              <div>
+                                <strong><%= link.linked_group_label %></strong>
+                                <div class="academic-v2-muted"><%= link.linked_subject_title %></div>
+                              </div>
+                              <span class="academic-v2-chip">Linked-копія</span>
+                            </div>
+                            <div class="academic-v2-actions mt-3">
+                              <a class="btn btn-sm btn-outline-secondary" href="<%= link.workspace_href %>">Відкрити</a>
+                            </div>
+                          </div>
+                        <% }); %>
+                      <% } else if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
+                        <div class="academic-v2-course-subject-card academic-v2-course-subject-card--compact">
+                          <div class="academic-v2-course-subject-card-head">
+                            <div>
+                              <strong><%= initialSubjectSharedMeta.inbound_link.source_group_label %></strong>
+                              <div class="academic-v2-muted"><%= initialSubjectSharedMeta.inbound_link.source_subject_title %></div>
+                            </div>
+                            <span class="academic-v2-chip academic-v2-chip--ok">Базове джерело</span>
+                          </div>
+                          <div class="academic-v2-actions mt-3">
+                            <a class="btn btn-sm btn-outline-secondary" href="<%= initialSubjectSharedMeta.inbound_link.workspace_href %>">Відкрити джерело</a>
+                          </div>
+                        </div>
+                      <% } else { %>
+                        <div class="academic-v2-empty">Поки що немає linked-копій. Створи shared-копію для іншого курсу або працюй з одноразовим призначенням нижче.</div>
+                      <% } %>
+                    </div>
+                  </div>
+
                   <form method="post" action="/admin/pathways/v2/group-subjects/assign" class="academic-v2-subcard" id="subject-assign-form">
                     <%- renderFocusFields() %>
                     <input type="hidden" name="source_group_subject_id" value="" data-group-subject-assign-source />
@@ -1752,7 +1966,7 @@
                       <div>
                         <div class="academic-v2-subcard-topline">Повторне використання предмета</div>
                         <h3 class="h5 mb-1">Призначити в інший курс</h3>
-                        <p class="academic-v2-section-copy">Створює окремий live subject у вибраному курсі на базі поточного предмета. Копіюються назва, прапорці, терми за номером, викладачі й активності. Розклад не переноситься.</p>
+                        <p class="academic-v2-section-copy">Створює окремий live subject у вибраному курсі без shared-звʼязку. Копіюються назва, прапорці, терми за номером, викладачі й активності. Розклад не переноситься.</p>
                       </div>
                     </div>
                     <div class="academic-v2-form-grid academic-v2-form-grid--compact">
@@ -2483,6 +2697,7 @@
         const subjectCardsData = <%- JSON.stringify(subjectCards || []) %>;
         const scopedGroupSubjectsData = <%- JSON.stringify(subjectCards || []) %>;
         const scopedGroupSubjectActivitiesData = <%- JSON.stringify(scopedGroupSubjectActivitiesList || []) %>;
+        const sharedSubjectMetaData = <%- JSON.stringify(sharedSubjectMetaById || {}) %>;
         const subjectTemplateIdsByGroupData = <%- JSON.stringify(subjectTemplateIdsByGroup || {}) %>;
         const requestedSubjectId = Number(<%- JSON.stringify(numberOrZero(requestedSubjectId)) %> || 0);
         const requestedWorkspaceTab = <%- JSON.stringify(String(requestedWorkspaceTab || '').trim()) %>;
@@ -2517,6 +2732,22 @@
         const subjectDetailTeachers = document.querySelector('[data-subject-detail-teachers]');
         const subjectDetailActivities = document.querySelector('[data-subject-detail-activities]');
         const subjectDetailReadiness = document.querySelector('[data-subject-detail-readiness]');
+        const groupSubjectTemplate = document.getElementById('groupSubjectTemplate');
+        const groupSubjectTemplateHiddenLock = document.querySelector('[data-group-subject-template-hidden-lock]');
+        const groupSubjectTemplateLock = document.querySelector('[data-group-subject-template-lock]');
+        const groupSubjectSharedCard = document.getElementById('subject-shared-card');
+        const groupSubjectShareForm = document.getElementById('subject-share-form');
+        const groupSubjectShareSource = document.querySelector('[data-group-subject-share-source]');
+        const groupSubjectShareTarget = document.querySelector('[data-group-subject-share-target]');
+        const groupSubjectSharedCopy = document.querySelector('[data-group-subject-shared-copy]');
+        const groupSubjectSharedSummary = document.querySelector('[data-group-subject-shared-summary]');
+        const groupSubjectSharedFeedback = document.querySelector('[data-group-subject-shared-feedback]');
+        const groupSubjectShareSubmit = document.querySelector('[data-group-subject-share-submit]');
+        const groupSubjectSharedOpenSource = document.querySelector('[data-group-subject-shared-open-source]');
+        const groupSubjectSharedSyncForm = document.getElementById('subject-shared-sync-form');
+        const groupSubjectSharedSyncSource = document.querySelector('[data-group-subject-shared-sync-source]');
+        const groupSubjectSharedSyncSubmit = document.querySelector('[data-group-subject-shared-sync-submit]');
+        const groupSubjectSharedLinks = document.querySelector('[data-group-subject-shared-links]');
         const groupSubjectAssignForm = document.getElementById('subject-assign-form');
         const groupSubjectAssignSource = document.querySelector('[data-group-subject-assign-source]');
         const groupSubjectAssignTarget = document.querySelector('[data-group-subject-assign-target]');
@@ -2575,9 +2806,31 @@
           const text = String(value || '').trim();
           return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
         };
+        const escapeHtml = (value) => String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
         const getSubjectCardById = (subjectId) => subjectCardsData.find((subject) => Number(subject.id || 0) === Number(subjectId || 0)) || null;
         const getScopedSubjectById = (subjectId) => scopedGroupSubjectsData.find((subject) => Number(subject.id || 0) === Number(subjectId || 0)) || null;
         const getScopedActivityById = (activityId) => scopedGroupSubjectActivitiesData.find((activity) => Number(activity.id || 0) === Number(activityId || 0)) || null;
+        const getSharedSubjectMetaById = (subjectId) => {
+          const meta = sharedSubjectMetaData && typeof sharedSubjectMetaData === 'object'
+            ? sharedSubjectMetaData[String(Number(subjectId || 0))] || sharedSubjectMetaData[Number(subjectId || 0)] || null
+            : null;
+          return meta && typeof meta === 'object'
+            ? {
+              mode: String(meta.mode || 'standalone').trim() || 'standalone',
+              outbound_links: Array.isArray(meta.outbound_links) ? meta.outbound_links : [],
+              inbound_link: meta.inbound_link && typeof meta.inbound_link === 'object' ? meta.inbound_link : null,
+            }
+            : {
+              mode: 'standalone',
+              outbound_links: [],
+              inbound_link: null,
+            };
+        };
         const courseSubjectTemplateIdsByGroup = new Map(
           Object.entries(subjectTemplateIdsByGroupData || {}).map(([groupId, subjectTemplateIds]) => ([
             Number(groupId || 0),
@@ -3193,6 +3446,161 @@
           });
         };
 
+        const renderSharedSubjectLinksHtml = (meta = {}) => {
+          const outboundLinks = Array.isArray(meta.outbound_links) ? meta.outbound_links : [];
+          if (String(meta.mode || '') === 'source' && outboundLinks.length) {
+            return outboundLinks.map((link) => `
+              <div class="academic-v2-course-subject-card academic-v2-course-subject-card--compact">
+                <div class="academic-v2-course-subject-card-head">
+                  <div>
+                    <strong>${escapeHtml(link.linked_group_label || '')}</strong>
+                    <div class="academic-v2-muted">${escapeHtml(link.linked_subject_title || '')}</div>
+                  </div>
+                  <span class="academic-v2-chip">Linked-копія</span>
+                </div>
+                <div class="academic-v2-actions mt-3">
+                  <a class="btn btn-sm btn-outline-secondary" href="${escapeHtml(link.workspace_href || '/admin/pathways')}">Відкрити</a>
+                </div>
+              </div>
+            `).join('');
+          }
+          if (String(meta.mode || '') === 'linked' && meta.inbound_link) {
+            return `
+              <div class="academic-v2-course-subject-card academic-v2-course-subject-card--compact">
+                <div class="academic-v2-course-subject-card-head">
+                  <div>
+                    <strong>${escapeHtml(meta.inbound_link.source_group_label || '')}</strong>
+                    <div class="academic-v2-muted">${escapeHtml(meta.inbound_link.source_subject_title || '')}</div>
+                  </div>
+                  <span class="academic-v2-chip academic-v2-chip--ok">Базове джерело</span>
+                </div>
+                <div class="academic-v2-actions mt-3">
+                  <a class="btn btn-sm btn-outline-secondary" href="${escapeHtml(meta.inbound_link.workspace_href || '/admin/pathways')}">Відкрити джерело</a>
+                </div>
+              </div>
+            `;
+          }
+          return '<div class="academic-v2-empty">Поки що немає linked-копій. Створи shared-копію для іншого курсу або працюй з одноразовим призначенням нижче.</div>';
+        };
+
+        const syncGroupSubjectSharedState = () => {
+          const subject = getSubjectCardById(activeSubjectId);
+          const subjectTemplateId = Number(subject && subject.subject_template_id || 0);
+          const sharedMeta = getSharedSubjectMetaById(activeSubjectId);
+          const outboundLinks = Array.isArray(sharedMeta.outbound_links) ? sharedMeta.outbound_links : [];
+          const outboundGroupIds = new Set(outboundLinks.map((link) => Number(link.linked_group_id || 0)).filter((value) => value > 0));
+          const isLinkedCopy = String(sharedMeta.mode || '') === 'linked';
+          const isSourceSubject = String(sharedMeta.mode || '') === 'source';
+          const isSharedParticipant = isLinkedCopy || isSourceSubject;
+          if (groupSubjectTemplate && groupSubjectTemplateHiddenLock) {
+            groupSubjectTemplate.disabled = Boolean(subject && isSharedParticipant);
+            groupSubjectTemplateHiddenLock.disabled = !(subject && isSharedParticipant);
+            groupSubjectTemplateHiddenLock.value = subject && isSharedParticipant
+              ? String(subjectTemplateId || '')
+              : '';
+          }
+          if (groupSubjectTemplateLock) {
+            if (!subject) {
+              groupSubjectTemplateLock.textContent = '';
+            } else if (isLinkedCopy) {
+              groupSubjectTemplateLock.textContent = 'Шаблон зафіксовано, бо цей предмет є linked-копією shared-джерела.';
+            } else if (isSourceSubject) {
+              groupSubjectTemplateLock.textContent = 'Шаблон зафіксовано, поки цей предмет має linked-копії в інших курсах.';
+            } else {
+              groupSubjectTemplateLock.textContent = '';
+            }
+          }
+          if (groupSubjectShareSource) {
+            groupSubjectShareSource.value = subject ? String(subject.id || '') : '';
+          }
+          if (groupSubjectSharedSyncSource) {
+            groupSubjectSharedSyncSource.value = subject ? String(subject.id || '') : '';
+          }
+          if (groupSubjectSharedCopy) {
+            if (!subject) {
+              groupSubjectSharedCopy.textContent = 'Вибери живий предмет, щоб побачити shared-стан і керувати linked-копіями між курсами.';
+            } else if (isLinkedCopy && sharedMeta.inbound_link) {
+              groupSubjectSharedCopy.textContent = `Цей предмет є linked-копією і керується з курсу «${sharedMeta.inbound_link.source_group_label || ''}».`;
+            } else if (isSourceSubject) {
+              groupSubjectSharedCopy.textContent = `Цей предмет є базовим shared-джерелом для ${outboundLinks.length} курсів. Можна створювати нові linked-копії та вручну синхронізувати їхні налаштування.`;
+            } else {
+              groupSubjectSharedCopy.textContent = 'Перетворює поточний предмет на базове shared-джерело для інших курсів, але лишає окремі live rows у кожному курсі. Розклад лишається локальним для кожної копії.';
+            }
+          }
+          if (groupSubjectSharedSummary) {
+            if (!subject) {
+              groupSubjectSharedSummary.textContent = 'Вибери живий предмет зліва, щоб створити shared-копію або керувати вже звʼязаними курсами.';
+            } else if (isLinkedCopy && sharedMeta.inbound_link) {
+              groupSubjectSharedSummary.textContent = 'Linked-копія не може створювати власні shared-гілки. Відкрий базовий предмет, щоб керувати shared-звʼязками.';
+            } else {
+              groupSubjectSharedSummary.textContent = 'Буде створено linked-копію або підʼєднано наявний предмет з тим самим шаблоном у вибраному курсі. Далі його можна оновлювати з цього джерела вручну.';
+            }
+          }
+          if (groupSubjectShareTarget && groupSubjectShareSubmit) {
+            let availableTargetCount = 0;
+            Array.from(groupSubjectShareTarget.options || []).forEach((option) => {
+              if (!option.value) {
+                option.disabled = false;
+                return;
+              }
+              if (!option.dataset.baseLabel) {
+                option.dataset.baseLabel = option.textContent.trim();
+              }
+              const targetGroupId = Number(option.value || 0);
+              const hasExistingSharedLink = outboundGroupIds.has(targetGroupId);
+              const targetTemplateIds = courseSubjectTemplateIdsByGroup.get(targetGroupId) || new Set();
+              const hasExistingTargetSubject = Boolean(subjectTemplateId && targetTemplateIds.has(subjectTemplateId));
+              const isDisabled = !subject || isLinkedCopy || hasExistingSharedLink;
+              option.disabled = isDisabled;
+              option.textContent = hasExistingSharedLink
+                ? `${option.dataset.baseLabel} · уже звʼязано`
+                : hasExistingTargetSubject
+                  ? `${option.dataset.baseLabel} · підʼєднає наявний предмет`
+                  : `${option.dataset.baseLabel} · створить linked-копію`;
+              if (!isDisabled) {
+                availableTargetCount += 1;
+              }
+            });
+            if (!subject || isLinkedCopy || (groupSubjectShareTarget.value && groupSubjectShareTarget.selectedOptions[0] && groupSubjectShareTarget.selectedOptions[0].disabled)) {
+              groupSubjectShareTarget.value = '';
+            }
+            groupSubjectShareTarget.disabled = !subject || isLinkedCopy || availableTargetCount < 1;
+            const selectedTargetGroupId = Number(groupSubjectShareTarget.value || 0);
+            const selectedOption = groupSubjectShareTarget.selectedOptions[0] || null;
+            const selectedTargetTemplateIds = courseSubjectTemplateIdsByGroup.get(selectedTargetGroupId) || new Set();
+            const willLinkExisting = Boolean(selectedTargetGroupId && subjectTemplateId && selectedTargetTemplateIds.has(subjectTemplateId));
+            groupSubjectShareSubmit.disabled = !subject || isLinkedCopy || !selectedTargetGroupId;
+            if (groupSubjectSharedFeedback) {
+              if (!subject) {
+                groupSubjectSharedFeedback.textContent = 'Спочатку вибери живий предмет у поточному курсі.';
+              } else if (isLinkedCopy && sharedMeta.inbound_link) {
+                groupSubjectSharedFeedback.textContent = `Цей предмет уже звʼязано з «${sharedMeta.inbound_link.source_group_label || ''}». Для нових shared-звʼязків відкрий базовий предмет.`;
+              } else if (!availableTargetCount) {
+                groupSubjectSharedFeedback.textContent = 'Для цього предмета немає доступного цільового курсу: усі релевантні курси вже linked до цього джерела.';
+              } else if (selectedOption && willLinkExisting) {
+                groupSubjectSharedFeedback.textContent = `У курсі «${selectedOption.dataset.baseLabel || selectedOption.textContent.trim()}» вже є предмет з тим самим шаблоном. Ми підʼєднаємо його як linked-копію і синхронізуємо налаштування з цього джерела.`;
+              } else if (selectedOption) {
+                groupSubjectSharedFeedback.textContent = `Буде створено нову linked-копію в курсі «${selectedOption.dataset.baseLabel || selectedOption.textContent.trim()}». Далі її можна буде вручну синхронізувати з цього джерела.`;
+              } else {
+                groupSubjectSharedFeedback.textContent = 'Вибери курс, у якому треба створити shared-копію або підʼєднати наявний предмет того самого шаблону.';
+              }
+            }
+          }
+          if (groupSubjectSharedOpenSource) {
+            const sourceHref = sharedMeta.inbound_link && sharedMeta.inbound_link.workspace_href
+              ? String(sharedMeta.inbound_link.workspace_href).trim()
+              : '';
+            groupSubjectSharedOpenSource.classList.toggle('d-none', !sourceHref);
+            groupSubjectSharedOpenSource.dataset.sharedOpenHref = sourceHref;
+          }
+          if (groupSubjectSharedSyncSubmit) {
+            groupSubjectSharedSyncSubmit.disabled = !subject || !isSourceSubject || !outboundLinks.length;
+          }
+          if (groupSubjectSharedLinks) {
+            groupSubjectSharedLinks.innerHTML = renderSharedSubjectLinksHtml(sharedMeta);
+          }
+        };
+
         const syncGroupSubjectAssignState = () => {
           const subject = getSubjectCardById(activeSubjectId);
           const subjectTemplateId = Number(subject && subject.subject_template_id || 0);
@@ -3295,6 +3703,7 @@
             subjectDetailReadiness.classList.toggle('academic-v2-chip--ok', Boolean(subject && subject.readiness && subject.readiness.tone === 'ok'));
             subjectDetailReadiness.classList.toggle('academic-v2-chip--warm', !subject || !subject.readiness || subject.readiness.tone !== 'ok');
           }
+          syncGroupSubjectSharedState();
           syncGroupSubjectAssignState();
           persistWorkspaceState();
         };
@@ -3586,6 +3995,55 @@
         if (groupSubjectAssignTarget) {
           groupSubjectAssignTarget.addEventListener('change', () => {
             syncGroupSubjectAssignState();
+          });
+        }
+        if (groupSubjectShareTarget) {
+          groupSubjectShareTarget.addEventListener('change', () => {
+            syncGroupSubjectSharedState();
+          });
+        }
+        if (groupSubjectSharedOpenSource) {
+          groupSubjectSharedOpenSource.addEventListener('click', () => {
+            const href = String(groupSubjectSharedOpenSource.dataset.sharedOpenHref || '').trim();
+            if (href) {
+              window.location.href = href;
+            }
+          });
+        }
+        if (groupSubjectShareForm) {
+          groupSubjectShareForm.addEventListener('submit', (event) => {
+            const subject = getSubjectCardById(activeSubjectId);
+            const targetGroupId = Number(groupSubjectShareTarget && groupSubjectShareTarget.value || 0);
+            const selectedOption = targetGroupId && groupSubjectShareTarget && groupSubjectShareTarget.selectedOptions[0]
+              ? groupSubjectShareTarget.selectedOptions[0]
+              : null;
+            const targetLabel = selectedOption ? (selectedOption.dataset.baseLabel || selectedOption.textContent.trim()) : '';
+            if (!subject || !targetLabel) {
+              event.preventDefault();
+              return;
+            }
+            const targetTemplateIds = courseSubjectTemplateIdsByGroup.get(targetGroupId) || new Set();
+            const willLinkExisting = Boolean(subject.subject_template_id && targetTemplateIds.has(Number(subject.subject_template_id || 0)));
+            const confirmationText = willLinkExisting
+              ? `Підʼєднати наявний предмет «${subject.title}» у курсі «${targetLabel}» як linked-копію і синхронізувати його налаштування?`
+              : `Створити linked-копію предмета «${subject.title}» у курсі «${targetLabel}»? Розклад не буде скопійовано.`;
+            if (!window.confirm(confirmationText)) {
+              event.preventDefault();
+            }
+          });
+        }
+        if (groupSubjectSharedSyncForm) {
+          groupSubjectSharedSyncForm.addEventListener('submit', (event) => {
+            const subject = getSubjectCardById(activeSubjectId);
+            const sharedMeta = getSharedSubjectMetaById(activeSubjectId);
+            const linkedCount = Array.isArray(sharedMeta.outbound_links) ? sharedMeta.outbound_links.length : 0;
+            if (!subject || !linkedCount) {
+              event.preventDefault();
+              return;
+            }
+            if (!window.confirm(`Синхронізувати налаштування предмета «${subject.title}» у ${linkedCount} linked-копіях? Локальний розклад у цих курсах не переноситься, але зайві activity можуть бути очищені.`)) {
+              event.preventDefault();
+            }
           });
         }
         if (groupSubjectAssignForm) {

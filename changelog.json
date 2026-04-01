@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.93",
+      "date": "2026-04-01",
+      "items": [
+        "feat(academic-v2-shared-subjects): add a first-class shared subject flow to `/admin/pathways` by introducing `academic_v2_shared_group_subject_links`, a new `Спільний предмет` panel in the course-subject editor, actions to create linked copies in other courses or attach an existing same-template subject, a manual sync action that copies title, flags, subgroup config, term bindings by `term_number`, teacher assignments, and activity setup while keeping schedule rows local, and guardrails that lock course/template changes for shared participants, block deleting a source subject while linked copies exist, and clean up linked-course schedule rows that no longer fit after subgroup-count sync"
+      ]
+    },
+    {
       "version": "1.3.92",
       "date": "2026-04-01",
       "items": [

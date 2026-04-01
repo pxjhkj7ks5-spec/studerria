@@ -44,6 +44,7 @@ const academicV2StageTemplates = require('./043_academic_v2_stage_templates');
 const academicV2TeacherRegistrationDefaults = require('./044_academic_v2_teacher_registration_defaults');
 const academicV2SubjectActivities = require('./045_academic_v2_subject_activities');
 const academicV2ActivityBaselines = require('./046_academic_v2_activity_baselines');
+const academicV2SharedGroupSubjectLinks = require('./047_academic_v2_shared_group_subject_links');
 
 module.exports = [
   init,
@@ -92,4 +93,5 @@ module.exports = [
   academicV2TeacherRegistrationDefaults,
   academicV2SubjectActivities,
   academicV2ActivityBaselines,
+  academicV2SharedGroupSubjectLinks,
 ];

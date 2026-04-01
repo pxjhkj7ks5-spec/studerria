@@ -10438,6 +10438,8 @@ function getAcademicV2RouteMessages(req) {
     templateSaved: 'Шаблон предмета збережено',
     groupSubjectSaved: 'Предмет групи збережено',
     groupSubjectAssignedToCourse: 'Предмет призначено в інший курс',
+    groupSubjectSharedToCourse: 'Спільний предмет підʼєднано до іншого курсу',
+    groupSubjectSharedSync: 'Спільні копії предмета синхронізовано',
     groupSubjectDeleted: 'Предмет групи видалено',
     usersAssigned: 'Користувачів перепризначено',
     scheduleSaved: 'Рядок розкладу збережено',
@@ -10457,6 +10459,15 @@ function getAcademicV2RouteMessages(req) {
     GROUP_SUBJECT_ASSIGN_TARGET_NOT_FOUND: 'Цільовий курс не знайдено',
     GROUP_SUBJECT_ASSIGN_TARGET_SAME: 'Предмет уже належить цьому курсу',
     GROUP_SUBJECT_ASSIGN_DUPLICATE: 'У цільовому курсі вже є предмет на базі цього шаблону',
+    GROUP_SUBJECT_SHARED_SOURCE_ONLY: 'Спільні копії можна створювати й синхронізувати лише з базового предмета, а не з linked-копії',
+    GROUP_SUBJECT_SHARED_TARGET_SAME: 'Для спільного предмета треба вибрати інший курс',
+    GROUP_SUBJECT_SHARED_TARGET_LINKED: 'Цей предмет у цільовому курсі вже керується іншим спільним джерелом',
+    GROUP_SUBJECT_SHARED_TARGET_SOURCE: 'Предмет у цільовому курсі вже є базовим shared-джерелом для інших курсів',
+    GROUP_SUBJECT_SHARED_ALREADY_LINKED: 'Для цього курсу спільний звʼязок уже існує',
+    GROUP_SUBJECT_SHARED_NONE: 'У цього предмета ще немає звʼязаних shared-копій',
+    GROUP_SUBJECT_SHARED_SCOPE_LOCKED: 'Поки предмет бере участь у shared-звʼязку, не можна змінювати його курс або шаблон',
+    GROUP_SUBJECT_SHARED_TEMPLATE_MISMATCH: 'Linked-предмет має інший шаблон і не може синхронізуватися з цим джерелом',
+    GROUP_SUBJECT_SHARED_DELETE_SOURCE: 'Спочатку прибери linked-копії або перенеси їх на інше джерело, а потім видаляй базовий предмет',
     USER_ASSIGNMENT_TARGET_REQUIRED: 'Виберіть групу і хоча б одного користувача',
     SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм, предмет і режим активності',
     SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
@@ -10477,6 +10488,8 @@ function getAcademicV2RouteMessages(req) {
     templateSaved: 'Subject template saved',
     groupSubjectSaved: 'Group subject saved',
     groupSubjectAssignedToCourse: 'Subject assigned to another course',
+    groupSubjectSharedToCourse: 'Shared subject linked to another course',
+    groupSubjectSharedSync: 'Shared subject copies synced',
     groupSubjectDeleted: 'Group subject deleted',
     usersAssigned: 'Users reassigned',
     scheduleSaved: 'Schedule entry saved',
@@ -10496,6 +10509,15 @@ function getAcademicV2RouteMessages(req) {
     GROUP_SUBJECT_ASSIGN_TARGET_NOT_FOUND: 'Target course not found',
     GROUP_SUBJECT_ASSIGN_TARGET_SAME: 'The subject already belongs to that course',
     GROUP_SUBJECT_ASSIGN_DUPLICATE: 'The target course already has a subject based on this template',
+    GROUP_SUBJECT_SHARED_SOURCE_ONLY: 'Only the base subject can create or sync shared copies',
+    GROUP_SUBJECT_SHARED_TARGET_SAME: 'Choose a different course for the shared subject',
+    GROUP_SUBJECT_SHARED_TARGET_LINKED: 'The target course subject is already managed by a different shared source',
+    GROUP_SUBJECT_SHARED_TARGET_SOURCE: 'The target course subject is already the base shared source for other courses',
+    GROUP_SUBJECT_SHARED_ALREADY_LINKED: 'A shared link for that course already exists',
+    GROUP_SUBJECT_SHARED_NONE: 'This subject does not have any linked shared copies yet',
+    GROUP_SUBJECT_SHARED_SCOPE_LOCKED: 'A shared-linked subject cannot change its course or template while the shared relationship exists',
+    GROUP_SUBJECT_SHARED_TEMPLATE_MISMATCH: 'The linked subject uses a different template and cannot be synced from this source',
+    GROUP_SUBJECT_SHARED_DELETE_SOURCE: 'Remove or rehome linked copies before deleting the base shared subject',
     USER_ASSIGNMENT_TARGET_REQUIRED: 'Select a target group and at least one user',
     SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires a term, subject, and activity mode',
     SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
@@ -36248,6 +36270,52 @@ app.post('/admin/pathways/v2/group-subjects/assign', requirePathwaysSectionAcces
       };
     },
     logContext: 'admin.pathways.v2.group-subject.assign',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subjects/share', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.shareGroupSubjectWithAnotherGroup(getAcademicV2Store(), req.body),
+    successMessageKey: 'groupSubjectSharedToCourse',
+    focusBuilder: (result, focus) => {
+      if (!normalizeBoolean(req.body && req.body.open_target_course, true)) {
+        return focus;
+      }
+      return {
+        ...focus,
+        programId: Number(result && result.targetGroup && result.targetGroup.program_id) || focus.programId,
+        cohortId: Number(result && result.targetGroup && result.targetGroup.cohort_id) || focus.cohortId,
+        groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+        termId: null,
+        templateStageNumber: Number(result && result.targetGroup && result.targetGroup.stage_number) || focus.templateStageNumber,
+      };
+    },
+    extraParamsBuilder: (result) => {
+      if (!normalizeBoolean(req.body && req.body.open_target_course, true)) {
+        return {};
+      }
+      return {
+        subject_id: Number(result && result.row && result.row.id) || '',
+        workspace_tab: 'subjects',
+      };
+    },
+    logContext: 'admin.pathways.v2.group-subject.share',
+  })
+));
+
+app.post('/admin/pathways/v2/group-subjects/shared-sync', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.syncSharedGroupSubjectLinks(getAcademicV2Store(), req.body),
+    successMessageKey: 'groupSubjectSharedSync',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+    }),
+    extraParamsBuilder: (result) => ({
+      subject_id: Number(result && result.row && result.row.id) || '',
+      workspace_tab: 'subjects',
+    }),
+    logContext: 'admin.pathways.v2.group-subject.shared-sync',
   })
 ));
 
