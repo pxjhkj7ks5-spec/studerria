@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.92",
+      "date": "2026-04-01",
+      "items": [
+        "feat(academic-v2-course-subject-redirect): add an opt-in `Після призначення відкрити цільовий курс і новий предмет` toggle to the new course-subject reuse flow, teach the Academic V2 mutation redirect helper to append extra deep-link params, and make `/admin/pathways` honor `subject_id` plus `workspace_tab` overrides so assigning a subject across courses can land directly inside the target course on the newly cloned live subject instead of dropping the admin back into the old workspace state"
+      ]
+    },
+    {
       "version": "1.3.91",
       "date": "2026-03-31",
       "items": [

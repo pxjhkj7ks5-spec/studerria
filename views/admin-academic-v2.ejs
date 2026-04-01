@@ -1777,6 +1777,13 @@
                       <span class="academic-v2-chip">Активності</span>
                       <span class="academic-v2-chip academic-v2-chip--warm">Розклад не копіюється</span>
                     </div>
+                    <div class="academic-v2-checkboxes mt-3">
+                      <input type="hidden" name="open_target_course" value="0" />
+                      <div class="form-check">
+                        <input id="groupSubjectAssignOpenTarget" class="form-check-input" type="checkbox" name="open_target_course" value="1" checked />
+                        <label class="form-check-label" for="groupSubjectAssignOpenTarget">Після призначення відкрити цільовий курс і новий предмет</label>
+                      </div>
+                    </div>
                     <p class="academic-v2-section-copy mt-3 mb-0" data-group-subject-assign-feedback>Вибери предмет і цільовий курс. Якщо в курсі вже є предмет на базі цього шаблону, опція буде заблокована.</p>
                     <div class="academic-v2-actions mt-3">
                       <button type="submit" class="btn btn-primary" data-group-subject-assign-submit disabled>Призначити в інший курс</button>
@@ -2477,6 +2484,11 @@
         const scopedGroupSubjectsData = <%- JSON.stringify(subjectCards || []) %>;
         const scopedGroupSubjectActivitiesData = <%- JSON.stringify(scopedGroupSubjectActivitiesList || []) %>;
         const subjectTemplateIdsByGroupData = <%- JSON.stringify(subjectTemplateIdsByGroup || {}) %>;
+        const requestedSubjectId = Number(<%- JSON.stringify(numberOrZero(requestedSubjectId)) %> || 0);
+        const requestedWorkspaceTab = <%- JSON.stringify(String(requestedWorkspaceTab || '').trim()) %>;
+        const normalizedRequestedWorkspaceTab = ['overview', 'subjects', 'terms', 'schedule', 'teachers', 'students'].includes(requestedWorkspaceTab)
+          ? requestedWorkspaceTab
+          : '';
         const scheduleEntriesData = <%- JSON.stringify(scheduleEntriesForViews || []) %>;
         const requestedScheduleEntryId = Number(<%- JSON.stringify(numberOrZero(requestedScheduleEntryId)) %> || 0);
         const forms = new Map();
@@ -2946,6 +2958,11 @@
             );
           }
         }
+        if (requestedSubjectId && getSubjectCardById(requestedSubjectId)) {
+          activeMode = 'workspace';
+          activeWorkspaceTab = normalizedRequestedWorkspaceTab || 'subjects';
+          activeSubjectId = requestedSubjectId;
+        }
 
         const syncGroupTeacherDefaultVisibility = () => {
           if (!groupTeacherDefaultField || !groupTeacherDefault || !groupCohort) {
@@ -3396,6 +3413,23 @@
           }
           return true;
         };
+        const openRequestedSubject = () => {
+          if (!requestedSubjectId || requestedScheduleEntryId) {
+            return false;
+          }
+          const subject = getSubjectCardById(requestedSubjectId);
+          if (!subject) {
+            return false;
+          }
+          updateSubjectDetail(requestedSubjectId);
+          applyPayload('group-subject', subject);
+          setWorkspaceTab(normalizedRequestedWorkspaceTab || 'subjects');
+          const form = forms.get('group-subject');
+          if (form) {
+            form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return true;
+        };
 
         document.querySelectorAll('[data-editor-target]').forEach((button) => {
           button.addEventListener('click', (event) => {
@@ -3817,7 +3851,8 @@
           setScheduleView('advanced');
         }
         const didOpenRequestedScheduleEntry = openRequestedScheduleEntry();
-        if (!didOpenRequestedScheduleEntry) {
+        const didOpenRequestedSubject = didOpenRequestedScheduleEntry ? false : openRequestedSubject();
+        if (!didOpenRequestedScheduleEntry && !didOpenRequestedSubject) {
           restoreScrollPosition(restoredScrollY);
         }
         persistWorkspaceState();

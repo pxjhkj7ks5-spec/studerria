@@ -35759,6 +35759,7 @@ async function handleAcademicV2MutationRoute(req, res, {
   successMessageKey,
   successMessage = '',
   focusBuilder = null,
+  extraParamsBuilder = null,
   afterSuccess = null,
   logContext = 'admin.pathways.v2.mutation',
 } = {}) {
@@ -35799,11 +35800,20 @@ async function handleAcademicV2MutationRoute(req, res, {
     }
 
     let focus = baseFocus;
+    let extraParams = {};
     if (typeof focusBuilder === 'function') {
       try {
         focus = focusBuilder(result, baseFocus) || baseFocus;
       } catch (focusErr) {
         console.error(`${logContext}.focus`, focusErr);
+        pushWarning('', 'focusRestoreDeferred');
+      }
+    }
+    if (typeof extraParamsBuilder === 'function') {
+      try {
+        extraParams = extraParamsBuilder(result, focus, baseFocus) || {};
+      } catch (extraParamsErr) {
+        console.error(`${logContext}.extra-params`, extraParamsErr);
         pushWarning('', 'focusRestoreDeferred');
       }
     }
@@ -35813,7 +35823,10 @@ async function handleAcademicV2MutationRoute(req, res, {
       'ok',
       String(successMessage || '').trim() || routeMessages[successMessageKey] || routeMessages.unknown,
       focus,
-      warningMessage ? { warn: warningMessage } : {}
+      {
+        ...(warningMessage ? { warn: warningMessage } : {}),
+        ...(extraParams && typeof extraParams === 'object' ? extraParams : {}),
+      }
     ));
   } catch (err) {
     console.error(logContext, err);
@@ -35840,6 +35853,8 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
     error: String(req.query.err || ''),
     success: String(req.query.ok || ''),
     warning: String(req.query.warn || ''),
+    requestedSubjectId: parsePositiveIntStrict(req.query.subject_id),
+    requestedWorkspaceTab: sanitizeCompactText(req.query.workspace_tab, 40),
     requestedScheduleEntryId: parsePositiveIntStrict(req.query.schedule_entry_id),
     ...pageData,
   });
@@ -36210,6 +36225,28 @@ app.post('/admin/pathways/v2/group-subjects/assign', requirePathwaysSectionAcces
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.assignGroupSubjectToAnotherGroup(getAcademicV2Store(), req.body),
     successMessageKey: 'groupSubjectAssignedToCourse',
+    focusBuilder: (result, focus) => {
+      if (!normalizeBoolean(req.body && req.body.open_target_course, true)) {
+        return focus;
+      }
+      return {
+        ...focus,
+        programId: Number(result && result.targetGroup && result.targetGroup.program_id) || focus.programId,
+        cohortId: Number(result && result.targetGroup && result.targetGroup.cohort_id) || focus.cohortId,
+        groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
+        termId: null,
+        templateStageNumber: Number(result && result.targetGroup && result.targetGroup.stage_number) || focus.templateStageNumber,
+      };
+    },
+    extraParamsBuilder: (result) => {
+      if (!normalizeBoolean(req.body && req.body.open_target_course, true)) {
+        return {};
+      }
+      return {
+        subject_id: Number(result && result.row && result.row.id) || '',
+        workspace_tab: 'subjects',
+      };
+    },
     logContext: 'admin.pathways.v2.group-subject.assign',
   })
 ));
