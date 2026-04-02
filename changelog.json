@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.95",
+      "date": "2026-04-02",
+      "items": [
+        "fix(admin): remove orphaned EJS closing tag left after legacy Academics panel removal, fixing SyntaxError on admin page"
+      ]
+    },
+    {
       "version": "1.3.94",
       "date": "2026-04-02",
       "items": [
