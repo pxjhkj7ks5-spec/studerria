@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.94",
+      "date": "2026-04-02",
+      "items": [
+        "chore(admin): remove legacy Academics subpages (Subjects, Semesters, Courses) from the admin sidebar and their corresponding panels — all functionality is now covered by Academic Setup v2 (Pathways)"
+      ]
+    },
+    {
       "version": "1.3.93",
       "date": "2026-04-01",
       "items": [
