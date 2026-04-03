@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.05",
+      "date": "2026-04-03",
+      "items": [
+        "tune(admin-users-context): render the full academic context string in the users table before opening the user modal, and keep the AJAX refresh path aligned so the row does not collapse back to the short label"
+      ]
+    },
+    {
       "version": "1.4.04",
       "date": "2026-04-03",
       "items": [

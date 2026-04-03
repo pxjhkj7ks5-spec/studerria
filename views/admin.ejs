@@ -2439,6 +2439,10 @@
                   <% const rowRiskClass = rowRiskLevel === 'high-risk' ? 'danger' : (rowRiskLevel === 'watch' ? 'warning' : 'secondary'); %>
                   <% const rowRiskLabel = rowRiskLevel === 'high-risk' ? 'High-risk' : (rowRiskLevel === 'watch' ? 'Watch' : 'Normal'); %>
                   <% const rowContextLabel = String(u.academic_group_label || u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim(); %>
+                  <% const rowAcademicContextLabel = String(u.study_context_label || u.study_context_name || '').trim(); %>
+                  <% const rowContextDisplay = rowContextLabel && rowAcademicContextLabel && rowContextLabel !== rowAcademicContextLabel
+                    ? `${rowContextLabel} - ${rowAcademicContextLabel}`
+                    : (rowContextLabel || rowAcademicContextLabel); %>
                   <% const rowContextCourseId = Number(u.study_context_course_id || u.course_id || 0); %>
                   <% const rowAcademicGroupId = Number(u.academic_group_id || u.group_id || 0); %>
                   <% const rowGroupOptions = Array.isArray(u.group_options) ? u.group_options : scopeAvailableAcademicGroups; %>
@@ -2473,8 +2477,8 @@
                     </td>
                     <td>
                       <%= u.full_name %>
-                      <% if (rowContextLabel) { %>
-                        <div class="small text-muted mb-1"><%= rowContextLabel %></div>
+                      <% if (rowContextDisplay) { %>
+                        <div class="small text-muted mb-1"><%= rowContextDisplay %></div>
                       <% } %>
                     </td>
                     <td>
@@ -7078,7 +7082,10 @@
               || contextOptions.find((option) => Number(option.courseId) === contextCourseId)
               || contextOptions[0]
               || null;
-            const contextSummary = buildStudyContextSummary(selectedContext) || contextLabel;
+            const contextSummary = buildStudyContextSummary(selectedContext)
+              || (contextLabel && selectedContext && selectedContext.label && contextLabel !== selectedContext.label
+                ? `${contextLabel} - ${selectedContext.label}`
+                : contextLabel);
             const courseLabel = contextSummary || courseMap.get(String(u.course_id)) || `Course ${u.course_id || 1}`;
             const riskBadgeClass = securityRiskLevel === 'high-risk'
               ? 'danger'
