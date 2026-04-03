@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.02",
+      "date": "2026-04-03",
+      "items": [
+        "fix(homework-submit-compat): make teacher homework creation tolerate legacy homework schemas and shared-subject contexts by normalizing the subject title fallback, checking the active study day after resolving the real storage course, and inserting homework only into columns that actually exist in the current database"
+      ]
+    },
+    {
       "version": "1.4.01",
       "date": "2026-04-03",
       "items": [

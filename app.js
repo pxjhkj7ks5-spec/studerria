@@ -13439,6 +13439,63 @@ async function createAssetFromUpload({ file, userId, courseId = null, name = '',
   }
 }
 
+async function insertHomeworkRecord(payload = {}) {
+  const homeworkColumns = await getTableColumnSet('homework').catch(() => new Set());
+  const columnList = [];
+  const valueList = [];
+  const pushColumn = (columnName, value) => {
+    if (homeworkColumns.size && !homeworkColumns.has(columnName)) {
+      return;
+    }
+    columnList.push(columnName);
+    valueList.push(value);
+  };
+
+  pushColumn('group_name', payload.group_name);
+  pushColumn('subject', payload.subject);
+  pushColumn('day', payload.day);
+  pushColumn('time', payload.time);
+  pushColumn('week_number', payload.week_number ?? null);
+  pushColumn('class_number', payload.class_number ?? null);
+  pushColumn('subject_id', payload.subject_id ?? null);
+  pushColumn('group_number', payload.group_number ?? null);
+  pushColumn('day_of_week', payload.day_of_week ?? null);
+  pushColumn('created_by_id', payload.created_by_id ?? null);
+  pushColumn('description', payload.description);
+  pushColumn('class_date', payload.class_date ?? null);
+  pushColumn('meeting_url', payload.meeting_url ?? null);
+  pushColumn('link_url', payload.link_url ?? null);
+  pushColumn('file_path', payload.file_path ?? null);
+  pushColumn('file_name', payload.file_name ?? null);
+  pushColumn('created_by', payload.created_by);
+  pushColumn('created_at', payload.created_at);
+  pushColumn('course_id', payload.course_id ?? null);
+  pushColumn('semester_id', payload.semester_id ?? null);
+  pushColumn('status', payload.status ?? null);
+  pushColumn('scheduled_at', payload.scheduled_at ?? null);
+  pushColumn('published_at', payload.published_at ?? null);
+  pushColumn('is_custom_deadline', payload.is_custom_deadline ?? 0);
+  pushColumn('custom_due_date', payload.custom_due_date ?? null);
+  pushColumn('is_control', payload.is_control ?? 0);
+  pushColumn('is_teacher_homework', payload.is_teacher_homework ?? 0);
+  pushColumn('is_credit', payload.is_credit ?? 0);
+  pushColumn('room_id', payload.room_id ?? null);
+  pushColumn('source_template_id', payload.source_template_id ?? null);
+
+  if (!columnList.length) {
+    return null;
+  }
+
+  return db.get(
+    `
+      INSERT INTO homework (${columnList.join(', ')})
+      VALUES (${columnList.map(() => '?').join(', ')})
+      RETURNING id
+    `,
+    valueList
+  );
+}
+
 function unlinkUploadedFiles(files = []) {
   (Array.isArray(files) ? files : []).forEach((file) => {
     if (!file || !file.path) return;
@@ -50149,6 +50206,13 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       return res.status(400).send('Invalid subject');
     }
     const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || selectedCourseId || 1);
+    const dayAllowed = await isCourseDayActive(storageCourseId || courseId, day_of_week);
+    if (!dayAllowed || classNum < 1 || classNum > 7) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(400).send('Invalid data');
+    }
     const activeSemester = await getActiveSemester(storageCourseId || 1);
     let safeRoomId = null;
     if (Number.isInteger(inputRoomId) && inputRoomId > 0) {
@@ -50254,43 +50318,39 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
 
     const createdIds = [];
     for (const targetGroup of targetGroups) {
-      const row = await db.get(
-        `
-          INSERT INTO homework
-          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, status, scheduled_at, published_at, is_control, is_teacher_homework, is_credit, room_id, source_template_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          RETURNING id
-        `,
-        [
-          group,
-          subjectRow.name,
-          day_of_week,
-          time,
-          classNum,
-          subjectId,
-          targetGroup,
-          day_of_week,
-          userId,
-          description,
-          class_date,
-          meeting_url || null,
-          link_url || null,
-          filePath,
-          fileName,
-          username,
-          createdAt,
-          storageCourseId,
-          activeSemester ? activeSemester.id : null,
-          homeworkStatus,
-          scheduledAt,
-          publishedAt,
-          isControl,
-          isTeacher ? 1 : 0,
-          isCredit,
-          safeRoomId,
-          templateSourceId,
-        ]
-      );
+      const homeworkSubjectName = normalizeSubjectDraftName(
+        subjectRow.name || subjectRow.subject_name || subjectRow.title || subjectRow.catalog_name || '',
+        160
+      ) || 'Предмет';
+      const row = await insertHomeworkRecord({
+        group_name: group,
+        subject: homeworkSubjectName,
+        day: day_of_week,
+        time,
+        class_number: classNum,
+        subject_id: subjectId,
+        group_number: targetGroup,
+        day_of_week,
+        created_by_id: userId,
+        description,
+        class_date,
+        meeting_url: meeting_url || null,
+        link_url: link_url || null,
+        file_path: filePath,
+        file_name: fileName,
+        created_by: username,
+        created_at: createdAt,
+        course_id: storageCourseId,
+        semester_id: activeSemester ? activeSemester.id : null,
+        status: homeworkStatus,
+        scheduled_at: scheduledAt,
+        published_at: publishedAt,
+        is_control: isControl,
+        is_teacher_homework: isTeacher ? 1 : 0,
+        is_credit: isCredit,
+        room_id: safeRoomId,
+        source_template_id: templateSourceId,
+      });
       if (!row || !row.id) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
@@ -50472,6 +50532,13 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       return res.status(400).send('Invalid subject');
     }
     const storageCourseId = Number(subjectRow.owner_course_id || subjectRow.course_id || selectedCourseId || 1);
+    const dayAllowed = await isCourseDayActive(storageCourseId || courseId, dayName);
+    if (!dayAllowed) {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+      return res.status(400).send('Invalid data');
+    }
     const activeSemester = await getActiveSemester(storageCourseId || 1);
     let safeRoomId = null;
     if (Number.isInteger(inputRoomId) && inputRoomId > 0) {
@@ -50553,44 +50620,40 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     const dayName = getDayNameFromDate(dueDate);
     let createdId = null;
     for (const targetGroup of targetGroups) {
-      const row = await db.get(
-        `
-          INSERT INTO homework
-          (group_name, subject, day, time, class_number, subject_id, group_number, day_of_week, created_by_id, description, class_date, meeting_url, link_url, file_path, file_name, created_by, created_at, course_id, semester_id, is_custom_deadline, custom_due_date, status, scheduled_at, published_at, is_teacher_homework, is_credit, room_id, source_template_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          RETURNING id
-        `,
-        [
-          group,
-          subjectRow.name,
-          dayName || 'Deadline',
-          'Deadline',
-          null,
-          subjectId,
-          targetGroup,
-          dayName,
-          userId,
-          description,
-          null,
-          meeting_url || null,
-          link_url || null,
-          filePath,
-          fileName,
-          username,
-          createdAt,
-          storageCourseId,
-          activeSemester ? activeSemester.id : null,
-          1,
-          dueDate,
-          homeworkStatus,
-          scheduledAt,
-          publishedAt,
-          isTeacher ? 1 : 0,
-          isCredit,
-          safeRoomId,
-          templateSourceId,
-        ]
-      );
+      const homeworkSubjectName = normalizeSubjectDraftName(
+        subjectRow.name || subjectRow.subject_name || subjectRow.title || subjectRow.catalog_name || '',
+        160
+      ) || 'Предмет';
+      const row = await insertHomeworkRecord({
+        group_name: group,
+        subject: homeworkSubjectName,
+        day: dayName || 'Deadline',
+        time: 'Deadline',
+        class_number: null,
+        subject_id: subjectId,
+        group_number: targetGroup,
+        day_of_week: dayName,
+        created_by_id: userId,
+        description,
+        class_date: null,
+        meeting_url: meeting_url || null,
+        link_url: link_url || null,
+        file_path: filePath,
+        file_name: fileName,
+        created_by: username,
+        created_at: createdAt,
+        course_id: storageCourseId,
+        semester_id: activeSemester ? activeSemester.id : null,
+        is_custom_deadline: 1,
+        custom_due_date: dueDate,
+        status: homeworkStatus,
+        scheduled_at: scheduledAt,
+        published_at: publishedAt,
+        is_teacher_homework: isTeacher ? 1 : 0,
+        is_credit: isCredit,
+        room_id: safeRoomId,
+        source_template_id: templateSourceId,
+      });
       if (!row || !row.id) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
