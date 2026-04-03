@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.03",
+      "date": "2026-04-03",
+      "items": [
+        "fix(generator-theme-sync): stop the schedule/session generator pages from forcing a separate light theme state and switch them to the shared `ui-theme` storage key so entering generators no longer flips the whole app to white"
+      ]
+    },
+    {
       "version": "1.4.02",
       "date": "2026-04-03",
       "items": [

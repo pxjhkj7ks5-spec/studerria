@@ -477,7 +477,7 @@
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/dynamic-bg.css" />
   </head>
-  <body class="studerria-theme theme-light schedule-generator-page">
+  <body class="studerria-theme theme-dark schedule-generator-page">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <nav class="navbar navbar-expand-lg admin-nav">
@@ -1553,13 +1553,19 @@
         const applyTheme = (theme) => {
           document.body.classList.toggle('theme-light', theme === 'light');
           document.body.classList.toggle('theme-dark', theme === 'dark');
-          themeToggle.textContent = theme === 'light' ? themeToggle.dataset.darkLabel : themeToggle.dataset.lightLabel;
+          document.body.setAttribute('data-theme', theme);
+          document.documentElement.setAttribute('data-theme', theme);
+          themeToggle.textContent = theme === 'light'
+            ? (themeToggle.dataset.darkLabel || '☀️')
+            : (themeToggle.dataset.lightLabel || '🌙');
         };
-        const stored = localStorage.getItem('theme') || 'light';
-        applyTheme(stored);
+        const storedTheme = localStorage.getItem('ui-theme');
+        const normalizedTheme = storedTheme === 'theme-light' || storedTheme === 'light' ? 'light' : 'dark';
+        localStorage.setItem('ui-theme', normalizedTheme === 'dark' ? 'theme-dark' : 'theme-light');
+        applyTheme(normalizedTheme);
         themeToggle.addEventListener('click', () => {
-          const next = document.body.classList.contains('theme-light') ? 'dark' : 'light';
-          localStorage.setItem('theme', next);
+          const next = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
+          localStorage.setItem('ui-theme', next === 'dark' ? 'theme-dark' : 'theme-light');
           applyTheme(next);
         });
       }
