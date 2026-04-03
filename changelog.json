@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.07",
+      "date": "2026-04-03",
+      "items": [
+        "fix(admin-users-dropdown): normalize inactive user state in the table and force the row actions menu upward for inactive users so `Delete permanently` stays visible instead of being clipped by the table footer"
+      ]
+    },
+    {
       "version": "1.4.06",
       "date": "2026-04-03",
       "items": [

@@ -2438,6 +2438,7 @@
                   <% const rowRiskScore = Number(u.security_risk_score || 0); %>
                   <% const rowRiskClass = rowRiskLevel === 'high-risk' ? 'danger' : (rowRiskLevel === 'watch' ? 'warning' : 'secondary'); %>
                   <% const rowRiskLabel = rowRiskLevel === 'high-risk' ? 'High-risk' : (rowRiskLevel === 'watch' ? 'Watch' : 'Normal'); %>
+                  <% const rowIsActive = typeof u.is_active === 'undefined' ? 1 : (Number(u.is_active) === 0 ? 0 : 1); %>
                   <% const rowContextLabel = String(u.academic_group_label || u.study_context_label || u.study_context_name || u.study_context || u.cohort_label || '').trim(); %>
                   <% const rowAcademicContextLabel = String(u.study_context_label || u.study_context_name || '').trim(); %>
                   <% const rowContextDisplay = rowContextLabel && rowAcademicContextLabel && rowContextLabel !== rowAcademicContextLabel
@@ -2461,7 +2462,7 @@
                     data-user-context-course-id="<%= rowContextCourseId || 0 %>"
                     data-user-context-options="<%- JSON.stringify(rowGroupOptions).replace(/'/g, '&#39;') %>"
                     data-user-group-options="<%- JSON.stringify(rowGroupOptions).replace(/'/g, '&#39;') %>"
-                    data-user-active="<%= u.is_active %>"
+                    data-user-active="<%= rowIsActive %>"
                     data-user-ip="<%= u.last_login_ip || '' %>"
                     data-user-agent="<%= u.last_user_agent || '' %>"
                     data-user-login="<%= u.last_login_at || '' %>"
@@ -2535,13 +2536,13 @@
                     </td>
                     <td class="text-end">
                       <form id="user-delete-<%= u.id %>" method="POST" action="/admin/users/delete-permanent"></form>
-                      <div class="dropdown">
+                      <div class="dropdown <%= !hasAdminRole && rowIsActive === 0 ? 'dropup' : '' %>">
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                           ⋯
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                           <li><button class="dropdown-item user-manage-btn" type="button"><%= t('admin.manage') %></button></li>
-                          <% if (!hasAdminRole && u.is_active === 0) { %>
+                          <% if (!hasAdminRole && rowIsActive === 0) { %>
                             <li><hr class="dropdown-divider" /></li>
                             <li>
                               <button
@@ -7093,6 +7094,7 @@
             const riskBadgeLabel = securityRiskLevel === 'high-risk'
               ? 'High-risk'
               : (securityRiskLevel === 'watch' ? 'Watch' : 'Normal');
+            const dropdownClass = !hasAdminRole && isActive === 0 ? 'dropdown dropup' : 'dropdown';
             const checkbox = !hasAdminRole
               ? `<input type="checkbox" name="delete_user_ids" value="${escapeHtml(userId)}" form="deleteUsersForm" />`
               : '';
@@ -7177,7 +7179,7 @@
                 </td>
                 <td class="text-end">
                   <form id="user-delete-${escapeHtml(userId)}" method="POST" action="/admin/users/delete-permanent"></form>
-                  <div class="dropdown">
+                  <div class="${dropdownClass}">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">⋯</button>
                     <ul class="dropdown-menu dropdown-menu-end">
                       <li><button class="dropdown-item user-manage-btn" type="button">Manage</button></li>
