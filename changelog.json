@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.06",
+      "date": "2026-04-03",
+      "items": [
+        "tune(admin-users-bulk-bar): keep the bulk users action strip on one centered row on wide screens while allowing a stacked fallback on small screens"
+      ]
+    },
+    {
       "version": "1.4.05",
       "date": "2026-04-03",
       "items": [

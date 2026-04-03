@@ -932,7 +932,41 @@ body.theme-light .bulk-bar {
 .bulk-bar-content {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.bulk-bar-content .bulk-count {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#moveUsersContextForm {
+  flex: 1 1 auto;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+#moveUsersContextForm .form-select,
+#moveUsersContextForm .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#moveUsersContextForm .form-select {
+  min-width: min(58vw, 760px);
+}
+
+#moveUsersContextForm #usersBulkContextIds {
+  display: contents;
+}
+
+.bulk-bar-content > .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .danger-zone {
@@ -1288,6 +1322,22 @@ body.theme-light .admin-toast.is-error {
   .visit-role-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .bulk-bar-content {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  #moveUsersContextForm {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  #moveUsersContextForm .form-select {
+    min-width: 0;
+    width: 100%;
   }
 
   .week-time-row {
