@@ -667,9 +667,17 @@ body.theme-light .role-studio-role-card {
   background: rgba(148, 163, 184, 0.08);
 }
 
+.role-studio-simulator--compact {
+  padding: 8px 9px;
+}
+
 .role-studio-sim-chip {
   font-size: 0.7rem;
   font-weight: 600;
+}
+
+.role-studio-sim-chip--more {
+  opacity: 0.82;
 }
 
 body.theme-light .role-studio-simulator {

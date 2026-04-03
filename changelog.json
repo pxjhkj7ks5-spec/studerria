@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.99",
+      "date": "2026-04-03",
+      "items": [
+        "tune(admin-role-studio-preview): shorten the Role Studio copy and collapse long permission previews into a few visible chips plus a compact `+N` overflow badge, so admin role cards keep editing power without stretching the panel wide"
+      ]
+    },
+    {
       "version": "1.3.98",
       "date": "2026-04-03",
       "items": [
