@@ -35313,6 +35313,11 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
               u.role,
               u.schedule_group,
               u.course_id,
+              u.group_id,
+              u.admission_id,
+              u.study_program_id,
+              u.study_track,
+              u.study_context_id,
               ${usersHasIsActive ? 'u.is_active,' : ''}
               COALESCE(NULLIF(u.last_login_ip, ''), NULLIF(reg.ip, '')) AS last_login_ip,
               COALESCE(NULLIF(u.last_user_agent, ''), NULLIF(reg.user_agent, '')) AS last_user_agent,
@@ -35699,6 +35704,112 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         primary_role: primaryRole,
       };
     });
+    const userIds = usersWithRoles.map((user) => Number(user.id)).filter((id) => Number.isFinite(id));
+    const placementRows = userIds.length ? await db.all(
+      `
+        SELECT
+          u.id AS user_id,
+          g.id AS group_id,
+          g.label AS group_label,
+          COALESCE(g.legacy_study_context_id, sc.id) AS study_context_id,
+          COALESCE(g.stage_number, sc.stage_number, 1) AS stage,
+          COALESCE(
+            NULLIF(TRIM(g.campus_key), ''),
+            NULLIF(TRIM(sc.campus_key), ''),
+            NULLIF(TRIM(course_meta.location), ''),
+            'kyiv'
+          ) AS campus_key,
+          COALESCE(v2_cohort.id, coh.id) AS cohort_id,
+          COALESCE(v2_cohort.admission_year, coh.admission_year) AS admission_year,
+          COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id) AS admission_id,
+          COALESCE(v2_program.id, p.id, u.study_program_id) AS program_id,
+          COALESCE(v2_program.code, p.code, '') AS program_code,
+          COALESCE(v2_program.name, p.name, '') AS program_name,
+          COALESCE(
+            v2_program.track_key,
+            p.track_key,
+            LOWER(
+              COALESCE(
+                NULLIF(TRIM(u.study_track), ''),
+                CASE WHEN COALESCE(course_meta.is_teacher_course, 0) = 1 THEN 'teacher' ELSE 'bachelor' END
+              )
+            )
+          ) AS track_key,
+          COALESCE(g.legacy_course_id, primary_binding.course_id, u.course_id) AS course_id,
+          COALESCE(group_course.name, c.name, course_meta.name) AS course_name
+        FROM users u
+        LEFT JOIN academic_v2_groups g ON g.id = u.group_id
+        LEFT JOIN academic_v2_cohorts v2_cohort ON v2_cohort.id = g.cohort_id
+        LEFT JOIN academic_v2_programs v2_program ON v2_program.id = v2_cohort.program_id
+        LEFT JOIN courses group_course ON group_course.id = g.legacy_course_id
+        LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
+        LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
+        LEFT JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN LATERAL (
+          SELECT sccb.course_id
+          FROM study_context_course_bindings sccb
+          WHERE sccb.study_context_id = sc.id
+          ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+          LIMIT 1
+        ) primary_binding ON true
+        LEFT JOIN courses c ON c.id = primary_binding.course_id
+        LEFT JOIN courses course_meta ON course_meta.id = u.course_id
+        WHERE u.id = ANY(?::int[])
+      `,
+      [userIds]
+    ).catch((err) => {
+      if (isDbSchemaCompatibilityError(err)) {
+        return [];
+      }
+      throw err;
+    }) : [];
+    const placementByUserId = new Map();
+    (placementRows || []).forEach((row) => {
+      const userId = Number(row.user_id || 0);
+      if (!userId) return;
+      const context = {
+        id: Number(row.study_context_id || 0) || null,
+        group_id: Number(row.group_id || 0) || null,
+        group_label: sanitizeCompactText(row.group_label || '', 140),
+        course_id: Number(row.course_id || 0) || null,
+        stage: normalizeStudyContextStage(row.stage, 1),
+        campus_key: normalizeCourseCampus(row.campus_key || 'kyiv'),
+        cohort_id: Number(row.cohort_id || 0) || null,
+        admission_id: Number(row.admission_id || 0) || null,
+        admission_year: Number(row.admission_year || 0) || null,
+        program_id: Number(row.program_id || 0) || null,
+        program_code: sanitizeCompactText(row.program_code || '', 40),
+        program_name: sanitizeCompactText(row.program_name || '', 140),
+        track_key: normalizeRegistrationTrack(row.track_key, 'bachelor'),
+        course_name: sanitizeCompactText(row.course_name || '', 140),
+      };
+      placementByUserId.set(userId, {
+        ...context,
+        label: context.id ? buildStudyContextLabel(context, 'en') : (context.group_label || context.course_name || ''),
+        label_uk: context.id ? buildStudyContextLabel(context, 'uk') : (context.group_label || context.course_name || ''),
+      });
+    });
+    const usersWithContext = usersWithRoles.map((user) => {
+      const placement = placementByUserId.get(Number(user.id)) || null;
+      return {
+        ...user,
+        study_context: placement,
+        study_context_id: placement && placement.id ? placement.id : null,
+        study_context_label: placement && placement.label_uk ? placement.label_uk : '',
+        study_context_name: placement && placement.label_uk ? placement.label_uk : '',
+        study_context_course_id: placement && placement.course_id ? placement.course_id : null,
+        program_id: placement && placement.program_id ? Number(placement.program_id) : (parsePositiveIntStrict(user.study_program_id) || null),
+        program_name: placement && placement.program_name ? placement.program_name : '',
+        admission_id: placement && placement.admission_id ? Number(placement.admission_id) : (parsePositiveIntStrict(user.admission_id) || null),
+        admission_year: placement && placement.admission_year ? Number(placement.admission_year) : null,
+        stage_number: placement ? normalizeStudyContextStage(placement.stage, 1) : null,
+        campus_key: placement && placement.campus_key ? placement.campus_key : '',
+        derived_course_id: placement && placement.course_id ? Number(placement.course_id) : (parsePositiveIntStrict(user.course_id) || null),
+        track_key: placement && placement.track_key ? normalizeRegistrationTrack(placement.track_key, 'bachelor') : normalizeRegistrationTrack(user.study_track, 'bachelor'),
+        academic_group_id: placement && placement.group_id ? placement.group_id : null,
+        academic_group_label: placement && placement.group_label ? placement.group_label : '',
+      };
+    });
     let supportRequests = [];
     let selectedSupportRequest = null;
     if (isAdminPanelOwner) {
@@ -35730,7 +35841,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       schedule,
                                       homework,
                                       homeworkTags,
-                                      users: usersWithRoles,
+                                      users: usersWithContext,
                                       subjects,
                                       studentGroups,
                                       logs,

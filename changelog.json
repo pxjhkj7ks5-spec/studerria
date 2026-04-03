@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.09",
+      "date": "2026-04-03",
+      "items": [
+        "fix(admin-users-context-render): enrich the main admin users query with study context placement data so the academic label under each username is visible on the first page load instead of appearing only after opening the user modal"
+      ]
+    },
+    {
       "version": "1.4.08",
       "date": "2026-04-03",
       "items": [
