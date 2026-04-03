@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.96",
+      "date": "2026-04-03",
+      "items": [
+        "fix(schedule-mobile-week-carousel): replace the mobile week-rail grid override that was collapsing the week carousel into a narrow sliver on phones, so the Liquid Glass week navigator now spans the full dock width and keeps the week cards readable on small screens"
+      ]
+    },
+    {
       "version": "1.3.95",
       "date": "2026-04-02",
       "items": [

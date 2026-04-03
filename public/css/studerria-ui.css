@@ -1623,20 +1623,29 @@ body.page-schedule .week-rail {
   }
 
   body.page-schedule .week-rail {
-    width: min(364px, calc(100vw - 16px));
+    width: min(680px, calc(100vw - 16px));
     min-width: 0;
     max-width: calc(100vw - 16px);
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    gap: 8px;
-    padding: 10px 8px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 8px;
     border-radius: 28px;
     transform: none !important;
+  }
+
+  body.page-schedule .week-pager {
+    width: 100%;
+  }
+
+  body.page-schedule .week-pager .week-pager-shell {
+    width: 100%;
   }
 
   body.page-schedule .week-pill {
     width: 100%;
     min-width: 0;
-    height: 44px;
+    min-height: 122px;
+    height: auto;
   }
 
   body.page-schedule .week-nav-btn {
