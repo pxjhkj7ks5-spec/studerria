@@ -24,7 +24,26 @@ const navConfig = {
       href: '/home',
       section: 'main',
       rolesAllowed: APP_ROLES,
+      keepWhenActive: true,
       matchPaths: ['/home', '/my-day'],
+      children: [
+        {
+          id: 'about',
+          label: 'Про сайт',
+          href: '/about',
+          section: 'main',
+          rolesAllowed: APP_ROLES,
+          matchPaths: ['/about'],
+        },
+        {
+          id: 'help',
+          label: 'FAQ & Help',
+          href: '/help',
+          section: 'main',
+          rolesAllowed: APP_ROLES,
+          matchPaths: ['/help'],
+        },
+      ],
     },
     {
       id: 'learning',
@@ -131,14 +150,6 @@ const navConfig = {
           section: 'main',
           rolesAllowed: APP_ROLES,
           matchPaths: ['/profile'],
-        },
-        {
-          id: 'help',
-          label: 'FAQ & Help',
-          href: '/help',
-          section: 'main',
-          rolesAllowed: APP_ROLES,
-          matchPaths: ['/help'],
         },
         {
           id: 'messages',

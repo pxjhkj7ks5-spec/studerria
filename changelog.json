@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.01",
+      "date": "2026-04-03",
+      "items": [
+        "tune(navbar-home-group): make `Studerria` plain text in the shared navbar and move `Про сайт` plus `FAQ & Help` under the `Головна` dropdown so the top navigation matches the rest of the app"
+      ]
+    },
+    {
       "version": "1.4.00",
       "date": "2026-04-03",
       "items": [

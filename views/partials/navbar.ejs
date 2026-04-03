@@ -271,7 +271,7 @@
       <div class="container">
         <div class="snav-main">
           <div class="snav-brand-stack">
-            <a class="navbar-brand text-white topbar-title-spotlight" href="/about">Studerria</a>
+            <span class="navbar-brand text-white topbar-title-spotlight" aria-label="Studerria">Studerria</span>
             <% if (displayRoleText) { %>
               <span class="snav-mobile-meta"><%= displayRoleText %></span>
             <% } %>
@@ -374,7 +374,7 @@
     </nav>
   <% } else { %>
     <nav class="studerria-navbar" aria-label="Global Navigation">
-      <a class="studerria-brand" href="/about">Studerria</a>
+      <span class="studerria-brand" aria-label="Studerria">Studerria</span>
 
       <div class="studerria-nav-links">
         <% if (isAuthed) { %>
