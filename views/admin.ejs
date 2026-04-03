@@ -2536,6 +2536,7 @@
                     </td>
                     <td class="text-end">
                       <form id="user-delete-<%= u.id %>" method="POST" action="/admin/users/delete-permanent"></form>
+                      <input type="hidden" name="users_status" value="<%= usersStatus || 'active' %>" form="user-delete-<%= u.id %>" />
                       <div class="dropdown <%= !hasAdminRole && rowIsActive === 0 ? 'dropup' : '' %>">
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                           ⋯
@@ -7179,6 +7180,7 @@
                 </td>
                 <td class="text-end">
                   <form id="user-delete-${escapeHtml(userId)}" method="POST" action="/admin/users/delete-permanent"></form>
+                  <input type="hidden" name="users_status" value="${escapeHtml(status)}" form="user-delete-${escapeHtml(userId)}" />
                   <div class="${dropdownClass}">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">⋯</button>
                     <ul class="dropdown-menu dropdown-menu-end">
@@ -7819,6 +7821,14 @@
             const permForm = document.getElementById('uaDeletePermanentForm');
             if (permForm) {
               permForm.style.display = userActive === 'Yes' ? 'none' : 'block';
+              let hiddenStatus = permForm.querySelector('input[name="users_status"]');
+              if (!hiddenStatus) {
+                hiddenStatus = document.createElement('input');
+                hiddenStatus.type = 'hidden';
+                hiddenStatus.name = 'users_status';
+                permForm.appendChild(hiddenStatus);
+              }
+              hiddenStatus.value = String(document.getElementById('usersTableBody')?.dataset.status || 'active');
             }
 
             const historyList = document.getElementById('uaLoginHistory');

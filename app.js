@@ -54792,8 +54792,11 @@ app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req,
   const userId = Number(user_id);
   const courseId = getAdminCourse(req);
   const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
+  const rawUsersStatus = String(req.body.users_status || req.query.users_status || req.query.status || 'active').trim().toLowerCase();
+  const usersStatus = rawUsersStatus === 'inactive' || rawUsersStatus === 'all' ? rawUsersStatus : 'active';
+  const redirectBaseWithStatus = appendQueryParamToUrl(redirectBase, 'users_status', usersStatus);
   if (Number.isNaN(userId)) {
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Invalid user'));
+    return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Invalid user'));
   }
   try {
     const user = await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
@@ -54801,10 +54804,10 @@ app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req,
       courseId,
     });
     if (!user) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
+      return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'User not found'));
     }
     if (user.role === 'admin') {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Cannot delete admin'));
+      return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Cannot delete admin'));
     }
     await db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
     await db.run('DELETE FROM login_history WHERE user_id = ?', [userId]);
@@ -54818,9 +54821,9 @@ app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req,
     await db.run('DELETE FROM users WHERE id = ?', [userId]);
     logAction(db, req, 'user_delete_permanent', { user_id: userId });
     broadcast('users_updated');
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'User deleted'));
+    return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'ok', 'User deleted'));
   } catch (err) {
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
+    return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Database error'));
   }
 });
 

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.08",
+      "date": "2026-04-03",
+      "items": [
+        "fix(admin-users-delete-permanent): preserve the current `users_status` filter on permanent delete so inactive and all-user views stay where the operator left them after the redirect"
+      ]
+    },
+    {
       "version": "1.4.07",
       "date": "2026-04-03",
       "items": [
