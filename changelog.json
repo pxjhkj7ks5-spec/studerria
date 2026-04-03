@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.3.98",
+      "date": "2026-04-03",
+      "items": [
+        "tune(schedule-mobile-compact-cards): tighten schedule cards on mobile by hiding secondary meta rows, removing the old Academic V2 / legacy-binding labels from the visible UI, and flattening the subject card layout so shared-subject-heavy views feel lighter and less width-stretched"
+      ]
+    },
+    {
       "version": "1.3.97",
       "date": "2026-04-03",
       "items": [

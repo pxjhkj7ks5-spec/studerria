@@ -273,7 +273,6 @@
         transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
 
-      /* Disable hover lift on background cards; keep hover on classes */
       .glass.week-hero:hover,
       .glass.day-card:hover,
       .alert.glass:hover {
@@ -1558,12 +1557,6 @@
         font-size: 0.82rem;
         color: var(--text-muted);
       }
-      .schedule-card-note {
-        color: rgba(248, 250, 252, 0.78);
-      }
-      body.theme-light .schedule-card-note {
-        color: rgba(15, 23, 42, 0.68);
-      }
       .schedule-debug-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -2155,7 +2148,6 @@
                   <% const compatHomeworkEnabled = cls.compat_homework_enabled !== false
                     && Number(cls.legacy_subject_id || cls.subject_id || 0) > 0
                     && Number(cls.course_id || cls.owner_course_id || 0) > 0; %>
-                  <% const mappingState = String(cls.mapping_state || 'mapped'); %>
                   <% const legacyKey = compatHomeworkEnabled ? `${cls.subject_id}|${cls.group_number}|${cls.day_of_week}|${cls.class_number}` : null; %>
                   <% const datedKey = compatHomeworkEnabled && cls.class_date ? `${legacyKey}|${cls.class_date}` : null; %>
                   <% const baseKey = compatHomeworkEnabled
@@ -2181,19 +2173,15 @@
                           : ''; %>
                   <% const sessionCardClass = sessionKind ? `has-session session-${sessionKind}` : ''; %>
                   <% const groupLabel = cls.group_label ? cls.group_label : `${t('schedule.group.single')} ${cls.group_number}`; %>
-                  <% const courseLabel = cls.course_name ? ` · ${cls.course_name}` : ''; %>
-                  <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
-                  <% const next = idx < dayEntries.length - 1 ? dayEntries[idx + 1] : null; %>
-                  <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
-                  <% const chainNext = next && next.subject_id === cls.subject_id && next.class_number === cls.class_number + 1; %>
-                  <% const tooltipParts = [subjectName, groupLabel, `${scheduleViewText.classLabel} ${cls.class_number}`, timeLabel]; %>
-                  <% if (sessionChipText) { tooltipParts.push(sessionChipText); } %>
-                  <% if (showTypeBadge) { tooltipParts.push(typeLabel); } %>
-                  <% if (cls.course_name) { tooltipParts.push(cls.course_name); } %>
-                  <% if (hwMeta && hwMeta.preview && hwMeta.preview.length) { tooltipParts.push(...hwMeta.preview); } %>
-                  <% if (!compatHomeworkEnabled) { tooltipParts.push('Предмет ще не має legacy binding'); } %>
-                  <div
-                    class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %> <%= hwMeta && hwMeta.credit ? 'has-credit' : '' %> <%= sessionCardClass %> <%= !compatHomeworkEnabled ? 'schedule-card--readonly' : '' %>"
+                    <% const prev = idx > 0 ? dayEntries[idx - 1] : null; %>
+                    <% const next = idx < dayEntries.length - 1 ? dayEntries[idx + 1] : null; %>
+                    <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
+                    <% const chainNext = next && next.subject_id === cls.subject_id && next.class_number === cls.class_number + 1; %>
+                    <% const tooltipParts = [subjectName, groupLabel, `${scheduleViewText.classLabel} ${cls.class_number}`, timeLabel]; %>
+                    <% if (sessionChipText) { tooltipParts.push(sessionChipText); } %>
+                    <% if (showTypeBadge) { tooltipParts.push(typeLabel); } %>
+                    <div
+                      class="list-group-item schedule-card liquid-card <%= chainPrev ? 'chain-prev' : '' %> <%= chainNext ? 'chain-next' : '' %> <%= hwMeta && hwMeta.credit ? 'has-credit' : '' %> <%= sessionCardClass %> <%= !compatHomeworkEnabled ? 'schedule-card--readonly' : '' %>"
                     <% if (compatHomeworkEnabled) { %>
                       role="button"
                       tabindex="0"
@@ -2227,17 +2215,8 @@
                           <% if (showTypeBadge) { %>
                             <span class="lesson-pill"><%= typeLabel %></span>
                           <% } %>
-                          <% if (scheduleDebug && scheduleDebug.enabled && mappingState === 'unmapped') { %>
-                            <span class="lesson-pill lesson-pill--debug">Academic V2 only</span>
-                          <% } %>
                         </div>
-                        <% if (cls.room_label) { %>
-                          <div class="schedule-meta classMeta"><%= lang === 'en' ? 'Room' : 'Кабінет' %>: <%= cls.room_label %></div>
-                        <% } %>
-                        <div class="schedule-meta classMeta"><%= groupLabel %> · <%= scheduleViewText.classLabel %> <%= cls.class_number %><%= courseLabel %></div>
-                        <% if (!compatHomeworkEnabled) { %>
-                          <div class="schedule-meta classMeta schedule-card-note">Предмет ще не має legacy binding.</div>
-                        <% } %>
+                        <div class="schedule-meta classMeta"><%= groupLabel %> · <%= scheduleViewText.classLabel %> <%= cls.class_number %></div>
                       </div>
                       <div class="schedule-aside">
                         <div class="schedule-time classTime"><%= timeLabel %></div>
@@ -3927,7 +3906,6 @@
             return kyivWeekFormatter.formatRange(range.start, range.end);
           }
         } catch (error) {
-          // Fallback below handles browsers without formatRange.
         }
         return `${kyivWeekFormatter.format(range.start)} - ${kyivWeekFormatter.format(range.end)}`;
       }
@@ -4386,15 +4364,9 @@
       }, { passive: true });
 
       window.addEventListener('load', () => {
-        // --- FORCE REFLOW HACK ---
-        // This is a workaround for a stubborn rendering bug where hover effects
-        // cause artifacts on other elements. Forcing a reflow after the page
-        // loads seems to fix the browser's initial faulty rendering state,
-        // similar to how opening a modal fixes it.
         document.body.style.transform = 'translateZ(0)';
         void document.body.offsetHeight;
         document.body.style.transform = '';
-        // --- END HACK ---
 
         const content = document.querySelector('.schedule-content');
         if (!content) return;

@@ -1676,4 +1676,45 @@ body.page-schedule .week-rail {
     padding: 8px;
     bottom: calc(10px + env(safe-area-inset-bottom) + var(--studerria-vv-offset-bottom, 0px));
   }
+
+  body.page-schedule .schedule-card {
+    padding: 12px 13px;
+    gap: 8px;
+    border-radius: 18px;
+  }
+
+  body.page-schedule .schedule-card-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+  }
+
+  body.page-schedule .schedule-main,
+  body.page-schedule .schedule-aside {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.page-schedule .schedule-aside {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  body.page-schedule .schedule-flags {
+    justify-content: flex-start;
+    gap: 4px 6px;
+  }
+
+  body.page-schedule .schedule-meta.classMeta {
+    display: none;
+  }
+
+  body.page-schedule .schedule-time {
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
 }
