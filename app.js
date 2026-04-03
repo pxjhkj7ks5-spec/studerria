@@ -44211,6 +44211,7 @@ app.get('/admin/session-generator', requireScheduleGeneratorSectionAccess, async
       courseStudyDays,
       activeStudyDayNames,
       sessionWeekNumbers,
+      explicitSessionDates,
       slotBoard,
       plannerItems,
       draftMeta,
