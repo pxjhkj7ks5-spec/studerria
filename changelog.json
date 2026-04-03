@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.04",
+      "date": "2026-04-03",
+      "items": [
+        "fix(admin-users-status): make the users list respect `users_status` from the page URL so inactive and all-user views persist instead of snapping back to active-only, and surface the context label directly under the username in the server and client table renderers"
+      ]
+    },
+    {
       "version": "1.4.03",
       "date": "2026-04-03",
       "items": [

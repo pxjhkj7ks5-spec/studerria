@@ -35008,7 +35008,8 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     teamwork_to,
     schedule_date,
   } = req.query;
-  const resolvedUsersStatus = 'active';
+  const rawUsersStatus = String(req.query.users_status || req.query.status || 'active').trim().toLowerCase();
+  const resolvedUsersStatus = rawUsersStatus === 'inactive' || rawUsersStatus === 'all' ? rawUsersStatus : 'active';
   const scheduleFilters = [];
   const scheduleParams = [];
   let activeSemester = null;

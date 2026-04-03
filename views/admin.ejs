@@ -2471,11 +2471,13 @@
                         <input type="checkbox" name="delete_user_ids" value="<%= u.id %>" form="deleteUsersForm" />
                       <% } %>
                     </td>
-                    <td><%= u.full_name %></td>
                     <td>
+                      <%= u.full_name %>
                       <% if (rowContextLabel) { %>
                         <div class="small text-muted mb-1"><%= rowContextLabel %></div>
                       <% } %>
+                    </td>
+                    <td>
                       <span class="badge text-bg-<%= rowPrimaryRole === 'admin' ? 'primary' : (rowPrimaryRole === 'starosta' ? 'warning' : (rowPrimaryRole === 'deanery' ? 'info' : 'secondary')) %>">
                         <%= rowRolesLabel %>
                       </span>
@@ -7881,6 +7883,9 @@
           const tbody = document.getElementById('usersTableBody');
           if (!tbody) return;
           tbody.dataset.status = status;
+          const url = new URL(window.location.href);
+          url.searchParams.set('users_status', status);
+          window.history.replaceState({}, '', url.toString());
           refreshUsers();
         });
       });
