@@ -25,7 +25,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
-    <title>Teacher subjects</title>
+    <title>Teacher subject assignments</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -206,14 +206,14 @@
       <% } %>
 
       <section class="glass hero mb-3">
-        <h1 class="hero-title">Legacy teacher subjects</h1>
+        <h1 class="hero-title">Teacher subject assignments</h1>
         <p class="hero-subtitle">
-          Compatibility editor for the old subject picker. Primary live teaching scope, templates, files, and semester filters now live in Teacher workspace.
+          Manage your teaching scope here. The offering-based path is the default; compatibility fallback appears only when no offering catalog is available.
         </p>
         <div class="chip-row">
           <span class="chip">Catalog: <%= teacherSubjects.length %></span>
           <span class="chip">Selected: <%= selectedCount %></span>
-          <span class="chip">Mode: <%= teacherSelectionMode === 'offering' ? 'live offerings' : 'legacy subjects' %></span>
+          <span class="chip">Mode: <%= teacherSelectionMode === 'offering' ? 'offering-based' : 'compatibility fallback' %></span>
         </div>
         <div class="hero-actions">
           <a class="btn btn-primary" href="<%= workspaceHref || '/teacher/workspace' %>">Open teacher workspace</a>
@@ -222,9 +222,9 @@
       </section>
 
       <section class="glass section mb-3">
-        <h2 class="section-title">Compatibility teaching scope</h2>
+        <h2 class="section-title">Teaching scope</h2>
         <p class="section-subtitle">
-          Use this screen only when you need the legacy subject-selection flow. Normal teaching setup should be managed from Teacher workspace.
+          Use this screen to choose the subjects you teach. If the live offering catalog is unavailable, the compatibility picker stays available.
         </p>
 
         <form id="teacherSubjectsForm" method="POST" action="/teacher/subjects" class="mt-3">
@@ -298,15 +298,15 @@
             <% if (!teacherSubjects.length) { %>
               <div class="subject-row">
                 <span class="subject-main">
-                  <span class="subject-title">No visible subjects in catalog</span>
-                  <span class="subject-meta">Check subject visibility in pathways and subject settings.</span>
+                  <span class="subject-title">No visible offerings in catalog</span>
+                  <span class="subject-meta">Check offering visibility in Academic Setup and subject settings.</span>
                 </span>
               </div>
             <% } %>
           </div>
 
           <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-primary" type="submit">Save teacher subjects</button>
+            <button class="btn btn-primary" type="submit">Save assignments</button>
             <a class="btn btn-outline-secondary" href="<%= workspaceHref || '/teacher/workspace' %>">Back to workspace</a>
           </div>
         </form>
@@ -374,4 +374,3 @@
       <script src="/js/dynamic-bg.js" defer></script>
   </body>
 </html>
-

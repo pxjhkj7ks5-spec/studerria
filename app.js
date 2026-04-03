@@ -16536,12 +16536,42 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         limit: 300,
       }),
       listTeacherAssets(userId, { courseIds: workspaceTemplateCourseIds }),
-      academicSetupHelpers.listLegacyTeacherHomeworkRows(getAcademicSetupStore(), {
-        userId,
-        courseIds: workspaceScopedOwnerCourseIds,
-        subjectIds: workspaceScopedSubjectIds,
-        semesterIds: selectedWorkspaceLegacySemesterIds,
-        limit: 8,
+      db.all(
+        `
+          SELECT
+            h.id,
+            h.description,
+            h.class_date,
+            h.custom_due_date,
+            h.subject_id,
+            h.group_number,
+            h.course_id,
+            h.semester_id,
+            s.name AS subject_name
+          FROM homework h
+          LEFT JOIN subjects s ON s.id = h.subject_id
+          WHERE h.created_by_id = ?
+            AND COALESCE(h.is_teacher_homework, 0) = 1
+            AND h.course_id = ANY(?::int[])
+            AND h.subject_id = ANY(?::int[])
+            AND (
+              h.semester_id = ANY(?::int[])
+              OR h.semester_id IS NULL
+            )
+          ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) DESC NULLS LAST, CAST(h.created_at AS TEXT) DESC
+          LIMIT 8
+        `,
+        [
+          userId,
+          workspaceScopedOwnerCourseIds.length ? workspaceScopedOwnerCourseIds : workspaceTemplateCourseIds,
+          workspaceScopedSubjectIds,
+          selectedWorkspaceLegacySemesterIds.length ? selectedWorkspaceLegacySemesterIds : [null],
+        ]
+      ).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return [];
+        }
+        throw err;
       }),
     ]);
 
@@ -23029,11 +23059,24 @@ app.get('/schedule', requireLogin, async (req, res) => {
       if (hasSessionRole(req, 'admin')) {
         return loadCourseSubjectGroupsForSingleGroup(adminFallbackGroupNumber, cb);
       }
-      return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-        studentId: userId,
-        courseId: scheduleCourseId,
-        includeHidden: false,
-      }).then((rows) => cb(null, rows)).catch((err) => cb(err));
+      return loadAcademicV2LegacyStudentRows(userId, {
+        selectedOnly: true,
+        routeKey: 'schedule.student',
+      }).then((studentCompat) => {
+        const scopedRows = (studentCompat && Array.isArray(studentCompat.rows) ? studentCompat.rows : [])
+          .filter((row) => {
+            const ownerCourseId = Number(row && (row.owner_course_id || row.course_id) || 0);
+            return !scheduleCourseId || ownerCourseId === Number(scheduleCourseId);
+          });
+        if (scopedRows.length) {
+          return cb(null, scopedRows);
+        }
+        return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+          studentId: userId,
+          courseId: scheduleCourseId,
+          includeHidden: false,
+        }).then((rows) => cb(null, rows)).catch((err) => cb(err));
+      }).catch((err) => cb(err));
     }
     if (viewAsMode === 'self') {
       if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
@@ -23051,15 +23094,28 @@ app.get('/schedule', requireLogin, async (req, res) => {
           return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
         }).catch((err) => cb(err));
       }
-      return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-        studentId: userId,
-        courseId: scheduleCourseId,
-        includeHidden: false,
-      }).then((rows) => {
-        if (Array.isArray(rows) && rows.length) {
-          return cb(null, rows);
+      return loadAcademicV2LegacyStudentRows(userId, {
+        selectedOnly: true,
+        routeKey: 'schedule.view-as-self',
+      }).then((studentCompat) => {
+        const scopedRows = (studentCompat && Array.isArray(studentCompat.rows) ? studentCompat.rows : [])
+          .filter((row) => {
+            const ownerCourseId = Number(row && (row.owner_course_id || row.course_id) || 0);
+            return !scheduleCourseId || ownerCourseId === Number(scheduleCourseId);
+          });
+        if (scopedRows.length) {
+          return cb(null, scopedRows);
         }
-        return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
+        return academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+          studentId: userId,
+          courseId: scheduleCourseId,
+          includeHidden: false,
+        }).then((rows) => {
+          if (Array.isArray(rows) && rows.length) {
+            return cb(null, rows);
+          }
+          return loadCourseSubjectGroupsForSingleGroup(selfFallbackGroupNumber, cb);
+        }).catch((err) => cb(err));
       }).catch((err) => cb(err));
     }
     if (courseSubjectScope && courseSubjectScope.source === 'academic_v2') {
@@ -26248,25 +26304,32 @@ async function getStudentJournalSubjectOptions(userId) {
 async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode) {
   const userId = Number(req.session.user.id);
   if (teacherJournalMode && journalScope.fullAccess) {
-    const rows = await db.all(
-      `
-        SELECT s.id AS subject_id, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
-        FROM subjects s
-        JOIN courses c ON c.id = s.course_id
-        WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
-        ORDER BY c.id ASC, s.name ASC
-      `
-    );
-    return (rows || []).map((row) => ({
-      subject_id: Number(row.subject_id),
-      subject_name: row.subject_name,
-      group_count: Math.max(1, Number(row.group_count || 1)),
-      course_id: Number(row.course_id || 1),
-      course_name: row.course_name || '',
-      has_all_groups: true,
-      group_numbers: Array.from({ length: Math.max(1, Number(row.group_count || 1)) }, (_v, index) => index + 1),
-      group_label: 'Усі групи',
-    }));
+    const rows = await listTeacherOfferingCatalog();
+    const map = new Map();
+    (rows || []).forEach((row) => {
+      const subjectId = Number(row.legacy_subject_id || row.subject_id || row.id || 0);
+      if (!Number.isInteger(subjectId) || subjectId < 1 || map.has(subjectId)) {
+        return;
+      }
+      const contexts = Array.isArray(row.contexts) ? row.contexts : [];
+      const primaryContext = contexts[0] || null;
+      const groupCount = Math.max(1, Number(row.group_count || 1));
+      map.set(subjectId, {
+        subject_id: subjectId,
+        subject_name: row.name,
+        group_count: groupCount,
+        course_id: Number(primaryContext && primaryContext.course_id ? primaryContext.course_id : (row.course_id || 0)) || 1,
+        course_name: String(primaryContext && primaryContext.course_name ? primaryContext.course_name : row.course_name || ''),
+        has_all_groups: true,
+        group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
+        group_label: 'Усі групи',
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const byCourse = Number(a.course_id || 0) - Number(b.course_id || 0);
+      if (byCourse !== 0) return byCourse;
+      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk', { sensitivity: 'base' });
+    });
   }
 
   if (teacherJournalMode) {
@@ -26514,6 +26577,59 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
   const groups = groupFilterSet && groupFilterSet.size
     ? Array.from(groupFilterSet).filter((value) => Number.isInteger(value) && value > 0)
     : [];
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  if (normalizedSubjectId && normalizedCourseId) {
+    try {
+      const courseUsers = await academicV2RuntimeHelpers.listCourseUsersByLegacyCourse(
+        getAcademicV2Store(),
+        normalizedCourseId,
+        {
+          activeOnly: usersHasIsActive,
+          userIds: Array.isArray(userFilterIds) && userFilterIds.length ? userFilterIds : undefined,
+        }
+      );
+      const rows = [];
+      for (const userRow of courseUsers || []) {
+        const roleKey = normalizeRoleKey(userRow.role || 'student');
+        if (roleKey !== 'student' && roleKey !== 'starosta') {
+          continue;
+        }
+        const studentState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+          getAcademicV2Store(),
+          userRow,
+          { selectedOnly: true }
+        ).catch(() => null);
+        const subjectRows = Array.isArray(studentState && studentState.subjects) ? studentState.subjects : [];
+        const selectedSubject = subjectRows.find((row) => Number(row.subject_id || row.id) === Number(normalizedSubjectId)) || null;
+        if (!selectedSubject) {
+          continue;
+        }
+        const selectedGroup = Number(
+          selectedSubject.selected_group
+          || selectedSubject.default_group
+          || (Array.isArray(selectedSubject.group_numbers) && selectedSubject.group_numbers.length
+            ? selectedSubject.group_numbers[0]
+            : 0)
+        ) || 0;
+        if (groups.length && !selectedSubject.has_all_groups && (!selectedGroup || !groups.includes(selectedGroup))) {
+          continue;
+        }
+        rows.push({
+          id: Number(userRow.id),
+          full_name: String(userRow.full_name || ''),
+          group_number: selectedSubject.has_all_groups ? 0 : selectedGroup,
+        });
+      }
+      if (rows.length) {
+        return rows.sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || ''), 'uk'));
+      }
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+  }
   const rows = await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
     subjectId,
     courseId,
@@ -26529,6 +26645,31 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
 }
 
 async function getJournalStudentGroup(subjectId, studentId) {
+  try {
+    const studentState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      studentId,
+      { selectedOnly: true }
+    );
+    const subjectRows = Array.isArray(studentState && studentState.subjects) ? studentState.subjects : [];
+    const selectedSubject = subjectRows.find((row) => Number(row.subject_id || row.id) === Number(subjectId)) || null;
+    if (selectedSubject) {
+      const selectedGroup = selectedSubject.has_all_groups
+        ? null
+        : Number(
+          selectedSubject.selected_group
+          || selectedSubject.default_group
+          || (Array.isArray(selectedSubject.group_numbers) && selectedSubject.group_numbers.length
+            ? selectedSubject.group_numbers[0]
+            : 0)
+        ) || null;
+      return { group_number: selectedGroup };
+    }
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+  }
   return academicSetupHelpers.getLegacyStudentSubjectGroup(getAcademicSetupStore(), {
     subjectId,
     studentId,
@@ -29329,11 +29470,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Column not found' });
     }
 
-    const studentRowCandidates = await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
-      subjectId: column.subject_id,
-      userIds: [studentId],
-      activeOnly: usersHasIsActive,
-    });
+    const studentRowCandidates = await getJournalStudents(column.subject_id, column.course_id, null, [studentId]);
     const studentRow = Array.isArray(studentRowCandidates) && studentRowCandidates.length
       ? studentRowCandidates[0]
       : null;
@@ -29994,11 +30131,7 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
 
     const maxPoints = parsePositiveDecimal(column.max_points, 10);
     const uniqueStudentIds = Array.from(new Set(normalizedEntries.map((entry) => entry.student_id)));
-    const studentRows = await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
-      subjectId: column.subject_id,
-      userIds: uniqueStudentIds,
-      activeOnly: usersHasIsActive,
-    });
+    const studentRows = await getJournalStudents(column.subject_id, column.course_id, null, uniqueStudentIds);
     const studentGroups = new Map(
       (studentRows || []).map((row) => [Number(row.student_id || row.id), Number(row.group_number || 0)])
     );
@@ -32403,7 +32536,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
           || String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk')
         );
       const selectedSubject = selectedSubjectId
-        ? (subjects.find((subject) => Number(subject.subject_id) === Number(selectedSubjectId)) || null)
+        ? (subjects.find((subject) => Number(subject.subject_id || subject.id) === Number(selectedSubjectId)) || null)
         : (subjects[0] || null);
 
       let materials = [];
@@ -32489,15 +32622,26 @@ app.get('/subjects', requireLogin, async (req, res) => {
         'subjects'
       );
     } else {
-      subjectRows = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-        studentId: userId,
-        includeHidden: false,
+      const studentCompat = await loadAcademicV2LegacyStudentRows(req.session.user, {
+        selectedOnly: true,
+        routeKey: 'subjects.student-generic',
       });
+      subjectRows = Array.isArray(studentCompat.rows) && studentCompat.rows.length
+        ? studentCompat.rows
+        : await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+            studentId: userId,
+            includeHidden: false,
+          });
+      projectionAlert = buildAcademicV2StudentProjectionAlert(
+        req,
+        studentCompat && studentCompat.state ? studentCompat.state.projectionIssues : {},
+        'subjects'
+      );
     }
 
     const subjectMap = new Map();
     (subjectRows || []).forEach((row) => {
-      const subjectKey = Number(row.subject_id);
+      const subjectKey = Number(row.subject_id || row.id);
       if (!subjectMap.has(subjectKey)) {
         subjectMap.set(subjectKey, {
           subject_id: subjectKey,
@@ -32938,10 +33082,22 @@ app.get('/teamwork', requireLogin, async (req, res) => {
         'teamwork'
       );
     } else {
-      subjectRows = (await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
-        studentId: userId,
-        includeHidden: false,
-      })).filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1));
+      const studentCompat = await loadAcademicV2LegacyStudentRows(req.session.user, {
+        selectedOnly: true,
+        teamworkOnly: true,
+        routeKey: 'teamwork.student-generic',
+      });
+      subjectRows = Array.isArray(studentCompat.rows) && studentCompat.rows.length
+        ? studentCompat.rows.filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1))
+        : (await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+            studentId: userId,
+            includeHidden: false,
+          })).filter((row) => row && (row.show_in_teamwork === true || Number(row.show_in_teamwork || 0) === 1));
+      projectionAlert = buildAcademicV2StudentProjectionAlert(
+        req,
+        studentCompat && studentCompat.state ? studentCompat.state.projectionIssues : {},
+        'teamwork'
+      );
     }
 
     const subjectMap = new Map();
@@ -33405,12 +33561,12 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       return res.redirect('/teamwork?err=No%20active%20semester');
     }
 
-    const students = (await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
+    const students = await getJournalStudents(
       subjectId,
-      courseId: subjectRow.course_id || 1,
-      groupNumbers: targetGroups,
-      activeOnly: usersHasIsActive,
-    })).sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+      subjectRow.course_id || 1,
+      new Set(targetGroups),
+      []
+    );
 
     const seminarGroupOrder = lessonScope === 'seminar'
       ? [...targetGroups].sort((a, b) => a - b)
@@ -34586,12 +34742,12 @@ app.get('/admin/api/messages/:id/reads', requireMessagesSectionAccess, readLimit
         }))
         .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
     } else if (message.subject_id) {
-      recipients = (await academicSetupHelpers.listLegacySubjectStudentRows(getAcademicSetupStore(), {
-        subjectId: message.subject_id,
+      recipients = (await getJournalStudents(
+        message.subject_id,
         courseId,
-        groupNumbers: parsePositiveIntStrict(message.group_number) ? [message.group_number] : [],
-        activeOnly: usersHasIsActive,
-      })).map((row) => ({
+        parsePositiveIntStrict(message.group_number) ? new Set([Number(message.group_number)]) : null,
+        []
+      )).map((row) => ({
         id: Number(row.id),
         full_name: row.full_name,
       }));

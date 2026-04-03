@@ -740,7 +740,7 @@
             </select>
           </div>
           <div class="col-12 col-lg-4">
-            <label class="form-label" for="workspaceCourseId">Compatibility course helper</label>
+            <label class="form-label" for="workspaceCourseId">Course scope</label>
             <select class="form-select" id="workspaceCourseId" name="course">
               <option value="">All visible courses</option>
               <% workspaceCourseList.forEach(function(course) { %>
@@ -749,12 +749,12 @@
             </select>
           </div>
           <div class="col-12">
-            <p class="hint mb-0">Primary scope is `study_context_id + semester_id`. Course stays only as a derived helper for legacy runtime actions.</p>
+            <p class="hint mb-0">Primary scope is `study_context_id + semester_id`. Course is derived from the current offering context and used only when older actions still need it.</p>
           </div>
           <div class="col-12 d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit">Apply filters</button>
             <a class="btn btn-outline-secondary" href="/teacher/workspace">Clear</a>
-            <a class="btn btn-outline-info" href="/teacher/subjects">Manage assignments</a>
+            <a class="btn btn-outline-info" href="/teacher/subjects">Open subject assignments</a>
           </div>
         </form>
         <% if (teacherOfferingList.length) { %>
@@ -788,7 +788,7 @@
             <% }) %>
           </div>
         <% } else { %>
-          <div class="alert alert-info mb-0">No live offerings assigned yet. Use <a href="/teacher/subjects">teacher subjects</a> to choose offerings and groups.</div>
+          <div class="alert alert-info mb-0">No live offerings assigned yet. Use <a href="/teacher/subjects">subject assignments</a> to choose offerings and groups.</div>
         <% } %>
       </section>
 
@@ -1176,7 +1176,7 @@
             </p>
             <% if (!(teacherSubjects || []).length) { %>
               <div class="alert alert-warning mt-3 mb-0">
-                Choose your teaching subjects first in <a href="/teacher/subjects">teacher subjects</a>.
+                Choose your teaching subjects first in <a href="/teacher/subjects">subject assignments</a>.
               </div>
             <% } %>
           </article>

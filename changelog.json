@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.11",
+      "date": "2026-04-03",
+      "items": [
+        "fix(academic-v2-teacher-student-surfaces): make teacher hub and workspace prefer the offering-based subject flow, replace journal student lookup and subject selection with v2 bridge-first resolution, reduce student/teamwork legacy fallbacks, normalize v2 subject shapes, and remove legacy navigation labels from the primary teacher entry points"
+      ]
+    },
+    {
       "version": "1.4.09",
       "date": "2026-04-03",
       "items": [
