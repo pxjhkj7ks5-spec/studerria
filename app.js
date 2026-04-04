@@ -18421,6 +18421,7 @@ const buildJournalEmptyStateViewModel = ({
   username: req.session.user.username,
   role: req.session.role,
   subjects,
+  journalWorkflowLinks: {},
   selectedSubject: null,
   columns: [],
   journalRows: [],

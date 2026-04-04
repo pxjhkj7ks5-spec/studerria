@@ -513,6 +513,9 @@
       <% if (messages && messages.success) { %>
         <div class="alert alert-success"><%= messages.success %></div>
       <% } %>
+      <% if (compatibilityMessage) { %>
+        <div class="alert alert-warning"><%= compatibilityMessage %></div>
+      <% } %>
       <% if (undoGrade && canEditJournal) { %>
         <form method="POST" action="/journal/grades/restore" class="alert alert-warning d-flex flex-wrap gap-2 align-items-center">
           <input type="hidden" name="column_id" value="<%= undoGrade.column_id %>" />

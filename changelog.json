@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.14",
+      "date": "2026-04-04",
+      "items": [
+        "fix(journal-render-fallback): keep the journal compatibility fallback inside the normal app shell by providing the missing empty-state workflow links and showing the compatibility warning inline"
+      ]
+    },
+    {
       "version": "1.4.13",
       "date": "2026-04-04",
       "items": [
