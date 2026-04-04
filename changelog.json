@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.17",
+      "date": "2026-04-05",
+      "items": [
+        "fix(journal-student-v2-subjects): merge Academic V2 student selections with the personal schedule scope so journal self-view and admin view-as-self show the same subjects that are available in the student's Academic Setup V2 schedule path"
+      ]
+    },
+    {
       "version": "1.4.16",
       "date": "2026-04-04",
       "items": [

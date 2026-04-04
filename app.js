@@ -26361,12 +26361,328 @@ async function listJournalAcademicV2FallbackSubjects() {
   }
 }
 
+function parseJournalTargetGroupNumbers(rawValue, maxGroupCount = null) {
+  const rawItems = Array.isArray(rawValue)
+    ? rawValue
+    : (
+      typeof rawValue === 'string'
+        ? String(rawValue)
+          .replace(/^\{/, '')
+          .replace(/\}$/, '')
+          .split(',')
+        : [rawValue]
+    );
+  const normalizedMax = parsePositiveIntStrict(maxGroupCount);
+  return Array.from(new Set(
+    rawItems
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+      .filter((value) => !normalizedMax || value <= normalizedMax)
+  )).sort((a, b) => a - b);
+}
+
+function mergeStudentJournalSubjectOption(optionsMap, option = {}) {
+  const runtimeSubjectId = buildJournalRuntimeSubjectId({
+    legacySubjectId: option.legacy_subject_id || option.subject_id,
+    groupSubjectId: option.group_subject_id,
+  });
+  if (!Number.isInteger(runtimeSubjectId) || runtimeSubjectId === 0) {
+    return;
+  }
+
+  const normalizedLegacySubjectId = parsePositiveIntStrict(option.legacy_subject_id || option.subject_id) || null;
+  const normalizedGroupSubjectId = parsePositiveIntStrict(option.group_subject_id) || null;
+  const normalizedGroupCount = Math.max(1, Number(option.group_count || 1) || 1);
+  const explicitGroups = Array.isArray(option.group_numbers)
+    ? option.group_numbers
+    : [];
+  const normalizedGroups = Array.from(new Set(
+    explicitGroups
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  )).sort((a, b) => a - b);
+  const selectedGroup = parsePositiveIntStrict(option.selected_group || option.group_number) || null;
+  if (!normalizedGroups.length && selectedGroup) {
+    normalizedGroups.push(selectedGroup);
+  }
+
+  if (!optionsMap.has(runtimeSubjectId)) {
+    optionsMap.set(runtimeSubjectId, {
+      subject_id: runtimeSubjectId,
+      legacy_subject_id: normalizedLegacySubjectId,
+      group_subject_id: normalizedGroupSubjectId,
+      subject_name: String(option.subject_name || option.subject_title || option.name || '').trim(),
+      group_count: normalizedGroupCount,
+      course_id: Number(option.owner_course_id || option.course_id || 1) || 1,
+      course_name: String(option.course_name || '').trim(),
+      has_all_groups: Boolean(option.has_all_groups) && !normalizedGroups.length,
+      group_numbers_set: new Set(normalizedGroups),
+      selected_group: selectedGroup,
+      default_group: parsePositiveIntStrict(option.default_group) || 1,
+      legacy_semester_id: parsePositiveIntStrict(option.legacy_semester_id) || null,
+    });
+    return;
+  }
+
+  const existing = optionsMap.get(runtimeSubjectId);
+  if (!existing.legacy_subject_id && normalizedLegacySubjectId) {
+    existing.legacy_subject_id = normalizedLegacySubjectId;
+  }
+  if (!existing.group_subject_id && normalizedGroupSubjectId) {
+    existing.group_subject_id = normalizedGroupSubjectId;
+  }
+  if (!existing.subject_name) {
+    existing.subject_name = String(option.subject_name || option.subject_title || option.name || '').trim();
+  }
+  if (!existing.course_name) {
+    existing.course_name = String(option.course_name || '').trim();
+  }
+  if (!existing.course_id && Number(option.owner_course_id || option.course_id || 0)) {
+    existing.course_id = Number(option.owner_course_id || option.course_id || 0);
+  }
+  existing.group_count = Math.max(existing.group_count || 1, normalizedGroupCount);
+  existing.has_all_groups = Boolean(existing.has_all_groups || (Boolean(option.has_all_groups) && !normalizedGroups.length));
+  if (!existing.selected_group && selectedGroup) {
+    existing.selected_group = selectedGroup;
+  }
+  if (!existing.default_group && parsePositiveIntStrict(option.default_group)) {
+    existing.default_group = parsePositiveIntStrict(option.default_group);
+  }
+  if (!existing.legacy_semester_id && parsePositiveIntStrict(option.legacy_semester_id)) {
+    existing.legacy_semester_id = parsePositiveIntStrict(option.legacy_semester_id);
+  }
+  normalizedGroups.forEach((groupNumber) => existing.group_numbers_set.add(groupNumber));
+}
+
+async function listAcademicV2StudentJournalScheduleOptions(userId) {
+  try {
+    const store = getAcademicV2Store();
+    const scopeState = await academicV2StudentHelpers.resolveStudentAcademicScope(store, userId);
+    if (!scopeState || !scopeState.scope || !scopeState.term) {
+      return [];
+    }
+
+    const catalogState = await academicV2StudentHelpers.loadStudentSubjectCatalog(store, userId, {
+      selectedOnly: false,
+    }).catch(() => null);
+    const visibleSubjects = Array.isArray(catalogState && catalogState.allSubjects)
+      ? catalogState.allSubjects
+      : (Array.isArray(catalogState && catalogState.subjects) ? catalogState.subjects : []);
+    const selectedByLegacySubjectId = new Map(
+      visibleSubjects
+        .filter((subject) => subject && subject.is_selected)
+        .map((subject) => [Number(subject.subject_id || subject.id || 0), subject])
+        .filter(([subjectId]) => Number.isInteger(subjectId) && subjectId > 0)
+    );
+    const visibleByLegacySubjectId = new Map(
+      visibleSubjects
+        .map((subject) => [Number(subject.subject_id || subject.id || 0), subject])
+        .filter(([subjectId]) => Number.isInteger(subjectId) && subjectId > 0)
+    );
+
+    const rows = await store.all(
+      `
+        SELECT
+          se.group_subject_id,
+          se.group_number,
+          se.target_group_numbers,
+          se.day_of_week,
+          se.class_number,
+          se.week_number,
+          se.lesson_type,
+          activity.activity_type,
+          gs.title AS subject_title,
+          gs.legacy_subject_id,
+          gs.is_visible,
+          gs.is_required,
+          gs.is_general,
+          gs.group_count,
+          gs.default_group,
+          st.name AS template_name
+        FROM academic_v2_schedule_entries se
+        JOIN academic_v2_group_subject_activities activity ON activity.id = se.group_subject_activity_id
+        JOIN academic_v2_group_subjects gs ON gs.id = activity.group_subject_id
+        JOIN academic_v2_subject_templates st ON st.id = gs.subject_template_id
+        WHERE gs.group_id = ?
+          AND se.term_id = ?
+          AND COALESCE(gs.is_visible, TRUE) = TRUE
+        ORDER BY
+          COALESCE(gs.sort_order, 0) ASC,
+          gs.title ASC,
+          gs.id ASC,
+          se.week_number ASC,
+          se.day_of_week ASC,
+          se.class_number ASC,
+          se.id ASC
+      `,
+      [scopeState.scope.group_id, scopeState.term.id]
+    );
+
+    const optionMap = new Map();
+    (rows || []).forEach((row) => {
+      const legacySubjectId = parsePositiveIntStrict(row.legacy_subject_id) || null;
+      const groupSubjectId = parsePositiveIntStrict(row.group_subject_id) || null;
+      const isVisible = normalizeBoolean(row.is_visible, true);
+      if (!isVisible) {
+        return;
+      }
+
+      const selectedSubject = legacySubjectId ? (selectedByLegacySubjectId.get(legacySubjectId) || null) : null;
+      const visibleSubject = legacySubjectId ? (visibleByLegacySubjectId.get(legacySubjectId) || null) : null;
+      const activityType = String(row.activity_type || row.lesson_type || 'lecture').trim().toLowerCase() || 'lecture';
+      const maxGroupCount = Math.max(1, Number((visibleSubject && visibleSubject.group_count) || row.group_count || 1) || 1);
+      const targetGroupNumbers = activityType === 'lecture'
+        ? []
+        : parseJournalTargetGroupNumbers(
+          row.target_group_numbers,
+          maxGroupCount
+        );
+      const selectedGroup = selectedSubject
+        ? (
+          parsePositiveIntStrict(
+            selectedSubject.selected_group
+            || selectedSubject.group_number
+          ) || null
+        )
+        : null;
+
+      let shouldInclude = false;
+      let derivedGroups = [];
+      if (activityType === 'lecture') {
+        shouldInclude = Boolean(selectedSubject || visibleSubject || !legacySubjectId);
+        if (selectedGroup) {
+          derivedGroups = [selectedGroup];
+        }
+      } else if (selectedSubject && visibleSubject && selectedGroup && targetGroupNumbers.includes(selectedGroup)) {
+        shouldInclude = true;
+        derivedGroups = [selectedGroup];
+      }
+
+      if (!shouldInclude) {
+        return;
+      }
+
+      mergeStudentJournalSubjectOption(optionMap, {
+        subject_id: legacySubjectId,
+        legacy_subject_id: legacySubjectId,
+        group_subject_id: groupSubjectId,
+        subject_name: String(
+          (selectedSubject && selectedSubject.subject_name)
+          || (visibleSubject && visibleSubject.subject_name)
+          || row.subject_title
+          || row.template_name
+          || ''
+        ).trim(),
+        group_count: maxGroupCount,
+        owner_course_id: parsePositiveIntStrict(scopeState.scope.legacy_course_id) || null,
+        course_id: parsePositiveIntStrict(scopeState.scope.legacy_course_id) || null,
+        course_name: String(scopeState.scope.legacy_course_name || '').trim(),
+        has_all_groups: Boolean(
+          (selectedSubject && selectedSubject.has_all_groups)
+          || (visibleSubject && visibleSubject.has_all_groups)
+          || normalizeBoolean(row.is_general, true)
+        ),
+        group_numbers: derivedGroups,
+        selected_group: derivedGroups[0] || null,
+        default_group: parsePositiveIntStrict(
+          (selectedSubject && selectedSubject.default_group)
+          || (visibleSubject && visibleSubject.default_group)
+          || row.default_group
+        ) || 1,
+        legacy_semester_id: parsePositiveIntStrict(scopeState.term.legacy_semester_id) || null,
+      });
+    });
+
+    return Array.from(optionMap.values())
+      .map((item) => {
+        const groupNumbers = Array.from(item.group_numbers_set || []).sort((a, b) => a - b);
+        let groupLabel = 'Без групи';
+        if (item.has_all_groups && !groupNumbers.length) {
+          groupLabel = 'Усі групи';
+        } else if (groupNumbers.length === 1) {
+          groupLabel = `Група ${groupNumbers[0]}`;
+        } else if (groupNumbers.length > 1) {
+          groupLabel = `Групи ${groupNumbers.join(', ')}`;
+        }
+        return {
+          subject_id: item.subject_id,
+          legacy_subject_id: item.legacy_subject_id,
+          group_subject_id: item.group_subject_id,
+          subject_name: item.subject_name,
+          group_count: Math.max(1, Number(item.group_count || 1) || 1),
+          course_id: Number(item.course_id || 1) || 1,
+          course_name: item.course_name || '',
+          has_all_groups: Boolean(item.has_all_groups),
+          group_numbers: groupNumbers,
+          group_label: groupLabel,
+          selected_group: item.selected_group || null,
+          default_group: item.default_group || 1,
+          legacy_semester_id: item.legacy_semester_id || null,
+        };
+      })
+      .sort((a, b) => {
+        const byCourse = Number(a.course_id || 0) - Number(b.course_id || 0);
+        if (byCourse !== 0) return byCourse;
+        return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk', { sensitivity: 'base' });
+      });
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 async function getStudentJournalSubjectOptions(userId) {
   try {
-    const { rows } = await loadAcademicV2LegacyStudentRows(userId, {
-      selectedOnly: true,
-      routeKey: 'journal.student-options',
+    const [{ rows }, scheduleRows] = await Promise.all([
+      loadAcademicV2LegacyStudentRows(userId, {
+        selectedOnly: true,
+        routeKey: 'journal.student-options',
+      }),
+      listAcademicV2StudentJournalScheduleOptions(userId),
+    ]);
+    const optionMap = new Map();
+    (rows || []).forEach((row) => {
+      mergeStudentJournalSubjectOption(optionMap, row);
     });
+    (scheduleRows || []).forEach((row) => {
+      mergeStudentJournalSubjectOption(optionMap, row);
+    });
+    if (optionMap.size) {
+      return Array.from(optionMap.values())
+        .map((item) => {
+          const groupNumbers = Array.from(item.group_numbers_set || []).sort((a, b) => a - b);
+          let groupLabel = 'Без групи';
+          if (item.has_all_groups && !groupNumbers.length) {
+            groupLabel = 'Усі групи';
+          } else if (groupNumbers.length === 1) {
+            groupLabel = `Група ${groupNumbers[0]}`;
+          } else if (groupNumbers.length > 1) {
+            groupLabel = `Групи ${groupNumbers.join(', ')}`;
+          }
+          return {
+            subject_id: item.subject_id,
+            legacy_subject_id: item.legacy_subject_id,
+            group_subject_id: item.group_subject_id,
+            subject_name: item.subject_name,
+            group_count: Math.max(1, Number(item.group_count || 1) || 1),
+            course_id: Number(item.course_id || 1) || 1,
+            course_name: item.course_name || '',
+            has_all_groups: Boolean(item.has_all_groups),
+            group_numbers: groupNumbers,
+            group_label: groupLabel,
+            selected_group: item.selected_group || null,
+            default_group: item.default_group || 1,
+            legacy_semester_id: item.legacy_semester_id || null,
+          };
+        })
+        .sort((a, b) => {
+          const byCourse = Number(a.course_id || 0) - Number(b.course_id || 0);
+          if (byCourse !== 0) return byCourse;
+          return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk', { sensitivity: 'base' });
+        });
+    }
     return (rows || []).map((row) => ({
       subject_id: Number(row.subject_id),
       subject_name: row.subject_name,
@@ -26403,6 +26719,9 @@ async function getStudentJournalSubjectOptions(userId) {
 
 async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode) {
   const userId = Number(req.session.user.id);
+  if (isPlainStudentSession(req) || isAdminViewingStudentSelf(req)) {
+    return getStudentJournalSubjectOptions(userId);
+  }
   if (teacherJournalMode && journalScope.fullAccess) {
     try {
       const rows = await listTeacherOfferingCatalog();
@@ -28688,6 +29007,14 @@ app.get('/journal', requireLogin, async (req, res) => {
     return handleDbError(res, err, 'journal.init');
   }
 
+  let journalFallbackState = {
+    subjects: [],
+    selectedSubject: null,
+    selectedSemester: null,
+    teacherJournalMode: false,
+    canManageAllSubjects: false,
+  };
+
   try {
     const journalScope = await getJournalAccessScope(req);
     if (!journalScope.canUseJournal) {
@@ -28695,10 +29022,17 @@ app.get('/journal', requireLogin, async (req, res) => {
     }
     const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
     const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+    journalFallbackState = {
+      ...journalFallbackState,
+      subjects: subjectOptions,
+      teacherJournalMode,
+      canManageAllSubjects: Boolean(journalScope.fullAccess),
+    };
     const requestedSubjectId = Number(req.query.subject_id);
     const selectedSubject = Number.isFinite(requestedSubjectId) && requestedSubjectId !== 0
       ? (subjectOptions.find((item) => Number(item.subject_id) === requestedSubjectId) || null)
       : (subjectOptions[0] || null);
+    journalFallbackState.selectedSubject = selectedSubject || null;
     const undoColumnId = Number(req.query.undo_column_id);
     const undoStudentId = Number(req.query.undo_student_id);
     const undoUntilMs = Number(req.query.undo_until);
@@ -28722,7 +29056,7 @@ app.get('/journal', requireLogin, async (req, res) => {
         'journal',
         buildJournalEmptyStateViewModel({
           req,
-          subjects: [],
+          subjects: subjectOptions,
           teacherJournalMode,
           canManageAllSubjects: Boolean(journalScope.fullAccess),
         })
@@ -28732,6 +29066,7 @@ app.get('/journal', requireLogin, async (req, res) => {
 
     const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
     const selectedSemester = await getActiveSemester(selectedCourseId);
+    journalFallbackState.selectedSemester = selectedSemester || null;
     const selectedLegacySubjectId = parsePositiveIntStrict(selectedSubject.legacy_subject_id || selectedSubject.subject_id);
     if (!selectedLegacySubjectId) {
       const lang = getPreferredLang(req);
@@ -28852,13 +29187,17 @@ app.get('/journal', requireLogin, async (req, res) => {
         await renderViewToResponse(
           res,
           'journal',
-          buildJournalEmptyStateViewModel({
-            req,
-            subjects: [],
-            teacherJournalMode: false,
-            canManageAllSubjects: false,
-            compatibilityMessage: 'Рендер журналу тимчасово спрощено через внутрішню помилку шаблону.',
-          })
+          {
+            ...buildJournalEmptyStateViewModel({
+              req,
+              subjects: journalFallbackState.subjects,
+              teacherJournalMode: journalFallbackState.teacherJournalMode,
+              canManageAllSubjects: journalFallbackState.canManageAllSubjects,
+              compatibilityMessage: 'Рендер журналу тимчасово спрощено через внутрішню помилку шаблону.',
+            }),
+            selectedSubject: journalFallbackState.selectedSubject,
+            selectedSemester: journalFallbackState.selectedSemester,
+          }
         );
         return;
       } catch (fallbackRenderErr) {
@@ -28878,13 +29217,17 @@ app.get('/journal', requireLogin, async (req, res) => {
         await renderViewToResponse(
           res,
           'journal',
-          buildJournalEmptyStateViewModel({
-            req,
-            subjects: [],
-            teacherJournalMode: false,
-            canManageAllSubjects: false,
-            compatibilityMessage: 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).',
-          })
+          {
+            ...buildJournalEmptyStateViewModel({
+              req,
+              subjects: journalFallbackState.subjects,
+              teacherJournalMode: journalFallbackState.teacherJournalMode,
+              canManageAllSubjects: journalFallbackState.canManageAllSubjects,
+              compatibilityMessage: 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).',
+            }),
+            selectedSubject: journalFallbackState.selectedSubject,
+            selectedSemester: journalFallbackState.selectedSemester,
+          }
         );
         return;
       } catch (renderErr) {
