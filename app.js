@@ -26311,51 +26311,99 @@ async function getTeacherJournalSubjectAccess(userId, subjectId) {
 }
 
 async function getStudentJournalSubjectOptions(userId) {
-  const { rows } = await loadAcademicV2LegacyStudentRows(userId, {
-    selectedOnly: true,
-    routeKey: 'journal.student-options',
-  });
-  return (rows || []).map((row) => ({
-    subject_id: Number(row.subject_id),
-    subject_name: row.subject_name,
-    group_count: Math.max(1, Number(row.group_count || 1)),
-    course_id: Number(row.owner_course_id || row.course_id || 1),
-    course_name: row.course_name || '',
-    has_all_groups: false,
-    group_numbers: [Number(row.group_number || 1)],
-    group_label: `Група ${Number(row.group_number || 1)}`,
-  }));
+  try {
+    const { rows } = await loadAcademicV2LegacyStudentRows(userId, {
+      selectedOnly: true,
+      routeKey: 'journal.student-options',
+    });
+    return (rows || []).map((row) => ({
+      subject_id: Number(row.subject_id),
+      subject_name: row.subject_name,
+      group_count: Math.max(1, Number(row.group_count || 1)),
+      course_id: Number(row.owner_course_id || row.course_id || 1),
+      course_name: row.course_name || '',
+      has_all_groups: false,
+      group_numbers: [Number(row.group_number || 1)],
+      group_label: `Група ${Number(row.group_number || 1)}`,
+    }));
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    const legacyRows = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+      studentId: userId,
+      includeHidden: false,
+    }).catch(() => []);
+    return (legacyRows || []).map((row) => {
+      const groupNumber = Number(row.group_number || 1) || 1;
+      return {
+        subject_id: Number(row.subject_id),
+        subject_name: row.subject_name,
+        group_count: Math.max(1, Number(row.group_count || 1)),
+        course_id: Number(row.course_id || 1),
+        course_name: row.course_name || '',
+        has_all_groups: false,
+        group_numbers: [groupNumber],
+        group_label: `Група ${groupNumber}`,
+      };
+    });
+  }
 }
 
 async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode) {
   const userId = Number(req.session.user.id);
   if (teacherJournalMode && journalScope.fullAccess) {
-    const rows = await listTeacherOfferingCatalog();
-    const map = new Map();
-    (rows || []).forEach((row) => {
-      const subjectId = Number(row.legacy_subject_id || row.subject_id || row.id || 0);
-      if (!Number.isInteger(subjectId) || subjectId < 1 || map.has(subjectId)) {
-        return;
-      }
-      const contexts = Array.isArray(row.contexts) ? row.contexts : [];
-      const primaryContext = contexts[0] || null;
-      const groupCount = Math.max(1, Number(row.group_count || 1));
-      map.set(subjectId, {
-        subject_id: subjectId,
-        subject_name: row.name,
-        group_count: groupCount,
-        course_id: Number(primaryContext && primaryContext.course_id ? primaryContext.course_id : (row.course_id || 0)) || 1,
-        course_name: String(primaryContext && primaryContext.course_name ? primaryContext.course_name : row.course_name || ''),
-        has_all_groups: true,
-        group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
-        group_label: 'Усі групи',
+    try {
+      const rows = await listTeacherOfferingCatalog();
+      const map = new Map();
+      (rows || []).forEach((row) => {
+        const subjectId = Number(row.legacy_subject_id || row.subject_id || row.id || 0);
+        if (!Number.isInteger(subjectId) || subjectId < 1 || map.has(subjectId)) {
+          return;
+        }
+        const contexts = Array.isArray(row.contexts) ? row.contexts : [];
+        const primaryContext = contexts[0] || null;
+        const groupCount = Math.max(1, Number(row.group_count || 1));
+        map.set(subjectId, {
+          subject_id: subjectId,
+          subject_name: row.name,
+          group_count: groupCount,
+          course_id: Number(primaryContext && primaryContext.course_id ? primaryContext.course_id : (row.course_id || 0)) || 1,
+          course_name: String(primaryContext && primaryContext.course_name ? primaryContext.course_name : row.course_name || ''),
+          has_all_groups: true,
+          group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
+          group_label: 'Усі групи',
+        });
       });
-    });
-    return Array.from(map.values()).sort((a, b) => {
-      const byCourse = Number(a.course_id || 0) - Number(b.course_id || 0);
-      if (byCourse !== 0) return byCourse;
-      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk', { sensitivity: 'base' });
-    });
+      return Array.from(map.values()).sort((a, b) => {
+        const byCourse = Number(a.course_id || 0) - Number(b.course_id || 0);
+        if (byCourse !== 0) return byCourse;
+        return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk', { sensitivity: 'base' });
+      });
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+      const rows = await db.all(
+        `
+          SELECT s.id AS subject_id, s.name AS subject_name, s.group_count, s.course_id, c.name AS course_name
+          FROM subjects s
+          JOIN courses c ON c.id = s.course_id
+          WHERE COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't')
+          ORDER BY c.id ASC, s.name ASC
+        `
+      ).catch(() => []);
+      return (rows || []).map((row) => ({
+        subject_id: Number(row.subject_id),
+        subject_name: row.subject_name,
+        group_count: Math.max(1, Number(row.group_count || 1)),
+        course_id: Number(row.course_id || 1),
+        course_name: row.course_name || '',
+        has_all_groups: true,
+        group_numbers: Array.from({ length: Math.max(1, Number(row.group_count || 1)) }, (_v, index) => index + 1),
+        group_label: 'Усі групи',
+      }));
+    }
   }
 
   if (teacherJournalMode) {
