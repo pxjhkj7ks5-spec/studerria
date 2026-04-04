@@ -378,6 +378,11 @@
       <% } else { %>
         <div class="mb-3 text-muted"><%= selectedScopeLabel %></div>
       <% } %>
+      <% if (typeof overviewCompatibilityWarning !== 'undefined' && overviewCompatibilityWarning) { %>
+        <div class="alert alert-warning border-0 glass-inset mb-3" role="alert">
+          <%= overviewCompatibilityWarning %>
+        </div>
+      <% } %>
 
       <% const stats = dashboardStats || { users: 0, subjects: 0, homework: 0, teamworkTasks: 0, teamworkGroups: 0, teamworkMembers: 0 }; %>
       <% const pulse = coursePulse || { summary: {}, subjects: [] }; %>

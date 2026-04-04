@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const ejs = require('ejs');
 
@@ -137,6 +138,30 @@ test('admin overview renders with canonical scope locals', async () => {
     coursePulse: { summary: {}, subjects: [] },
   }));
   assert.match(html, /dashboard|overview/i);
+});
+
+test('admin overview surfaces compatibility warning text', async () => {
+  const html = await renderView('admin-overview.ejs', baseRenderLocals({
+    dashboardStats: { users: 0, subjects: 0, homework: 0, teamworkTasks: 0, teamworkGroups: 0, teamworkMembers: 0 },
+    overviewCompatibilityWarning: 'Academic V2 scope is missing for this course.',
+    coursePulse: { summary: {}, subjects: [] },
+  }));
+  assert.match(html, /Academic V2 scope is missing for this course\./i);
+});
+
+test('admin overview and export routes do not keep legacy course fallback clauses', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  const overviewStart = source.indexOf("app.get('/admin/overview'");
+  const overviewEnd = source.indexOf("app.get('/__version'", overviewStart);
+  const overviewBlock = source.slice(overviewStart, overviewEnd > overviewStart ? overviewEnd : overviewStart + 9000);
+  assert.match(overviewBlock, /allowLegacyFallback:\s*false/);
+  assert.doesNotMatch(overviewBlock, /legacy_course_id\s*=\s*\?/);
+
+  const exportStart = source.indexOf("app.get('/admin/export/users.csv'");
+  const exportEnd = source.indexOf("app.post('/admin/import/users.csv'", exportStart);
+  const exportBlock = source.slice(exportStart, exportEnd > exportStart ? exportEnd : exportStart + 4000);
+  assert.match(exportBlock, /u\.course_id\s*=\s*\?/);
+  assert.doesNotMatch(exportBlock, /legacy_course_id/);
 });
 
 test('admin pathways renders moderation and compatibility sections', async () => {

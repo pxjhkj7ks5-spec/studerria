@@ -6853,6 +6853,20 @@ async function getCourseSubjectAccessScope(courseId, options = {}) {
       projectionIssues: runtimeScope.projectionIssues || academicV2RuntimeHelpers.buildEmptyProjectionIssues(),
     };
   }
+  if (options.allowLegacyFallback === false) {
+    return {
+      course_id: normalizedCourseId,
+      subjects: [],
+      subject_ids: [],
+      owner_course_ids: [normalizedCourseId],
+      owner_semester_ids: [],
+      owner_semester_map: new Map(),
+      subject_map: new Map(),
+      source: 'missing_v2',
+      compatibilityWarning: 'Academic V2 scope is missing for this course. Legacy fallback is disabled.',
+      projectionIssues: academicV2RuntimeHelpers.buildEmptyProjectionIssues(),
+    };
+  }
   const subjects = await getSubjectsCached(normalizedCourseId, {
     visibleOnly: options.visibleOnly === true,
   });
@@ -6894,6 +6908,7 @@ async function getCourseSubjectAccessScope(courseId, options = {}) {
     owner_semester_map: ownerSemesterMap,
     subject_map: subjectMap,
     source: 'legacy',
+    compatibilityWarning: 'Academic V2 scope is missing for this course, so legacy storage was used as a fallback.',
     projectionIssues: academicV2RuntimeHelpers.buildEmptyProjectionIssues(),
   };
 }
@@ -6917,6 +6932,7 @@ async function getCourseSharedStorageScope(courseId, options = {}) {
   const normalizedCourseId = Number(courseId || 0);
   const subjectScope = await getCourseSubjectAccessScope(normalizedCourseId, {
     visibleOnly: options.visibleOnly === true,
+    allowLegacyFallback: options.allowLegacyFallback !== false,
   });
   const ownerCourseIds = Array.isArray(subjectScope.owner_course_ids) && subjectScope.owner_course_ids.length
     ? subjectScope.owner_course_ids
@@ -6968,7 +6984,7 @@ async function buildSubjectOptionStorageScope(subjectOptions = [], options = {})
   };
 }
 
-async function buildCourseDashboardStats(courseId, semesterId = null) {
+async function buildCourseDashboardStats(courseId, semesterId = null, options = {}) {
   const safeCourseId = Number(courseId || 0);
   const safeSemesterId = Number(semesterId || 0);
   const hasSemester = Number.isInteger(safeSemesterId) && safeSemesterId > 0;
@@ -6988,6 +7004,7 @@ async function buildCourseDashboardStats(courseId, semesterId = null) {
   const courseScope = await getCourseSharedStorageScope(safeCourseId, {
     visibleOnly: false,
     fallbackSemesterId: hasSemester ? safeSemesterId : null,
+    allowLegacyFallback: options.allowLegacyFallback !== false,
   });
   if (!courseScope.subject_ids.length) {
     const usersRow = await usersPromise;
@@ -6998,6 +7015,7 @@ async function buildCourseDashboardStats(courseId, semesterId = null) {
       teamworkTasks: 0,
       teamworkGroups: 0,
       teamworkMembers: 0,
+      compatibilityWarning: courseScope.compatibilityWarning || null,
     };
   }
 
@@ -7077,6 +7095,7 @@ async function buildCourseDashboardStats(courseId, semesterId = null) {
     teamworkTasks: Number(teamworkTasksRow?.count || 0),
     teamworkGroups: Number(teamworkGroupsRow?.count || 0),
     teamworkMembers: Number(teamworkMembersRow?.count || 0),
+    compatibilityWarning: courseScope.compatibilityWarning || null,
   };
 }
 
@@ -7084,6 +7103,7 @@ async function buildCourseWeeklyWorkloadSeries({
   courseId,
   semesterId = null,
   startIso,
+  allowLegacyFallback = true,
 }) {
   const safeCourseId = Number(courseId || 0);
   const safeSemesterId = Number(semesterId || 0);
@@ -7094,9 +7114,14 @@ async function buildCourseWeeklyWorkloadSeries({
   const courseScope = await getCourseSharedStorageScope(safeCourseId, {
     visibleOnly: false,
     fallbackSemesterId: hasSemester ? safeSemesterId : null,
+    allowLegacyFallback,
   });
   if (!courseScope.subject_ids.length) {
-    return { homeworkRows: [], teamworkRows: [] };
+    return {
+      homeworkRows: [],
+      teamworkRows: [],
+      compatibilityWarning: courseScope.compatibilityWarning || null,
+    };
   }
   const homeworkSemesterClause = courseScope.owner_semester_ids.length
     ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
@@ -7147,6 +7172,7 @@ async function buildCourseWeeklyWorkloadSeries({
   return {
     homeworkRows: homeworkRows || [],
     teamworkRows: teamworkRows || [],
+    compatibilityWarning: courseScope.compatibilityWarning || null,
   };
 }
 
@@ -35359,10 +35385,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                 OR COALESCE(v2_group.legacy_study_context_id, 0) = ?
                 OR (
                   u.study_context_id IS NULL
-                  AND (
-                    u.course_id = ?
-                    OR COALESCE(v2_group.legacy_course_id, 0) = ?
-                  )
+                  AND u.course_id = ?
                   AND COALESCE(v2_program.id, coh.program_id, u.study_program_id, 0) = ?
                   AND COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id, 0) = ?
                   AND LOWER(
@@ -35381,7 +35404,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
             Number(adminAcademicScope.studyContextId || 0),
             Number(adminAcademicScope.studyContextId || 0),
             Number(courseId || 0),
-            Number(courseId || 0),
             Number(adminAcademicScope.programId || 0),
             Number(adminAcademicScope.admissionId || 0),
             String(adminAcademicScope.track || 'bachelor'),
@@ -35392,16 +35414,10 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
             `
               (
                 u.course_id = ?
-                OR EXISTS (
-                  SELECT 1
-                  FROM academic_v2_groups v2_group
-                  WHERE v2_group.id = u.group_id
-                    AND v2_group.legacy_course_id = ?
-                )
               )
             `
           );
-          userParams.push(courseId, courseId);
+          userParams.push(courseId);
         }
         if (usersHasIsActive) {
           userFilters.push('u.is_active = 1');
@@ -35722,13 +35738,18 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                     allSemestersRows,
                                     settingsUpdateRow,
                                   ] = await Promise.all([
-                                    buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null),
+                                    buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null, {
+                                      allowLegacyFallback: false,
+                                    }),
                                     db.all('SELECT id, title, weeks_count, course_id, start_date FROM semesters ORDER BY start_date DESC'),
                                     db.get(
                                       'SELECT actor_name, created_at FROM history_log WHERE action = ? ORDER BY created_at DESC LIMIT 1',
                                       ['system_settings_update']
                                     ),
                                   ]);
+                                  const overviewCompatibilityWarning = dashboardStats && dashboardStats.compatibilityWarning
+                                    ? dashboardStats.compatibilityWarning
+                                    : null;
 
     const semestersByCourse = {};
     (allSemestersRows || []).forEach((row) => {
@@ -35780,22 +35801,17 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
           courseId,
           semesterId: activeSemester ? Number(activeSemester.id) : null,
           startIso: weekStart.toISOString(),
+          allowLegacyFallback: false,
         }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users u
            WHERE (
              u.course_id = ?
-             OR EXISTS (
-               SELECT 1
-               FROM academic_v2_groups v2_group
-               WHERE v2_group.id = u.group_id
-                 AND v2_group.legacy_course_id = ?
-             )
            ) AND created_at >= ?
            GROUP BY DATE(created_at), role
            ORDER BY day`,
-          [courseId, courseId, weekStart.toISOString()]
+          [courseId, weekStart.toISOString()]
         ),
       ]);
       const weeklyHomeworkRows = weeklySeries.homeworkRows || [];
@@ -36004,6 +36020,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       activityLogs,
                                       activityTop,
                                       dashboardStats,
+                                      overviewCompatibilityWarning,
                                       teamworkTasks,
                                       adminMessages,
                                       supportRequests,
@@ -48259,7 +48276,12 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
     return handleDbError(res, err, 'admin.overview.semester');
   }
   try {
-    const dashboardStats = await buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null);
+    const dashboardStats = await buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null, {
+      allowLegacyFallback: false,
+    });
+    const overviewCompatibilityWarning = dashboardStats && dashboardStats.compatibilityWarning
+      ? dashboardStats.compatibilityWarning
+      : null;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -48300,22 +48322,17 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
           courseId,
           semesterId: activeSemester ? Number(activeSemester.id) : null,
           startIso: weekStart.toISOString(),
+          allowLegacyFallback: false,
         }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
            FROM users u
            WHERE (
              u.course_id = ?
-             OR EXISTS (
-               SELECT 1
-               FROM academic_v2_groups v2_group
-               WHERE v2_group.id = u.group_id
-                 AND v2_group.legacy_course_id = ?
-             )
            ) AND created_at >= ?
            GROUP BY DATE(created_at), role
            ORDER BY day`,
-          [courseId, courseId, weekStart.toISOString()]
+          [courseId, weekStart.toISOString()]
         ),
       ]);
       const weeklyHomeworkRows = weeklySeries.homeworkRows || [];
@@ -48369,6 +48386,7 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
       courses,
       selectedCourseId: courseId,
       dashboardStats,
+      overviewCompatibilityWarning,
       weeklyLabels,
       weeklyHomework,
       weeklyTeamwork,
@@ -48411,10 +48429,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
             OR COALESCE(v2_group.legacy_study_context_id, 0) = ?
             OR (
               u.study_context_id IS NULL
-              AND (
-                u.course_id = ?
-                OR COALESCE(v2_group.legacy_course_id, 0) = ?
-              )
+              AND u.course_id = ?
               AND COALESCE(v2_program.id, coh.program_id, u.study_program_id, 0) = ?
               AND COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id, 0) = ?
               AND LOWER(
@@ -48433,7 +48448,6 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
         Number(adminAcademicScope.studyContextId || 0),
         Number(adminAcademicScope.studyContextId || 0),
         Number(courseId || 0),
-        Number(courseId || 0),
         Number(adminAcademicScope.programId || 0),
         Number(adminAcademicScope.admissionId || 0),
         String(adminAcademicScope.track || 'bachelor'),
@@ -48444,16 +48458,10 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
         `
           (
             u.course_id = ?
-            OR EXISTS (
-              SELECT 1
-              FROM academic_v2_groups v2_group
-              WHERE v2_group.id = u.group_id
-                AND v2_group.legacy_course_id = ?
-            )
           )
         `
       );
-      userParams.push(Number(courseId || 0), Number(courseId || 0));
+      userParams.push(Number(courseId || 0));
     }
     if (usersHasIsActive) {
       if (status === 'inactive') {
@@ -49112,20 +49120,8 @@ app.get('/admin/export/users.csv', requireImportExportSectionAccess, async (req,
   const courseId = Number(req.query.course || getAdminCourse(req));
   const semesterId = req.query.semester_id ? Number(req.query.semester_id) : null;
   const group = req.query.group;
-  const filters = [
-    `
-      (
-        u.course_id = ?
-        OR EXISTS (
-          SELECT 1
-          FROM academic_v2_groups v2_group
-          WHERE v2_group.id = u.group_id
-            AND v2_group.legacy_course_id = ?
-        )
-      )
-    `,
-  ];
-  const params = [courseId, courseId];
+  const filters = ['u.course_id = ?'];
+  const params = [courseId];
   if (group) {
     filters.push('u.schedule_group = ?');
     params.push(group);

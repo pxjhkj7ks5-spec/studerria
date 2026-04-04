@@ -1198,6 +1198,11 @@
                     <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-summary') %>">Semester summary</a>
                   </div>
                 </div>
+                <% if (typeof overviewCompatibilityWarning !== 'undefined' && overviewCompatibilityWarning) { %>
+                  <div class="alert alert-warning border-0 glass-inset mb-3" role="alert">
+                    <%= overviewCompatibilityWarning %>
+                  </div>
+                <% } %>
                 <div class="admin-overview-grid">
                   <div class="admin-metric-card">
                     <div class="small text-muted">Users</div>
