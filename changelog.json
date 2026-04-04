@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.16",
+      "date": "2026-04-04",
+      "items": [
+        "fix(journal-shell-fallback): route journal view-render failures through the safe in-app journal shell before falling back to the plain compatibility HTML"
+      ]
+    },
+    {
       "version": "1.4.15",
       "date": "2026-04-04",
       "items": [

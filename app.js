@@ -28845,7 +28845,26 @@ app.get('/journal', requireLogin, async (req, res) => {
         view: err.viewName || 'journal',
         message: normalizeRuntimeErrorMessage(err && err.message ? err.message : err),
       });
-      return sendJournalPlainFallback(res);
+      try {
+        if (res.locals && res.locals.messages && !res.locals.messages.error) {
+          res.locals.messages.error = 'Журнал тимчасово працює у fallback-режимі рендеру.';
+        }
+        await renderViewToResponse(
+          res,
+          'journal',
+          buildJournalEmptyStateViewModel({
+            req,
+            subjects: [],
+            teacherJournalMode: false,
+            canManageAllSubjects: false,
+            compatibilityMessage: 'Рендер журналу тимчасово спрощено через внутрішню помилку шаблону.',
+          })
+        );
+        return;
+      } catch (fallbackRenderErr) {
+        console.error('Journal render fallback failed', fallbackRenderErr);
+        return sendJournalPlainFallback(res);
+      }
     }
     if (isDbSchemaCompatibilityError(err)) {
       console.error('Journal compatibility fallback (journal.page.compat)', {
