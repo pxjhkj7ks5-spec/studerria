@@ -26311,6 +26311,56 @@ async function getTeacherJournalSubjectAccess(userId, subjectId) {
   return buildTeacherSubjectAccess(rows, Number(rows[0].group_count || 1));
 }
 
+function buildJournalRuntimeSubjectId({
+  legacySubjectId = null,
+  groupSubjectId = null,
+  subjectOfferingId = null,
+} = {}) {
+  const normalizedLegacySubjectId = parsePositiveIntStrict(legacySubjectId);
+  if (normalizedLegacySubjectId) {
+    return normalizedLegacySubjectId;
+  }
+  const normalizedGroupSubjectId = parsePositiveIntStrict(groupSubjectId);
+  if (normalizedGroupSubjectId) {
+    return 0 - normalizedGroupSubjectId;
+  }
+  const normalizedSubjectOfferingId = parsePositiveIntStrict(subjectOfferingId);
+  if (normalizedSubjectOfferingId) {
+    return 0 - (1000000000 + normalizedSubjectOfferingId);
+  }
+  return null;
+}
+
+async function listJournalAcademicV2FallbackSubjects() {
+  try {
+    return await db.all(
+      `
+        SELECT
+          gs.id AS group_subject_id,
+          gs.legacy_subject_id,
+          gs.title AS subject_name,
+          gs.group_count,
+          gs.default_group,
+          gs.is_general,
+          gs.sort_order,
+          g.legacy_course_id AS course_id,
+          c.name AS course_name
+        FROM academic_v2_group_subjects gs
+        JOIN academic_v2_groups g ON g.id = gs.group_id
+        LEFT JOIN courses c ON c.id = g.legacy_course_id
+        WHERE COALESCE(gs.is_visible, TRUE) = TRUE
+          AND COALESCE(g.is_active, TRUE) = TRUE
+        ORDER BY COALESCE(g.legacy_course_id, 0) ASC, gs.sort_order ASC, gs.title ASC, gs.id ASC
+      `
+    );
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 async function getStudentJournalSubjectOptions(userId) {
   try {
     const { rows } = await loadAcademicV2LegacyStudentRows(userId, {
@@ -26356,10 +26406,14 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
   if (teacherJournalMode && journalScope.fullAccess) {
     try {
       const rows = await listTeacherOfferingCatalog();
+      const fallbackRows = await listJournalAcademicV2FallbackSubjects();
       const map = new Map();
       (rows || []).forEach((row) => {
-        const subjectId = Number(row.legacy_subject_id || row.subject_id || row.id || 0);
-        if (!Number.isInteger(subjectId) || subjectId < 1 || map.has(subjectId)) {
+        const subjectId = buildJournalRuntimeSubjectId({
+          legacySubjectId: row.legacy_subject_id || row.subject_id,
+          subjectOfferingId: row.subject_offering_id || row.id,
+        });
+        if (!Number.isInteger(subjectId) || subjectId === 0 || map.has(subjectId)) {
           return;
         }
         const contexts = Array.isArray(row.contexts) ? row.contexts : [];
@@ -26367,10 +26421,42 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
         const groupCount = Math.max(1, Number(row.group_count || 1));
         map.set(subjectId, {
           subject_id: subjectId,
+          legacy_subject_id: parsePositiveIntStrict(row.legacy_subject_id || row.subject_id) || null,
           subject_name: row.name,
           group_count: groupCount,
           course_id: Number(primaryContext && primaryContext.course_id ? primaryContext.course_id : (row.course_id || 0)) || 1,
           course_name: String(primaryContext && primaryContext.course_name ? primaryContext.course_name : row.course_name || ''),
+          has_all_groups: true,
+          group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
+          group_label: 'Усі групи',
+        });
+      });
+      (fallbackRows || []).forEach((row) => {
+        const subjectId = buildJournalRuntimeSubjectId({
+          legacySubjectId: row.legacy_subject_id,
+          groupSubjectId: row.group_subject_id,
+        });
+        const normalizedLegacySubjectId = parsePositiveIntStrict(row.legacy_subject_id) || null;
+        const normalizedCourseId = Number(row.course_id || 0) || 1;
+        const normalizedSubjectName = String(row.subject_name || '').trim().toLowerCase();
+        const duplicateUnmappedOption = !normalizedLegacySubjectId
+          && Array.from(map.values()).some((item) => (
+            !parsePositiveIntStrict(item.legacy_subject_id)
+            && Number(item.course_id || 0) === normalizedCourseId
+            && String(item.subject_name || '').trim().toLowerCase() === normalizedSubjectName
+          ));
+        if (!Number.isInteger(subjectId) || map.has(subjectId) || duplicateUnmappedOption) {
+          return;
+        }
+        const groupCount = Math.max(1, Number(row.group_count || 1));
+        map.set(subjectId, {
+          subject_id: subjectId,
+          legacy_subject_id: normalizedLegacySubjectId,
+          group_subject_id: parsePositiveIntStrict(row.group_subject_id) || null,
+          subject_name: String(row.subject_name || ''),
+          group_count: groupCount,
+          course_id: normalizedCourseId,
+          course_name: String(row.course_name || ''),
           has_all_groups: true,
           group_numbers: Array.from({ length: groupCount }, (_v, index) => index + 1),
           group_label: 'Усі групи',
@@ -26414,10 +26500,20 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
     }
     const map = new Map();
     (rows || []).forEach((row) => {
-      const key = Number(row.subject_id);
+      const key = buildJournalRuntimeSubjectId({
+        legacySubjectId: row.subject_id || row.legacy_subject_id,
+        groupSubjectId: row.group_subject_id,
+        subjectOfferingId: row.subject_offering_id,
+      });
+      if (!Number.isInteger(key)) {
+        return;
+      }
       if (!map.has(key)) {
         map.set(key, {
           subject_id: key,
+          legacy_subject_id: parsePositiveIntStrict(row.subject_id || row.legacy_subject_id) || null,
+          group_subject_id: parsePositiveIntStrict(row.group_subject_id) || null,
+          subject_offering_id: parsePositiveIntStrict(row.subject_offering_id) || null,
           subject_name: row.subject_name,
           group_count: Math.max(1, Number(row.group_count || 1)),
           course_id: Number(row.course_id || 1),
@@ -26446,6 +26542,9 @@ async function getJournalSubjectOptionsForUser(req, journalScope, teacherJournal
       else if (groupNumbers.length > 1) groupLabel = `Групи ${groupNumbers.join(', ')}`;
       return {
         subject_id: item.subject_id,
+        legacy_subject_id: item.legacy_subject_id,
+        group_subject_id: item.group_subject_id,
+        subject_offering_id: item.subject_offering_id,
         subject_name: item.subject_name,
         group_count: item.group_count,
         course_id: item.course_id,
@@ -27050,6 +27149,19 @@ async function buildJournalMatrix({
   groupFilterSet = null,
   studentFilterIds = [],
 }) {
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  if (!normalizedSubjectId) {
+    return {
+      gradingSettings: {
+        ...DEFAULT_SUBJECT_GRADING_SETTINGS,
+        is_closed: 0,
+        closed_by: null,
+        closed_at: null,
+      },
+      columns: [],
+      rows: [],
+    };
+  }
   const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, actorUserId);
   if (Number(gradingSettings?.is_closed || 0) !== 1) {
     try {
@@ -28584,7 +28696,7 @@ app.get('/journal', requireLogin, async (req, res) => {
     const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
     const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
     const requestedSubjectId = Number(req.query.subject_id);
-    const selectedSubject = Number.isFinite(requestedSubjectId) && requestedSubjectId > 0
+    const selectedSubject = Number.isFinite(requestedSubjectId) && requestedSubjectId !== 0
       ? (subjectOptions.find((item) => Number(item.subject_id) === requestedSubjectId) || null)
       : (subjectOptions[0] || null);
     const undoColumnId = Number(req.query.undo_column_id);
@@ -28620,7 +28732,29 @@ app.get('/journal', requireLogin, async (req, res) => {
 
     const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
     const selectedSemester = await getActiveSemester(selectedCourseId);
-    const subjectClosure = await getJournalSubjectClosureState(Number(selectedSubject.subject_id));
+    const selectedLegacySubjectId = parsePositiveIntStrict(selectedSubject.legacy_subject_id || selectedSubject.subject_id);
+    if (!selectedLegacySubjectId) {
+      const lang = getPreferredLang(req);
+      await renderViewToResponse(
+        res,
+        'journal',
+        {
+          ...buildJournalEmptyStateViewModel({
+            req,
+            subjects: subjectOptions,
+            teacherJournalMode,
+            canManageAllSubjects: Boolean(journalScope.fullAccess),
+            compatibilityMessage: lang === 'en'
+              ? 'This Academic V2 subject is visible already, but the journal storage binding is not ready yet.'
+              : 'Цей предмет уже видно в Academic V2, але journal storage binding для нього ще не готовий.',
+          }),
+          selectedSubject,
+          selectedSemester,
+        }
+      );
+      return;
+    }
+    const subjectClosure = await getJournalSubjectClosureState(selectedLegacySubjectId);
     const canEditJournal = teacherJournalMode && !subjectClosure.is_closed;
     const canCloseSubject = Boolean(
       teacherJournalMode

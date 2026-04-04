@@ -502,6 +502,8 @@
         const journalLinks = (journalWorkflowLinks && typeof journalWorkflowLinks === 'object') ? journalWorkflowLinks : {};
         const selectedJournalSubjectId = selectedSubject ? Number(selectedSubject.subject_id || 0) : 0;
         const selectedJournalCourseId = selectedSubject ? Number(selectedSubject.course_id || 0) : 0;
+        const selectedJournalStorageSubjectId = selectedSubject ? Number(selectedSubject.legacy_subject_id || selectedSubject.subject_id || 0) : 0;
+        const selectedJournalHasStorageBinding = selectedJournalStorageSubjectId > 0;
         const journalInsightsHref = journalLinks.insightsHref
           || `/journal/insights?course_id=${selectedJournalCourseId}&subject_id=${selectedJournalSubjectId}&scope_type=subject&period=semester`;
         const journalCloseExportHref = journalLinks.closeExportHref
@@ -566,14 +568,16 @@
                   <span class="status-chip status-chip--success"><%= journalCopy.fullAccess %></span>
                 <% } %>
               </div>
-              <div class="d-flex justify-content-lg-end mt-2">
-                <a
-                  class="btn btn-sm btn-outline-secondary"
-                  href="<%= journalInsightsHref %>"
-                >
-                  📊 <%= journalCopy.journalInsights %>
-                </a>
-              </div>
+              <% if (selectedJournalHasStorageBinding) { %>
+                <div class="d-flex justify-content-lg-end mt-2">
+                  <a
+                    class="btn btn-sm btn-outline-secondary"
+                    href="<%= journalInsightsHref %>"
+                  >
+                    📊 <%= journalCopy.journalInsights %>
+                  </a>
+                </div>
+              <% } %>
             <% } %>
           </div>
         </form>

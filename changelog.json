@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.15",
+      "date": "2026-04-04",
+      "items": [
+        "fix(journal-v2-subject-dropdown): surface new Academic V2 subjects in the journal selector for teacher and full-access flows, keep unmapped subjects selectable with synthetic ids, and stop journal storage writes for subjects that still lack a legacy binding"
+      ]
+    },
+    {
       "version": "1.4.14",
       "date": "2026-04-04",
       "items": [
