@@ -45,7 +45,7 @@ body.theme-dark {
 
 .academic-v2-page {
   position: relative;
-  padding: 36px 20px 56px;
+  padding: 16px 20px 56px;
 }
 
 .academic-v2-shell {
@@ -82,8 +82,8 @@ body.theme-dark .academic-v2-sidebar {
   position: relative;
   overflow: hidden;
   border-radius: var(--academic-radius-xl);
-  padding: 28px;
-  margin-bottom: 24px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
 }
 
 .academic-v2-hero::before,
@@ -104,7 +104,7 @@ body.theme-dark .academic-v2-sidebar {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 20px;
+  gap: 16px;
   grid-template-columns: minmax(0, 1.5fr) minmax(340px, 0.9fr);
   align-items: start;
 }
@@ -113,9 +113,9 @@ body.theme-dark .academic-v2-sidebar {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
+  padding: 6px 11px;
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   font-weight: 700;
@@ -129,18 +129,19 @@ body.theme-dark .academic-v2-kicker {
 }
 
 .academic-v2-title {
-  margin: 18px 0 10px;
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  margin: 12px 0 8px;
+  font-size: clamp(1.8rem, 3.2vw, 2.9rem);
   font-weight: 700;
-  line-height: 1.02;
+  line-height: 1;
   letter-spacing: -0.04em;
+  max-width: 11ch;
 }
 
 .academic-v2-subtitle {
-  max-width: 760px;
+  max-width: 680px;
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.75;
+  font-size: 0.94rem;
+  line-height: 1.5;
   color: var(--academic-muted-light);
 }
 
@@ -152,18 +153,18 @@ body.theme-dark .academic-v2-subtitle {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 .academic-v2-summary-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .academic-v2-stat {
   border-radius: 22px;
-  padding: 18px;
+  padding: 15px 18px;
   border: 1px solid transparent;
 }
 
@@ -191,8 +192,8 @@ body.theme-dark .academic-v2-stat-label {
 
 .academic-v2-stat-value {
   display: block;
-  margin-top: 10px;
-  font-size: 2rem;
+  margin-top: 8px;
+  font-size: 1.8rem;
   font-weight: 700;
   line-height: 1;
 }
@@ -614,7 +615,7 @@ body.theme-dark .academic-v2-empty {
 
 @media (max-width: 768px) {
   .academic-v2-page {
-    padding-inline: 14px;
+    padding: 14px 14px 42px;
   }
 
   .academic-v2-hero,

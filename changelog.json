@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.19",
+      "date": "2026-04-05",
+      "items": [
+        "tune(academic-setup-v2-hero): reduce the top gap under the navbar, compress the hero block spacing and stats cards, and shorten the opening copy so the first glass panel lands much closer to the navigation"
+      ]
+    },
+    {
       "version": "1.4.18",
       "date": "2026-04-05",
       "items": [
