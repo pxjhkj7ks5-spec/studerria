@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.18",
+      "date": "2026-04-05",
+      "items": [
+        "fix(journal-runtime): restore the shared boolean normalizer in app.js so the journal student V2 subject merge path no longer crashes with a runtime error during page load"
+      ]
+    },
+    {
       "version": "1.4.17",
       "date": "2026-04-05",
       "items": [

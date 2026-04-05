@@ -11129,6 +11129,15 @@ function parsePositiveIntStrict(rawValue, fallback = null) {
   return parsed;
 }
 
+function normalizeBoolean(rawValue, fallback = false) {
+  if (typeof rawValue === 'boolean') return rawValue;
+  if (typeof rawValue === 'number') return rawValue === 1;
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  if (['1', 'true', 't', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'f', 'no', 'off'].includes(normalized)) return false;
+  return fallback === true;
+}
+
 function parseBooleanFlag(rawValue, fallback = false) {
   if (rawValue === null || typeof rawValue === 'undefined') {
     return Boolean(fallback);
