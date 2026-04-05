@@ -480,97 +480,121 @@
         background: rgba(148, 163, 184, 0.12);
         border-color: rgba(148, 163, 184, 0.18);
       }
-      .schedule-attendance-panel {
-        margin-bottom: 1.25rem;
+      .schedule-attendance-quick-card {
+        margin: 0 0 1.1rem;
         padding: 16px 18px;
         border-radius: 20px;
         border: 1px solid rgba(255, 255, 255, 0.12);
         background: rgba(15, 23, 42, 0.2);
       }
-      body.theme-light .schedule-attendance-panel {
+      body.theme-light .schedule-attendance-quick-card {
         border-color: rgba(15, 23, 42, 0.1);
         background: rgba(255, 255, 255, 0.42);
       }
-      .schedule-attendance-head {
+      .schedule-attendance-quick-head {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 12px;
       }
-      .schedule-attendance-head h6 {
+      .schedule-attendance-quick-head h6 {
         margin: 0;
       }
-      .schedule-attendance-status-card {
+      .schedule-attendance-quick-shell {
+        display: grid;
+        gap: 12px;
+      }
+      .schedule-attendance-quick-student {
+        display: grid;
+        gap: 6px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      body.theme-light .schedule-attendance-quick-student {
+        border-color: rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.52);
+      }
+      .schedule-attendance-quick-label {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.66;
+      }
+      .schedule-attendance-quick-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        line-height: 1.25;
+      }
+      .schedule-attendance-quick-meta {
+        font-size: 13px;
+        opacity: 0.72;
+      }
+      .schedule-attendance-quick-status {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 10px;
-        flex-wrap: wrap;
-        margin-bottom: 12px;
-      }
-      .schedule-attendance-summary-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 12px;
       }
       .schedule-attendance-feedback {
         min-height: 20px;
       }
-      .schedule-attendance-editor {
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        margin-top: 12px;
-        padding-top: 12px;
-      }
-      body.theme-light .schedule-attendance-editor {
-        border-top-color: rgba(15, 23, 42, 0.08);
-      }
-      .schedule-attendance-rows {
+      .schedule-attendance-quick-actions {
         display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
       }
-      .schedule-attendance-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(240px, 420px);
-        gap: 12px;
-        padding: 12px 14px;
+      .schedule-attendance-choice {
+        min-height: 48px;
+        font-weight: 700;
         border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.04);
       }
-      body.theme-light .schedule-attendance-row {
-        border-color: rgba(15, 23, 42, 0.08);
-        background: rgba(255, 255, 255, 0.52);
+      .schedule-attendance-choice.is-active {
+        color: #ffffff;
+        border-color: rgba(129, 140, 248, 0.62);
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.42), rgba(139, 92, 246, 0.52));
       }
-      .schedule-attendance-row-name {
-        font-weight: 600;
+      .schedule-attendance-quick-nav {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
       }
-      .schedule-attendance-row-meta {
+      .schedule-attendance-quick-summary {
         font-size: 12px;
+        text-align: center;
         opacity: 0.72;
       }
-      .schedule-attendance-row-controls {
-        display: grid;
-        grid-template-columns: 132px minmax(0, 1fr);
-        gap: 10px;
+      .schedule-modal-footer {
+        justify-content: space-between;
+        gap: 12px;
       }
-      .schedule-attendance-actions {
+      .schedule-modal-footer-main {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
         gap: 10px;
-        margin-top: 14px;
+        margin-left: auto;
       }
       @media (max-width: 767px) {
-        .schedule-attendance-head,
-        .schedule-attendance-actions {
+        .schedule-attendance-quick-head,
+        .schedule-modal-footer,
+        .schedule-modal-footer-main {
           flex-direction: column;
           align-items: stretch;
         }
-        .schedule-attendance-row {
+        .schedule-modal-footer-main {
+          margin-left: 0;
+        }
+        .schedule-attendance-quick-actions,
+        .schedule-attendance-quick-nav {
           grid-template-columns: 1fr;
         }
-        .schedule-attendance-row-controls {
-          grid-template-columns: 1fr;
+        .schedule-attendance-quick-summary {
+          text-align: left;
         }
       }
       .tag-pill {
@@ -2601,43 +2625,44 @@
               <li class="list-group-item text-muted"><%= t('schedule.homeworkModal.empty') %></li>
             </ul>
 
-            <section class="schedule-attendance-panel" id="scheduleAttendancePanel">
-              <div class="schedule-attendance-head">
+            <section class="schedule-attendance-quick-card d-none" id="scheduleAttendanceQuickCard">
+              <div class="schedule-attendance-quick-head">
                 <div>
                   <h6><%= t('schedule.attendance.title') %></h6>
                   <div class="small text-muted" id="scheduleAttendanceMeta"><%= t('schedule.attendance.meta') %></div>
                 </div>
-                <button
-                  type="button"
-                  class="btn btn-outline-primary btn-sm glass d-none"
-                  id="scheduleAttendanceToggleBtn"
-                  data-open-label="<%= t('schedule.attendance.fillAction') %>"
-                  data-close-label="<%= t('schedule.attendance.hideAction') %>"
-                >
-                  <%= t('schedule.attendance.fillAction') %>
-                </button>
+                <span class="attendance-chip attendance-chip--pending" id="scheduleAttendanceProgressChip"><%= t('schedule.attendance.progressIdle') %></span>
               </div>
-              <div class="schedule-attendance-status-card d-none" id="scheduleAttendanceStudentCard">
-                <span class="attendance-chip attendance-chip--pending" id="scheduleAttendanceStudentChip"><%= t('schedule.attendance.status.pendingShort') %></span>
-                <span class="small text-muted" id="scheduleAttendanceStudentNote"><%= t('schedule.attendance.noMark') %></span>
-              </div>
-              <div class="small text-muted d-none" id="scheduleAttendanceTeacherHint"><%= t('schedule.attendance.teacherHint') %></div>
-              <div class="schedule-attendance-editor d-none" id="scheduleAttendanceEditor">
-                <div class="schedule-attendance-summary-chips" id="scheduleAttendanceSummaryChips"></div>
-                <div class="schedule-attendance-feedback small text-muted mb-3" id="scheduleAttendanceFeedback"></div>
-                <form id="scheduleAttendanceForm" autocomplete="off">
-                  <input type="hidden" name="subject_id" id="scheduleAttendanceSubjectId" />
-                  <input type="hidden" name="course_id" id="scheduleAttendanceCourseId" />
-                  <input type="hidden" name="attendance_date" id="scheduleAttendanceDate" />
-                  <input type="hidden" name="attendance_class_number" id="scheduleAttendanceClassNumber" />
-                  <input type="hidden" name="group_number" id="scheduleAttendanceGroupNumber" />
-                  <input type="hidden" name="lesson_type" id="scheduleAttendanceLessonType" />
-                  <input type="hidden" name="is_general" id="scheduleAttendanceIsGeneral" />
-                  <input type="hidden" name="target_groups" id="scheduleAttendanceTargetGroups" />
-                  <div class="schedule-attendance-rows" id="scheduleAttendanceRows"></div>
-                </form>
-                <div class="schedule-attendance-actions">
-                  <button type="button" class="btn btn-outline-secondary btn-sm glass" id="scheduleAttendanceCancelBtn"><%= t('schedule.attendance.hideAction') %></button>
+              <div class="schedule-attendance-feedback small text-muted" id="scheduleAttendanceFeedback"></div>
+              <form id="scheduleAttendanceForm" autocomplete="off">
+                <input type="hidden" name="subject_id" id="scheduleAttendanceSubjectId" />
+                <input type="hidden" name="course_id" id="scheduleAttendanceCourseId" />
+                <input type="hidden" name="attendance_date" id="scheduleAttendanceDate" />
+                <input type="hidden" name="attendance_class_number" id="scheduleAttendanceClassNumber" />
+                <input type="hidden" name="group_number" id="scheduleAttendanceGroupNumber" />
+                <input type="hidden" name="lesson_type" id="scheduleAttendanceLessonType" />
+                <input type="hidden" name="is_general" id="scheduleAttendanceIsGeneral" />
+                <input type="hidden" name="target_groups" id="scheduleAttendanceTargetGroups" />
+              </form>
+              <div class="small text-muted d-none" id="scheduleAttendanceEmptyState"><%= t('schedule.attendance.empty') %></div>
+              <div class="schedule-attendance-quick-shell d-none" id="scheduleAttendanceQuickShell">
+                <div class="schedule-attendance-quick-student">
+                  <div class="schedule-attendance-quick-label"><%= t('schedule.attendance.studentLabel') %></div>
+                  <div class="schedule-attendance-quick-name" id="scheduleAttendanceStudentName">-</div>
+                  <div class="schedule-attendance-quick-meta" id="scheduleAttendanceStudentMeta">-</div>
+                  <div class="schedule-attendance-quick-status">
+                    <span class="attendance-chip attendance-chip--pending" id="scheduleAttendanceStudentChip"><%= t('schedule.attendance.status.pendingShort') %></span>
+                    <span class="small text-muted" id="scheduleAttendanceStudentNote"><%= t('schedule.attendance.quickHint') %></span>
+                  </div>
+                </div>
+                <div class="schedule-attendance-quick-actions">
+                  <button type="button" class="btn btn-outline-success glass schedule-attendance-choice" data-attendance-choice="present"><%= t('schedule.attendance.status.present') %></button>
+                  <button type="button" class="btn btn-outline-danger glass schedule-attendance-choice" data-attendance-choice="absent"><%= t('schedule.attendance.status.absent') %></button>
+                  <button type="button" class="btn btn-outline-primary glass schedule-attendance-choice" data-attendance-choice="excused"><%= t('schedule.attendance.status.excused') %></button>
+                </div>
+                <div class="schedule-attendance-quick-nav">
+                  <button type="button" class="btn btn-outline-secondary btn-sm glass" id="scheduleAttendancePrevBtn"><%= t('schedule.attendance.backAction') %></button>
+                  <div class="schedule-attendance-quick-summary" id="scheduleAttendanceSummary"></div>
                   <button type="button" class="btn btn-primary btn-sm glass" id="scheduleAttendanceSaveBtn"><%= t('schedule.attendance.saveAction') %></button>
                 </div>
               </div>
@@ -2797,11 +2822,24 @@
               </div>
             <% } %>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal"><%= t('schedule.homeworkModal.close') %></button>
-            <% if (canCreateHomeworkInSchedule) { %>
-              <button type="submit" class="btn btn-primary glass" form="homeworkCreateForm"><%= t('schedule.homeworkModal.save') %></button>
-            <% } %>
+          <div class="modal-footer schedule-modal-footer">
+            <div class="schedule-modal-footer-start">
+              <button
+                type="button"
+                class="btn btn-outline-primary glass d-none"
+                id="scheduleAttendanceToggleBtn"
+                data-open-label="<%= t('schedule.attendance.fillAction') %>"
+                data-close-label="<%= t('schedule.attendance.hideAction') %>"
+              >
+                <%= t('schedule.attendance.fillAction') %>
+              </button>
+            </div>
+            <div class="schedule-modal-footer-main">
+              <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal"><%= t('schedule.homeworkModal.close') %></button>
+              <% if (canCreateHomeworkInSchedule) { %>
+                <button type="submit" class="btn btn-primary glass" form="homeworkCreateForm"><%= t('schedule.homeworkModal.save') %></button>
+              <% } %>
+            </div>
           </div>
         </div>
       </div>
@@ -3135,12 +3173,17 @@
         attendanceLoadError: t('schedule.attendance.loadError'),
         attendanceTeacherHint: t('schedule.attendance.teacherHint'),
         attendanceNoMark: t('schedule.attendance.noMark'),
-        attendanceReasonOptional: t('schedule.attendance.reasonOptional'),
         attendanceSaveAction: t('schedule.attendance.saveAction'),
         attendanceSaving: t('schedule.attendance.saving'),
         attendanceSaved: t('schedule.attendance.saveSuccess'),
         attendanceEmpty: t('schedule.attendance.empty'),
         attendanceMarkedAtPrefix: t('schedule.attendance.markedAtPrefix'),
+        attendanceQuickHint: t('schedule.attendance.quickHint'),
+        attendanceBackAction: t('schedule.attendance.backAction'),
+        attendanceProgressIdle: t('schedule.attendance.progressIdle'),
+        attendanceProgressPrefix: t('schedule.attendance.progressPrefix'),
+        attendanceCompleteHint: t('schedule.attendance.completeHint'),
+        attendanceCompleteRequired: t('schedule.attendance.completeRequired'),
         attendanceStatusPresent: t('schedule.attendance.status.present'),
         attendanceStatusLate: t('schedule.attendance.status.late'),
         attendanceStatusAbsent: t('schedule.attendance.status.absent'),
@@ -3390,7 +3433,6 @@
       const allowCrossGroupHomeworkFallback = <%- JSON.stringify(role === 'admin' || viewAs === 'student') %>;
       const homeworkModal = document.getElementById('homeworkModal');
       const homeworkData = <%- JSON.stringify(homework || []) %>;
-      const scheduleAttendanceSlots = <%- JSON.stringify(scheduleAttendanceMarkers || {}) %>;
       const teacherHomeworkTemplates = <%- JSON.stringify(typeof teacherHomeworkTemplates !== 'undefined' ? teacherHomeworkTemplates : []) %>;
       const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
       const listEl = document.getElementById('homeworkList');
@@ -3425,20 +3467,21 @@
       const customTemplateTitleInput = document.getElementById('customTemplateTitleInput');
       const customHwDescription = document.getElementById('customHwDescription');
       const templateCache = new Map();
-      const attendancePanelEl = document.getElementById('scheduleAttendancePanel');
+      const attendancePanelEl = document.getElementById('scheduleAttendanceQuickCard');
       const attendanceMetaEl = document.getElementById('scheduleAttendanceMeta');
       const attendanceToggleBtn = document.getElementById('scheduleAttendanceToggleBtn');
-      const attendanceStudentCardEl = document.getElementById('scheduleAttendanceStudentCard');
+      const attendanceProgressChipEl = document.getElementById('scheduleAttendanceProgressChip');
+      const attendanceQuickShellEl = document.getElementById('scheduleAttendanceQuickShell');
+      const attendanceEmptyStateEl = document.getElementById('scheduleAttendanceEmptyState');
+      const attendanceStudentNameEl = document.getElementById('scheduleAttendanceStudentName');
+      const attendanceStudentMetaEl = document.getElementById('scheduleAttendanceStudentMeta');
       const attendanceStudentChipEl = document.getElementById('scheduleAttendanceStudentChip');
       const attendanceStudentNoteEl = document.getElementById('scheduleAttendanceStudentNote');
-      const attendanceTeacherHintEl = document.getElementById('scheduleAttendanceTeacherHint');
-      const attendanceEditorEl = document.getElementById('scheduleAttendanceEditor');
-      const attendanceSummaryChipsEl = document.getElementById('scheduleAttendanceSummaryChips');
       const attendanceFeedbackEl = document.getElementById('scheduleAttendanceFeedback');
       const attendanceFormEl = document.getElementById('scheduleAttendanceForm');
-      const attendanceRowsEl = document.getElementById('scheduleAttendanceRows');
+      const attendanceSummaryEl = document.getElementById('scheduleAttendanceSummary');
       const attendanceSaveBtn = document.getElementById('scheduleAttendanceSaveBtn');
-      const attendanceCancelBtn = document.getElementById('scheduleAttendanceCancelBtn');
+      const attendancePrevBtn = document.getElementById('scheduleAttendancePrevBtn');
       const attendanceSubjectIdInput = document.getElementById('scheduleAttendanceSubjectId');
       const attendanceCourseIdInput = document.getElementById('scheduleAttendanceCourseId');
       const attendanceDateInput = document.getElementById('scheduleAttendanceDate');
@@ -3447,11 +3490,16 @@
       const attendanceLessonTypeInput = document.getElementById('scheduleAttendanceLessonType');
       const attendanceIsGeneralInput = document.getElementById('scheduleAttendanceIsGeneral');
       const attendanceTargetGroupsInput = document.getElementById('scheduleAttendanceTargetGroups');
+      const attendanceChoiceButtons = Array.from(document.querySelectorAll('[data-attendance-choice]'));
       let currentHomeworkItems = [];
       let currentAttendanceSlot = null;
       let currentAttendanceContext = null;
+      let currentAttendanceRows = [];
+      let currentAttendanceIndex = 0;
+      let attendanceContextLoaded = false;
 
       const attendanceStatusKeys = ['present', 'late', 'absent', 'excused'];
+      const attendanceQuickStatusKeys = ['present', 'absent', 'excused'];
       const normalizeAttendanceStatusKey = (rawValue) => {
         const normalized = String(rawValue || '').trim().toLowerCase();
         return attendanceStatusKeys.includes(normalized) ? normalized : '';
@@ -3467,28 +3515,6 @@
       const getAttendanceChipTone = (status) => {
         const key = normalizeAttendanceStatusKey(status);
         return key || 'pending';
-      };
-      const clearNode = (node) => {
-        if (!node) return;
-        while (node.firstChild) {
-          node.removeChild(node.firstChild);
-        }
-      };
-      const buildScheduleAttendanceSlotKeyClient = ({
-        subjectId,
-        courseId,
-        classDate,
-        classNumber,
-      } = {}) => {
-        const safeSubjectId = Number(subjectId || 0);
-        const safeCourseId = Number(courseId || 0);
-        const safeClassDate = String(classDate || '').slice(0, 10);
-        const safeClassNumber = Number(classNumber || 0);
-        if (!Number.isInteger(safeSubjectId) || safeSubjectId < 1) return '';
-        if (!Number.isInteger(safeCourseId) || safeCourseId < 1) return '';
-        if (!safeClassDate) return '';
-        if (!Number.isInteger(safeClassNumber) || safeClassNumber < 1) return '';
-        return `${safeSubjectId}|${safeCourseId}|${safeClassDate}|${safeClassNumber}`;
       };
       const formatAttendanceDateTime = (rawValue) => {
         if (!rawValue) return '';
@@ -3511,138 +3537,160 @@
         chipEl.className = `attendance-chip attendance-chip--${tone}`;
         chipEl.textContent = getAttendanceStatusLabel(status, short);
       };
-      const renderAttendanceStudentCard = (slot) => {
-        if (!attendanceStudentCardEl || canManageAttendance) return;
-        const slotKey = slot ? buildScheduleAttendanceSlotKeyClient(slot) : '';
-        const marker = slotKey ? scheduleAttendanceSlots[slotKey] : null;
-        const shouldShow = Boolean(canSubmitHomework || marker);
-        attendanceStudentCardEl.classList.toggle('d-none', !shouldShow);
-        if (!shouldShow) return;
-        setAttendanceChip(attendanceStudentChipEl, marker && marker.status ? marker.status : '', { short: true });
-        if (attendanceStudentNoteEl) {
-          if (marker && marker.reason) {
-            attendanceStudentNoteEl.textContent = String(marker.reason);
-          } else if (marker && marker.marked_at) {
-            attendanceStudentNoteEl.textContent = `${scheduleText.attendanceMarkedAtPrefix}: ${formatAttendanceDateTime(marker.marked_at)}`;
-          } else {
-            attendanceStudentNoteEl.textContent = scheduleText.attendanceNoMark;
-          }
-        }
-      };
-      const setAttendanceEditorVisible = (visible) => {
-        if (!attendanceEditorEl || !attendanceToggleBtn) return;
-        attendanceEditorEl.classList.toggle('d-none', !visible);
+      const setAttendanceEditorVisible = (visible, { scroll = false } = {}) => {
+        if (!attendancePanelEl || !attendanceToggleBtn) return;
+        attendancePanelEl.classList.toggle('d-none', !visible);
         attendanceToggleBtn.textContent = visible
           ? String(attendanceToggleBtn.dataset.closeLabel || scheduleText.attendanceSaveAction)
           : String(attendanceToggleBtn.dataset.openLabel || scheduleText.attendanceSaveAction);
+        if (visible && scroll) {
+          attendancePanelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       };
-      const renderAttendanceSummaryChips = (summary = {}) => {
-        if (!attendanceSummaryChipsEl) return;
-        clearNode(attendanceSummaryChipsEl);
-        const metrics = [
-          { status: 'present', count: Number(summary.present || 0) },
-          { status: 'late', count: Number(summary.late || 0) },
-          { status: 'absent', count: Number(summary.absent || 0) },
-          { status: 'excused', count: Number(summary.excused || 0) },
-        ];
-        metrics.forEach((item) => {
-          const chip = document.createElement('span');
-          chip.className = `attendance-chip attendance-chip--${getAttendanceChipTone(item.status)}`;
-          chip.textContent = `${getAttendanceStatusLabel(item.status, false)}: ${item.count}`;
-          attendanceSummaryChipsEl.appendChild(chip);
-        });
+      const cloneAttendanceRows = (rows = []) => (Array.isArray(rows) ? rows : [])
+        .map((row) => ({
+          student_id: Number(row && row.student_id || 0),
+          full_name: String(row && row.full_name || ''),
+          group_number: Number(row && row.group_number || 0),
+          status: normalizeAttendanceStatusKey(row && row.status),
+          reason: String(row && row.reason || ''),
+          marked_at: String(row && row.marked_at || ''),
+        }))
+        .filter((row) => Number.isInteger(row.student_id) && row.student_id > 0);
+      const countMarkedAttendanceRows = () => currentAttendanceRows.reduce((count, row) => (
+        normalizeAttendanceStatusKey(row && row.status) ? count + 1 : count
+      ), 0);
+      const isAttendanceReadyToSave = () => (
+        currentAttendanceRows.length > 0
+        && currentAttendanceRows.every((row) => Boolean(normalizeAttendanceStatusKey(row && row.status)))
+      );
+      const getAttendanceInitialIndex = (rows = []) => {
+        const firstPendingIndex = (Array.isArray(rows) ? rows : []).findIndex(
+          (row) => !normalizeAttendanceStatusKey(row && row.status)
+        );
+        return firstPendingIndex >= 0 ? firstPendingIndex : 0;
       };
-      const renderAttendanceRows = (rows = [], reasonMaxLength = 240) => {
-        if (!attendanceRowsEl) return;
-        clearNode(attendanceRowsEl);
-        if (!rows.length) {
-          const empty = document.createElement('div');
-          empty.className = 'text-muted small';
-          empty.textContent = scheduleText.attendanceEmpty;
-          attendanceRowsEl.appendChild(empty);
+      const renderAttendanceProgressChip = () => {
+        if (!attendanceProgressChipEl) return;
+        const total = currentAttendanceRows.length;
+        const marked = countMarkedAttendanceRows();
+        const tone = total > 0 && marked === total ? 'present' : 'pending';
+        attendanceProgressChipEl.className = `attendance-chip attendance-chip--${tone}`;
+        attendanceProgressChipEl.textContent = total > 0 ? `${marked}/${total}` : scheduleText.attendanceProgressIdle;
+      };
+      const renderAttendanceQuickCard = () => {
+        renderAttendanceProgressChip();
+        if (attendanceEmptyStateEl) {
+          attendanceEmptyStateEl.classList.toggle('d-none', currentAttendanceRows.length > 0);
+        }
+        if (attendanceQuickShellEl) {
+          attendanceQuickShellEl.classList.toggle('d-none', currentAttendanceRows.length < 1);
+        }
+        if (!currentAttendanceRows.length) {
+          if (attendanceSummaryEl) attendanceSummaryEl.textContent = '';
+          if (attendanceStudentNameEl) attendanceStudentNameEl.textContent = '-';
+          if (attendanceStudentMetaEl) attendanceStudentMetaEl.textContent = '-';
+          if (attendanceStudentNoteEl) attendanceStudentNoteEl.textContent = scheduleText.attendanceEmpty;
+          setAttendanceChip(attendanceStudentChipEl, '', { short: true });
+          attendanceChoiceButtons.forEach((button) => {
+            button.classList.remove('is-active');
+            button.disabled = true;
+          });
+          if (attendancePrevBtn) attendancePrevBtn.disabled = true;
+          if (attendanceSaveBtn) attendanceSaveBtn.disabled = true;
           return;
         }
-        rows.forEach((row) => {
-          const item = document.createElement('div');
-          item.className = 'schedule-attendance-row';
-          item.dataset.studentId = String(Number(row && row.student_id || 0));
-
-          const main = document.createElement('div');
-          const name = document.createElement('div');
-          name.className = 'schedule-attendance-row-name';
-          name.textContent = String(row && row.full_name || '');
-          main.appendChild(name);
-          const meta = document.createElement('div');
-          meta.className = 'schedule-attendance-row-meta';
-          meta.textContent = Number(row && row.group_number || 0) > 0
-            ? `${scheduleText.groupSingle} ${Number(row.group_number)}`
-            : '';
-          meta.hidden = !meta.textContent;
-          main.appendChild(meta);
-
-          const controls = document.createElement('div');
-          controls.className = 'schedule-attendance-row-controls';
-
-          const select = document.createElement('select');
-          select.className = 'form-select form-select-sm';
-          select.dataset.attendanceStatus = '1';
-          const pendingOption = document.createElement('option');
-          pendingOption.value = '';
-          pendingOption.textContent = scheduleText.attendanceStatusPending;
-          select.appendChild(pendingOption);
-          attendanceStatusKeys.forEach((statusKey) => {
-            const option = document.createElement('option');
-            option.value = statusKey;
-            option.textContent = getAttendanceStatusLabel(statusKey, false);
-            option.selected = normalizeAttendanceStatusKey(row && row.status) === statusKey;
-            select.appendChild(option);
-          });
-
-          const reason = document.createElement('input');
-          reason.type = 'text';
-          reason.className = 'form-control form-control-sm';
-          reason.maxLength = Number(reasonMaxLength || 240);
-          reason.placeholder = scheduleText.attendanceReasonOptional;
-          reason.value = String(row && row.reason || '');
-          reason.dataset.attendanceReason = '1';
-
-          controls.appendChild(select);
-          controls.appendChild(reason);
-          item.appendChild(main);
-          item.appendChild(controls);
-          attendanceRowsEl.appendChild(item);
+        if (currentAttendanceIndex < 0) currentAttendanceIndex = 0;
+        if (currentAttendanceIndex >= currentAttendanceRows.length) currentAttendanceIndex = currentAttendanceRows.length - 1;
+        const row = currentAttendanceRows[currentAttendanceIndex] || null;
+        const statusKey = normalizeAttendanceStatusKey(row && row.status);
+        if (attendanceStudentNameEl) {
+          attendanceStudentNameEl.textContent = row ? String(row.full_name || '-') : '-';
+        }
+        if (attendanceStudentMetaEl) {
+          const parts = [];
+          if (row && Number(row.group_number || 0) > 0) {
+            parts.push(`${scheduleText.groupSingle} ${Number(row.group_number)}`);
+          }
+          parts.push(`${currentAttendanceIndex + 1}/${currentAttendanceRows.length}`);
+          attendanceStudentMetaEl.textContent = parts.join(' · ');
+        }
+        setAttendanceChip(attendanceStudentChipEl, statusKey, { short: true });
+        if (attendanceStudentNoteEl) {
+          if (row && row.reason) {
+            attendanceStudentNoteEl.textContent = String(row.reason);
+          } else if (row && row.marked_at) {
+            attendanceStudentNoteEl.textContent = `${scheduleText.attendanceMarkedAtPrefix}: ${formatAttendanceDateTime(row.marked_at)}`;
+          } else {
+            attendanceStudentNoteEl.textContent = scheduleText.attendanceQuickHint;
+          }
+        }
+        attendanceChoiceButtons.forEach((button) => {
+          const buttonStatus = normalizeAttendanceStatusKey(button.dataset.attendanceChoice);
+          button.classList.toggle('is-active', Boolean(statusKey) && buttonStatus === statusKey);
+          button.disabled = false;
         });
-        wireSelectOpenState(attendanceRowsEl);
+        if (attendancePrevBtn) {
+          attendancePrevBtn.disabled = currentAttendanceIndex < 1;
+        }
+        if (attendanceSaveBtn) {
+          attendanceSaveBtn.disabled = !isAttendanceReadyToSave();
+          attendanceSaveBtn.textContent = scheduleText.attendanceSaveAction;
+        }
+        if (attendanceSummaryEl) {
+          const marked = countMarkedAttendanceRows();
+          attendanceSummaryEl.textContent = isAttendanceReadyToSave()
+            ? scheduleText.attendanceCompleteHint
+            : `${scheduleText.attendanceProgressPrefix}: ${marked}/${currentAttendanceRows.length}`;
+        }
       };
-      const collectAttendanceRows = () => Array.from(attendanceRowsEl ? attendanceRowsEl.querySelectorAll('[data-student-id]') : [])
-        .map((rowEl) => {
-          const statusEl = rowEl.querySelector('[data-attendance-status]');
-          const reasonEl = rowEl.querySelector('[data-attendance-reason]');
-          return {
-            student_id: Number(rowEl.dataset.studentId || 0),
-            status: String(statusEl ? statusEl.value : '').trim(),
-            reason: String(reasonEl ? reasonEl.value : '').trim(),
-          };
-        })
+      const collectAttendanceRows = () => currentAttendanceRows
+        .map((row) => ({
+          student_id: Number(row && row.student_id || 0),
+          status: normalizeAttendanceStatusKey(row && row.status),
+          reason: String(row && row.reason || '').trim(),
+        }))
         .filter((row) => Number.isInteger(row.student_id) && row.student_id > 0);
+      const markCurrentAttendanceStatus = (statusKey) => {
+        if (!attendanceQuickStatusKeys.includes(String(statusKey || ''))) return;
+        const row = currentAttendanceRows[currentAttendanceIndex];
+        if (!row) return;
+        row.status = String(statusKey);
+        if (statusKey !== 'excused') {
+          row.reason = '';
+        }
+        row.marked_at = '';
+        setAttendanceFeedback('');
+        if (currentAttendanceIndex < currentAttendanceRows.length - 1) {
+          currentAttendanceIndex += 1;
+        }
+        renderAttendanceQuickCard();
+      };
       const resetAttendancePanel = () => {
         currentAttendanceSlot = null;
         currentAttendanceContext = null;
-        if (attendancePanelEl) attendancePanelEl.classList.remove('d-none');
+        currentAttendanceRows = [];
+        currentAttendanceIndex = 0;
+        attendanceContextLoaded = false;
+        if (attendancePanelEl) attendancePanelEl.classList.add('d-none');
         if (attendanceMetaEl) attendanceMetaEl.textContent = scheduleText.attendanceMeta;
-        if (attendanceTeacherHintEl) {
-          attendanceTeacherHintEl.classList.toggle('d-none', !canManageAttendance);
-          attendanceTeacherHintEl.textContent = scheduleText.attendanceTeacherHint;
-        }
         if (attendanceToggleBtn) {
           attendanceToggleBtn.classList.toggle('d-none', !canManageAttendance);
           attendanceToggleBtn.disabled = !canManageAttendance;
+          attendanceToggleBtn.textContent = String(attendanceToggleBtn.dataset.openLabel || scheduleText.attendanceSaveAction);
         }
-        renderAttendanceStudentCard(null);
-        renderAttendanceSummaryChips({});
         setAttendanceFeedback('');
-        clearNode(attendanceRowsEl);
-        setAttendanceEditorVisible(false);
+        if (attendanceSummaryEl) attendanceSummaryEl.textContent = '';
+        if (attendancePrevBtn) attendancePrevBtn.disabled = true;
+        if (attendanceSaveBtn) {
+          attendanceSaveBtn.disabled = true;
+          attendanceSaveBtn.textContent = scheduleText.attendanceSaveAction;
+        }
+        attendanceChoiceButtons.forEach((button) => {
+          button.classList.remove('is-active');
+          button.disabled = true;
+        });
+        renderAttendanceQuickCard();
         if (attendanceSubjectIdInput) attendanceSubjectIdInput.value = '';
         if (attendanceCourseIdInput) attendanceCourseIdInput.value = '';
         if (attendanceDateInput) attendanceDateInput.value = '';
@@ -3654,8 +3702,10 @@
       };
       const applyAttendanceContextToEditor = (payload = {}) => {
         currentAttendanceContext = payload;
-        renderAttendanceSummaryChips(payload.summary || {});
-        renderAttendanceRows(payload.rows || [], payload.reason_max_length || 240);
+        attendanceContextLoaded = true;
+        currentAttendanceRows = cloneAttendanceRows(payload.rows || []);
+        currentAttendanceIndex = getAttendanceInitialIndex(currentAttendanceRows);
+        renderAttendanceQuickCard();
         setAttendanceFeedback('');
       };
       const loadAttendanceContext = async () => {
@@ -3671,7 +3721,13 @@
           target_groups: String(currentAttendanceSlot.targetGroups || ''),
         });
         if (attendanceToggleBtn) attendanceToggleBtn.disabled = true;
+        if (attendancePrevBtn) attendancePrevBtn.disabled = true;
         if (attendanceSaveBtn) attendanceSaveBtn.disabled = true;
+        attendanceChoiceButtons.forEach((button) => {
+          button.disabled = true;
+        });
+        if (attendanceEmptyStateEl) attendanceEmptyStateEl.classList.add('d-none');
+        if (attendanceQuickShellEl) attendanceQuickShellEl.classList.add('d-none');
         setAttendanceFeedback(scheduleText.attendanceLoading);
         try {
           const response = await fetch(`/schedule/attendance/context?${params.toString()}`, {
@@ -3693,11 +3749,14 @@
           return payload;
         } finally {
           if (attendanceToggleBtn) attendanceToggleBtn.disabled = false;
-          if (attendanceSaveBtn) attendanceSaveBtn.disabled = false;
         }
       };
       const saveAttendanceContext = async () => {
         if (!attendanceFormEl || !currentAttendanceSlot) return;
+        if (!isAttendanceReadyToSave()) {
+          setAttendanceFeedback(scheduleText.attendanceCompleteRequired, 'error');
+          return;
+        }
         const payload = new URLSearchParams();
         payload.set('subject_id', String(attendanceSubjectIdInput ? attendanceSubjectIdInput.value : currentAttendanceSlot.subjectId || ''));
         payload.set('course_id', String(attendanceCourseIdInput ? attendanceCourseIdInput.value : currentAttendanceSlot.courseId || ''));
@@ -3712,6 +3771,10 @@
           attendanceSaveBtn.disabled = true;
           attendanceSaveBtn.textContent = scheduleText.attendanceSaving;
         }
+        if (attendancePrevBtn) attendancePrevBtn.disabled = true;
+        attendanceChoiceButtons.forEach((button) => {
+          button.disabled = true;
+        });
         setAttendanceFeedback(scheduleText.attendanceSaving);
         try {
           const response = await fetch('/schedule/attendance/save', {
@@ -3731,10 +3794,7 @@
         } catch (error) {
           setAttendanceFeedback(String(error && error.message ? error.message : scheduleText.attendanceLoadError), 'error');
         } finally {
-          if (attendanceSaveBtn) {
-            attendanceSaveBtn.disabled = false;
-            attendanceSaveBtn.textContent = scheduleText.attendanceSaveAction;
-          }
+          renderAttendanceQuickCard();
         }
       };
       resetAttendancePanel();
@@ -4310,19 +4370,17 @@
           isGeneral,
           targetGroups,
         };
-        const currentAttendanceSlotKey = buildScheduleAttendanceSlotKeyClient(currentAttendanceSlot);
-        const hasStudentMarker = Boolean(currentAttendanceSlotKey && scheduleAttendanceSlots[currentAttendanceSlotKey]);
+        currentAttendanceContext = null;
+        currentAttendanceRows = [];
+        currentAttendanceIndex = 0;
+        attendanceContextLoaded = false;
         if (attendancePanelEl) {
-          attendancePanelEl.classList.toggle('d-none', !(canManageAttendance || canSubmitHomework || hasStudentMarker));
+          attendancePanelEl.classList.add('d-none');
         }
         if (attendanceMetaEl) {
           attendanceMetaEl.textContent = roomLabel
             ? `${scheduleText.attendanceMeta} · ${scheduleUiText.roomLabel}: ${roomLabel}`
             : scheduleText.attendanceMeta;
-        }
-        if (attendanceTeacherHintEl) {
-          attendanceTeacherHintEl.classList.toggle('d-none', !canManageAttendance);
-          attendanceTeacherHintEl.textContent = scheduleText.attendanceTeacherHint;
         }
         if (attendanceToggleBtn) {
           attendanceToggleBtn.classList.toggle(
@@ -4334,12 +4392,10 @@
             || !currentAttendanceSlot.classNumber
           );
           attendanceToggleBtn.disabled = false;
+          attendanceToggleBtn.textContent = String(attendanceToggleBtn.dataset.openLabel || scheduleText.attendanceSaveAction);
         }
-        renderAttendanceSummaryChips({});
-        clearNode(attendanceRowsEl);
         setAttendanceFeedback('');
-        setAttendanceEditorVisible(false);
-        renderAttendanceStudentCard(currentAttendanceSlot);
+        renderAttendanceQuickCard();
 
         const normalizedCardDay = String(day || '').trim().toLowerCase();
         const normalizedCardDate = String(classDate || '').slice(0, 10);
@@ -4418,23 +4474,35 @@
       if (attendanceToggleBtn) {
         attendanceToggleBtn.addEventListener('click', async () => {
           if (!canManageAttendance) return;
-          const shouldOpen = attendanceEditorEl ? attendanceEditorEl.classList.contains('d-none') : true;
+          const shouldOpen = attendancePanelEl ? attendancePanelEl.classList.contains('d-none') : true;
           if (!shouldOpen) {
             setAttendanceEditorVisible(false);
             return;
           }
+          setAttendanceEditorVisible(true, { scroll: true });
+          if (attendanceContextLoaded) {
+            renderAttendanceQuickCard();
+            return;
+          }
           try {
-            setAttendanceFeedback(scheduleText.attendanceLoading);
             await loadAttendanceContext();
-            setAttendanceEditorVisible(true);
           } catch (error) {
             setAttendanceFeedback(String(error && error.message ? error.message : scheduleText.attendanceLoadError), 'error');
           }
         });
       }
-      if (attendanceCancelBtn) {
-        attendanceCancelBtn.addEventListener('click', () => {
-          setAttendanceEditorVisible(false);
+      if (attendancePrevBtn) {
+        attendancePrevBtn.addEventListener('click', () => {
+          if (currentAttendanceIndex < 1) return;
+          currentAttendanceIndex -= 1;
+          renderAttendanceQuickCard();
+        });
+      }
+      if (attendanceChoiceButtons.length) {
+        attendanceChoiceButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            markCurrentAttendanceStatus(button.dataset.attendanceChoice);
+          });
         });
       }
       if (attendanceSaveBtn) {

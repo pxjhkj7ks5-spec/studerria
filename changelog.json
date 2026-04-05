@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.21",
+      "date": "2026-04-05",
+      "items": [
+        "refactor(schedule-attendance-modal): move attendance entry to a single footer button, replace the bulky list editor with a one-student-at-a-time card flow, and keep saving locked until every student in the class has been marked as present, absent, or excused"
+      ]
+    },
+    {
       "version": "1.4.20",
       "date": "2026-04-05",
       "items": [
