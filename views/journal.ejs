@@ -508,6 +508,7 @@
           || `/journal/insights?course_id=${selectedJournalCourseId}&subject_id=${selectedJournalSubjectId}&scope_type=subject&period=semester`;
         const journalCloseExportHref = journalLinks.closeExportHref
           || `/journal/subject/close-export?subject_id=${selectedJournalSubjectId}`;
+        const showJournalAttendance = false;
       %>
       <% if (messages && messages.error) { %>
         <div class="alert alert-danger"><%= messages.error %></div>
@@ -726,6 +727,7 @@
             </div>
           </div>
         </section>
+        <% if (showJournalAttendance) { %>
         <section class="glass liquid-card p-3 mb-3">
           <details class="journal-attendance-details" open>
             <summary class="journal-attendance-summary">
@@ -968,6 +970,7 @@
             </div>
           </details>
         </section>
+        <% } %>
         <section class="glass liquid-card p-3 mb-3">
           <details class="journal-grading-details">
             <summary class="journal-grading-summary">
@@ -1544,6 +1547,7 @@
       </div>
     </div>
 
+    <% if (showJournalAttendance) { %>
     <div class="modal fade" id="journalAttendanceQuickModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-md modal-dialog-centered">
         <div class="modal-content">
@@ -1591,6 +1595,7 @@
         </div>
       </div>
     </div>
+    <% } %>
 
     <div class="modal fade" id="journalBulkModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">

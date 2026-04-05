@@ -22759,6 +22759,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
         teacherHomeworkTemplates,
         canCreateHomework,
         canUseCustomDeadlinesUi,
+        scheduleAttendanceMarkers: {},
+        canManageAttendance: true,
         projectionAlert,
         scheduleDebug: null,
       });
@@ -22893,6 +22895,11 @@ app.get('/schedule', requireLogin, async (req, res) => {
           }))
         : [];
 
+      const scheduleAttendanceMarkers = await buildScheduleStudentAttendanceMarkers({
+        studentId: userId,
+        scheduleByDay,
+        fallbackCourseId: legacyCourseId || parsePositiveIntStrict(courseId) || null,
+      });
       return res.render('schedule', {
         scheduleByDay,
         daysOfWeek: activeDays,
@@ -22929,6 +22936,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
         teacherHomeworkTemplates,
         canCreateHomework,
         canUseCustomDeadlinesUi,
+        scheduleAttendanceMarkers,
+        canManageAttendance: false,
         projectionAlert,
         scheduleDebug: scheduleDebugEnabled ? (scheduleState.debug || null) : null,
       });
@@ -23327,6 +23336,16 @@ app.get('/schedule', requireLogin, async (req, res) => {
         return Array.from(map.values());
       };
 
+      const canShowPersonalAttendanceMarkers = ['student', 'starosta'].includes(String(req.session.role || '').toLowerCase())
+        && !hasSessionRole(req, 'admin');
+      const scheduleAttendanceMarkers = canShowPersonalAttendanceMarkers
+        ? await buildScheduleStudentAttendanceMarkers({
+          studentId: userId,
+          scheduleByDay,
+          fallbackCourseId: scheduleCourseId,
+        })
+        : {};
+
       const loadCustomDeadlines = (homeworkTargets, cb) => {
         if (!canUseCustomDeadlinesUi) {
           return cb({}, [], []);
@@ -23452,6 +23471,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               teacherHomeworkTemplates,
               canCreateHomework,
               canUseCustomDeadlinesUi,
+              scheduleAttendanceMarkers,
+              canManageAttendance: false,
               projectionAlert: null,
               scheduleDebug,
             })
@@ -23660,6 +23681,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 teacherHomeworkTemplates,
                 canCreateHomework,
                 canUseCustomDeadlinesUi,
+                scheduleAttendanceMarkers,
+                canManageAttendance: false,
                 projectionAlert: null,
                 scheduleDebug,
               });
@@ -24351,6 +24374,358 @@ const normalizeAttendanceReason = (rawValue) => {
   if (!normalized) return '';
   return normalized.slice(0, ATTENDANCE_REASON_MAX_LENGTH);
 };
+
+const buildScheduleAttendanceSlotKey = ({
+  subjectId,
+  courseId,
+  classDate,
+  classNumber,
+} = {}) => {
+  const safeSubjectId = parsePositiveIntStrict(subjectId);
+  const safeCourseId = parsePositiveIntStrict(courseId);
+  const safeClassDate = isValidDateString(String(classDate || ''))
+    ? String(classDate).slice(0, 10)
+    : '';
+  const safeClassNumber = parsePositiveIntStrict(classNumber);
+  if (!safeSubjectId || !safeCourseId || !safeClassDate || !safeClassNumber) {
+    return '';
+  }
+  return `${safeSubjectId}|${safeCourseId}|${safeClassDate}|${safeClassNumber}`;
+};
+
+function findJournalSubjectOptionForSchedule(subjectOptions = [], subjectId, courseId = null) {
+  const safeSubjectId = parsePositiveIntStrict(subjectId);
+  const safeCourseId = parsePositiveIntStrict(courseId);
+  if (!safeSubjectId) {
+    return null;
+  }
+  const rows = Array.isArray(subjectOptions) ? subjectOptions : [];
+  const matchesCourse = (item) => !safeCourseId || Number(item && item.course_id || 0) === safeCourseId;
+  return rows.find((item) => matchesCourse(item) && Number(item && item.subject_id || 0) === safeSubjectId)
+    || rows.find((item) => matchesCourse(item) && Number(item && item.legacy_subject_id || 0) === safeSubjectId)
+    || rows.find((item) => Number(item && item.subject_id || 0) === safeSubjectId)
+    || rows.find((item) => Number(item && item.legacy_subject_id || 0) === safeSubjectId)
+    || null;
+}
+
+function resolveScheduleAttendanceGroupScope(
+  selectedSubject = {},
+  {
+    groupNumber = null,
+    targetGroups = [],
+    lessonType = '',
+    isGeneral = false,
+  } = {}
+) {
+  const allowedSubjectGroups = Array.from(new Set(
+    (Array.isArray(selectedSubject && selectedSubject.group_numbers) ? selectedSubject.group_numbers : [])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter(Boolean)
+  )).sort((a, b) => a - b);
+  const allowedSubjectGroupSet = new Set(allowedSubjectGroups);
+  const normalizedTargetGroups = parseJournalTargetGroupNumbers(
+    targetGroups,
+    Math.max(1, Number(selectedSubject && selectedSubject.group_count || allowedSubjectGroups.length || 1) || 1)
+  );
+  const slotGroupNumber = parsePositiveIntStrict(groupNumber);
+  const lessonKey = String(lessonType || '').trim().toLowerCase();
+  const isLectureLike = lessonKey === 'lecture' || Boolean(isGeneral);
+
+  if (isLectureLike) {
+    if (normalizedTargetGroups.length) {
+      if (!selectedSubject.has_all_groups && allowedSubjectGroups.length) {
+        const intersection = normalizedTargetGroups.filter((value) => allowedSubjectGroupSet.has(value));
+        return {
+          hasAccess: intersection.length > 0,
+          groupFilterSet: intersection.length ? new Set(intersection) : null,
+          allowedGroupNumbers: intersection,
+        };
+      }
+      return {
+        hasAccess: true,
+        groupFilterSet: new Set(normalizedTargetGroups),
+        allowedGroupNumbers: normalizedTargetGroups,
+      };
+    }
+    if (!selectedSubject.has_all_groups && allowedSubjectGroups.length) {
+      return {
+        hasAccess: true,
+        groupFilterSet: new Set(allowedSubjectGroups),
+        allowedGroupNumbers: allowedSubjectGroups,
+      };
+    }
+    return {
+      hasAccess: true,
+      groupFilterSet: null,
+      allowedGroupNumbers: [],
+    };
+  }
+
+  const scopedGroups = normalizedTargetGroups.length
+    ? normalizedTargetGroups
+    : (slotGroupNumber ? [slotGroupNumber] : []);
+  if (!scopedGroups.length) {
+    if (!selectedSubject.has_all_groups && allowedSubjectGroups.length) {
+      return {
+        hasAccess: true,
+        groupFilterSet: new Set(allowedSubjectGroups),
+        allowedGroupNumbers: allowedSubjectGroups,
+      };
+    }
+    return {
+      hasAccess: true,
+      groupFilterSet: null,
+      allowedGroupNumbers: [],
+    };
+  }
+  if (selectedSubject.has_all_groups || !allowedSubjectGroups.length) {
+    return {
+      hasAccess: true,
+      groupFilterSet: new Set(scopedGroups),
+      allowedGroupNumbers: scopedGroups,
+    };
+  }
+  const intersection = scopedGroups.filter((value) => allowedSubjectGroupSet.has(value));
+  return {
+    hasAccess: intersection.length > 0,
+    groupFilterSet: intersection.length ? new Set(intersection) : null,
+    allowedGroupNumbers: intersection,
+  };
+}
+
+function normalizeAttendancePayloadRows(rowsInput = []) {
+  const normalizedMap = new Map();
+  (Array.isArray(rowsInput) ? rowsInput : []).forEach((row) => {
+    const studentId = Number(row && row.student_id);
+    if (!Number.isFinite(studentId) || studentId < 1) {
+      return;
+    }
+    normalizedMap.set(studentId, {
+      student_id: studentId,
+      status: normalizeAttendanceStatus(row && row.status),
+      reason: normalizeAttendanceReason(row && row.reason),
+    });
+  });
+  return Array.from(normalizedMap.values());
+}
+
+async function persistAttendanceRows({
+  subjectId,
+  courseId,
+  semesterId = null,
+  attendanceDate,
+  attendanceClassNumber,
+  normalizedEntries = [],
+  allowedStudentMap = new Map(),
+  actorUserId = null,
+}) {
+  const semesterMatchClause = semesterId ? 'AND ar.semester_id = ?' : 'AND ar.semester_id IS NULL';
+  const semesterMatchParams = semesterId ? [semesterId] : [];
+  let updatedCount = 0;
+  let deletedCount = 0;
+
+  await withTransaction(async (client) => {
+    const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
+    for (const entry of (Array.isArray(normalizedEntries) ? normalizedEntries : [])) {
+      const studentId = Number(entry.student_id);
+      const studentGroup = Number(allowedStudentMap.get(studentId)?.group_number || 0);
+      if (!entry.status) {
+        const deleteResult = await query(
+          `
+            DELETE FROM attendance_records ar
+            WHERE ar.subject_id = ?
+              AND ar.course_id = ?
+              ${semesterMatchClause}
+              AND ar.class_date = ?
+              AND ar.class_number = ?
+              AND ar.student_id = ?
+          `,
+          [subjectId, courseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
+        );
+        deletedCount += Number(deleteResult.rowCount || 0);
+        continue;
+      }
+
+      const existing = await query(
+        `
+          SELECT ar.id
+          FROM attendance_records ar
+          WHERE ar.subject_id = ?
+            AND ar.course_id = ?
+            ${semesterMatchClause}
+            AND ar.class_date = ?
+            AND ar.class_number = ?
+            AND ar.student_id = ?
+          ORDER BY ar.id ASC
+          LIMIT 1
+        `,
+        [subjectId, courseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
+      );
+      const existingId = existing.rows && existing.rows[0] ? Number(existing.rows[0].id) : null;
+      if (Number.isFinite(existingId) && existingId > 0) {
+        await query(
+          `
+            UPDATE attendance_records
+            SET status = ?,
+                reason = ?,
+                group_number = ?,
+                marked_by = ?,
+                marked_at = NOW(),
+                updated_at = NOW()
+            WHERE id = ?
+          `,
+          [
+            entry.status,
+            entry.reason || null,
+            Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
+            actorUserId ? Number(actorUserId) : null,
+            existingId,
+          ]
+        );
+      } else {
+        await query(
+          `
+            INSERT INTO attendance_records
+            (
+              subject_id, course_id, semester_id, student_id, group_number,
+              class_date, class_number, status, reason, marked_by, marked_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+          `,
+          [
+            subjectId,
+            courseId,
+            semesterId,
+            studentId,
+            Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
+            attendanceDate,
+            attendanceClassNumber,
+            entry.status,
+            entry.reason || null,
+            actorUserId ? Number(actorUserId) : null,
+          ]
+        );
+      }
+      updatedCount += 1;
+    }
+  });
+
+  return {
+    updatedCount,
+    deletedCount,
+  };
+}
+
+async function buildScheduleStudentAttendanceMarkers({
+  studentId,
+  scheduleByDay = {},
+  fallbackCourseId = null,
+} = {}) {
+  const safeStudentId = parsePositiveIntStrict(studentId);
+  if (!safeStudentId || !scheduleByDay || typeof scheduleByDay !== 'object') {
+    return {};
+  }
+
+  const slotMap = new Map();
+  Object.values(scheduleByDay).forEach((dayRows) => {
+    (Array.isArray(dayRows) ? dayRows : []).forEach((row) => {
+      const key = buildScheduleAttendanceSlotKey({
+        subjectId: row && (row.legacy_subject_id || row.subject_id),
+        courseId: row && (row.course_id || row.owner_course_id || fallbackCourseId),
+        classDate: row && row.class_date,
+        classNumber: row && row.class_number,
+      });
+      if (!key || slotMap.has(key)) {
+        return;
+      }
+      slotMap.set(key, {
+        subjectId: parsePositiveIntStrict(row && (row.legacy_subject_id || row.subject_id)),
+        courseId: parsePositiveIntStrict(row && (row.course_id || row.owner_course_id || fallbackCourseId)),
+        classDate: String(row && row.class_date || '').slice(0, 10),
+        classNumber: parsePositiveIntStrict(row && row.class_number),
+      });
+    });
+  });
+
+  if (!slotMap.size) {
+    return {};
+  }
+
+  const slots = Array.from(slotMap.values());
+  const subjectIds = Array.from(new Set(
+    slots.map((slot) => Number(slot.subjectId || 0)).filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const courseIds = Array.from(new Set(
+    slots.map((slot) => Number(slot.courseId || 0)).filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const sortedDates = slots
+    .map((slot) => String(slot.classDate || '').trim())
+    .filter((value) => isValidDateString(value))
+    .sort();
+  if (!subjectIds.length || !courseIds.length || !sortedDates.length) {
+    return {};
+  }
+
+  let rows = [];
+  try {
+    rows = await db.all(
+      `
+        SELECT
+          ar.id,
+          ar.subject_id,
+          ar.course_id,
+          ar.class_date,
+          ar.class_number,
+          ar.status,
+          ar.reason,
+          ar.marked_at
+        FROM attendance_records ar
+        WHERE ar.student_id = ?
+          AND ar.subject_id = ANY(?::int[])
+          AND ar.course_id = ANY(?::int[])
+          AND ar.class_date >= ?
+          AND ar.class_date <= ?
+        ORDER BY
+          ar.class_date ASC,
+          ar.class_number ASC,
+          COALESCE(ar.marked_at, NOW()) DESC,
+          ar.id DESC
+      `,
+      [safeStudentId, subjectIds, courseIds, sortedDates[0], sortedDates[sortedDates.length - 1]]
+    );
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    rows = [];
+  }
+
+  const markerMap = {};
+  const claimedKeys = new Set();
+  (rows || []).forEach((row) => {
+    const status = normalizeAttendanceStatus(row.status);
+    if (!status) {
+      return;
+    }
+    const key = buildScheduleAttendanceSlotKey({
+      subjectId: row.subject_id,
+      courseId: row.course_id,
+      classDate: row.class_date,
+      classNumber: row.class_number,
+    });
+    if (!key || !slotMap.has(key) || claimedKeys.has(key)) {
+      return;
+    }
+    claimedKeys.add(key);
+    markerMap[key] = {
+      status,
+      reason: normalizeAttendanceReason(row.reason),
+      marked_at: row.marked_at || null,
+    };
+  });
+
+  return markerMap;
+}
 
 const buildExactSemesterCondition = (alias, semesterId) => {
   if (semesterId) {
@@ -27382,6 +27757,98 @@ async function buildJournalAttendanceContext({
   };
 }
 
+async function resolveScheduleAttendanceTeacherContext(
+  req,
+  {
+    subjectId,
+    courseId = null,
+    classDate,
+    classNumber,
+    groupNumber = null,
+    targetGroups = [],
+    lessonType = '',
+    isGeneral = false,
+  } = {}
+) {
+  const safeSubjectId = parsePositiveIntStrict(subjectId);
+  const safeCourseId = parsePositiveIntStrict(courseId);
+  const safeClassDate = isValidDateString(String(classDate || ''))
+    ? String(classDate).slice(0, 10)
+    : '';
+  const safeClassNumber = parsePositiveIntStrict(classNumber);
+
+  if (!safeSubjectId || !safeClassDate || !safeClassNumber || !bellSchedule[safeClassNumber]) {
+    const error = new Error('Invalid attendance slot');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const journalScope = await getJournalAccessScope(req);
+  const teacherJournalMode = canUseTeacherJournalMode(req, journalScope);
+  if (!journalScope.canUseJournal || !teacherJournalMode) {
+    const error = new Error('Forbidden (schedule attendance)');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const subjectOptions = await getJournalSubjectOptionsForUser(req, journalScope, teacherJournalMode);
+  const selectedSubject = findJournalSubjectOptionForSchedule(subjectOptions, safeSubjectId, safeCourseId);
+  if (!selectedSubject) {
+    const error = new Error('Forbidden (schedule attendance)');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const storageSubjectId = parsePositiveIntStrict(selectedSubject.legacy_subject_id || safeSubjectId);
+  if (!storageSubjectId) {
+    const error = new Error('Attendance storage binding is not ready for this subject');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const selectedCourseId = parsePositiveIntStrict(
+    selectedSubject.course_id
+    || safeCourseId
+    || req?.session?.user?.course_id
+  );
+  if (!selectedCourseId) {
+    const error = new Error('Invalid course');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const selectedSemester = await getActiveSemester(selectedCourseId).catch(() => null);
+  const groupScope = resolveScheduleAttendanceGroupScope(selectedSubject, {
+    groupNumber,
+    targetGroups,
+    lessonType,
+    isGeneral,
+  });
+  if (!groupScope.hasAccess) {
+    const error = new Error('Forbidden (schedule attendance)');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const students = await getJournalStudents(
+    storageSubjectId,
+    selectedCourseId,
+    groupScope.groupFilterSet
+  );
+  return {
+    selectedSubject,
+    subjectId: storageSubjectId,
+    courseId: selectedCourseId,
+    semester: selectedSemester || null,
+    semesterId: selectedSemester ? Number(selectedSemester.id || 0) : null,
+    classDate: safeClassDate,
+    classNumber: safeClassNumber,
+    groupFilterSet: groupScope.groupFilterSet,
+    allowedGroupNumbers: groupScope.allowedGroupNumbers,
+    students,
+  };
+}
+
 async function resolveJournalColumnHomeworkForStudent(columnRow, studentGroupNumber) {
   const sourceHomeworkId = Number(columnRow?.source_homework_id || 0);
   const fallback = {
@@ -29129,19 +29596,7 @@ app.get('/journal', requireLogin, async (req, res) => {
       groupFilterSet,
       studentFilterIds,
     });
-    const attendanceContext = await buildJournalAttendanceContext({
-      subjectId: Number(selectedSubject.subject_id),
-      courseId: selectedCourseId,
-      semesterId: selectedSemester ? Number(selectedSemester.id) : null,
-      semester: selectedSemester || null,
-      students: (matrix.rows || []).map((row) => row.student),
-      requestedDate: req.query.attendance_date,
-      requestedClassNumber: req.query.attendance_class_number,
-      studentViewUserId: teacherJournalMode ? null : Number(req.session.user.id),
-      allowedGroupNumbers: Array.isArray(selectedSubject.group_numbers) ? selectedSubject.group_numbers : [],
-      hasAllGroups: Boolean(selectedSubject.has_all_groups),
-    });
-    const attendanceQuickEnabled = teacherJournalMode && String(req.query.attendance_quick || '') === '1';
+    const attendanceContext = buildJournalEmptyAttendanceContext();
     const journalWorkflowLinks = {
       insightsHref: buildJournalInsightsUrl({
         courseId: Number(selectedSubject.course_id || 0),
@@ -29149,14 +29604,8 @@ app.get('/journal', requireLogin, async (req, res) => {
         scopeType: 'subject',
         period: 'semester',
         returnSubjectId: Number(selectedSubject.subject_id || 0),
-        returnAttendanceDate: attendanceContext?.date || '',
-        returnAttendanceClassNumber: attendanceContext?.class_number || '',
-        returnAttendanceQuick: attendanceQuickEnabled ? 1 : 0,
       }),
       closeExportHref: buildJournalCloseExportPathFromRequest(req, Number(selectedSubject.subject_id || 0), {
-        attendanceDate: attendanceContext?.date || '',
-        attendanceClassNumber: attendanceContext?.class_number || '',
-        attendanceQuick: attendanceQuickEnabled ? 1 : 0,
       }),
     };
 
@@ -29170,9 +29619,9 @@ app.get('/journal', requireLogin, async (req, res) => {
       gradingSettings: matrix.gradingSettings,
       attendanceContext,
       canEditJournal,
-      canEditAttendance: teacherJournalMode,
+      canEditAttendance: false,
       teacherJournalMode,
-      attendanceQuickAutoOpen: attendanceQuickEnabled,
+      attendanceQuickAutoOpen: false,
       canManageAllSubjects: Boolean(journalScope.fullAccess),
       subjectClosure,
       canCloseSubject,
@@ -29314,19 +29763,7 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
       (allowedStudents || []).map((student) => [Number(student.id), student])
     );
 
-    const normalizedMap = new Map();
-    parsedRows.forEach((row) => {
-      const studentId = Number(row?.student_id);
-      if (!Number.isFinite(studentId) || studentId < 1) return;
-      const normalizedStatus = normalizeAttendanceStatus(row?.status);
-      const normalizedReason = normalizeAttendanceReason(row?.reason);
-      normalizedMap.set(studentId, {
-        student_id: studentId,
-        status: normalizedStatus,
-        reason: normalizedReason,
-      });
-    });
-    const normalizedEntries = Array.from(normalizedMap.values());
+    const normalizedEntries = normalizeAttendancePayloadRows(parsedRows);
     if (!normalizedEntries.length) {
       return res.redirect(baseAttendanceRedirect({ err: 'No attendance rows' }));
     }
@@ -29337,95 +29774,15 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
       }
     }
 
-    const semesterMatchClause = semesterId ? 'AND ar.semester_id = ?' : 'AND ar.semester_id IS NULL';
-    const semesterMatchParams = semesterId ? [semesterId] : [];
-    let updatedCount = 0;
-    let deletedCount = 0;
-
-    await withTransaction(async (client) => {
-      const query = (sql, params = []) => client.query(convertPlaceholders(sql), params);
-      for (const entry of normalizedEntries) {
-        const studentId = Number(entry.student_id);
-        const studentGroup = Number(allowedStudentMap.get(studentId)?.group_number || 0);
-        if (!entry.status) {
-          const deleteResult = await query(
-            `
-              DELETE FROM attendance_records ar
-              WHERE ar.subject_id = ?
-                AND ar.course_id = ?
-                ${semesterMatchClause}
-                AND ar.class_date = ?
-                AND ar.class_number = ?
-                AND ar.student_id = ?
-            `,
-            [subjectId, selectedCourseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
-          );
-          deletedCount += Number(deleteResult.rowCount || 0);
-          continue;
-        }
-
-        const existing = await query(
-          `
-            SELECT ar.id
-            FROM attendance_records ar
-            WHERE ar.subject_id = ?
-              AND ar.course_id = ?
-              ${semesterMatchClause}
-              AND ar.class_date = ?
-              AND ar.class_number = ?
-              AND ar.student_id = ?
-            ORDER BY ar.id ASC
-            LIMIT 1
-          `,
-          [subjectId, selectedCourseId, ...semesterMatchParams, attendanceDate, attendanceClassNumber, studentId]
-        );
-        const existingId = existing.rows && existing.rows[0] ? Number(existing.rows[0].id) : null;
-        if (Number.isFinite(existingId) && existingId > 0) {
-          await query(
-            `
-              UPDATE attendance_records
-              SET status = ?,
-                  reason = ?,
-                  group_number = ?,
-                  marked_by = ?,
-                  marked_at = NOW(),
-                  updated_at = NOW()
-              WHERE id = ?
-            `,
-            [
-              entry.status,
-              entry.reason || null,
-              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
-              Number(req.session.user.id),
-              existingId,
-            ]
-          );
-        } else {
-          await query(
-            `
-              INSERT INTO attendance_records
-              (
-                subject_id, course_id, semester_id, student_id, group_number,
-                class_date, class_number, status, reason, marked_by, marked_at, updated_at
-              )
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            `,
-            [
-              subjectId,
-              selectedCourseId,
-              semesterId,
-              studentId,
-              Number.isInteger(studentGroup) && studentGroup > 0 ? studentGroup : null,
-              attendanceDate,
-              attendanceClassNumber,
-              entry.status,
-              entry.reason || null,
-              Number(req.session.user.id),
-            ]
-          );
-        }
-        updatedCount += 1;
-      }
+    const { updatedCount, deletedCount } = await persistAttendanceRows({
+      subjectId,
+      courseId: selectedCourseId,
+      semesterId,
+      attendanceDate,
+      attendanceClassNumber,
+      normalizedEntries,
+      allowedStudentMap,
+      actorUserId: Number(req.session.user.id),
     });
 
     logActivity(
@@ -29447,6 +29804,189 @@ app.post('/journal/attendance/save', requireLogin, writeLimiter, async (req, res
     return res.redirect(baseAttendanceRedirect({ ok: 'Відвідуваність збережено' }));
   } catch (err) {
     return res.redirect(baseAttendanceRedirect({ err: 'Database error' }));
+  }
+});
+
+app.get('/schedule/attendance/context', requireLogin, async (req, res) => {
+  const subjectId = Number(req.query.subject_id);
+  const courseId = Number(req.query.course_id);
+  const classDate = String(req.query.class_date || '').trim();
+  const classNumber = Number(req.query.class_number);
+  const groupNumber = Number(req.query.group_number);
+  const lessonType = String(req.query.lesson_type || '').trim().toLowerCase();
+  const isGeneral = parseBinaryFlag(req.query.is_general, 0) === 1;
+  const targetGroups = String(req.query.target_groups || '').trim();
+
+  try {
+    await ensureDbReady();
+    const contextState = await resolveScheduleAttendanceTeacherContext(req, {
+      subjectId,
+      courseId,
+      classDate,
+      classNumber,
+      groupNumber,
+      targetGroups,
+      lessonType,
+      isGeneral,
+    });
+    const attendanceContext = await buildJournalAttendanceContext({
+      subjectId: contextState.subjectId,
+      courseId: contextState.courseId,
+      semesterId: contextState.semesterId,
+      semester: contextState.semester,
+      students: contextState.students,
+      requestedDate: contextState.classDate,
+      requestedClassNumber: contextState.classNumber,
+      allowedGroupNumbers: contextState.allowedGroupNumbers,
+      hasAllGroups: Boolean(contextState.selectedSubject && contextState.selectedSubject.has_all_groups),
+    });
+    return res.json({
+      ok: true,
+      subject_id: contextState.subjectId,
+      course_id: contextState.courseId,
+      class_date: attendanceContext.date,
+      class_number: attendanceContext.class_number,
+      subject_name: String(contextState.selectedSubject && contextState.selectedSubject.subject_name || ''),
+      group_numbers: contextState.allowedGroupNumbers,
+      rows: attendanceContext.rows || [],
+      summary: attendanceContext.summary || {},
+      reason_max_length: Number(attendanceContext.reason_max_length || ATTENDANCE_REASON_MAX_LENGTH),
+    });
+  } catch (err) {
+    if (Number(err && err.statusCode || 0) >= 400) {
+      return res.status(Number(err.statusCode)).json({
+        ok: false,
+        message: String(err && err.message || 'Attendance is unavailable'),
+      });
+    }
+    console.error('Schedule attendance context failed', err);
+    return res.status(500).json({
+      ok: false,
+      message: 'Database error',
+    });
+  }
+});
+
+app.post('/schedule/attendance/save', requireLogin, writeLimiter, async (req, res) => {
+  const subjectId = Number(req.body.subject_id);
+  const courseId = Number(req.body.course_id);
+  const attendanceDate = String(req.body.attendance_date || '').trim();
+  const attendanceClassNumber = Number(req.body.attendance_class_number);
+  const groupNumber = Number(req.body.group_number);
+  const lessonType = String(req.body.lesson_type || '').trim().toLowerCase();
+  const isGeneral = parseBinaryFlag(req.body.is_general, 0) === 1;
+  const targetGroups = String(req.body.target_groups || '').trim();
+  const rowsRaw = String(req.body.rows_json || '[]').trim() || '[]';
+
+  if (!Number.isFinite(subjectId) || subjectId < 1) {
+    return res.status(400).json({ ok: false, message: 'Invalid subject' });
+  }
+  if (!isValidDateString(attendanceDate)) {
+    return res.status(400).json({ ok: false, message: 'Invalid attendance date' });
+  }
+  if (!Number.isInteger(attendanceClassNumber) || !bellSchedule[attendanceClassNumber]) {
+    return res.status(400).json({ ok: false, message: 'Invalid class number' });
+  }
+
+  let parsedRows = [];
+  try {
+    const parsed = JSON.parse(rowsRaw);
+    parsedRows = Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return res.status(400).json({ ok: false, message: 'Invalid attendance payload' });
+  }
+  if (!parsedRows.length) {
+    return res.status(400).json({ ok: false, message: 'No attendance rows' });
+  }
+  if (parsedRows.length > 500) {
+    return res.status(400).json({ ok: false, message: 'Attendance payload is too large' });
+  }
+
+  try {
+    await ensureDbReady();
+    const contextState = await resolveScheduleAttendanceTeacherContext(req, {
+      subjectId,
+      courseId,
+      classDate: attendanceDate,
+      classNumber: attendanceClassNumber,
+      groupNumber,
+      targetGroups,
+      lessonType,
+      isGeneral,
+    });
+    const allowedStudentMap = new Map(
+      (contextState.students || []).map((student) => [Number(student.id), student])
+    );
+    const normalizedEntries = normalizeAttendancePayloadRows(parsedRows);
+    if (!normalizedEntries.length) {
+      return res.status(400).json({ ok: false, message: 'No attendance rows' });
+    }
+
+    for (const entry of normalizedEntries) {
+      if (!allowedStudentMap.has(Number(entry.student_id))) {
+        return res.status(403).json({ ok: false, message: 'Forbidden (schedule attendance)' });
+      }
+    }
+
+    const { updatedCount, deletedCount } = await persistAttendanceRows({
+      subjectId: contextState.subjectId,
+      courseId: contextState.courseId,
+      semesterId: contextState.semesterId,
+      attendanceDate,
+      attendanceClassNumber,
+      normalizedEntries,
+      allowedStudentMap,
+      actorUserId: Number(req.session.user.id),
+    });
+    logActivity(
+      db,
+      req,
+      'schedule_attendance_save',
+      'attendance_record',
+      null,
+      {
+        subject_id: contextState.subjectId,
+        course_id: contextState.courseId,
+        class_date: attendanceDate,
+        class_number: attendanceClassNumber,
+        updated_count: updatedCount,
+        deleted_count: deletedCount,
+      },
+      contextState.courseId,
+      contextState.semesterId
+    );
+
+    const attendanceContext = await buildJournalAttendanceContext({
+      subjectId: contextState.subjectId,
+      courseId: contextState.courseId,
+      semesterId: contextState.semesterId,
+      semester: contextState.semester,
+      students: contextState.students,
+      requestedDate: attendanceDate,
+      requestedClassNumber: attendanceClassNumber,
+      allowedGroupNumbers: contextState.allowedGroupNumbers,
+      hasAllGroups: Boolean(contextState.selectedSubject && contextState.selectedSubject.has_all_groups),
+    });
+    return res.json({
+      ok: true,
+      message: 'Attendance saved',
+      subject_id: contextState.subjectId,
+      course_id: contextState.courseId,
+      class_date: attendanceContext.date,
+      class_number: attendanceContext.class_number,
+      rows: attendanceContext.rows || [],
+      summary: attendanceContext.summary || {},
+      reason_max_length: Number(attendanceContext.reason_max_length || ATTENDANCE_REASON_MAX_LENGTH),
+    });
+  } catch (err) {
+    if (Number(err && err.statusCode || 0) >= 400) {
+      return res.status(Number(err.statusCode)).json({
+        ok: false,
+        message: String(err && err.message || 'Attendance is unavailable'),
+      });
+    }
+    console.error('Schedule attendance save failed', err);
+    return res.status(500).json({ ok: false, message: 'Database error' });
   }
 });
 

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.20",
+      "date": "2026-04-05",
+      "items": [
+        "fix(schedule-attendance-flow): remove attendance UI from the journal page, move teacher attendance marking into the schedule class modal with a dedicated save flow, and show per-class attendance chips for students directly on visible schedule cards"
+      ]
+    },
+    {
       "version": "1.4.19",
       "date": "2026-04-05",
       "items": [
