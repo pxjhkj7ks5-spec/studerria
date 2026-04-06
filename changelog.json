@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.27",
+      "date": "2026-04-06",
+      "items": [
+        "feat(academic-v2-bachelor-semesters): backfill bachelor stage templates and course subjects from the bachelor catalog into the fixed three-term model, extend the workbook-derived semester mapping with short T3 placements, auto-seed all courses in the selected bachelor program with three visible terms and matching stage subjects, and add optional grade/semester filters to the bachelor bulk catalog editor while preserving that filter state across sync/save redirects"
+      ]
+    },
+    {
       "version": "1.4.26",
       "date": "2026-04-06",
       "items": [

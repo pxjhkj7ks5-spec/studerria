@@ -10,6 +10,13 @@
   const activeTermId = numberOrZero(focusState.termId);
   const activeTemplateStage = numberOrZero(focusState.templateStageNumber) || 1;
   const activeBachelorCatalogSourceKey = String(focusState.bachelorCatalogSourceKey || selectedBachelorCatalogSourceKey || '').trim();
+  const activeBachelorCatalogFilterEnabled = (
+    focusState.bachelorCatalogFilterEnabled === true
+    || Number(focusState.bachelorCatalogFilterEnabled || 0) === 1
+    || String(focusState.bachelorCatalogFilterEnabled || '').trim().toLowerCase() === 'true'
+  );
+  const activeBachelorCatalogStageFilter = numberOrZero(focusState.bachelorCatalogStageFilter);
+  const activeBachelorCatalogTermFilter = numberOrZero(focusState.bachelorCatalogTermFilter);
   const projectionHealthList = Array.isArray(projectionHealth) ? projectionHealth : [];
   const projectionHealthByGroup = new Map(projectionHealthList.map((item) => [Number(item.group_id || 0), item]));
   const projectionHealthTotals = projectionHealthSummary && typeof projectionHealthSummary === 'object' ? projectionHealthSummary : {};
@@ -81,12 +88,21 @@
       term_id: activeTermId,
       template_stage: activeTemplateStage,
       bachelor_catalog_source: activeBachelorCatalogSourceKey,
+      bachelor_catalog_filter_enabled: activeBachelorCatalogFilterEnabled ? 1 : 0,
+      bachelor_catalog_stage_filter: activeBachelorCatalogStageFilter,
+      bachelor_catalog_term_filter: activeBachelorCatalogTermFilter,
     }, overrides || {});
     const params = new URLSearchParams();
     Object.entries(merged).forEach(([key, rawValue]) => {
       if (String(key) === 'bachelor_catalog_source') {
         if (String(rawValue || '').trim()) {
           params.set(key, String(rawValue).trim());
+        }
+        return;
+      }
+      if (String(key) === 'bachelor_catalog_filter_enabled') {
+        if (Number(rawValue || 0) === 1) {
+          params.set(key, '1');
         }
         return;
       }
@@ -130,6 +146,9 @@
     <input type="hidden" name="focus_term_id" value="${activeTermId || ''}" />
     <input type="hidden" name="focus_template_stage" value="${activeTemplateStage || 1}" />
     <input type="hidden" name="focus_bachelor_catalog_source" value="${String(activeBachelorCatalogSourceKey || '').replace(/"/g, '&quot;')}" />
+    <input type="hidden" name="focus_bachelor_catalog_filter_enabled" value="${activeBachelorCatalogFilterEnabled ? '1' : '0'}" />
+    <input type="hidden" name="focus_bachelor_catalog_stage_filter" value="${activeBachelorCatalogStageFilter || ''}" />
+    <input type="hidden" name="focus_bachelor_catalog_term_filter" value="${activeBachelorCatalogTermFilter || ''}" />
   `;
   const toAttr = (value) => JSON.stringify(value || {}).replace(/'/g, '&#39;');
   const campusLabelByKey = new Map(campusOptions.map((campus) => [campus.value, campus.label]));
@@ -603,6 +622,9 @@
           </select>
           <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
           <input type="hidden" name="bachelor_catalog_source" value="<%= String(activeBachelorCatalogSourceKey || '').replace(/"/g, '&quot;') %>" />
+          <input type="hidden" name="bachelor_catalog_filter_enabled" value="<%= activeBachelorCatalogFilterEnabled ? '1' : '0' %>" />
+          <input type="hidden" name="bachelor_catalog_stage_filter" value="<%= activeBachelorCatalogStageFilter || '' %>" />
+          <input type="hidden" name="bachelor_catalog_term_filter" value="<%= activeBachelorCatalogTermFilter || '' %>" />
           <button type="submit" class="btn btn-sm btn-primary">Apply</button>
         </div>
         <div class="academic-v2-context-bar-stats">
@@ -1480,6 +1502,9 @@
                       <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
                       <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
                       <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
+                      <input type="hidden" name="bachelor_catalog_filter_enabled" value="<%= activeBachelorCatalogFilterEnabled ? '1' : '0' %>" />
+                      <input type="hidden" name="bachelor_catalog_stage_filter" value="<%= activeBachelorCatalogStageFilter || '' %>" />
+                      <input type="hidden" name="bachelor_catalog_term_filter" value="<%= activeBachelorCatalogTermFilter || '' %>" />
                       <div class="academic-v2-field">
                         <label for="bachelorCatalogSource">Source</label>
                         <select id="bachelorCatalogSource" class="form-select" name="bachelor_catalog_source">
@@ -1515,6 +1540,59 @@
                       </div>
                     </form>
                   </div>
+                  <div class="academic-v2-grid-2 mt-3">
+                    <form method="get" action="/admin/pathways" class="academic-v2-subcard">
+                      <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
+                      <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+                      <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                      <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
+                      <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
+                      <input type="hidden" name="bachelor_catalog_source" value="<%= String(activeBachelorCatalogSourceKey || '').replace(/"/g, '&quot;') %>" />
+                      <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                        <label class="academic-v2-chip">
+                          <input
+                            type="checkbox"
+                            name="bachelor_catalog_filter_enabled"
+                            value="1"
+                            <%= activeBachelorCatalogFilterEnabled ? 'checked' : '' %>
+                            data-bachelor-catalog-filter-enabled
+                          />
+                          Enable filter
+                        </label>
+                        <div class="academic-v2-field">
+                          <label for="bachelorCatalogStageFilter">Grade</label>
+                          <select
+                            id="bachelorCatalogStageFilter"
+                            class="form-select"
+                            name="bachelor_catalog_stage_filter"
+                            data-bachelor-catalog-stage-filter
+                          >
+                            <option value="">All grades</option>
+                            <% stageOptions.forEach((stageNumber) => { %>
+                              <option value="<%= stageNumber %>" <%= activeBachelorCatalogStageFilter === stageNumber ? 'selected' : '' %>>Grade <%= stageNumber %></option>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="academic-v2-field">
+                          <label for="bachelorCatalogTermFilter">Semester</label>
+                          <select
+                            id="bachelorCatalogTermFilter"
+                            class="form-select"
+                            name="bachelor_catalog_term_filter"
+                            data-bachelor-catalog-term-filter
+                          >
+                            <option value="">All semesters</option>
+                            <% termOptions.forEach((term) => { %>
+                              <option value="<%= term.value %>" <%= activeBachelorCatalogTermFilter === term.value ? 'selected' : '' %>><%= term.label %></option>
+                            <% }); %>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="academic-v2-actions mt-2">
+                        <button type="submit" class="btn btn-outline-secondary">Apply filters</button>
+                      </div>
+                    </form>
+                  </div>
                   <div class="academic-v2-field mt-3">
                     <label for="bachelorCatalogSearch">Search</label>
                     <input
@@ -1543,9 +1621,13 @@
                             <% const currentStageNumber = numberOrZero(row.current_stage_number); %>
                             <% const currentTermNumbers = Array.isArray(row.current_term_numbers) ? row.current_term_numbers : []; %>
                             <% const suggestedTermNumbers = Array.isArray(row.suggested_term_numbers) ? row.suggested_term_numbers : []; %>
+                            <% const catalogStageValues = Array.from(new Set([numberOrZero(row.suggested_stage_number), currentStageNumber].filter((value) => value > 0))).sort((a, b) => a - b); %>
+                            <% const catalogTermValues = Array.from(new Set([].concat(suggestedTermNumbers, currentTermNumbers).filter((value) => Number(value || 0) > 0))).sort((a, b) => a - b); %>
                             <tr
                               data-bachelor-catalog-row
                               data-bachelor-catalog-searchable="<%= [row.display_title, row.template_name, row.source_code, row.source_section, row.entry_kind].join(' ').toLowerCase() %>"
+                              data-bachelor-catalog-stage-values="<%= catalogStageValues.join(',') %>"
+                              data-bachelor-catalog-term-values="<%= catalogTermValues.join(',') %>"
                             >
                               <td>
                                 <strong><%= row.display_title %></strong>
@@ -2958,6 +3040,9 @@
         const subjectActivityRows = Array.from(document.querySelectorAll('[data-subject-activity-row]'));
         const bachelorCatalogSearch = document.querySelector('[data-bachelor-catalog-search]');
         const bachelorCatalogRows = Array.from(document.querySelectorAll('[data-bachelor-catalog-row]'));
+        const bachelorCatalogFilterEnabled = document.querySelector('[data-bachelor-catalog-filter-enabled]');
+        const bachelorCatalogStageFilter = document.querySelector('[data-bachelor-catalog-stage-filter]');
+        const bachelorCatalogTermFilter = document.querySelector('[data-bachelor-catalog-term-filter]');
         const subjectDetailTitle = document.querySelector('[data-subject-detail-title]');
         const subjectDetailCopy = document.querySelector('[data-subject-detail-copy]');
         const subjectDetailGroups = document.querySelector('[data-subject-detail-groups]');
@@ -2994,9 +3079,29 @@
           const query = String(bachelorCatalogSearch && bachelorCatalogSearch.value || '')
             .trim()
             .toLowerCase();
+          const filterEnabled = Boolean(bachelorCatalogFilterEnabled && bachelorCatalogFilterEnabled.checked);
+          const stageFilterValue = Number(bachelorCatalogStageFilter && bachelorCatalogStageFilter.value || 0);
+          const termFilterValue = Number(bachelorCatalogTermFilter && bachelorCatalogTermFilter.value || 0);
+          if (bachelorCatalogStageFilter) {
+            bachelorCatalogStageFilter.disabled = !filterEnabled;
+          }
+          if (bachelorCatalogTermFilter) {
+            bachelorCatalogTermFilter.disabled = !filterEnabled;
+          }
           bachelorCatalogRows.forEach((row) => {
             const haystack = String(row.getAttribute('data-bachelor-catalog-searchable') || '').toLowerCase();
-            row.hidden = Boolean(query) && !haystack.includes(query);
+            const stageValues = String(row.getAttribute('data-bachelor-catalog-stage-values') || '')
+              .split(',')
+              .map((value) => Number(value || 0))
+              .filter((value) => value > 0);
+            const termValues = String(row.getAttribute('data-bachelor-catalog-term-values') || '')
+              .split(',')
+              .map((value) => Number(value || 0))
+              .filter((value) => value > 0);
+            const matchesQuery = !query || haystack.includes(query);
+            const matchesStage = !filterEnabled || !stageFilterValue || stageValues.includes(stageFilterValue);
+            const matchesTerm = !filterEnabled || !termFilterValue || termValues.includes(termFilterValue);
+            row.hidden = !(matchesQuery && matchesStage && matchesTerm);
           });
         };
         const scheduleTargetGroups = document.getElementById('scheduleTargetGroups');
@@ -4628,6 +4733,15 @@
 
         if (bachelorCatalogSearch) {
           bachelorCatalogSearch.addEventListener('input', applyBachelorCatalogSearch);
+          if (bachelorCatalogFilterEnabled) {
+            bachelorCatalogFilterEnabled.addEventListener('change', applyBachelorCatalogSearch);
+          }
+          if (bachelorCatalogStageFilter) {
+            bachelorCatalogStageFilter.addEventListener('change', applyBachelorCatalogSearch);
+          }
+          if (bachelorCatalogTermFilter) {
+            bachelorCatalogTermFilter.addEventListener('change', applyBachelorCatalogSearch);
+          }
           applyBachelorCatalogSearch();
         }
 

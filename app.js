@@ -10767,6 +10767,22 @@ function parseAcademicV2Focus(source = {}) {
       || payload.bachelorCatalogSourceKey,
       80
     ),
+    bachelorCatalogFilterEnabled: parseBooleanFlag(
+      payload.focus_bachelor_catalog_filter_enabled
+      || payload.bachelor_catalog_filter_enabled
+      || payload.bachelorCatalogFilterEnabled,
+      false
+    ),
+    bachelorCatalogStageFilter: parsePositiveIntStrict(
+      payload.focus_bachelor_catalog_stage_filter
+      || payload.bachelor_catalog_stage_filter
+      || payload.bachelorCatalogStageFilter
+    ),
+    bachelorCatalogTermFilter: parsePositiveIntStrict(
+      payload.focus_bachelor_catalog_term_filter
+      || payload.bachelor_catalog_term_filter
+      || payload.bachelorCatalogTermFilter
+    ),
   };
 }
 
@@ -10779,6 +10795,9 @@ function buildAcademicV2NoticeUrl(kind, message, focus = {}, extraParams = {}) {
   if (normalizedFocus.termId) query.set('term_id', String(normalizedFocus.termId));
   if (normalizedFocus.templateStageNumber) query.set('template_stage', String(normalizedFocus.templateStageNumber));
   if (normalizedFocus.bachelorCatalogSourceKey) query.set('bachelor_catalog_source', String(normalizedFocus.bachelorCatalogSourceKey));
+  if (normalizedFocus.bachelorCatalogFilterEnabled) query.set('bachelor_catalog_filter_enabled', '1');
+  if (normalizedFocus.bachelorCatalogStageFilter) query.set('bachelor_catalog_stage_filter', String(normalizedFocus.bachelorCatalogStageFilter));
+  if (normalizedFocus.bachelorCatalogTermFilter) query.set('bachelor_catalog_term_filter', String(normalizedFocus.bachelorCatalogTermFilter));
   Object.entries(extraParams && typeof extraParams === 'object' ? extraParams : {}).forEach(([key, value]) => {
     if (!key || typeof value === 'undefined' || value === null || value === '') {
       return;
