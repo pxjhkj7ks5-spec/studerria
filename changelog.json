@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.23",
+      "date": "2026-04-06",
+      "items": [
+        "docs(agents): remove the outdated note from AGENTS.md that told Codex to handle explicit test requests automatically"
+      ]
+    },
+    {
       "version": "1.4.22",
       "date": "2026-04-06",
       "items": [
