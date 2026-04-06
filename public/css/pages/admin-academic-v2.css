@@ -53,6 +53,11 @@ body.theme-dark {
 .academic-v2-page {
   position: relative;
   padding: 0 12px 24px;
+  margin-top: -4px;
+}
+
+body > .topbar.topbar--title-spotlight.studerria-nav-shell + .academic-v2-page {
+  margin-top: -10px;
 }
 
 .academic-v2-shell {
@@ -1291,6 +1296,14 @@ body.theme-dark .academic-v2-advanced-block {
 }
 
 @media (max-width: 900px) {
+  .academic-v2-page {
+    margin-top: -2px;
+  }
+
+  body > .topbar.topbar--title-spotlight.studerria-nav-shell + .academic-v2-page {
+    margin-top: -4px;
+  }
+
   .academic-v2-timetable {
     grid-template-columns: 50px repeat(7, minmax(130px, 1fr));
   }
