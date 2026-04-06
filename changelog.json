@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.25",
+      "date": "2026-04-06",
+      "items": [
+        "refactor(academic-setup-v2-density): remove the duplicate scope summary from the sidebar, switch the workspace shell to a tighter system-font operator UI, collapse diagnostics and stage-template tooling into disclosure-based panels, simplify the sticky scope strip to value-only chips, move utility links out of the context bar, and tighten the laptop-first density of the Academic Setup v2 admin workspace"
+      ]
+    },
+    {
       "version": "1.4.24",
       "date": "2026-04-06",
       "items": [
