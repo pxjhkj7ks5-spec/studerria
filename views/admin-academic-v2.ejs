@@ -544,7 +544,7 @@
     map.set(templateId, Number(map.get(templateId) || 0) + 1);
     return map;
   }, new Map());
-  const workspaceDefaultMode = selectedGroup ? 'workspace' : 'architecture';
+  const workspaceDefaultMode = selectedGroup ? 'operate' : 'structure';
 %>
 <!doctype html>
 <html lang="<%= lang %>">
@@ -572,74 +572,76 @@
     <%- include('partials/theme-bootstrap-body') %>
 
     <main class="academic-v2-page">
+      <form method="get" action="/admin/pathways" class="academic-v2-context-bar">
+        <span class="academic-v2-context-bar-title">Academic Setup v2</span>
+        <div class="academic-v2-context-bar-selectors">
+          <select name="program_id" title="Програма">
+            <% (programs || []).forEach((program) => { %>
+              <option value="<%= program.id %>" <%= Number(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
+            <% }); %>
+          </select>
+          <select name="cohort_id" title="Когорта">
+            <% (scopedCohorts || []).forEach((cohort) => { %>
+              <option value="<%= cohort.id %>" <%= Number(cohort.id) === activeCohortId ? 'selected' : '' %>><%= cohort.label %> · <%= cohort.admission_year %></option>
+            <% }); %>
+          </select>
+          <select name="group_id" title="Курс">
+            <% (scopedGroups || []).forEach((group) => { %>
+              <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %> · s<%= group.stage_number %> · <%= campusLabelByKey.get(group.campus_key) || group.campus_key %></option>
+            <% }); %>
+          </select>
+          <select name="term_id" title="Терм">
+            <option value="">Усі терми</option>
+            <% scopedTermsList.forEach((term) => { %>
+              <option value="<%= term.id %>" <%= Number(term.id) === activeTermId ? 'selected' : '' %>><%= term.title %></option>
+            <% }); %>
+          </select>
+          <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
+          <input type="hidden" name="bachelor_catalog_source" value="<%= String(activeBachelorCatalogSourceKey || '').replace(/"/g, '&quot;') %>" />
+          <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+        </div>
+        <div class="academic-v2-context-bar-stats">
+          <span><strong><%= Number(summary && summary.programs_total || 0) %></strong> prog</span>
+          <span><strong><%= Number(summary && summary.groups_total || 0) %></strong> courses</span>
+          <span><strong><%= Number(summary && summary.group_subjects_total || 0) %></strong> subj</span>
+          <span><strong><%= Number(summary && summary.schedule_entries_total || 0) %></strong> slots</span>
+        </div>
+        <div class="academic-v2-context-bar-links">
+          <a href="/admin/pathways?legacy=1">Legacy</a>
+          <a href="/admin">← Admin</a>
+        </div>
+      </form>
+
       <div class="academic-v2-shell">
-        <section class="academic-v2-hero">
-          <div class="academic-v2-hero-grid">
-            <div>
-              <span class="academic-v2-kicker">Studerria Academic Operations</span>
-              <h1 class="academic-v2-title">Academic Setup v2 як операційний центр курсу.</h1>
-              <p class="academic-v2-subtitle">
-                `academic_v2_*` лишається source of truth, а цей екран дає швидкий робочий доступ до контексту, предметів, термів і розкладу.
-              </p>
-              <div class="academic-v2-hero-actions">
-                <a class="btn btn-primary btn-lg" href="#scope">Відкрити контекст</a>
-                <a class="btn btn-outline-secondary btn-lg" href="/admin/pathways?legacy=1">Legacy read-only режим</a>
-                <a class="btn btn-outline-secondary btn-lg" href="/admin">Назад в адмінку</a>
-              </div>
-            </div>
-            <div class="academic-v2-summary-grid">
-              <div class="academic-v2-stat">
-                <span class="academic-v2-stat-label">Програми</span>
-                <span class="academic-v2-stat-value"><%= Number(summary && summary.programs_total ? summary.programs_total : 0) %></span>
-              </div>
-              <div class="academic-v2-stat">
-                <span class="academic-v2-stat-label">Курси</span>
-                <span class="academic-v2-stat-value"><%= Number(summary && summary.groups_total ? summary.groups_total : 0) %></span>
-              </div>
-              <div class="academic-v2-stat">
-                <span class="academic-v2-stat-label">Живі предмети</span>
-                <span class="academic-v2-stat-value"><%= Number(summary && summary.group_subjects_total ? summary.group_subjects_total : 0) %></span>
-              </div>
-              <div class="academic-v2-stat">
-                <span class="academic-v2-stat-label">Слоти розкладу</span>
-                <span class="academic-v2-stat-value"><%= Number(summary && summary.schedule_entries_total ? summary.schedule_entries_total : 0) %></span>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <div class="academic-v2-layout">
           <aside class="academic-v2-sidebar">
-            <div class="academic-v2-sidebar-title">Режими</div>
-            <div class="academic-v2-mode-toggle">
-              <button type="button" class="academic-v2-mode-button" data-mode-button="workspace">Робочий простір</button>
-              <button type="button" class="academic-v2-mode-button" data-mode-button="architecture">Архітектура</button>
+            <div class="academic-v2-sidebar-title">Workspace</div>
+            <div class="academic-v2-mode-toggle academic-v2-mode-toggle--triple">
+              <button type="button" class="academic-v2-mode-button" data-mode-button="operate">Operate</button>
+              <button type="button" class="academic-v2-mode-button" data-mode-button="structure">Structure</button>
+              <button type="button" class="academic-v2-mode-button" data-mode-button="diagnostics">Diagnostics</button>
             </div>
             <div class="academic-v2-sidebar-group">
-              <div class="academic-v2-sidebar-group-title">Робота по курсу</div>
-              <nav class="academic-v2-sidebar-nav">
-                <button type="button" class="academic-v2-nav-link academic-v2-nav-link--button" data-mode-button="workspace" data-workspace-tab-target="overview"><span>Огляд</span><span class="academic-v2-code">01</span></button>
-                <button type="button" class="academic-v2-nav-link academic-v2-nav-link--button" data-mode-button="workspace" data-workspace-tab-target="subjects"><span>Предмети</span><span class="academic-v2-code">02</span></button>
-                <button type="button" class="academic-v2-nav-link academic-v2-nav-link--button" data-mode-button="workspace" data-workspace-tab-target="terms"><span>Терми</span><span class="academic-v2-code">03</span></button>
-                <button type="button" class="academic-v2-nav-link academic-v2-nav-link--button" data-mode-button="workspace" data-workspace-tab-target="schedule"><span>Розклад</span><span class="academic-v2-code">04</span></button>
-                <button type="button" class="academic-v2-nav-link academic-v2-nav-link--button" data-mode-button="workspace" data-workspace-tab-target="teachers"><span>Викладачі</span><span class="academic-v2-code">05</span></button>
-                <button type="button" class="academic-v2-nav-link academic-v2-nav-link--button" data-mode-button="workspace" data-workspace-tab-target="students"><span>Студенти</span><span class="academic-v2-code">06</span></button>
-              </nav>
+              <div class="academic-v2-sidebar-group-title">Scope</div>
+              <div class="academic-v2-sidebar-kv">
+                <strong><%= selectedGroup ? selectedGroup.label : 'Курс не вибрано' %></strong>
+                <span class="academic-v2-muted"><%= selectedProgram ? selectedProgram.name : 'Програму не вибрано' %></span>
+                <span class="academic-v2-muted"><%= selectedCohort ? `${selectedCohort.label} · ${selectedCohort.admission_year}` : 'Когорту не вибрано' %></span>
+                <span class="academic-v2-muted"><%= selectedGroup ? `Stage ${selectedGroup.stage_number} · ${campusLabelByKey.get(selectedGroup.campus_key) || selectedGroup.campus_key}` : `Template stage ${activeTemplateStage}` %></span>
+              </div>
             </div>
             <div class="academic-v2-sidebar-group">
-              <div class="academic-v2-sidebar-group-title">Система та моделі</div>
-              <nav class="academic-v2-sidebar-nav">
-                <a class="academic-v2-nav-link" href="#scope" data-mode-button="architecture"><span>Контекст</span><span class="academic-v2-code">A1</span></a>
-                <a class="academic-v2-nav-link" href="#health" data-mode-button="architecture"><span>Діагностика</span><span class="academic-v2-code">A2</span></a>
-                <a class="academic-v2-nav-link" href="#programs" data-mode-button="architecture"><span>Програми</span><span class="academic-v2-code">A3</span></a>
-                <a class="academic-v2-nav-link" href="#cohorts" data-mode-button="architecture"><span>Когорти</span><span class="academic-v2-code">A4</span></a>
-                <a class="academic-v2-nav-link" href="#stage-templates" data-mode-button="architecture"><span>Шаблони етапів</span><span class="academic-v2-code">A5</span></a>
-                <a class="academic-v2-nav-link" href="#groups" data-mode-button="architecture"><span>Курси</span><span class="academic-v2-code">A6</span></a>
-              </nav>
+              <div class="academic-v2-sidebar-group-title">Snapshot</div>
+              <div class="academic-v2-sidebar-chip-stack">
+                <span class="academic-v2-chip <%= selectedGroup ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= selectedGroup ? 'Scope ready' : 'Need course' %></span>
+                <span class="academic-v2-chip"><%= subjectCards.length %> subj</span>
+                <span class="academic-v2-chip"><%= termCards.length %> terms</span>
+                <span class="academic-v2-chip <%= workspaceReadiness.scheduleConflictCount ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= workspaceReadiness.scheduleConflictCount %> warnings</span>
+              </div>
             </div>
-            <div class="academic-v2-sidebar-note">
-              Запис іде тільки в <span class="academic-v2-code">academic_v2_*</span>.
-              Legacy-таблиці лишаються суміснісною проєкцією для реєстрації та старих сторінок, але не є primary source.
+            <div class="academic-v2-sidebar-note" title="Запис іде тільки в academic_v2_* таблиці. Legacy-таблиці — лише проєкція для суміснісності.">
+              Source: <span class="academic-v2-code">academic_v2_*</span>
             </div>
           </aside>
 
@@ -654,143 +656,108 @@
               <div class="academic-v2-alert academic-v2-alert--warning"><strong>Збережено з попередженням.</strong> <%= warning %></div>
             <% } %>
 
-            <section class="academic-v2-card" id="scope">
-              <div class="academic-v2-section-head">
-                <div>
-                  <h2 class="academic-v2-section-title">Робочий контекст</h2>
-                  <p class="academic-v2-section-copy">
-                    Спершу вибери програму, когорту, курс і терм. Після застосування контекст стає постійним робочим scope для всіх дій нижче, а не просто фільтром сторінки.
-                  </p>
-                </div>
-                <div class="academic-v2-chip-row">
+            <section class="academic-v2-card academic-v2-scope-strip">
+              <div class="academic-v2-scope-strip-main">
+                <div class="academic-v2-scope-strip-title">Активний scope</div>
+                <div class="academic-v2-scope-strip-items">
                   <% workspaceScopeSummary.forEach((item) => { %>
-                    <span class="academic-v2-chip"><%= item.label %>: <%= item.value %></span>
+                    <span class="academic-v2-scope-pill"><span class="academic-v2-scope-pill-label"><%= item.label %></span><strong><%= item.value %></strong></span>
                   <% }); %>
                 </div>
               </div>
-              <div class="academic-v2-grid-2 academic-v2-grid-2--workspace">
-                <form method="get" action="/admin/pathways" class="academic-v2-subcard academic-v2-scope-picker">
-                  <div class="academic-v2-focus-grid">
-                    <div class="academic-v2-field">
-                      <label for="focusProgramId">Програма</label>
-                      <select id="focusProgramId" class="form-select" name="program_id">
-                        <% (programs || []).forEach((program) => { %>
-                          <option value="<%= program.id %>" <%= Number(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
-                        <% }); %>
-                      </select>
-                    </div>
-                    <div class="academic-v2-field">
-                      <label for="focusCohortId">Когорта</label>
-                      <select id="focusCohortId" class="form-select" name="cohort_id">
-                        <% (scopedCohorts || []).forEach((cohort) => { %>
-                          <option value="<%= cohort.id %>" <%= Number(cohort.id) === activeCohortId ? 'selected' : '' %>><%= cohort.label %> · <%= cohort.admission_year %></option>
-                        <% }); %>
-                      </select>
-                    </div>
-                    <div class="academic-v2-field">
-                      <label for="focusGroupId">Курс</label>
-                      <select id="focusGroupId" class="form-select" name="group_id">
-                        <% (scopedGroups || []).forEach((group) => { %>
-                          <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %> · stage <%= group.stage_number %> · <%= campusLabelByKey.get(group.campus_key) || group.campus_key %></option>
-                        <% }); %>
-                      </select>
-                    </div>
-                    <div class="academic-v2-field">
-                      <label for="focusTermId">Терм</label>
-                      <select id="focusTermId" class="form-select" name="term_id">
-                        <option value="">Усі терми</option>
-                        <% scopedTermsList.forEach((term) => { %>
-                          <option value="<%= term.id %>" <%= Number(term.id) === activeTermId ? 'selected' : '' %>><%= term.title %></option>
-                        <% }); %>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="academic-v2-actions mt-3">
-                    <button type="submit" class="btn btn-primary">Застосувати контекст</button>
-                    <button type="button" class="btn btn-outline-secondary" data-mode-button="workspace" data-workspace-tab-target="overview">Відкрити робочий простір</button>
-                  </div>
-                </form>
-                <div class="academic-v2-subcard academic-v2-scope-summary-card">
-                  <div class="academic-v2-subcard-topline">Після застосування</div>
-                  <h3 class="h5 mb-2">Ти редагуєш саме цей академічний scope</h3>
-                  <div class="academic-v2-scope-summary-grid">
-                    <% workspaceScopeSummary.forEach((item) => { %>
-                      <div class="academic-v2-scope-summary-item">
-                        <span class="academic-v2-muted"><%= item.label %></span>
-                        <strong><%= item.value %></strong>
-                      </div>
-                    <% }); %>
-                  </div>
-                  <div class="academic-v2-chip-row mt-3">
-                    <span class="academic-v2-chip <%= selectedGroup ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= selectedGroup ? 'Курс вибрано' : 'Курс не вибрано' %></span>
-                    <span class="academic-v2-chip"><%= activeTermCount ? `${activeTermCount} активних термів` : 'Активний терм відсутній' %></span>
-                    <span class="academic-v2-chip"><%= subjectCards.length %> предметів у курсі</span>
-                    <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів у розкладі</span>
-                  </div>
-                  <div class="academic-v2-actions mt-3">
-                    <button type="button" class="btn btn-outline-secondary" data-mode-button="workspace" data-workspace-tab-target="subjects">Редагувати предмети</button>
-                    <button type="button" class="btn btn-outline-secondary" data-mode-button="workspace" data-workspace-tab-target="terms">Редагувати терми</button>
-                    <button type="button" class="btn btn-outline-secondary" data-mode-button="workspace" data-workspace-tab-target="schedule">Відкрити розклад</button>
-                    <button type="button" class="btn btn-outline-secondary" data-mode-button="workspace" data-workspace-tab-target="students">Переглянути студентів</button>
-                    <button type="button" class="btn btn-outline-secondary" data-mode-button="workspace" data-workspace-tab-target="overview">Перевірити готовність</button>
-                  </div>
-                </div>
+              <div class="academic-v2-scope-strip-actions">
+                <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="subjects">Предмети</button>
+                <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="terms">Терми</button>
+                <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="schedule">Розклад</button>
               </div>
             </section>
 
-            <section class="academic-v2-card academic-v2-workspace-header-card" data-mode-panel="workspace" id="workspace">
-              <div class="academic-v2-workspace-header">
-                <div>
-                  <div class="academic-v2-subcard-topline">Робочий простір курсу</div>
-                  <h2 class="academic-v2-section-title"><%= selectedGroup ? selectedGroup.label : 'Курс ще не вибрано' %></h2>
-                  <p class="academic-v2-section-copy">
-                    <%= selectedGroup
-                      ? `Операційний шар для курсу ${selectedGroup.label}: предмети, терми, розклад, викладачі та студенти в одному постійному контексті.`
-                      : 'Вибери курс у блоці вище, щоб відкрити повний робочий простір оператора.' %>
-                  </p>
-                </div>
-                <div class="academic-v2-chip-row">
-                  <% workspaceScopeSummary.forEach((item) => { %>
-                    <span class="academic-v2-chip"><%= item.label %>: <%= item.value %></span>
-                  <% }); %>
-                </div>
-              </div>
-              <div class="academic-v2-workspace-tabs">
-                <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="overview">Огляд</button>
-                <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="subjects">Предмети</button>
-                <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="terms">Терми</button>
-                <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="schedule">Розклад</button>
-                <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="teachers">Викладачі</button>
-                <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="students">Студенти</button>
-              </div>
-            </section>
-
-            <div class="academic-v2-mode-panel" data-mode-panel="architecture">
-            <section class="academic-v2-card" id="health">
-              <div class="academic-v2-section-head">
-                <div>
-                  <h2 class="academic-v2-section-title">Діагностика та проєкції</h2>
-                  <p class="academic-v2-section-copy">
-                    <span class="academic-v2-code">academic_v2_*</span> is the only write source now. This section is a dry-run audit surface for projection drift, user normalization gaps, and legacy cleanup candidates before any destructive cleanup script runs.
-                  </p>
-                </div>
-                <form method="post" action="/admin/pathways/v2/groups/resync-all">
-                  <%- renderFocusFields() %>
-                    <button type="submit" class="btn btn-outline-secondary">Resync all course projections</button>
-                </form>
-              </div>
-              <div class="academic-v2-grid-2">
-                <div class="academic-v2-subcard">
-                  <h3 class="h5 mb-3">Live projection summary</h3>
+            <section class="academic-v2-card academic-v2-workspace-header-card">
+              <div class="academic-v2-mode-toolbar" data-mode-panel="operate">
+                <div class="academic-v2-mode-toolbar-head">
+                  <div>
+                    <div class="academic-v2-subcard-topline">Операційна робота</div>
+                    <h2 class="academic-v2-section-title">Course workspace</h2>
+                  </div>
                   <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip academic-v2-chip--ok"><%= Number(projectionHealthTotals.groups_healthy || 0) %> healthy courses</span>
-                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(projectionHealthTotals.groups_with_issues || 0) %> courses with issues</span>
-                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_missing_legacy_course || 0) %> missing legacy course</span>
-                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_without_active_term || 0) %> missing active term</span>
-                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_with_user_sync_gaps || 0) %> user sync gaps</span>
-                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.subjects_without_teachers || 0) %> subjects without teachers</span>
+                    <span class="academic-v2-chip"><%= subjectCards.length %> subjects</span>
+                    <span class="academic-v2-chip"><%= activeTermCount %> active terms</span>
+                    <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> slots</span>
                   </div>
-                  <div class="academic-v2-table-wrap mt-3">
+                </div>
+                <div class="academic-v2-workspace-tabs">
+                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="overview">Огляд</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="subjects">Предмети</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="terms">Терми</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="schedule">Розклад</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="teachers">Викладачі</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="students">Студенти</button>
+                </div>
+              </div>
+              <div class="academic-v2-mode-toolbar" data-mode-panel="structure">
+                <div class="academic-v2-mode-toolbar-head">
+                  <div>
+                    <div class="academic-v2-subcard-topline">Конфігурація</div>
+                    <h2 class="academic-v2-section-title">Academic structure</h2>
+                  </div>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip"><%= Number(summary && summary.programs_total || 0) %> programs</span>
+                    <span class="academic-v2-chip"><%= Number(summary && summary.groups_total || 0) %> courses</span>
+                    <span class="academic-v2-chip"><%= scopedStageSubjectTemplatesList.length %> stage subjects</span>
+                  </div>
+                </div>
+                <div class="academic-v2-workspace-tabs academic-v2-workspace-tabs--structure">
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="programs">Programs</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="cohorts">Cohorts</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="courses">Courses</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="stage-templates">Stage Templates</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="subject-templates">Subject Templates</button>
+                  <% if (isBachelorProgramSelected) { %>
+                    <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="bachelor-catalog">Bachelor Catalog</button>
+                  <% } %>
+                </div>
+              </div>
+              <div class="academic-v2-mode-toolbar" data-mode-panel="diagnostics">
+                <div class="academic-v2-mode-toolbar-head">
+                  <div>
+                    <div class="academic-v2-subcard-topline">Контроль якості</div>
+                    <h2 class="academic-v2-section-title">Diagnostics</h2>
+                  </div>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip <%= Number(projectionHealthTotals.groups_with_issues || 0) ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= Number(projectionHealthTotals.groups_with_issues || 0) %> projection issues</span>
+                    <span class="academic-v2-chip <%= Number(activityIntegritySummary.group_subjects_without_activities || 0) ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= Number(activityIntegritySummary.group_subjects_without_activities || 0) %> missing activities</span>
+                    <span class="academic-v2-chip <%= Number(cleanupAudit.total_findings || 0) ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= Number(cleanupAudit.total_findings || 0) %> cleanup findings</span>
+                  </div>
+                </div>
+                <div class="academic-v2-workspace-tabs academic-v2-workspace-tabs--structure">
+                  <button type="button" class="academic-v2-workspace-tab" data-diagnostics-tab-target="projection">Projection</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-diagnostics-tab-target="integrity">Integrity</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-diagnostics-tab-target="cleanup">Cleanup</button>
+                </div>
+              </div>
+            </section>
+
+            <div class="academic-v2-mode-panel" data-mode-panel="diagnostics">
+              <section class="academic-v2-card" id="diagnostics-projection" data-diagnostics-panel="projection">
+                <div class="academic-v2-section-head">
+                  <div>
+                    <h2 class="academic-v2-section-title">Projection health</h2>
+                  </div>
+                  <form method="post" action="/admin/pathways/v2/groups/resync-all">
+                    <%- renderFocusFields() %>
+                    <button type="submit" class="btn btn-outline-secondary">Resync projections</button>
+                  </form>
+                </div>
+                <div class="academic-v2-subcard">
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip academic-v2-chip--ok"><%= Number(projectionHealthTotals.groups_healthy || 0) %> healthy</span>
+                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(projectionHealthTotals.groups_with_issues || 0) %> review</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_missing_legacy_course || 0) %> missing legacy</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_without_active_term || 0) %> no active term</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.groups_with_user_sync_gaps || 0) %> sync gaps</span>
+                    <span class="academic-v2-chip"><%= Number(projectionHealthTotals.subjects_without_teachers || 0) %> no teacher</span>
+                  </div>
+                  <div class="academic-v2-table-wrap mt-2">
                     <table class="table academic-v2-table">
                       <thead>
                         <tr>
@@ -805,17 +772,17 @@
                             <td>
                               <div class="academic-v2-kv">
                                 <strong><%= item.group_label %></strong>
-                                <span class="academic-v2-muted"><%= item.program_name %> - <%= item.admission_year %> - stage <%= item.stage_number %> - <%= item.campus_key %></span>
+                                <span class="academic-v2-muted"><%= item.program_name %> · <%= item.admission_year %> · stage <%= item.stage_number %> · <%= item.campus_key %></span>
                               </div>
                             </td>
                             <td>
                               <div class="academic-v2-chip-row">
-                                <span class="academic-v2-chip <%= item.is_healthy ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= item.is_healthy ? 'projection ok' : 'needs review' %></span>
+                                <span class="academic-v2-chip <%= item.is_healthy ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= item.is_healthy ? 'ok' : 'review' %></span>
                                 <% (item.issues || []).slice(0, 4).forEach((issue) => { %>
                                   <span class="academic-v2-chip"><%= issue %></span>
                                 <% }); %>
                                 <% if ((item.issues || []).length > 4) { %>
-                                  <span class="academic-v2-chip">+<%= item.issues.length - 4 %> more</span>
+                                  <span class="academic-v2-chip">+<%= item.issues.length - 4 %></span>
                                 <% } %>
                               </div>
                             </td>
@@ -834,15 +801,82 @@
                     </table>
                   </div>
                 </div>
-                <div class="academic-v2-subcard">
-                  <h3 class="h5 mb-3">Cleanup dry-run</h3>
-                  <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(cleanupAudit.total_findings || 0) %> total findings</span>
-                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_without_group_id || 0) %> users without v2 course</span>
-                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_with_course_projection_mismatch || 0) %> user projection mismatches</span>
-                    <span class="academic-v2-chip"><%= Number(cleanupAudit.group_subjects_without_teacher_assignment || 0) %> subjects missing teacher</span>
+              </section>
+
+              <section class="academic-v2-card" id="diagnostics-integrity" data-diagnostics-panel="integrity">
+                <div class="academic-v2-section-head">
+                  <div>
+                    <h2 class="academic-v2-section-title">Activity integrity</h2>
                   </div>
-                  <div class="academic-v2-table-wrap mt-3">
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip <%= Number(activityIntegritySummary.stage_subject_templates_without_activities || 0) === 0 ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= Number(activityIntegritySummary.stage_subject_templates_without_activities || 0) %> stage gaps</span>
+                    <span class="academic-v2-chip <%= Number(activityIntegritySummary.group_subjects_without_activities || 0) === 0 ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= Number(activityIntegritySummary.group_subjects_without_activities || 0) %> course gaps</span>
+                  </div>
+                </div>
+                <div class="academic-v2-grid-2">
+                  <div class="academic-v2-subcard">
+                    <div class="academic-v2-subcard-topline">Stage scope</div>
+                    <div class="academic-v2-chip-row mt-1">
+                      <span class="academic-v2-chip"><%= Number(activityIntegritySummary.scoped_stage_subject_templates_without_activities || 0) %> missing</span>
+                    </div>
+                    <% if (scopedStageSubjectsWithoutActivities.length) { %>
+                      <div class="academic-v2-stack mt-2">
+                        <% scopedStageSubjectsWithoutActivities.forEach((item) => { %>
+                          <div class="academic-v2-subcard">
+                            <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center">
+                              <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                              <div class="academic-v2-actions">
+                                <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: item.program_id, cohort_id: '', group_id: '', term_id: '', template_stage: item.stage_number }) %>">Фокус</a>
+                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject" data-editor-payload='<%- toAttr(item) %>'>Edit</button>
+                              </div>
+                            </div>
+                          </div>
+                        <% }); %>
+                      </div>
+                    <% } else { %>
+                      <div class="academic-v2-empty mt-2">У вибраному stage scope все ок.</div>
+                    <% } %>
+                  </div>
+                  <div class="academic-v2-subcard">
+                    <div class="academic-v2-subcard-topline">Course scope</div>
+                    <div class="academic-v2-chip-row mt-1">
+                      <span class="academic-v2-chip"><%= Number(activityIntegritySummary.scoped_group_subjects_without_activities || 0) %> missing</span>
+                    </div>
+                    <% if (scopedGroupSubjectsWithoutActivities.length) { %>
+                      <div class="academic-v2-stack mt-2">
+                        <% scopedGroupSubjectsWithoutActivities.forEach((item) => { %>
+                          <div class="academic-v2-subcard">
+                            <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center">
+                              <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
+                              <div class="academic-v2-actions">
+                                <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: '', cohort_id: '', group_id: item.group_id, term_id: '' }) %>">Фокус</a>
+                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="group-subject" data-editor-payload='<%- toAttr(item) %>'>Edit</button>
+                              </div>
+                            </div>
+                          </div>
+                        <% }); %>
+                      </div>
+                    <% } else { %>
+                      <div class="academic-v2-empty mt-2">У вибраному course scope все ок.</div>
+                    <% } %>
+                  </div>
+                </div>
+              </section>
+
+              <section class="academic-v2-card" id="diagnostics-cleanup" data-diagnostics-panel="cleanup">
+                <div class="academic-v2-section-head">
+                  <div>
+                    <h2 class="academic-v2-section-title">Cleanup dry-run</h2>
+                  </div>
+                  <div class="academic-v2-chip-row">
+                    <span class="academic-v2-chip academic-v2-chip--warm"><%= Number(cleanupAudit.total_findings || 0) %> findings</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_without_group_id || 0) %> no course</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.users_with_course_projection_mismatch || 0) %> mismatch</span>
+                    <span class="academic-v2-chip"><%= Number(cleanupAudit.group_subjects_without_teacher_assignment || 0) %> no teacher</span>
+                  </div>
+                </div>
+                <div class="academic-v2-subcard">
+                  <div class="academic-v2-table-wrap">
                     <table class="table academic-v2-table">
                       <tbody>
                         <tr><th>Courses without active term</th><td><%= Number(cleanupAudit.groups_without_active_term || 0) %></td></tr>
@@ -856,92 +890,25 @@
                       </tbody>
                     </table>
                   </div>
-                  <div class="academic-v2-muted mt-3">
-                    Cleanup runs only from CLI:
-                    <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --normalize-users</span>,
-                    <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --archive-legacy-config</span>,
-                    <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --activity-integrity --write-snapshot</span>,
-                    then repeat with <span class="academic-v2-code">--apply</span> after reviewing the dry-run snapshot.
-                  </div>
+                  <details class="mt-2 academic-v2-help-details">
+                    <summary class="academic-v2-muted">CLI cleanup commands</summary>
+                    <div class="academic-v2-muted mt-1">
+                      <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --normalize-users</span><br />
+                      <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --archive-legacy-config</span><br />
+                      <span class="academic-v2-code">node scripts/academic-v2-cleanup.js --activity-integrity --write-snapshot</span><br />
+                      Then repeat with <span class="academic-v2-code">--apply</span>.
+                    </div>
+                  </details>
                 </div>
-                <div class="academic-v2-subcard">
-                  <h3 class="h5 mb-3">Activity integrity</h3>
-                  <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip <%= Number(activityIntegritySummary.stage_subject_templates_without_activities || 0) === 0 ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
-                      <%= Number(activityIntegritySummary.stage_subject_templates_without_activities || 0) %> stage subjects missing activity
-                    </span>
-                    <span class="academic-v2-chip <%= Number(activityIntegritySummary.group_subjects_without_activities || 0) === 0 ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
-                      <%= Number(activityIntegritySummary.group_subjects_without_activities || 0) %> course subjects missing activity
-                    </span>
-                    <span class="academic-v2-chip">
-                      <%= Number(activityIntegritySummary.scoped_stage_subject_templates_without_activities || 0) %> missing in selected stage scope
-                    </span>
-                    <span class="academic-v2-chip">
-                      <%= Number(activityIntegritySummary.scoped_group_subjects_without_activities || 0) %> missing in selected course scope
-                    </span>
-                  </div>
-                  <div class="academic-v2-table-wrap mt-3">
-                    <table class="table academic-v2-table">
-                      <tbody>
-                        <tr>
-                          <th>Selected stage template scope</th>
-                          <td>
-                            <% if (scopedStageSubjectsWithoutActivities.length) { %>
-                              <div class="academic-v2-stack">
-                                <% scopedStageSubjectsWithoutActivities.forEach((item) => { %>
-                                  <div class="academic-v2-subcard">
-                                    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center">
-                                      <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
-                                      <div class="academic-v2-actions">
-                                        <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: item.program_id, cohort_id: '', group_id: '', term_id: '', template_stage: item.stage_number }) %>">Фокус</a>
-                                        <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject" data-editor-payload='<%- toAttr(item) %>'>Edit</button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                <% }); %>
-                              </div>
-                            <% } else { %>
-                              <span class="academic-v2-muted">No missing activities in the selected stage template scope.</span>
-                            <% } %>
-                          </td>
-                        </tr>
-                        <tr>
-                          <th>Selected course scope</th>
-                          <td>
-                            <% if (scopedGroupSubjectsWithoutActivities.length) { %>
-                              <div class="academic-v2-stack">
-                                <% scopedGroupSubjectsWithoutActivities.forEach((item) => { %>
-                                  <div class="academic-v2-subcard">
-                                    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center">
-                                      <span class="academic-v2-chip academic-v2-chip--warm"><%= item.subject_title %></span>
-                                      <div class="academic-v2-actions">
-                                        <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ program_id: '', cohort_id: '', group_id: item.group_id, term_id: '' }) %>">Фокус</a>
-                                        <button type="button" class="btn btn-sm btn-primary" data-editor-target="group-subject" data-editor-payload='<%- toAttr(item) %>'>Edit</button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                <% }); %>
-                              </div>
-                            <% } else { %>
-                              <span class="academic-v2-muted">No missing activities in the selected course scope.</span>
-                            <% } %>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div class="academic-v2-muted mt-3">
-                    Every stage subject template and live course subject should keep at least one activity so the activity-based schedule editor always has a valid target.
-                  </div>
-                </div>
-              </div>
-            </section>
+              </section>
+            </div>
 
-            <section class="academic-v2-card" id="programs">
+            <div class="academic-v2-mode-panel" data-mode-panel="structure">
+            <section class="academic-v2-card" id="programs" data-structure-panel="programs">
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Програми</h2>
-                  <p class="academic-v2-section-copy">Track-level configuration. No admissions, pathways, presets, or contexts here. Just the canonical program list.</p>
+                  <!-- Track-level canonical program list -->
                 </div>
               </div>
               <div class="academic-v2-grid-2">
@@ -975,7 +942,7 @@
                     <input id="programActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="program.is_active" checked />
                     <label class="form-check-label" for="programActive">Active program</label>
                   </div>
-                  <div class="academic-v2-actions mt-3">
+                  <div class="academic-v2-actions mt-2">
                     <button type="submit" class="btn btn-primary">Зберегти програму</button>
                     <button type="button" class="btn btn-outline-secondary" data-editor-reset="program">Скинути</button>
                   </div>
@@ -1019,11 +986,11 @@
               </div>
             </section>
 
-            <section class="academic-v2-card" id="cohorts">
+            <section class="academic-v2-card" id="cohorts" data-structure-panel="cohorts">
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Когорти</h2>
-                  <p class="academic-v2-section-copy">Рік набору належить програмі. Когорти лишаються порожніми, доки ти не створиш курс або не промотуєш їх у підготовлений stage template.</p>
+                  <!-- Cohorts: admission year + stage promotion -->
                 </div>
               </div>
               <div class="academic-v2-grid-2">
@@ -1053,7 +1020,7 @@
                     <input id="cohortActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="cohort.is_active" checked />
                     <label class="form-check-label" for="cohortActive">Active cohort</label>
                   </div>
-                  <div class="academic-v2-actions mt-3">
+                  <div class="academic-v2-actions mt-2">
                     <button type="submit" class="btn btn-primary">Зберегти когорту</button>
                     <button type="button" class="btn btn-outline-secondary" data-editor-reset="cohort">Скинути</button>
                   </div>
@@ -1100,9 +1067,9 @@
                     </div>
                   </div>
                   <div class="academic-v2-subcard">
-                    <h3 class="h5 mb-2">Promote cohort</h3>
+                    <h3 class="h6 mb-1">Promote cohort</h3>
                     <% if (selectedCohort) { %>
-                      <p class="academic-v2-section-copy mb-3">Move the cohort to the next stage with a preview. Promotion replaces the live subject and term set for the new stage, while the previous stage stays as history.</p>
+                      <!-- Promotion: replaces live subjects/terms for the new stage -->
                       <form method="get" action="/admin/pathways" class="academic-v2-form-grid academic-v2-form-grid--compact">
                         <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
                         <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
@@ -1183,11 +1150,11 @@
               </div>
             </section>
 
-            <section class="academic-v2-card" id="stage-templates">
+            <section class="academic-v2-card" id="stage-templates" data-structure-panel="stage-templates">
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Stage templates</h2>
-                  <p class="academic-v2-section-copy">Templates define which terms and subjects belong to each program stage. They do not create live course data until you explicitly apply them to a course or promote a cohort.</p>
+                  <!-- Templates: stage-level term/subject definitions, applied on promotion -->
                 </div>
                 <% if (scopedStageSubjectsWithoutActivities.length) { %>
                   <div class="academic-v2-chip-row">
@@ -1220,7 +1187,7 @@
                     <button type="submit" class="btn btn-outline-secondary">Load stage template</button>
                   </div>
                 </form>
-                <div class="academic-v2-chip-row mt-3">
+                <div class="academic-v2-chip-row mt-1">
                   <% (templateStageCards || []).forEach((card) => { %>
                     <span class="academic-v2-chip <%= card.is_current ? 'academic-v2-chip--ok' : '' %>">Stage <%= card.stage_number %>: <%= card.term_count %> terms, <%= card.subject_count %> subjects</span>
                   <% }); %>
@@ -1233,7 +1200,7 @@
                     <input type="hidden" name="stage_term_template_id" value="" data-editor-input="stage-term.id" />
                     <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
                     <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
-                    <h3 class="h5 mb-3">Stage terms</h3>
+                    <h3 class="h6 mb-1">Stage terms</h3>
                     <div class="academic-v2-form-grid academic-v2-form-grid--compact">
                       <div class="academic-v2-field">
                         <label for="stageTermNumber">Term number</label>
@@ -1257,13 +1224,13 @@
                       <input id="stageTermActiveDefault" class="form-check-input" type="checkbox" name="is_active_default" value="1" data-editor-input="stage-term.is_active_default" />
                       <label class="form-check-label" for="stageTermActiveDefault">Make this the default active term when the stage is applied</label>
                     </div>
-                    <div class="academic-v2-actions mt-3">
+                    <div class="academic-v2-actions mt-2">
                       <button type="submit" class="btn btn-primary">Зберегти stage term</button>
                       <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-term">Скинути</button>
                     </div>
                   </form>
                   <div class="academic-v2-subcard">
-                    <h3 class="h5 mb-3">Поточні stage term templates</h3>
+                    <h3 class="h6 mb-1">Поточні stage term templates</h3>
                     <% if ((scopedStageTermTemplates || []).length) { %>
                       <div class="academic-v2-stack">
                         <% (scopedStageTermTemplates || []).forEach((stageTerm) => { %>
@@ -1295,7 +1262,7 @@
                     <input type="hidden" name="stage_subject_template_id" value="" data-editor-input="stage-subject.id" />
                     <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
                     <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
-                    <h3 class="h5 mb-3">Stage subjects</h3>
+                    <h3 class="h6 mb-1">Stage subjects</h3>
                     <div class="academic-v2-form-grid">
                       <div class="academic-v2-field">
                         <label for="stageSubjectTemplate">Subject template</label>
@@ -1347,13 +1314,13 @@
                       <input type="hidden" name="show_in_teamwork" value="0" />
                       <div class="form-check"><input id="stageSubjectTeamwork" class="form-check-input" type="checkbox" name="show_in_teamwork" value="1" data-editor-input="stage-subject.show_in_teamwork" checked /><label class="form-check-label" for="stageSubjectTeamwork">Show in teamwork</label></div>
                     </div>
-                    <div class="academic-v2-actions mt-3">
+                    <div class="academic-v2-actions mt-2">
                       <button type="submit" class="btn btn-primary">Зберегти stage subject</button>
                       <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject">Скинути</button>
                     </div>
                   </form>
                   <div class="academic-v2-subcard">
-                    <h3 class="h5 mb-3">Поточні stage subject templates</h3>
+                    <h3 class="h6 mb-1">Поточні stage subject templates</h3>
                     <% if (scopedStageSubjectTemplatesList.length) { %>
                       <div class="academic-v2-stack">
                         <% scopedStageSubjectTemplatesList.forEach((stageSubject) => { %>
@@ -1388,7 +1355,7 @@
                   <form method="post" action="/admin/pathways/v2/stage-subject-activities/save" class="academic-v2-subcard" data-editor-form="stage-subject-activity">
                     <%- renderFocusFields() %>
                     <input type="hidden" name="stage_subject_activity_id" value="" data-editor-input="stage-subject-activity.id" />
-                    <h3 class="h5 mb-3">Stage subject activities</h3>
+                    <h3 class="h6 mb-1">Stage subject activities</h3>
                     <div class="academic-v2-form-grid">
                       <div class="academic-v2-field">
                         <label for="stageSubjectActivityTemplate">Stage subject</label>
@@ -1412,11 +1379,11 @@
                       </div>
                     </div>
                     <div class="academic-v2-muted mt-3">Lecture activities are shared across all groups. Seminar, practice, and lab activities are scheduled by subgroup.</div>
-                    <div class="academic-v2-actions mt-3">
+                    <div class="academic-v2-actions mt-2">
                       <button type="submit" class="btn btn-primary">Зберегти stage activity</button>
                       <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject-activity">Скинути</button>
                     </div>
-                    <div class="academic-v2-chip-row mt-3">
+                    <div class="academic-v2-chip-row mt-1">
                       <% activityPresetOptions.forEach((preset) => { %>
                         <button
                           type="submit"
@@ -1430,7 +1397,7 @@
                     </div>
                   </form>
                   <div class="academic-v2-subcard">
-                    <h3 class="h5 mb-3">Поточні stage activity templates</h3>
+                    <h3 class="h6 mb-1">Поточні stage activity templates</h3>
                     <% if (scopedStageSubjectActivitiesList.length) { %>
                       <div class="academic-v2-stack">
                         <% scopedStageSubjectActivitiesList.forEach((activity) => { %>
@@ -1457,13 +1424,15 @@
                   </div>
                 </div>
               </div>
-              <% if (isBachelorProgramSelected) { %>
-                <div class="academic-v2-subcard mt-4" id="bachelor-catalog-panel">
+            </section>
+
+            <% if (isBachelorProgramSelected) { %>
+              <section class="academic-v2-card" id="bachelor-catalog-panel" data-structure-panel="bachelor-catalog">
                   <div class="academic-v2-section-head academic-v2-section-head--tight">
                     <div>
-                      <div class="academic-v2-subcard-topline">Кодовий бакалаврський каталог</div>
-                      <h3 class="h5 mb-1">Bulk-редактор source rows</h3>
-                      <p class="academic-v2-section-copy">Каталог живе в коді, а тут редагуються stage, term, required/general для вибраної бакалаврської програми. Sync додає лише відсутні шаблони та stage rows і не перетирає ручні налаштування.</p>
+                      <div class="academic-v2-subcard-topline">Каталог бакалавра</div>
+                      <h3 class="h6 mb-1">Bulk editor</h3>
+                      <!-- Bachelor catalog: edit stage/term/required flags; sync adds missing only -->
                     </div>
                     <div class="academic-v2-chip-row">
                       <span class="academic-v2-chip"><%= bachelorCatalogRowsList.length %> entries</span>
@@ -1479,7 +1448,6 @@
                       <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
                       <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
                       <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
-                      <input type="hidden" name="workspace_tab" value="subjects" />
                       <div class="academic-v2-field">
                         <label for="bachelorCatalogSource">Source</label>
                         <select id="bachelorCatalogSource" class="form-select" name="bachelor_catalog_source">
@@ -1490,7 +1458,7 @@
                           <% }); %>
                         </select>
                       </div>
-                      <div class="academic-v2-actions mt-3">
+                      <div class="academic-v2-actions mt-2">
                         <button type="submit" class="btn btn-outline-secondary">Завантажити source</button>
                       </div>
                     </form>
@@ -1499,19 +1467,18 @@
                       <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
                       <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
                       <div class="academic-v2-subcard-topline">Sync</div>
-                      <div class="academic-v2-section-copy">
+                      <div class="academic-v2-muted" style="font-size:0.78rem;">
                         <% if (selectedBachelorCatalogSource) { %>
-                          <strong><%= selectedBachelorCatalogSource.title %></strong><br />
-                          <%= selectedBachelorCatalogSource.description %>
+                          <strong><%= selectedBachelorCatalogSource.title %></strong>
                         <% } else { %>
-                          Обери source, щоб додати missing templates і stage rows.
+                          Обери source для sync.
                         <% } %>
                       </div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip">Default preset: L + S</span>
                         <span class="academic-v2-chip">Flags start as required + general</span>
                       </div>
-                      <div class="academic-v2-actions mt-3">
+                      <div class="academic-v2-actions mt-2">
                         <button type="submit" class="btn btn-primary" <%= !selectedBachelorCatalogSource ? 'disabled' : '' %>>Sync source → program</button>
                       </div>
                     </form>
@@ -1528,7 +1495,7 @@
                   </div>
                   <% if (bachelorCatalogRowsList.length) { %>
                     <div class="table-responsive mt-3">
-                      <table class="table align-middle">
+                      <table class="table align-middle academic-v2-table">
                         <thead>
                           <tr>
                             <th>Source row</th>
@@ -1636,15 +1603,93 @@
                   <% } else { %>
                     <div class="academic-v2-empty mt-3">Для вибраної програми ще немає rows у source registry.</div>
                   <% } %>
+              </section>
+            <% } %>
+
+            <section class="academic-v2-card" id="subject-templates" data-structure-panel="subject-templates">
+              <div class="academic-v2-section-head">
+                <div>
+                  <h2 class="academic-v2-section-title">Subject templates</h2>
                 </div>
-              <% } %>
+                <div class="academic-v2-chip-row">
+                  <span class="academic-v2-chip"><%= subjectTemplates.length %> templates</span>
+                  <span class="academic-v2-chip"><%= subjectCards.length %> linked in selected course</span>
+                </div>
+              </div>
+              <div class="academic-v2-grid-2">
+                <form method="post" action="/admin/pathways/v2/templates/save" class="academic-v2-subcard" data-editor-form="template">
+                  <%- renderFocusFields() %>
+                  <input type="hidden" name="subject_template_id" value="" data-editor-input="template.id" />
+                  <div class="academic-v2-section-head academic-v2-section-head--tight">
+                    <div>
+                      <div class="academic-v2-subcard-topline">Catalog</div>
+                      <h3 class="h6 mb-1">Шаблон предмета</h3>
+                    </div>
+                  </div>
+                  <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                    <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                      <label for="templateName">Назва шаблону</label>
+                      <input id="templateName" class="form-control" type="text" name="name" data-editor-input="template.name" placeholder="Філософія" required />
+                    </div>
+                  </div>
+                  <input type="hidden" name="is_active" value="0" />
+                  <div class="form-check mt-2">
+                    <input id="templateActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="template.is_active" checked />
+                    <label class="form-check-label" for="templateActive">Активний шаблон</label>
+                  </div>
+                  <div class="academic-v2-actions mt-2">
+                    <button type="submit" class="btn btn-primary">Зберегти шаблон</button>
+                    <button type="button" class="btn btn-outline-secondary" data-editor-reset="template">Скинути</button>
+                  </div>
+                </form>
+                <div class="academic-v2-subcard">
+                  <div class="academic-v2-table-wrap">
+                    <table class="table academic-v2-table">
+                      <thead>
+                        <tr>
+                          <th>Template</th>
+                          <th>Usage</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% (subjectTemplates || []).forEach((template) => { %>
+                          <tr>
+                            <td>
+                              <div class="academic-v2-kv">
+                                <strong><%= template.name %></strong>
+                                <span class="academic-v2-muted"><%= template.is_active ? 'Active' : 'Inactive' %></span>
+                              </div>
+                            </td>
+                            <td>
+                              <div class="academic-v2-chip-row">
+                                <span class="academic-v2-chip"><%= template.group_subject_count %> system</span>
+                                <span class="academic-v2-chip"><%= Number(currentSubjectTemplateLinks.get(Number(template.id || 0)) || 0) %> selected course</span>
+                              </div>
+                            </td>
+                            <td class="text-end">
+                              <div class="academic-v2-actions justify-content-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="template" data-editor-payload='<%- toAttr(template) %>'>Edit</button>
+                                <form method="post" action="/admin/pathways/v2/templates/<%= template.id %>/delete">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                              </div>
+                            </td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </section>
 
-            <section class="academic-v2-card" id="groups">
+            <section class="academic-v2-card" id="groups" data-structure-panel="courses">
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Courses</h2>
-                  <p class="academic-v2-section-copy">Courses carry stage number, campus, label, and the live student enrollment scope. They start empty until you explicitly apply a stage template or add subjects and terms manually.</p>
+                  <!-- Courses: stage + campus + enrollment. Empty until template applied -->
                 </div>
                 <% if (selectedGroup) { %>
                   <div class="academic-v2-actions">
@@ -1715,7 +1760,7 @@
                     <label class="form-check-label" for="groupTeacherDefault">Default for teacher registration</label>
                     <div class="academic-v2-muted">If several teacher groups share one campus, registration will use this one.</div>
                   </div>
-                  <div class="academic-v2-actions mt-3">
+                  <div class="academic-v2-actions mt-2">
                     <button type="submit" class="btn btn-primary">Зберегти курс</button>
                     <button type="button" class="btn btn-outline-secondary" data-editor-reset="group">Скинути</button>
                   </div>
@@ -1772,13 +1817,10 @@
                     </div>
                   </div>
                   <div class="academic-v2-subcard">
-                    <h3 class="h5 mb-2">Операційний перехід у курс</h3>
-                    <p class="academic-v2-section-copy mb-3">
-                      Студентські переміщення, предмети, терми та розклад тепер згруповані в окремому робочому просторі нижче.
-                      Тут лишається тільки системне керування курсом як обʼєктом.
-                    </p>
+                    <h3 class="h6 mb-1">Операційний перехід у курс</h3>
+                    <!-- Workspace contains subjects, terms, schedule, students -->
                     <div class="academic-v2-actions">
-                      <button type="button" class="btn btn-outline-secondary" data-mode-button="workspace" data-workspace-tab-target="overview">Відкрити workspace</button>
+                      <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="overview">Відкрити workspace</button>
                     </div>
                   </div>
                 </div>
@@ -1787,14 +1829,12 @@
 
             </div>
 
-            <div class="academic-v2-mode-panel" data-mode-panel="workspace">
+            <div class="academic-v2-mode-panel" data-mode-panel="operate">
               <section class="academic-v2-card" id="overview" data-workspace-panel="overview">
                 <div class="academic-v2-section-head">
                   <div>
-                    <h2 class="academic-v2-section-title">Огляд курсу</h2>
-                    <p class="academic-v2-section-copy">
-                      Короткий operational snapshot для поточного курсу: готовність предметів, термів, викладачів і розкладу без занурення в таблиці.
-                    </p>
+                    <h2 class="academic-v2-section-title">Огляд</h2>
+                    <!-- Overview: readiness snapshot -->
                   </div>
                   <div class="academic-v2-chip-row">
                     <span class="academic-v2-chip <%= workspaceReadiness.hasActiveTerm ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
@@ -1809,7 +1849,7 @@
                   <div class="academic-v2-grid-3 academic-v2-grid-3--overview">
                     <div class="academic-v2-subcard">
                       <div class="academic-v2-subcard-topline">Готовність предметів</div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip"><%= workspaceReadiness.subjectBoundCount %> привʼязані до термів</span>
                         <span class="academic-v2-chip"><%= workspaceReadiness.activityReadyCount %> з активностями</span>
                         <span class="academic-v2-chip"><%= workspaceReadiness.teacherReadyCount %> з викладачами</span>
@@ -1818,7 +1858,7 @@
                     </div>
                     <div class="academic-v2-subcard">
                       <div class="academic-v2-subcard-topline">Розклад і терми</div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip <%= activeTermCount ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= activeTermCount %> активних термів</span>
                         <span class="academic-v2-chip"><%= archivedTermCount %> архівних</span>
                         <span class="academic-v2-chip"><%= selectedWorkspaceTermId ? (selectedTermRecord ? selectedTermRecord.title : 'Поточний терм') : 'Усі терми' %></span>
@@ -1827,7 +1867,7 @@
                     </div>
                     <div class="academic-v2-subcard">
                       <div class="academic-v2-subcard-topline">Швидкі дії</div>
-                      <div class="academic-v2-actions mt-3">
+                      <div class="academic-v2-actions mt-2">
                         <button type="button" class="btn btn-outline-secondary" data-workspace-tab-target="subjects">Предмети</button>
                         <button type="button" class="btn btn-outline-secondary" data-workspace-tab-target="terms">Терми</button>
                         <button type="button" class="btn btn-outline-secondary" data-workspace-tab-target="schedule">Розклад</button>
@@ -1844,13 +1884,11 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Предмети курсу</h2>
-                  <p class="academic-v2-section-copy">
-                    Тут розділено три шари: глобальний каталог шаблонів, живі предмети поточного курсу і детальний редактор одного вибраного предмета разом з активностями.
-                  </p>
+                  <!-- Live course subjects + right-side editor -->
                 </div>
                 <div class="academic-v2-chip-row">
                   <span class="academic-v2-chip"><%= subjectCards.length %> живих предметів</span>
-                  <span class="academic-v2-chip"><%= subjectTemplates.length %> шаблонів</span>
+                  <span class="academic-v2-chip"><%= workspaceReadiness.teacherReadyCount %> з викладачами</span>
                   <span class="academic-v2-chip academic-v2-chip--warm"><%= scopedGroupSubjectsWithoutActivities.length %> без активності</span>
                 </div>
               </div>
@@ -1860,56 +1898,9 @@
                   <div class="academic-v2-subcard">
                     <div class="academic-v2-section-head academic-v2-section-head--tight">
                       <div>
-                        <div class="academic-v2-subcard-topline">Глобальний каталог</div>
-                        <h3 class="h5 mb-1">Шаблони предметів</h3>
-                        <p class="academic-v2-section-copy">Мінімальний каталог шаблонів. Окремо від живих предметів курсу.</p>
-                      </div>
-                    </div>
-                    <form method="post" action="/admin/pathways/v2/templates/save" class="academic-v2-stack" data-editor-form="template">
-                      <%- renderFocusFields() %>
-                      <input type="hidden" name="subject_template_id" value="" data-editor-input="template.id" />
-                      <div class="academic-v2-form-grid academic-v2-form-grid--compact">
-                        <div class="academic-v2-field" style="grid-column: 1 / -1;">
-                          <label for="templateName">Назва шаблону</label>
-                          <input id="templateName" class="form-control" type="text" name="name" data-editor-input="template.name" placeholder="Філософія" required />
-                        </div>
-                      </div>
-                      <input type="hidden" name="is_active" value="0" />
-                      <div class="form-check">
-                        <input id="templateActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="template.is_active" checked />
-                        <label class="form-check-label" for="templateActive">Шаблон активний</label>
-                      </div>
-                      <div class="academic-v2-actions">
-                        <button type="submit" class="btn btn-primary">Зберегти шаблон</button>
-                        <button type="button" class="btn btn-outline-secondary" data-editor-reset="template">Скинути</button>
-                      </div>
-                    </form>
-                    <div class="academic-v2-stack mt-4">
-                      <% (subjectTemplates || []).forEach((template) => { %>
-                        <div class="academic-v2-template-row">
-                          <div>
-                            <strong><%= template.name %></strong>
-                            <div class="academic-v2-chip-row mt-2">
-                              <span class="academic-v2-chip <%= template.is_active ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= template.is_active ? 'Активний' : 'Неактивний' %></span>
-                              <span class="academic-v2-chip"><%= template.group_subject_count %> у всій системі</span>
-                              <span class="academic-v2-chip"><%= Number(currentSubjectTemplateLinks.get(Number(template.id || 0)) || 0) %> у вибраному курсі</span>
-                            </div>
-                          </div>
-                          <div class="academic-v2-actions">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="template" data-editor-payload='<%- toAttr(template) %>'>Редагувати</button>
-                            <button type="submit" class="btn btn-sm btn-outline-danger" formaction="/admin/pathways/v2/templates/<%= template.id %>/delete" formmethod="post">Видалити</button>
-                          </div>
-                        </div>
-                      <% }); %>
-                    </div>
-                  </div>
-
-                  <div class="academic-v2-subcard">
-                    <div class="academic-v2-section-head academic-v2-section-head--tight">
-                      <div>
                         <div class="academic-v2-subcard-topline">Живі предмети курсу</div>
-                        <h3 class="h5 mb-1">Операційний список предметів</h3>
-                        <p class="academic-v2-section-copy">Картки курсових предметів з readiness-станом, термами, викладачами, активностями та прапорцями видимості.</p>
+                        <h3 class="h6 mb-1">Операційний список предметів</h3>
+                        <!-- Live course subjects with readiness state -->
                       </div>
                       <div class="academic-v2-actions">
                         <button type="button" class="btn btn-outline-secondary" data-subject-create>Додати предмет до курсу</button>
@@ -1928,7 +1919,7 @@
                               </div>
                               <span class="academic-v2-chip <%= subject.readiness.tone === 'ok' ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= subject.readiness.label %></span>
                             </div>
-                            <div class="academic-v2-chip-row mt-3">
+                            <div class="academic-v2-chip-row mt-1">
                               <span class="academic-v2-chip"><%= subject.group_count %> підгруп</span>
                               <span class="academic-v2-chip">default G<%= subject.default_group %></span>
                               <span class="academic-v2-chip"><%= subject.teacher_count %> викладачів</span>
@@ -1948,7 +1939,7 @@
                                 <% }); %>
                               </div>
                             <% } %>
-                            <div class="academic-v2-actions mt-3">
+                            <div class="academic-v2-actions mt-2">
                               <button type="button" class="btn btn-sm btn-primary" data-editor-target="group-subject" data-editor-payload='<%- toAttr(subject) %>' data-subject-focus-id="<%= subject.id %>">Редагувати</button>
                               <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="group-subject" data-editor-payload='<%- toAttr(subject) %>' data-subject-focus-id="<%= subject.id %>" data-subject-focus-section="teachers">Викладачі</button>
                               <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="group-subject" data-editor-payload='<%- toAttr(subject) %>' data-subject-focus-id="<%= subject.id %>" data-subject-focus-section="activities">Активності</button>
@@ -1968,14 +1959,12 @@
 
                 <div class="academic-v2-detail-shell">
                   <div class="academic-v2-subcard academic-v2-detail-summary" id="subject-detail-summary">
-                    <div class="academic-v2-subcard-topline">Детальний редактор предмета</div>
-                    <h3 class="h5 mb-2" data-subject-detail-title><%= initialSubjectCard ? initialSubjectCard.title : 'Новий предмет курсу' %></h3>
-                    <p class="academic-v2-section-copy" data-subject-detail-copy>
-                      <%= initialSubjectCard
-                        ? `Керуй назвою, термами, викладачами, прапорцями видимості та набором активностей для предмета ${initialSubjectCard.title}.`
-                        : 'Вибери картку зліва або створи новий предмет. Детальний редактор працює всередині поточного курсу.' %>
+                    <div class="academic-v2-subcard-topline">Редактор</div>
+                    <h3 class="h6 mb-1" data-subject-detail-title><%= initialSubjectCard ? initialSubjectCard.title : 'Новий предмет курсу' %></h3>
+                    <p class="academic-v2-muted" style="font-size:0.74rem;" data-subject-detail-copy>
+                      <%= initialSubjectCard ? initialSubjectCard.title : 'Вибери предмет зліва' %>
                     </p>
-                    <div class="academic-v2-chip-row mt-3">
+                    <div class="academic-v2-chip-row mt-1">
                       <span class="academic-v2-chip" data-subject-detail-groups><%= initialSubjectCard ? `${initialSubjectCard.group_count} підгруп` : '1 підгрупа' %></span>
                       <span class="academic-v2-chip" data-subject-detail-terms><%= initialSubjectCard ? `${initialSubjectCard.term_count} термів` : '0 термів' %></span>
                       <span class="academic-v2-chip" data-subject-detail-teachers><%= initialSubjectCard ? `${initialSubjectCard.teacher_count} викладачів` : '0 викладачів' %></span>
@@ -1988,7 +1977,7 @@
                     <%- renderFocusFields() %>
                     <input type="hidden" name="group_subject_id" value="" data-editor-input="group-subject.id" />
                     <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" data-editor-input="group-subject.group_id" data-preserve-reset="1" />
-                    <div class="academic-v2-subcard-topline">Основні параметри</div>
+                    <div class="academic-v2-subcard-topline">Основне</div>
                     <div class="academic-v2-form-grid">
                       <div class="academic-v2-field">
                         <label for="groupSubjectTemplate">Шаблон предмета</label>
@@ -2042,7 +2031,7 @@
                       <input type="hidden" name="show_in_teamwork" value="0" />
                       <div class="form-check"><input id="groupSubjectTeamwork" class="form-check-input" type="checkbox" name="show_in_teamwork" value="1" data-editor-input="group-subject.show_in_teamwork" checked /><label class="form-check-label" for="groupSubjectTeamwork">Показувати в teamwork</label></div>
                     </div>
-                    <div class="academic-v2-actions mt-3">
+                    <div class="academic-v2-actions mt-2">
                       <button type="submit" class="btn btn-primary">Зберегти предмет</button>
                       <button type="button" class="btn btn-outline-secondary" data-editor-reset="group-subject">Скинути</button>
                     </div>
@@ -2052,14 +2041,14 @@
                     <div class="academic-v2-section-head academic-v2-section-head--tight">
                       <div>
                         <div class="academic-v2-subcard-topline">Спільний предмет</div>
-                        <h3 class="h5 mb-1">Shared-копії між курсами</h3>
-                        <p class="academic-v2-section-copy" data-group-subject-shared-copy>
+                        <h3 class="h6 mb-1">Shared-копії між курсами</h3>
+                        <p class="academic-v2-muted" style="font-size:0.74rem;" data-group-subject-shared-copy>
                           <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
-                            Цей предмет є linked-копією і керується з курсу «<%= initialSubjectSharedMeta.inbound_link.source_group_label %>».
+                            Linked-копія з «<%= initialSubjectSharedMeta.inbound_link.source_group_label %>»
                           <% } else if (initialSubjectSharedMeta.mode === 'source') { %>
-                            Цей предмет є базовим shared-джерелом для <%= initialSubjectSharedMeta.outbound_links.length %> курсів. Можна створювати нові linked-копії та вручну синхронізувати їхні налаштування.
+                            Shared-джерело для <%= initialSubjectSharedMeta.outbound_links.length %> курсів
                           <% } else { %>
-                            Перетворює поточний предмет на базове shared-джерело для інших курсів, але лишає окремі live rows у кожному курсі. Розклад лишається локальним для кожної копії.
+                            Standalone. Можна перетворити на shared-джерело.
                           <% } %>
                         </p>
                       </div>
@@ -2089,7 +2078,7 @@
                           </div>
                         </div>
                       </div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip">Setup синхронізується вручну</span>
                         <span class="academic-v2-chip">Терми мапляться за номером</span>
                         <span class="academic-v2-chip">Викладачі й активності копіюються</span>
@@ -2102,14 +2091,14 @@
                           <label class="form-check-label" for="groupSubjectShareOpenTarget">Після створення відкрити цільовий курс і linked-копію</label>
                         </div>
                       </div>
-                      <p class="academic-v2-section-copy mt-3 mb-0" data-group-subject-shared-feedback>
+                      <p class="academic-v2-muted mt-2 mb-0" style="font-size:0.74rem;" data-group-subject-shared-feedback>
                         <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
-                          Цей предмет уже керується з іншого курсу, тому створення shared-копій тут заблоковано.
+                          Заблоковано: керується з іншого курсу.
                         <% } else { %>
-                          Вибери курс, у якому треба створити shared-копію або підʼєднати наявний предмет того самого шаблону.
+                          Вибери курс-ціль для shared-копії.
                         <% } %>
                       </p>
-                      <div class="academic-v2-actions mt-3">
+                      <div class="academic-v2-actions mt-2">
                         <button type="submit" class="btn btn-primary" data-group-subject-share-submit disabled>Створити shared-копію</button>
                         <button
                           type="button"
@@ -2141,7 +2130,7 @@
                               </div>
                               <span class="academic-v2-chip">Linked-копія</span>
                             </div>
-                            <div class="academic-v2-actions mt-3">
+                            <div class="academic-v2-actions mt-2">
                               <a class="btn btn-sm btn-outline-secondary" href="<%= link.workspace_href %>">Відкрити</a>
                             </div>
                           </div>
@@ -2155,7 +2144,7 @@
                             </div>
                             <span class="academic-v2-chip academic-v2-chip--ok">Базове джерело</span>
                           </div>
-                          <div class="academic-v2-actions mt-3">
+                          <div class="academic-v2-actions mt-2">
                             <a class="btn btn-sm btn-outline-secondary" href="<%= initialSubjectSharedMeta.inbound_link.workspace_href %>">Відкрити джерело</a>
                           </div>
                         </div>
@@ -2171,8 +2160,8 @@
                     <div class="academic-v2-section-head academic-v2-section-head--tight">
                       <div>
                         <div class="academic-v2-subcard-topline">Повторне використання предмета</div>
-                        <h3 class="h5 mb-1">Призначити в інший курс</h3>
-                        <p class="academic-v2-section-copy">Створює окремий live subject у вибраному курсі без shared-звʼязку. Копіюються назва, прапорці, терми за номером, викладачі й активності. Розклад не переноситься.</p>
+                        <h3 class="h6 mb-1">Призначити в інший курс</h3>
+                        <p class="academic-v2-muted" style="font-size:0.74rem;">Копіює предмет без shared-звʼязку. Розклад не переноситься.</p>
                       </div>
                     </div>
                     <div class="academic-v2-form-grid academic-v2-form-grid--compact">
@@ -2190,7 +2179,7 @@
                         <div class="academic-v2-muted" data-group-subject-assign-summary>Вибери живий предмет зліва, щоб підготувати копію в інший курс.</div>
                       </div>
                     </div>
-                    <div class="academic-v2-chip-row mt-3">
+                    <div class="academic-v2-chip-row mt-1">
                       <span class="academic-v2-chip">Назва і прапорці</span>
                       <span class="academic-v2-chip">Терми за номером</span>
                       <span class="academic-v2-chip">Викладачі</span>
@@ -2204,8 +2193,8 @@
                         <label class="form-check-label" for="groupSubjectAssignOpenTarget">Після призначення відкрити цільовий курс і новий предмет</label>
                       </div>
                     </div>
-                    <p class="academic-v2-section-copy mt-3 mb-0" data-group-subject-assign-feedback>Вибери предмет і цільовий курс. Якщо в курсі вже є предмет на базі цього шаблону, опція буде заблокована.</p>
-                    <div class="academic-v2-actions mt-3">
+                    <p class="academic-v2-muted mt-2 mb-0" style="font-size:0.74rem;" data-group-subject-assign-feedback>Вибери предмет і курс-ціль.</p>
+                    <div class="academic-v2-actions mt-2">
                       <button type="submit" class="btn btn-primary" data-group-subject-assign-submit disabled>Призначити в інший курс</button>
                     </div>
                   </form>
@@ -2216,8 +2205,8 @@
                     <div class="academic-v2-section-head academic-v2-section-head--tight">
                       <div>
                         <div class="academic-v2-subcard-topline">Активності предмета</div>
-                        <h3 class="h5 mb-1">Керування лекціями, семінарами та практиками</h3>
-                        <p class="academic-v2-section-copy">Активності більше не живуть окремим сирим блоком. Це child-layer поточного предмета.</p>
+                        <h3 class="h6 mb-1">Керування лекціями, семінарами та практиками</h3>
+                        <!-- Activities: child-layer of the current subject -->
                       </div>
                     </div>
                     <div class="academic-v2-form-grid academic-v2-form-grid--compact">
@@ -2242,15 +2231,15 @@
                         <input id="groupSubjectActivitySortOrder" class="form-control" type="number" name="sort_order" data-editor-input="group-subject-activity.sort_order" value="0" />
                       </div>
                     </div>
-                    <div class="academic-v2-chip-row mt-3">
+                    <div class="academic-v2-chip-row mt-1">
                       <span class="academic-v2-chip">Lecture = для всіх підгруп</span>
                       <span class="academic-v2-chip">Seminar / Practice / Lab = по підгрупах</span>
                     </div>
-                    <div class="academic-v2-actions mt-3">
+                    <div class="academic-v2-actions mt-2">
                       <button type="submit" class="btn btn-primary">Зберегти активність</button>
                       <button type="button" class="btn btn-outline-secondary" data-editor-reset="group-subject-activity">Скинути</button>
                     </div>
-                    <div class="academic-v2-chip-row mt-3">
+                    <div class="academic-v2-chip-row mt-1">
                       <% activityPresetOptions.forEach((preset) => { %>
                         <button
                           type="submit"
@@ -2296,7 +2285,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Терми</h2>
-                  <p class="academic-v2-section-copy">Керування життєвим циклом термів поточного курсу: активний стан, архів, тижні і готовність до розкладу.</p>
+                  <!-- Terms: lifecycle, archive, week count, schedule readiness -->
                 </div>
                 <div class="academic-v2-chip-row">
                   <span class="academic-v2-chip <%= activeTermCount ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= activeTermCount %> активних</span>
@@ -2310,7 +2299,7 @@
                   <div class="academic-v2-stack">
                     <div class="academic-v2-subcard">
                       <div class="academic-v2-subcard-topline">Готовність</div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip <%= workspaceReadiness.hasActiveTerm ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= workspaceReadiness.hasActiveTerm ? 'Активний терм вибрано' : 'Активний терм відсутній' %></span>
                         <span class="academic-v2-chip"><%= workspaceReadiness.subjectBoundCount %> предметів привʼязані до термів</span>
                         <span class="academic-v2-chip"><%= workspaceReadiness.activityReadyCount %> предметів готові до розкладу</span>
@@ -2329,11 +2318,11 @@
                               <%= term.is_live ? 'Активний' : (term.is_archived ? 'Архів' : 'Неактивний') %>
                             </span>
                           </div>
-                          <div class="academic-v2-chip-row mt-3">
+                          <div class="academic-v2-chip-row mt-1">
                             <span class="academic-v2-chip"><%= term.schedule_entry_count %> слотів</span>
                             <span class="academic-v2-chip"><%= term.is_archived ? 'Архівний' : 'Живий' %></span>
                           </div>
-                          <div class="academic-v2-actions mt-3">
+                          <div class="academic-v2-actions mt-2">
                             <button type="button" class="btn btn-sm btn-primary" data-editor-target="term" data-editor-payload='<%- toAttr(term) %>'>Редагувати</button>
                             <form method="post" action="/admin/pathways/v2/terms/save">
                               <%- renderFocusFields() %>
@@ -2398,7 +2387,7 @@
                       <input type="hidden" name="is_archived" value="0" />
                       <div class="form-check"><input id="termArchived" class="form-check-input" type="checkbox" name="is_archived" value="1" data-editor-input="term.is_archived" /><label class="form-check-label" for="termArchived">Архівний</label></div>
                     </div>
-                    <div class="academic-v2-actions mt-3">
+                    <div class="academic-v2-actions mt-2">
                       <button type="submit" class="btn btn-primary">Зберегти терм</button>
                       <button type="button" class="btn btn-outline-secondary" data-editor-reset="term">Скинути</button>
                     </div>
@@ -2413,7 +2402,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Розклад</h2>
-                  <p class="academic-v2-section-copy">Grid-first редактор для вибраного терму. Календар є основним режимом, low-level row editor лишається як advanced fallback.</p>
+                  <!-- Schedule: grid-first editor, advanced row editor as fallback -->
                 </div>
                 <div class="academic-v2-chip-row">
                   <span class="academic-v2-chip"><%= selectedTermRecord ? selectedTermRecord.title : 'Терм не вибрано' %></span>
@@ -2429,11 +2418,11 @@
                   <div class="academic-v2-subcard" id="schedule-warning-preview">
                     <div class="academic-v2-subcard-topline">Попередження розкладу</div>
                     <% if (scheduleWarningEntries.length) { %>
-                      <h3 class="h5 mb-2">Що саме означає <%= workspaceReadiness.scheduleConflictCount %> попереджень</h3>
+                      <h3 class="h6 mb-1">Що саме означає <%= workspaceReadiness.scheduleConflictCount %> попереджень</h3>
                       <div class="academic-v2-muted">
                         Лічильник показує кількість слотів, у яких є хоча б одна проблема. Нижче є розбивка по причинах і кілька перших прикладів.
                       </div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip academic-v2-chip--warm"><%= scheduleWarningEntries.length %> слотів з проблемами</span>
                         <span class="academic-v2-chip"><%= scheduleWarningReasonTotal %> окремих причин</span>
                         <% scheduleWarningReasonBreakdown.slice(0, 4).forEach((item) => { %>
@@ -2461,7 +2450,7 @@
                       <% if (scheduleWarningHiddenCount > 0) { %>
                         <div class="academic-v2-muted mt-3">Ще <%= scheduleWarningHiddenCount %> слотів із попередженнями винесені в детальний список.</div>
                       <% } %>
-                      <div class="academic-v2-actions mt-3">
+                      <div class="academic-v2-actions mt-2">
                         <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Відкрити детальний розбір</a>
                         <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Усі слоти окремою сторінкою</a>
                       </div>
@@ -2473,16 +2462,16 @@
                   </div>
                   <div class="academic-v2-subcard">
                     <div class="academic-v2-subcard-topline">Окремий список слотів</div>
-                    <h3 class="h5 mb-2">Повний перелік пар більше не вантажиться в цьому workspace цілком</h3>
+                    <h3 class="h6 mb-1">Повний перелік пар більше не вантажиться в цьому workspace цілком</h3>
                     <div class="academic-v2-muted">
                       Основний робочий екран лишається grid-first. Повний список усіх слотів і детальний warning-report відкриваються окремо, щоб вкладка `Розклад` не гальмувала.
                     </div>
-                    <div class="academic-v2-chip-row mt-3">
+                    <div class="academic-v2-chip-row mt-1">
                       <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів</span>
                       <span class="academic-v2-chip"><%= schedulePreviewEntries.length %> слотів у швидкому preview</span>
                       <span class="academic-v2-chip"><%= scheduleBySubject.length %> предметів із розкладом</span>
                     </div>
-                    <div class="academic-v2-actions mt-3">
+                    <div class="academic-v2-actions mt-2">
                       <a class="btn btn-primary" href="<%= buildScheduleListHref() %>">Відкрити повний список слотів</a>
                       <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Тільки проблемні слоти</a>
                     </div>
@@ -2494,7 +2483,7 @@
                       <div class="academic-v2-section-head academic-v2-section-head--tight">
                         <div>
                           <div class="academic-v2-subcard-topline">Вигляд</div>
-                          <h3 class="h5 mb-1">Перемикання подань</h3>
+                          <h3 class="h6 mb-1">Перемикання подань</h3>
                         </div>
                         <div class="academic-v2-actions">
                           <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="calendar">Календар</button>
@@ -2504,7 +2493,7 @@
                           <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="advanced">Advanced</button>
                         </div>
                       </div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <% scheduleWeekOptions.forEach((weekNumber) => { %>
                           <button type="button" class="btn btn-sm btn-outline-secondary" data-schedule-week="<%= weekNumber %>">Тиждень <%= weekNumber %></button>
                         <% }); %>
@@ -2546,11 +2535,11 @@
                             <select id="schedulePlacementTargetGroups" class="form-select" multiple size="4"></select>
                           </div>
                         </div>
-                        <div class="academic-v2-chip-row mt-3">
+                        <div class="academic-v2-chip-row mt-1">
                           <span class="academic-v2-chip" id="schedulePlacementSummary">Оберіть предмет, режим і натисніть на слот у таблиці.</span>
                           <span class="academic-v2-chip academic-v2-chip--warm" id="schedulePlacementWarning">Лекції ставляться на всі підгрупи автоматично.</span>
                         </div>
-                        <div class="academic-v2-actions mt-3">
+                        <div class="academic-v2-actions mt-2">
                           <button type="button" class="btn btn-primary" id="schedulePlacementSave">Зберегти у вибраний слот</button>
                           <button type="button" class="btn btn-outline-secondary" data-schedule-bulk="duplicate-selected">Дублювати рядок</button>
                           <button type="button" class="btn btn-outline-secondary" data-schedule-bulk="copy-next-week">Копія на наступний тиждень</button>
@@ -2621,7 +2610,7 @@
                         <% if (scheduleBySubjectHiddenCount > 0) { %>
                           <div class="academic-v2-muted mt-3">Ще <%= scheduleBySubjectHiddenCount %> предметів із розкладом винесені на окрему сторінку.</div>
                         <% } %>
-                        <div class="academic-v2-actions mt-3">
+                        <div class="academic-v2-actions mt-2">
                           <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Усі предмети і всі слоти</a>
                         </div>
                       <% } else { %>
@@ -2673,7 +2662,7 @@
                           </div>
                         <% }); %>
                       </div>
-                      <div class="academic-v2-actions mt-3">
+                      <div class="academic-v2-actions mt-2">
                         <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Повний список по підгрупах</a>
                       </div>
                     </div>
@@ -2730,7 +2719,7 @@
                             <div id="scheduleTargetGroupsHint" class="academic-v2-muted mt-2">Спершу вибери предмет і режим активності. Лекції використовують усі підгрупи автоматично.</div>
                           </div>
                         </div>
-                        <div class="academic-v2-actions mt-3">
+                        <div class="academic-v2-actions mt-2">
                           <button type="submit" class="btn btn-primary">Зберегти слот</button>
                           <button type="button" class="btn btn-outline-secondary" data-editor-reset="schedule">Скинути</button>
                         </div>
@@ -2762,7 +2751,7 @@
                         <% if (schedulePreviewHiddenCount > 0) { %>
                           <div class="academic-v2-muted mt-3">Ще <%= schedulePreviewHiddenCount %> слотів винесено на окрему сторінку, щоб ця вкладка відкривалась швидше.</div>
                         <% } %>
-                        <div class="academic-v2-actions mt-3">
+                        <div class="academic-v2-actions mt-2">
                           <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Відкрити повний список слотів</a>
                           <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Проблемні слоти</a>
                         </div>
@@ -2781,7 +2770,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Викладачі</h2>
-                  <p class="academic-v2-section-copy">Окремий зріз по teacher coverage: хто що веде в межах поточного курсу та які предмети ще потребують призначення.</p>
+                  <!-- Teacher coverage for current course -->
                 </div>
               </div>
               <% if (teacherCoverageCards.length) { %>
@@ -2795,7 +2784,7 @@
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-workspace-tab-target="schedule">Розклад</button>
                       </div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <% teacher.subject_titles.forEach((title) => { %>
                           <span class="academic-v2-chip"><%= title %></span>
                         <% }); %>
@@ -2812,7 +2801,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Студенти та перепризначення</h2>
-                  <p class="academic-v2-section-copy">Безпечна панель масового призначення до поточного курсу з попереднім підсумком і явним підтвердженням перед записом.</p>
+                  <!-- Bulk enrollment with preview and confirmation -->
                 </div>
                 <div class="academic-v2-chip-row">
                   <span class="academic-v2-chip"><%= selectedGroupUsersList.length %> вже в курсі</span>
@@ -2833,7 +2822,7 @@
                           <% }); %>
                         </select>
                       </div>
-                      <div class="academic-v2-chip-row mt-3">
+                      <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip" id="studentSelectionCount">0 вибрано</span>
                         <span class="academic-v2-chip"><%= selectedGroup.label %></span>
                         <span class="academic-v2-chip"><%= selectedGroupUsersList.length %> зараз у курсі</span>
@@ -2841,7 +2830,7 @@
                       <div class="academic-v2-alert academic-v2-alert--warning mt-3" id="studentBulkConfirmText">
                         Перед застосуванням перевір підсумок: скільки людей вибрано і в який курс вони підуть.
                       </div>
-                      <div class="academic-v2-actions mt-3">
+                      <div class="academic-v2-actions mt-2">
                         <button type="submit" class="btn btn-primary">Застосувати перепризначення</button>
                       </div>
                     </div>
@@ -2925,6 +2914,10 @@
         const modePanels = Array.from(document.querySelectorAll('[data-mode-panel]'));
         const workspaceTabButtons = Array.from(document.querySelectorAll('[data-workspace-tab-target]'));
         const workspacePanels = Array.from(document.querySelectorAll('[data-workspace-panel]'));
+        const structureTabButtons = Array.from(document.querySelectorAll('[data-structure-tab-target]'));
+        const structurePanels = Array.from(document.querySelectorAll('[data-structure-panel]'));
+        const diagnosticsTabButtons = Array.from(document.querySelectorAll('[data-diagnostics-tab-target]'));
+        const diagnosticsPanels = Array.from(document.querySelectorAll('[data-diagnostics-panel]'));
         const scheduleViewButtons = Array.from(document.querySelectorAll('[data-schedule-view-target]'));
         const scheduleViewPanels = Array.from(document.querySelectorAll('[data-schedule-view-panel]'));
         const scheduleWeekButtons = Array.from(document.querySelectorAll('[data-schedule-week]'));
@@ -3008,8 +3001,24 @@
         ].join(':');
         const workspaceStateStorageKey = `academic-v2-workspace:${workspaceScopeKey}`;
 
-        let activeMode = workspaceDefaultMode;
+        const normalizeModeName = (value) => {
+          const mode = String(value || '').trim().toLowerCase();
+          if (mode === 'workspace') {
+            return 'operate';
+          }
+          if (mode === 'architecture') {
+            return 'structure';
+          }
+          if (mode === 'operate' || mode === 'structure' || mode === 'diagnostics') {
+            return mode;
+          }
+          return 'operate';
+        };
+
+        let activeMode = normalizeModeName(workspaceDefaultMode);
         let activeWorkspaceTab = 'overview';
+        let activeStructureTab = <%- JSON.stringify(Boolean(selectedGroup)) %> ? 'courses' : 'programs';
+        let activeDiagnosticsTab = 'projection';
         let activeScheduleView = 'calendar';
         let activeScheduleWeek = 1;
         let activeSubjectId = defaultSubjectId;
@@ -3302,6 +3311,8 @@
         const buildWorkspaceState = () => ({
           mode: activeMode,
           workspaceTab: activeWorkspaceTab,
+          structureTab: activeStructureTab,
+          diagnosticsTab: activeDiagnosticsTab,
           scheduleView: activeScheduleView,
           scheduleWeek: Number(activeScheduleWeek || 1) || 1,
           subjectId: Number(activeSubjectId || 0) || 0,
@@ -3334,6 +3345,16 @@
               .map((button) => String(button.getAttribute('data-workspace-tab-target') || '').trim())
               .filter(Boolean)
           );
+          const allowedStructureTabs = new Set(
+            structureTabButtons
+              .map((button) => String(button.getAttribute('data-structure-tab-target') || '').trim())
+              .filter(Boolean)
+          );
+          const allowedDiagnosticsTabs = new Set(
+            diagnosticsTabButtons
+              .map((button) => String(button.getAttribute('data-diagnostics-tab-target') || '').trim())
+              .filter(Boolean)
+          );
           const allowedScheduleViews = new Set(
             scheduleViewButtons
               .map((button) => String(button.getAttribute('data-schedule-view-target') || '').trim())
@@ -3364,12 +3385,18 @@
             }
           }
           return {
-            mode: allowedModes.has(String(rawState.mode || '').trim())
-              ? String(rawState.mode || '').trim()
+            mode: allowedModes.has(normalizeModeName(rawState.mode))
+              ? normalizeModeName(rawState.mode)
               : workspaceDefaultMode,
             workspaceTab: allowedTabs.has(String(rawState.workspaceTab || '').trim())
               ? String(rawState.workspaceTab || '').trim()
               : 'overview',
+            structureTab: allowedStructureTabs.has(String(rawState.structureTab || '').trim())
+              ? String(rawState.structureTab || '').trim()
+              : activeStructureTab,
+            diagnosticsTab: allowedDiagnosticsTabs.has(String(rawState.diagnosticsTab || '').trim())
+              ? String(rawState.diagnosticsTab || '').trim()
+              : activeDiagnosticsTab,
             scheduleView: allowedScheduleViews.has(String(rawState.scheduleView || '').trim())
               ? String(rawState.scheduleView || '').trim()
               : 'calendar',
@@ -3412,6 +3439,8 @@
         if (initialWorkspaceState) {
           activeMode = initialWorkspaceState.mode;
           activeWorkspaceTab = initialWorkspaceState.workspaceTab;
+          activeStructureTab = initialWorkspaceState.structureTab;
+          activeDiagnosticsTab = initialWorkspaceState.diagnosticsTab;
           activeScheduleView = initialWorkspaceState.scheduleView;
           activeScheduleWeek = initialWorkspaceState.scheduleWeek;
           activeSubjectId = initialWorkspaceState.subjectId;
@@ -3429,7 +3458,7 @@
           }
         }
         if (requestedSubjectId && getSubjectCardById(requestedSubjectId)) {
-          activeMode = 'workspace';
+          activeMode = 'operate';
           activeWorkspaceTab = normalizedRequestedWorkspaceTab || 'subjects';
           activeSubjectId = requestedSubjectId;
         }
@@ -3675,7 +3704,7 @@
                   </div>
                   <span class="academic-v2-chip">Linked-копія</span>
                 </div>
-                <div class="academic-v2-actions mt-3">
+                <div class="academic-v2-actions mt-2">
                   <a class="btn btn-sm btn-outline-secondary" href="${escapeHtml(link.workspace_href || '/admin/pathways')}">Відкрити</a>
                 </div>
               </div>
@@ -3691,7 +3720,7 @@
                   </div>
                   <span class="academic-v2-chip academic-v2-chip--ok">Базове джерело</span>
                 </div>
-                <div class="academic-v2-actions mt-3">
+                <div class="academic-v2-actions mt-2">
                   <a class="btn btn-sm btn-outline-secondary" href="${escapeHtml(meta.inbound_link.workspace_href || '/admin/pathways')}">Відкрити джерело</a>
                 </div>
               </div>
@@ -3926,12 +3955,17 @@
         };
 
         const setMode = (mode) => {
-          activeMode = mode === 'workspace' ? 'workspace' : 'architecture';
+          const normalizedMode = normalizeModeName(mode);
+          activeMode = ['operate', 'structure', 'diagnostics'].includes(normalizedMode) ? normalizedMode : 'operate';
           modePanels.forEach((panel) => {
             panel.hidden = panel.getAttribute('data-mode-panel') !== activeMode;
           });
           modeButtons.forEach((button) => {
-            button.classList.toggle('is-active', String(button.getAttribute('data-mode-button') || '') === activeMode);
+            button.classList.toggle(
+              'is-active',
+              button.classList.contains('academic-v2-mode-button')
+              && String(button.getAttribute('data-mode-button') || '') === activeMode
+            );
           });
           persistWorkspaceState();
         };
@@ -3944,7 +3978,31 @@
           workspaceTabButtons.forEach((button) => {
             button.classList.toggle('is-active', String(button.getAttribute('data-workspace-tab-target') || '') === activeWorkspaceTab);
           });
-          setMode('workspace');
+          setMode('operate');
+          persistWorkspaceState();
+        };
+
+        const setStructureTab = (tab) => {
+          activeStructureTab = tab || 'programs';
+          structurePanels.forEach((panel) => {
+            panel.hidden = panel.getAttribute('data-structure-panel') !== activeStructureTab;
+          });
+          structureTabButtons.forEach((button) => {
+            button.classList.toggle('is-active', String(button.getAttribute('data-structure-tab-target') || '') === activeStructureTab);
+          });
+          setMode('structure');
+          persistWorkspaceState();
+        };
+
+        const setDiagnosticsTab = (tab) => {
+          activeDiagnosticsTab = tab || 'projection';
+          diagnosticsPanels.forEach((panel) => {
+            panel.hidden = panel.getAttribute('data-diagnostics-panel') !== activeDiagnosticsTab;
+          });
+          diagnosticsTabButtons.forEach((button) => {
+            button.classList.toggle('is-active', String(button.getAttribute('data-diagnostics-tab-target') || '') === activeDiagnosticsTab);
+          });
+          setMode('diagnostics');
           persistWorkspaceState();
         };
 
@@ -3990,12 +4048,27 @@
           });
           if (target === 'group') {
             syncGroupTeacherDefaultVisibility();
+            setStructureTab('courses');
+          }
+          if (target === 'program') {
+            setStructureTab('programs');
+          }
+          if (target === 'cohort') {
+            setStructureTab('cohorts');
+          }
+          if (target === 'template') {
+            setStructureTab('subject-templates');
+          }
+          if (target === 'stage-term' || target === 'stage-subject' || target === 'stage-subject-activity') {
+            setStructureTab('stage-templates');
           }
           if (target === 'group-subject') {
             updateSubjectDetail(payload.id);
+            setWorkspaceTab('subjects');
           }
           if (target === 'group-subject-activity') {
             updateSubjectDetail(payload.group_subject_id);
+            setWorkspaceTab('subjects');
           }
           if (target === 'term') {
             setWorkspaceTab('terms');
@@ -4118,6 +4191,14 @@
           button.addEventListener('click', () => {
             const targetMode = button.getAttribute('data-mode-button');
             if (targetMode) {
+              if (targetMode === 'structure') {
+                setStructureTab(activeStructureTab);
+                return;
+              }
+              if (targetMode === 'diagnostics') {
+                setDiagnosticsTab(activeDiagnosticsTab);
+                return;
+              }
               setMode(targetMode);
             }
           });
@@ -4128,6 +4209,24 @@
             const targetTab = button.getAttribute('data-workspace-tab-target');
             if (targetTab) {
               setWorkspaceTab(targetTab);
+            }
+          });
+        });
+
+        structureTabButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-structure-tab-target');
+            if (targetTab) {
+              setStructureTab(targetTab);
+            }
+          });
+        });
+
+        diagnosticsTabButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-diagnostics-tab-target');
+            if (targetTab) {
+              setDiagnosticsTab(targetTab);
             }
           });
         });
@@ -4516,9 +4615,12 @@
         syncScheduleActivityState();
         syncSchedulePlacementState();
         updateSubjectDetail(activeSubjectId);
+        const initialMode = activeMode;
         setWorkspaceTab(activeWorkspaceTab);
+        setStructureTab(activeStructureTab);
+        setDiagnosticsTab(activeDiagnosticsTab);
         setScheduleView(activeScheduleView);
-        setMode(activeMode);
+        setMode(initialMode);
         if (activeWorkspaceTab === 'subjects' && activeSubjectId) {
           const persistedSubject = getSubjectCardById(activeSubjectId);
           if (persistedSubject) {

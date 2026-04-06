@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.24",
+      "date": "2026-04-06",
+      "items": [
+        "refactor(academic-setup-v2-workspace): rebuild `/admin/pathways` into a denser desktop-first operator workspace with a sticky scope strip, clear `Operate / Structure / Diagnostics` modes, compact secondary tabs, diagnostics separated from daily course work, the global subject template catalog moved out of live subjects into structure, a standalone bachelor catalog panel, and tighter Apple-style table/control density for daily admin use on laptop screens"
+      ]
+    },
+    {
       "version": "1.4.23",
       "date": "2026-04-06",
       "items": [
