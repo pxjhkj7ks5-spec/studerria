@@ -25,6 +25,11 @@
     : [];
   const cleanupAudit = auditSummary && typeof auditSummary === 'object' ? auditSummary : {};
   const stageOptions = [1, 2, 3, 4];
+  const termOptions = [
+    { value: 1, label: 'Term 1', weeks: 15 },
+    { value: 2, label: 'Term 2', weeks: 15 },
+    { value: 3, label: 'Term 3', weeks: 7 },
+  ];
   const trackOptions = [
     { value: 'bachelor', label: 'Bachelor' },
     { value: 'master', label: 'Master' },
@@ -1211,19 +1216,23 @@
                         <div class="academic-v2-form-grid academic-v2-form-grid--compact">
                           <div class="academic-v2-field">
                             <label for="stageTermNumber">Term number</label>
-                            <input id="stageTermNumber" class="form-control" type="number" name="term_number" data-editor-input="stage-term.term_number" value="1" required />
+                            <select id="stageTermNumber" class="form-select" name="term_number" data-editor-input="stage-term.term_number">
+                              <% termOptions.forEach((term) => { %>
+                                <option value="<%= term.value %>"><%= term.label %></option>
+                              <% }); %>
+                            </select>
                           </div>
                           <div class="academic-v2-field">
                             <label for="stageTermTitle">Title</label>
-                            <input id="stageTermTitle" class="form-control" type="text" name="title" data-editor-input="stage-term.title" placeholder="Semester 1" required />
+                            <input id="stageTermTitle" class="form-control" type="text" name="title" data-editor-input="stage-term.title" placeholder="Term 1" required />
                           </div>
                           <div class="academic-v2-field">
                             <label for="stageTermStartDate">Start date</label>
                             <input id="stageTermStartDate" class="form-control" type="date" name="start_date" data-editor-input="stage-term.start_date" />
                           </div>
                           <div class="academic-v2-field">
-                            <label for="stageTermWeeks">Weeks</label>
-                            <input id="stageTermWeeks" class="form-control" type="number" name="weeks_count" data-editor-input="stage-term.weeks_count" value="16" />
+                            <label>Weeks</label>
+                            <div class="academic-v2-muted">Fixed presets: T1 = 15, T2 = 15, T3 = 7.</div>
                           </div>
                         </div>
                         <input type="hidden" name="is_active_default" value="0" />
@@ -1249,10 +1258,6 @@
                                   </div>
                                   <div class="academic-v2-actions">
                                     <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-term" data-editor-payload='<%- toAttr(stageTerm) %>'>Edit</button>
-                                    <form method="post" action="/admin/pathways/v2/stage-terms/<%= stageTerm.id %>/delete">
-                                      <%- renderFocusFields() %>
-                                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                    </form>
                                   </div>
                                 </div>
                               </div>
@@ -1596,10 +1601,10 @@
                                     <div class="academic-v2-field">
                                       <label>Terms</label>
                                       <div class="academic-v2-chip-row">
-                                        <% [1, 2].forEach((termNumber) => { %>
+                                        <% termOptions.forEach((term) => { %>
                                           <label class="academic-v2-chip">
-                                            <input type="checkbox" name="term_numbers" value="<%= termNumber %>" <%= currentTermNumbers.includes(termNumber) ? 'checked' : '' %> />
-                                            T<%= termNumber %>
+                                            <input type="checkbox" name="term_numbers" value="<%= term.value %>" <%= currentTermNumbers.includes(term.value) ? 'checked' : '' %> />
+                                            T<%= term.value %>
                                           </label>
                                         <% }); %>
                                       </div>
@@ -2376,10 +2381,6 @@
                               <button type="submit" class="btn btn-sm btn-outline-secondary"><%= term.is_archived ? 'Повернути з архіву' : 'В архів' %></button>
                             </form>
                             <a class="btn btn-sm btn-outline-secondary" href="<%= buildFocusHref({ term_id: term.id }) %>">Відкрити розклад</a>
-                            <form method="post" action="/admin/pathways/v2/terms/<%= term.id %>/delete">
-                              <%- renderFocusFields() %>
-                              <button type="submit" class="btn btn-sm btn-outline-danger">Видалити</button>
-                            </form>
                           </div>
                         </div>
                       <% }); %>
@@ -2393,19 +2394,23 @@
                     <div class="academic-v2-form-grid">
                       <div class="academic-v2-field">
                         <label for="termNumber">Номер терму</label>
-                        <input id="termNumber" class="form-control" type="number" name="term_number" data-editor-input="term.term_number" value="1" required />
+                        <select id="termNumber" class="form-select" name="term_number" data-editor-input="term.term_number">
+                          <% termOptions.forEach((term) => { %>
+                            <option value="<%= term.value %>"><%= term.label %></option>
+                          <% }); %>
+                        </select>
                       </div>
                       <div class="academic-v2-field" style="grid-column: 1 / -1;">
                         <label for="termTitle">Назва</label>
-                        <input id="termTitle" class="form-control" type="text" name="title" data-editor-input="term.title" placeholder="Осінній терм" required />
+                        <input id="termTitle" class="form-control" type="text" name="title" data-editor-input="term.title" placeholder="Term 1" required />
                       </div>
                       <div class="academic-v2-field">
                         <label for="termStartDate">Дата старту</label>
                         <input id="termStartDate" class="form-control" type="date" name="start_date" data-editor-input="term.start_date" />
                       </div>
                       <div class="academic-v2-field">
-                        <label for="termWeeks">Кількість тижнів</label>
-                        <input id="termWeeks" class="form-control" type="number" name="weeks_count" data-editor-input="term.weeks_count" value="16" />
+                        <label>Кількість тижнів</label>
+                        <div class="academic-v2-muted">Фіксовано: T1 = 15, T2 = 15, T3 = 7.</div>
                       </div>
                     </div>
                     <div class="academic-v2-checkboxes mt-3">

@@ -10476,6 +10476,8 @@ function getAcademicV2RouteMessages(req) {
     GROUP_LABEL_REQUIRED: 'Назва групи обов’язкова',
     GROUP_REQUIRED: 'Спочатку виберіть групу',
     TERM_NOT_FOUND: 'Терм не знайдено',
+    TERM_NUMBER_ALREADY_EXISTS: 'У курсі вже існує терм із цим номером',
+    CANONICAL_TERM_DELETE_BLOCKED: 'Фіксовані терми T1, T2 і T3 не можна видаляти',
     TEMPLATE_NAME_REQUIRED: 'Назва шаблону предмета обов’язкова',
     GROUP_SUBJECT_TARGET_REQUIRED: 'Для предмета групи треба вибрати групу і шаблон',
     GROUP_SUBJECT_NOT_FOUND: 'Предмет групи не знайдено',
@@ -10507,6 +10509,8 @@ function getAcademicV2RouteMessages(req) {
     BACHELOR_CATALOG_SOURCE_NOT_FOUND: 'Вибране джерело бакалаврського каталогу не знайдено',
     BACHELOR_CATALOG_TEMPLATE_REQUIRED: 'У рядка бакалаврського каталогу немає назви шаблону',
     BACHELOR_CATALOG_ENTRY_NOT_FOUND: 'Вибраний рядок бакалаврського каталогу не знайдено',
+    STAGE_TERM_NUMBER_ALREADY_EXISTS: 'Для цього stage вже існує term template з таким номером',
+    CANONICAL_STAGE_TERM_DELETE_BLOCKED: 'Фіксовані stage terms T1, T2 і T3 не можна видаляти',
   } : {
     unknown: 'Unable to save academic v2 changes',
     programSaved: 'Program saved',
@@ -10530,6 +10534,8 @@ function getAcademicV2RouteMessages(req) {
     GROUP_LABEL_REQUIRED: 'Group label is required',
     GROUP_REQUIRED: 'Select a group first',
     TERM_NOT_FOUND: 'Term not found',
+    TERM_NUMBER_ALREADY_EXISTS: 'That course already has a term with this number',
+    CANONICAL_TERM_DELETE_BLOCKED: 'Fixed terms T1, T2, and T3 cannot be deleted',
     TEMPLATE_NAME_REQUIRED: 'Subject template name is required',
     GROUP_SUBJECT_TARGET_REQUIRED: 'Group subject requires both group and template',
     GROUP_SUBJECT_NOT_FOUND: 'Group subject not found',
@@ -10561,6 +10567,8 @@ function getAcademicV2RouteMessages(req) {
     BACHELOR_CATALOG_SOURCE_NOT_FOUND: 'The selected bachelor catalog source was not found.',
     BACHELOR_CATALOG_TEMPLATE_REQUIRED: 'Bachelor catalog entry is missing a template name.',
     BACHELOR_CATALOG_ENTRY_NOT_FOUND: 'The selected bachelor catalog row was not found.',
+    STAGE_TERM_NUMBER_ALREADY_EXISTS: 'That stage already has a term template with this number.',
+    CANONICAL_STAGE_TERM_DELETE_BLOCKED: 'Fixed stage terms T1, T2, and T3 cannot be deleted.',
   };
 }
 

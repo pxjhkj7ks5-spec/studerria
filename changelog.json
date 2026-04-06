@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.26",
+      "date": "2026-04-06",
+      "items": [
+        "feat(academic-v2-terms): switch Academic Setup v2 to a fixed three-term model with canonical T1/T2/T3 topology, hard-code week counts to 15/15/7 across live terms and stage templates, extend bachelor-catalog term bindings to T3, auto-normalize selected Academic V2 program/course term sets, remove manual week editing from the v2 term editors, and block deletion or duplication of the canonical term numbers"
+      ]
+    },
+    {
       "version": "1.4.25",
       "date": "2026-04-06",
       "items": [

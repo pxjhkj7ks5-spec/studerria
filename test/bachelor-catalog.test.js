@@ -211,8 +211,9 @@ function createMockAcademicV2Store(options = {}) {
           stage_template_id: Number(params[0] || 0),
           term_number: Number(params[1] || 1),
           title: String(params[2] || ''),
-          is_active_default: Boolean(params[3]),
-          sort_order: Number(params[4] || 0),
+          weeks_count: Number(params[3] || 0) || 15,
+          is_active_default: Boolean(params[4]),
+          sort_order: Number(params[5] || 0),
         };
         nextIds.stageTermTemplate += 1;
         state.stageTermTemplates.push(row);
@@ -320,6 +321,22 @@ function createMockAcademicV2Store(options = {}) {
         state.stageSubjectTerms = state.stageSubjectTerms.filter((row) => (
           Number(row.stage_subject_template_id || 0) !== stageSubjectTemplateId
         ));
+        return;
+      }
+
+      if (
+        query.includes('UPDATE academic_v2_program_stage_term_templates')
+        && query.includes('SET title = ?')
+        && query.includes('weeks_count = ?')
+        && query.includes('sort_order = ?')
+      ) {
+        const row = state.stageTermTemplates.find((item) => Number(item.id || 0) === Number(params[3] || 0));
+        if (!row) {
+          return;
+        }
+        row.title = String(params[0] || '');
+        row.weeks_count = Number(params[1] || 0) || row.weeks_count;
+        row.sort_order = Number(params[2] || 0);
         return;
       }
 
@@ -472,7 +489,7 @@ test('buildBachelorCatalogRows marks manual overrides as customized', async () =
   assert.equal(row.current_is_required, false);
 });
 
-test('syncBachelorCatalogSource creates missing templates, term 1/2, and lecture+seminar activities', async () => {
+test('syncBachelorCatalogSource creates missing templates, term 1/2/3, and lecture+seminar activities', async () => {
   const store = createMockAcademicV2Store();
 
   const result = await academicV2Helpers.syncBachelorCatalogSource(store, {
@@ -491,7 +508,7 @@ test('syncBachelorCatalogSource creates missing templates, term 1/2, and lecture
     .filter((row) => row.stage_template_id === stageOneTemplate.id)
     .map((row) => row.term_number)
     .sort((left, right) => left - right);
-  assert.deepEqual(stageOneTerms, [1, 2]);
+  assert.deepEqual(stageOneTerms, [1, 2, 3]);
 
   const philosophyStageSubject = store.state.stageSubjects.find((row) => (
     row.stage_template_id === stageOneTemplate.id
@@ -515,8 +532,8 @@ test('syncBachelorCatalogSource does not overwrite manual required/general flags
       { id: 21, program_id: 11, stage_number: 1 },
     ],
     stageTermTemplates: [
-      { id: 31, stage_template_id: 21, term_number: 1, title: 'Term 1' },
-      { id: 32, stage_template_id: 21, term_number: 2, title: 'Term 2' },
+      { id: 31, stage_template_id: 21, term_number: 1, title: 'Term 1', weeks_count: 15, is_active_default: true, sort_order: 1 },
+      { id: 32, stage_template_id: 21, term_number: 2, title: 'Term 2', weeks_count: 15, is_active_default: false, sort_order: 2 },
     ],
     stageSubjects: [
       {
@@ -556,7 +573,7 @@ test('syncBachelorCatalogSource does not overwrite manual required/general flags
   );
 });
 
-test('saveBachelorCatalogRow creates a row, auto-creates term 1/2, and applies lecture+seminar by default', async () => {
+test('saveBachelorCatalogRow creates a row, auto-creates term 1/2/3, and applies lecture+seminar by default', async () => {
   const store = createMockAcademicV2Store();
 
   await academicV2Helpers.saveBachelorCatalogRow(store, {
@@ -579,7 +596,7 @@ test('saveBachelorCatalogRow creates a row, auto-creates term 1/2, and applies l
       .filter((row) => row.stage_template_id === stageTemplate.id)
       .map((row) => row.term_number)
       .sort((left, right) => left - right),
-    [1, 2]
+    [1, 2, 3]
   );
 
   const stageSubject = store.state.stageSubjects.find((row) => (
@@ -616,8 +633,8 @@ test('saveBachelorCatalogRow preserves extra practice activity on existing rows 
       { id: 21, program_id: 11, stage_number: 1 },
     ],
     stageTermTemplates: [
-      { id: 31, stage_template_id: 21, term_number: 1, title: 'Term 1' },
-      { id: 32, stage_template_id: 21, term_number: 2, title: 'Term 2' },
+      { id: 31, stage_template_id: 21, term_number: 1, title: 'Term 1', weeks_count: 15, is_active_default: true, sort_order: 1 },
+      { id: 32, stage_template_id: 21, term_number: 2, title: 'Term 2', weeks_count: 15, is_active_default: false, sort_order: 2 },
     ],
     stageSubjects: [
       {
