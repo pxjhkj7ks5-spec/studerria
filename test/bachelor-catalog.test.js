@@ -370,8 +370,11 @@ test('bachelor catalog container-title helper excludes minor and block headers',
 
 test('bachelor semester-column mapper resolves stage and term pairs', () => {
   assert.deepEqual(mapBachelorSemesterColumnToStageTerm(10), { stage_number: 1, term_number: 1 });
+  assert.deepEqual(mapBachelorSemesterColumnToStageTerm(12), { stage_number: 1, term_number: 3 });
+  assert.deepEqual(mapBachelorSemesterColumnToStageTerm(15), { stage_number: 2, term_number: 3 });
   assert.deepEqual(mapBachelorSemesterColumnToStageTerm(17), { stage_number: 3, term_number: 2 });
-  assert.equal(mapBachelorSemesterColumnToStageTerm(12), null);
+  assert.deepEqual(mapBachelorSemesterColumnToStageTerm(21), { stage_number: 4, term_number: 3 });
+  assert.equal(mapBachelorSemesterColumnToStageTerm(22), null);
 });
 
 test('minor coursework template builder appends the minor suffix for duplicate titles', () => {
@@ -423,6 +426,25 @@ test('bachelor catalog source registry exposes the expected seed size', () => {
   assert.ok(source);
   assert.equal(source.entry_count, 77);
   assert.equal(listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY).length, 77);
+});
+
+test('bachelor catalog keeps workbook-derived third-semester placements in the source registry', () => {
+  const rows = listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY);
+  const diplomacyProtocol = rows.find((item) => item.source_code === '1.1.11.');
+  const secondForeignLanguage = rows.find((item) => item.source_code === '2.2.1.');
+  const finalExam = rows.find((item) => item.source_code === '3.2.');
+
+  assert.ok(diplomacyProtocol);
+  assert.equal(diplomacyProtocol.suggested_stage_number, 1);
+  assert.deepEqual(diplomacyProtocol.suggested_term_numbers, [3]);
+
+  assert.ok(secondForeignLanguage);
+  assert.equal(secondForeignLanguage.suggested_stage_number, 3);
+  assert.deepEqual(secondForeignLanguage.suggested_term_numbers, [3]);
+
+  assert.ok(finalExam);
+  assert.equal(finalExam.suggested_stage_number, 4);
+  assert.deepEqual(finalExam.suggested_term_numbers, [3]);
 });
 
 test('buildBachelorCatalogRows marks default row as seeded when stage, terms, flags, and activities match', async () => {

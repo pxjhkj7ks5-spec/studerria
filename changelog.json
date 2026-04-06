@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.28",
+      "date": "2026-04-06",
+      "items": [
+        "fix(academic-v2-bachelor-t3): complete the workbook-derived bachelor semester column map with canonical third-semester columns for all four stages, and lock the source registry with tests so the seeded T3 subjects stay assigned to the correct grades and semesters in code"
+      ]
+    },
+    {
       "version": "1.4.27",
       "date": "2026-04-06",
       "items": [
