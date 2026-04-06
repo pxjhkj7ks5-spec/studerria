@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.22",
+      "date": "2026-04-06",
+      "items": [
+        "feat(academic-v2-bachelor-catalog): add a code-backed bachelor subject registry seeded from the bachelor workbook, expose a bachelor-only bulk catalog editor in `/admin/pathways`, add non-destructive source sync and inline stage/term/general/required saving on top of existing Academic V2 templates, preserve manual activity overrides while defaulting new rows to lecture + seminar, and cover the new source, service, and render paths with catalog-focused tests"
+      ]
+    },
+    {
       "version": "1.4.21",
       "date": "2026-04-05",
       "items": [

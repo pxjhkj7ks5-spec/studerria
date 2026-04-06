@@ -9,6 +9,7 @@
   const activeGroupId = numberOrZero(focusState.groupId);
   const activeTermId = numberOrZero(focusState.termId);
   const activeTemplateStage = numberOrZero(focusState.templateStageNumber) || 1;
+  const activeBachelorCatalogSourceKey = String(focusState.bachelorCatalogSourceKey || selectedBachelorCatalogSourceKey || '').trim();
   const projectionHealthList = Array.isArray(projectionHealth) ? projectionHealth : [];
   const projectionHealthByGroup = new Map(projectionHealthList.map((item) => [Number(item.group_id || 0), item]));
   const projectionHealthTotals = projectionHealthSummary && typeof projectionHealthSummary === 'object' ? projectionHealthSummary : {};
@@ -50,6 +51,23 @@
   const scopedGroupSubjectActivitiesList = Array.isArray(scopedGroupSubjectActivities) ? scopedGroupSubjectActivities : [];
   const scopedStageSubjectTemplatesList = Array.isArray(scopedStageSubjectTemplates) ? scopedStageSubjectTemplates : [];
   const scopedStageSubjectActivitiesList = Array.isArray(scopedStageSubjectActivities) ? scopedStageSubjectActivities : [];
+  const bachelorCatalogSourcesList = Array.isArray(bachelorCatalogSources) ? bachelorCatalogSources : [];
+  const bachelorCatalogRowsList = Array.isArray(bachelorCatalogRows) ? bachelorCatalogRows : [];
+  const selectedBachelorCatalogSource = bachelorCatalogSourcesList.find((source) => String(source.key || '') === activeBachelorCatalogSourceKey)
+    || bachelorCatalogSourcesList[0]
+    || null;
+  const isBachelorProgramSelected = Boolean(selectedProgram && String(selectedProgram.track_key || '') === 'bachelor');
+  const bachelorCatalogSummary = bachelorCatalogRowsList.reduce((summary, row) => {
+    const statusCode = String(row && row.status && row.status.code || '');
+    if (statusCode === 'seeded') {
+      summary.seeded += 1;
+    } else if (statusCode === 'customized') {
+      summary.customized += 1;
+    } else {
+      summary.unassigned += 1;
+    }
+    return summary;
+  }, { seeded: 0, customized: 0, unassigned: 0 });
   const buildFocusHref = (overrides = {}) => {
     const merged = Object.assign({}, {
       program_id: activeProgramId,
@@ -57,9 +75,16 @@
       group_id: activeGroupId,
       term_id: activeTermId,
       template_stage: activeTemplateStage,
+      bachelor_catalog_source: activeBachelorCatalogSourceKey,
     }, overrides || {});
     const params = new URLSearchParams();
     Object.entries(merged).forEach(([key, rawValue]) => {
+      if (String(key) === 'bachelor_catalog_source') {
+        if (String(rawValue || '').trim()) {
+          params.set(key, String(rawValue).trim());
+        }
+        return;
+      }
       const value = numberOrZero(rawValue);
       if (value > 0) {
         params.set(key, String(value));
@@ -99,6 +124,7 @@
     <input type="hidden" name="focus_group_id" value="${activeGroupId || ''}" />
     <input type="hidden" name="focus_term_id" value="${activeTermId || ''}" />
     <input type="hidden" name="focus_template_stage" value="${activeTemplateStage || 1}" />
+    <input type="hidden" name="focus_bachelor_catalog_source" value="${String(activeBachelorCatalogSourceKey || '').replace(/"/g, '&quot;')}" />
   `;
   const toAttr = (value) => JSON.stringify(value || {}).replace(/'/g, '&#39;');
   const campusLabelByKey = new Map(campusOptions.map((campus) => [campus.value, campus.label]));
@@ -1431,6 +1457,187 @@
                   </div>
                 </div>
               </div>
+              <% if (isBachelorProgramSelected) { %>
+                <div class="academic-v2-subcard mt-4" id="bachelor-catalog-panel">
+                  <div class="academic-v2-section-head academic-v2-section-head--tight">
+                    <div>
+                      <div class="academic-v2-subcard-topline">Кодовий бакалаврський каталог</div>
+                      <h3 class="h5 mb-1">Bulk-редактор source rows</h3>
+                      <p class="academic-v2-section-copy">Каталог живе в коді, а тут редагуються stage, term, required/general для вибраної бакалаврської програми. Sync додає лише відсутні шаблони та stage rows і не перетирає ручні налаштування.</p>
+                    </div>
+                    <div class="academic-v2-chip-row">
+                      <span class="academic-v2-chip"><%= bachelorCatalogRowsList.length %> entries</span>
+                      <span class="academic-v2-chip academic-v2-chip--ok"><%= bachelorCatalogSummary.seeded %> seeded</span>
+                      <span class="academic-v2-chip academic-v2-chip--warm"><%= bachelorCatalogSummary.customized %> customized</span>
+                      <span class="academic-v2-chip academic-v2-chip--warm"><%= bachelorCatalogSummary.unassigned %> unassigned</span>
+                    </div>
+                  </div>
+                  <div class="academic-v2-grid-2">
+                    <form method="get" action="/admin/pathways" class="academic-v2-subcard">
+                      <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
+                      <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+                      <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                      <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
+                      <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
+                      <input type="hidden" name="workspace_tab" value="subjects" />
+                      <div class="academic-v2-field">
+                        <label for="bachelorCatalogSource">Source</label>
+                        <select id="bachelorCatalogSource" class="form-select" name="bachelor_catalog_source">
+                          <% bachelorCatalogSourcesList.forEach((source) => { %>
+                            <option value="<%= source.key %>" <%= String(source.key || '') === String(activeBachelorCatalogSourceKey || '') ? 'selected' : '' %>>
+                              <%= source.label %> · <%= source.entry_count %> rows
+                            </option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-actions mt-3">
+                        <button type="submit" class="btn btn-outline-secondary">Завантажити source</button>
+                      </div>
+                    </form>
+                    <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync" class="academic-v2-subcard">
+                      <%- renderFocusFields() %>
+                      <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
+                      <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
+                      <div class="academic-v2-subcard-topline">Sync</div>
+                      <div class="academic-v2-section-copy">
+                        <% if (selectedBachelorCatalogSource) { %>
+                          <strong><%= selectedBachelorCatalogSource.title %></strong><br />
+                          <%= selectedBachelorCatalogSource.description %>
+                        <% } else { %>
+                          Обери source, щоб додати missing templates і stage rows.
+                        <% } %>
+                      </div>
+                      <div class="academic-v2-chip-row mt-3">
+                        <span class="academic-v2-chip">Default preset: L + S</span>
+                        <span class="academic-v2-chip">Flags start as required + general</span>
+                      </div>
+                      <div class="academic-v2-actions mt-3">
+                        <button type="submit" class="btn btn-primary" <%= !selectedBachelorCatalogSource ? 'disabled' : '' %>>Sync source → program</button>
+                      </div>
+                    </form>
+                  </div>
+                  <div class="academic-v2-field mt-3">
+                    <label for="bachelorCatalogSearch">Search</label>
+                    <input
+                      id="bachelorCatalogSearch"
+                      class="form-control"
+                      type="search"
+                      placeholder="Пошук за назвою, кодом або блоком"
+                      data-bachelor-catalog-search
+                    />
+                  </div>
+                  <% if (bachelorCatalogRowsList.length) { %>
+                    <div class="table-responsive mt-3">
+                      <table class="table align-middle">
+                        <thead>
+                          <tr>
+                            <th>Source row</th>
+                            <th>Suggested</th>
+                            <th>Current</th>
+                            <th>Flags</th>
+                            <th>Status</th>
+                            <th>Save</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <% bachelorCatalogRowsList.forEach((row) => { %>
+                            <% const currentStageNumber = numberOrZero(row.current_stage_number); %>
+                            <% const currentTermNumbers = Array.isArray(row.current_term_numbers) ? row.current_term_numbers : []; %>
+                            <% const suggestedTermNumbers = Array.isArray(row.suggested_term_numbers) ? row.suggested_term_numbers : []; %>
+                            <tr
+                              data-bachelor-catalog-row
+                              data-bachelor-catalog-searchable="<%= [row.display_title, row.template_name, row.source_code, row.source_section, row.entry_kind].join(' ').toLowerCase() %>"
+                            >
+                              <td>
+                                <strong><%= row.display_title %></strong>
+                                <div class="academic-v2-muted"><%= row.source_code %> · <%= row.source_section %></div>
+                                <% if (row.template_name !== row.display_title) { %>
+                                  <div class="academic-v2-muted">Template: <%= row.template_name %></div>
+                                <% } %>
+                                <div class="academic-v2-chip-row mt-2">
+                                  <span class="academic-v2-chip">Kind: <%= row.entry_kind %></span>
+                                  <span class="academic-v2-chip">L + S default</span>
+                                </div>
+                              </td>
+                              <td>
+                                <div class="academic-v2-chip-row">
+                                  <span class="academic-v2-chip"><%= row.suggested_stage_number ? `Stage ${row.suggested_stage_number}` : 'Stage —' %></span>
+                                  <span class="academic-v2-chip"><%= suggestedTermNumbers.length ? `Term ${suggestedTermNumbers.join(', ')}` : 'Terms —' %></span>
+                                </div>
+                              </td>
+                              <td>
+                                <div class="academic-v2-chip-row">
+                                  <span class="academic-v2-chip <%= currentStageNumber ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= currentStageNumber ? `Stage ${currentStageNumber}` : 'Unassigned' %></span>
+                                  <span class="academic-v2-chip"><%= currentTermNumbers.length ? `Term ${currentTermNumbers.join(', ')}` : 'Terms —' %></span>
+                                </div>
+                              </td>
+                              <td>
+                                <div class="academic-v2-chip-row">
+                                  <span class="academic-v2-chip <%= row.current_is_required ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= row.current_is_required ? 'Required' : 'Optional' %></span>
+                                  <span class="academic-v2-chip <%= row.current_is_general ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= row.current_is_general ? 'General' : 'Not general' %></span>
+                                </div>
+                              </td>
+                              <td>
+                                <span class="academic-v2-chip <%= row.status && row.status.tone === 'ok' ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
+                                  <%= row.status && row.status.label ? row.status.label : 'Unknown' %>
+                                </span>
+                              </td>
+                              <td style="min-width: 360px;">
+                                <form method="post" action="/admin/pathways/v2/bachelor-catalog/save" class="academic-v2-stack">
+                                  <%- renderFocusFields() %>
+                                  <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
+                                  <input type="hidden" name="source_key" value="<%= row.source_key %>" />
+                                  <input type="hidden" name="source_code" value="<%= row.source_code %>" />
+                                  <input type="hidden" name="stage_subject_template_id" value="<%= row.current_stage_subject_template_id || '' %>" />
+                                  <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                                    <div class="academic-v2-field">
+                                      <label>Stage</label>
+                                      <select class="form-select form-select-sm" name="stage_number">
+                                        <option value="">Unassigned</option>
+                                        <% stageOptions.forEach((stageNumber) => { %>
+                                          <option value="<%= stageNumber %>" <%= currentStageNumber === stageNumber ? 'selected' : '' %>>Stage <%= stageNumber %></option>
+                                        <% }); %>
+                                      </select>
+                                    </div>
+                                    <div class="academic-v2-field">
+                                      <label>Terms</label>
+                                      <div class="academic-v2-chip-row">
+                                        <% [1, 2].forEach((termNumber) => { %>
+                                          <label class="academic-v2-chip">
+                                            <input type="checkbox" name="term_numbers" value="<%= termNumber %>" <%= currentTermNumbers.includes(termNumber) ? 'checked' : '' %> />
+                                            T<%= termNumber %>
+                                          </label>
+                                        <% }); %>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div class="academic-v2-chip-row">
+                                    <label class="academic-v2-chip">
+                                      <input type="hidden" name="is_required" value="0" />
+                                      <input type="checkbox" name="is_required" value="1" <%= row.current_is_required ? 'checked' : '' %> />
+                                      Required
+                                    </label>
+                                    <label class="academic-v2-chip">
+                                      <input type="hidden" name="is_general" value="0" />
+                                      <input type="checkbox" name="is_general" value="1" <%= row.current_is_general ? 'checked' : '' %> />
+                                      General
+                                    </label>
+                                  </div>
+                                  <div class="academic-v2-actions">
+                                    <button type="submit" class="btn btn-sm btn-primary">Save row</button>
+                                  </div>
+                                </form>
+                              </td>
+                            </tr>
+                          <% }); %>
+                        </tbody>
+                      </table>
+                    </div>
+                  <% } else { %>
+                    <div class="academic-v2-empty mt-3">Для вибраної програми ще немає rows у source registry.</div>
+                  <% } %>
+                </div>
+              <% } %>
             </section>
 
             <section class="academic-v2-card" id="groups">
@@ -2724,6 +2931,8 @@
         const subjectCards = Array.from(document.querySelectorAll('[data-subject-card]'));
         const subjectCreateButtons = Array.from(document.querySelectorAll('[data-subject-create]'));
         const subjectActivityRows = Array.from(document.querySelectorAll('[data-subject-activity-row]'));
+        const bachelorCatalogSearch = document.querySelector('[data-bachelor-catalog-search]');
+        const bachelorCatalogRows = Array.from(document.querySelectorAll('[data-bachelor-catalog-row]'));
         const subjectDetailTitle = document.querySelector('[data-subject-detail-title]');
         const subjectDetailCopy = document.querySelector('[data-subject-detail-copy]');
         const subjectDetailGroups = document.querySelector('[data-subject-detail-groups]');
@@ -2756,6 +2965,15 @@
         const scheduleSubject = document.getElementById('scheduleSubject');
         const scheduleActivity = document.getElementById('scheduleActivity');
         const scheduleActivityType = document.getElementById('scheduleActivityType');
+        const applyBachelorCatalogSearch = () => {
+          const query = String(bachelorCatalogSearch && bachelorCatalogSearch.value || '')
+            .trim()
+            .toLowerCase();
+          bachelorCatalogRows.forEach((row) => {
+            const haystack = String(row.getAttribute('data-bachelor-catalog-searchable') || '').toLowerCase();
+            row.hidden = Boolean(query) && !haystack.includes(query);
+          });
+        };
         const scheduleTargetGroups = document.getElementById('scheduleTargetGroups');
         const scheduleTargetGroupsHint = document.getElementById('scheduleTargetGroupsHint');
         const scheduleTerm = document.getElementById('scheduleTerm');
@@ -4275,6 +4493,11 @@
             });
           }
           syncStudentSelection();
+        }
+
+        if (bachelorCatalogSearch) {
+          bachelorCatalogSearch.addEventListener('input', applyBachelorCatalogSearch);
+          applyBachelorCatalogSearch();
         }
 
         if (groupCohort) {

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ejs = require('ejs');
+const academicV2Helpers = require('../lib/academicV2');
 
 const viewsDir = path.join(__dirname, '..', 'views');
 
@@ -206,6 +207,71 @@ test('admin pathways renders moderation and compatibility sections', async () =>
     selectedStudyContextOfferingsList: [],
   }));
   assert.match(html, /Compatibility tools|Moderation|Pathways/i);
+});
+
+test('admin academic v2 renders bachelor catalog panel only for bachelor programs', async () => {
+  const fallback = academicV2Helpers.buildAcademicSetupPageFallback({
+    programId: 1,
+    templateStageNumber: 1,
+    bachelorCatalogSourceKey: 'bachelor_bp_pled_2025',
+  });
+  const commonLocals = {
+    ...fallback,
+    error: '',
+    success: '',
+    warning: '',
+    requestedSubjectId: 0,
+    requestedWorkspaceTab: 'subjects',
+    requestedScheduleEntryId: 0,
+    focus: {
+      ...fallback.focus,
+      programId: 1,
+      bachelorCatalogSourceKey: 'bachelor_bp_pled_2025',
+    },
+    bachelorCatalogSources: [{
+      key: 'bachelor_bp_pled_2025',
+      track_key: 'bachelor',
+      label: 'БП 2025-2026',
+      title: 'Політичне лідерство та економічна дипломатія',
+      description: 'Seed source',
+      entry_count: 77,
+    }],
+    bachelorCatalogRows: [{
+      source_key: 'bachelor_bp_pled_2025',
+      source_code: '1.1.10.',
+      template_name: 'Філософія',
+      display_title: 'Філософія',
+      source_section: '1.1. Обов\'язкові освітні компоненти',
+      entry_kind: 'subject',
+      suggested_stage_number: 1,
+      suggested_term_numbers: [2],
+      current_stage_subject_template_id: 0,
+      current_stage_number: null,
+      current_term_numbers: [],
+      current_is_general: true,
+      current_is_required: true,
+      status: {
+        code: 'unassigned',
+        label: 'Unassigned',
+        tone: 'warm',
+      },
+    }],
+  };
+
+  const bachelorHtml = await renderView('admin-academic-v2.ejs', baseRenderLocals({
+    ...commonLocals,
+    programs: [{ id: 1, name: 'Bachelor Program', track_key: 'bachelor' }],
+    selectedProgram: { id: 1, name: 'Bachelor Program', track_key: 'bachelor' },
+  }));
+  assert.match(bachelorHtml, /Кодовий бакалаврський каталог/i);
+  assert.match(bachelorHtml, /Sync source → program/i);
+
+  const masterHtml = await renderView('admin-academic-v2.ejs', baseRenderLocals({
+    ...commonLocals,
+    programs: [{ id: 1, name: 'Master Program', track_key: 'master' }],
+    selectedProgram: { id: 1, name: 'Master Program', track_key: 'master' },
+  }));
+  assert.doesNotMatch(masterHtml, /Кодовий бакалаврський каталог/i);
 });
 
 test('teacher workspace renders context-first filter surface', async () => {

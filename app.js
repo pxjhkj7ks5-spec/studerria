@@ -10503,6 +10503,10 @@ function getAcademicV2RouteMessages(req) {
     GROUP_SUBJECT_ACTIVITY_REQUIRED: 'У предмета курсу має залишатися хоча б одна activity',
     STAGE_SUBJECT_ACTIVITY_DUPLICATE: 'Для цього stage subject такий тип activity вже існує',
     GROUP_SUBJECT_ACTIVITY_DUPLICATE: 'Для цього предмета курсу такий тип activity вже існує',
+    BACHELOR_CATALOG_PROGRAM_REQUIRED: 'Дії бакалаврського каталогу доступні лише для бакалаврських програм',
+    BACHELOR_CATALOG_SOURCE_NOT_FOUND: 'Вибране джерело бакалаврського каталогу не знайдено',
+    BACHELOR_CATALOG_TEMPLATE_REQUIRED: 'У рядка бакалаврського каталогу немає назви шаблону',
+    BACHELOR_CATALOG_ENTRY_NOT_FOUND: 'Вибраний рядок бакалаврського каталогу не знайдено',
   } : {
     unknown: 'Unable to save academic v2 changes',
     programSaved: 'Program saved',
@@ -10553,6 +10557,10 @@ function getAcademicV2RouteMessages(req) {
     GROUP_SUBJECT_ACTIVITY_REQUIRED: 'Course subject must keep at least one activity',
     STAGE_SUBJECT_ACTIVITY_DUPLICATE: 'This stage subject already has that activity type',
     GROUP_SUBJECT_ACTIVITY_DUPLICATE: 'This course subject already has that activity type',
+    BACHELOR_CATALOG_PROGRAM_REQUIRED: 'Bachelor catalog actions are available only for bachelor programs.',
+    BACHELOR_CATALOG_SOURCE_NOT_FOUND: 'The selected bachelor catalog source was not found.',
+    BACHELOR_CATALOG_TEMPLATE_REQUIRED: 'Bachelor catalog entry is missing a template name.',
+    BACHELOR_CATALOG_ENTRY_NOT_FOUND: 'The selected bachelor catalog row was not found.',
   };
 }
 
@@ -10745,6 +10753,12 @@ function parseAcademicV2Focus(source = {}) {
     templateStageNumber: parsePositiveIntStrict(
       payload.focus_template_stage || payload.template_stage || payload.templateStageNumber
     ),
+    bachelorCatalogSourceKey: sanitizeCompactText(
+      payload.focus_bachelor_catalog_source
+      || payload.bachelor_catalog_source
+      || payload.bachelorCatalogSourceKey,
+      80
+    ),
   };
 }
 
@@ -10756,6 +10770,7 @@ function buildAcademicV2NoticeUrl(kind, message, focus = {}, extraParams = {}) {
   if (normalizedFocus.groupId) query.set('group_id', String(normalizedFocus.groupId));
   if (normalizedFocus.termId) query.set('term_id', String(normalizedFocus.termId));
   if (normalizedFocus.templateStageNumber) query.set('template_stage', String(normalizedFocus.templateStageNumber));
+  if (normalizedFocus.bachelorCatalogSourceKey) query.set('bachelor_catalog_source', String(normalizedFocus.bachelorCatalogSourceKey));
   Object.entries(extraParams && typeof extraParams === 'object' ? extraParams : {}).forEach(([key, value]) => {
     if (!key || typeof value === 'undefined' || value === null || value === '') {
       return;
@@ -37664,6 +37679,32 @@ app.post('/admin/pathways/v2/stage-subject-activities/preset', requirePathwaysSe
       templateStageNumber: Number(result && result.row && result.row.stage_number) || focus.templateStageNumber,
     }),
     logContext: 'admin.pathways.v2.stage-subject-activity.preset',
+  })
+));
+
+app.post('/admin/pathways/v2/bachelor-catalog/sync', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.syncBachelorCatalogSource(getAcademicV2Store(), req.body),
+    successMessage: 'Бакалаврський каталог синхронізовано',
+    extraParamsBuilder: () => ({
+      workspace_tab: 'subjects',
+    }),
+    logContext: 'admin.pathways.v2.bachelor-catalog.sync',
+  })
+));
+
+app.post('/admin/pathways/v2/bachelor-catalog/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveBachelorCatalogRow(getAcademicV2Store(), req.body),
+    successMessage: 'Рядок бакалаврського каталогу збережено',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.programId) || focus.programId,
+    }),
+    extraParamsBuilder: () => ({
+      workspace_tab: 'subjects',
+    }),
+    logContext: 'admin.pathways.v2.bachelor-catalog.save',
   })
 ));
 
