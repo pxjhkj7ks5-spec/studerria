@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.48",
+      "date": "2026-04-07",
+      "items": [
+        "docs(deploy): switch project instructions from legacy Cloud Run wording to Docker Compose as the active deployment target, add routine server update steps with `git pull --rebase` plus `docker compose up --build -d`, and document that `down -v` is only for intentional database re-creation or dump re-import"
+      ]
+    },
+    {
       "version": "1.4.47",
       "date": "2026-04-07",
       "items": [

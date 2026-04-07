@@ -39,6 +39,21 @@ Postgres host access:
 
 If you want custom ports or credentials, copy `.env.example` to `.env` in this folder and adjust the values.
 
+## Update an existing server
+
+For a normal application update, keep the existing PostgreSQL volume and run:
+
+```bash
+cd ~/studerria
+git pull --rebase
+cd docker/local
+docker compose up --build -d
+docker compose ps
+docker compose logs --tail=100 app
+```
+
+Do not run `docker compose down -v` for a routine update, because that recreates the database volume.
+
 ## Re-import the backup from scratch
 
 The PostgreSQL dump is imported only when the database volume is empty. To recreate the database and re-run the import:

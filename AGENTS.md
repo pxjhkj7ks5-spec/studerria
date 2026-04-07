@@ -6,3 +6,6 @@
 - Дотримуйся стилю `macOS Tahoe / Apple Liquid Glass / iOS 26`.
 - Після кожного оновлення оновлюй `changelog.json` на основі нових git-комітів.
 - Відображай `changelog.json` через модалку, яка відкривається кнопкою `Changelog` у футері.
+- Актуальний сценарій деплою та оновлення: `Docker Compose` із `docker/local`; `Cloud Run` більше не є робочим цільовим середовищем.
+- Для звичайного серверного оновлення використовуй `git pull --rebase` у корені репозиторію, потім `docker compose up --build -d` у `docker/local`.
+- `docker compose down -v` використовуй тільки для повного перестворення Postgres volume або повторного імпорту SQL-дампу, а не для звичайного апдейту.

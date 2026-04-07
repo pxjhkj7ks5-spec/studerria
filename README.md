@@ -1,20 +1,38 @@
 # studerria
-Student portal (Node.js + Express + EJS + Postgres on Cloud Run).
+Student portal (`Node.js + Express + EJS + Postgres`) with Docker Compose as the primary runtime.
 
-## CI/CD (GitHub Actions → Cloud Run)
-Secrets to add in GitHub:
-- `GCP_PROJECT_ID`
-- `GCP_SA_KEY`
-- `GCP_REGION`
-- `SERVICE_NAME`
-- `INSTANCE_CONNECTION_NAME`
+## Primary runtime
 
-Workflow lives at `.github/workflows/deploy.yml`.
+The current deployment path is Docker Compose from:
 
-## Cloud SQL backup to GCS
-Example (Postgres):
+- `docker/local/docker-compose.yml`
+
+Local and server-specific notes live in:
+
+- `docker/local/README.md`
+
+## Fresh start
+
 ```bash
-gcloud sql export sql student-portal-db gs://YOUR_BUCKET/backups/student_portal_$(date +%F).sql \
-  --database=student_portal \
-  --project=project-25b725c0-e6f6-4253-afa
+cd docker/local
+docker compose up --build -d
 ```
+
+## Update an existing server
+
+Run this on the server from the repository root:
+
+```bash
+cd ~/studerria
+git pull --rebase
+cd docker/local
+docker compose up --build -d
+docker compose ps
+docker compose logs --tail=100 app
+```
+
+Use `docker compose down -v` only when you intentionally want to recreate the PostgreSQL volume or re-import the SQL dump from scratch.
+
+## Legacy infrastructure
+
+`cloudbuild.yaml` and old Cloud Run-related assets are legacy artifacts and are no longer the active deployment target.
