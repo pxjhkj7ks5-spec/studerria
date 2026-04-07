@@ -32,6 +32,7 @@
     : [];
   const cleanupAudit = auditSummary && typeof auditSummary === 'object' ? auditSummary : {};
   const stageOptions = [1, 2, 3, 4];
+  const groupCountOptions = [1, 2, 3];
   const termOptions = [
     { value: 1, label: 'Term 1', weeks: 15 },
     { value: 2, label: 'Term 2', weeks: 15 },
@@ -1718,6 +1719,7 @@
                                 <div class="academic-v2-chip-row">
                                   <span class="academic-v2-chip <%= currentStageNumber ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= currentStageNumber ? `Stage ${currentStageNumber}` : 'Unassigned' %></span>
                                   <span class="academic-v2-chip"><%= currentTermNumbers.length ? `Term ${currentTermNumbers.join(', ')}` : 'Terms —' %></span>
+                                  <span class="academic-v2-chip"><%= numberOrZero(row.current_group_count) || 2 %> groups</span>
                                 </div>
                               </td>
                               <td>
@@ -1746,6 +1748,16 @@
                                         <% stageOptions.forEach((stageNumber) => { %>
                                           <option value="<%= stageNumber %>" <%= currentStageNumber === stageNumber ? 'selected' : '' %>>Stage <%= stageNumber %></option>
                                         <% }); %>
+                                      </select>
+                                    </div>
+                                    <div class="academic-v2-field">
+                                      <label>Groups</label>
+                                      <select class="form-select form-select-sm" name="group_count">
+                                        <% groupCountOptions.forEach((groupCount) => { %>
+                                          <option value="<%= groupCount %>" <%= numberOrZero(row.current_group_count || row.default_group_count) === groupCount ? 'selected' : '' %>>
+                                            <%= groupCount %>
+                                          </option>
+                                        <% }) %>
                                       </select>
                                     </div>
                                     <div class="academic-v2-field">

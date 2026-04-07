@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.50",
+      "date": "2026-04-07",
+      "items": [
+        "feat(bachelor-catalog): add manual subject group-count control in the bachelor catalog with selectable values 1..3, default new catalog rows to 2 groups, and persist that count into stage templates so seeded/live sync subjects inherit it"
+      ]
+    },
+    {
       "version": "1.4.49",
       "date": "2026-04-07",
       "items": [
