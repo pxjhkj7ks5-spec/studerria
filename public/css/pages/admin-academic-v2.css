@@ -56,8 +56,24 @@ body.theme-dark {
   margin-top: -4px;
 }
 
+body > .page-container:has(> .academic-v2-page) {
+  padding-top: 12px;
+}
+
+body.page-local-topbar > .page-container:has(> .academic-v2-page) {
+  padding-top: 6px;
+}
+
+body > .page-container > .academic-v2-page {
+  margin-top: 0;
+}
+
 body > .topbar.topbar--title-spotlight.studerria-nav-shell + .academic-v2-page {
   margin-top: -10px;
+}
+
+body > .topbar.topbar--title-spotlight.studerria-nav-shell + .page-container:has(> .academic-v2-page) {
+  padding-top: 4px;
 }
 
 .academic-v2-shell {
@@ -1296,12 +1312,24 @@ body.theme-dark .academic-v2-advanced-block {
 }
 
 @media (max-width: 900px) {
+  body > .page-container:has(> .academic-v2-page) {
+    padding-top: 8px;
+  }
+
+  body.page-local-topbar > .page-container:has(> .academic-v2-page) {
+    padding-top: 4px;
+  }
+
   .academic-v2-page {
     margin-top: -2px;
   }
 
   body > .topbar.topbar--title-spotlight.studerria-nav-shell + .academic-v2-page {
     margin-top: -4px;
+  }
+
+  body > .topbar.topbar--title-spotlight.studerria-nav-shell + .page-container:has(> .academic-v2-page) {
+    padding-top: 2px;
   }
 
   .academic-v2-timetable {

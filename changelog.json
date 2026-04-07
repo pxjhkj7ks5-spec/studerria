@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.30",
+      "date": "2026-04-07",
+      "items": [
+        "fix(academic-v2-layout): reduce the remaining top gap above Academic Setup v2 when the page is wrapped by the shared page-container layout, so the local context bar sits much closer to the global navbar"
+      ]
+    },
+    {
       "version": "1.4.29",
       "date": "2026-04-06",
       "items": [
