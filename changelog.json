@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.42",
+      "date": "2026-04-07",
+      "items": [
+        "fix(register-course): broaden the Academic V2 registration scope beyond stage-1-only groups, allow repairable cohort and campus routes to stay selectable instead of hiding them behind hard readiness gating, prefer the current higher-stage group when a cohort has multiple active campus rows, and label routes that will auto-repair on continue so cohort 2024 and teacher-track registration can resolve through the same submit-time repair flow"
+      ]
+    },
+    {
       "version": "1.4.41",
       "date": "2026-04-07",
       "items": [

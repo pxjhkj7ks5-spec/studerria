@@ -3200,10 +3200,12 @@ function getRegistrationScopeStatusLabel(statusKey, lang = 'uk') {
   const normalizedStatus = sanitizeCompactText(statusKey, 40) || 'needs_setup';
   if (lang === 'en') {
     if (normalizedStatus === 'ready') return 'Ready';
+    if (normalizedStatus === 'repair') return 'Repairable';
     if (normalizedStatus === 'blocked') return 'Blocked';
     return 'Needs setup';
   }
   if (normalizedStatus === 'ready') return 'Готова';
+  if (normalizedStatus === 'repair') return 'Можна виправити';
   if (normalizedStatus === 'blocked') return 'Заблоковано';
   return 'Потрібне налаштування';
 }
@@ -3388,8 +3390,83 @@ function collectRegistrationScopeCodes(rows = []) {
   };
 }
 
+function isRegistrationSelectableCampusRow(row = {}) {
+  return Boolean(row && row.catalog_candidate && !row.selection_blocked);
+}
+
+function compareRegistrationCampusChoiceRows(left = {}, right = {}) {
+  const stageDiff = Math.max(1, Number(right && right.stage_number || 0) || 1)
+    - Math.max(1, Number(left && left.stage_number || 0) || 1);
+  if (stageDiff !== 0) return stageDiff;
+  const readinessDiff = Number(Boolean(right && right.final_ready)) - Number(Boolean(left && left.final_ready));
+  if (readinessDiff !== 0) return readinessDiff;
+  const teacherDefaultDiff = Number(Boolean(right && right.is_teacher_registration_default))
+    - Number(Boolean(left && left.is_teacher_registration_default));
+  if (teacherDefaultDiff !== 0) return teacherDefaultDiff;
+  const mappedDiff = Math.max(0, Number(right && right.visible_mapped_subject_count || 0) || 0)
+    - Math.max(0, Number(left && left.visible_mapped_subject_count || 0) || 0);
+  if (mappedDiff !== 0) return mappedDiff;
+  const compatDiff = Number(Array.isArray(left && left.missing_compat_fields) ? left.missing_compat_fields.length : 0)
+    - Number(Array.isArray(right && right.missing_compat_fields) ? right.missing_compat_fields.length : 0);
+  if (compatDiff !== 0) return compatDiff;
+  const termDiff = Number(Boolean(right && right.has_active_term)) - Number(Boolean(left && left.has_active_term));
+  if (termDiff !== 0) return termDiff;
+  return Number(left && left.group_id || 0) - Number(right && right.group_id || 0);
+}
+
+function pickRegistrationCampusChoiceRow(rows = [], options = {}) {
+  const selectableRows = (Array.isArray(rows) ? rows : []).filter((row) => isRegistrationSelectableCampusRow(row));
+  if (!selectableRows.length) {
+    return null;
+  }
+  const preferredGroupId = parsePositiveIntStrict(options && options.preferredGroupId);
+  if (preferredGroupId) {
+    const preferredRow = selectableRows.find((row) => Number(row.group_id || 0) === Number(preferredGroupId));
+    if (preferredRow) {
+      return preferredRow;
+    }
+  }
+  return selectableRows.slice().sort(compareRegistrationCampusChoiceRows)[0] || null;
+}
+
+function buildRegistrationSelectableCampusCopy(row = {}, lang = 'uk') {
+  if (!row || !isRegistrationSelectableCampusRow(row)) {
+    return {
+      reasonCode: 'registration_path_missing',
+      reasonCopy: getRegistrationScopeIssueMeta('registration_path_missing', lang).label,
+      reasonShort: getRegistrationScopeIssueMeta('registration_path_missing', lang).shortLabel,
+      reasonTone: getRegistrationScopeIssueMeta('registration_path_missing', lang).tone,
+      requiresRepair: false,
+    };
+  }
+  if (row.final_ready) {
+    return {
+      reasonCode: 'ready',
+      reasonCopy: lang === 'en' ? 'Ready to continue.' : 'Готово до продовження.',
+      reasonShort: lang === 'en' ? 'Ready' : 'Готово',
+      reasonTone: 'ready',
+      requiresRepair: false,
+    };
+  }
+  const blockingCode = pickRegistrationScopeIssueCode(
+    Array.isArray(row.final_ready_blocking_issue_codes) ? row.final_ready_blocking_issue_codes : [],
+    Array.isArray(row.final_ready_warning_issue_codes) ? row.final_ready_warning_issue_codes : []
+  );
+  const issueMeta = getRegistrationScopeIssueMeta(blockingCode, lang);
+  return {
+    reasonCode: blockingCode || 'repair_on_continue',
+    reasonCopy: lang === 'en'
+      ? `${issueMeta.label} We will try to repair this route when you continue.`
+      : `${issueMeta.label} Спробуємо автоматично доремонтувати цей маршрут під час продовження.`,
+    reasonShort: lang === 'en' ? 'Repair on continue' : 'Виправимо далі',
+    reasonTone: 'repair',
+    requiresRepair: true,
+  };
+}
+
 function buildRegistrationCampusChoices(rows = [], options = {}) {
   const lang = options.lang === 'en' ? 'en' : 'uk';
+  const preferredGroupId = parsePositiveIntStrict(options && options.preferredGroupId);
   const campusRows = new Map();
   (Array.isArray(rows) ? rows : []).forEach((row) => {
     const campusKey = normalizeCourseCampus(row && row.campus_key);
@@ -3401,13 +3478,10 @@ function buildRegistrationCampusChoices(rows = [], options = {}) {
   return Array.from(campusRows.entries())
     .map(([campusKey, bucket]) => {
       const { issueCodes, warningCodes } = collectRegistrationScopeCodes(bucket);
-      const selectableRows = bucket.filter((row) => (
-        row
-        && row.catalog_candidate
-        && row.final_ready
-        && !row.selection_blocked
-      ));
-      const selectedRow = selectableRows.length === 1 ? selectableRows[0] : null;
+      const selectedRow = pickRegistrationCampusChoiceRow(bucket, { preferredGroupId });
+      const selectedMeta = selectedRow
+        ? buildRegistrationSelectableCampusCopy(selectedRow, lang)
+        : null;
       const topIssueCode = selectedRow ? 'ready' : pickRegistrationScopeIssueCode(issueCodes, warningCodes);
       const issueMeta = selectedRow
         ? null
@@ -3425,20 +3499,22 @@ function buildRegistrationCampusChoices(rows = [], options = {}) {
         study_context_id: parsePositiveIntStrict(selectedRow && selectedRow.group_id) || null,
         course_id: parsePositiveIntStrict(selectedRow && selectedRow.legacy_course_id) || null,
         group_label: sanitizeCompactText(selectedRow && selectedRow.group_label, 160) || '',
+        stage_number: Math.max(1, Number(selectedRow && selectedRow.stage_number || 0) || 1),
         is_selectable: Boolean(selectedRow),
         is_candidate: bucket.some((row) => row && row.catalog_candidate),
-        is_ready: Boolean(selectedRow),
+        is_ready: Boolean(selectedRow && selectedRow.final_ready),
+        requires_repair: Boolean(selectedMeta && selectedMeta.requiresRepair),
         selection_blocked: !selectedRow && bucket.some((row) => row && row.selection_blocked),
         issue_codes: issueCodes,
         warning_codes: warningCodes,
-        reason_code: selectedRow ? 'ready' : topIssueCode,
+        reason_code: selectedRow ? selectedMeta.reasonCode : topIssueCode,
         reason_copy: selectedRow
-          ? (lang === 'en' ? 'Ready to continue.' : 'Готово до продовження.')
+          ? selectedMeta.reasonCopy
           : issueMeta.label,
         reason_short: selectedRow
-          ? (lang === 'en' ? 'Ready' : 'Готово')
+          ? selectedMeta.reasonShort
           : issueMeta.shortLabel,
-        reason_tone: selectedRow ? 'ready' : issueMeta.tone,
+        reason_tone: selectedRow ? selectedMeta.reasonTone : issueMeta.tone,
       };
     })
     .sort((left, right) => {
@@ -3587,13 +3663,17 @@ function buildRegistrationScopeMatrix(rows = [], options = {}) {
     if (!programId) {
       return;
     }
-    const campusChoices = buildRegistrationCampusChoices(bucket, { lang });
+    const campusChoices = buildRegistrationCampusChoices(bucket, {
+      lang,
+      preferredGroupId: parsePositiveIntStrict(selectedGroup && selectedGroup.group_id),
+    });
     campusesByCohort[String(cohortId)] = campusChoices;
     const { issueCodes, warningCodes } = collectRegistrationScopeCodes(bucket);
     const availableCampusesCount = campusChoices.filter((choice) => choice.is_selectable).length;
     const totalCampusesCount = campusChoices.length;
+    const hasTrulyReadyCampus = campusChoices.some((choice) => choice.is_selectable && choice.is_ready);
     const statusKey = availableCampusesCount > 0
-      ? 'ready'
+      ? (hasTrulyReadyCampus ? 'ready' : 'repair')
       : (campusChoices.some((choice) => choice.selection_blocked || choice.reason_tone === 'blocked') ? 'blocked' : 'needs_setup');
     const topIssueCode = pickRegistrationScopeIssueCode(issueCodes, warningCodes);
     const topIssueMeta = getRegistrationScopeIssueMeta(topIssueCode, lang);
@@ -3605,6 +3685,10 @@ function buildRegistrationScopeMatrix(rows = [], options = {}) {
             ? `Ready on ${availableCampusesCount} of ${totalCampusesCount} campuses.`
             : `Готово для ${availableCampusesCount} з ${totalCampusesCount} кампусів.`)
       )
+      : statusKey === 'repair'
+        ? (lang === 'en'
+          ? `Selectable on ${availableCampusesCount} of ${totalCampusesCount} campuses. We will try to repair the route on continue.`
+          : `Доступно для ${availableCampusesCount} з ${totalCampusesCount} кампусів. Спробуємо доремонтувати маршрут під час продовження.`)
       : topIssueMeta.label;
     const entry = {
       id: parsePositiveIntStrict(sample.cohort_id) || null,
@@ -3613,7 +3697,8 @@ function buildRegistrationScopeMatrix(rows = [], options = {}) {
       label: sanitizeCompactText(sample.cohort_label, 160) || '',
       admission_year: Number(sample.admission_year || 0) || null,
       is_candidate: bucket.some((row) => row && row.catalog_candidate),
-      is_ready: availableCampusesCount > 0,
+      is_selectable: availableCampusesCount > 0,
+      is_ready: hasTrulyReadyCampus,
       selection_blocked: statusKey === 'blocked',
       issue_codes: issueCodes,
       warning_codes: warningCodes,
@@ -3643,7 +3728,10 @@ function buildRegistrationScopeMatrix(rows = [], options = {}) {
 
   const teacherCampusesByProgram = {};
   teacherRowsByProgram.forEach((bucket, programId) => {
-    teacherCampusesByProgram[String(programId)] = buildRegistrationCampusChoices(bucket, { lang });
+    teacherCampusesByProgram[String(programId)] = buildRegistrationCampusChoices(bucket, {
+      lang,
+      preferredGroupId: parsePositiveIntStrict(selectedGroup && selectedGroup.group_id),
+    });
   });
 
   const scopeMatrix = {

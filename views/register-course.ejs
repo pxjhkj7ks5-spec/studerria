@@ -443,6 +443,10 @@
         color: var(--warning);
         background: rgba(184, 107, 0, 0.14);
       }
+      .scope-status--repair {
+        color: #8a5a00;
+        background: rgba(246, 173, 85, 0.2);
+      }
       body.theme-dark .scope-status--ready {
         color: #86efac;
         background: rgba(17, 138, 86, 0.16);
@@ -454,6 +458,10 @@
       body.theme-dark .scope-status--needs_setup {
         color: #fdba74;
         background: rgba(184, 107, 0, 0.18);
+      }
+      body.theme-dark .scope-status--repair {
+        color: #fcd34d;
+        background: rgba(217, 119, 6, 0.22);
       }
       .registration-empty {
         padding: 0.72rem 0.78rem;
@@ -1064,8 +1072,8 @@
         placeholderOption.textContent = registerCourseText.chooseCohortOption;
         placeholderOption.selected = !state.cohortConfirmed || !state.cohortId;
         cohortSelect.appendChild(placeholderOption);
-        const hasReadyCohort = cohorts.some((cohort) => cohort && cohort.is_ready);
-        if (!hasReadyCohort) {
+        const hasSelectableCohort = cohorts.some((cohort) => cohort && (cohort.is_selectable || cohort.is_ready));
+        if (!hasSelectableCohort) {
           setHint(cohortHint, registerCourseText.noReadyCohorts, true);
         } else if (!state.cohortConfirmed) {
           setHint(cohortHint, registerCourseText.chooseCohortFirst);
@@ -1075,7 +1083,7 @@
         }
         cohorts.forEach((cohort) => {
           const option = document.createElement('option');
-          const isSelectable = Boolean(cohort && cohort.is_ready);
+          const isSelectable = Boolean(cohort && (cohort.is_selectable || cohort.is_ready));
           const cohortLabel = String(cohort.label || '').trim() || `${registerCourseText.cohortLabel} ${Number(cohort.admission_year || 0) || ''}`;
           const statusLabel = cohort.status_label || (isSelectable ? registerCourseText.ready : registerCourseText.needsSetup);
           option.value = String(cohort.id || '');
@@ -1154,14 +1162,18 @@
           const isSelected = state.campusConfirmed
             && normalizeCampusKey(choice.campus_key) === normalizeCampusKey(state.campusKey)
             && Number(choice.group_id || 0) === Number(state.groupId || 0);
-          const statusClass = isSelectable ? 'ready' : (choice.reason_tone === 'blocked' ? 'blocked' : 'needs_setup');
+          const statusClass = isSelectable
+            ? (choice.reason_tone === 'repair' ? 'repair' : 'ready')
+            : (choice.reason_tone === 'blocked' ? 'blocked' : 'needs_setup');
+          const statusLabel = choice.reason_short
+            || (isSelectable ? registerCourseText.ready : registerCourseText.needsSetup);
           button.type = 'button';
           button.className = `scope-option ${isSelected ? 'is-selected' : ''} ${isSelectable ? '' : 'is-disabled'}`;
           button.disabled = !isSelectable;
           button.innerHTML = `
             <div class="scope-option-head">
               <div class="scope-option-title">${escapeHtml(choice.campus_label || formatCampusLabelClient(choice.campus_key))}</div>
-              <span class="scope-status scope-status--${escapeHtml(statusClass)}">${escapeHtml(isSelectable ? registerCourseText.ready : (choice.reason_short || registerCourseText.needsSetup))}</span>
+              <span class="scope-status scope-status--${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
             </div>
             <div class="scope-option-subtitle">${escapeHtml(choice.reason_copy || '')}</div>
             <div class="scope-option-foot">
