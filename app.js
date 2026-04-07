@@ -10692,6 +10692,7 @@ function getAcademicV2RouteMessages(req) {
     usersAssigned: 'Користувачів перепризначено',
     scheduleSaved: 'Рядок розкладу збережено',
     scheduleDeleted: 'Рядок розкладу видалено',
+    scheduleCleared: 'Розклад вибраного терму очищено',
     PROGRAM_NAME_REQUIRED: 'Назва програми обов’язкова',
     PROGRAM_REQUIRED: 'Спочатку виберіть програму',
     COHORT_REQUIRED: 'Спочатку виберіть когорту',
@@ -10750,6 +10751,7 @@ function getAcademicV2RouteMessages(req) {
     usersAssigned: 'Users reassigned',
     scheduleSaved: 'Schedule entry saved',
     scheduleDeleted: 'Schedule entry deleted',
+    scheduleCleared: 'Selected term schedule cleared',
     PROGRAM_NAME_REQUIRED: 'Program name is required',
     PROGRAM_REQUIRED: 'Select a program first',
     COHORT_REQUIRED: 'Select a cohort first',
@@ -38183,6 +38185,23 @@ app.post('/admin/pathways/v2/schedule/:scheduleEntryId/delete', requirePathwaysS
       groupId: Number(result && result.row && result.row.group_id) || focus.groupId,
     }),
     logContext: 'admin.pathways.v2.schedule.delete',
+  })
+));
+
+app.post('/admin/pathways/v2/schedule/clear', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.clearScheduleEntriesForTerm(getAcademicV2Store(), req.body),
+    successMessageKey: 'scheduleCleared',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.groupId) || focus.groupId,
+      termId: Number(result && result.termId) || focus.termId,
+    }),
+    extraParamsBuilder: () => ({
+      workspace_tab: 'schedule',
+      schedule_entry_id: '',
+    }),
+    logContext: 'admin.pathways.v2.schedule.clear',
   })
 ));
 

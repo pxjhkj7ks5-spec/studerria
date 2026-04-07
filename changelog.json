@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.55",
+      "date": "2026-04-08",
+      "items": [
+        "fix(academic-v2-schedule-workspace): simplify the Academic Setup v2 schedule tab down to the advanced editor only, move warning/problem slot review behind the separate schedule-list page, and add a clear-current-term action that bulk-deletes the selected term's schedule rows with projection sync"
+      ]
+    },
+    {
       "version": "1.4.54",
       "date": "2026-04-07",
       "items": [

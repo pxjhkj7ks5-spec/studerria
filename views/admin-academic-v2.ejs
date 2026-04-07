@@ -2616,7 +2616,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Розклад</h2>
-                  <!-- Schedule: grid-first editor, advanced row editor as fallback -->
+                  <div class="academic-v2-muted">Основний workspace тепер залишає тільки advanced editor. Повний список і проблемні слоти відкриваються окремо.</div>
                 </div>
                 <div class="academic-v2-chip-row">
                   <span class="academic-v2-chip"><%= selectedTermRecord ? selectedTermRecord.title : 'Терм не вибрано' %></span>
@@ -2628,351 +2628,128 @@
                 </div>
               </div>
               <% if (selectedGroup) { %>
-                <div class="academic-v2-grid-2 academic-v2-grid-2--schedule-summary">
-                  <div class="academic-v2-subcard" id="schedule-warning-preview">
-                    <div class="academic-v2-subcard-topline">Попередження розкладу</div>
-                    <% if (scheduleWarningEntries.length) { %>
-                      <h3 class="h6 mb-1">Що саме означає <%= workspaceReadiness.scheduleConflictCount %> попереджень</h3>
-                      <div class="academic-v2-muted">
-                        Лічильник показує кількість слотів, у яких є хоча б одна проблема. Нижче є розбивка по причинах і кілька перших прикладів.
-                      </div>
-                      <div class="academic-v2-chip-row mt-1">
-                        <span class="academic-v2-chip academic-v2-chip--warm"><%= scheduleWarningEntries.length %> слотів з проблемами</span>
-                        <span class="academic-v2-chip"><%= scheduleWarningReasonTotal %> окремих причин</span>
-                        <% scheduleWarningReasonBreakdown.slice(0, 4).forEach((item) => { %>
-                          <span class="academic-v2-chip"><%= item.label %> · <%= item.count %></span>
-                        <% }); %>
-                      </div>
-                      <div class="academic-v2-stack mt-3">
-                        <% scheduleWarningPreview.forEach((entry) => { %>
-                          <div class="academic-v2-warning-row">
-                            <div class="academic-v2-warning-row-head">
-                              <strong><%= entry.subject_title %></strong>
-                              <span class="academic-v2-chip academic-v2-chip--warm"><%= entry.warning_labels.length %> причин</span>
-                            </div>
-                            <div class="academic-v2-muted">
-                              <%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %> · <%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %>
-                            </div>
-                            <div class="academic-v2-chip-row mt-2">
-                              <% entry.warning_labels.forEach((label) => { %>
-                                <span class="academic-v2-schedule-warning"><%= label %></span>
-                              <% }); %>
-                            </div>
-                          </div>
-                        <% }); %>
-                      </div>
-                      <% if (scheduleWarningHiddenCount > 0) { %>
-                        <div class="academic-v2-muted mt-3">Ще <%= scheduleWarningHiddenCount %> слотів із попередженнями винесені в детальний список.</div>
-                      <% } %>
-                      <div class="academic-v2-actions mt-2">
-                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Відкрити детальний розбір</a>
-                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Усі слоти окремою сторінкою</a>
-                      </div>
-                    <% } else { %>
-                      <div class="academic-v2-alert academic-v2-alert--success mb-0">
-                        У вибраному термі зараз немає слотів із конфліктами, браком викладача або term-binding помилками.
-                      </div>
-                    <% } %>
-                  </div>
+                <div class="academic-v2-stack">
                   <div class="academic-v2-subcard">
-                    <div class="academic-v2-subcard-topline">Окремий список слотів</div>
-                    <h3 class="h6 mb-1">Повний перелік пар більше не вантажиться в цьому workspace цілком</h3>
+                    <div class="academic-v2-subcard-topline">Schedule workspace</div>
+                    <h3 class="h6 mb-1">Тільки advanced editor</h3>
                     <div class="academic-v2-muted">
-                      Основний робочий екран лишається grid-first. Повний список усіх слотів і детальний warning-report відкриваються окремо, щоб вкладка `Розклад` не гальмувала.
+                      У цій вкладці лишається тільки ручне редагування слотів. Повний список пар і проблемні слоти винесені на окрему сторінку, щоб workspace був коротким і стабільним.
                     </div>
-                    <div class="academic-v2-chip-row mt-1">
-                      <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів</span>
-                      <span class="academic-v2-chip"><%= schedulePreviewEntries.length %> слотів у швидкому preview</span>
-                      <span class="academic-v2-chip"><%= scheduleBySubject.length %> предметів із розкладом</span>
+                    <div class="academic-v2-chip-row mt-2">
+                      <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів у термі</span>
+                      <span class="academic-v2-chip"><%= schedulePreviewEntries.length %> слотів у швидкому списку</span>
+                      <span class="academic-v2-chip"><%= workspaceReadiness.scheduleConflictCount %> попереджень</span>
                     </div>
-                    <div class="academic-v2-actions mt-2">
-                      <a class="btn btn-primary" href="<%= buildScheduleListHref() %>">Відкрити повний список слотів</a>
-                      <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Тільки проблемні слоти</a>
+                    <div class="academic-v2-actions mt-3">
+                      <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Усі слоти</a>
+                      <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Проблемні слоти</a>
+                      <form method="post" action="/admin/pathways/v2/schedule/clear" data-schedule-clear-form data-schedule-clear-label="<%= selectedTermRecord ? selectedTermRecord.title : '' %>" data-schedule-clear-count="<%= scheduleEntriesForViews.length %>">
+                        <%- renderFocusFields() %>
+                        <input type="hidden" name="term_id" value="<%= selectedWorkspaceTermId || '' %>" />
+                        <button type="submit" class="btn btn-outline-danger" <%= selectedWorkspaceTermId && scheduleEntriesForViews.length ? '' : 'disabled' %>>
+                          Очистити терм
+                        </button>
+                      </form>
                     </div>
                   </div>
-                </div>
-                <div class="academic-v2-grid-2 academic-v2-grid-2--schedule">
-                  <div class="academic-v2-stack">
-                    <div class="academic-v2-subcard">
-                      <div class="academic-v2-section-head academic-v2-section-head--tight">
-                        <div>
-                          <div class="academic-v2-subcard-topline">Вигляд</div>
-                          <h3 class="h6 mb-1">Перемикання подань</h3>
-                        </div>
-                        <div class="academic-v2-actions">
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="calendar">Календар</button>
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="subject">За предметом</button>
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="teacher">За викладачем</button>
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="group">За підгрупою</button>
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="advanced">Advanced</button>
-                        </div>
+
+                  <form method="post" action="/admin/pathways/v2/schedule/save" class="academic-v2-subcard" data-editor-form="schedule">
+                    <%- renderFocusFields() %>
+                    <input type="hidden" name="schedule_entry_id" value="" data-editor-input="schedule.id" />
+                    <input id="scheduleActivity" type="hidden" name="group_subject_activity_id" value="" data-editor-input="schedule.group_subject_activity_id" />
+                    <div class="academic-v2-section-head academic-v2-section-head--tight">
+                      <div>
+                        <div class="academic-v2-subcard-topline">Advanced editor</div>
+                        <h3 class="h6 mb-1">Ручне редагування слотів</h3>
                       </div>
-                      <div class="academic-v2-chip-row mt-1">
+                      <div class="academic-v2-chip-row">
                         <% scheduleWeekOptions.forEach((weekNumber) => { %>
                           <button type="button" class="btn btn-sm btn-outline-secondary" data-schedule-week="<%= weekNumber %>">Тиждень <%= weekNumber %></button>
                         <% }); %>
                       </div>
                     </div>
-
-                    <div class="academic-v2-subcard" data-schedule-view-panel="calendar">
-                      <div class="academic-v2-subcard-topline">Календар</div>
-                      <div class="academic-v2-schedule-placement">
-                        <div class="academic-v2-form-grid academic-v2-form-grid--compact academic-v2-form-grid--schedule-placement">
-                          <div class="academic-v2-field">
-                            <label for="schedulePlacementTerm">Терм</label>
-                            <select id="schedulePlacementTerm" class="form-select">
-                              <% termCards.forEach((term) => { %>
-                                <option value="<%= term.id %>" <%= Number(term.id || 0) === Number(selectedWorkspaceTermId || 0) ? 'selected' : '' %>><%= term.title %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field academic-v2-field--wide">
-                            <label for="schedulePlacementSubject">Предмет</label>
-                            <select id="schedulePlacementSubject" class="form-select">
-                              <% schedulableSubjects.forEach((subject) => { %>
-                                <option value="<%= subject.id %>"><%= subject.title %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="schedulePlacementActivityType">Режим активності</label>
-                            <select id="schedulePlacementActivityType" class="form-select"></select>
-                            <input id="schedulePlacementActivity" type="hidden" value="" />
-                          </div>
-                          <div class="academic-v2-field academic-v2-field--compact">
-                            <label for="schedulePlacementWeek">Тижні</label>
-                            <input id="schedulePlacementWeek" class="form-control" type="text" value="<%= scheduleWeekOptions[0] || 1 %>" placeholder="1 або 1, 3, 5" />
-                            <div class="academic-v2-muted mt-1">Після збереження залишаться лише тижні зі списку.</div>
-                          </div>
-                          <div class="academic-v2-field academic-v2-field--full academic-v2-field--schedule-groups">
-                            <label for="schedulePlacementTargetGroups">Підгрупи</label>
-                            <select id="schedulePlacementTargetGroups" class="form-select" multiple size="4"></select>
-                          </div>
-                        </div>
-                        <div class="academic-v2-chip-row mt-1">
-                          <span class="academic-v2-chip" id="schedulePlacementSummary">Оберіть предмет, режим і натисніть на слот у таблиці.</span>
-                          <span class="academic-v2-chip academic-v2-chip--warm" id="schedulePlacementWarning">Лекції ставляться на всі підгрупи автоматично.</span>
-                        </div>
-                        <div class="academic-v2-actions mt-2">
-                          <button type="button" class="btn btn-primary" id="schedulePlacementSave">Зберегти у вибраний слот</button>
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-bulk="duplicate-selected">Дублювати рядок</button>
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-bulk="copy-next-week">Копія на наступний тиждень</button>
-                          <button type="button" class="btn btn-outline-secondary" data-schedule-view-target="advanced">Відкрити advanced editor</button>
-                        </div>
+                    <div class="academic-v2-form-grid academic-v2-form-grid--compact academic-v2-form-grid--schedule-advanced">
+                      <div class="academic-v2-field">
+                        <label for="scheduleTerm">Терм</label>
+                        <select id="scheduleTerm" class="form-select" name="term_id" data-editor-input="schedule.term_id">
+                          <% termCards.forEach((term) => { %>
+                            <option value="<%= term.id %>" <%= Number(term.id) === activeTermId ? 'selected' : '' %>><%= term.title %></option>
+                          <% }); %>
+                        </select>
                       </div>
-                      <div class="academic-v2-timetable mt-4">
-                        <div class="academic-v2-timetable-corner">Пара</div>
-                        <% dayOptions.forEach((day) => { %>
-                          <div class="academic-v2-timetable-day"><%= day %></div>
-                        <% }); %>
-                        <% scheduleGridRows.forEach((classNumber) => { %>
-                          <div class="academic-v2-timetable-row-label"><%= classNumber %></div>
+                      <div class="academic-v2-field academic-v2-field--wide">
+                        <label for="scheduleSubject">Предмет</label>
+                        <select id="scheduleSubject" class="form-select">
+                          <% schedulableSubjects.forEach((subject) => { %>
+                            <option value="<%= subject.id %>"><%= subject.title %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="scheduleDay">День</label>
+                        <select id="scheduleDay" class="form-select" name="day_of_week" data-editor-input="schedule.day_of_week">
                           <% dayOptions.forEach((day) => { %>
-                            <% const slotEntries = scheduleEntriesBySlotKey.get(`${day}::${classNumber}`) || []; %>
-                            <div class="academic-v2-timetable-slot" data-schedule-slot data-day-of-week="<%= day %>" data-class-number="<%= classNumber %>">
-                              <% slotEntries.forEach((entry) => { %>
-                                <button
-                                  type="button"
-                                  class="academic-v2-schedule-card"
-                                  data-editor-target="schedule"
-                                  data-editor-payload='<%- toAttr(entry) %>'
-                                  data-schedule-entry-week="<%= entry.week_number %>"
-                                  data-schedule-entry-id="<%= entry.id %>"
-                                >
-                                  <strong><%= entry.subject_title %></strong>
-                                  <span><%= entry.activity_label || entry.activity_type %></span>
-                                  <span><%= entry.target_group_label || (`G${entry.group_number}`) %></span>
-                                  <span><%= entry.teacher_names.length ? entry.teacher_names.join(', ') : 'Викладача не призначено' %></span>
-                                  <% if (entry.week_number) { %><span>Тиждень <%= entry.week_number %></span><% } %>
-                                  <% if (entry.warning_labels.length) { %>
-                                    <span class="academic-v2-schedule-warning"><%= entry.warning_labels[0] %></span>
-                                  <% } %>
-                                </button>
-                              <% }); %>
-                              <div class="academic-v2-schedule-slot-empty">Натисни, щоб поставити активність</div>
-                            </div>
+                            <option value="<%= day %>"><%= day %></option>
                           <% }); %>
-                        <% }); %>
+                        </select>
+                      </div>
+                      <div class="academic-v2-field">
+                        <label for="scheduleActivityType">Режим активності</label>
+                        <select id="scheduleActivityType" class="form-select"></select>
+                      </div>
+                      <div class="academic-v2-field academic-v2-field--compact">
+                        <label for="scheduleClassNumber">Пара</label>
+                        <input id="scheduleClassNumber" class="form-control" type="number" name="class_number" data-editor-input="schedule.class_number" value="1" />
+                      </div>
+                      <div class="academic-v2-field academic-v2-field--wide">
+                        <label for="scheduleWeekNumber">Тижні</label>
+                        <input id="scheduleWeekNumber" class="form-control" type="text" name="week_number" data-editor-input="schedule.week_number" value="1" placeholder="1 або 1, 3, 5" />
+                        <div class="academic-v2-muted mt-1">Список тижнів замінює поточний набір для цього слота.</div>
+                      </div>
+                      <div class="academic-v2-field academic-v2-field--full academic-v2-field--schedule-groups">
+                        <label for="scheduleTargetGroups">Підгрупи</label>
+                        <select id="scheduleTargetGroups" class="form-select" name="target_group_numbers" multiple size="4" data-editor-input="schedule.target_group_numbers"></select>
+                        <div id="scheduleTargetGroupsHint" class="academic-v2-muted mt-2">Спершу вибери предмет і режим активності. Лекції використовують усі підгрупи автоматично.</div>
                       </div>
                     </div>
-
-                    <div class="academic-v2-subcard" data-schedule-view-panel="subject">
-                      <div class="academic-v2-subcard-topline">За предметом</div>
-                      <% if (scheduleBySubject.length) { %>
-                        <div class="academic-v2-stack">
-                          <% scheduleBySubjectPreview.forEach((item) => { %>
-                            <div class="academic-v2-schedule-list-card">
-                              <strong><%= item.subject.title %></strong>
-                              <div class="academic-v2-chip-row mt-2">
-                                <span class="academic-v2-chip"><%= item.entries.length %> слотів</span>
-                                <span class="academic-v2-chip"><%= item.subject.teacher_count %> викладачів</span>
-                              </div>
-                              <div class="academic-v2-stack mt-3">
-                                <% item.preview_entries.forEach((entry) => { %>
-                                  <button type="button" class="academic-v2-inline-card-button" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>
-                                    <span><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %></span>
-                                    <span><%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %></span>
-                                  </button>
-                                <% }); %>
-                              </div>
-                              <% if (item.hidden_entry_count > 0) { %>
-                                <div class="academic-v2-muted mt-2">Ще <%= item.hidden_entry_count %> слотів цього предмета винесено в окремий список.</div>
-                              <% } %>
-                            </div>
-                          <% }); %>
-                        </div>
-                        <% if (scheduleBySubjectHiddenCount > 0) { %>
-                          <div class="academic-v2-muted mt-3">Ще <%= scheduleBySubjectHiddenCount %> предметів із розкладом винесені на окрему сторінку.</div>
-                        <% } %>
-                        <div class="academic-v2-actions mt-2">
-                          <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Усі предмети і всі слоти</a>
-                        </div>
-                      <% } else { %>
-                        <div class="academic-v2-empty">У вибраному термі ще немає слотів.</div>
-                      <% } %>
+                    <div class="academic-v2-actions mt-2">
+                      <button type="submit" class="btn btn-primary">Зберегти слот</button>
+                      <button type="button" class="btn btn-outline-secondary" data-editor-reset="schedule">Скинути</button>
                     </div>
+                  </form>
 
-                    <div class="academic-v2-subcard" data-schedule-view-panel="teacher">
-                      <div class="academic-v2-subcard-topline">За викладачем</div>
-                      <% if (teacherCoverageCards.length) { %>
-                        <div class="academic-v2-stack">
-                          <% teacherCoverageCards.forEach((teacher) => { %>
-                            <div class="academic-v2-schedule-list-card">
-                              <strong><%= teacher.teacher_name %></strong>
-                              <div class="academic-v2-chip-row mt-2">
-                                <span class="academic-v2-chip"><%= teacher.subject_titles.length %> предметів</span>
-                                <span class="academic-v2-chip"><%= teacher.entries.length %> слотів</span>
-                              </div>
-                              <div class="academic-v2-muted mt-2"><%= teacher.subject_titles.join(', ') %></div>
-                            </div>
-                          <% }); %>
-                        </div>
-                      <% } else { %>
-                        <div class="academic-v2-empty">У поточному курсі ще немає teacher coverage для розкладу.</div>
-                      <% } %>
-                    </div>
-
-                    <div class="academic-v2-subcard" data-schedule-view-panel="group">
-                      <div class="academic-v2-subcard-topline">За підгрупою</div>
+                  <div class="academic-v2-subcard">
+                    <div class="academic-v2-subcard-topline">Швидкий список слотів</div>
+                    <% if (schedulePreviewEntries.length) { %>
                       <div class="academic-v2-stack">
-                        <% scheduleByGroupPreview.forEach((groupView) => { %>
+                        <% schedulePreviewEntries.forEach((entry) => { %>
                           <div class="academic-v2-schedule-list-card">
-                            <strong>Підгрупа G<%= groupView.group_number %></strong>
-                            <% if (groupView.entries.length) { %>
-                              <div class="academic-v2-stack mt-3">
-                                <% groupView.preview_entries.forEach((entry) => { %>
-                                  <button type="button" class="academic-v2-inline-card-button" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>
-                                    <span><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %></span>
-                                    <span><%= entry.subject_title %> · <%= entry.activity_label || entry.activity_type %></span>
-                                  </button>
-                                <% }); %>
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                              <div>
+                                <strong><%= entry.subject_title %></strong>
+                                <div class="academic-v2-muted"><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %> · <%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %></div>
                               </div>
-                              <% if (groupView.hidden_entry_count > 0) { %>
-                                <div class="academic-v2-muted mt-2">Ще <%= groupView.hidden_entry_count %> слотів цієї підгрупи є в окремому списку.</div>
-                              <% } %>
-                            <% } else { %>
-                              <div class="academic-v2-muted mt-2">На цю підгрупу поки нічого не поставлено.</div>
-                            <% } %>
+                              <div class="academic-v2-actions">
+                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>Редагувати</button>
+                                <form method="post" action="/admin/pathways/v2/schedule/<%= entry.id %>/delete">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger">Видалити</button>
+                                </form>
+                              </div>
+                            </div>
                           </div>
                         <% }); %>
                       </div>
-                      <div class="academic-v2-actions mt-2">
-                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Повний список по підгрупах</a>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="academic-v2-stack">
-                    <details class="academic-v2-advanced-block" open>
-                      <summary>Advanced editor</summary>
-                      <form method="post" action="/admin/pathways/v2/schedule/save" class="academic-v2-subcard mt-3" data-editor-form="schedule">
-                        <%- renderFocusFields() %>
-                        <input type="hidden" name="schedule_entry_id" value="" data-editor-input="schedule.id" />
-                        <input id="scheduleActivity" type="hidden" name="group_subject_activity_id" value="" data-editor-input="schedule.group_subject_activity_id" />
-                        <div class="academic-v2-form-grid academic-v2-form-grid--compact academic-v2-form-grid--schedule-advanced">
-                          <div class="academic-v2-field">
-                            <label for="scheduleTerm">Терм</label>
-                            <select id="scheduleTerm" class="form-select" name="term_id" data-editor-input="schedule.term_id">
-                              <% termCards.forEach((term) => { %>
-                                <option value="<%= term.id %>" <%= Number(term.id) === activeTermId ? 'selected' : '' %>><%= term.title %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field academic-v2-field--wide">
-                            <label for="scheduleSubject">Предмет</label>
-                            <select id="scheduleSubject" class="form-select">
-                              <% schedulableSubjects.forEach((subject) => { %>
-                                <option value="<%= subject.id %>"><%= subject.title %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="scheduleDay">День</label>
-                            <select id="scheduleDay" class="form-select" name="day_of_week" data-editor-input="schedule.day_of_week">
-                              <% dayOptions.forEach((day) => { %>
-                                <option value="<%= day %>"><%= day %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="scheduleActivityType">Режим активності</label>
-                            <select id="scheduleActivityType" class="form-select"></select>
-                          </div>
-                          <div class="academic-v2-field academic-v2-field--compact">
-                            <label for="scheduleClassNumber">Пара</label>
-                            <input id="scheduleClassNumber" class="form-control" type="number" name="class_number" data-editor-input="schedule.class_number" value="1" />
-                          </div>
-                          <div class="academic-v2-field academic-v2-field--wide">
-                            <label for="scheduleWeekNumber">Тижні</label>
-                            <input id="scheduleWeekNumber" class="form-control" type="text" name="week_number" data-editor-input="schedule.week_number" value="1" placeholder="1 або 1, 3, 5" />
-                            <div class="academic-v2-muted mt-1">Список тижнів замінює поточний набір для цього слота.</div>
-                          </div>
-                          <div class="academic-v2-field academic-v2-field--full academic-v2-field--schedule-groups">
-                            <label for="scheduleTargetGroups">Підгрупи</label>
-                            <select id="scheduleTargetGroups" class="form-select" name="target_group_numbers" multiple size="4" data-editor-input="schedule.target_group_numbers"></select>
-                            <div id="scheduleTargetGroupsHint" class="academic-v2-muted mt-2">Спершу вибери предмет і режим активності. Лекції використовують усі підгрупи автоматично.</div>
-                          </div>
-                        </div>
-                        <div class="academic-v2-actions mt-2">
-                          <button type="submit" class="btn btn-primary">Зберегти слот</button>
-                          <button type="button" class="btn btn-outline-secondary" data-editor-reset="schedule">Скинути</button>
-                        </div>
-                      </form>
-                    </details>
-
-                    <div class="academic-v2-subcard" data-schedule-view-panel="advanced">
-                      <div class="academic-v2-subcard-topline">Швидкий список слотів</div>
-                      <% if (schedulePreviewEntries.length) { %>
-                        <div class="academic-v2-stack">
-                          <% schedulePreviewEntries.forEach((entry) => { %>
-                            <div class="academic-v2-schedule-list-card">
-                              <div class="d-flex flex-wrap justify-content-between gap-2">
-                                <div>
-                                  <strong><%= entry.subject_title %></strong>
-                                  <div class="academic-v2-muted"><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %> · <%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %></div>
-                                </div>
-                                <div class="academic-v2-actions">
-                                  <button type="button" class="btn btn-sm btn-primary" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>Редагувати</button>
-                                  <form method="post" action="/admin/pathways/v2/schedule/<%= entry.id %>/delete">
-                                    <%- renderFocusFields() %>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Видалити</button>
-                                  </form>
-                                </div>
-                              </div>
-                            </div>
-                          <% }); %>
-                        </div>
-                        <% if (schedulePreviewHiddenCount > 0) { %>
-                          <div class="academic-v2-muted mt-3">Ще <%= schedulePreviewHiddenCount %> слотів винесено на окрему сторінку, щоб ця вкладка відкривалась швидше.</div>
-                        <% } %>
-                        <div class="academic-v2-actions mt-2">
-                          <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Відкрити повний список слотів</a>
-                          <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Проблемні слоти</a>
-                        </div>
-                      <% } else { %>
-                        <div class="academic-v2-empty">У цьому термі ще немає manual rows.</div>
+                      <% if (schedulePreviewHiddenCount > 0) { %>
+                        <div class="academic-v2-muted mt-3">Ще <%= schedulePreviewHiddenCount %> слотів винесено на окрему сторінку, щоб вкладка залишалась легкою.</div>
                       <% } %>
-                    </div>
+                      <div class="academic-v2-actions mt-2">
+                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref() %>">Відкрити повний список слотів</a>
+                        <a class="btn btn-outline-secondary" href="<%= buildScheduleListHref({ warning_only: 1 }) %>#warning-report">Проблемні слоти</a>
+                      </div>
+                    <% } else { %>
+                      <div class="academic-v2-empty">У цьому термі ще немає рядків розкладу.</div>
+                    <% } %>
                   </div>
                 </div>
               <% } else { %>
@@ -3224,6 +3001,7 @@
         const schedulePlacementSave = document.getElementById('schedulePlacementSave');
         const scheduleSlots = Array.from(document.querySelectorAll('[data-schedule-slot]'));
         const scheduleAdvancedBlock = document.querySelector('.academic-v2-advanced-block');
+        const scheduleClearForms = Array.from(document.querySelectorAll('[data-schedule-clear-form]'));
         const groupSubjectActivitySubject = document.getElementById('groupSubjectActivitySubject');
         const studentBulkForm = document.getElementById('studentBulkForm');
         const studentCheckboxes = Array.from(document.querySelectorAll('[data-student-checkbox]'));
@@ -3259,7 +3037,7 @@
         let activeWorkspaceTab = 'overview';
         let activeStructureTab = <%- JSON.stringify(Boolean(selectedGroup)) %> ? 'courses' : 'programs';
         let activeDiagnosticsTab = 'projection';
-        let activeScheduleView = 'calendar';
+        let activeScheduleView = 'advanced';
         let activeScheduleWeek = 1;
         let activeSubjectId = defaultSubjectId;
         let selectedSlot = {
@@ -3645,7 +3423,7 @@
               : activeDiagnosticsTab,
             scheduleView: allowedScheduleViews.has(String(rawState.scheduleView || '').trim())
               ? String(rawState.scheduleView || '').trim()
-              : 'calendar',
+              : 'advanced',
             scheduleWeek: normalizedWeek,
             subjectId: normalizedSubjectId,
             scheduleDraft: normalizedScheduleDraft,
@@ -4264,7 +4042,7 @@
         };
 
         const setScheduleView = (view) => {
-          activeScheduleView = view || 'calendar';
+          activeScheduleView = view || 'advanced';
           scheduleViewPanels.forEach((panel) => {
             panel.hidden = panel.getAttribute('data-schedule-view-panel') !== activeScheduleView;
           });
@@ -4817,6 +4595,19 @@
             syncSchedulePlacementFromAdvancedFields();
           });
         }
+
+        scheduleClearForms.forEach((form) => {
+          form.addEventListener('submit', (event) => {
+            const termLabel = String(form.getAttribute('data-schedule-clear-label') || '').trim();
+            const slotCount = Math.max(0, Number(form.getAttribute('data-schedule-clear-count') || 0) || 0);
+            const message = termLabel
+              ? `Очистити ${slotCount} слотів у термі «${termLabel}»? Цю дію не можна скасувати.`
+              : 'Очистити всі слоти у вибраному термі? Цю дію не можна скасувати.';
+            if (!window.confirm(message)) {
+              event.preventDefault();
+            }
+          });
+        });
 
         if (studentCheckboxes.length) {
           const syncStudentSelection = () => {
