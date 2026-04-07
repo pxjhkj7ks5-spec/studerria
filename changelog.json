@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.53",
+      "date": "2026-04-07",
+      "items": [
+        "fix(register-subjects-source): make bachelor student subject registration overlay live group subjects with stage-template catalog settings, so group counts and visibility now follow the catalog even when workspace live rows are stale"
+      ]
+    },
+    {
       "version": "1.4.52",
       "date": "2026-04-07",
       "items": [
