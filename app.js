@@ -3748,6 +3748,136 @@ function buildRegistrationScopeMatrix(rows = [], options = {}) {
   return scopeMatrix;
 }
 
+function buildRegistrationTrackDiagnostics(data = {}, lang = 'uk') {
+  const allPrograms = Array.isArray(data && data.programs) ? data.programs : [];
+  const allCohorts = Array.isArray(data && data.cohorts) ? data.cohorts : [];
+  const allGroups = Array.isArray(data && data.groups) ? data.groups : [];
+  const catalogGroups = Array.isArray(data && data.catalogGroups) ? data.catalogGroups : [];
+  const readyGroups = Array.isArray(data && data.readyGroups) ? data.readyGroups : [];
+  const auditIssues = Array.isArray(data && data.auditIssues) ? data.auditIssues : [];
+  const diagnostics = {};
+  REGISTRATION_TRACK_OPTIONS.forEach((track) => {
+    const trackKey = normalizeRegistrationTrack(track && track.key, 'bachelor');
+    const programs = allPrograms.filter((item) => normalizeRegistrationTrack(item && item.track_key, 'bachelor') === trackKey);
+    const cohorts = allCohorts.filter((item) => normalizeRegistrationTrack(item && item.track_key, 'bachelor') === trackKey);
+    const groups = allGroups.filter((item) => normalizeRegistrationTrack(item && item.track_key, 'bachelor') === trackKey);
+    const scopedCatalogGroups = catalogGroups.filter((item) => normalizeRegistrationTrack(item && item.track_key, 'bachelor') === trackKey);
+    const scopedReadyGroups = readyGroups.filter((item) => normalizeRegistrationTrack(item && item.track_key, 'bachelor') === trackKey);
+    const scopedIssues = auditIssues.filter((item) => normalizeRegistrationTrack(item && item.track_key, 'bachelor') === trackKey);
+    const issueCodes = sortRegistrationScopeCodes(
+      scopedIssues.map((item) => sanitizeCompactText(item && item.issue_code, 80)).filter(Boolean)
+    );
+    const topIssueCode = issueCodes[0] || '';
+    const topIssueMeta = getRegistrationScopeIssueMeta(topIssueCode, lang);
+
+    let statusKey = 'ready';
+    let message = lang === 'en' ? 'Registration route is ready.' : 'Маршрут готовий до реєстрації.';
+    let action = '';
+
+    if (topIssueCode === 'registration_teacher_multiple_defaults') {
+      statusKey = 'blocked';
+      message = lang === 'en'
+        ? 'Teacher registration is blocked because one campus/stage has several default teacher groups.'
+        : 'Викладацька реєстрація заблокована: для одного кампусу або стейджу позначено кілька default-викладацьких груп.';
+      action = lang === 'en'
+        ? 'Leave exactly one default teacher group per campus and stage in Academic Setup v2.'
+        : 'Залиш рівно одну default-викладацьку групу на кожен кампус і стейдж у Academic Setup v2.';
+    } else if (topIssueCode === 'registration_teacher_default_required') {
+      statusKey = 'blocked';
+      message = lang === 'en'
+        ? 'Teacher registration is blocked because one campus/stage still has no default teacher group.'
+        : 'Викладацька реєстрація заблокована: для одного кампусу або стейджу ще не визначено default-викладацьку групу.';
+      action = lang === 'en'
+        ? 'Mark one teacher group as the registration default for that campus and stage.'
+        : 'Познач одну викладацьку групу як registration default для цього кампусу і стейджу.';
+    } else if (!programs.length) {
+      statusKey = 'blocked';
+      message = lang === 'en'
+        ? `Academic V2 has no ${trackKey} program yet.`
+        : `У Academic V2 ще немає програми для треку "${track.label}".`;
+      action = lang === 'en'
+        ? `Create an academic_v2 program with track_key="${trackKey}".`
+        : `Створи academic_v2 program з track_key="${trackKey}".`;
+    } else if (!cohorts.length) {
+      statusKey = 'needs_setup';
+      message = lang === 'en'
+        ? 'The track has a program, but no cohort yet.'
+        : 'Для цього треку є програма, але ще немає когорти.';
+      action = lang === 'en'
+        ? 'Create at least one cohort for this track.'
+        : 'Створи хоча б одну когорту для цього треку.';
+    } else if (!groups.length) {
+      statusKey = 'needs_setup';
+      message = lang === 'en'
+        ? 'The track has a cohort, but no academic groups yet.'
+        : 'Для цього треку є когорта, але ще немає академічних груп.';
+      action = lang === 'en'
+        ? 'Create the academic groups for the needed campus.'
+        : 'Створи академічні групи для потрібного кампусу.';
+    } else if (scopedReadyGroups.length > 0) {
+      statusKey = 'ready';
+      message = lang === 'en'
+        ? 'The track has ready registration routes.'
+        : 'Для цього треку вже є готові маршрути реєстрації.';
+    } else if (scopedCatalogGroups.length > 0) {
+      statusKey = 'repair';
+      message = lang === 'en'
+        ? 'The route is selectable, but some legacy compatibility data still needs repair on continue.'
+        : 'Маршрут можна вибрати, але під час продовження ще знадобиться repair legacy-сумісності.';
+      action = topIssueCode === 'missing_mapped_subjects'
+        ? (lang === 'en'
+          ? 'Project at least one visible subject into legacy mapping or run Resync.'
+          : 'Спроєктуй хоча б один visible subject у legacy mapping або запусти Resync.')
+        : topIssueCode === 'missing_compat_bridge'
+          ? (lang === 'en'
+            ? 'Run projection repair or resync to restore legacy bridge ids.'
+            : 'Запусти repair або resync проєкції, щоб відновити legacy bridge ids.')
+          : topIssueCode === 'missing_active_term'
+            ? (lang === 'en'
+              ? 'Activate a term for the selected academic group.'
+              : 'Увімкни активний терм для вибраної академічної групи.')
+            : '';
+    } else if (topIssueCode) {
+      statusKey = topIssueMeta.tone === 'blocked' ? 'blocked' : 'needs_setup';
+      message = topIssueMeta.label;
+      action = topIssueCode === 'missing_visible_subjects'
+        ? (lang === 'en'
+          ? 'Add at least one visible subject to the academic group.'
+          : 'Додай хоча б один visible subject до академічної групи.')
+        : topIssueCode === 'missing_mapped_subjects'
+          ? (lang === 'en'
+            ? 'Run Resync or create mapped visible subjects for this route.'
+            : 'Запусти Resync або додай mapped visible subjects для цього маршруту.')
+          : topIssueCode === 'missing_compat_bridge'
+            ? (lang === 'en'
+              ? 'Repair the legacy compatibility bridge for the selected group.'
+              : 'Відремонтуй legacy compatibility bridge для вибраної групи.')
+            : topIssueCode === 'missing_active_term'
+              ? (lang === 'en'
+                ? 'Mark one term as active for this academic group.'
+                : 'Познач один терм як active для цієї академічної групи.')
+              : '';
+    }
+
+    diagnostics[trackKey] = {
+      key: trackKey,
+      label: track.label,
+      program_count: programs.length,
+      cohort_count: cohorts.length,
+      group_count: groups.length,
+      catalog_group_count: scopedCatalogGroups.length,
+      ready_group_count: scopedReadyGroups.length,
+      issue_codes: issueCodes,
+      top_issue_code: topIssueCode,
+      status_key: statusKey,
+      status_label: getRegistrationScopeStatusLabel(statusKey, lang),
+      message,
+      action,
+    };
+  });
+  return diagnostics;
+}
+
 function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk', options = {}) {
   const isEn = lang === 'en';
   const isTeacher = normalizeRegistrationTrack(options && options.trackKey, 'bachelor') === 'teacher';
@@ -15521,14 +15651,27 @@ app.get('/register/course', async (req, res) => {
   try {
     await ensureDbReady();
     const lang = getPreferredLang(req);
-    const [pendingUser, catalogGroups, registrationScopeRows, registrationAuditIssues] = await Promise.all([
+    const [
+      pendingUser,
+      catalogGroups,
+      readyRegistrationGroups,
+      registrationScopeRows,
+      registrationAuditIssues,
+      allAcademicV2Programs,
+      allAcademicV2Cohorts,
+      allAcademicV2Groups,
+    ] = await Promise.all([
       db.get(
         'SELECT group_id, course_id, study_track, study_program_id, admission_id, study_context_id FROM users WHERE id = ?',
         [req.session.pendingUserId]
       ),
       academicV2Helpers.listRegistrationCatalogGroups(getAcademicV2Store()),
+      academicV2Helpers.listRegistrationReadyGroups(getAcademicV2Store()),
       academicV2Helpers.listRegistrationScopeRows(getAcademicV2Store()),
       academicV2Helpers.listRegistrationGroupAuditIssues(getAcademicV2Store()),
+      academicV2Helpers.listPrograms(getAcademicV2Store()),
+      academicV2Helpers.listCohorts(getAcademicV2Store()),
+      academicV2Helpers.listGroups(getAcademicV2Store()),
     ]);
     if (!pendingUser) {
       req.session.pendingUserId = null;
@@ -15553,6 +15696,14 @@ app.get('/register/course', async (req, res) => {
       pendingUser,
       selectedGroup: selectedScopeGroup,
     });
+    const registrationTrackDiagnostics = buildRegistrationTrackDiagnostics({
+      programs: allAcademicV2Programs,
+      cohorts: allAcademicV2Cohorts,
+      groups: allAcademicV2Groups,
+      catalogGroups,
+      readyGroups: readyRegistrationGroups,
+      auditIssues: registrationAuditIssues,
+    }, lang);
     const initialSelection = registrationScopeMatrix && registrationScopeMatrix.initialSelection
       ? registrationScopeMatrix.initialSelection
       : {};
@@ -15595,6 +15746,7 @@ app.get('/register/course', async (req, res) => {
       registrationStudyContexts,
       registrationCatalog,
       registrationScopeMatrix,
+      registrationTrackDiagnostics,
       registrationAuditIssues: Array.isArray(registrationAuditIssues) ? registrationAuditIssues : [],
       selectedCourseId: parsePositiveIntStrict(initialSelection.courseId)
         || (selectedGroup && selectedGroup.legacy_course_id ? Number(selectedGroup.legacy_course_id) : null),

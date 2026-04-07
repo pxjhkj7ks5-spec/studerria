@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.43",
+      "date": "2026-04-07",
+      "items": [
+        "feat(register-course-debug): make all registration tracks selectable in the track picker, add per-track diagnostics with concrete setup actions and readiness counts, and explain why teacher/master routes are unavailable even when no registration-ready program rows exist yet; export Academic V2 listPrograms/listCohorts/listGroups for this route-level diagnostics pass"
+      ]
+    },
+    {
       "version": "1.4.42",
       "date": "2026-04-07",
       "items": [
