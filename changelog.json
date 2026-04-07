@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.41",
+      "date": "2026-04-07",
+      "items": [
+        "tune(register-course): compact the academic route picker into a denser track-registration flow, replace cohort cards with a dropdown selector plus compact cohort meta, rename the top heading to track registration, tighten the overall spacing and control sizing, and remove the bottom selection preview block"
+      ]
+    },
+    {
       "version": "1.4.40",
       "date": "2026-04-07",
       "items": [

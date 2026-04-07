@@ -21,32 +21,28 @@
   const registerCourseText = lang === 'en'
     ? {
         themeToggleAria: 'Change theme',
-        introLabel: 'Academic scope',
-        introTitle: 'Choose the registration route',
-        introSubtitle: 'Studerria uses one explicit academic scope for the next registration step. Cohort and campus stay visible and never auto-confirm silently.',
+        introLabel: 'Track registration',
+        introTitle: 'Track registration',
+        introSubtitle: 'Choose level, program, cohort, and campus.',
         stepTrack: 'Level',
-        stepTrackCopy: 'Choose the route you register into. The next steps will rebuild around this academic level.',
+        stepTrackCopy: 'Choose the academic level.',
         stepProgram: 'Program',
-        stepProgramCopy: 'Program sets the working context. Cohort and campus remain a separate explicit choice.',
+        stepProgramCopy: 'Program defines the working context.',
         stepCohort: 'Cohort',
-        stepCohortCopy: 'Pick the cohort you want to join. Blocked cohorts stay visible with setup reasons.',
+        stepCohortCopy: 'Pick the cohort you want to join.',
         stepCampus: 'Campus',
-        stepCampusCopyStudent: 'After the cohort is confirmed, choose the campus that resolves the exact academic group.',
-        stepCampusCopyTeacher: 'Choose the campus that resolves the teacher academic group for this program.',
+        stepCampusCopyStudent: 'Choose the campus that resolves the academic group.',
+        stepCampusCopyTeacher: 'Choose the campus for the teacher academic group.',
         chooseProgram: 'Choose a program',
         chooseProgramFirst: 'Choose a program first to unlock cohort choices.',
         noPrograms: 'No programs available for this route yet.',
         noCohorts: 'No cohort is available for this program yet.',
         noReadyCohorts: 'This program has no ready cohort for registration yet.',
         chooseCohortFirst: 'Choose a cohort to review available campuses.',
+        chooseCohortOption: 'Choose cohort',
         noCampuses: 'No campuses are available for this scope yet.',
         noReadyCampuses: 'This scope has no ready campus for registration yet.',
         chooseCampus: 'Choose a campus to confirm the academic scope.',
-        summaryLabel: 'Confirmed academic scope',
-        summaryEmptyStudent: 'Choose program, cohort, and campus to continue.',
-        summaryEmptyTeacher: 'Choose program and campus to continue.',
-        summaryPending: 'Selection in progress',
-        summaryReady: 'Scope confirmed',
         ready: 'Ready',
         blocked: 'Blocked',
         needsSetup: 'Needs setup',
@@ -62,37 +58,35 @@
         scopeCohort: 'Cohort',
         scopeRoute: 'Route',
         scopeGroup: 'Academic group',
+        cohortMetaReady: 'ready',
+        cohortMetaBlocked: 'blocked',
         continueLockedStudent: 'Choose cohort and campus before continuing.',
         continueLockedTeacher: 'Choose campus before continuing.',
       }
     : {
         themeToggleAria: 'Змінити тему',
-        introLabel: 'Академічний контекст',
-        introTitle: 'Оберіть маршрут реєстрації',
-        introSubtitle: 'Studerria продовжує реєстрацію лише в межах одного явного академічного контексту. Когорта й кампус залишаються видимими та не підтверджуються автоматично.',
+        introLabel: 'Реєстрація треку',
+        introTitle: 'Реєстрація треку',
+        introSubtitle: 'Оберіть рівень, програму, когорту та кампус.',
         stepTrack: 'Рівень',
-        stepTrackCopy: 'Оберіть маршрут, у який ви реєструєтесь. Далі сторінка перебудується під цей академічний рівень.',
+        stepTrackCopy: 'Оберіть академічний рівень.',
         stepProgram: 'Програма',
-        stepProgramCopy: 'Програма задає робочий контекст. Когорта і кампус нижче залишаються окремим явним вибором.',
+        stepProgramCopy: 'Програма задає робочий контекст.',
         stepCohort: 'Когорта',
-        stepCohortCopy: 'Оберіть когорту, до якої хочете приєднатись. Заблоковані когорти залишаються видимими з причиною.',
+        stepCohortCopy: 'Оберіть когорту, до якої хочете приєднатись.',
         stepCampus: 'Кампус',
-        stepCampusCopyStudent: 'Після підтвердження когорти оберіть кампус, який привʼязує точну академічну групу.',
-        stepCampusCopyTeacher: 'Оберіть кампус, який привʼязує викладацьку академічну групу для цієї програми.',
+        stepCampusCopyStudent: 'Оберіть кампус, який привʼязує академічну групу.',
+        stepCampusCopyTeacher: 'Оберіть кампус для викладацької академічної групи.',
         chooseProgram: 'Оберіть програму',
         chooseProgramFirst: 'Спершу оберіть програму, щоб побачити когорти.',
         noPrograms: 'Для цього маршруту ще немає доступних програм.',
         noCohorts: 'Для цієї програми поки немає жодної когорти.',
         noReadyCohorts: 'Для цієї програми поки немає готової когорти для реєстрації.',
         chooseCohortFirst: 'Оберіть когорту, щоб переглянути доступні кампуси.',
+        chooseCohortOption: 'Оберіть когорту',
         noCampuses: 'Для цього контексту поки немає доступних кампусів.',
         noReadyCampuses: 'Для цього контексту поки немає готового кампусу для реєстрації.',
         chooseCampus: 'Оберіть кампус, щоб підтвердити академічний маршрут.',
-        summaryLabel: 'Підтверджений академічний контекст',
-        summaryEmptyStudent: 'Оберіть програму, когорту й кампус, щоб продовжити.',
-        summaryEmptyTeacher: 'Оберіть програму й кампус, щоб продовжити.',
-        summaryPending: 'Вибір ще не завершено',
-        summaryReady: 'Контекст підтверджено',
         ready: 'Готово',
         blocked: 'Заблоковано',
         needsSetup: 'Потрібне налаштування',
@@ -108,6 +102,8 @@
         scopeCohort: 'Когорта',
         scopeRoute: 'Маршрут',
         scopeGroup: 'Академічна група',
+        cohortMetaReady: 'готово',
+        cohortMetaBlocked: 'заблоковано',
         continueLockedStudent: 'Оберіть когорту і кампус перед продовженням.',
         continueLockedTeacher: 'Оберіть кампус перед продовженням.',
       };
@@ -185,19 +181,19 @@
         overflow: hidden;
       }
       body.page-register-course .auth-card .card-body {
-        padding: 1.8rem 1.6rem !important;
+        padding: 1.2rem 1.05rem !important;
       }
       body.page-register-course .auth-card h1 {
         margin: 0;
-        font-size: clamp(1.45rem, 3vw, 1.95rem);
-        line-height: 1.06;
+        font-size: clamp(1.18rem, 2.4vw, 1.48rem);
+        line-height: 1.08;
         letter-spacing: -0.04em;
         font-weight: 760;
       }
       .registration-intro {
-        margin-bottom: 1.15rem;
-        padding: 1.1rem 1.15rem 1.05rem;
-        border-radius: 24px;
+        margin-bottom: 0.75rem;
+        padding: 0.9rem 0.95rem 0.85rem;
+        border-radius: 18px;
         border: 1px solid rgba(148, 163, 184, 0.14);
       }
       body.theme-light .registration-intro {
@@ -210,10 +206,10 @@
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
-        min-height: 1.8rem;
-        padding: 0.2rem 0.72rem;
+        min-height: 1.55rem;
+        padding: 0.16rem 0.58rem;
         border-radius: 999px;
-        font-size: 0.74rem;
+        font-size: 0.66rem;
         font-weight: 700;
         letter-spacing: 0.01em;
         text-transform: uppercase;
@@ -227,12 +223,12 @@
         color: rgba(191, 219, 254, 0.92);
       }
       .registration-intro-copy {
-        margin-top: 0.8rem;
+        margin-top: 0.35rem;
       }
       .registration-intro-copy p {
-        margin: 0.5rem 0 0;
-        font-size: 0.92rem;
-        line-height: 1.55;
+        margin: 0.28rem 0 0;
+        font-size: 0.78rem;
+        line-height: 1.4;
       }
       body.theme-light .registration-intro-copy p {
         color: rgba(51, 65, 85, 0.84);
@@ -241,28 +237,28 @@
         color: rgba(226, 232, 240, 0.8);
       }
       .registration-step {
-        padding: 1rem 0 1.05rem;
+        padding: 0.72rem 0 0.78rem;
         border-top: 1px solid rgba(148, 163, 184, 0.14);
       }
       .registration-step:first-of-type {
         border-top: 0;
-        padding-top: 0.25rem;
+        padding-top: 0.1rem;
       }
       .registration-step-header {
         display: flex;
         align-items: flex-start;
-        gap: 0.85rem;
-        margin-bottom: 0.8rem;
+        gap: 0.65rem;
+        margin-bottom: 0.45rem;
       }
       .registration-step-index {
         flex: 0 0 auto;
-        width: 1.9rem;
-        height: 1.9rem;
+        width: 1.55rem;
+        height: 1.55rem;
         border-radius: 999px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.82rem;
+        font-size: 0.72rem;
         font-weight: 700;
       }
       body.theme-light .registration-step-index {
@@ -275,14 +271,14 @@
       }
       .registration-step-title {
         margin: 0;
-        font-size: 1rem;
+        font-size: 0.9rem;
         font-weight: 700;
         letter-spacing: -0.02em;
       }
       .registration-step-copy {
-        margin: 0.28rem 0 0;
-        font-size: 0.82rem;
-        line-height: 1.5;
+        margin: 0.14rem 0 0;
+        font-size: 0.74rem;
+        line-height: 1.35;
       }
       body.theme-light .registration-step-copy {
         color: rgba(51, 65, 85, 0.78);
@@ -293,22 +289,22 @@
       .track-grid,
       .scope-grid {
         display: grid;
-        gap: 0.78rem;
+        gap: 0.55rem;
       }
       .track-grid {
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
       }
       .scope-grid--cohorts {
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: 1fr;
       }
       .scope-grid--campuses {
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
       }
       .track-option,
       .scope-option,
       .registration-empty {
         position: relative;
-        border-radius: 20px;
+        border-radius: 14px;
         border: 1px solid rgba(148, 163, 184, 0.22);
         color: var(--registration-text);
         transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, background 150ms ease, opacity 150ms ease;
@@ -326,10 +322,11 @@
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
       }
       .track-option {
-        padding: 0.85rem 0.95rem;
+        padding: 0.62rem 0.75rem;
         text-align: center;
         cursor: pointer;
         font-weight: 700;
+        font-size: 0.82rem;
       }
       .track-option input {
         position: absolute;
@@ -361,7 +358,7 @@
       }
       .scope-option {
         width: 100%;
-        padding: 0.95rem 1rem;
+        padding: 0.72rem 0.78rem;
         text-align: left;
         cursor: pointer;
         color: var(--registration-text);
@@ -380,32 +377,30 @@
         gap: 0.7rem;
       }
       .scope-option-head {
-        margin-bottom: 0.55rem;
+        margin-bottom: 0.35rem;
       }
       .scope-option-title {
-        font-size: 0.98rem;
+        font-size: 0.9rem;
         font-weight: 700;
         line-height: 1.25;
         letter-spacing: -0.02em;
         color: var(--registration-heading);
       }
       .scope-option-subtitle {
-        font-size: 0.78rem;
-        line-height: 1.42;
-        margin-top: 0.24rem;
+        font-size: 0.72rem;
+        line-height: 1.32;
+        margin-top: 0.16rem;
       }
       body.theme-light .scope-option-subtitle,
       body.theme-light .registration-empty-copy,
       body.theme-light .registration-hint,
-      body.theme-light .program-static-copy,
-      body.theme-light .registration-summary-copy {
+      body.theme-light .program-static-copy {
         color: var(--registration-muted);
       }
       body.theme-dark .scope-option-subtitle,
       body.theme-dark .registration-empty-copy,
       body.theme-dark .registration-hint,
-      body.theme-dark .program-static-copy,
-      body.theme-dark .registration-summary-copy {
+      body.theme-dark .program-static-copy {
         color: var(--registration-muted);
       }
       .scope-option-meta {
@@ -418,10 +413,10 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 1.65rem;
-        padding: 0.2rem 0.62rem;
+        min-height: 1.45rem;
+        padding: 0.14rem 0.52rem;
         border-radius: 999px;
-        font-size: 0.72rem;
+        font-size: 0.66rem;
         font-weight: 700;
         letter-spacing: -0.01em;
       }
@@ -461,22 +456,22 @@
         background: rgba(184, 107, 0, 0.18);
       }
       .registration-empty {
-        padding: 0.95rem 1rem;
+        padding: 0.72rem 0.78rem;
       }
       .registration-empty-title {
-        font-size: 0.94rem;
+        font-size: 0.82rem;
         font-weight: 700;
         line-height: 1.25;
         color: var(--registration-heading);
       }
       .registration-empty-copy {
-        margin-top: 0.28rem;
-        font-size: 0.79rem;
-        line-height: 1.45;
+        margin-top: 0.18rem;
+        font-size: 0.72rem;
+        line-height: 1.35;
       }
       .program-static {
-        padding: 0.9rem 1rem;
-        border-radius: 20px;
+        padding: 0.7rem 0.78rem;
+        border-radius: 14px;
         border: 1px solid rgba(148, 163, 184, 0.2);
       }
       body.theme-light .program-static {
@@ -486,19 +481,21 @@
         background: rgba(255, 255, 255, 0.05);
       }
       .program-static-title {
-        font-size: 0.96rem;
+        font-size: 0.86rem;
         font-weight: 700;
         color: var(--registration-heading);
       }
       .program-static-copy {
-        margin-top: 0.24rem;
-        font-size: 0.79rem;
+        margin-top: 0.16rem;
+        font-size: 0.72rem;
       }
       .pathway-select {
-        min-height: 48px;
-        border-radius: 18px;
+        min-height: 40px;
+        border-radius: 12px;
         border: 1px solid rgba(148, 163, 184, 0.22);
         font-weight: 650;
+        font-size: 0.84rem;
+        padding: 0.45rem 0.85rem;
       }
       body.theme-light .pathway-select {
         background: rgba(255, 255, 255, 0.76);
@@ -517,92 +514,53 @@
         background: #0f2238;
       }
       .registration-hint {
-        margin: 0.65rem 0 0;
-        font-size: 0.79rem;
-        line-height: 1.45;
+        margin: 0.36rem 0 0;
+        font-size: 0.72rem;
+        line-height: 1.35;
       }
       .registration-hint.is-error {
         color: var(--danger) !important;
       }
-      .registration-summary {
-        margin-top: 1rem;
-        padding: 1rem 1.05rem 1.05rem;
-        border-radius: 24px;
+      .cohort-select-wrap {
+        display: grid;
+        gap: 0.42rem;
+      }
+      .cohort-meta {
+        display: none;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.42rem;
+        min-height: 1.7rem;
+        padding: 0.52rem 0.6rem;
+        border-radius: 12px;
         border: 1px solid rgba(148, 163, 184, 0.16);
       }
-      body.theme-light .registration-summary {
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(241, 248, 255, 0.8));
+      body.theme-light .cohort-meta {
+        background: rgba(255, 255, 255, 0.5);
       }
-      body.theme-dark .registration-summary {
-        background: linear-gradient(135deg, rgba(13, 28, 46, 0.84), rgba(10, 24, 39, 0.8));
+      body.theme-dark .cohort-meta {
+        background: rgba(255, 255, 255, 0.05);
       }
-      .registration-summary-head {
+      .cohort-meta.is-visible {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.7rem;
       }
-      .registration-summary-label {
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        text-transform: uppercase;
-      }
-      body.theme-light .registration-summary-label {
-        color: rgba(51, 65, 85, 0.68);
-      }
-      body.theme-dark .registration-summary-label {
-        color: rgba(226, 232, 240, 0.62);
-      }
-      .registration-summary-title {
-        margin: 0.75rem 0 0;
-        font-size: 1.02rem;
-        line-height: 1.38;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        color: var(--registration-heading);
-      }
-      .registration-summary-copy {
-        margin: 0.35rem 0 0;
-        font-size: 0.82rem;
-        line-height: 1.5;
-      }
-      .summary-chip-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.85rem;
-      }
-      .summary-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.38rem;
-        min-height: 1.75rem;
-        padding: 0.24rem 0.68rem;
-        border-radius: 999px;
-        font-size: 0.74rem;
-        font-weight: 650;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-      }
-      body.theme-light .summary-chip {
-        background: rgba(255, 255, 255, 0.72);
-        color: rgba(30, 41, 59, 0.84);
-      }
-      body.theme-dark .summary-chip {
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(226, 232, 240, 0.88);
+      .cohort-meta-copy {
+        font-size: 0.72rem;
+        line-height: 1.3;
+        color: var(--registration-muted);
       }
       .auth-action-stack {
-        margin-top: 1.15rem;
+        margin-top: 0.8rem;
       }
       body.page-register-course .register-action-btn {
-        height: 48px;
-        border-radius: 16px;
+        height: 42px;
+        border-radius: 12px;
         font-weight: 700;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.78rem 1rem;
+        padding: 0.6rem 0.9rem;
+        font-size: 0.84rem;
       }
       body.page-register-course .btn-primary.register-action-btn {
         background: linear-gradient(180deg, #2d8cff, #1973e8);
@@ -681,10 +639,10 @@
       }
       @media (max-width: 767px) {
         body.page-register-course .auth-card .card-body {
-          padding: 1.35rem 1.05rem !important;
+          padding: 1rem 0.85rem !important;
         }
         .registration-step-header {
-          gap: 0.7rem;
+          gap: 0.55rem;
         }
         .scope-grid--cohorts,
         .scope-grid--campuses {
@@ -718,10 +676,9 @@
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
         <div class="col-11 col-md-10 col-lg-8 col-xl-7">
-          <div class="card auth-card glass">
+            <div class="card auth-card glass">
             <div class="card-body">
               <div class="registration-intro glass">
-                <span class="registration-eyebrow"><%= registerCourseText.introLabel %></span>
                 <div class="registration-intro-copy">
                   <h1><%= registerCourseText.introTitle %></h1>
                   <p><%= registerCourseText.introSubtitle %></p>
@@ -785,8 +742,16 @@
                       <p class="registration-step-copy"><%= registerCourseText.stepCohortCopy %></p>
                     </div>
                   </div>
-                  <input type="hidden" name="cohort_id" id="selectedCohortInput" value="" />
-                  <div class="scope-grid scope-grid--cohorts" id="cohortOptions"></div>
+                  <div class="cohort-select-wrap">
+                    <label class="visually-hidden" for="cohortSelect"><%= registerCourseText.stepCohort %></label>
+                    <select id="cohortSelect" name="cohort_id" class="form-select pathway-select"></select>
+                    <div class="cohort-meta" id="cohortMeta">
+                      <span class="scope-status scope-status--needs_setup" id="cohortMetaStatus"><%= registerCourseText.needsSetup %></span>
+                      <span class="scope-pill" id="cohortMetaYear"><%= registerCourseText.admissionYearLabel %></span>
+                      <span class="scope-pill" id="cohortMetaCampuses"></span>
+                      <span class="cohort-meta-copy" id="cohortMetaCopy"></span>
+                    </div>
+                  </div>
                   <p class="registration-hint" id="cohortHint"></p>
                 </section>
 
@@ -803,20 +768,6 @@
                   <div class="scope-grid scope-grid--campuses" id="campusOptions"></div>
                   <p class="registration-hint" id="campusHint"></p>
                 </section>
-
-                <div class="registration-summary glass" id="academicContextSummaryCard">
-                  <div class="registration-summary-head">
-                    <span class="registration-summary-label"><%= registerCourseText.summaryLabel %></span>
-                    <span class="scope-status scope-status--needs_setup" id="summaryStatusBadge"><%= registerCourseText.summaryPending %></span>
-                  </div>
-                  <div class="registration-summary-title" id="academicContextSummary">
-                    <%= selectedTrackValue === 'teacher' ? registerCourseText.summaryEmptyTeacher : registerCourseText.summaryEmptyStudent %>
-                  </div>
-                  <p class="registration-summary-copy" id="academicContextSummaryCopy">
-                    <%= selectedTrackValue === 'teacher' ? registerCourseText.continueLockedTeacher : registerCourseText.continueLockedStudent %>
-                  </p>
-                  <div class="summary-chip-row" id="summaryChips"></div>
-                </div>
 
                 <div class="auth-action-stack auth-action-stack--grid">
                   <button type="submit" class="btn btn-primary register-action-btn auth-action-btn" id="registerContinueButton" disabled>
@@ -848,19 +799,19 @@
       const programStaticLabel = document.getElementById('programStaticLabel');
       const programHint = document.getElementById('programHint');
       const cohortStep = document.getElementById('cohortStep');
-      const cohortOptions = document.getElementById('cohortOptions');
+      const cohortSelect = document.getElementById('cohortSelect');
       const cohortHint = document.getElementById('cohortHint');
-      const cohortInput = document.getElementById('selectedCohortInput');
+      const cohortMeta = document.getElementById('cohortMeta');
+      const cohortMetaStatus = document.getElementById('cohortMetaStatus');
+      const cohortMetaYear = document.getElementById('cohortMetaYear');
+      const cohortMetaCampuses = document.getElementById('cohortMetaCampuses');
+      const cohortMetaCopy = document.getElementById('cohortMetaCopy');
       const campusStep = document.getElementById('campusStep');
       const campusStepCopy = document.getElementById('campusStepCopy');
       const campusOptions = document.getElementById('campusOptions');
       const campusHint = document.getElementById('campusHint');
       const groupInput = document.getElementById('selectedGroupInput');
       const campusInput = document.getElementById('selectedCampusInput');
-      const academicContextSummaryEl = document.getElementById('academicContextSummary');
-      const academicContextSummaryCopyEl = document.getElementById('academicContextSummaryCopy');
-      const summaryStatusBadge = document.getElementById('summaryStatusBadge');
-      const summaryChips = document.getElementById('summaryChips');
       const continueButton = document.getElementById('registerContinueButton');
       const registerCourseForm = document.getElementById('registerCourseForm');
 
@@ -1072,27 +1023,47 @@
       }
 
       function renderCohorts() {
-        if (!(cohortOptions instanceof HTMLElement) || !(cohortStep instanceof HTMLElement)) return;
+        if (!(cohortSelect instanceof HTMLSelectElement) || !(cohortStep instanceof HTMLElement)) return;
         const teacherMode = isTeacherTrack(state.trackKey);
         cohortStep.style.display = teacherMode ? 'none' : '';
-        cohortOptions.innerHTML = '';
+        cohortSelect.innerHTML = '';
+        if (cohortMeta instanceof HTMLElement) {
+          cohortMeta.classList.remove('is-visible');
+        }
         if (teacherMode) {
+          cohortSelect.disabled = true;
           setHint(cohortHint, '');
           return;
         }
         const cohorts = getCohortsForProgram(state.programId);
         if (!state.programId) {
-          cohortOptions.appendChild(createEmptyCard(registerCourseText.chooseProgram, registerCourseText.chooseProgramFirst));
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = registerCourseText.chooseProgram;
+          option.selected = true;
+          cohortSelect.appendChild(option);
+          cohortSelect.disabled = true;
           setHint(cohortHint, registerCourseText.chooseProgramFirst);
           clearSelectionBelowProgram();
           return;
         }
         if (!cohorts.length) {
-          cohortOptions.appendChild(createEmptyCard(registerCourseText.noCohorts, registerCourseText.noReadyCohorts));
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = registerCourseText.noCohorts;
+          option.selected = true;
+          cohortSelect.appendChild(option);
+          cohortSelect.disabled = true;
           setHint(cohortHint, registerCourseText.noReadyCohorts, true);
           clearSelectionBelowProgram();
           return;
         }
+        cohortSelect.disabled = false;
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = registerCourseText.chooseCohortOption;
+        placeholderOption.selected = !state.cohortConfirmed || !state.cohortId;
+        cohortSelect.appendChild(placeholderOption);
         const hasReadyCohort = cohorts.some((cohort) => cohort && cohort.is_ready);
         if (!hasReadyCohort) {
           setHint(cohortHint, registerCourseText.noReadyCohorts, true);
@@ -1103,38 +1074,34 @@
           setHint(cohortHint, activeCohort ? activeCohort.reason_copy : registerCourseText.chooseCohortFirst);
         }
         cohorts.forEach((cohort) => {
-          const button = document.createElement('button');
+          const option = document.createElement('option');
           const isSelectable = Boolean(cohort && cohort.is_ready);
-          const isSelected = state.cohortConfirmed && Number(cohort.id || 0) === Number(state.cohortId || 0);
-          button.type = 'button';
-          button.className = `scope-option ${isSelected ? 'is-selected' : ''} ${isSelectable ? '' : 'is-disabled'}`;
-          button.disabled = !isSelectable;
-          const statusClass = String(cohort.status_key || 'needs_setup').replace('-', '_');
           const cohortLabel = String(cohort.label || '').trim() || `${registerCourseText.cohortLabel} ${Number(cohort.admission_year || 0) || ''}`;
-          const availableLabel = getCampusReadyLabel(cohort.available_campuses_count, cohort.total_campuses_count);
-          button.innerHTML = `
-            <div class="scope-option-head">
-              <div class="scope-option-title">${escapeHtml(cohortLabel)}</div>
-              <span class="scope-status scope-status--${escapeHtml(statusClass)}">${escapeHtml(cohort.status_label || registerCourseText.needsSetup)}</span>
-            </div>
-            <div class="scope-option-subtitle">${escapeHtml(`${registerCourseText.admissionYearLabel} ${Number(cohort.admission_year || 0) || ''}`)}</div>
-            <div class="scope-option-subtitle">${escapeHtml(cohort.reason_copy || '')}</div>
-            <div class="scope-option-foot">
-              <div class="scope-option-meta">
-                <span class="scope-pill">${escapeHtml(availableLabel)}</span>
-              </div>
-            </div>
-          `;
-          if (isSelectable) {
-            button.addEventListener('click', () => {
-              state.cohortId = Number(cohort.id || 0) || null;
-              state.cohortConfirmed = true;
-              clearCampusSelection();
-              renderAll();
-            });
-          }
-          cohortOptions.appendChild(button);
+          const statusLabel = cohort.status_label || (isSelectable ? registerCourseText.ready : registerCourseText.needsSetup);
+          option.value = String(cohort.id || '');
+          option.textContent = `${cohortLabel} · ${statusLabel}`;
+          option.disabled = !isSelectable;
+          option.selected = state.cohortConfirmed && Number(cohort.id || 0) === Number(state.cohortId || 0);
+          cohortSelect.appendChild(option);
         });
+        const selectedCohort = cohorts.find((cohort) => Number(cohort.id || 0) === Number(state.cohortId || 0)) || null;
+        if (selectedCohort && state.cohortConfirmed && cohortMeta instanceof HTMLElement) {
+          const statusClass = String(selectedCohort.status_key || 'needs_setup').replace('-', '_');
+          if (cohortMetaStatus) {
+            cohortMetaStatus.textContent = selectedCohort.status_label || registerCourseText.ready;
+            cohortMetaStatus.className = `scope-status scope-status--${statusClass}`;
+          }
+          if (cohortMetaYear) {
+            cohortMetaYear.textContent = `${registerCourseText.admissionYearLabel} ${Number(selectedCohort.admission_year || 0) || ''}`;
+          }
+          if (cohortMetaCampuses) {
+            cohortMetaCampuses.textContent = getCampusReadyLabel(selectedCohort.available_campuses_count, selectedCohort.total_campuses_count);
+          }
+          if (cohortMetaCopy) {
+            cohortMetaCopy.textContent = selectedCohort.reason_copy || '';
+          }
+          cohortMeta.classList.add('is-visible');
+        }
       }
 
       function renderCampuses() {
@@ -1222,8 +1189,8 @@
       }
 
       function syncFormFields() {
-        if (cohortInput) {
-          cohortInput.value = !isTeacherTrack(state.trackKey) && state.cohortConfirmed
+        if (cohortSelect) {
+          cohortSelect.value = !isTeacherTrack(state.trackKey) && state.cohortConfirmed
             ? String(state.cohortId || '')
             : '';
         }
@@ -1241,88 +1208,12 @@
         }
       }
 
-      function renderSummary() {
-        if (!(academicContextSummaryEl instanceof HTMLElement) || !(summaryStatusBadge instanceof HTMLElement)) return;
-        const program = getProgramById(state.programId);
-        const teacherMode = isTeacherTrack(state.trackKey);
-        const defaultTitle = teacherMode
-          ? registerCourseText.summaryEmptyTeacher
-          : registerCourseText.summaryEmptyStudent;
-        const chips = [];
-        chips.push(`${registerCourseText.scopeRoute}: ${formatTrackLabelClient(state.trackKey)}`);
-        if (program) {
-          chips.push(`${registerCourseText.scopeProgram}: ${formatProgramLabel(program)}`);
-        }
-        if (!teacherMode && state.cohortConfirmed && state.cohortId) {
-          const cohort = getCohortsForProgram(state.programId)
-            .find((item) => Number(item.id || 0) === Number(state.cohortId || 0)) || null;
-          if (cohort) {
-            chips.push(`${registerCourseText.scopeCohort}: ${cohort.label || `${registerCourseText.cohortLabel} ${cohort.admission_year}`}`);
-          }
-        }
-        if (state.campusConfirmed && state.campusKey) {
-          chips.push(`${registerCourseText.campusLabel}: ${formatCampusLabelClient(state.campusKey)}`);
-        }
-
-        let groupLabel = '';
-        if (state.campusConfirmed && state.groupId) {
-          const campusChoices = teacherMode
-            ? getTeacherCampusesForProgram(state.programId)
-            : getCampusesForCohort(state.cohortId);
-          const activeChoice = campusChoices.find((choice) => Number(choice.group_id || 0) === Number(state.groupId || 0)) || null;
-          if (activeChoice && activeChoice.group_label) {
-            groupLabel = activeChoice.group_label;
-            chips.push(`${registerCourseText.scopeGroup}: ${activeChoice.group_label}`);
-          }
-        }
-
-        if (isSelectionComplete()) {
-          const summaryParts = [
-            formatTrackLabelClient(state.trackKey),
-            program ? formatProgramLabel(program) : '',
-            !teacherMode && state.cohortConfirmed && state.cohortId
-              ? (() => {
-                const cohort = getCohortsForProgram(state.programId)
-                  .find((item) => Number(item.id || 0) === Number(state.cohortId || 0)) || null;
-                return cohort ? (cohort.label || `${registerCourseText.cohortLabel} ${cohort.admission_year}`) : '';
-              })()
-              : '',
-            state.campusConfirmed ? formatCampusLabelClient(state.campusKey) : '',
-            groupLabel,
-          ].filter(Boolean);
-          academicContextSummaryEl.textContent = summaryParts.join(' / ');
-          academicContextSummaryCopyEl.textContent = teacherMode
-            ? registerCourseText.ready
-            : registerCourseText.ready;
-          summaryStatusBadge.textContent = registerCourseText.summaryReady;
-          summaryStatusBadge.className = 'scope-status scope-status--ready';
-        } else {
-          academicContextSummaryEl.textContent = defaultTitle;
-          academicContextSummaryCopyEl.textContent = teacherMode
-            ? registerCourseText.continueLockedTeacher
-            : registerCourseText.continueLockedStudent;
-          summaryStatusBadge.textContent = registerCourseText.summaryPending;
-          summaryStatusBadge.className = 'scope-status scope-status--needs_setup';
-        }
-
-        if (summaryChips) {
-          summaryChips.innerHTML = '';
-          chips.forEach((label) => {
-            const chip = document.createElement('span');
-            chip.className = 'summary-chip';
-            chip.textContent = label;
-            summaryChips.appendChild(chip);
-          });
-        }
-      }
-
       function renderAll() {
         syncTrackCards();
         renderProgramField();
         renderCohorts();
         renderCampuses();
         syncFormFields();
-        renderSummary();
       }
 
       function hydrateInitialState() {
@@ -1364,6 +1255,26 @@
           }
           state.programId = nextProgramId;
           clearSelectionBelowProgram();
+          renderAll();
+        });
+      }
+
+      if (cohortSelect) {
+        cohortSelect.addEventListener('change', () => {
+          const nextCohortId = Number(cohortSelect.value || 0) || null;
+          if (!nextCohortId) {
+            state.cohortId = null;
+            state.cohortConfirmed = false;
+            clearCampusSelection();
+            renderAll();
+            return;
+          }
+          if (Number(nextCohortId || 0) === Number(state.cohortId || 0) && state.cohortConfirmed) {
+            return;
+          }
+          state.cohortId = nextCohortId;
+          state.cohortConfirmed = true;
+          clearCampusSelection();
           renderAll();
         });
       }
