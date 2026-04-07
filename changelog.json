@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.46",
+      "date": "2026-04-07",
+      "items": [
+        "fix(runtime): normalize security-event `course_id` values so zero never violates foreign keys during failed logins or registration auditing, make post-registration security recompute null-safe when risk signals are absent, and sort visible messages with a timestamptz-safe fallback for legacy text `created_at` rows"
+      ]
+    },
+    {
       "version": "1.4.45",
       "date": "2026-04-07",
       "items": [

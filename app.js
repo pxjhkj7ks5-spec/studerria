@@ -8922,7 +8922,7 @@ async function appendJournalGradeHashAudit({
       normalizedColumnId,
       normalizedStudentId,
       Number.isFinite(Number(subjectId)) ? Number(subjectId) : null,
-      Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+      normalizeOptionalCourseId(courseId),
       Number.isFinite(Number(semesterId)) ? Number(semesterId) : null,
       Number.isFinite(Number(actorUserId)) ? Number(actorUserId) : null,
       String(actionType || 'grade_update').trim() || 'grade_update',
@@ -8975,6 +8975,10 @@ function resolveRegistrationSecurityRiskLevel(scoreRaw) {
   return { key: 'none', label: 'None' };
 }
 
+function normalizeOptionalCourseId(courseId) {
+  return parsePositiveIntStrict(courseId) || null;
+}
+
 async function evaluateRegistrationSecuritySignals({
   userId,
   ip,
@@ -9025,7 +9029,7 @@ async function evaluateRegistrationSecuritySignals({
     settingsCache.security_registration_alert_threshold,
     DEFAULT_SETTINGS.security_registration_alert_threshold
   );
-  const numericCourseId = Number.isFinite(Number(courseId)) ? Number(courseId) : null;
+  const numericCourseId = normalizeOptionalCourseId(courseId);
 
   const loadDistinctUsersCount = async (column, value) => {
     if (!value) {
@@ -9187,7 +9191,7 @@ async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, se
       buildForensicsDeviceFingerprint(normalizedAgent),
       normalizedSessionId,
       normalizedSource,
-      Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+      normalizeOptionalCourseId(courseId),
     ]
   );
   let evaluation = null;
@@ -9198,7 +9202,7 @@ async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, se
       sessionId: normalizedSessionId,
       deviceFingerprint: buildForensicsDeviceFingerprint(normalizedAgent),
       source: normalizedSource,
-      courseId: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+      courseId: normalizeOptionalCourseId(courseId),
     });
   } catch (err) {
     console.error('Database error (register.security_signals)', err);
@@ -9209,7 +9213,7 @@ async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, se
     session_id: normalizedSessionId,
     device_fingerprint: buildForensicsDeviceFingerprint(normalizedAgent),
     source: normalizedSource,
-    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    course_id: normalizeOptionalCourseId(courseId),
     security: evaluation,
   };
 }
@@ -9274,7 +9278,7 @@ async function emitSecurityAlertEvent({
       `,
       [
         Number.isFinite(Number(userId)) ? Number(userId) : null,
-        Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+        normalizeOptionalCourseId(courseId),
         normalizedAlertKey,
         normalizedSeverity,
         normalizedTitle,
@@ -9293,7 +9297,7 @@ async function emitSecurityAlertEvent({
 
   pushRuntimeErrorEvent('security', normalizedAlertKey, normalizedMessage, {
     user_id: Number.isFinite(Number(userId)) ? Number(userId) : null,
-    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    course_id: normalizeOptionalCourseId(courseId),
     severity: normalizedSeverity,
     details: payload,
   });
@@ -9305,7 +9309,7 @@ async function emitSecurityAlertEvent({
     message: normalizedMessage,
     created_at: createdAt,
     user_id: Number.isFinite(Number(userId)) ? Number(userId) : null,
-    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    course_id: normalizeOptionalCourseId(courseId),
   });
 
   return {
@@ -9417,7 +9421,7 @@ async function recordUserRoleChangeEvent({
       title: 'Privileged role elevation',
       message: `${normalizedTargetName || `User ${normalizedUserId}`} отримав(ла) підвищені права`,
       userId: normalizedUserId,
-      courseId: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+      courseId: normalizeOptionalCourseId(courseId),
       details: {
         before_roles: normalizedBefore,
         after_roles: normalizedAfter,
@@ -9449,7 +9453,7 @@ async function recordAuthFailureEvent({
   const normalizedAgent = normalizeForensicsAgent(userAgent);
   const normalizedSessionId = normalizeForensicsToken(sessionId);
   const normalizedUserId = Number.isFinite(Number(userId)) ? Number(userId) : null;
-  const normalizedCourseId = Number.isFinite(Number(courseId)) ? Number(courseId) : null;
+  const normalizedCourseId = normalizeOptionalCourseId(courseId);
   const normalizedNameKey = normalizedName.toLowerCase();
   await db.run(
     `
@@ -14848,7 +14852,7 @@ async function listVisibleMessagesForUser({
       LEFT JOIN users u ON u.id = m.created_by_id
       LEFT JOIN message_reads mr ON mr.message_id = m.id AND mr.user_id = ?
       ${baseWhere}${subjectFilter}${statusFilter}
-      ORDER BY COALESCE(m.published_at, m.created_at) DESC, m.id DESC
+      ORDER BY COALESCE(m.published_at, NULLIF(TRIM(CAST(m.created_at AS TEXT)), '')::timestamptz) DESC, m.id DESC
       LIMIT ${safeLimit}
     `,
     [
@@ -15613,13 +15617,12 @@ app.post('/register', registerLimiter, async (req, res) => {
       const signalRisk = registrationSignals && registrationSignals.security && registrationSignals.security.risk
         ? registrationSignals.security.risk
         : null;
+      const signalReasons = Array.isArray(signalRisk?.reasons) ? signalRisk.reasons : [];
       const securityCase = await recomputeUserSecurityCase(row.id, {
         allowAutoQuarantine: true,
         courseId: null,
         extraScore: Number(signalRisk && signalRisk.score ? signalRisk.score : 0),
-        extraReasons: Array.isArray(signalRisk && signalRisk.reasons ? signalRisk.reasons : [])
-          ? signalRisk.reasons
-          : [],
+        extraReasons: signalReasons,
       });
       const isQuarantined = securityCase
         && securityCase.case
