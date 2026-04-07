@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.35",
+      "date": "2026-04-07",
+      "items": [
+        "fix(academic-v2-bachelor-backfill): make bachelor course stage changes backward-compatible with older academic_v2 schemas by skipping missing stage-activity template tables, defaulting live bachelor subjects to lecture plus seminar when needed, and backfilling missing subject coverage across all courses in the program during course save"
+      ]
+    },
+    {
       "version": "1.4.34",
       "date": "2026-04-07",
       "items": [
