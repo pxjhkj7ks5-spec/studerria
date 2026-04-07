@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.52",
+      "date": "2026-04-07",
+      "items": [
+        "fix(bachelor-catalog-live-sync): make bachelor catalog save and sync-live propagate stage-template subject settings into live group subjects, so edited group counts now reach registration instead of falling back to raw source defaults"
+      ]
+    },
+    {
       "version": "1.4.51",
       "date": "2026-04-07",
       "items": [
