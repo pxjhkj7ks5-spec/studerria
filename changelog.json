@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.49",
+      "date": "2026-04-07",
+      "items": [
+        "tune(register-subjects): remove the top registration helper panel and cohort readiness block so the subject picker opens directly into the working catalog"
+      ]
+    },
+    {
       "version": "1.4.48",
       "date": "2026-04-07",
       "items": [

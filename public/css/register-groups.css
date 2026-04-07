@@ -96,23 +96,6 @@
   max-width: 42rem;
 }
 
-.page-register-subjects .reg-groups-instructions {
-  display: grid;
-  gap: 0.18rem;
-  margin-bottom: 0.82rem;
-  padding: 0.72rem 0.9rem;
-  border-radius: 16px;
-  color: var(--reg-groups-muted);
-  font-size: 0.88rem;
-  line-height: 1.46;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12));
-  border: 1px solid rgba(148, 163, 184, 0.14);
-}
-
-.page-register-subjects.theme-dark .reg-groups-instructions {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-}
-
 .page-register-subjects .reg-groups-surface {
   margin-bottom: 0.85rem;
   padding: 0.9rem 1rem;
