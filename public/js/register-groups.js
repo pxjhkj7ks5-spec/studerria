@@ -23,6 +23,8 @@
       missingHintPrefix: 'Choose groups for',
       filterEmpty: 'All active subjects are already filled in.',
       selectedSuffix: 'selected',
+      baselineSelectedCount: 0,
+      baselineTotalCount: 0,
     },
     window.__registerGroupsConfig || {}
   );
@@ -39,6 +41,8 @@
   const emptyState = form.querySelector('[data-reg-groups-empty]');
   const quickButtons = Array.from(document.querySelectorAll('[data-reg-groups-quick-group]'));
   const resetButton = document.querySelector('[data-reg-groups-reset]');
+  const baselineSelectedCount = Math.max(0, Number(config.baselineSelectedCount || 0) || 0);
+  const baselineTotalCount = Math.max(0, Number(config.baselineTotalCount || 0) || 0);
 
   const selectedGroupsBySubject = {};
   window.selectedGroupsBySubject = selectedGroupsBySubject;
@@ -188,14 +192,16 @@
     const activeRows = trackedRows.filter((row) => !isOptedOut(row));
     const selectedRows = trackedRows.filter((row) => isOptedOut(row) || Boolean(readSelectedGroup(row)));
     const missingRows = trackedRows.filter((row) => isManualSelectable(row) && !isOptedOut(row) && !readSelectedGroup(row));
+    const selectedCount = baselineSelectedCount + selectedRows.length;
+    const totalCount = baselineTotalCount + trackedRows.length;
 
     return {
       trackedRows,
       activeRows,
       selectedRows,
       missingRows,
-      selectedCount: selectedRows.length,
-      totalCount: trackedRows.length,
+      selectedCount,
+      totalCount,
     };
   };
 

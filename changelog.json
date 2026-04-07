@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.54",
+      "date": "2026-04-07",
+      "items": [
+        "fix(register-subjects-quick-select): hide single-group required subjects from the manual registration list while keeping them auto-assigned in hidden submit fields and progress counters, so quick-pick group 2 no longer leaves required one-group subjects visibly stuck or blocking completion"
+      ]
+    },
+    {
       "version": "1.4.53",
       "date": "2026-04-07",
       "items": [

@@ -56,6 +56,7 @@
   }, []);
 
   const selectableSubjects = subjectCards.filter((subject) => subject.interactive);
+  const renderedSubjectCards = subjectCards.filter((subject) => !subject.autoAssigned);
   const activeSelectableSubjects = selectableSubjects.filter((subject) => !subject.optedOut);
   const pendingSelectableSubjects = activeSelectableSubjects.filter((subject) => !subject.selectedGroup);
   const totalVisibleCount = subjectCards.length;
@@ -106,6 +107,8 @@
     missingHintPrefix: t('registerSubjects.missingHintPrefix'),
     filterEmpty: t('registerSubjects.filterEmpty'),
     selectedSuffix: t('registerSubjects.selectedSuffix'),
+    baselineSelectedCount: autoAssignedCount,
+    baselineTotalCount: autoAssignedCount,
   };
 %>
 <html lang="<%= lang %>">
@@ -415,6 +418,12 @@
               <% } %>
 
               <form method="POST" action="/register/subjects" id="registerGroupsForm" data-reg-groups-form novalidate>
+                <% subjectCards.forEach(function(subject) { %>
+                  <% if (subject.autoAssigned) { %>
+                    <input type="hidden" name="subject_<%= subject.id %>" value="<%= subject.selectedGroup || 1 %>" />
+                  <% } %>
+                <% }); %>
+
                 <% if (showNoSubjectsNotice) { %>
                   <div class="alert alert-info flash-alert mb-3" role="status">
                     <span class="flash-alert__icon" aria-hidden="true">i</span>
@@ -479,7 +488,7 @@
                   </section>
                 <% } %>
 
-                <% if (subjectCards.length) { %>
+                <% if (renderedSubjectCards.length) { %>
                   <section class="reg-groups-surface reg-groups-list-panel">
                     <div class="reg-groups-list-head">
                       <div>
@@ -501,7 +510,7 @@
                     </div>
 
                     <div class="reg-groups-list" data-reg-groups-list>
-                      <% subjectCards.forEach(function(subject) { %>
+                      <% renderedSubjectCards.forEach(function(subject) { %>
                         <% const subjectStatusText = subject.optedOut
                           ? t('registerSubjects.statusSkipped')
                           : (subject.autoAssigned
