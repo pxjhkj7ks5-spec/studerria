@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+.vscode
+.DS_Store
+node_modules
+npm-debug.log*
+coverage
+test
+uploads
+.local
+docker/local/db/init/*.sql
+docker/local/db/init/*.sql.gz
+

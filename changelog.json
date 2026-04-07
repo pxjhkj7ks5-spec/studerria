@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.44",
+      "date": "2026-04-07",
+      "items": [
+        "feat(docker): add an isolated `docker/local` runtime with Docker Compose, a dedicated app image, PostgreSQL 18 bootstrap from the provided Cloud SQL dump, default local env wiring for the existing `DB_*` config, and documentation for first boot plus backup re-import flow"
+      ]
+    },
+    {
       "version": "1.4.43",
       "date": "2026-04-07",
       "items": [

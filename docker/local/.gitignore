@@ -1,0 +1,4 @@
+db/init/*.sql
+db/init/*.sql.gz
+!db/init/.gitkeep
+
