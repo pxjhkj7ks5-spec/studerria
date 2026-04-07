@@ -656,6 +656,16 @@ body.theme-dark .academic-v2-chip--ok {
   background: rgba(16, 185, 129, 0.14);
 }
 
+.academic-v2-chip--subtle {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+body.theme-dark .academic-v2-chip--subtle {
+  color: rgba(226, 232, 240, 0.9);
+  background: rgba(148, 163, 184, 0.12);
+}
+
 /* ── Actions / buttons ──────────────────────────────────────── */
 
 .academic-v2-actions {

@@ -69,6 +69,17 @@
     || bachelorCatalogSourcesList[0]
     || null;
   const isBachelorProgramSelected = Boolean(selectedProgram && String(selectedProgram.track_key || '') === 'bachelor');
+  const activeGroupStageNumber = numberOrZero(selectedGroup && selectedGroup.stage_number);
+  const bachelorCatalogTemplateIdsForActiveStage = new Set(
+    (
+      isBachelorProgramSelected && activeGroupStageNumber
+        ? bachelorCatalogRowsList
+          .filter((row) => numberOrZero(row && row.suggested_stage_number) === activeGroupStageNumber)
+          .map((row) => numberOrZero(row && row.subject_template_id))
+          .filter((value) => value > 0)
+        : []
+    )
+  );
   const bachelorCatalogSummary = bachelorCatalogRowsList.reduce((summary, row) => {
     const statusCode = String(row && row.status && row.status.code || '');
     if (statusCode === 'seeded') {
@@ -209,12 +220,16 @@
   const subjectCards = scopedGroupSubjectsList.map((subject) => {
     const activities = activityOptionsBySubjectId.get(Number(subject.id || 0)) || [];
     const readiness = buildSubjectReadiness(subject, activities);
+    const isCatalogSubject = bachelorCatalogTemplateIdsForActiveStage.has(Number(subject.subject_template_id || 0));
     return {
       ...subject,
       activities,
       teacher_count: Array.isArray(subject.teacher_names) ? subject.teacher_names.length : 0,
       term_count: Array.isArray(subject.term_titles) ? subject.term_titles.length : 0,
       activity_count: activities.length,
+      subject_origin: isCatalogSubject
+        ? { code: 'catalog', label: 'Каталог', tone: 'ok' }
+        : { code: 'manual', label: 'Ручний', tone: 'subtle' },
       readiness,
       readiness_labels: readiness.issues.map((issue) => (
         issue === 'teacher'
@@ -2087,6 +2102,7 @@
                               <span class="academic-v2-chip <%= subject.readiness.tone === 'ok' ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= subject.readiness.label %></span>
                             </div>
                             <div class="academic-v2-chip-row mt-1">
+                              <span class="academic-v2-chip <%= subject.subject_origin && subject.subject_origin.tone === 'ok' ? 'academic-v2-chip--ok' : 'academic-v2-chip--subtle' %>"><%= subject.subject_origin ? subject.subject_origin.label : 'Ручний' %></span>
                               <span class="academic-v2-chip"><%= subject.group_count %> підгруп</span>
                               <span class="academic-v2-chip">default G<%= subject.default_group %></span>
                               <span class="academic-v2-chip"><%= subject.teacher_count %> викладачів</span>
@@ -2132,6 +2148,7 @@
                       <%= initialSubjectCard ? initialSubjectCard.title : 'Вибери предмет зліва' %>
                     </p>
                     <div class="academic-v2-chip-row mt-1">
+                      <span class="academic-v2-chip <%= initialSubjectCard && initialSubjectCard.subject_origin && initialSubjectCard.subject_origin.tone === 'ok' ? 'academic-v2-chip--ok' : 'academic-v2-chip--subtle' %>" data-subject-detail-origin><%= initialSubjectCard && initialSubjectCard.subject_origin ? initialSubjectCard.subject_origin.label : 'Ручний' %></span>
                       <span class="academic-v2-chip" data-subject-detail-groups><%= initialSubjectCard ? `${initialSubjectCard.group_count} підгруп` : '1 підгрупа' %></span>
                       <span class="academic-v2-chip" data-subject-detail-terms><%= initialSubjectCard ? `${initialSubjectCard.term_count} термів` : '0 термів' %></span>
                       <span class="academic-v2-chip" data-subject-detail-teachers><%= initialSubjectCard ? `${initialSubjectCard.teacher_count} викладачів` : '0 викладачів' %></span>
@@ -3120,6 +3137,7 @@
         const subjectDetailTerms = document.querySelector('[data-subject-detail-terms]');
         const subjectDetailTeachers = document.querySelector('[data-subject-detail-teachers]');
         const subjectDetailActivities = document.querySelector('[data-subject-detail-activities]');
+        const subjectDetailOrigin = document.querySelector('[data-subject-detail-origin]');
         const subjectDetailReadiness = document.querySelector('[data-subject-detail-readiness]');
         const groupSubjectTemplate = document.getElementById('groupSubjectTemplate');
         const groupSubjectTemplateHiddenLock = document.querySelector('[data-group-subject-template-hidden-lock]');
@@ -4159,6 +4177,14 @@
           }
           if (subjectDetailActivities) {
             subjectDetailActivities.textContent = subject ? `${subject.activity_count} активностей` : '0 активностей';
+          }
+          if (subjectDetailOrigin) {
+            const origin = subject && subject.subject_origin && typeof subject.subject_origin === 'object'
+              ? subject.subject_origin
+              : { label: 'Ручний', tone: 'subtle' };
+            subjectDetailOrigin.textContent = String(origin.label || 'Ручний');
+            subjectDetailOrigin.classList.toggle('academic-v2-chip--ok', String(origin.tone || '') === 'ok');
+            subjectDetailOrigin.classList.toggle('academic-v2-chip--subtle', String(origin.tone || '') !== 'ok');
           }
           if (groupSubjectActivitiesPanelCount) {
             groupSubjectActivitiesPanelCount.textContent = subject ? `${subject.activity_count} активностей` : '0 активностей';

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.40",
+      "date": "2026-04-07",
+      "items": [
+        "tune(academic-v2-live-subjects): add compact origin badges in live course subjects and the subject detail summary, marking whether a subject came from the active bachelor catalog stage or was added manually"
+      ]
+    },
+    {
       "version": "1.4.39",
       "date": "2026-04-07",
       "items": [
