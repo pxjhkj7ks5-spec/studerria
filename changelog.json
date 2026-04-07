@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.47",
+      "date": "2026-04-07",
+      "items": [
+        "fix(register-subjects): show the full registration catalog instead of only manual-choice rows, mark single-group required subjects as auto-configured, hide quick select when it adds no value, and compact the readiness and summary surfaces into a denser Liquid Glass flow"
+      ]
+    },
+    {
       "version": "1.4.46",
       "date": "2026-04-07",
       "items": [

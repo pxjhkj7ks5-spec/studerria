@@ -23,13 +23,9 @@
   const isRequiredSubject = (subject) =>
     subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
 
-  const selectableSubjects = allSubjects.reduce((list, subject) => {
+  const subjectCards = allSubjects.reduce((list, subject) => {
     const requiredFlag = isRequiredSubject(subject);
     const groupCount = Math.max(1, Number(subject.group_count || 1));
-    if (requiredFlag && groupCount === 1) {
-      return list;
-    }
-
     const subjectId = Number(subject.id || 0);
     const selectedGroupValue = Object.prototype.hasOwnProperty.call(selectedGroupMap, subjectId)
       ? selectedGroupMap[subjectId]
@@ -40,25 +36,34 @@
         ? selectedGroupRaw
         : null;
     const optedOut = !requiredFlag && subjectOptouts.includes(subjectId);
+    const autoAssigned = requiredFlag && groupCount === 1;
+    const effectiveSelectedGroup = autoAssigned ? (selectedGroup || 1) : selectedGroup;
 
     list.push({
       id: subjectId,
       name: subject.name || '',
       groupCount,
       requiredFlag,
-      selectedGroup,
+      selectedGroup: effectiveSelectedGroup,
       optedOut,
+      autoAssigned,
+      interactive: !autoAssigned,
+      pending: !autoAssigned && !optedOut && !effectiveSelectedGroup,
+      ready: optedOut || Boolean(effectiveSelectedGroup),
     });
 
     return list;
   }, []);
 
+  const selectableSubjects = subjectCards.filter((subject) => subject.interactive);
   const activeSelectableSubjects = selectableSubjects.filter((subject) => !subject.optedOut);
-  const selectedActiveCount = activeSelectableSubjects.filter((subject) => Boolean(subject.selectedGroup)).length;
   const pendingSelectableSubjects = activeSelectableSubjects.filter((subject) => !subject.selectedGroup);
-  const totalActiveCount = activeSelectableSubjects.length;
+  const totalVisibleCount = subjectCards.length;
+  const configuredSubjectCount = subjectCards.filter((subject) => subject.ready).length;
+  const autoAssignedCount = subjectCards.filter((subject) => subject.autoAssigned).length;
+  const manualMultiGroupSubjects = activeSelectableSubjects.filter((subject) => subject.groupCount > 1);
   const hasPendingSelections = pendingSelectableSubjects.length > 0;
-  const progressPercent = totalActiveCount ? Math.round((selectedActiveCount / totalActiveCount) * 100) : 100;
+  const progressPercent = totalVisibleCount ? Math.round((configuredSubjectCount / totalVisibleCount) * 100) : 100;
   const summarizeSubjectNames = (list) => {
     const names = list.map((subject) => String(subject.name || '').trim()).filter(Boolean);
     if (!names.length) return '';
@@ -73,11 +78,18 @@
     ? `${t('registerSubjects.missingHintPrefix')}: ${pendingSubjectSummary}`
     : '';
   const submitHintText = hasPendingSelections ? t('registerSubjects.submitHintIncomplete') : '';
+  const quickGroupMax = manualMultiGroupSubjects.length
+    ? Math.min(3, Math.min(...manualMultiGroupSubjects.map((subject) => subject.groupCount)))
+    : 0;
+  const hasQuickSelect = manualMultiGroupSubjects.length > 1 && quickGroupMax > 1;
+  const quickGroupOptions = hasQuickSelect
+    ? Array.from({ length: quickGroupMax }, (_value, index) => index + 1)
+    : [];
   const quickSelectedGroup = (() => {
-    if (!activeSelectableSubjects.length) return null;
-    const [firstSubject] = activeSelectableSubjects;
+    if (!hasQuickSelect || !manualMultiGroupSubjects.length) return null;
+    const [firstSubject] = manualMultiGroupSubjects;
     if (!firstSubject || !firstSubject.selectedGroup) return null;
-    return activeSelectableSubjects.every((subject) => subject.selectedGroup === firstSubject.selectedGroup)
+    return manualMultiGroupSubjects.every((subject) => subject.selectedGroup === firstSubject.selectedGroup)
       ? firstSubject.selectedGroup
       : null;
   })();
@@ -96,6 +108,7 @@
     statusSelected: t('registerSubjects.statusSelected'),
     statusPending: t('registerSubjects.statusPending'),
     statusSkipped: t('registerSubjects.statusSkipped'),
+    statusReady: lang === 'en' ? 'Ready' : 'Готово',
     remaining: t('registerSubjects.remaining'),
     allSet: t('registerSubjects.allSet'),
     submitHintIncomplete: t('registerSubjects.submitHintIncomplete'),
@@ -338,10 +351,10 @@
 
       .reg-groups-readiness {
         display: grid;
-        gap: 1rem;
-        margin-bottom: 1rem;
-        padding: 1.1rem;
-        border-radius: 24px;
+        gap: 0.85rem;
+        margin-bottom: 0.9rem;
+        padding: 1rem;
+        border-radius: 22px;
       }
 
       .reg-groups-readiness__head {
@@ -413,13 +426,13 @@
 
       .reg-groups-readiness__metrics {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+        gap: 0.62rem;
       }
 
       .reg-groups-readiness__metric {
-        padding: 0.82rem 0.9rem;
-        border-radius: 18px;
+        padding: 0.72rem 0.82rem;
+        border-radius: 16px;
         border: 1px solid rgba(148, 163, 184, 0.16);
         background: rgba(255, 255, 255, 0.34);
       }
@@ -441,6 +454,39 @@
       .reg-groups-readiness__metric-value {
         font-size: 1.05rem;
         font-weight: 700;
+      }
+
+      .reg-groups-readiness__stage-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.48rem;
+      }
+
+      .reg-groups-readiness__stage-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.42rem;
+        min-height: 34px;
+        padding: 0.38rem 0.72rem;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: rgba(255, 255, 255, 0.34);
+        color: var(--page-text);
+      }
+
+      body.theme-dark .reg-groups-readiness__stage-pill {
+        background: rgba(15, 23, 42, 0.28);
+        border-color: rgba(148, 163, 184, 0.2);
+      }
+
+      .reg-groups-readiness__stage-value {
+        font-size: 0.84rem;
+        font-weight: 700;
+      }
+
+      .reg-groups-readiness__stage-label {
+        font-size: 0.76rem;
+        color: var(--page-muted);
       }
 
       .reg-groups-readiness__issues {
@@ -471,13 +517,6 @@
         font-size: 0.88rem;
         color: var(--page-muted);
         line-height: 1.5;
-      }
-
-      .reg-groups-readiness__metric-note {
-        margin-top: 0.38rem;
-        font-size: 0.8rem;
-        color: var(--page-muted);
-        line-height: 1.45;
       }
 
       .app-footer {
@@ -538,8 +577,18 @@
               </div>
 
               <div class="reg-groups-instructions">
-                <p class="mb-0"><%= t('registerSubjects.instructionsPrimary') %></p>
-                <p class="mb-0"><%= t('registerSubjects.instructionsSecondary') %></p>
+                <p class="mb-0">
+                  <%= lang === 'en'
+                    ? 'Review the full registration catalog. Subjects with only one available group are already configured; choose only the rows with multiple options.'
+                    : 'Переглянь увесь каталог реєстрації. Предмети з однією доступною групою вже налаштовані; обери лише рядки, де є кілька варіантів.' %>
+                </p>
+                <% if (hasQuickSelect) { %>
+                  <p class="mb-0">
+                    <%= lang === 'en'
+                      ? 'Use Quick Select only when most multi-group subjects follow the same group.'
+                      : '«Швидкий вибір» використовуй лише тоді, коли більшість предметів з поділом іде в одну групу.' %>
+                  </p>
+                <% } %>
               </div>
               <% if (pathwayReadinessAlert && pathwayReadinessMetrics) { %>
                 <section class="reg-groups-surface reg-groups-readiness" aria-labelledby="pathwayReadinessTitle">
@@ -586,14 +635,11 @@
                         <%= registrationExperience.title %>
                       </p>
                     </div>
-                    <div class="reg-groups-readiness__metrics">
+                    <div class="reg-groups-readiness__stage-strip">
                       <% registrationExperienceStages.forEach((stage) => { %>
-                        <div class="reg-groups-readiness__metric">
-                          <span class="reg-groups-readiness__metric-label"><%= stage.label %></span>
-                          <div class="reg-groups-readiness__metric-value"><%= stage.value %></div>
-                          <% if (stage.hint) { %>
-                            <div class="reg-groups-readiness__metric-note"><%= stage.hint %></div>
-                          <% } %>
+                        <div class="reg-groups-readiness__stage-pill">
+                          <span class="reg-groups-readiness__stage-value"><%= stage.value %></span>
+                          <span class="reg-groups-readiness__stage-label"><%= stage.label %></span>
                         </div>
                       <% }) %>
                     </div>
@@ -674,14 +720,14 @@
                   </div>
                 <% } %>
 
-                <% if (selectableSubjects.length) { %>
+                <% if (hasQuickSelect) { %>
                   <section class="reg-groups-surface reg-groups-quick-panel" aria-labelledby="quickSelectHeading">
                     <div class="reg-groups-quick-panel__copy">
                       <span class="reg-groups-kicker" id="quickSelectHeading"><%= t('registerSubjects.quickTitle') %></span>
                       <p class="mb-0 text-muted"><%= t('registerSubjects.quickText') %></p>
                     </div>
                     <div class="reg-groups-quick-panel__actions" role="group" aria-label="<%= t('registerSubjects.quickTitle') %>">
-                      <% for (let g = 1; g <= 3; g += 1) { %>
+                      <% quickGroupOptions.forEach((g) => { %>
                         <button
                           type="button"
                           class="reg-groups-quick-pill <%= quickSelectedGroup === g ? 'is-active' : '' %>"
@@ -690,25 +736,52 @@
                         >
                           <%= t('registerSubjects.group') %> <%= g %>
                         </button>
-                      <% } %>
+                      <% }) %>
                       <button type="button" class="reg-groups-reset" data-reg-groups-reset>
                         <%= t('registerSubjects.resetSelection') %>
                       </button>
                     </div>
                   </section>
+                <% } %>
 
+                <% if (subjectCards.length) { %>
                   <section class="reg-groups-surface reg-groups-list-panel">
+                    <div class="reg-groups-list-head">
+                      <div>
+                        <span class="reg-groups-kicker"><%= lang === 'en' ? 'Registration catalog' : 'Каталог реєстрації' %></span>
+                        <p class="reg-groups-list-head__copy mb-0">
+                          <%= lang === 'en'
+                            ? `${totalVisibleCount} subjects are visible in this route.`
+                            : `У цьому маршруті видно ${totalVisibleCount} предметів.` %>
+                        </p>
+                      </div>
+                      <div class="reg-groups-list-head__meta" aria-label="<%= lang === 'en' ? 'Catalog summary' : 'Підсумок каталогу' %>">
+                        <% if (autoAssignedCount) { %>
+                          <span class="reg-groups-list-head__pill"><%= autoAssignedCount %> <%= lang === 'en' ? 'auto-ready' : 'авто-готово' %></span>
+                        <% } %>
+                        <% if (pendingSelectableSubjects.length) { %>
+                          <span class="reg-groups-list-head__pill is-pending"><%= pendingSelectableSubjects.length %> <%= lang === 'en' ? 'need your choice' : 'потребують вибору' %></span>
+                        <% } %>
+                      </div>
+                    </div>
+
                     <div class="reg-groups-list" data-reg-groups-list>
-                      <% selectableSubjects.forEach(function(subject) { %>
-                        <% const subjectStatusText = subject.optedOut ? t('registerSubjects.statusSkipped') : (subject.selectedGroup ? t('registerSubjects.statusSelected') : t('registerSubjects.statusPending')); %>
+                      <% subjectCards.forEach(function(subject) { %>
+                        <% const subjectStatusText = subject.optedOut
+                          ? t('registerSubjects.statusSkipped')
+                          : (subject.autoAssigned
+                            ? (lang === 'en' ? 'Ready' : 'Готово')
+                            : (subject.selectedGroup ? t('registerSubjects.statusSelected') : t('registerSubjects.statusPending'))); %>
                         <div
-                          class="reg-groups-row<%= (!subject.selectedGroup && !subject.optedOut) ? ' is-pending' : '' %><%= subject.optedOut ? ' is-opted-out' : '' %>"
+                          class="reg-groups-row<%= subject.pending ? ' is-pending' : '' %><%= subject.optedOut ? ' is-opted-out' : '' %><%= subject.autoAssigned ? ' is-auto-assigned' : '' %>"
                           data-reg-groups-row
                           data-subject-id="<%= subject.id %>"
                           data-subject-name="<%= subject.name %>"
                           data-group-count="<%= subject.groupCount %>"
                           data-opted-out="<%= subject.optedOut ? '1' : '0' %>"
                           data-required="<%= subject.requiredFlag ? '1' : '0' %>"
+                          data-manual-selectable="<%= subject.interactive ? '1' : '0' %>"
+                          data-auto-assigned="<%= subject.autoAssigned ? '1' : '0' %>"
                         >
                           <div class="reg-groups-row__heading">
                             <div class="reg-groups-row__title-stack">
@@ -740,19 +813,30 @@
                             </span>
                           </div>
 
-                          <div class="reg-groups-row__actions" role="group" aria-label="<%= subject.name %>">
-                            <% for (let g = 1; g <= subject.groupCount; g += 1) { %>
-                              <button
-                                type="button"
-                                class="reg-groups-pill <%= subject.selectedGroup === g ? 'is-active' : '' %>"
-                                data-reg-groups-group="<%= g %>"
-                                aria-pressed="<%= subject.selectedGroup === g ? 'true' : 'false' %>"
-                                <%= subject.optedOut ? 'disabled aria-disabled="true"' : '' %>
-                              >
-                                <%= t('registerSubjects.group') %> <%= g %>
-                              </button>
-                            <% } %>
-                          </div>
+                          <% if (subject.autoAssigned) { %>
+                            <div class="reg-groups-row__actions reg-groups-row__actions--static">
+                              <span class="reg-groups-pill reg-groups-pill--static is-active">
+                                <%= t('registerSubjects.group') %> <%= subject.selectedGroup || 1 %>
+                              </span>
+                              <span class="reg-groups-row__meta">
+                                <%= lang === 'en' ? 'Assigned automatically' : 'Призначено автоматично' %>
+                              </span>
+                            </div>
+                          <% } else { %>
+                            <div class="reg-groups-row__actions" role="group" aria-label="<%= subject.name %>">
+                              <% for (let g = 1; g <= subject.groupCount; g += 1) { %>
+                                <button
+                                  type="button"
+                                  class="reg-groups-pill <%= subject.selectedGroup === g ? 'is-active' : '' %>"
+                                  data-reg-groups-group="<%= g %>"
+                                  aria-pressed="<%= subject.selectedGroup === g ? 'true' : 'false' %>"
+                                  <%= subject.optedOut ? 'disabled aria-disabled="true"' : '' %>
+                                >
+                                  <%= t('registerSubjects.group') %> <%= g %>
+                                </button>
+                              <% } %>
+                            </div>
+                          <% } %>
 
                           <input
                             type="hidden"
@@ -777,7 +861,7 @@
                 <div class="reg-groups-sticky__meta">
                   <div class="reg-groups-sticky__summary">
                     <div class="reg-groups-sticky__count">
-                      <strong><span data-reg-groups-selected><%= selectedActiveCount %></span>/<span data-reg-groups-total><%= totalActiveCount %></span></strong>
+                      <strong><span data-reg-groups-selected><%= configuredSubjectCount %></span>/<span data-reg-groups-total><%= totalVisibleCount %></span></strong>
                       <span><%= t('registerSubjects.selectedSuffix') %></span>
                     </div>
                     <p class="reg-groups-sticky__remaining mb-0" data-reg-groups-remaining role="status" aria-live="polite">
@@ -797,8 +881,8 @@
                       role="progressbar"
                       aria-label="<%= t('registerSubjects.progressSelected') %>"
                       aria-valuemin="0"
-                      aria-valuemax="<%= totalActiveCount %>"
-                      aria-valuenow="<%= selectedActiveCount %>"
+                      aria-valuemax="<%= totalVisibleCount %>"
+                      aria-valuenow="<%= configuredSubjectCount %>"
                       data-reg-groups-progress
                     >
                       <span style="width: <%= progressPercent %>%;" data-reg-groups-progress-bar></span>

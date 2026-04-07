@@ -98,13 +98,13 @@
 
 .page-register-subjects .reg-groups-instructions {
   display: grid;
-  gap: 0.22rem;
-  margin-bottom: 1rem;
-  padding: 0.8rem 0.95rem;
-  border-radius: 18px;
+  gap: 0.18rem;
+  margin-bottom: 0.82rem;
+  padding: 0.72rem 0.9rem;
+  border-radius: 16px;
   color: var(--reg-groups-muted);
-  font-size: 0.9rem;
-  line-height: 1.52;
+  font-size: 0.88rem;
+  line-height: 1.46;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12));
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
@@ -258,6 +258,48 @@
   padding-bottom: 0.7rem;
 }
 
+.page-register-subjects .reg-groups-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem 1rem;
+  margin-bottom: 0.72rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--reg-groups-divider);
+}
+
+.page-register-subjects .reg-groups-list-head__copy {
+  color: var(--reg-groups-muted);
+  font-size: 0.88rem;
+  line-height: 1.42;
+}
+
+.page-register-subjects .reg-groups-list-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.42rem;
+}
+
+.page-register-subjects .reg-groups-list-head__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0.34rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid var(--reg-groups-chip-border);
+  background: var(--reg-groups-chip-bg);
+  color: var(--reg-groups-chip-text);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.page-register-subjects .reg-groups-list-head__pill.is-pending {
+  border-color: var(--reg-groups-warning-border);
+  background: var(--reg-groups-warning-bg);
+  color: var(--reg-groups-warning-text);
+}
+
 .page-register-subjects .reg-groups-list {
   display: flex;
   flex-direction: column;
@@ -268,8 +310,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.9rem;
-  padding: 0.74rem 0.08rem;
+  gap: 0.8rem;
+  padding: 0.68rem 0.08rem;
   color: var(--reg-groups-text);
   transition: background 160ms ease, box-shadow 160ms ease, border-color 160ms ease, opacity 160ms ease;
 }
@@ -279,9 +321,10 @@
 }
 
 .page-register-subjects .reg-groups-row.is-pending,
-.page-register-subjects .reg-groups-row.is-opted-out {
+.page-register-subjects .reg-groups-row.is-opted-out,
+.page-register-subjects .reg-groups-row.is-auto-assigned {
   margin: 0.14rem -0.18rem;
-  padding: 0.8rem 0.48rem;
+  padding: 0.72rem 0.48rem;
   border-radius: 18px;
 }
 
@@ -292,6 +335,15 @@
 
 .page-register-subjects .reg-groups-row.is-opted-out {
   background: rgba(148, 163, 184, 0.06);
+}
+
+.page-register-subjects .reg-groups-row.is-auto-assigned {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+}
+
+.page-register-subjects.theme-dark .reg-groups-row.is-auto-assigned {
+  background: rgba(15, 23, 42, 0.18);
 }
 
 .page-register-subjects .reg-groups-row__heading {
@@ -392,6 +444,10 @@
   background: rgba(148, 163, 184, 0.82);
 }
 
+.page-register-subjects .reg-groups-row.is-auto-assigned .reg-groups-row__status-dot {
+  background: rgba(16, 185, 129, 0.82);
+}
+
 .page-register-subjects .reg-groups-row__actions {
   display: flex;
   flex: 0 1 auto;
@@ -402,6 +458,21 @@
 
 .page-register-subjects .reg-groups-row.is-opted-out .reg-groups-row__actions {
   opacity: 0.68;
+}
+
+.page-register-subjects .reg-groups-row__actions--static {
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.page-register-subjects .reg-groups-pill--static {
+  pointer-events: none;
+}
+
+.page-register-subjects .reg-groups-row__meta {
+  color: var(--reg-groups-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .page-register-subjects .reg-groups-filter-empty {
@@ -544,6 +615,15 @@
   .page-register-subjects .reg-groups-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .page-register-subjects .reg-groups-list-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-register-subjects .reg-groups-list-head__meta {
+    justify-content: flex-start;
   }
 
   .page-register-subjects .reg-groups-row__heading {

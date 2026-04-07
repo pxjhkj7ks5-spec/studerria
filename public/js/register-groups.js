@@ -16,6 +16,7 @@
       statusSelected: 'Selected',
       statusPending: 'Needs selection',
       statusSkipped: 'Skipped',
+      statusReady: 'Ready',
       remaining: 'Remaining',
       allSet: 'Everything is ready.',
       submitHintIncomplete: 'Choose a group for every active subject.',
@@ -49,6 +50,9 @@
   const getSubjectName = (row) => String(row.dataset.subjectName || '').trim();
   const getGroupCount = (row) => Number(row.dataset.groupCount || 0);
   const getStatusLabel = (row) => row.querySelector('[data-reg-groups-status-label]');
+  const isManualSelectable = (row) => row.dataset.manualSelectable !== '0';
+  const isAutoAssigned = (row) => row.dataset.autoAssigned === '1';
+  const isQuickEligible = (row) => isManualSelectable(row) && getGroupCount(row) > 1 && !isOptedOut(row);
 
   const setNodeText = (nodes, text) => {
     nodes.forEach((node) => {
@@ -140,6 +144,8 @@
     const selectedGroup = isOptedOut(row) ? null : readSelectedGroup(row);
     const optedOut = isOptedOut(row);
     const statusLabel = getStatusLabel(row);
+    const manualSelectable = isManualSelectable(row);
+    const autoAssigned = isAutoAssigned(row);
 
     if (optedOut) {
       setSelectedGroup(row, null);
@@ -149,12 +155,15 @@
 
     syncButtons(row, optedOut ? null : selectedGroup, optedOut);
     row.dataset.optedOut = optedOut ? '1' : '0';
-    row.classList.toggle('is-pending', !optedOut && !selectedGroup);
+    row.classList.toggle('is-pending', manualSelectable && !optedOut && !selectedGroup);
     row.classList.toggle('is-opted-out', optedOut);
+    row.classList.toggle('is-auto-assigned', autoAssigned && !optedOut && Boolean(selectedGroup));
 
     if (statusLabel instanceof HTMLElement) {
       statusLabel.textContent = optedOut
         ? config.statusSkipped
+        : autoAssigned
+          ? config.statusReady
         : selectedGroup
           ? config.statusSelected
           : config.statusPending;
@@ -175,37 +184,33 @@
   };
 
   const computeProgress = () => {
-    const activeRows = rows.filter((row) => !isOptedOut(row));
-    const selectedRows = activeRows.filter((row) => Boolean(readSelectedGroup(row)));
-    const missingRows = activeRows.filter((row) => !readSelectedGroup(row));
+    const trackedRows = rows.slice();
+    const activeRows = trackedRows.filter((row) => !isOptedOut(row));
+    const selectedRows = trackedRows.filter((row) => isOptedOut(row) || Boolean(readSelectedGroup(row)));
+    const missingRows = trackedRows.filter((row) => isManualSelectable(row) && !isOptedOut(row) && !readSelectedGroup(row));
 
     return {
+      trackedRows,
       activeRows,
       selectedRows,
       missingRows,
       selectedCount: selectedRows.length,
-      totalCount: activeRows.length,
+      totalCount: trackedRows.length,
     };
   };
 
-  const syncQuickButtons = (progressState) => {
-    const { activeRows } = progressState;
-    const referenceGroup =
-      activeRows.length > 0 &&
-      activeRows.every((row) => {
-        const selectedGroup = readSelectedGroup(row);
-        return Boolean(selectedGroup);
-      })
-        ? readSelectedGroup(activeRows[0])
-        : null;
-
+  const syncQuickButtons = () => {
+    const quickRows = rows.filter((row) => isQuickEligible(row));
     quickButtons.forEach((button) => {
       if (!(button instanceof HTMLButtonElement)) {
         return;
       }
 
       const quickGroup = Number(button.dataset.regGroupsQuickGroup || button.getAttribute('data-reg-groups-quick-group'));
-      const isActive = Boolean(referenceGroup) && activeRows.every((row) => readSelectedGroup(row) === quickGroup);
+      const isActive =
+        quickRows.length > 0
+        && Number.isInteger(quickGroup)
+        && quickRows.every((row) => readSelectedGroup(row) === quickGroup);
       button.classList.toggle('is-active', isActive);
       button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
@@ -216,7 +221,7 @@
     let visibleCount = 0;
 
     rows.forEach((row) => {
-      const shouldHide = onlyPending && (isOptedOut(row) || Boolean(readSelectedGroup(row)));
+      const shouldHide = onlyPending && (!isManualSelectable(row) || isOptedOut(row) || Boolean(readSelectedGroup(row)));
       row.hidden = shouldHide;
       row.setAttribute('aria-hidden', shouldHide ? 'true' : 'false');
       if (!shouldHide) {
@@ -272,7 +277,7 @@
       progressFill.style.width = `${progressPercent}%`;
     }
 
-    syncQuickButtons(progressState);
+    syncQuickButtons();
     syncFilter(progressState);
 
     return progressState;
@@ -320,17 +325,13 @@
     button.addEventListener('click', () => {
       const quickGroup = Number(button.dataset.regGroupsQuickGroup || button.getAttribute('data-reg-groups-quick-group'));
       rows.forEach((row) => {
-        if (isOptedOut(row)) {
+        if (!isQuickEligible(row)) {
           return;
         }
 
-        const groupCount = getGroupCount(row);
-        if (Number.isInteger(quickGroup) && quickGroup >= 1 && quickGroup <= groupCount) {
+        if (Number.isInteger(quickGroup) && quickGroup >= 1 && quickGroup <= getGroupCount(row)) {
           setSelectedGroup(row, quickGroup);
-          return;
         }
-
-        setSelectedGroup(row, null);
       });
       updateUI();
     });
@@ -339,7 +340,7 @@
   if (resetButton instanceof HTMLButtonElement) {
     resetButton.addEventListener('click', () => {
       rows.forEach((row) => {
-        if (isOptedOut(row)) {
+        if (isOptedOut(row) || !isManualSelectable(row)) {
           return;
         }
 
