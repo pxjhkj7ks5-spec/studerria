@@ -37720,6 +37720,23 @@ app.post('/admin/pathways/v2/bachelor-catalog/sync', requirePathwaysSectionAcces
   })
 ));
 
+app.post('/admin/pathways/v2/bachelor-catalog/sync-live', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.syncBachelorCatalogLiveSubjects(getAcademicV2Store(), req.body),
+    successMessage: 'Live-предмети бакалаврського каталогу синхронізовано',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.programId) || focus.programId,
+      cohortId: Number(result && result.cohortId) || focus.cohortId,
+      groupId: Number(result && result.groupId) || focus.groupId,
+    }),
+    extraParamsBuilder: () => ({
+      workspace_tab: 'subjects',
+    }),
+    logContext: 'admin.pathways.v2.bachelor-catalog.sync-live',
+  })
+));
+
 app.post('/admin/pathways/v2/bachelor-catalog/save', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.saveBachelorCatalogRow(getAcademicV2Store(), req.body),

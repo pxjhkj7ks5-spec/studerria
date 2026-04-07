@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.38",
+      "date": "2026-04-07",
+      "items": [
+        "feat(academic-v2-bachelor-live-sync): add explicit catalog-to-live sync actions in the bachelor bulk editor for the current program, cohort, or course, and seed live Academic V2 subjects directly from the code-backed bachelor catalog so missing T1/T2/T3 subject rows can be added to live courses even when the implicit stage-change flow does not backfill them"
+      ]
+    },
+    {
       "version": "1.4.37",
       "date": "2026-04-07",
       "items": [

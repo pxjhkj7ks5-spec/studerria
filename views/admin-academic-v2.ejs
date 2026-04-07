@@ -1540,6 +1540,59 @@
                       </div>
                     </form>
                   </div>
+                  <div class="academic-v2-grid-3 mt-3">
+                    <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync-live" class="academic-v2-subcard">
+                      <%- renderFocusFields() %>
+                      <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
+                      <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
+                      <div class="academic-v2-subcard-topline">Live sync</div>
+                      <div class="academic-v2-kv">
+                        <strong>Програма</strong>
+                        <span class="academic-v2-muted"><%= selectedProgram ? selectedProgram.name : 'Не вибрано програму' %></span>
+                      </div>
+                      <div class="academic-v2-chip-row mt-1">
+                        <span class="academic-v2-chip">Missing only</span>
+                        <span class="academic-v2-chip">T1 + T2 + T3</span>
+                      </div>
+                      <div class="academic-v2-actions mt-2">
+                        <button type="submit" class="btn btn-outline-secondary" <%= !selectedBachelorCatalogSource || !activeProgramId ? 'disabled' : '' %>>Sync live → program</button>
+                      </div>
+                    </form>
+                    <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync-live" class="academic-v2-subcard">
+                      <%- renderFocusFields() %>
+                      <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+                      <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
+                      <div class="academic-v2-subcard-topline">Live sync</div>
+                      <div class="academic-v2-kv">
+                        <strong>Когорта</strong>
+                        <span class="academic-v2-muted"><%= selectedCohort ? `${selectedCohort.label} · ${selectedCohort.admission_year}` : 'Не вибрано когорту' %></span>
+                      </div>
+                      <div class="academic-v2-chip-row mt-1">
+                        <span class="academic-v2-chip">Current cohort</span>
+                        <span class="academic-v2-chip">Adds missing rows</span>
+                      </div>
+                      <div class="academic-v2-actions mt-2">
+                        <button type="submit" class="btn btn-outline-secondary" <%= !selectedBachelorCatalogSource || !activeCohortId ? 'disabled' : '' %>>Sync live → cohort</button>
+                      </div>
+                    </form>
+                    <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync-live" class="academic-v2-subcard">
+                      <%- renderFocusFields() %>
+                      <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                      <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
+                      <div class="academic-v2-subcard-topline">Live sync</div>
+                      <div class="academic-v2-kv">
+                        <strong>Курс</strong>
+                        <span class="academic-v2-muted"><%= selectedGroup ? `${selectedGroup.label} · Stage ${selectedGroup.stage_number}` : 'Не вибрано курс' %></span>
+                      </div>
+                      <div class="academic-v2-chip-row mt-1">
+                        <span class="academic-v2-chip">Current course</span>
+                        <span class="academic-v2-chip">Catalog → live subjects</span>
+                      </div>
+                      <div class="academic-v2-actions mt-2">
+                        <button type="submit" class="btn btn-primary" <%= !selectedBachelorCatalogSource || !activeGroupId ? 'disabled' : '' %>>Sync live → course</button>
+                      </div>
+                    </form>
+                  </div>
                   <div class="academic-v2-grid-2 mt-3">
                     <form method="get" action="/admin/pathways" class="academic-v2-subcard">
                       <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
