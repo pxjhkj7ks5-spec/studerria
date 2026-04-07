@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.36",
+      "date": "2026-04-07",
+      "items": [
+        "fix(academic-v2-bachelor-schema-fallback): preflight the bachelor stage-template schema before sync/apply flows, route save/render/manual course seeding through one shared fallback that can seed live course subjects directly from the bachelor catalog when required stage-template migrations are missing, and keep program-wide subject backfill running after course stage changes instead of aborting with a schema migration error"
+      ]
+    },
+    {
       "version": "1.4.35",
       "date": "2026-04-07",
       "items": [
