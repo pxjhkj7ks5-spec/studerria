@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.34",
+      "date": "2026-04-07",
+      "items": [
+        "fix(academic-v2-bachelor-course-seeding): apply the matching bachelor stage template immediately when saving a course, so changing a course to another stage now auto-syncs the bachelor catalog for the program and assigns the correct subjects and canonical terms to that live course instead of waiting for a later page render pass"
+      ]
+    },
+    {
       "version": "1.4.32",
       "date": "2026-04-07",
       "items": [
