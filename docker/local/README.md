@@ -7,6 +7,8 @@ This stack runs the current KMA app with PostgreSQL through Docker Compose.
 - `app`: the existing Node.js + Express application from this repository
 - `db`: PostgreSQL 18 with first-start initialization from `docker/local/db/init/*.sql`
 
+The stack includes a compatibility init script that creates the `cloudsqlsuperuser` role before importing Cloud SQL dumps, so Google Cloud exports restore cleanly on plain PostgreSQL.
+
 ## Included database backup
 
 The Cloud SQL dump is expected at:
@@ -52,4 +54,3 @@ docker compose up --build -d
 - The app uses `NODE_ENV=development` in this stack so local cookies continue to work over plain `http://localhost`.
 - The repository `uploads/` directory is mounted into the app container, so uploaded files stay visible in the workspace.
 - If the backup file is missing, PostgreSQL still starts empty and the app will create schema via its built-in migrations.
-

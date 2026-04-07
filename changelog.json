@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.45",
+      "date": "2026-04-07",
+      "items": [
+        "fix(docker): pre-create the `cloudsqlsuperuser` compatibility role before local Postgres imports Cloud SQL dumps, and extend the database healthcheck start period so restore-heavy first boots do not fail early while initialization is still running"
+      ]
+    },
+    {
       "version": "1.4.44",
       "date": "2026-04-07",
       "items": [

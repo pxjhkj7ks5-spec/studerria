@@ -1,4 +1,4 @@
 db/init/*.sql
 db/init/*.sql.gz
 !db/init/.gitkeep
-
+!db/init/00-cloudsql-compat.sql
