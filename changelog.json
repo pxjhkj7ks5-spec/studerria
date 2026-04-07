@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.32",
+      "date": "2026-04-07",
+      "items": [
+        "fix(academic-v2-projection): harden legacy projection resync so saved groups self-heal stale legacy program, admission, course, semester, subject, and schedule-entry pointers instead of deferring with a projection-sync warning when old compatibility rows are missing"
+      ]
+    },
+    {
       "version": "1.4.31",
       "date": "2026-04-07",
       "items": [
