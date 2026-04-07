@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.39",
+      "date": "2026-04-07",
+      "items": [
+        "fix(academic-v2-projection-fallback): make legacy schedule projection schema-aware by falling back to old schedule-entry fields when migration-045 activity/link structures are missing, so Academic V2 saves and manual live sync no longer defer projection just because group_subject_activity_id or academic_v2_schedule_entry_legacy_links is unavailable"
+      ]
+    },
+    {
       "version": "1.4.38",
       "date": "2026-04-07",
       "items": [
