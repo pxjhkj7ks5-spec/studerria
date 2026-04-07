@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.51",
+      "date": "2026-04-07",
+      "items": [
+        "fix(bachelor-catalog): auto-backfill older auto-seeded bachelor stage-template rows from legacy 1 group to the new default 2 groups during catalog sync, without overwriting rows that were already edited manually"
+      ]
+    },
+    {
       "version": "1.4.50",
       "date": "2026-04-07",
       "items": [
