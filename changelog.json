@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.31",
+      "date": "2026-04-07",
+      "items": [
+        "tune(academic-v2-subject-editor): collapse the shared-subject tools, non-shared course assignment flow, activity editor, and current activity list by default inside the subject detail workspace, while auto-opening the activities disclosure when jumping into activity-focused editing"
+      ]
+    },
+    {
       "version": "1.4.30",
       "date": "2026-04-07",
       "items": [

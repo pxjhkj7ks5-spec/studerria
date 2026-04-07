@@ -2151,246 +2151,264 @@
                     </div>
                   </form>
 
-                  <div class="academic-v2-subcard" id="subject-shared-card">
-                    <div class="academic-v2-section-head academic-v2-section-head--tight">
-                      <div>
-                        <div class="academic-v2-subcard-topline">Спільний предмет</div>
-                        <h3 class="h6 mb-1">Shared-копії між курсами</h3>
-                        <p class="academic-v2-muted" style="font-size:0.74rem;" data-group-subject-shared-copy>
-                          <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
-                            Linked-копія з «<%= initialSubjectSharedMeta.inbound_link.source_group_label %>»
-                          <% } else if (initialSubjectSharedMeta.mode === 'source') { %>
-                            Shared-джерело для <%= initialSubjectSharedMeta.outbound_links.length %> курсів
-                          <% } else { %>
-                            Standalone. Можна перетворити на shared-джерело.
-                          <% } %>
-                        </p>
-                      </div>
-                    </div>
-
-                    <form method="post" action="/admin/pathways/v2/group-subjects/share" id="subject-share-form">
-                      <%- renderFocusFields() %>
-                      <input type="hidden" name="source_group_subject_id" value="<%= initialSubjectCard ? initialSubjectCard.id : '' %>" data-group-subject-share-source />
-                      <div class="academic-v2-form-grid academic-v2-form-grid--compact">
-                        <div class="academic-v2-field">
-                          <label for="groupSubjectShareTarget">Цільовий курс для shared-копії</label>
-                          <select id="groupSubjectShareTarget" class="form-select" name="target_group_id" data-group-subject-share-target>
-                            <option value="">Оберіть курс…</option>
-                            <% assignableCourseOptions.forEach((group) => { %>
-                              <option value="<%= group.id %>"><%= group.option_label %></option>
-                            <% }); %>
-                          </select>
-                        </div>
-                        <div class="academic-v2-field">
-                          <label>Як це працює</label>
-                          <div class="academic-v2-muted" data-group-subject-shared-summary>
-                            <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
-                              Linked-копія не може створювати власні shared-гілки. Відкрий базовий предмет, щоб керувати shared-звʼязками.
-                            <% } else { %>
-                              Буде створено linked-копію або підʼєднано наявний предмет з тим самим шаблоном у вибраному курсі. Далі його можна оновлювати з цього джерела вручну.
-                            <% } %>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="academic-v2-chip-row mt-1">
-                        <span class="academic-v2-chip">Setup синхронізується вручну</span>
-                        <span class="academic-v2-chip">Терми мапляться за номером</span>
-                        <span class="academic-v2-chip">Викладачі й активності копіюються</span>
-                        <span class="academic-v2-chip academic-v2-chip--warm">Розклад лишається локальним</span>
-                      </div>
-                      <div class="academic-v2-checkboxes mt-3">
-                        <input type="hidden" name="open_target_course" value="0" />
-                        <div class="form-check">
-                          <input id="groupSubjectShareOpenTarget" class="form-check-input" type="checkbox" name="open_target_course" value="1" checked />
-                          <label class="form-check-label" for="groupSubjectShareOpenTarget">Після створення відкрити цільовий курс і linked-копію</label>
-                        </div>
-                      </div>
-                      <p class="academic-v2-muted mt-2 mb-0" style="font-size:0.74rem;" data-group-subject-shared-feedback>
+                  <details class="academic-v2-subcard academic-v2-disclosure" id="subject-shared-card">
+                    <summary class="academic-v2-disclosure-summary">
+                      <span class="academic-v2-subcard-topline">Спільний предмет</span>
+                      <strong>Shared-копії між курсами</strong>
+                      <% if (initialSubjectSharedMeta.mode === 'source') { %>
+                        <span class="academic-v2-chip academic-v2-chip--ok"><%= initialSubjectSharedMeta.outbound_links.length %> linked</span>
+                      <% } else if (initialSubjectSharedMeta.mode === 'linked') { %>
+                        <span class="academic-v2-chip academic-v2-chip--warm">Linked-копія</span>
+                      <% } else { %>
+                        <span class="academic-v2-chip">Standalone</span>
+                      <% } %>
+                    </summary>
+                    <div class="academic-v2-disclosure-body">
+                      <p class="academic-v2-muted" style="font-size:0.74rem;" data-group-subject-shared-copy>
                         <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
-                          Заблоковано: керується з іншого курсу.
+                          Linked-копія з «<%= initialSubjectSharedMeta.inbound_link.source_group_label %>»
+                        <% } else if (initialSubjectSharedMeta.mode === 'source') { %>
+                          Shared-джерело для <%= initialSubjectSharedMeta.outbound_links.length %> курсів
                         <% } else { %>
-                          Вибери курс-ціль для shared-копії.
+                          Standalone. Можна перетворити на shared-джерело.
                         <% } %>
                       </p>
-                      <div class="academic-v2-actions mt-2">
-                        <button type="submit" class="btn btn-primary" data-group-subject-share-submit disabled>Створити shared-копію</button>
-                        <button
-                          type="button"
-                          class="btn btn-outline-secondary <%= initialSubjectSharedMeta.inbound_link ? '' : 'd-none' %>"
-                          data-group-subject-shared-open-source
-                          data-shared-open-href="<%= initialSubjectSharedMeta.inbound_link ? initialSubjectSharedMeta.inbound_link.workspace_href : '' %>"
-                        >
-                          Відкрити базовий предмет
-                        </button>
-                      </div>
-                    </form>
 
-                    <form method="post" action="/admin/pathways/v2/group-subjects/shared-sync" class="mt-3" id="subject-shared-sync-form">
-                      <%- renderFocusFields() %>
-                      <input type="hidden" name="source_group_subject_id" value="<%= initialSubjectCard ? initialSubjectCard.id : '' %>" data-group-subject-shared-sync-source />
-                      <div class="academic-v2-actions">
-                        <button type="submit" class="btn btn-outline-secondary" data-group-subject-shared-sync-submit <%= initialSubjectSharedMeta.mode === 'source' && initialSubjectSharedMeta.outbound_links.length ? '' : 'disabled' %>>Синхронізувати linked-копії</button>
-                      </div>
-                    </form>
+                      <form method="post" action="/admin/pathways/v2/group-subjects/share" id="subject-share-form">
+                        <%- renderFocusFields() %>
+                        <input type="hidden" name="source_group_subject_id" value="<%= initialSubjectCard ? initialSubjectCard.id : '' %>" data-group-subject-share-source />
+                        <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                          <div class="academic-v2-field">
+                            <label for="groupSubjectShareTarget">Цільовий курс для shared-копії</label>
+                            <select id="groupSubjectShareTarget" class="form-select" name="target_group_id" data-group-subject-share-target>
+                              <option value="">Оберіть курс…</option>
+                              <% assignableCourseOptions.forEach((group) => { %>
+                                <option value="<%= group.id %>"><%= group.option_label %></option>
+                              <% }); %>
+                            </select>
+                          </div>
+                          <div class="academic-v2-field">
+                            <label>Як це працює</label>
+                            <div class="academic-v2-muted" data-group-subject-shared-summary>
+                              <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
+                                Linked-копія не може створювати власні shared-гілки. Відкрий базовий предмет, щоб керувати shared-звʼязками.
+                              <% } else { %>
+                                Буде створено linked-копію або підʼєднано наявний предмет з тим самим шаблоном у вибраному курсі. Далі його можна оновлювати з цього джерела вручну.
+                              <% } %>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="academic-v2-chip-row mt-1">
+                          <span class="academic-v2-chip">Setup синхронізується вручну</span>
+                          <span class="academic-v2-chip">Терми мапляться за номером</span>
+                          <span class="academic-v2-chip">Викладачі й активності копіюються</span>
+                          <span class="academic-v2-chip academic-v2-chip--warm">Розклад лишається локальним</span>
+                        </div>
+                        <div class="academic-v2-checkboxes mt-3">
+                          <input type="hidden" name="open_target_course" value="0" />
+                          <div class="form-check">
+                            <input id="groupSubjectShareOpenTarget" class="form-check-input" type="checkbox" name="open_target_course" value="1" checked />
+                            <label class="form-check-label" for="groupSubjectShareOpenTarget">Після створення відкрити цільовий курс і linked-копію</label>
+                          </div>
+                        </div>
+                        <p class="academic-v2-muted mt-2 mb-0" style="font-size:0.74rem;" data-group-subject-shared-feedback>
+                          <% if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
+                            Заблоковано: керується з іншого курсу.
+                          <% } else { %>
+                            Вибери курс-ціль для shared-копії.
+                          <% } %>
+                        </p>
+                        <div class="academic-v2-actions mt-2">
+                          <button type="submit" class="btn btn-primary" data-group-subject-share-submit disabled>Створити shared-копію</button>
+                          <button
+                            type="button"
+                            class="btn btn-outline-secondary <%= initialSubjectSharedMeta.inbound_link ? '' : 'd-none' %>"
+                            data-group-subject-shared-open-source
+                            data-shared-open-href="<%= initialSubjectSharedMeta.inbound_link ? initialSubjectSharedMeta.inbound_link.workspace_href : '' %>"
+                          >
+                            Відкрити базовий предмет
+                          </button>
+                        </div>
+                      </form>
 
-                    <div class="academic-v2-stack mt-3" data-group-subject-shared-links>
-                      <% if (initialSubjectSharedMeta.mode === 'source' && initialSubjectSharedMeta.outbound_links.length) { %>
-                        <% initialSubjectSharedMeta.outbound_links.forEach((link) => { %>
+                      <form method="post" action="/admin/pathways/v2/group-subjects/shared-sync" class="mt-3" id="subject-shared-sync-form">
+                        <%- renderFocusFields() %>
+                        <input type="hidden" name="source_group_subject_id" value="<%= initialSubjectCard ? initialSubjectCard.id : '' %>" data-group-subject-shared-sync-source />
+                        <div class="academic-v2-actions">
+                          <button type="submit" class="btn btn-outline-secondary" data-group-subject-shared-sync-submit <%= initialSubjectSharedMeta.mode === 'source' && initialSubjectSharedMeta.outbound_links.length ? '' : 'disabled' %>>Синхронізувати linked-копії</button>
+                        </div>
+                      </form>
+
+                      <div class="academic-v2-stack mt-3" data-group-subject-shared-links>
+                        <% if (initialSubjectSharedMeta.mode === 'source' && initialSubjectSharedMeta.outbound_links.length) { %>
+                          <% initialSubjectSharedMeta.outbound_links.forEach((link) => { %>
+                            <div class="academic-v2-course-subject-card academic-v2-course-subject-card--compact">
+                              <div class="academic-v2-course-subject-card-head">
+                                <div>
+                                  <strong><%= link.linked_group_label %></strong>
+                                  <div class="academic-v2-muted"><%= link.linked_subject_title %></div>
+                                </div>
+                                <span class="academic-v2-chip">Linked-копія</span>
+                              </div>
+                              <div class="academic-v2-actions mt-2">
+                                <a class="btn btn-sm btn-outline-secondary" href="<%= link.workspace_href %>">Відкрити</a>
+                              </div>
+                            </div>
+                          <% }); %>
+                        <% } else if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
                           <div class="academic-v2-course-subject-card academic-v2-course-subject-card--compact">
                             <div class="academic-v2-course-subject-card-head">
                               <div>
-                                <strong><%= link.linked_group_label %></strong>
-                                <div class="academic-v2-muted"><%= link.linked_subject_title %></div>
+                                <strong><%= initialSubjectSharedMeta.inbound_link.source_group_label %></strong>
+                                <div class="academic-v2-muted"><%= initialSubjectSharedMeta.inbound_link.source_subject_title %></div>
                               </div>
-                              <span class="academic-v2-chip">Linked-копія</span>
+                              <span class="academic-v2-chip academic-v2-chip--ok">Базове джерело</span>
                             </div>
                             <div class="academic-v2-actions mt-2">
-                              <a class="btn btn-sm btn-outline-secondary" href="<%= link.workspace_href %>">Відкрити</a>
+                              <a class="btn btn-sm btn-outline-secondary" href="<%= initialSubjectSharedMeta.inbound_link.workspace_href %>">Відкрити джерело</a>
                             </div>
                           </div>
-                        <% }); %>
-                      <% } else if (initialSubjectSharedMeta.mode === 'linked' && initialSubjectSharedMeta.inbound_link) { %>
-                        <div class="academic-v2-course-subject-card academic-v2-course-subject-card--compact">
-                          <div class="academic-v2-course-subject-card-head">
-                            <div>
-                              <strong><%= initialSubjectSharedMeta.inbound_link.source_group_label %></strong>
-                              <div class="academic-v2-muted"><%= initialSubjectSharedMeta.inbound_link.source_subject_title %></div>
-                            </div>
-                            <span class="academic-v2-chip academic-v2-chip--ok">Базове джерело</span>
+                        <% } else { %>
+                          <div class="academic-v2-empty">Поки що немає linked-копій. Створи shared-копію для іншого курсу або працюй з одноразовим призначенням нижче.</div>
+                        <% } %>
+                      </div>
+                    </div>
+                  </details>
+
+                  <details class="academic-v2-subcard academic-v2-disclosure" id="subject-assign-panel">
+                    <summary class="academic-v2-disclosure-summary">
+                      <span class="academic-v2-subcard-topline">Повторне використання предмета</span>
+                      <strong>Призначити в інший курс</strong>
+                      <span class="academic-v2-chip academic-v2-chip--warm">Без shared-звʼязку</span>
+                    </summary>
+                    <div class="academic-v2-disclosure-body">
+                      <form method="post" action="/admin/pathways/v2/group-subjects/assign" id="subject-assign-form">
+                        <%- renderFocusFields() %>
+                        <input type="hidden" name="source_group_subject_id" value="" data-group-subject-assign-source />
+                        <p class="academic-v2-muted" style="font-size:0.74rem;">Копіює предмет без shared-звʼязку. Розклад не переноситься.</p>
+                        <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                          <div class="academic-v2-field">
+                            <label for="groupSubjectAssignTarget">Цільовий курс</label>
+                            <select id="groupSubjectAssignTarget" class="form-select" name="target_group_id" data-group-subject-assign-target required>
+                              <option value="">Оберіть курс…</option>
+                              <% assignableCourseOptions.forEach((group) => { %>
+                                <option value="<%= group.id %>"><%= group.option_label %></option>
+                              <% }); %>
+                            </select>
                           </div>
-                          <div class="academic-v2-actions mt-2">
-                            <a class="btn btn-sm btn-outline-secondary" href="<%= initialSubjectSharedMeta.inbound_link.workspace_href %>">Відкрити джерело</a>
+                          <div class="academic-v2-field">
+                            <label>Що буде перенесено</label>
+                            <div class="academic-v2-muted" data-group-subject-assign-summary>Вибери живий предмет зліва, щоб підготувати копію в інший курс.</div>
                           </div>
                         </div>
+                        <div class="academic-v2-chip-row mt-1">
+                          <span class="academic-v2-chip">Назва і прапорці</span>
+                          <span class="academic-v2-chip">Терми за номером</span>
+                          <span class="academic-v2-chip">Викладачі</span>
+                          <span class="academic-v2-chip">Активності</span>
+                          <span class="academic-v2-chip academic-v2-chip--warm">Розклад не копіюється</span>
+                        </div>
+                        <div class="academic-v2-checkboxes mt-3">
+                          <input type="hidden" name="open_target_course" value="0" />
+                          <div class="form-check">
+                            <input id="groupSubjectAssignOpenTarget" class="form-check-input" type="checkbox" name="open_target_course" value="1" checked />
+                            <label class="form-check-label" for="groupSubjectAssignOpenTarget">Після призначення відкрити цільовий курс і новий предмет</label>
+                          </div>
+                        </div>
+                        <p class="academic-v2-muted mt-2 mb-0" style="font-size:0.74rem;" data-group-subject-assign-feedback>Вибери предмет і курс-ціль.</p>
+                        <div class="academic-v2-actions mt-2">
+                          <button type="submit" class="btn btn-primary" data-group-subject-assign-submit disabled>Призначити в інший курс</button>
+                        </div>
+                      </form>
+                    </div>
+                  </details>
+
+                  <details class="academic-v2-subcard academic-v2-disclosure" id="subject-detail-activities-panel">
+                    <summary class="academic-v2-disclosure-summary">
+                      <span class="academic-v2-subcard-topline">Активності предмета</span>
+                      <strong>Керування лекціями, семінарами та практиками</strong>
+                      <span class="academic-v2-chip" data-subject-detail-activities-panel-count><%= initialSubjectCard ? `${initialSubjectCard.activity_count} активностей` : '0 активностей' %></span>
+                    </summary>
+                    <div class="academic-v2-disclosure-body">
+                      <form method="post" action="/admin/pathways/v2/group-subject-activities/save" data-editor-form="group-subject-activity" id="subject-detail-activities">
+                        <%- renderFocusFields() %>
+                        <input type="hidden" name="group_subject_activity_id" value="" data-editor-input="group-subject-activity.id" />
+                        <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                          <div class="academic-v2-field">
+                            <label for="groupSubjectActivitySubject">Предмет курсу</label>
+                            <select id="groupSubjectActivitySubject" class="form-select" name="group_subject_id" data-editor-input="group-subject-activity.group_subject_id">
+                              <% subjectCards.forEach((subject) => { %>
+                                <option value="<%= subject.id %>"><%= subject.title %></option>
+                              <% }); %>
+                            </select>
+                          </div>
+                          <div class="academic-v2-field">
+                            <label for="groupSubjectActivityType">Тип активності</label>
+                            <select id="groupSubjectActivityType" class="form-select" name="activity_type" data-editor-input="group-subject-activity.activity_type">
+                              <% activityTypeOptions.forEach((activityType) => { %>
+                                <option value="<%= activityType.value %>"><%= activityType.label %></option>
+                              <% }); %>
+                            </select>
+                          </div>
+                          <div class="academic-v2-field">
+                            <label for="groupSubjectActivitySortOrder">Порядок</label>
+                            <input id="groupSubjectActivitySortOrder" class="form-control" type="number" name="sort_order" data-editor-input="group-subject-activity.sort_order" value="0" />
+                          </div>
+                        </div>
+                        <div class="academic-v2-chip-row mt-1">
+                          <span class="academic-v2-chip">Lecture = для всіх підгруп</span>
+                          <span class="academic-v2-chip">Seminar / Practice / Lab = по підгрупах</span>
+                        </div>
+                        <div class="academic-v2-actions mt-2">
+                          <button type="submit" class="btn btn-primary">Зберегти активність</button>
+                          <button type="button" class="btn btn-outline-secondary" data-editor-reset="group-subject-activity">Скинути</button>
+                        </div>
+                        <div class="academic-v2-chip-row mt-1">
+                          <% activityPresetOptions.forEach((preset) => { %>
+                            <button
+                              type="submit"
+                              class="btn btn-sm btn-outline-secondary"
+                              formaction="/admin/pathways/v2/group-subject-activities/preset"
+                              formmethod="post"
+                              name="preset_key"
+                              value="<%= preset.value %>"
+                            ><%= preset.label %></button>
+                          <% }); %>
+                        </div>
+                      </form>
+                    </div>
+                  </details>
+
+                  <details class="academic-v2-subcard academic-v2-disclosure" id="subject-current-activities-panel">
+                    <summary class="academic-v2-disclosure-summary">
+                      <span class="academic-v2-subcard-topline">Поточний набір активностей</span>
+                      <strong>Список активностей курсу</strong>
+                      <span class="academic-v2-chip"><%= scopedGroupSubjectActivitiesList.length %> записів</span>
+                    </summary>
+                    <div class="academic-v2-disclosure-body">
+                      <% if (scopedGroupSubjectActivitiesList.length) { %>
+                        <div class="academic-v2-stack">
+                          <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
+                            <div class="academic-v2-activity-row" data-subject-activity-row data-subject-id="<%= activity.group_subject_id %>">
+                              <div>
+                                <strong><%= activity.subject_title %></strong>
+                                <div class="academic-v2-muted"><%= activity.activity_label || activity.activity_type %> · порядок <%= Number(activity.sort_order || 0) %></div>
+                              </div>
+                              <div class="academic-v2-actions">
+                                <button type="button" class="btn btn-sm btn-primary" data-editor-target="group-subject-activity" data-editor-payload='<%- toAttr(activity) %>' data-subject-focus-id="<%= activity.group_subject_id %>" data-subject-focus-section="activities">Редагувати</button>
+                                <form method="post" action="/admin/pathways/v2/group-subject-activities/<%= activity.id %>/delete">
+                                  <%- renderFocusFields() %>
+                                  <button type="submit" class="btn btn-sm btn-outline-danger">Видалити</button>
+                                </form>
+                              </div>
+                            </div>
+                          <% }); %>
+                        </div>
                       <% } else { %>
-                        <div class="academic-v2-empty">Поки що немає linked-копій. Створи shared-копію для іншого курсу або працюй з одноразовим призначенням нижче.</div>
+                        <div class="academic-v2-empty">Для поточного курсу ще немає жодної активності.</div>
                       <% } %>
                     </div>
-                  </div>
-
-                  <form method="post" action="/admin/pathways/v2/group-subjects/assign" class="academic-v2-subcard" id="subject-assign-form">
-                    <%- renderFocusFields() %>
-                    <input type="hidden" name="source_group_subject_id" value="" data-group-subject-assign-source />
-                    <div class="academic-v2-section-head academic-v2-section-head--tight">
-                      <div>
-                        <div class="academic-v2-subcard-topline">Повторне використання предмета</div>
-                        <h3 class="h6 mb-1">Призначити в інший курс</h3>
-                        <p class="academic-v2-muted" style="font-size:0.74rem;">Копіює предмет без shared-звʼязку. Розклад не переноситься.</p>
-                      </div>
-                    </div>
-                    <div class="academic-v2-form-grid academic-v2-form-grid--compact">
-                      <div class="academic-v2-field">
-                        <label for="groupSubjectAssignTarget">Цільовий курс</label>
-                        <select id="groupSubjectAssignTarget" class="form-select" name="target_group_id" data-group-subject-assign-target required>
-                          <option value="">Оберіть курс…</option>
-                          <% assignableCourseOptions.forEach((group) => { %>
-                            <option value="<%= group.id %>"><%= group.option_label %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="academic-v2-field">
-                        <label>Що буде перенесено</label>
-                        <div class="academic-v2-muted" data-group-subject-assign-summary>Вибери живий предмет зліва, щоб підготувати копію в інший курс.</div>
-                      </div>
-                    </div>
-                    <div class="academic-v2-chip-row mt-1">
-                      <span class="academic-v2-chip">Назва і прапорці</span>
-                      <span class="academic-v2-chip">Терми за номером</span>
-                      <span class="academic-v2-chip">Викладачі</span>
-                      <span class="academic-v2-chip">Активності</span>
-                      <span class="academic-v2-chip academic-v2-chip--warm">Розклад не копіюється</span>
-                    </div>
-                    <div class="academic-v2-checkboxes mt-3">
-                      <input type="hidden" name="open_target_course" value="0" />
-                      <div class="form-check">
-                        <input id="groupSubjectAssignOpenTarget" class="form-check-input" type="checkbox" name="open_target_course" value="1" checked />
-                        <label class="form-check-label" for="groupSubjectAssignOpenTarget">Після призначення відкрити цільовий курс і новий предмет</label>
-                      </div>
-                    </div>
-                    <p class="academic-v2-muted mt-2 mb-0" style="font-size:0.74rem;" data-group-subject-assign-feedback>Вибери предмет і курс-ціль.</p>
-                    <div class="academic-v2-actions mt-2">
-                      <button type="submit" class="btn btn-primary" data-group-subject-assign-submit disabled>Призначити в інший курс</button>
-                    </div>
-                  </form>
-
-                  <form method="post" action="/admin/pathways/v2/group-subject-activities/save" class="academic-v2-subcard" data-editor-form="group-subject-activity" id="subject-detail-activities">
-                    <%- renderFocusFields() %>
-                    <input type="hidden" name="group_subject_activity_id" value="" data-editor-input="group-subject-activity.id" />
-                    <div class="academic-v2-section-head academic-v2-section-head--tight">
-                      <div>
-                        <div class="academic-v2-subcard-topline">Активності предмета</div>
-                        <h3 class="h6 mb-1">Керування лекціями, семінарами та практиками</h3>
-                        <!-- Activities: child-layer of the current subject -->
-                      </div>
-                    </div>
-                    <div class="academic-v2-form-grid academic-v2-form-grid--compact">
-                      <div class="academic-v2-field">
-                        <label for="groupSubjectActivitySubject">Предмет курсу</label>
-                        <select id="groupSubjectActivitySubject" class="form-select" name="group_subject_id" data-editor-input="group-subject-activity.group_subject_id">
-                          <% subjectCards.forEach((subject) => { %>
-                            <option value="<%= subject.id %>"><%= subject.title %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="academic-v2-field">
-                        <label for="groupSubjectActivityType">Тип активності</label>
-                        <select id="groupSubjectActivityType" class="form-select" name="activity_type" data-editor-input="group-subject-activity.activity_type">
-                          <% activityTypeOptions.forEach((activityType) => { %>
-                            <option value="<%= activityType.value %>"><%= activityType.label %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                      <div class="academic-v2-field">
-                        <label for="groupSubjectActivitySortOrder">Порядок</label>
-                        <input id="groupSubjectActivitySortOrder" class="form-control" type="number" name="sort_order" data-editor-input="group-subject-activity.sort_order" value="0" />
-                      </div>
-                    </div>
-                    <div class="academic-v2-chip-row mt-1">
-                      <span class="academic-v2-chip">Lecture = для всіх підгруп</span>
-                      <span class="academic-v2-chip">Seminar / Practice / Lab = по підгрупах</span>
-                    </div>
-                    <div class="academic-v2-actions mt-2">
-                      <button type="submit" class="btn btn-primary">Зберегти активність</button>
-                      <button type="button" class="btn btn-outline-secondary" data-editor-reset="group-subject-activity">Скинути</button>
-                    </div>
-                    <div class="academic-v2-chip-row mt-1">
-                      <% activityPresetOptions.forEach((preset) => { %>
-                        <button
-                          type="submit"
-                          class="btn btn-sm btn-outline-secondary"
-                          formaction="/admin/pathways/v2/group-subject-activities/preset"
-                          formmethod="post"
-                          name="preset_key"
-                          value="<%= preset.value %>"
-                        ><%= preset.label %></button>
-                      <% }); %>
-                    </div>
-                  </form>
-
-                  <div class="academic-v2-subcard">
-                    <div class="academic-v2-subcard-topline">Поточний набір активностей</div>
-                    <% if (scopedGroupSubjectActivitiesList.length) { %>
-                      <div class="academic-v2-stack">
-                        <% scopedGroupSubjectActivitiesList.forEach((activity) => { %>
-                          <div class="academic-v2-activity-row" data-subject-activity-row data-subject-id="<%= activity.group_subject_id %>">
-                            <div>
-                              <strong><%= activity.subject_title %></strong>
-                              <div class="academic-v2-muted"><%= activity.activity_label || activity.activity_type %> · порядок <%= Number(activity.sort_order || 0) %></div>
-                            </div>
-                            <div class="academic-v2-actions">
-                              <button type="button" class="btn btn-sm btn-primary" data-editor-target="group-subject-activity" data-editor-payload='<%- toAttr(activity) %>' data-subject-focus-id="<%= activity.group_subject_id %>" data-subject-focus-section="activities">Редагувати</button>
-                              <form method="post" action="/admin/pathways/v2/group-subject-activities/<%= activity.id %>/delete">
-                                <%- renderFocusFields() %>
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Видалити</button>
-                              </form>
-                            </div>
-                          </div>
-                        <% }); %>
-                      </div>
-                    <% } else { %>
-                      <div class="academic-v2-empty">Для поточного курсу ще немає жодної активності.</div>
-                    <% } %>
-                  </div>
+                  </details>
                 </div>
               </div>
             </section>
@@ -3066,6 +3084,8 @@
         const groupSubjectSharedSyncSource = document.querySelector('[data-group-subject-shared-sync-source]');
         const groupSubjectSharedSyncSubmit = document.querySelector('[data-group-subject-shared-sync-submit]');
         const groupSubjectSharedLinks = document.querySelector('[data-group-subject-shared-links]');
+        const groupSubjectActivitiesPanel = document.getElementById('subject-detail-activities-panel');
+        const groupSubjectActivitiesPanelCount = document.querySelector('[data-subject-detail-activities-panel-count]');
         const groupSubjectAssignForm = document.getElementById('subject-assign-form');
         const groupSubjectAssignSource = document.querySelector('[data-group-subject-assign-source]');
         const groupSubjectAssignTarget = document.querySelector('[data-group-subject-assign-target]');
@@ -3247,6 +3267,12 @@
             ? Array.from(selectElement.selectedOptions).map((option) => option.value)
             : []
         );
+        const openSubjectDisclosure = (section) => {
+          const normalizedSection = String(section || '').trim().toLowerCase();
+          if (normalizedSection === 'activities' && groupSubjectActivitiesPanel) {
+            groupSubjectActivitiesPanel.open = true;
+          }
+        };
         const parseWeekNumberList = (value) => {
           const tokens = (Array.isArray(value) ? value : [value])
             .flatMap((item) => String(item == null ? '' : item).split(','))
@@ -4081,6 +4107,9 @@
           if (subjectDetailActivities) {
             subjectDetailActivities.textContent = subject ? `${subject.activity_count} активностей` : '0 активностей';
           }
+          if (groupSubjectActivitiesPanelCount) {
+            groupSubjectActivitiesPanelCount.textContent = subject ? `${subject.activity_count} активностей` : '0 активностей';
+          }
           if (subjectDetailReadiness) {
             subjectDetailReadiness.textContent = subject ? subject.readiness.label : 'Потребує налаштування';
             subjectDetailReadiness.classList.toggle('academic-v2-chip--ok', Boolean(subject && subject.readiness && subject.readiness.tone === 'ok'));
@@ -4274,6 +4303,9 @@
             const rawPayload = button.getAttribute('data-editor-payload') || '{}';
             try {
               applyPayload(target, JSON.parse(rawPayload));
+              if (target === 'group-subject-activity') {
+                openSubjectDisclosure('activities');
+              }
               const form = forms.get(target);
               if (form) {
                 form.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -4416,6 +4448,7 @@
             updateSubjectDetail(subjectId);
             setWorkspaceTab('subjects');
             if (focusSection) {
+              openSubjectDisclosure(focusSection);
               const target = document.getElementById(focusSection === 'teachers' ? 'subject-detail-teachers' : 'subject-detail-activities');
               if (target) {
                 target.scrollIntoView({ behavior: 'smooth', block: 'center' });

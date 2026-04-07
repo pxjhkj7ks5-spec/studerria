@@ -1600,6 +1600,15 @@ body.theme-dark .academic-v2-table thead th {
   list-style: none;
 }
 
+.academic-v2-disclosure-summary strong {
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.academic-v2-disclosure-summary .academic-v2-chip {
+  margin-left: auto;
+}
+
 .academic-v2-disclosure-summary::-webkit-details-marker {
   display: none;
 }
