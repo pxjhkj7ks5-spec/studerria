@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.37",
+      "date": "2026-04-07",
+      "items": [
+        "fix(academic-v2-bachelor-schema-resilience): guard every SQL path that touches migration-045 tables (academic_v2_group_subject_activities, academic_v2_schedule_entry_legacy_links, group_subject_activity_id column) with runtime table-existence checks so bachelor course stage changes, subject seeding, and program-wide backfill survive partial schemas where the activity-migration has not yet been applied; add runtime try/catch fallback in applyConfiguredStructureToGroupTx so any remaining schema error in the template path gracefully degrades to direct catalog seeding instead of aborting the transaction"
+      ]
+    },
+    {
       "version": "1.4.36",
       "date": "2026-04-07",
       "items": [
