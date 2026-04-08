@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.91",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-blur-layering): split the Atlas modal fallback into true background blur only on the full-screen background roots plus a softer opacity fade on foreground shell containers, so opaque page wrappers like the schedule shell no longer stack a second darker blur slab over the main backdrop"
+      ]
+    },
+    {
       "version": "1.4.90",
       "date": "2026-04-08",
       "items": [

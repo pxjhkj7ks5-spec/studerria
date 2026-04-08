@@ -72,6 +72,7 @@
   const MODAL_BLUR_STYLE_FIELDS = [
     ['-webkit-filter', 'studerriaModalBlurWebkitFilterValue', 'studerriaModalBlurWebkitFilterPriority'],
     ['filter', 'studerriaModalBlurFilterValue', 'studerriaModalBlurFilterPriority'],
+    ['opacity', 'studerriaModalBlurOpacityValue', 'studerriaModalBlurOpacityPriority'],
     ['transition', 'studerriaModalBlurTransitionValue', 'studerriaModalBlurTransitionPriority'],
     ['will-change', 'studerriaModalBlurWillChangeValue', 'studerriaModalBlurWillChangePriority']
   ];
@@ -235,12 +236,37 @@
       : 'blur(18px) saturate(0.94) brightness(0.94)';
   }
 
+  function getModalForegroundFadeValue() {
+    const body = document.body;
+    const isLightTheme = body instanceof HTMLElement && body.classList.contains('theme-light');
+    return isLightTheme ? '0.84' : '0.76';
+  }
+
   function isModalBlurFallbackTarget(target) {
     return (
       target instanceof HTMLElement &&
       target.parentElement === document.body &&
       !target.matches('.modal, .modal-backdrop, script, style, link, template, noscript')
     );
+  }
+
+  function isModalBlurBackgroundTarget(target) {
+    return target instanceof HTMLElement && (target.id === 'dynamic-bg' || target.id === 'studerriaBg');
+  }
+
+  function restoreTrackedInlineStyle(target, cssProperty, valueKey, priorityKey) {
+    const inlineValue = target.dataset[valueKey];
+    const inlinePriority = target.dataset[priorityKey];
+
+    if (inlineValue && inlineValue !== EMPTY_STYLE_TOKEN) {
+      target.style.setProperty(
+        cssProperty,
+        inlineValue,
+        inlinePriority && inlinePriority !== EMPTY_STYLE_TOKEN ? inlinePriority : ''
+      );
+    } else {
+      target.style.removeProperty(cssProperty);
+    }
   }
 
   function clearModalBlurCleanupTimer(target) {
@@ -258,6 +284,8 @@
 
     clearModalBlurCleanupTimer(target);
     const blurValue = getModalBlurFallbackValue();
+    const foregroundFadeValue = getModalForegroundFadeValue();
+    const isBackgroundTarget = isModalBlurBackgroundTarget(target);
     const isAlreadyActive = target.getAttribute(MODAL_BLUR_STATE_ATTR) === '1';
 
     if (!isAlreadyActive) {
@@ -270,7 +298,7 @@
     }
 
     target.style.setProperty('transition', MODAL_BLUR_TRANSITION_VALUE, 'important');
-    target.style.setProperty('will-change', 'filter', 'important');
+    target.style.setProperty('will-change', 'filter, opacity', 'important');
     target.setAttribute(MODAL_BLUR_STATE_ATTR, '1');
 
     requestAnimationFrame(() => {
@@ -278,8 +306,31 @@
         return;
       }
 
-      target.style.setProperty('-webkit-filter', blurValue, 'important');
-      target.style.setProperty('filter', blurValue, 'important');
+      if (isBackgroundTarget) {
+        target.style.setProperty('-webkit-filter', blurValue, 'important');
+        target.style.setProperty('filter', blurValue, 'important');
+        restoreTrackedInlineStyle(
+          target,
+          'opacity',
+          'studerriaModalBlurOpacityValue',
+          'studerriaModalBlurOpacityPriority'
+        );
+        return;
+      }
+
+      restoreTrackedInlineStyle(
+        target,
+        '-webkit-filter',
+        'studerriaModalBlurWebkitFilterValue',
+        'studerriaModalBlurWebkitFilterPriority'
+      );
+      restoreTrackedInlineStyle(
+        target,
+        'filter',
+        'studerriaModalBlurFilterValue',
+        'studerriaModalBlurFilterPriority'
+      );
+      target.style.setProperty('opacity', foregroundFadeValue, 'important');
     });
   }
 
@@ -290,24 +341,14 @@
 
     clearModalBlurCleanupTimer(target);
     target.style.setProperty('transition', MODAL_BLUR_TRANSITION_VALUE, 'important');
-    target.style.setProperty('will-change', 'filter', 'important');
+    target.style.setProperty('will-change', 'filter, opacity', 'important');
 
     [
       ['-webkit-filter', 'studerriaModalBlurWebkitFilterValue', 'studerriaModalBlurWebkitFilterPriority'],
-      ['filter', 'studerriaModalBlurFilterValue', 'studerriaModalBlurFilterPriority']
+      ['filter', 'studerriaModalBlurFilterValue', 'studerriaModalBlurFilterPriority'],
+      ['opacity', 'studerriaModalBlurOpacityValue', 'studerriaModalBlurOpacityPriority']
     ].forEach(([cssProperty, valueKey, priorityKey]) => {
-      const inlineValue = target.dataset[valueKey];
-      const inlinePriority = target.dataset[priorityKey];
-
-      if (inlineValue && inlineValue !== EMPTY_STYLE_TOKEN) {
-        target.style.setProperty(
-          cssProperty,
-          inlineValue,
-          inlinePriority && inlinePriority !== EMPTY_STYLE_TOKEN ? inlinePriority : ''
-        );
-      } else {
-        target.style.removeProperty(cssProperty);
-      }
+      restoreTrackedInlineStyle(target, cssProperty, valueKey, priorityKey);
     });
 
     const cleanupTimer = window.setTimeout(() => {
@@ -315,18 +356,7 @@
         ['transition', 'studerriaModalBlurTransitionValue', 'studerriaModalBlurTransitionPriority'],
         ['will-change', 'studerriaModalBlurWillChangeValue', 'studerriaModalBlurWillChangePriority']
       ].forEach(([cssProperty, valueKey, priorityKey]) => {
-        const inlineValue = target.dataset[valueKey];
-        const inlinePriority = target.dataset[priorityKey];
-
-        if (inlineValue && inlineValue !== EMPTY_STYLE_TOKEN) {
-          target.style.setProperty(
-            cssProperty,
-            inlineValue,
-            inlinePriority && inlinePriority !== EMPTY_STYLE_TOKEN ? inlinePriority : ''
-          );
-        } else {
-          target.style.removeProperty(cssProperty);
-        }
+        restoreTrackedInlineStyle(target, cssProperty, valueKey, priorityKey);
       });
 
       MODAL_BLUR_STYLE_FIELDS.forEach(([, valueKey, priorityKey]) => {
