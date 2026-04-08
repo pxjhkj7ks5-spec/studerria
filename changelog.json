@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.56",
+      "date": "2026-04-08",
+      "items": [
+        "fix(academic-v2-schedule-groups): make the Academic Setup v2 schedule editor and schedule save flow read bachelor subject group counts from stage-template catalog settings instead of stale live subject rows, so seminar subgroup selection now exposes the configured catalog groups"
+      ]
+    },
+    {
       "version": "1.4.55",
       "date": "2026-04-08",
       "items": [

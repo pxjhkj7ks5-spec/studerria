@@ -368,9 +368,11 @@
     Math.max(maxValue, Math.max(1, Number(subject.group_count || 0) || 1))
   ), 1);
   const resolveEntryGroupNumbers = (entry) => {
+    const subject = subjectCardsById.get(Number(entry && entry.group_subject_id || 0)) || null;
+    const effectiveGroupCount = Math.max(1, Number((subject && subject.group_count) || (entry && entry.group_count) || 0) || 1);
     const activityType = String(entry && (entry.activity_type || entry.lesson_type) || '').trim().toLowerCase();
     if (activityType === 'lecture') {
-      return Array.from({ length: Math.max(1, Number(entry && entry.group_count || 0) || 1) }, (_value, index) => index + 1);
+      return Array.from({ length: effectiveGroupCount }, (_value, index) => index + 1);
     }
     const requested = Array.isArray(entry && entry.target_group_numbers)
       ? entry.target_group_numbers.map((value) => Number(value || 0)).filter((value) => value > 0)
