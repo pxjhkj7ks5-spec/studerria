@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.09",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-coverage-ratio): replace Atlas modal host/fallback blur compensation based on `getComputedStyle(...).zoom` with a fixed-overlay probe ratio (`rendered fixed width / viewport width`) and use its reciprocal for host, scene, and blur-clone zoom, so blur coverage no longer collapses to the top-left ~75% slab when Atlas reports computed zoom incorrectly"
+      ]
+    },
+    {
       "version": "1.5.08",
       "date": "2026-04-08",
       "items": [

@@ -137,22 +137,18 @@
     );
   }
 
-  /* Feature probe: detect whether the current body actually shrinks fixed
-     overlays. This catches Atlas regardless of user-agent sniffing — if a
-     position:fixed element sized at window.innerWidth renders narrower than
-     that, we have a body-zoom coverage problem that will also affect the
-     modal backdrop and blur layers. */
-  function probeBodyZoomAffectsFixedOverlays() {
+  function measureFixedOverlayCoverage() {
     const body = document.body;
     if (!(body instanceof HTMLElement)) {
-      return false;
+      return null;
     }
 
+    const viewportWidth = Math.max(window.innerWidth || 1, 1);
     const probe = document.createElement('div');
     probe.style.position = 'fixed';
     probe.style.left = '0';
     probe.style.top = '0';
-    probe.style.width = `${Math.max(window.innerWidth || 1, 1)}px`;
+    probe.style.width = `${viewportWidth}px`;
     probe.style.height = '2px';
     probe.style.visibility = 'hidden';
     probe.style.pointerEvents = 'none';
@@ -161,10 +157,55 @@
     const renderedWidth = probe.getBoundingClientRect().width;
     probe.remove();
 
-    const viewportWidth = Math.max(window.innerWidth || 1, 1);
+    if (!(renderedWidth > 0)) {
+      return {
+        viewportWidth,
+        renderedWidth: viewportWidth,
+        scale: 1
+      };
+    }
+
+    const scale = renderedWidth / viewportWidth;
+    return {
+      viewportWidth,
+      renderedWidth,
+      scale: Number.isFinite(scale) && scale > 0 ? scale : 1
+    };
+  }
+
+  /* Feature probe: detect whether the current body actually shrinks fixed
+     overlays. This catches Atlas regardless of user-agent sniffing — if a
+     position:fixed element sized at window.innerWidth renders narrower than
+     that, we have a body-zoom coverage problem that will also affect the
+     modal backdrop and blur layers. */
+  function probeBodyZoomAffectsFixedOverlays() {
+    const coverage = measureFixedOverlayCoverage();
+    if (!coverage) {
+      return false;
+    }
+
     /* If the rendered width of a fixed element set to innerWidth is smaller
        than innerWidth by more than 0.5 px, body zoom is eating coverage. */
-    return renderedWidth > 0 && viewportWidth - renderedWidth > 0.5;
+    return coverage.viewportWidth - coverage.renderedWidth > 0.5;
+  }
+
+  function getFixedOverlayZoomCompensation() {
+    const coverage = measureFixedOverlayCoverage();
+    if (!coverage) {
+      return 1;
+    }
+
+    const scale = coverage.scale;
+    if (!Number.isFinite(scale) || scale <= 0) {
+      return 1;
+    }
+
+    const compensation = 1 / scale;
+    if (!Number.isFinite(compensation) || compensation <= 0) {
+      return 1;
+    }
+
+    return compensation;
   }
 
   function clearModalCloseFinalizeTimer() {
@@ -287,13 +328,11 @@
   }
 
   function configureModalHostBase(host) {
-    const body = document.body;
-    if (!(host instanceof HTMLElement) || !(body instanceof HTMLElement)) {
+    if (!(host instanceof HTMLElement)) {
       return;
     }
 
-    const bodyZoom = readComputedZoom(body);
-    const compensation = bodyZoom > 0 ? 1 / bodyZoom : 1;
+    const compensation = getFixedOverlayZoomCompensation();
     host.style.position = 'fixed';
     host.style.left = '0';
     host.style.top = '0';
@@ -559,14 +598,8 @@
 
     configureModalFallbackSceneBase(scene);
     if (shouldUseAtlasModalHost()) {
-      const body = document.body;
-      if (body instanceof HTMLElement) {
-        const bodyZoom = readComputedZoom(body);
-        if (Number.isFinite(bodyZoom) && bodyZoom > 0) {
-          scene.style.zoom = (1 / bodyZoom).toFixed(6);
-          return;
-        }
-      }
+      scene.style.zoom = getFixedOverlayZoomCompensation().toFixed(6);
+      return;
     }
     const compensation = computeViewportFitZoomCompensation(scene);
     if (compensation) {
@@ -711,13 +744,7 @@
     configureModalBlurCloneBase(clone);
     let compensation = null;
     if (shouldUseAtlasModalHost()) {
-      const body = document.body;
-      if (body instanceof HTMLElement) {
-        const bodyZoom = readComputedZoom(body);
-        if (Number.isFinite(bodyZoom) && bodyZoom > 0) {
-          compensation = 1 / bodyZoom;
-        }
-      }
+      compensation = getFixedOverlayZoomCompensation();
     }
     if (!compensation) {
       compensation = computeViewportFitZoomCompensation(clone);
