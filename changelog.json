@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.90",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-blur-animation): smooth the Atlas inline modal blur animation with a longer Apple-style easing curve and delayed cleanup of the temporary transition styles, so both blur appearance and fade-out feel softer instead of snapping off when dialogs close"
+      ]
+    },
+    {
       "version": "1.4.89",
       "date": "2026-04-08",
       "items": [

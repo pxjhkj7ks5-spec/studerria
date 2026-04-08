@@ -20,6 +20,13 @@
   const EMPTY_STYLE_TOKEN = '__studerria-empty-style__';
   const APPLE_WEBVIEW_CLASS = 'studerria-apple-webview';
   const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
+  const MODAL_BLUR_TRANSITION_MS = 340;
+  const MODAL_BLUR_CLEANUP_DELAY_MS = MODAL_BLUR_TRANSITION_MS + 80;
+  const MODAL_BLUR_TRANSITION_VALUE = [
+    `-webkit-filter ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+    `filter ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+    'opacity 260ms ease-out'
+  ].join(', ');
   const NO_BLUR_SELECTOR = [
     '.glass',
     '.glass-card',
@@ -68,6 +75,7 @@
     ['transition', 'studerriaModalBlurTransitionValue', 'studerriaModalBlurTransitionPriority'],
     ['will-change', 'studerriaModalBlurWillChangeValue', 'studerriaModalBlurWillChangePriority']
   ];
+  const modalBlurCleanupTimers = new WeakMap();
 
   function getModal() {
     return document.querySelector(MODAL_SELECTOR);
@@ -235,25 +243,44 @@
     );
   }
 
+  function clearModalBlurCleanupTimer(target) {
+    const activeTimer = modalBlurCleanupTimers.get(target);
+    if (activeTimer) {
+      window.clearTimeout(activeTimer);
+      modalBlurCleanupTimers.delete(target);
+    }
+  }
+
   function applyModalBlurFallback(target) {
-    if (!isModalBlurFallbackTarget(target) || target.getAttribute(MODAL_BLUR_STATE_ATTR) === '1') {
+    if (!isModalBlurFallbackTarget(target)) {
       return;
     }
 
+    clearModalBlurCleanupTimer(target);
     const blurValue = getModalBlurFallbackValue();
+    const isAlreadyActive = target.getAttribute(MODAL_BLUR_STATE_ATTR) === '1';
 
-    MODAL_BLUR_STYLE_FIELDS.forEach(([cssProperty, valueKey, priorityKey]) => {
-      const inlineValue = target.style.getPropertyValue(cssProperty);
-      const inlinePriority = target.style.getPropertyPriority(cssProperty);
-      target.dataset[valueKey] = inlineValue || EMPTY_STYLE_TOKEN;
-      target.dataset[priorityKey] = inlinePriority || EMPTY_STYLE_TOKEN;
-    });
+    if (!isAlreadyActive) {
+      MODAL_BLUR_STYLE_FIELDS.forEach(([cssProperty, valueKey, priorityKey]) => {
+        const inlineValue = target.style.getPropertyValue(cssProperty);
+        const inlinePriority = target.style.getPropertyPriority(cssProperty);
+        target.dataset[valueKey] = inlineValue || EMPTY_STYLE_TOKEN;
+        target.dataset[priorityKey] = inlinePriority || EMPTY_STYLE_TOKEN;
+      });
+    }
 
-    target.style.setProperty('-webkit-filter', blurValue, 'important');
-    target.style.setProperty('filter', blurValue, 'important');
-    target.style.setProperty('transition', 'filter 220ms ease, opacity 220ms ease', 'important');
+    target.style.setProperty('transition', MODAL_BLUR_TRANSITION_VALUE, 'important');
     target.style.setProperty('will-change', 'filter', 'important');
     target.setAttribute(MODAL_BLUR_STATE_ATTR, '1');
+
+    requestAnimationFrame(() => {
+      if (target.getAttribute(MODAL_BLUR_STATE_ATTR) !== '1') {
+        return;
+      }
+
+      target.style.setProperty('-webkit-filter', blurValue, 'important');
+      target.style.setProperty('filter', blurValue, 'important');
+    });
   }
 
   function restoreModalBlurFallback(target) {
@@ -261,7 +288,14 @@
       return;
     }
 
-    MODAL_BLUR_STYLE_FIELDS.forEach(([cssProperty, valueKey, priorityKey]) => {
+    clearModalBlurCleanupTimer(target);
+    target.style.setProperty('transition', MODAL_BLUR_TRANSITION_VALUE, 'important');
+    target.style.setProperty('will-change', 'filter', 'important');
+
+    [
+      ['-webkit-filter', 'studerriaModalBlurWebkitFilterValue', 'studerriaModalBlurWebkitFilterPriority'],
+      ['filter', 'studerriaModalBlurFilterValue', 'studerriaModalBlurFilterPriority']
+    ].forEach(([cssProperty, valueKey, priorityKey]) => {
       const inlineValue = target.dataset[valueKey];
       const inlinePriority = target.dataset[priorityKey];
 
@@ -274,12 +308,37 @@
       } else {
         target.style.removeProperty(cssProperty);
       }
-
-      delete target.dataset[valueKey];
-      delete target.dataset[priorityKey];
     });
 
-    target.removeAttribute(MODAL_BLUR_STATE_ATTR);
+    const cleanupTimer = window.setTimeout(() => {
+      [
+        ['transition', 'studerriaModalBlurTransitionValue', 'studerriaModalBlurTransitionPriority'],
+        ['will-change', 'studerriaModalBlurWillChangeValue', 'studerriaModalBlurWillChangePriority']
+      ].forEach(([cssProperty, valueKey, priorityKey]) => {
+        const inlineValue = target.dataset[valueKey];
+        const inlinePriority = target.dataset[priorityKey];
+
+        if (inlineValue && inlineValue !== EMPTY_STYLE_TOKEN) {
+          target.style.setProperty(
+            cssProperty,
+            inlineValue,
+            inlinePriority && inlinePriority !== EMPTY_STYLE_TOKEN ? inlinePriority : ''
+          );
+        } else {
+          target.style.removeProperty(cssProperty);
+        }
+      });
+
+      MODAL_BLUR_STYLE_FIELDS.forEach(([, valueKey, priorityKey]) => {
+        delete target.dataset[valueKey];
+        delete target.dataset[priorityKey];
+      });
+
+      target.removeAttribute(MODAL_BLUR_STATE_ATTR);
+      modalBlurCleanupTimers.delete(target);
+    }, MODAL_BLUR_CLEANUP_DELAY_MS);
+
+    modalBlurCleanupTimers.set(target, cleanupTimer);
   }
 
   function syncModalBlurFallback(forceOpen) {
