@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.19",
+      "date": "2026-04-08",
+      "items": [
+        "fix(bachelor-catalog-save-restore): keep bachelor catalog save/sync redirects on the same `Bachelor Catalog` structure tab, preserve the live catalog search and stage/semester filter state across row saves, group-count edits, sync actions, and reloads, and carry UI tab restore params through mutation redirects instead of forcing the page back to `Subjects`"
+      ]
+    },
+    {
       "version": "1.5.18",
       "date": "2026-04-08",
       "items": [

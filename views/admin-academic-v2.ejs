@@ -1515,6 +1515,7 @@
                   </div>
                   <div class="academic-v2-grid-2">
                     <form method="get" action="/admin/pathways" class="academic-v2-subcard">
+                      <input type="hidden" name="structure_tab" value="bachelor-catalog" />
                       <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
                       <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
                       <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
@@ -1539,6 +1540,7 @@
                     </form>
                     <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync" class="academic-v2-subcard">
                       <%- renderFocusFields() %>
+                      <input type="hidden" name="structure_tab" value="bachelor-catalog" />
                       <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
                       <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
                       <div class="academic-v2-subcard-topline">Sync</div>
@@ -1561,6 +1563,7 @@
                   <div class="academic-v2-grid-3 mt-3">
                     <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync-live" class="academic-v2-subcard">
                       <%- renderFocusFields() %>
+                      <input type="hidden" name="structure_tab" value="bachelor-catalog" />
                       <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
                       <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
                       <div class="academic-v2-subcard-topline">Live sync</div>
@@ -1578,6 +1581,7 @@
                     </form>
                     <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync-live" class="academic-v2-subcard">
                       <%- renderFocusFields() %>
+                      <input type="hidden" name="structure_tab" value="bachelor-catalog" />
                       <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
                       <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
                       <div class="academic-v2-subcard-topline">Live sync</div>
@@ -1595,6 +1599,7 @@
                     </form>
                     <form method="post" action="/admin/pathways/v2/bachelor-catalog/sync-live" class="academic-v2-subcard">
                       <%- renderFocusFields() %>
+                      <input type="hidden" name="structure_tab" value="bachelor-catalog" />
                       <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
                       <input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSource ? selectedBachelorCatalogSource.key : activeBachelorCatalogSourceKey %>" />
                       <div class="academic-v2-subcard-topline">Live sync</div>
@@ -1613,6 +1618,7 @@
                   </div>
                   <div class="academic-v2-grid-2 mt-3">
                     <form method="get" action="/admin/pathways" class="academic-v2-subcard">
+                      <input type="hidden" name="structure_tab" value="bachelor-catalog" />
                       <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
                       <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
                       <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
@@ -1738,6 +1744,7 @@
                               <td style="min-width: 360px;">
                                 <form method="post" action="/admin/pathways/v2/bachelor-catalog/save" class="academic-v2-stack">
                                   <%- renderFocusFields() %>
+                                  <input type="hidden" name="structure_tab" value="bachelor-catalog" />
                                   <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
                                   <input type="hidden" name="source_key" value="<%= row.source_key %>" />
                                   <input type="hidden" name="source_code" value="<%= row.source_code %>" />
@@ -2889,8 +2896,12 @@
         const subjectTemplateIdsByGroupData = <%- JSON.stringify(subjectTemplateIdsByGroup || {}) %>;
         const requestedSubjectId = Number(<%- JSON.stringify(numberOrZero(requestedSubjectId)) %> || 0);
         const requestedWorkspaceTab = <%- JSON.stringify(String(requestedWorkspaceTab || '').trim()) %>;
+        const requestedStructureTab = <%- JSON.stringify(String(requestedStructureTab || '').trim()) %>;
         const normalizedRequestedWorkspaceTab = ['overview', 'subjects', 'terms', 'schedule', 'teachers', 'students'].includes(requestedWorkspaceTab)
           ? requestedWorkspaceTab
+          : '';
+        const normalizedRequestedStructureTab = ['programs', 'cohorts', 'courses', 'stage-templates', 'subject-templates', 'bachelor-catalog'].includes(requestedStructureTab)
+          ? requestedStructureTab
           : '';
         const scheduleEntriesData = <%- JSON.stringify(scheduleEntriesForViews || []) %>;
         const requestedScheduleEntryId = Number(<%- JSON.stringify(numberOrZero(requestedScheduleEntryId)) %> || 0);
@@ -2922,6 +2933,26 @@
         const bachelorCatalogFilterEnabled = document.querySelector('[data-bachelor-catalog-filter-enabled]');
         const bachelorCatalogStageFilter = document.querySelector('[data-bachelor-catalog-stage-filter]');
         const bachelorCatalogTermFilter = document.querySelector('[data-bachelor-catalog-term-filter]');
+        const getBachelorCatalogUiState = () => ({
+          search: String(bachelorCatalogSearch && bachelorCatalogSearch.value || ''),
+          filterEnabled: Boolean(bachelorCatalogFilterEnabled && bachelorCatalogFilterEnabled.checked),
+          stageFilter: String(bachelorCatalogStageFilter && bachelorCatalogStageFilter.value || ''),
+          termFilter: String(bachelorCatalogTermFilter && bachelorCatalogTermFilter.value || ''),
+        });
+        const setHiddenInputValues = (name, value) => {
+          document.querySelectorAll(`input[type="hidden"][name="${name}"]`).forEach((input) => {
+            input.value = String(value == null ? '' : value);
+          });
+        };
+        const syncBachelorCatalogHiddenState = () => {
+          const bachelorCatalogUiState = getBachelorCatalogUiState();
+          setHiddenInputValues('focus_bachelor_catalog_filter_enabled', bachelorCatalogUiState.filterEnabled ? '1' : '0');
+          setHiddenInputValues('focus_bachelor_catalog_stage_filter', bachelorCatalogUiState.stageFilter);
+          setHiddenInputValues('focus_bachelor_catalog_term_filter', bachelorCatalogUiState.termFilter);
+          setHiddenInputValues('bachelor_catalog_filter_enabled', bachelorCatalogUiState.filterEnabled ? '1' : '0');
+          setHiddenInputValues('bachelor_catalog_stage_filter', bachelorCatalogUiState.stageFilter);
+          setHiddenInputValues('bachelor_catalog_term_filter', bachelorCatalogUiState.termFilter);
+        };
         const subjectDetailTitle = document.querySelector('[data-subject-detail-title]');
         const subjectDetailCopy = document.querySelector('[data-subject-detail-copy]');
         const subjectDetailGroups = document.querySelector('[data-subject-detail-groups]');
@@ -2958,12 +2989,11 @@
         const scheduleActivity = document.getElementById('scheduleActivity');
         const scheduleActivityType = document.getElementById('scheduleActivityType');
         const applyBachelorCatalogSearch = () => {
-          const query = String(bachelorCatalogSearch && bachelorCatalogSearch.value || '')
-            .trim()
-            .toLowerCase();
-          const filterEnabled = Boolean(bachelorCatalogFilterEnabled && bachelorCatalogFilterEnabled.checked);
-          const stageFilterValue = Number(bachelorCatalogStageFilter && bachelorCatalogStageFilter.value || 0);
-          const termFilterValue = Number(bachelorCatalogTermFilter && bachelorCatalogTermFilter.value || 0);
+          const bachelorCatalogUiState = getBachelorCatalogUiState();
+          const query = bachelorCatalogUiState.search.trim().toLowerCase();
+          const filterEnabled = bachelorCatalogUiState.filterEnabled;
+          const stageFilterValue = Number(bachelorCatalogUiState.stageFilter || 0);
+          const termFilterValue = Number(bachelorCatalogUiState.termFilter || 0);
           if (bachelorCatalogStageFilter) {
             bachelorCatalogStageFilter.disabled = !filterEnabled;
           }
@@ -2985,6 +3015,11 @@
             const matchesTerm = !filterEnabled || !termFilterValue || termValues.includes(termFilterValue);
             row.hidden = !(matchesQuery && matchesStage && matchesTerm);
           });
+        };
+        const syncBachelorCatalogState = () => {
+          syncBachelorCatalogHiddenState();
+          applyBachelorCatalogSearch();
+          persistWorkspaceState();
         };
         const scheduleTargetGroups = document.getElementById('scheduleTargetGroups');
         const scheduleTargetGroupsHint = document.getElementById('scheduleTargetGroupsHint');
@@ -3342,6 +3377,7 @@
           scheduleView: activeScheduleView,
           scheduleWeek: Number(activeScheduleWeek || 1) || 1,
           subjectId: Number(activeSubjectId || 0) || 0,
+          bachelorCatalog: getBachelorCatalogUiState(),
           scheduleDraft: buildScheduleDraft(),
           scrollY: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0)),
         });
@@ -3390,6 +3426,15 @@
           const normalizedSubjectId = requestedSubjectId && getSubjectCardById(requestedSubjectId)
             ? requestedSubjectId
             : defaultSubjectId;
+          const bachelorCatalogUiState = getBachelorCatalogUiState();
+          const rawBachelorCatalogState = rawState.bachelorCatalog && typeof rawState.bachelorCatalog === 'object'
+            ? rawState.bachelorCatalog
+            : {};
+          const hasRequestedSearch = Object.prototype.hasOwnProperty.call(rawBachelorCatalogState, 'search');
+          const hasRequestedStageFilter = Object.prototype.hasOwnProperty.call(rawBachelorCatalogState, 'stageFilter');
+          const hasRequestedTermFilter = Object.prototype.hasOwnProperty.call(rawBachelorCatalogState, 'termFilter');
+          const requestedStageFilter = String(rawBachelorCatalogState.stageFilter || '').trim();
+          const requestedTermFilter = String(rawBachelorCatalogState.termFilter || '').trim();
           const normalizedWeek = getPrimaryWeekNumber(rawState.scheduleWeek, activeScheduleWeek || 1);
           let normalizedScheduleDraft = null;
           if (rawState.scheduleDraft && typeof rawState.scheduleDraft === 'object') {
@@ -3428,6 +3473,30 @@
               : 'advanced',
             scheduleWeek: normalizedWeek,
             subjectId: normalizedSubjectId,
+            bachelorCatalog: {
+              search: hasRequestedSearch
+                ? String(rawBachelorCatalogState.search || '')
+                : String(bachelorCatalogUiState.search || ''),
+              filterEnabled: Boolean(
+                typeof rawBachelorCatalogState.filterEnabled === 'boolean'
+                  ? rawBachelorCatalogState.filterEnabled
+                  : bachelorCatalogUiState.filterEnabled
+              ),
+              stageFilter: hasRequestedStageFilter
+                ? (
+                  !requestedStageFilter || hasSelectOptionValue(bachelorCatalogStageFilter, requestedStageFilter)
+                    ? requestedStageFilter
+                    : String(bachelorCatalogUiState.stageFilter || '')
+                )
+                : String(bachelorCatalogUiState.stageFilter || ''),
+              termFilter: hasRequestedTermFilter
+                ? (
+                  !requestedTermFilter || hasSelectOptionValue(bachelorCatalogTermFilter, requestedTermFilter)
+                    ? requestedTermFilter
+                    : String(bachelorCatalogUiState.termFilter || '')
+                )
+                : String(bachelorCatalogUiState.termFilter || ''),
+            },
             scheduleDraft: normalizedScheduleDraft,
             scrollY: Math.max(0, Number(rawState.scrollY || 0) || 0),
           };
@@ -3461,6 +3530,7 @@
           && initialWorkspaceState.scheduleView === 'advanced'
           ? initialWorkspaceState.scheduleDraft
           : null;
+        const restoredBachelorCatalogState = initialWorkspaceState ? initialWorkspaceState.bachelorCatalog : null;
         const restoredScrollY = initialWorkspaceState ? initialWorkspaceState.scrollY : 0;
         if (initialWorkspaceState) {
           activeMode = initialWorkspaceState.mode;
@@ -3482,6 +3552,30 @@
               activeScheduleWeek || 1
             );
           }
+        }
+        if (restoredBachelorCatalogState) {
+          if (bachelorCatalogSearch) {
+            bachelorCatalogSearch.value = String(restoredBachelorCatalogState.search || '');
+          }
+          if (bachelorCatalogFilterEnabled) {
+            bachelorCatalogFilterEnabled.checked = Boolean(restoredBachelorCatalogState.filterEnabled);
+          }
+          if (bachelorCatalogStageFilter && (
+            String(restoredBachelorCatalogState.stageFilter || '') === ''
+            || hasSelectOptionValue(bachelorCatalogStageFilter, restoredBachelorCatalogState.stageFilter)
+          )) {
+            bachelorCatalogStageFilter.value = String(restoredBachelorCatalogState.stageFilter || '');
+          }
+          if (bachelorCatalogTermFilter && (
+            String(restoredBachelorCatalogState.termFilter || '') === ''
+            || hasSelectOptionValue(bachelorCatalogTermFilter, restoredBachelorCatalogState.termFilter)
+          )) {
+            bachelorCatalogTermFilter.value = String(restoredBachelorCatalogState.termFilter || '');
+          }
+        }
+        if (normalizedRequestedStructureTab) {
+          activeMode = 'structure';
+          activeStructureTab = normalizedRequestedStructureTab;
         }
         if (requestedSubjectId && getSubjectCardById(requestedSubjectId)) {
           activeMode = 'operate';
@@ -4649,16 +4743,17 @@
         }
 
         if (bachelorCatalogSearch) {
-          bachelorCatalogSearch.addEventListener('input', applyBachelorCatalogSearch);
+          bachelorCatalogSearch.addEventListener('input', syncBachelorCatalogState);
           if (bachelorCatalogFilterEnabled) {
-            bachelorCatalogFilterEnabled.addEventListener('change', applyBachelorCatalogSearch);
+            bachelorCatalogFilterEnabled.addEventListener('change', syncBachelorCatalogState);
           }
           if (bachelorCatalogStageFilter) {
-            bachelorCatalogStageFilter.addEventListener('change', applyBachelorCatalogSearch);
+            bachelorCatalogStageFilter.addEventListener('change', syncBachelorCatalogState);
           }
           if (bachelorCatalogTermFilter) {
-            bachelorCatalogTermFilter.addEventListener('change', applyBachelorCatalogSearch);
+            bachelorCatalogTermFilter.addEventListener('change', syncBachelorCatalogState);
           }
+          syncBachelorCatalogHiddenState();
           applyBachelorCatalogSearch();
         }
 

@@ -11010,6 +11010,18 @@ function parseAcademicV2Focus(source = {}) {
   };
 }
 
+function parseAcademicV2UiRestoreParams(source = {}) {
+  const payload = source && typeof source === 'object' ? source : {};
+  const workspaceTab = sanitizeCompactText(payload.workspace_tab || payload.workspaceTab, 40);
+  const structureTab = sanitizeCompactText(payload.structure_tab || payload.structureTab, 40);
+  const diagnosticsTab = sanitizeCompactText(payload.diagnostics_tab || payload.diagnosticsTab, 40);
+  return {
+    ...(workspaceTab ? { workspace_tab: workspaceTab } : {}),
+    ...(structureTab ? { structure_tab: structureTab } : {}),
+    ...(diagnosticsTab ? { diagnostics_tab: diagnosticsTab } : {}),
+  };
+}
+
 function buildAcademicV2NoticeUrl(kind, message, focus = {}, extraParams = {}) {
   const normalizedFocus = parseAcademicV2Focus(focus);
   const query = new URLSearchParams();
@@ -37909,6 +37921,7 @@ async function handleAcademicV2MutationRoute(req, res, {
     return handleDbError(res, err, `${logContext}.init`);
   }
   const baseFocus = parseAcademicV2Focus(req.body);
+  const baseUiRestoreParams = parseAcademicV2UiRestoreParams(req.body);
   const routeMessages = getAcademicV2ExtendedRouteMessages(req);
   try {
     const result = await run();
@@ -37940,7 +37953,7 @@ async function handleAcademicV2MutationRoute(req, res, {
     }
 
     let focus = baseFocus;
-    let extraParams = {};
+    let extraParams = { ...baseUiRestoreParams };
     if (typeof focusBuilder === 'function') {
       try {
         focus = focusBuilder(result, baseFocus) || baseFocus;
@@ -37951,7 +37964,10 @@ async function handleAcademicV2MutationRoute(req, res, {
     }
     if (typeof extraParamsBuilder === 'function') {
       try {
-        extraParams = extraParamsBuilder(result, focus, baseFocus) || {};
+        extraParams = {
+          ...extraParams,
+          ...(extraParamsBuilder(result, focus, baseFocus) || {}),
+        };
       } catch (extraParamsErr) {
         console.error(`${logContext}.extra-params`, extraParamsErr);
         pushWarning('', 'focusRestoreDeferred');
@@ -37973,7 +37989,8 @@ async function handleAcademicV2MutationRoute(req, res, {
     return res.redirect(buildAcademicV2NoticeUrl(
       'err',
       resolveAcademicV2RouteMessage(req, err),
-      baseFocus
+      baseFocus,
+      baseUiRestoreParams
     ));
   }
 }
@@ -37995,6 +38012,7 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) 
     warning: String(req.query.warn || ''),
     requestedSubjectId: parsePositiveIntStrict(req.query.subject_id),
     requestedWorkspaceTab: sanitizeCompactText(req.query.workspace_tab, 40),
+    requestedStructureTab: sanitizeCompactText(req.query.structure_tab, 40),
     requestedScheduleEntryId: parsePositiveIntStrict(req.query.schedule_entry_id),
     ...pageData,
   });
@@ -38354,7 +38372,7 @@ app.post('/admin/pathways/v2/bachelor-catalog/sync', requirePathwaysSectionAcces
     run: () => academicV2Helpers.syncBachelorCatalogSource(getAcademicV2Store(), req.body),
     successMessage: 'Бакалаврський каталог синхронізовано',
     extraParamsBuilder: () => ({
-      workspace_tab: 'subjects',
+      structure_tab: 'bachelor-catalog',
     }),
     logContext: 'admin.pathways.v2.bachelor-catalog.sync',
   })
@@ -38371,7 +38389,7 @@ app.post('/admin/pathways/v2/bachelor-catalog/sync-live', requirePathwaysSection
       groupId: Number(result && result.groupId) || focus.groupId,
     }),
     extraParamsBuilder: () => ({
-      workspace_tab: 'subjects',
+      structure_tab: 'bachelor-catalog',
     }),
     logContext: 'admin.pathways.v2.bachelor-catalog.sync-live',
   })
@@ -38386,7 +38404,7 @@ app.post('/admin/pathways/v2/bachelor-catalog/save', requirePathwaysSectionAcces
       programId: Number(result && result.programId) || focus.programId,
     }),
     extraParamsBuilder: () => ({
-      workspace_tab: 'subjects',
+      structure_tab: 'bachelor-catalog',
     }),
     logContext: 'admin.pathways.v2.bachelor-catalog.save',
   })
