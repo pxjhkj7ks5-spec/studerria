@@ -2,17 +2,15 @@
 html body.studerria-theme .modal-backdrop,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   z-index: 1070 !important;
-  background: rgba(6, 10, 22, 0.78) !important;
+  background: transparent !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-  transition:
-    opacity 320ms cubic-bezier(0.22, 1, 0.36, 1) !important,
-    background-color 320ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  transition: opacity 220ms ease !important;
 }
 
 html body.theme-light.studerria-theme .modal-backdrop,
 html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
-  background: rgba(226, 232, 240, 0.74) !important;
+  background: transparent !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
@@ -24,7 +22,7 @@ html body.studerria-theme .modal.show {
 
 html body.studerria-theme .modal-backdrop.show,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) .modal-backdrop.show {
-  opacity: 1 !important;
+  opacity: 0 !important;
   pointer-events: auto !important;
 }
 
@@ -32,11 +30,6 @@ html body.studerria-theme.modal-open,
 html body.studerria-theme.studerria-changelog-open {
   overflow: hidden !important;
   overscroll-behavior: contain;
-}
-
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #dynamic-bg,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg {
-  opacity: 0 !important;
 }
 
 html body.studerria-theme .modal.show .modal-dialog .modal-content,
@@ -116,48 +109,6 @@ html body.studerria-theme .modal-footer::before,
 html body.studerria-theme .modal-footer::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-}
-
-/* While a modal is open, turn off page-level glass blur layers so the viewport stays sharp behind the overlay. */
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-card,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-panel,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-inset,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-dock,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface--elevated,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .card,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer .footer-meta,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-content,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-shell,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-pager,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .cockpit-page,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-hero,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-panel,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .day-card,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .density-summary,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-rail,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-card,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-nav,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-viewas-form,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-sidebar,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-sidebar-inner,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-header-rail,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-course-chip,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-topbar-btn,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .session-health-chip,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .bulk-bar,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .flash-alert,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-toast,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .admin-preview-form,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .role-studio-role-card,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .dropdown-menu,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar.topbar--title-spotlight.studerria-nav-shell {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  filter: none !important;
 }
 
 /* Atlas / embedded Apple webviews use a single temporary scene wrapper instead of per-child blur. */

@@ -999,20 +999,20 @@ body.theme-light.studerria-theme input[type="week"] {
 body.studerria-theme .modal-backdrop {
   z-index: 1070 !important;
   --bs-backdrop-opacity: 1;
-  background: rgba(6, 10, 22, 0.78) !important;
+  background: transparent !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-  transition: opacity 220ms ease, background-color 220ms ease;
+  transition: opacity 220ms ease;
 }
 
 body.studerria-theme .modal-backdrop.show {
-  opacity: var(--bs-backdrop-opacity);
-  background: rgba(6, 10, 22, 0.78) !important;
+  opacity: 0 !important;
+  background: transparent !important;
 }
 
 body.theme-light.studerria-theme .modal-backdrop {
   --bs-backdrop-opacity: 1;
-  background: rgba(226, 232, 240, 0.74) !important;
+  background: transparent !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
@@ -1685,35 +1685,6 @@ body.page-schedule .modal.show .modal-footer {
     height: 5px;
     flex: 0 0 5px;
   }
-}
-
-/* Late no-blur guard: wins over page-specific blur rules whenever any modal is open. */
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .page-container,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar.topbar--title-spotlight.studerria-nav-shell,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .app-footer .footer-meta,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-content,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-shell,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-pager,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-hero,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-panel,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .day-card,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .density-summary,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .week-rail,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .schedule-card,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-card,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-panel,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-inset,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface--elevated,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-dialog .modal-content,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-header,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-footer {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  filter: none !important;
 }
 
 body.page-schedule .week-rail {

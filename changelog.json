@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.15",
+      "date": "2026-04-08",
+      "items": [
+        "fix(modal-background-no-op): make the shared Bootstrap modal backdrop fully transparent and remove all modal-open background override guards, so opening any dialog no longer dims, fades, de-blurs, or otherwise changes the page behind the modal"
+      ]
+    },
+    {
       "version": "1.5.14",
       "date": "2026-04-08",
       "items": [
