@@ -592,18 +592,18 @@
 
               <div class="mt-4">
                 <% if (teacherCourse) { %>
-                  <div class="text-muted small mb-2">Викладацькі предмети</div>
-                  <a class="btn btn-outline-primary w-100" href="/teacher/subjects">Обрати предмети заново</a>
+                  <div class="text-muted small mb-2">Викладацькі дисципліни</div>
+                  <a class="btn btn-outline-primary w-100" href="/teacher/subjects">Обрати дисципліни заново</a>
                   <% if (teacherStatus) { %>
                     <div class="text-muted small mt-2">
                       Статус: <%= teacherStatus === 'approved' ? 'Підтверджено' : (teacherStatus === 'rejected' ? 'Відхилено' : 'Очікує підтвердження') %>
                     </div>
                   <% } %>
                 <% } else { %>
-                  <form method="POST" action="/profile/reset-subjects" onsubmit="return confirm('Скинути вибір предметів та груп?')">
+                  <form method="POST" action="/profile/reset-subjects" onsubmit="return confirm('Скинути вибір дисциплін та груп?')">
                     <button class="btn btn-outline-danger w-100 profile-reset-btn" type="submit">Обрати групи заново</button>
                   </form>
-                  <div class="text-muted small mt-2">Обовʼязкові предмети буде призначено автоматично.</div>
+                  <div class="text-muted small mt-2">Обовʼязкові дисципліни буде призначено автоматично.</div>
                 <% } %>
               </div>
             </div>

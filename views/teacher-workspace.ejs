@@ -707,7 +707,7 @@
         <div class="hero-actions">
           <a class="btn btn-glass" href="/teacher">Teacher hub</a>
           <a class="btn btn-glass" href="/schedule">Schedule</a>
-          <a class="btn btn-glass" href="/teacher/subjects">My subjects</a>
+          <a class="btn btn-glass" href="/teacher/subjects">My disciplines</a>
           <a class="btn btn-glass" href="/journal">Journal</a>
         </div>
       </section>
@@ -754,7 +754,7 @@
           <div class="col-12 d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit">Apply filters</button>
             <a class="btn btn-outline-secondary" href="/teacher/workspace">Clear</a>
-            <a class="btn btn-outline-info" href="/teacher/subjects">Open subject assignments</a>
+            <a class="btn btn-outline-info" href="/teacher/subjects">Open discipline assignments</a>
           </div>
         </form>
         <% if (teacherOfferingList.length) { %>
@@ -788,7 +788,7 @@
             <% }) %>
           </div>
         <% } else { %>
-          <div class="alert alert-info mb-0">No live offerings assigned yet. Use <a href="/teacher/subjects">subject assignments</a> to choose offerings and groups.</div>
+          <div class="alert alert-info mb-0">No live offerings assigned yet. Use <a href="/teacher/subjects">discipline assignments</a> to choose offerings and groups.</div>
         <% } %>
       </section>
 
@@ -1060,7 +1060,7 @@
                   </select>
                 </div>
                 <div class="col-12 col-md-6">
-                  <label for="templateSubjectId" class="form-label">Subject (optional)</label>
+                  <label for="templateSubjectId" class="form-label">Discipline (optional)</label>
                   <select class="form-select" id="templateSubjectId" name="subject_id" <%= (teacherSubjects || []).length ? '' : 'disabled' %>>
                     <option value="">Any subject</option>
                     <% (teacherSubjects || []).forEach(function(subject) { %>
@@ -1176,7 +1176,7 @@
             </p>
             <% if (!(teacherSubjects || []).length) { %>
               <div class="alert alert-warning mt-3 mb-0">
-                Choose your teaching subjects first in <a href="/teacher/subjects">subject assignments</a>.
+                Choose your teaching disciplines first in <a href="/teacher/subjects">discipline assignments</a>.
               </div>
             <% } %>
           </article>
@@ -1338,7 +1338,7 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-6">
-                    <label for="editTemplateSubjectId" class="form-label">Subject (optional)</label>
+                    <label for="editTemplateSubjectId" class="form-label">Discipline (optional)</label>
                     <select class="form-select" id="editTemplateSubjectId" name="subject_id" <%= (teacherSubjects || []).length ? '' : 'disabled' %>>
                       <option value="">Any subject</option>
                       <% (teacherSubjects || []).forEach(function(subject) { %>
@@ -1474,12 +1474,12 @@
                   <strong id="cloneTemplateSourceTitle">-</strong>
                 </p>
                 <div class="mb-2">
-                  <label for="cloneTemplateSearch" class="form-label">Find subject</label>
+                  <label for="cloneTemplateSearch" class="form-label">Find discipline</label>
                   <input
                     id="cloneTemplateSearch"
                     class="form-control"
                     type="search"
-                    placeholder="Type subject or course name"
+                    placeholder="Type discipline or course name"
                     autocomplete="off"
                   />
                 </div>
@@ -1496,10 +1496,10 @@
                       </label>
                     <% }) %>
                   </div>
-                  <div id="cloneSubjectEmpty" class="small text-muted mt-2 d-none">No subjects match this filter.</div>
+                  <div id="cloneSubjectEmpty" class="small text-muted mt-2 d-none">No disciplines match this filter.</div>
                 <% } else { %>
                   <div class="alert alert-warning mb-0">
-                    No subjects available yet. Configure your teaching subjects first.
+                    No disciplines available yet. Configure your teaching disciplines first.
                   </div>
                 <% } %>
                 <p class="hint mt-2 mb-0">
@@ -1536,12 +1536,12 @@
                 </p>
                 <div class="bulk-source-list mb-3" id="bulkCloneSourceList"></div>
                 <div class="mb-2">
-                  <label for="bulkCloneTemplateSearch" class="form-label">Find subject</label>
+                  <label for="bulkCloneTemplateSearch" class="form-label">Find discipline</label>
                   <input
                     id="bulkCloneTemplateSearch"
                     class="form-control"
                     type="search"
-                    placeholder="Type subject or course name"
+                    placeholder="Type discipline or course name"
                     autocomplete="off"
                   />
                 </div>
@@ -1558,14 +1558,14 @@
                       </label>
                     <% }) %>
                   </div>
-                  <div id="bulkCloneSubjectEmpty" class="small text-muted mt-2 d-none">No subjects match this filter.</div>
+                  <div id="bulkCloneSubjectEmpty" class="small text-muted mt-2 d-none">No disciplines match this filter.</div>
                 <% } else { %>
                   <div class="alert alert-warning mb-0">
-                    No subjects available yet. Configure your teaching subjects first.
+                    No disciplines available yet. Configure your teaching disciplines first.
                   </div>
                 <% } %>
                 <p class="hint mt-2 mb-0">
-                  For each selected source template, one copy will be created per selected subject (duplicates skipped).
+                  For each selected source template, one copy will be created per selected discipline (duplicates skipped).
                 </p>
               </div>
               <div class="modal-footer">

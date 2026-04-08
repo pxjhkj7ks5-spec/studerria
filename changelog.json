@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.86",
+      "date": "2026-04-08",
+      "items": [
+        "tune(subjects-to-disciplines-copy): rename the student-facing Subjects terminology to Disciplines across the subjects page, teamwork picker, drawers, registration copy, teacher subject-management flows, admin visit labels, and related shared locale strings while keeping the existing `/subjects` route and technical subject ids unchanged"
+      ]
+    },
+    {
       "version": "1.4.85",
       "date": "2026-04-08",
       "items": [

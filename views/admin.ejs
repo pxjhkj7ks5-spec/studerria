@@ -1272,7 +1272,7 @@
                         <tr>
                           <th>Курс</th>
                           <th>Семестр</th>
-                          <th>Предмети</th>
+                          <th>Дисципліни</th>
                           <th>Закрито</th>
                           <th>Колонки</th>
                           <th>Розклад</th>
@@ -1301,7 +1301,7 @@
                 <% } %>
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                   <div class="fw-semibold">
-                    Предмети <%= monitorSelectedCourse && monitorSelectedCourse.course_name ? `— ${monitorSelectedCourse.course_name}` : '' %>
+                    Дисципліни <%= monitorSelectedCourse && monitorSelectedCourse.course_name ? `— ${monitorSelectedCourse.course_name}` : '' %>
                   </div>
                   <% if (monitorSelectedCourse && monitorSelectedCourse.active_semester_title) { %>
                     <span class="badge text-bg-secondary">Семестр: <%= monitorSelectedCourse.active_semester_title %></span>
@@ -2712,7 +2712,7 @@
                   <thead>
                     <tr>
                       <th>Імʼя</th>
-                      <th>Предмети</th>
+                      <th>Дисципліни</th>
                       <th>Статус</th>
                       <th>Дата</th>
                       <th>Дії</th>
@@ -2828,7 +2828,7 @@
                     <div class="visit-metric-value" id="visitSlaMetricUngraded">—</div>
                   </div>
                   <div class="visit-metric-card">
-                    <div class="small text-muted">Предмети в ризику</div>
+                    <div class="small text-muted">Дисципліни в ризику</div>
                     <div class="visit-metric-value" id="visitSlaMetricSubjects">—</div>
                   </div>
                   <div class="visit-metric-card">
@@ -4957,7 +4957,7 @@
           deanery: 'Деканат',
           starosta: 'Староста',
           teacher: 'Викладач',
-          subjects: 'Предмети',
+          subjects: 'Дисципліни',
         };
         const normalized = String(key || '').trim().toLowerCase();
         return labels[normalized] || normalized || 'unknown';
@@ -7875,11 +7875,11 @@
             } catch (e) {
               items = [];
             }
-            document.getElementById('subjectGroupsTitle').textContent = `Subjects for ${userName}`;
+            document.getElementById('subjectGroupsTitle').textContent = `Disciplines for ${userName}`;
             const list = document.getElementById('subjectGroupsList');
             list.innerHTML = '';
             if (!items.length) {
-              list.innerHTML = '<div class="text-muted">No subjects assigned.</div>';
+              list.innerHTML = '<div class="text-muted">No disciplines assigned.</div>';
             } else {
               items.forEach((item) => {
                 const row = document.createElement('div');
