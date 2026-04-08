@@ -77,6 +77,8 @@
     ['-webkit-filter', 'studerriaModalBlurWebkitFilterValue', 'studerriaModalBlurWebkitFilterPriority'],
     ['filter', 'studerriaModalBlurFilterValue', 'studerriaModalBlurFilterPriority'],
     ['opacity', 'studerriaModalBlurOpacityValue', 'studerriaModalBlurOpacityPriority'],
+    ['zoom', 'studerriaModalBlurZoomValue', 'studerriaModalBlurZoomPriority'],
+    ['transform-origin', 'studerriaModalBlurTransformOriginValue', 'studerriaModalBlurTransformOriginPriority'],
     ['transition', 'studerriaModalBlurTransitionValue', 'studerriaModalBlurTransitionPriority'],
     ['will-change', 'studerriaModalBlurWillChangeValue', 'studerriaModalBlurWillChangePriority']
   ];
@@ -257,6 +259,53 @@
     return isLightTheme ? 'rgba(236, 242, 252, 0.14)' : 'rgba(7, 11, 24, 0.18)';
   }
 
+  function readComputedZoom(target) {
+    const zoomValue = Number.parseFloat(window.getComputedStyle(target).zoom || '1');
+    return Number.isFinite(zoomValue) && zoomValue > 0 ? zoomValue : 1;
+  }
+
+  function readTargetRenderScale(target) {
+    if (!(target instanceof HTMLElement)) {
+      return { scaleX: 1, scaleY: 1 };
+    }
+
+    const probe = document.createElement('div');
+    probe.style.position = 'absolute';
+    probe.style.left = '0';
+    probe.style.top = '0';
+    probe.style.width = '100px';
+    probe.style.height = '100px';
+    probe.style.visibility = 'hidden';
+    probe.style.pointerEvents = 'none';
+    target.appendChild(probe);
+
+    const probeRect = probe.getBoundingClientRect();
+    probe.remove();
+
+    return {
+      scaleX: Math.max((Number(probeRect.width) || 100) / 100, 0.0001),
+      scaleY: Math.max((Number(probeRect.height) || 100) / 100, 0.0001)
+    };
+  }
+
+  function computeModalBlurZoomCompensation(target) {
+    const body = document.body;
+    if (!(body instanceof HTMLElement) || !body.classList.contains('studerria-theme') || window.innerWidth < 1200) {
+      return null;
+    }
+
+    const currentZoom = readComputedZoom(target);
+    const renderScale = readTargetRenderScale(target);
+    const dominantScale = Math.max(Math.min(renderScale.scaleX, renderScale.scaleY), 0.0001);
+    const compensatedZoom = currentZoom / dominantScale;
+
+    if (!Number.isFinite(compensatedZoom) || compensatedZoom <= 0 || Math.abs(compensatedZoom - currentZoom) < 0.001) {
+      return null;
+    }
+
+    return compensatedZoom;
+  }
+
   function restoreTrackedInlineStyle(target, cssProperty, valueKey, priorityKey) {
     const inlineValue = target.dataset[valueKey];
     const inlinePriority = target.dataset[priorityKey];
@@ -305,6 +354,12 @@
     requestAnimationFrame(() => {
       if (target.getAttribute(MODAL_BLUR_STATE_ATTR) !== '1') {
         return;
+      }
+
+      const compensatedZoom = computeModalBlurZoomCompensation(target);
+      if (compensatedZoom) {
+        target.style.setProperty('zoom', compensatedZoom.toFixed(6), 'important');
+        target.style.setProperty('transform-origin', 'top left', 'important');
       }
 
       target.style.setProperty('-webkit-filter', blurValue, 'important');

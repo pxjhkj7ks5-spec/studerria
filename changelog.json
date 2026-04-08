@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.94",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-blur-scale): compensate the modal blur background roots by their real rendered scale before applying the Atlas fallback blur, so the full-screen blur covers the same viewport area at normal zoom that Atlas previously only reached when the page was manually zoomed to 125%"
+      ]
+    },
+    {
       "version": "1.4.93",
       "date": "2026-04-08",
       "items": [
