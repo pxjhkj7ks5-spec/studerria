@@ -5256,7 +5256,8 @@
         entries.sort((a, b) => a.start - b.start);
         const nowMs = now.getTime();
         const current = entries.find((entry) => nowMs >= entry.start && nowMs < entry.end);
-        const next = entries.find((entry) => entry.start > nowMs);
+        const isCurrentWeek = document.querySelector('.day-card.is-today') !== null;
+        const next = isCurrentWeek ? entries.find((entry) => entry.start > nowMs) : null;
         if (current) current.el.classList.add('is-now');
         if (next) next.el.classList.add('is-next');
       }
