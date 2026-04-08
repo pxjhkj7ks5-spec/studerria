@@ -20,6 +20,7 @@
   const subjectCards = Array.isArray(registerSubjectCards) ? registerSubjectCards : [];
 
   const selectableSubjects = subjectCards.filter((subject) => subject.interactive);
+  const autoAssignedSubjects = subjectCards.filter((subject) => subject.autoAssigned);
   const renderedSubjectCards = subjectCards.filter((subject) => !subject.autoAssigned);
   const activeSelectableSubjects = selectableSubjects.filter((subject) => !subject.optedOut);
   const pendingSelectableSubjects = activeSelectableSubjects.filter((subject) => !subject.selectedGroup);
@@ -452,7 +453,7 @@
                   </section>
                 <% } %>
 
-                <% if (renderedSubjectCards.length) { %>
+                <% if (subjectCards.length) { %>
                   <section class="reg-groups-surface reg-groups-list-panel">
                     <div class="reg-groups-list-head">
                       <div>
@@ -547,9 +548,46 @@
                           <% } %>
                         </div>
                       <% }); %>
+
+                      <% if (autoAssignedSubjects.length) { %>
+                        <div class="reg-groups-list-section">
+                          <div class="reg-groups-list-section__head">
+                            <span class="reg-groups-kicker"><%= t('registerSubjects.autoAssignedSectionTitle') %></span>
+                            <p class="reg-groups-list-section__copy mb-0"><%= t('registerSubjects.autoAssignedSectionText') %></p>
+                          </div>
+
+                          <div class="reg-groups-list reg-groups-list--static">
+                            <% autoAssignedSubjects.forEach(function(subject) { %>
+                              <div class="reg-groups-row is-auto-assigned">
+                                <div class="reg-groups-row__heading">
+                                  <div class="reg-groups-row__title-stack">
+                                    <div class="reg-groups-row__title-line">
+                                      <span class="reg-groups-row__title"><%= subject.name %></span>
+                                      <span class="reg-groups-row__chip"><%= t('registerSubjects.required') %></span>
+                                    </div>
+                                  </div>
+
+                                  <span class="reg-groups-row__status">
+                                    <span class="reg-groups-row__status-dot" aria-hidden="true"></span>
+                                    <span><%= lang === 'en' ? 'Ready' : 'Готово' %></span>
+                                  </span>
+                                </div>
+
+                                <div class="reg-groups-row__actions reg-groups-row__actions--static" aria-hidden="true">
+                                  <span class="reg-groups-pill reg-groups-pill--static is-active">
+                                    <%= t('registerSubjects.group') %> <%= subject.selectedGroup || 1 %>
+                                  </span>
+                                </div>
+                              </div>
+                            <% }); %>
+                          </div>
+                        </div>
+                      <% } %>
                     </div>
 
-                    <p class="reg-groups-filter-empty" data-reg-groups-empty hidden><%= t('registerSubjects.filterEmpty') %></p>
+                    <% if (renderedSubjectCards.length) { %>
+                      <p class="reg-groups-filter-empty" data-reg-groups-empty hidden><%= t('registerSubjects.filterEmpty') %></p>
+                    <% } %>
                   </section>
                 <% } %>
               </form>

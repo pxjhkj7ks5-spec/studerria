@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.24",
+      "date": "2026-04-09",
+      "items": [
+        "fix(registration-catalog-auto-assigned-visibility): keep required single-group disciplines auto-assigned, but render them in the registration catalog as a separate read-only `Автододані дисципліни` section with clear copy, status, and group pills so students can see all visible disciplines instead of only the rows that still need manual choice"
+      ]
+    },
+    {
       "version": "1.5.23",
       "date": "2026-04-09",
       "items": [

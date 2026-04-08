@@ -288,6 +288,28 @@
   flex-direction: column;
 }
 
+.page-register-subjects .reg-groups-list-section {
+  margin-top: 0.82rem;
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--reg-groups-divider);
+}
+
+.page-register-subjects .reg-groups-list-section__head {
+  display: grid;
+  gap: 0.24rem;
+  margin-bottom: 0.58rem;
+}
+
+.page-register-subjects .reg-groups-list-section__copy {
+  color: var(--reg-groups-muted);
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.page-register-subjects .reg-groups-list--static {
+  gap: 0;
+}
+
 .page-register-subjects .reg-groups-row {
   position: relative;
   display: flex;
