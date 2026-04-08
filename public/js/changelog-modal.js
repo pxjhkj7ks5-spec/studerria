@@ -19,17 +19,12 @@
   const MODAL_BLUR_STATE_ATTR = 'data-studerria-modal-blur-active';
   const EMPTY_STYLE_TOKEN = '__studerria-empty-style__';
   const APPLE_WEBVIEW_CLASS = 'studerria-apple-webview';
-  const ATLAS_BODY_ZOOM_RESET_ATTR = 'data-studerria-atlas-body-zoom-reset';
-  const ATLAS_BODY_ZOOM_PREV_VALUE_ATTR = 'data-studerria-atlas-body-zoom-prev-value';
-  const ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR = 'data-studerria-atlas-body-zoom-prev-priority';
-  const ATLAS_HTML_ZOOM_RESET_ATTR = 'data-studerria-atlas-html-zoom-reset';
-  const ATLAS_HTML_ZOOM_PREV_VALUE_ATTR = 'data-studerria-atlas-html-zoom-prev-value';
-  const ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR = 'data-studerria-atlas-html-zoom-prev-priority';
   const ATLAS_MODAL_SCALE_ATTR = 'data-studerria-atlas-modal-scale';
   const ATLAS_MODAL_SCALE_ZOOM_VALUE_ATTR = 'data-studerria-atlas-modal-scale-zoom-prev-value';
   const ATLAS_MODAL_SCALE_ZOOM_PRIORITY_ATTR = 'data-studerria-atlas-modal-scale-zoom-prev-priority';
   const ATLAS_MODAL_SCALE_ORIGIN_VALUE_ATTR = 'data-studerria-atlas-modal-scale-origin-prev-value';
   const ATLAS_MODAL_SCALE_ORIGIN_PRIORITY_ATTR = 'data-studerria-atlas-modal-scale-origin-prev-priority';
+  const MODAL_HOST_ID = 'studerriaModalHost';
   const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
   const MODAL_FALLBACK_SCENE_ID = 'studerriaModalFallbackScene';
   const MODAL_FALLBACK_SCENE_CLASS = 'studerria-modal-fallback-scene';
@@ -172,79 +167,6 @@
     return renderedWidth > 0 && viewportWidth - renderedWidth > 0.5;
   }
 
-  function applyAtlasBodyZoomReset() {
-    const body = document.body;
-    const root = document.documentElement;
-    if (!(body instanceof HTMLElement) || !(root instanceof HTMLElement)) {
-      return;
-    }
-    if (body.getAttribute(ATLAS_BODY_ZOOM_RESET_ATTR) === '1') {
-      return;
-    }
-    if (!probeBodyZoomAffectsFixedOverlays()) {
-      return;
-    }
-
-    body.setAttribute(
-      ATLAS_BODY_ZOOM_PREV_VALUE_ATTR,
-      body.style.getPropertyValue('zoom') || EMPTY_STYLE_TOKEN
-    );
-    body.setAttribute(
-      ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR,
-      body.style.getPropertyPriority('zoom') || EMPTY_STYLE_TOKEN
-    );
-    body.style.setProperty('zoom', '1', 'important');
-    body.setAttribute(ATLAS_BODY_ZOOM_RESET_ATTR, '1');
-
-    root.setAttribute(
-      ATLAS_HTML_ZOOM_PREV_VALUE_ATTR,
-      root.style.getPropertyValue('zoom') || EMPTY_STYLE_TOKEN
-    );
-    root.setAttribute(
-      ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR,
-      root.style.getPropertyPriority('zoom') || EMPTY_STYLE_TOKEN
-    );
-    root.style.setProperty('zoom', '1', 'important');
-    root.setAttribute(ATLAS_HTML_ZOOM_RESET_ATTR, '1');
-  }
-
-  function restoreAtlasBodyZoomReset() {
-    const body = document.body;
-    const root = document.documentElement;
-    if (body instanceof HTMLElement && body.getAttribute(ATLAS_BODY_ZOOM_RESET_ATTR) === '1') {
-      const prevValue = body.getAttribute(ATLAS_BODY_ZOOM_PREV_VALUE_ATTR);
-      const prevPriority = body.getAttribute(ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR);
-      if (prevValue && prevValue !== EMPTY_STYLE_TOKEN) {
-        body.style.setProperty(
-          'zoom',
-          prevValue,
-          prevPriority && prevPriority !== EMPTY_STYLE_TOKEN ? prevPriority : ''
-        );
-      } else {
-        body.style.removeProperty('zoom');
-      }
-      body.removeAttribute(ATLAS_BODY_ZOOM_RESET_ATTR);
-      body.removeAttribute(ATLAS_BODY_ZOOM_PREV_VALUE_ATTR);
-      body.removeAttribute(ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR);
-    }
-    if (root instanceof HTMLElement && root.getAttribute(ATLAS_HTML_ZOOM_RESET_ATTR) === '1') {
-      const prevValue = root.getAttribute(ATLAS_HTML_ZOOM_PREV_VALUE_ATTR);
-      const prevPriority = root.getAttribute(ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR);
-      if (prevValue && prevValue !== EMPTY_STYLE_TOKEN) {
-        root.style.setProperty(
-          'zoom',
-          prevValue,
-          prevPriority && prevPriority !== EMPTY_STYLE_TOKEN ? prevPriority : ''
-        );
-      } else {
-        root.style.removeProperty('zoom');
-      }
-      root.removeAttribute(ATLAS_HTML_ZOOM_RESET_ATTR);
-      root.removeAttribute(ATLAS_HTML_ZOOM_PREV_VALUE_ATTR);
-      root.removeAttribute(ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR);
-    }
-  }
-
   function clearModalCloseFinalizeTimer() {
     if (modalCloseFinalizeTimer) {
       window.clearTimeout(modalCloseFinalizeTimer);
@@ -257,6 +179,14 @@
       return null;
     }
     return modal.querySelector('.modal-content');
+  }
+
+  function getModalHost() {
+    return document.getElementById(MODAL_HOST_ID);
+  }
+
+  function isModalHost(node) {
+    return node instanceof HTMLElement && node.id === MODAL_HOST_ID;
   }
 
   function applyAtlasModalScale(modal) {
@@ -347,6 +277,16 @@
     });
   }
 
+  function shouldUseAtlasModalHost() {
+    const body = document.body;
+    return Boolean(
+      body instanceof HTMLElement &&
+        body.classList.contains(APPLE_WEBVIEW_CLASS) &&
+        window.innerWidth >= 1200 &&
+        probeBodyZoomAffectsFixedOverlays()
+    );
+  }
+
   function primeEnvironmentFlags() {
     const body = document.body;
     if (!(body instanceof HTMLElement)) {
@@ -376,8 +316,86 @@
     });
   }
 
+  function configureModalHostBase(host) {
+    const body = document.body;
+    if (!(host instanceof HTMLElement) || !(body instanceof HTMLElement)) {
+      return;
+    }
+
+    const bodyZoom = readComputedZoom(body);
+    const compensation = bodyZoom > 0 ? 1 / bodyZoom : 1;
+    host.style.position = 'fixed';
+    host.style.left = '0';
+    host.style.top = '0';
+    host.style.width = `${Math.max(window.innerWidth || 0, 1)}px`;
+    host.style.height = `${Math.max(window.innerHeight || 0, 1)}px`;
+    host.style.overflow = 'visible';
+    host.style.pointerEvents = 'none';
+    host.style.zIndex = String(BASE_BACKDROP_Z_INDEX - 5);
+    host.style.isolation = 'isolate';
+    host.style.transformOrigin = 'top left';
+    host.style.zoom = compensation.toFixed(6);
+  }
+
+  function ensureModalHost() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement) || !shouldUseAtlasModalHost()) {
+      return null;
+    }
+
+    let host = getModalHost();
+    if (!(host instanceof HTMLElement)) {
+      host = document.createElement('div');
+      host.id = MODAL_HOST_ID;
+      body.appendChild(host);
+    }
+
+    configureModalHostBase(host);
+    return host;
+  }
+
+  function getModalPortalRoot(preferHost = false) {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) {
+      return null;
+    }
+
+    const shouldPortalToHost =
+      shouldUseAtlasModalHost() &&
+      (preferHost ||
+        hasVisibleModal() ||
+        document.querySelector('.modal-backdrop') instanceof HTMLElement ||
+        getModalHost() instanceof HTMLElement);
+
+    if (shouldPortalToHost) {
+      const host = ensureModalHost();
+      if (host instanceof HTMLElement) {
+        return host;
+      }
+    }
+
+    return body;
+  }
+
+  function dismantleModalHost() {
+    const body = document.body;
+    const host = getModalHost();
+    if (!(body instanceof HTMLElement) || !(host instanceof HTMLElement)) {
+      return;
+    }
+
+    while (host.firstChild) {
+      body.appendChild(host.firstChild);
+    }
+    host.remove();
+  }
+
   function syncModalLayers() {
     cleanupBackdrop();
+    const modalRoot = getModalPortalRoot();
+    if (modalRoot instanceof HTMLElement && modalRoot !== document.body) {
+      configureModalHostBase(modalRoot);
+    }
     const fallbackBackdropUsesTint =
       document.body instanceof HTMLElement && document.body.classList.contains(MODAL_FALLBACK_OPEN_CLASS);
 
@@ -385,6 +403,9 @@
       (modal) => modal instanceof HTMLElement
     );
     visibleModals.forEach((modal, index) => {
+      if (modalRoot instanceof HTMLElement && modal.parentElement !== modalRoot) {
+        modalRoot.appendChild(modal);
+      }
       modal.style.zIndex = String(BASE_MODAL_Z_INDEX + (index * MODAL_LAYER_STEP));
     });
 
@@ -392,6 +413,9 @@
     backdrops.forEach((backdrop, index) => {
       if (!(backdrop instanceof HTMLElement)) {
         return;
+      }
+      if (modalRoot instanceof HTMLElement && backdrop.parentElement !== modalRoot) {
+        modalRoot.appendChild(backdrop);
       }
 
       backdrop.style.pointerEvents = index === backdrops.length - 1 ? 'auto' : 'none';
@@ -414,12 +438,13 @@
     }
   }
 
-  function portalModal(modal) {
-    if (!(modal instanceof HTMLElement) || !document.body || modal.parentElement === document.body) {
+  function portalModal(modal, preferHost = false) {
+    const modalRoot = getModalPortalRoot(preferHost);
+    if (!(modal instanceof HTMLElement) || !(modalRoot instanceof HTMLElement) || modal.parentElement === modalRoot) {
       return;
     }
 
-    document.body.appendChild(modal);
+    modalRoot.appendChild(modal);
   }
 
   function primeStaticModals() {
@@ -574,6 +599,9 @@
       return false;
     }
     if (isModalBlurBackgroundTarget(node)) {
+      return false;
+    }
+    if (isModalHost(node)) {
       return false;
     }
     if (node.classList.contains('modal') || node.classList.contains('modal-backdrop')) {
@@ -1047,10 +1075,10 @@
     body.classList.remove(MODAL_FALLBACK_OPEN_CLASS);
     body.classList.remove(BODY_OPEN_CLASS);
     body.classList.remove(BOOTSTRAP_OPEN_CLASS);
-    restoreAtlasBodyZoomReset();
     restoreRootScrollLock();
     syncNoBlurTargets(false);
     syncAtlasModalScale();
+    dismantleModalHost();
     cleanupBackdrop();
     window.requestAnimationFrame(() => {
       syncModalLayers();
@@ -1084,11 +1112,7 @@
 
     if (shouldOpen) {
       clearModalCloseFinalizeTimer();
-      /* Atlas / embedded Apple WebView shrinks position:fixed overlays when the
-         body has CSS zoom applied. Probe at open time and, if detected, pin
-         body + html zoom to 1 inline with !important so the modal backdrop
-         and blur fallback layers cover the full viewport. Restored on close. */
-      applyAtlasBodyZoomReset();
+      ensureModalHost();
       body.classList.add(BOOTSTRAP_OPEN_CLASS);
       body.classList.toggle(MODAL_FALLBACK_OPEN_CLASS, useModalBlurFallback);
       if (includeChangelogClass || changelogIsVisible) {
@@ -1148,9 +1172,9 @@
           return;
         }
 
-        portalModal(event.target);
         const isChangelogModal = isChangelogModalElement(event.target);
         syncBodyOpenClasses(true, isChangelogModal);
+        portalModal(event.target, true);
         requestAnimationFrame(() => {
           syncAtlasModalScale();
           syncModalLayers();
@@ -1242,8 +1266,8 @@
     }
 
     modal.addEventListener('show.bs.modal', () => {
-      portalModal(modal);
       syncBodyOpenClasses(true, true);
+      portalModal(modal, true);
       requestAnimationFrame(() => {
         syncAtlasModalScale();
         syncModalLayers();

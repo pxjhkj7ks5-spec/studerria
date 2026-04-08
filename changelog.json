@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.5.07",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-host): remove the modal-time body/html zoom reset and switch Atlas to a dedicated fixed modal host that counteracts the global desktop body zoom only for modals/backdrops, so opening a modal no longer visibly rescales the whole page behind the blur while the overlay still covers the full viewport",
+        "tune(atlas-modal-scale): keep the Atlas 75% modal size correction on `.modal-content` inside that compensated host, so the dialog stays visually reduced without depending on the old page-wide zoom reset path"
+      ]
+    },
+    {
       "version": "1.5.06",
       "date": "2026-04-08",
       "items": [
