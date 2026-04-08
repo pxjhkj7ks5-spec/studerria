@@ -15136,7 +15136,6 @@ app.get('/about', requireLogin, (req, res) => {
 
   return res.render('about', {
     aboutCards,
-    homeHref: '/home',
   });
 });
 

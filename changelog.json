@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.58",
+      "date": "2026-04-08",
+      "items": [
+        "fix(about-hero): remove the top hero action block from the About page so the header area stays focused on the site vision text instead of showing the home CTA and note"
+      ]
+    },
+    {
       "version": "1.4.57",
       "date": "2026-04-08",
       "items": [
