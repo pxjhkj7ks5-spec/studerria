@@ -30,16 +30,18 @@
   const MODAL_FALLBACK_SCENE_CLASS = 'studerria-modal-fallback-scene';
   const MODAL_BLUR_CLONE_ATTR = 'data-studerria-modal-blur-clone';
   const MODAL_BLUR_CLONE_SOURCE_ATTR = 'data-studerria-modal-blur-clone-source';
-  const MODAL_BLUR_TRANSITION_MS = 340;
+  const MODAL_BLUR_TRANSITION_MS = 420;
+  const MODAL_BLUR_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
   const MODAL_BLUR_CLEANUP_DELAY_MS = MODAL_BLUR_TRANSITION_MS + 80;
+  const MODAL_CLOSE_FINALIZE_DELAY_MS = MODAL_BLUR_CLEANUP_DELAY_MS + 60;
   const MODAL_BLUR_TRANSITION_VALUE = [
-    `-webkit-filter ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-    `filter ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-    'opacity 260ms ease-out'
+    `-webkit-filter ${MODAL_BLUR_TRANSITION_MS}ms ${MODAL_BLUR_EASING}`,
+    `filter ${MODAL_BLUR_TRANSITION_MS}ms ${MODAL_BLUR_EASING}`,
+    `opacity ${MODAL_BLUR_TRANSITION_MS}ms ${MODAL_BLUR_EASING}`
   ].join(', ');
   const MODAL_BACKDROP_TRANSITION_VALUE = [
-    `opacity ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-    `background-color ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+    `opacity ${MODAL_BLUR_TRANSITION_MS}ms ${MODAL_BLUR_EASING}`,
+    `background-color ${MODAL_BLUR_TRANSITION_MS}ms ${MODAL_BLUR_EASING}`
   ].join(', ');
   const NO_BLUR_SELECTOR = [
     '.glass',
@@ -95,6 +97,7 @@
   const modalBlurCleanupTimers = new WeakMap();
   let modalFallbackSceneCleanupTimer = 0;
   let modalBlurCloneCleanupTimer = 0;
+  let modalCloseFinalizeTimer = 0;
 
   function getModal() {
     return document.querySelector(MODAL_SELECTOR);
@@ -106,6 +109,12 @@
 
   function hasVisibleChangelogModal() {
     return document.querySelector(`${MODAL_SELECTOR}.show`) instanceof HTMLElement;
+  }
+
+  function hasVisibleModalExcluding(excludedModal) {
+    return Array.from(document.querySelectorAll('.modal.show')).some(
+      (modal) => modal instanceof HTMLElement && modal !== excludedModal
+    );
   }
 
   function isAtlasLikeAppleWebView() {
@@ -228,6 +237,13 @@
       root.removeAttribute(ATLAS_HTML_ZOOM_RESET_ATTR);
       root.removeAttribute(ATLAS_HTML_ZOOM_PREV_VALUE_ATTR);
       root.removeAttribute(ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR);
+    }
+  }
+
+  function clearModalCloseFinalizeTimer() {
+    if (modalCloseFinalizeTimer) {
+      window.clearTimeout(modalCloseFinalizeTimer);
+      modalCloseFinalizeTimer = 0;
     }
   }
 
@@ -526,6 +542,29 @@
       window.clearTimeout(modalBlurCloneCleanupTimer);
       modalBlurCloneCleanupTimer = 0;
     }
+  }
+
+  function restoreRootScrollLock() {
+    const root = document.documentElement;
+    if (!(root instanceof HTMLElement) || root.getAttribute(SCROLL_LOCK_STATE_ATTR) !== '1') {
+      return;
+    }
+
+    const previousValue = root.getAttribute(SCROLL_LOCK_VALUE_ATTR);
+    const previousPriority = root.getAttribute(SCROLL_LOCK_PRIORITY_ATTR);
+    if (previousValue && previousValue !== EMPTY_STYLE_TOKEN) {
+      root.style.setProperty(
+        'overflow',
+        previousValue,
+        previousPriority && previousPriority !== EMPTY_STYLE_TOKEN ? previousPriority : ''
+      );
+    } else {
+      root.style.removeProperty('overflow');
+    }
+
+    root.removeAttribute(SCROLL_LOCK_STATE_ATTR);
+    root.removeAttribute(SCROLL_LOCK_VALUE_ATTR);
+    root.removeAttribute(SCROLL_LOCK_PRIORITY_ATTR);
   }
 
   function getModalBlurCloneForSource(sourceId) {
@@ -873,6 +912,47 @@
     });
   }
 
+  function finalizeModalCloseState() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) {
+      clearModalCloseFinalizeTimer();
+      return;
+    }
+
+    if (hasVisibleModal()) {
+      clearModalCloseFinalizeTimer();
+      syncBodyOpenClasses(true, hasVisibleChangelogModal());
+      requestAnimationFrame(syncModalLayers);
+      return;
+    }
+
+    clearModalCloseFinalizeTimer();
+    body.classList.remove(MODAL_FALLBACK_OPEN_CLASS);
+    body.classList.remove(BODY_OPEN_CLASS);
+    body.classList.remove(BOOTSTRAP_OPEN_CLASS);
+    restoreAtlasBodyZoomReset();
+    restoreRootScrollLock();
+    syncNoBlurTargets(false);
+    cleanupBackdrop();
+    window.requestAnimationFrame(() => {
+      syncModalLayers();
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+
+  function beginModalCloseSequence() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) {
+      return;
+    }
+
+    clearModalCloseFinalizeTimer();
+    syncModalBlurFallback(false);
+    modalCloseFinalizeTimer = window.setTimeout(() => {
+      finalizeModalCloseState();
+    }, MODAL_CLOSE_FINALIZE_DELAY_MS);
+  }
+
   function syncBodyOpenClasses(forceOpen, includeChangelogClass = false) {
     const body = document.body;
     if (!(body instanceof HTMLElement)) {
@@ -885,6 +965,7 @@
     const changelogIsVisible = hasVisibleChangelogModal();
 
     if (shouldOpen) {
+      clearModalCloseFinalizeTimer();
       /* Atlas / embedded Apple WebView shrinks position:fixed overlays when the
          body has CSS zoom applied. Probe at open time and, if detected, pin
          body + html zoom to 1 inline with !important so the modal backdrop
@@ -924,34 +1005,7 @@
       });
       return;
     }
-
-    body.classList.remove(MODAL_FALLBACK_OPEN_CLASS);
-    syncModalBlurFallback(false);
-    body.classList.remove(BODY_OPEN_CLASS);
-    body.classList.remove(BOOTSTRAP_OPEN_CLASS);
-    /* Restore the original body/html CSS zoom that we pinned on open. */
-    restoreAtlasBodyZoomReset();
-    const root = document.documentElement;
-    if (root instanceof HTMLElement && root.getAttribute(SCROLL_LOCK_STATE_ATTR) === '1') {
-      const previousValue = root.getAttribute(SCROLL_LOCK_VALUE_ATTR);
-      const previousPriority = root.getAttribute(SCROLL_LOCK_PRIORITY_ATTR);
-      if (previousValue && previousValue !== EMPTY_STYLE_TOKEN) {
-        root.style.setProperty(
-          'overflow',
-          previousValue,
-          previousPriority && previousPriority !== EMPTY_STYLE_TOKEN ? previousPriority : ''
-        );
-      } else {
-        root.style.removeProperty('overflow');
-      }
-      root.removeAttribute(SCROLL_LOCK_STATE_ATTR);
-      root.removeAttribute(SCROLL_LOCK_VALUE_ATTR);
-      root.removeAttribute(SCROLL_LOCK_PRIORITY_ATTR);
-    }
-    syncNoBlurTargets(false);
-    window.requestAnimationFrame(() => {
-      window.dispatchEvent(new Event('resize'));
-    });
+    finalizeModalCloseState();
   }
 
   function isModalElement(node) {
@@ -1004,8 +1058,10 @@
           return;
         }
 
+        if (!hasVisibleModalExcluding(event.target)) {
+          beginModalCloseSequence();
+        }
         requestAnimationFrame(() => {
-          syncBodyOpenClasses();
           syncModalLayers();
         });
       },
@@ -1019,7 +1075,11 @@
           return;
         }
 
-        syncBodyOpenClasses();
+        if (hasVisibleModal()) {
+          syncBodyOpenClasses(true, hasVisibleChangelogModal());
+        } else if (!modalCloseFinalizeTimer) {
+          finalizeModalCloseState();
+        }
         requestAnimationFrame(syncModalLayers);
       },
       true
@@ -1066,7 +1126,6 @@
     });
 
     modal.addEventListener('hidden.bs.modal', () => {
-      syncBodyOpenClasses();
       requestAnimationFrame(syncModalLayers);
     });
 

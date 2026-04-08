@@ -166,6 +166,21 @@ html body.studerria-theme.studerria-apple-webview.studerria-modal-fallback-open 
   will-change: filter, opacity;
 }
 
+html body.studerria-theme.studerria-apple-webview[data-studerria-atlas-body-zoom-reset="1"] .modal.fade .modal-dialog {
+  transform: scale(0.735) !important;
+  transform-origin: top center !important;
+  opacity: 0 !important;
+  will-change: transform, opacity !important;
+  transition:
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 320ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+html body.studerria-theme.studerria-apple-webview[data-studerria-atlas-body-zoom-reset="1"] .modal.show .modal-dialog {
+  transform: scale(0.75) !important;
+  opacity: 1 !important;
+}
+
 html body.studerria-theme #welcomeModal .modal-dialog,
 html body.studerria-theme #welcomeModal .modal-content,
 html body.studerria-theme #welcomeModal .modal-body,

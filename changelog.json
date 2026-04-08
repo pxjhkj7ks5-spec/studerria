@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.5.04",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-blur-lifecycle): slow the Atlas modal blur easing to a longer Liquid-Glass-style fade and move the final body-class / zoom-reset cleanup out of hide.bs.modal into a delayed close-finalize step, so the blur can appear and disappear smoothly without flashing the old partial rectangular fallback layer on close",
+        "tune(atlas-modal-dialog-scale): while the Atlas body/html zoom reset is active, render modal dialogs at 75% scale with a matching eased transform transition so the schedule modal keeps the same visual proportions users get when manually zooming the page out"
+      ]
+    },
+    {
       "version": "1.5.03",
       "date": "2026-04-08",
       "items": [
