@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.89",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-backdrop): remove the extra dark modal-backdrop tint while the Atlas inline blur fallback is active, so only the intended full-page blur remains behind open dialogs instead of a second darker overlay layer"
+      ]
+    },
+    {
       "version": "1.4.88",
       "date": "2026-04-08",
       "items": [

@@ -119,6 +119,9 @@
       backdrop.style.pointerEvents = '';
       backdrop.style.opacity = '';
       backdrop.style.zIndex = '';
+      backdrop.style.background = '';
+      backdrop.style.backgroundColor = '';
+      backdrop.style.removeProperty('--bs-backdrop-bg');
       backdrop.style.webkitBackdropFilter = '';
       backdrop.style.backdropFilter = '';
     });
@@ -126,6 +129,8 @@
 
   function syncModalLayers() {
     cleanupBackdrop();
+    const fallbackBackdropIsTransparent =
+      document.body instanceof HTMLElement && document.body.classList.contains(MODAL_FALLBACK_OPEN_CLASS);
 
     const visibleModals = Array.from(document.querySelectorAll('.modal.show')).filter(
       (modal) => modal instanceof HTMLElement
@@ -141,8 +146,13 @@
       }
 
       backdrop.style.pointerEvents = index === backdrops.length - 1 ? 'auto' : 'none';
-      backdrop.style.opacity = 'var(--bs-backdrop-opacity, 0.42)';
+      backdrop.style.opacity = fallbackBackdropIsTransparent ? '1' : 'var(--bs-backdrop-opacity, 0.42)';
       backdrop.style.zIndex = String(BASE_BACKDROP_Z_INDEX + (index * MODAL_LAYER_STEP));
+      if (fallbackBackdropIsTransparent) {
+        backdrop.style.setProperty('--bs-backdrop-bg', 'transparent');
+        backdrop.style.background = 'transparent';
+        backdrop.style.backgroundColor = 'transparent';
+      }
       backdrop.style.webkitBackdropFilter = 'none';
       backdrop.style.backdropFilter = 'none';
     });
