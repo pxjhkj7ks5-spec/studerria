@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.25",
+      "date": "2026-04-09",
+      "items": [
+        "fix(bachelor-registration-active-term-resolution): resolve the student-facing Academic V2 term only from rows that are actually marked active, prefer the newest active term when stale data leaves multiple terms active, and stop the bachelor registration catalog from leaking disciplines across terms when no active term can be resolved"
+      ]
+    },
+    {
       "version": "1.5.24",
       "date": "2026-04-09",
       "items": [

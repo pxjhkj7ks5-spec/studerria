@@ -114,6 +114,39 @@ test('bachelor overlay ignores stale live term coverage when catalog terms do no
   assert.deepEqual(rows, []);
 });
 
+test('bachelor overlay hides rows when the active term is unresolved', async () => {
+  const rows = await academicV2StudentHelpers.overlayBachelorCatalogSubjectRows(
+    createOverlayStore([createStageRow({ term_numbers: [2] })]),
+    [createLiveRow()],
+    {
+      programId: 11,
+      stageNumber: 1,
+      termNumber: null,
+    }
+  );
+
+  assert.deepEqual(rows, []);
+});
+
+test('preferred active group term picks the newest active term when multiple terms are marked active', () => {
+  const row = academicV2StudentHelpers.pickPreferredActiveTermRow([
+    { id: 101, term_number: 1, is_active: true, is_archived: false, updated_at: '2026-04-08T10:00:00.000Z' },
+    { id: 102, term_number: 2, is_active: true, is_archived: false, updated_at: '2026-04-09T10:00:00.000Z' },
+  ]);
+
+  assert.equal(row.id, 102);
+  assert.equal(row.term_number, 2);
+});
+
+test('preferred active group term returns null when no active term exists', () => {
+  const row = academicV2StudentHelpers.pickPreferredActiveTermRow([
+    { id: 101, term_number: 1, is_active: false, is_archived: false, updated_at: '2026-04-08T10:00:00.000Z' },
+    { id: 102, term_number: 2, is_active: false, is_archived: false, updated_at: '2026-04-09T10:00:00.000Z' },
+  ]);
+
+  assert.equal(row, null);
+});
+
 test('bachelor stage-template projection resolves zero live term links when no catalog terms are selected', () => {
   const termMap = new Map([
     [101, { id: 201 }],
