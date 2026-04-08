@@ -101,6 +101,11 @@
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
+    function readBodyZoom() {
+      const zoomValue = Number.parseFloat(window.getComputedStyle(body).zoom || '1');
+      return Number.isFinite(zoomValue) && zoomValue > 0 ? zoomValue : 1;
+    }
+
     function readRootRenderScale() {
       const probe = document.createElement('div');
       probe.style.position = 'absolute';
@@ -123,29 +128,29 @@
     function syncViewportMetrics() {
       root.style.transformOrigin = 'top left';
       root.style.transform = 'translateZ(0)';
+      root.style.zoom = '1';
 
-      const renderScale = readRootRenderScale();
-      const shouldCounterScale = isSafariBrowser
+      const bodyZoom = readBodyZoom();
+      const shouldNeutralizeZoom = isSafariBrowser
         && body.classList.contains('studerria-theme')
         && window.innerWidth >= DESKTOP_ZOOM_MIN_WIDTH
-        && (
-          Math.abs(renderScale.scaleX - 1) > 0.001
-          || Math.abs(renderScale.scaleY - 1) > 0.001
-        );
+        && Math.abs(bodyZoom - 1) > 0.001;
 
-      if (shouldCounterScale) {
-        const scaleX = 1 / renderScale.scaleX;
-        const scaleY = 1 / renderScale.scaleY;
-        root.style.transform = `translateZ(0) scale(${scaleX.toFixed(6)}, ${scaleY.toFixed(6)})`;
+      if (shouldNeutralizeZoom) {
+        root.style.zoom = (1 / bodyZoom).toFixed(6);
       }
 
       const rect = root.getBoundingClientRect();
-      state.width = Math.max(Number(rect.width) || window.innerWidth || 1, 1);
-      state.height = Math.max(Number(rect.height) || window.innerHeight || 1, 1);
+      const renderedWidth = Math.max(Number(rect.width) || window.innerWidth || 1, 1);
+      const renderedHeight = Math.max(Number(rect.height) || window.innerHeight || 1, 1);
+      const renderScale = readRootRenderScale();
+
+      state.width = renderedWidth / renderScale.scaleX;
+      state.height = renderedHeight / renderScale.scaleY;
       state.viewportLeft = Number.isFinite(rect.left) ? rect.left : 0;
       state.viewportTop = Number.isFinite(rect.top) ? rect.top : 0;
-      state.inputScaleX = 1;
-      state.inputScaleY = 1;
+      state.inputScaleX = 1 / renderScale.scaleX;
+      state.inputScaleY = 1 / renderScale.scaleY;
     }
 
     function mapPointerToScene(clientX, clientY) {

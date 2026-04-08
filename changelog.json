@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.79",
+      "date": "2026-04-08",
+      "items": [
+        "fix(safari-cursor-trail-zoom-root): neutralize the shared background root zoom on Safari desktop pages before measuring rendered scale, so the floating symbol cursor trail no longer inherits the Studerria shell's 0.75 body zoom and drifts diagonally away from the pointer"
+      ]
+    },
+    {
       "version": "1.4.78",
       "date": "2026-04-08",
       "items": [
