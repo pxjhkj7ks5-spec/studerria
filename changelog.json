@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.68",
+      "date": "2026-04-08",
+      "items": [
+        "tune(global-desktop-scale): extend the 75% desktop fallback beyond schedule by wiring a shared Safari-safe scale detector into the common Studerria head/body partials and narrowing the global Tahoe/Liquid Glass shell across app pages, auth screens, and the about/help surfaces"
+      ]
+    },
+    {
       "version": "1.4.67",
       "date": "2026-04-08",
       "items": [

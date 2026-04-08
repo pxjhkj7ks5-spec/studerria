@@ -1,0 +1,121 @@
+:root {
+  --studerria-fallback-shell-max-width: 1180px;
+  --studerria-fallback-shell-gap: clamp(120px, 11vw, 240px);
+}
+
+@media (min-width: 1200px) {
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) {
+    --t-display: 18px;
+    --t-h1: 15px;
+    --t-h2: 13px;
+    --t-body: 12px;
+    --t-meta: 10px;
+    --t-chip: 10px;
+    --studerria-shell-max-width: var(--studerria-fallback-shell-max-width);
+    --studerria-shell-gutter: var(--studerria-fallback-shell-gap);
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .page-container {
+    max-width: var(--studerria-fallback-shell-max-width) !important;
+    padding: 68px 20px 104px !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule).page-local-topbar .page-container {
+    padding-top: 10px !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) > .container,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) > section[class*="shell"],
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) > div[class*="shell"],
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) > main[class*="shell"] {
+    width: min(var(--studerria-fallback-shell-max-width), calc(100vw - var(--studerria-fallback-shell-gap))) !important;
+    max-width: min(var(--studerria-fallback-shell-max-width), calc(100vw - var(--studerria-fallback-shell-gap))) !important;
+    margin-inline: auto !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .topbar.topbar--title-spotlight.studerria-nav-shell {
+    width: min(var(--studerria-fallback-shell-max-width), calc(100vw - var(--studerria-fallback-shell-gap))) !important;
+    max-width: min(var(--studerria-fallback-shell-max-width), calc(100vw - var(--studerria-fallback-shell-gap))) !important;
+    margin: 0 auto 10px !important;
+    padding: 6px 10px !important;
+    border-radius: 24px !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule).page-local-topbar .topbar.topbar--title-spotlight.studerria-nav-shell {
+    width: min(var(--studerria-fallback-shell-max-width), calc(100vw - var(--studerria-fallback-shell-gap))) !important;
+    max-width: min(var(--studerria-fallback-shell-max-width), calc(100vw - var(--studerria-fallback-shell-gap))) !important;
+    margin: 0 auto 10px !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .topbar.topbar--title-spotlight.studerria-nav-shell .container {
+    min-height: 38px !important;
+    gap: 10px 14px !important;
+    padding-inline: 1rem !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .topbar.topbar--title-spotlight.studerria-nav-shell .navbar-brand.topbar-title-spotlight {
+    font-size: 1rem !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .snav-list {
+    gap: 16px;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-nav-shell .snav-link,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-nav-shell .snav-menu-link {
+    font-size: 0.84rem;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .snav-user-meta {
+    font-size: 0.72rem;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .app-footer {
+    margin-top: 0.9rem;
+    padding-top: 0.75rem !important;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .app-footer .footer-meta,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .app-footer .footer-meta.glass-dock {
+    min-height: 38px;
+    gap: 0.7rem;
+    padding: 0.46rem 1rem;
+    font-size: 10.5px;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .app-footer .footer-sync-pill {
+    font-size: 9.5px;
+    padding: 3px 7px;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .app-footer .footer-sync-pill .sync-dot {
+    width: 5px;
+    height: 5px;
+    flex: 0 0 5px;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-about-shell,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-shell {
+    gap: 1rem;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-about-hero,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-about-card,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-hero,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-faq,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-form-card,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-messages-card,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-history {
+    padding: 1.1rem;
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-about-title,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-title {
+    font-size: clamp(1.7rem, 1.22rem + 1.7vw, 2.7rem);
+  }
+
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-about-grid,
+  html.studerria-scale-fallback body.studerria-theme:not(.page-schedule) .studerria-help-grid {
+    gap: 1rem;
+  }
+}
