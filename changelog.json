@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.28",
+      "date": "2026-04-09",
+      "items": [
+        "fix(registration-asset-cache-busting): version the `register-groups.css` and `register-groups.js` assets on the subject-registration screen so browsers stop serving stale cached logic and layout after registration-flow fixes, especially for the `Дисципліна не викладається` action"
+      ]
+    },
+    {
       "version": "1.5.27",
       "date": "2026-04-09",
       "items": [
