@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.99",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-scene-dimming): stop blurring the temporary Atlas foreground scene wrapper and dim it with opacity instead while keeping the real blur on the full-screen background roots, then trigger a viewport-metrics resync on modal open and close so cursor-following backgrounds recalculate against the post-modal geometry instead of drifting on stale coordinates"
+      ]
+    },
+    {
       "version": "1.4.98",
       "date": "2026-04-08",
       "items": [

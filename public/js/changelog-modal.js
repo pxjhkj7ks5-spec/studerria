@@ -248,6 +248,12 @@
       : 'blur(18px) saturate(0.94) brightness(0.94)';
   }
 
+  function getModalFallbackSceneOpacity() {
+    const body = document.body;
+    const isLightTheme = body instanceof HTMLElement && body.classList.contains('theme-light');
+    return isLightTheme ? '0.9' : '0.82';
+  }
+
   function isModalBlurFallbackTarget(target) {
     if (isModalBlurSceneTarget(target)) {
       return true;
@@ -435,6 +441,8 @@
 
     clearModalBlurCleanupTimer(target);
     const blurValue = getModalBlurFallbackValue();
+    const sceneOpacity = getModalFallbackSceneOpacity();
+    const isSceneTarget = isModalBlurSceneTarget(target);
     const isAlreadyActive = target.getAttribute(MODAL_BLUR_STATE_ATTR) === '1';
 
     if (!isAlreadyActive) {
@@ -459,6 +467,13 @@
       if (compensatedZoom) {
         target.style.setProperty('zoom', compensatedZoom.toFixed(6), 'important');
         target.style.setProperty('transform-origin', 'top left', 'important');
+      }
+
+      if (isSceneTarget) {
+        target.style.setProperty('-webkit-filter', 'none', 'important');
+        target.style.setProperty('filter', 'none', 'important');
+        target.style.setProperty('opacity', sceneOpacity, 'important');
+        return;
       }
 
       target.style.setProperty('-webkit-filter', blurValue, 'important');
@@ -613,6 +628,9 @@
         syncModalBlurFallback(false);
         syncNoBlurTargets(true);
       }
+      window.requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
       return;
     }
 
@@ -638,6 +656,9 @@
       root.removeAttribute(SCROLL_LOCK_PRIORITY_ATTR);
     }
     syncNoBlurTargets(false);
+    window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
   }
 
   function isModalElement(node) {
