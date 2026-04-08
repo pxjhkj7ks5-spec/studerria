@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.21",
+      "date": "2026-04-08",
+      "items": [
+        "feat(bachelor-catalog-languages): add `Іспанська мова` and `Німецька мова` to the coded bachelor catalog source under the `Друга іноземна мова` branch with source codes `2.2.1.1.` and `2.2.1.2.`, both placed in stage 2 term 2, with default group counts 2 and 1 respectively"
+      ]
+    },
+    {
       "version": "1.5.20",
       "date": "2026-04-08",
       "items": [
