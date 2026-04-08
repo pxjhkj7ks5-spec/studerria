@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.27",
+      "date": "2026-04-09",
+      "items": [
+        "fix(registration-optout-action-layout): split the subject action area into a dedicated group-button lane plus a separate full-width `Дисципліна не викладається` lane, so the long opt-out control no longer overlaps the title column and remains reliably clickable for optional disciplines"
+      ]
+    },
+    {
       "version": "1.5.26",
       "date": "2026-04-09",
       "items": [

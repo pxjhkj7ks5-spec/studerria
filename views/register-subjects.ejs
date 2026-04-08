@@ -509,26 +509,34 @@
                             </span>
                           </div>
 
-                          <div class="reg-groups-row__actions" role="group" aria-label="<%= subject.name %>">
-                            <% for (let g = 1; g <= subject.groupCount; g += 1) { %>
-                              <button
-                                type="button"
-                                class="reg-groups-pill <%= subject.selectedGroup === g ? 'is-active' : '' %>"
-                                data-reg-groups-group="<%= g %>"
-                                aria-pressed="<%= subject.selectedGroup === g ? 'true' : 'false' %>"
-                              >
-                                <%= t('registerSubjects.group') %> <%= g %>
-                              </button>
-                            <% } %>
+                          <div
+                            class="reg-groups-row__actions<%= subject.allowNotTaught ? ' reg-groups-row__actions--stacked' : '' %>"
+                            role="group"
+                            aria-label="<%= subject.name %>"
+                          >
+                            <div class="reg-groups-row__group-buttons">
+                              <% for (let g = 1; g <= subject.groupCount; g += 1) { %>
+                                <button
+                                  type="button"
+                                  class="reg-groups-pill <%= subject.selectedGroup === g ? 'is-active' : '' %>"
+                                  data-reg-groups-group="<%= g %>"
+                                  aria-pressed="<%= subject.selectedGroup === g ? 'true' : 'false' %>"
+                                >
+                                  <%= t('registerSubjects.group') %> <%= g %>
+                                </button>
+                              <% } %>
+                            </div>
                             <% if (subject.allowNotTaught) { %>
-                              <button
-                                type="button"
-                                class="reg-groups-pill <%= subject.optedOut ? 'is-active' : '' %>"
-                                data-reg-groups-optout-btn
-                                aria-pressed="<%= subject.optedOut ? 'true' : 'false' %>"
-                              >
-                                <%= t('registerSubjects.optout') %>
-                              </button>
+                              <div class="reg-groups-row__optout">
+                                <button
+                                  type="button"
+                                  class="reg-groups-pill reg-groups-pill--optout <%= subject.optedOut ? 'is-active' : '' %>"
+                                  data-reg-groups-optout-btn
+                                  aria-pressed="<%= subject.optedOut ? 'true' : 'false' %>"
+                                >
+                                  <%= t('registerSubjects.optout') %>
+                                </button>
+                              </div>
                             <% } %>
                           </div>
 
