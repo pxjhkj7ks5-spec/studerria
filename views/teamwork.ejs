@@ -6,6 +6,8 @@
         tasksTitle: 'Subject tasks',
         createTask: 'Create task',
         noTasks: 'No teamwork tasks yet.',
+        roleTeacher: 'Teacher',
+        roleStudent: 'Student',
         subjectLabel: 'Subject',
         teacherLabel: 'Teacher',
         randomDistribution: 'Random distribution',
@@ -64,6 +66,8 @@
         tasksTitle: 'Завдання по предмету',
         createTask: 'Створити завдання',
         noTasks: 'Ще немає командних завдань',
+        roleTeacher: 'Викладач',
+        roleStudent: 'Студент',
         subjectLabel: 'Предмет',
         teacherLabel: 'Викладач',
         randomDistribution: 'Рандомний розподіл',
@@ -768,29 +772,32 @@
             <% if (selectedSubject) { %>
               <div class="text-muted small">
                 <span class="course-badge"><%= selectedSubject.course_name %></span>
-                <% if (isTeacherMode && selectedSubject.group_label) { %>
+                <% if (selectedSubject.group_label) { %>
                   <span class="ms-2"><%= selectedSubject.group_label %></span>
                 <% } %>
               </div>
             <% } %>
           </div>
-          <span class="status-chip status-chip--info"><%= isTeacherMode ? teamworkCopy.teacherLabel : teamworkCopy.subjectLabel %></span>
+          <span class="status-chip status-chip--info"><%= isTeacherMode ? teamworkCopy.roleTeacher : teamworkCopy.roleStudent %></span>
         </div>
         <div class="subject-chip-grid">
           <% if (!subjects.length) { %>
             <span class="text-muted"><%= teamworkCopy.noSubjects %></span>
           <% } else { %>
             <% subjects.forEach(function(s) { %>
-              <a
-                class="subject-nav-pill <%= selectedSubjectId === s.subject_id ? 'is-active' : '' %>"
-                href="/teamwork?subject_id=<%= s.subject_id %>"
-              >
-                <span class="subject-name"><%= s.subject_name %></span>
-                <span class="subject-meta"><%= s.course_name %></span>
-                <% if (isTeacherMode && s.group_label) { %>
-                  <span class="subject-meta"><%= s.group_label %></span>
-                <% } %>
-              </a>
+              <form method="GET" action="/teamwork" class="subject-nav-form">
+                <input type="hidden" name="subject_id" value="<%= s.subject_id %>" />
+                <button
+                  class="subject-nav-pill <%= selectedSubjectId === s.subject_id ? 'is-active' : '' %>"
+                  type="submit"
+                  aria-pressed="<%= selectedSubjectId === s.subject_id ? 'true' : 'false' %>"
+                >
+                  <span class="subject-name"><%= s.subject_name %></span>
+                  <span class="subject-meta">
+                    <%= s.course_name %><%= s.group_label ? ` • ${s.group_label}` : '' %>
+                  </span>
+                </button>
+              </form>
             <% }); %>
           <% } %>
         </div>
@@ -805,7 +812,7 @@
               <% if (selectedSubject) { %>
                 <div class="text-muted small mt-1">
                   <span class="course-badge"><%= selectedSubject.course_name %></span>
-                  <% if (isTeacherMode && selectedSubject.group_label) { %>
+                  <% if (selectedSubject.group_label) { %>
                     <span class="ms-2"><%= selectedSubject.group_label %></span>
                   <% } %>
                 </div>
