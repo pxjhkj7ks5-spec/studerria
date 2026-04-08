@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.10",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-backdrop): disable the Atlas-specific modal blur fallback entirely and keep only a clean dark vignette backdrop with no `backdrop-filter`, so Atlas modals no longer draw the top-left rectangular blur slab while still dimming the screen edges behind the dialog"
+      ]
+    },
+    {
       "version": "1.5.09",
       "date": "2026-04-08",
       "items": [

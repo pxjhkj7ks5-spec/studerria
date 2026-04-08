@@ -19,6 +19,34 @@ html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open)
   backdrop-filter: blur(18px) saturate(1.04) !important;
 }
 
+html body.studerria-theme.studerria-apple-webview .modal-backdrop,
+html body.studerria-theme.studerria-apple-webview:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(8, 12, 28, 0.05) 0%,
+      rgba(8, 12, 28, 0.14) 42%,
+      rgba(5, 8, 20, 0.34) 72%,
+      rgba(2, 6, 18, 0.58) 100%
+    ) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html body.theme-light.studerria-theme.studerria-apple-webview .modal-backdrop,
+html body.theme-light.studerria-theme.studerria-apple-webview:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(232, 238, 248, 0.2) 44%,
+      rgba(194, 205, 223, 0.36) 74%,
+      rgba(148, 163, 184, 0.46) 100%
+    ) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 html body.studerria-theme .modal,
 html body.studerria-theme .modal.show {
   z-index: 1080 !important;

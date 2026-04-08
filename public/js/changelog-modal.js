@@ -1122,7 +1122,7 @@
     }
 
     primeEnvironmentFlags();
-    const useModalBlurFallback = true;
+    const useModalBlurFallback = !body.classList.contains(APPLE_WEBVIEW_CLASS);
     const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal();
     const changelogIsVisible = hasVisibleChangelogModal();
 
@@ -1156,7 +1156,7 @@
         syncNoBlurTargets(false);
       } else {
         syncModalBlurFallback(false);
-        syncNoBlurTargets(true);
+        syncNoBlurTargets(false);
       }
       syncAtlasModalScale();
       window.requestAnimationFrame(() => {
