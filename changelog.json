@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.17",
+      "date": "2026-04-08",
+      "items": [
+        "fix(journal-shell-stabilization): move the teacher/admin journal shell onto an explicit server-side `journalPageMeta` contract with `renderMode`, health banner, scope chips, summary cards, primary actions, and typed empty states; replace the old double-alert fallback presentation with a single Liquid Glass health state; refresh the subject control bar, closure dashboard, and no-columns/no-students/no-storage/compatibility surfaces; and add render smoke coverage for full, simplified, compatibility, no-columns, and closed-subject journal states"
+      ]
+    },
+    {
       "version": "1.5.16",
       "date": "2026-04-08",
       "items": [

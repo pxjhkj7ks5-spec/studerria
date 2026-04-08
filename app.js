@@ -18734,7 +18734,315 @@ const buildJournalEmptyStateViewModel = ({
   undoGrade: null,
   gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
   compatibilityMessage: String(compatibilityMessage || ''),
+  journalPageMeta: buildJournalPageMeta({
+    lang: getPreferredLang(req),
+    renderMode: 'full',
+    teacherJournalMode: Boolean(teacherJournalMode),
+    canManageAllSubjects: Boolean(canManageAllSubjects),
+    emptyStateKind: 'no-subject',
+  }),
 });
+
+function getJournalShellCopy(lang = 'uk') {
+  if (lang === 'en') {
+    return {
+      headerSubtitleFull: 'Compact grading shell with clear subject, closure, and matrix states.',
+      headerSubtitleSimplified: 'Simplified shell is active while the full journal render recovers.',
+      headerSubtitleCompatibility: 'Compatibility shell is active until the required journal schema is available.',
+      fullAccess: 'Full access',
+      openState: 'Journal open',
+      closedState: 'Subject closed',
+      summaryColumns: 'Columns',
+      summaryStudents: 'Students',
+      summarySnapshot: 'Snapshot',
+      summarySnapshotPending: 'Generated on close',
+      summarySnapshotReady: 'Ready for audit',
+      insightsAction: 'Journal insights',
+      emptyNoSubjectTitle: 'Select a subject to open the journal',
+      emptyNoSubjectBody: 'No subject is selected in the current access scope yet.',
+      emptyNoStorageTitle: 'Journal storage is not ready for this subject',
+      emptyNoStorageBody: 'The subject is already visible in Academic V2, but its journal storage binding has not been created yet.',
+      emptyNoColumnsTitle: 'The journal has no grading columns yet',
+      emptyNoColumnsBody: 'Import the previous-semester template or create the first manual column to start grading.',
+      emptyNoColumnsCreate: 'Create manual column',
+      emptyNoColumnsImport: 'Import template',
+      emptyNoStudentsTitle: 'No students are available in this scope',
+      emptyNoStudentsBody: 'The subject is configured, but there are no students in the current teacher/admin scope.',
+      emptySimplifiedTitle: 'Journal is running in simplified render mode',
+      emptySimplifiedBody: 'The full journal layout was reduced after an internal render issue. Refresh the page to retry the normal shell.',
+      emptyCompatibilityTitle: 'Journal is running in compatibility mode',
+      emptyCompatibilityBody: 'The database schema is missing required journal structures. Update migrations and refresh the service.',
+      emptyRefresh: 'Refresh',
+      bannerActionRefresh: 'Refresh',
+      bannerGenericTitle: 'Journal needs attention',
+      bannerSimplifiedTitle: 'Journal render was simplified',
+      bannerCompatibilityTitle: 'Journal compatibility mode is active',
+    };
+  }
+  return {
+    headerSubtitleFull: 'Компактний shell для оцінювання з чітким subject, closure і matrix state.',
+    headerSubtitleSimplified: 'Працює спрощений shell, поки повний рендер журналу відновлюється.',
+    headerSubtitleCompatibility: 'Працює режим сумісності, поки для журналу не доступна потрібна схема БД.',
+    fullAccess: 'Повний доступ',
+    openState: 'Журнал відкрито',
+    closedState: 'Предмет закрито',
+    summaryColumns: 'Колонки',
+    summaryStudents: 'Студенти',
+    summarySnapshot: 'Знімок',
+    summarySnapshotPending: 'Буде згенерований при закритті',
+    summarySnapshotReady: 'Готовий до аудиту',
+    insightsAction: 'Інсайти журналу',
+    emptyNoSubjectTitle: 'Оберіть предмет, щоб відкрити журнал',
+    emptyNoSubjectBody: 'У поточному scope доступу ще не обрано предмет для журналу.',
+    emptyNoStorageTitle: 'Для цього предмета ще не готовий journal storage',
+    emptyNoStorageBody: 'Предмет уже видно в Academic V2, але його journal storage binding ще не створений.',
+    emptyNoColumnsTitle: 'У журналі ще немає колонок оцінювання',
+    emptyNoColumnsBody: 'Імпортуйте шаблон з попереднього семестру або створіть першу ручну колонку, щоб почати оцінювання.',
+    emptyNoColumnsCreate: 'Створити ручну колонку',
+    emptyNoColumnsImport: 'Імпортувати шаблон',
+    emptyNoStudentsTitle: 'У цьому scope поки немає студентів',
+    emptyNoStudentsBody: 'Предмет уже налаштований, але в поточному teacher/admin scope немає студентів для журналу.',
+    emptySimplifiedTitle: 'Журнал працює у спрощеному render mode',
+    emptySimplifiedBody: 'Повний layout журналу тимчасово спрощено після внутрішньої render-помилки. Оновіть сторінку, щоб повторити повний shell.',
+    emptyCompatibilityTitle: 'Журнал працює в режимі сумісності',
+    emptyCompatibilityBody: 'У схемі БД бракує структур журналу. Оновіть міграції та перезавантажте сервіс.',
+    emptyRefresh: 'Оновити',
+    bannerActionRefresh: 'Оновити',
+    bannerGenericTitle: 'Журнал потребує уваги',
+    bannerSimplifiedTitle: 'Рендер журналу тимчасово спрощено',
+    bannerCompatibilityTitle: 'Увімкнено режим сумісності журналу',
+  };
+}
+
+function normalizeJournalMetaTone(rawTone, fallback = 'neutral') {
+  const tone = String(rawTone || '').trim().toLowerCase();
+  if (['danger', 'warning', 'info', 'success', 'neutral'].includes(tone)) {
+    return tone;
+  }
+  return fallback;
+}
+
+function buildJournalPageMeta({
+  lang = 'uk',
+  renderMode = 'full',
+  selectedSubject = null,
+  selectedSemester = null,
+  teacherJournalMode = false,
+  canManageAllSubjects = false,
+  selectedJournalHasStorageBinding = false,
+  subjectClosure = null,
+  columns = [],
+  journalRows = [],
+  journalWorkflowLinks = {},
+  emptyStateKind = 'none',
+  canEditJournal = false,
+  healthBanner = null,
+} = {}) {
+  const copy = getJournalShellCopy(lang);
+  const normalizedRenderMode = ['full', 'simplified', 'compatibility'].includes(String(renderMode || '').trim())
+    ? String(renderMode).trim()
+    : 'full';
+  const normalizedEmptyStateKind = String(emptyStateKind || 'none').trim() || 'none';
+  const safeColumns = Array.isArray(columns) ? columns : [];
+  const safeRows = Array.isArray(journalRows) ? journalRows : [];
+  const activeColumnCount = safeColumns.filter((column) => Number(column && column.is_archived ? column.is_archived : 0) !== 1).length;
+  const studentCount = safeRows.length;
+  const latestClosureEvent = subjectClosure && typeof subjectClosure === 'object' ? subjectClosure.latest_event : null;
+  const snapshotReady = Boolean(
+    subjectClosure
+    && subjectClosure.is_closed
+    && latestClosureEvent
+    && (Number(latestClosureEvent.export_rows_count || 0) > 0 || Number(latestClosureEvent.export_columns_count || 0) > 0)
+  );
+  const snapshotValue = snapshotReady
+    ? `${Number(latestClosureEvent.export_rows_count || 0)} × ${Number(latestClosureEvent.export_columns_count || 0)}`
+    : '—';
+
+  const scopeChips = [];
+  if (selectedSubject && selectedSubject.course_name) {
+    scopeChips.push({ label: String(selectedSubject.course_name), tone: 'info' });
+  }
+  if (selectedSemester && selectedSemester.title) {
+    scopeChips.push({ label: String(selectedSemester.title), tone: 'neutral' });
+  }
+  if (selectedSubject && selectedSubject.group_label) {
+    scopeChips.push({ label: String(selectedSubject.group_label), tone: 'neutral' });
+  }
+  if (selectedSubject) {
+    scopeChips.push({
+      label: subjectClosure && subjectClosure.is_closed ? copy.closedState : copy.openState,
+      tone: subjectClosure && subjectClosure.is_closed ? 'danger' : 'success',
+    });
+  }
+  if (canManageAllSubjects) {
+    scopeChips.push({ label: copy.fullAccess, tone: 'success' });
+  }
+
+  const primaryActions = [];
+  if (
+    teacherJournalMode
+    && selectedSubject
+    && selectedJournalHasStorageBinding
+    && journalWorkflowLinks
+    && journalWorkflowLinks.insightsHref
+  ) {
+    primaryActions.push({
+      kind: 'link',
+      href: String(journalWorkflowLinks.insightsHref),
+      label: copy.insightsAction,
+      variant: 'outline-secondary',
+    });
+  }
+
+  const summaryCards = selectedSubject
+    ? [
+        {
+          key: 'columns',
+          label: copy.summaryColumns,
+          value: String(activeColumnCount),
+          meta: lang === 'en' ? 'Active grading columns' : 'Активні колонки оцінювання',
+          tone: 'neutral',
+        },
+        {
+          key: 'students',
+          label: copy.summaryStudents,
+          value: String(studentCount),
+          meta: lang === 'en' ? 'Students in current scope' : 'Студенти в поточному scope',
+          tone: 'neutral',
+        },
+        {
+          key: 'snapshot',
+          label: copy.summarySnapshot,
+          value: snapshotValue,
+          meta: snapshotReady ? copy.summarySnapshotReady : copy.summarySnapshotPending,
+          tone: snapshotReady ? 'info' : 'neutral',
+        },
+      ]
+    : [];
+
+  let normalizedHealthBanner = null;
+  if (healthBanner && typeof healthBanner === 'object') {
+    normalizedHealthBanner = {
+      tone: normalizeJournalMetaTone(healthBanner.tone, 'warning'),
+      title: String(healthBanner.title || ''),
+      body: String(healthBanner.body || ''),
+      actionLabel: String(healthBanner.actionLabel || ''),
+      actionHref: String(healthBanner.actionHref || ''),
+    };
+  }
+
+  let emptyState = null;
+  if (normalizedEmptyStateKind !== 'none') {
+    const actionList = [];
+    switch (normalizedEmptyStateKind) {
+      case 'no-storage-binding':
+        actionList.push({
+          kind: 'link',
+          href: '/journal',
+          label: copy.emptyRefresh,
+          variant: 'outline-secondary',
+        });
+        emptyState = {
+          tone: 'warning',
+          title: copy.emptyNoStorageTitle,
+          body: copy.emptyNoStorageBody,
+          actions: actionList,
+        };
+        break;
+      case 'no-columns':
+        if (canEditJournal && selectedSubject && Number(selectedSubject.subject_id || 0) > 0) {
+          actionList.push({
+            kind: 'link',
+            href: '#journalCreateColumnCard',
+            label: copy.emptyNoColumnsCreate,
+            variant: 'primary',
+          });
+          actionList.push({
+            kind: 'form',
+            action: '/journal/template/import-previous',
+            method: 'POST',
+            label: copy.emptyNoColumnsImport,
+            variant: 'outline-secondary',
+            confirm: lang === 'en'
+              ? 'Import manual columns from the previous semester?'
+              : 'Імпортувати ручні колонки з попереднього семестру?',
+            hiddenFields: {
+              subject_id: Number(selectedSubject.subject_id),
+            },
+          });
+        }
+        emptyState = {
+          tone: 'info',
+          title: copy.emptyNoColumnsTitle,
+          body: copy.emptyNoColumnsBody,
+          actions: actionList,
+        };
+        break;
+      case 'no-students':
+        emptyState = {
+          tone: 'neutral',
+          title: copy.emptyNoStudentsTitle,
+          body: copy.emptyNoStudentsBody,
+          actions: [],
+        };
+        break;
+      case 'simplified-render':
+        actionList.push({
+          kind: 'link',
+          href: '/journal',
+          label: copy.emptyRefresh,
+          variant: 'outline-secondary',
+        });
+        emptyState = {
+          tone: 'warning',
+          title: copy.emptySimplifiedTitle,
+          body: copy.emptySimplifiedBody,
+          actions: actionList,
+        };
+        break;
+      case 'compatibility-mode':
+        actionList.push({
+          kind: 'link',
+          href: '/journal',
+          label: copy.emptyRefresh,
+          variant: 'outline-secondary',
+        });
+        emptyState = {
+          tone: 'warning',
+          title: copy.emptyCompatibilityTitle,
+          body: copy.emptyCompatibilityBody,
+          actions: actionList,
+        };
+        break;
+      case 'no-subject':
+      default:
+        emptyState = {
+          tone: 'neutral',
+          title: copy.emptyNoSubjectTitle,
+          body: copy.emptyNoSubjectBody,
+          actions: [],
+        };
+        break;
+    }
+  }
+
+  const headerSubtitle = normalizedRenderMode === 'simplified'
+    ? copy.headerSubtitleSimplified
+    : normalizedRenderMode === 'compatibility'
+      ? copy.headerSubtitleCompatibility
+      : copy.headerSubtitleFull;
+
+  return {
+    renderMode: normalizedRenderMode,
+    headerSubtitle,
+    healthBanner: normalizedHealthBanner,
+    scopeChips,
+    summaryCards,
+    primaryActions,
+    emptyStateKind: normalizedEmptyStateKind,
+    emptyState,
+  };
+}
 
 const renderViewToResponse = (res, view, payload) => new Promise((resolve, reject) => {
   res.render(view, payload, (err, html) => {
@@ -29778,6 +30086,8 @@ app.get('/journal', requireLogin, async (req, res) => {
   };
 
   try {
+    const journalLang = getPreferredLang(req);
+    const journalShellCopy = getJournalShellCopy(journalLang);
     const journalScope = await getJournalAccessScope(req);
     if (!journalScope.canUseJournal) {
       return res.status(403).send('Forbidden (journal)');
@@ -29816,12 +30126,21 @@ app.get('/journal', requireLogin, async (req, res) => {
       await renderViewToResponse(
         res,
         'journal',
-        buildJournalEmptyStateViewModel({
-          req,
-          subjects: subjectOptions,
-          teacherJournalMode,
-          canManageAllSubjects: Boolean(journalScope.fullAccess),
-        })
+        {
+          ...buildJournalEmptyStateViewModel({
+            req,
+            subjects: subjectOptions,
+            teacherJournalMode,
+            canManageAllSubjects: Boolean(journalScope.fullAccess),
+          }),
+          journalPageMeta: buildJournalPageMeta({
+            lang: journalLang,
+            renderMode: 'full',
+            teacherJournalMode,
+            canManageAllSubjects: Boolean(journalScope.fullAccess),
+            emptyStateKind: 'no-subject',
+          }),
+        }
       );
       return;
     }
@@ -29831,7 +30150,6 @@ app.get('/journal', requireLogin, async (req, res) => {
     journalFallbackState.selectedSemester = selectedSemester || null;
     const selectedLegacySubjectId = parsePositiveIntStrict(selectedSubject.legacy_subject_id || selectedSubject.subject_id);
     if (!selectedLegacySubjectId) {
-      const lang = getPreferredLang(req);
       await renderViewToResponse(
         res,
         'journal',
@@ -29841,12 +30159,19 @@ app.get('/journal', requireLogin, async (req, res) => {
             subjects: subjectOptions,
             teacherJournalMode,
             canManageAllSubjects: Boolean(journalScope.fullAccess),
-            compatibilityMessage: lang === 'en'
-              ? 'This Academic V2 subject is visible already, but the journal storage binding is not ready yet.'
-              : 'Цей предмет уже видно в Academic V2, але journal storage binding для нього ще не готовий.',
           }),
           selectedSubject,
           selectedSemester,
+          journalPageMeta: buildJournalPageMeta({
+            lang: journalLang,
+            renderMode: 'full',
+            selectedSubject,
+            selectedSemester,
+            teacherJournalMode,
+            canManageAllSubjects: Boolean(journalScope.fullAccess),
+            selectedJournalHasStorageBinding: false,
+            emptyStateKind: 'no-storage-binding',
+          }),
         }
       );
       return;
@@ -29894,6 +30219,22 @@ app.get('/journal', requireLogin, async (req, res) => {
       closeExportHref: buildJournalCloseExportPathFromRequest(req, Number(selectedSubject.subject_id || 0), {
       }),
     };
+    const routeMessages = (res.locals && res.locals.messages && typeof res.locals.messages === 'object')
+      ? res.locals.messages
+      : {};
+    let emptyStateKind = 'none';
+    if (!matrix.columns.length) {
+      emptyStateKind = 'no-columns';
+    } else if (!matrix.rows.length) {
+      emptyStateKind = 'no-students';
+    }
+    const healthBanner = routeMessages.error
+      ? {
+          tone: 'danger',
+          title: journalShellCopy.bannerGenericTitle,
+          body: String(routeMessages.error),
+        }
+      : null;
 
     await renderViewToResponse(res, 'journal', {
       username: req.session.user.username,
@@ -29916,6 +30257,22 @@ app.get('/journal', requireLogin, async (req, res) => {
       undoGrade: canEditJournal ? undoGrade : null,
       gradingTypeMeta: JOURNAL_SCORING_TYPE_META,
       journalWorkflowLinks,
+      journalPageMeta: buildJournalPageMeta({
+        lang: journalLang,
+        renderMode: 'full',
+        selectedSubject,
+        selectedSemester,
+        teacherJournalMode,
+        canManageAllSubjects: Boolean(journalScope.fullAccess),
+        selectedJournalHasStorageBinding: true,
+        subjectClosure,
+        columns: matrix.columns,
+        journalRows: matrix.rows,
+        journalWorkflowLinks,
+        canEditJournal,
+        emptyStateKind,
+        healthBanner,
+      }),
     });
     return;
   } catch (err) {
@@ -29925,9 +30282,6 @@ app.get('/journal', requireLogin, async (req, res) => {
         message: normalizeRuntimeErrorMessage(err && err.message ? err.message : err),
       });
       try {
-        if (res.locals && res.locals.messages && !res.locals.messages.error) {
-          res.locals.messages.error = 'Журнал тимчасово працює у fallback-режимі рендеру.';
-        }
         await renderViewToResponse(
           res,
           'journal',
@@ -29937,10 +30291,31 @@ app.get('/journal', requireLogin, async (req, res) => {
               subjects: journalFallbackState.subjects,
               teacherJournalMode: journalFallbackState.teacherJournalMode,
               canManageAllSubjects: journalFallbackState.canManageAllSubjects,
-              compatibilityMessage: 'Рендер журналу тимчасово спрощено через внутрішню помилку шаблону.',
             }),
             selectedSubject: journalFallbackState.selectedSubject,
             selectedSemester: journalFallbackState.selectedSemester,
+            journalPageMeta: buildJournalPageMeta({
+              lang: getPreferredLang(req),
+              renderMode: 'simplified',
+              selectedSubject: journalFallbackState.selectedSubject,
+              selectedSemester: journalFallbackState.selectedSemester,
+              teacherJournalMode: journalFallbackState.teacherJournalMode,
+              canManageAllSubjects: journalFallbackState.canManageAllSubjects,
+              selectedJournalHasStorageBinding: Boolean(
+                parsePositiveIntStrict(
+                  journalFallbackState.selectedSubject
+                    && (journalFallbackState.selectedSubject.legacy_subject_id || journalFallbackState.selectedSubject.subject_id)
+                )
+              ),
+              emptyStateKind: 'simplified-render',
+              healthBanner: {
+                tone: 'warning',
+                title: getJournalShellCopy(getPreferredLang(req)).bannerSimplifiedTitle,
+                body: getJournalShellCopy(getPreferredLang(req)).emptySimplifiedBody,
+                actionLabel: getJournalShellCopy(getPreferredLang(req)).bannerActionRefresh,
+                actionHref: '/journal',
+              },
+            }),
           }
         );
         return;
@@ -29955,9 +30330,6 @@ app.get('/journal', requireLogin, async (req, res) => {
         message: normalizeRuntimeErrorMessage(err && err.message ? err.message : err),
       });
       try {
-        if (res.locals && res.locals.messages && !res.locals.messages.error) {
-          res.locals.messages.error = 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).';
-        }
         await renderViewToResponse(
           res,
           'journal',
@@ -29967,10 +30339,31 @@ app.get('/journal', requireLogin, async (req, res) => {
               subjects: journalFallbackState.subjects,
               teacherJournalMode: journalFallbackState.teacherJournalMode,
               canManageAllSubjects: journalFallbackState.canManageAllSubjects,
-              compatibilityMessage: 'Журнал тимчасово працює в режимі сумісності (оновіть структуру БД).',
             }),
             selectedSubject: journalFallbackState.selectedSubject,
             selectedSemester: journalFallbackState.selectedSemester,
+            journalPageMeta: buildJournalPageMeta({
+              lang: getPreferredLang(req),
+              renderMode: 'compatibility',
+              selectedSubject: journalFallbackState.selectedSubject,
+              selectedSemester: journalFallbackState.selectedSemester,
+              teacherJournalMode: journalFallbackState.teacherJournalMode,
+              canManageAllSubjects: journalFallbackState.canManageAllSubjects,
+              selectedJournalHasStorageBinding: Boolean(
+                parsePositiveIntStrict(
+                  journalFallbackState.selectedSubject
+                    && (journalFallbackState.selectedSubject.legacy_subject_id || journalFallbackState.selectedSubject.subject_id)
+                )
+              ),
+              emptyStateKind: 'compatibility-mode',
+              healthBanner: {
+                tone: 'warning',
+                title: getJournalShellCopy(getPreferredLang(req)).bannerCompatibilityTitle,
+                body: getJournalShellCopy(getPreferredLang(req)).emptyCompatibilityBody,
+                actionLabel: getJournalShellCopy(getPreferredLang(req)).bannerActionRefresh,
+                actionHref: '/journal',
+              },
+            }),
           }
         );
         return;

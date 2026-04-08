@@ -500,24 +500,39 @@
     <main class="container py-4">
       <%
         const journalLinks = (journalWorkflowLinks && typeof journalWorkflowLinks === 'object') ? journalWorkflowLinks : {};
+        const journalMeta = (journalPageMeta && typeof journalPageMeta === 'object') ? journalPageMeta : {};
+        const journalHealthBanner = (journalMeta.healthBanner && typeof journalMeta.healthBanner === 'object')
+          ? journalMeta.healthBanner
+          : null;
+        const journalScopeChips = Array.isArray(journalMeta.scopeChips) ? journalMeta.scopeChips : [];
+        const journalSummaryCards = Array.isArray(journalMeta.summaryCards) ? journalMeta.summaryCards : [];
+        const journalPrimaryActions = Array.isArray(journalMeta.primaryActions) ? journalMeta.primaryActions : [];
+        const journalEmptyStateKind = String(journalMeta.emptyStateKind || 'none');
+        const journalEmptyState = (journalMeta.emptyState && typeof journalMeta.emptyState === 'object')
+          ? journalMeta.emptyState
+          : null;
         const selectedJournalSubjectId = selectedSubject ? Number(selectedSubject.subject_id || 0) : 0;
-        const selectedJournalCourseId = selectedSubject ? Number(selectedSubject.course_id || 0) : 0;
-        const selectedJournalStorageSubjectId = selectedSubject ? Number(selectedSubject.legacy_subject_id || selectedSubject.subject_id || 0) : 0;
-        const selectedJournalHasStorageBinding = selectedJournalStorageSubjectId > 0;
-        const journalInsightsHref = journalLinks.insightsHref
-          || `/journal/insights?course_id=${selectedJournalCourseId}&subject_id=${selectedJournalSubjectId}&scope_type=subject&period=semester`;
         const journalCloseExportHref = journalLinks.closeExportHref
           || `/journal/subject/close-export?subject_id=${selectedJournalSubjectId}`;
         const showJournalAttendance = false;
       %>
-      <% if (messages && messages.error) { %>
-        <div class="alert alert-danger"><%= messages.error %></div>
-      <% } %>
       <% if (messages && messages.success) { %>
         <div class="alert alert-success"><%= messages.success %></div>
       <% } %>
-      <% if (compatibilityMessage) { %>
-        <div class="alert alert-warning"><%= compatibilityMessage %></div>
+      <% if (journalHealthBanner && (journalHealthBanner.title || journalHealthBanner.body)) { %>
+        <section class="journal-health-banner journal-health-banner--<%= journalHealthBanner.tone || 'warning' %> mb-3" role="status" aria-live="polite">
+          <div class="journal-health-banner__copy">
+            <% if (journalHealthBanner.title) { %>
+              <div class="journal-health-banner__title"><%= journalHealthBanner.title %></div>
+            <% } %>
+            <% if (journalHealthBanner.body) { %>
+              <div class="journal-health-banner__body"><%= journalHealthBanner.body %></div>
+            <% } %>
+          </div>
+          <% if (journalHealthBanner.actionHref && journalHealthBanner.actionLabel) { %>
+            <a class="btn btn-sm btn-outline-secondary" href="<%= journalHealthBanner.actionHref %>"><%= journalHealthBanner.actionLabel %></a>
+          <% } %>
+        </section>
       <% } %>
       <% if (undoGrade && canEditJournal) { %>
         <form method="POST" action="/journal/grades/restore" class="alert alert-warning d-flex flex-wrap gap-2 align-items-center">
@@ -530,15 +545,42 @@
         </form>
       <% } %>
 
-      <section class="glass liquid-card p-3 mb-3">
-        <form method="GET" action="/journal" class="row g-3 align-items-end">
+      <section class="glass liquid-card p-3 mb-3 journal-control-bar">
+        <div class="journal-control-bar__head">
+          <div class="journal-control-bar__copy">
+            <span class="journal-shell-kicker">Studerria Journal</span>
+            <h1 class="journal-control-bar__title"><%= journalCopy.pageTitle %></h1>
+            <% if (journalMeta.headerSubtitle) { %>
+              <p class="journal-control-bar__subtitle"><%= journalMeta.headerSubtitle %></p>
+            <% } %>
+          </div>
+          <div class="journal-control-bar__meta">
+            <% if (journalScopeChips.length) { %>
+              <div class="journal-control-bar__chips">
+                <% journalScopeChips.forEach(function(chip) { %>
+                  <span class="status-chip status-chip--<%= chip.tone || 'neutral' %>"><%= chip.label %></span>
+                <% }); %>
+              </div>
+            <% } %>
+            <% if (journalPrimaryActions.length) { %>
+              <div class="journal-control-bar__actions">
+                <% journalPrimaryActions.forEach(function(action) { %>
+                  <% if (action.kind === 'link' && action.href) { %>
+                    <a class="btn btn-sm <%= action.variant ? `btn-${action.variant}` : 'btn-outline-secondary' %>" href="<%= action.href %>"><%= action.label %></a>
+                  <% } %>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+        <form method="GET" action="/journal" class="row g-3 align-items-end journal-control-bar__form">
           <% if (attendanceContext && attendanceContext.date) { %>
             <input type="hidden" name="attendance_date" value="<%= attendanceContext.date %>" />
           <% } %>
           <% if (attendanceContext && attendanceContext.class_number) { %>
             <input type="hidden" name="attendance_class_number" value="<%= attendanceContext.class_number %>" />
           <% } %>
-          <div class="col-12 col-lg-7">
+          <div class="col-12 col-xl-8">
             <label class="form-label"><%= journalCopy.subjectLabel %></label>
             <select class="form-select" name="subject_id" onchange="this.form.submit()">
               <% if (!subjects || !subjects.length) { %>
@@ -552,34 +594,15 @@
               <% } %>
             </select>
           </div>
-          <div class="col-12 col-lg-5">
-            <% if (selectedSubject) { %>
-              <div class="journal-subject-meta">
-                <span class="status-chip status-chip--info"><%= selectedSubject.course_name %></span>
-                <% if (selectedSemester && selectedSemester.title) { %>
-                  <span class="status-chip status-chip--neutral"><%= selectedSemester.title %></span>
-                <% } %>
-                <span class="status-chip status-chip--neutral"><%= selectedSubject.group_label %></span>
-                <% if (subjectClosure && subjectClosure.is_closed) { %>
-                  <span class="status-chip status-chip--danger"><%= journalCopy.subjectClosed %></span>
-                <% } else { %>
-                  <span class="status-chip status-chip--success"><%= journalCopy.journalOpen %></span>
-                <% } %>
-                <% if (canManageAllSubjects) { %>
-                  <span class="status-chip status-chip--success"><%= journalCopy.fullAccess %></span>
-                <% } %>
-              </div>
-              <% if (selectedJournalHasStorageBinding) { %>
-                <div class="d-flex justify-content-lg-end mt-2">
-                  <a
-                    class="btn btn-sm btn-outline-secondary"
-                    href="<%= journalInsightsHref %>"
-                  >
-                    📊 <%= journalCopy.journalInsights %>
-                  </a>
-                </div>
+          <div class="col-12 col-xl-4">
+            <div class="journal-control-bar__hint">
+              <% if (selectedSubject) { %>
+                <div class="journal-control-bar__hint-title"><%= selectedSubject.subject_name %></div>
+                <div class="journal-control-bar__hint-copy"><%= selectedSubject.course_name %> · <%= selectedSubject.group_label %></div>
+              <% } else { %>
+                <div class="journal-control-bar__hint-copy"><%= journalCopy.subjectNotSelected %></div>
               <% } %>
-            <% } %>
+            </div>
           </div>
         </form>
       </section>
@@ -622,18 +645,17 @@
             const weight = Number(gradingSettings && gradingSettings[`${cfg.key}_weight_points`]);
             if (enabled && Number.isFinite(weight)) enabledWeightTotal += weight;
           });
-          const activeColumnCount = Array.isArray(columns)
-            ? columns.filter((column) => Number(column && column.is_archived ? column.is_archived : 0) !== 1).length
-            : 0;
-          const closureStudentCount = Array.isArray(journalRows) ? journalRows.length : 0;
-          const latestClosureEvent = subjectClosure && subjectClosure.latest_event ? subjectClosure.latest_event : null;
+          const gradingDetailsShouldOpen = canEditJournal && journalEmptyStateKind === 'no-columns';
+          const showClosureDashboard = !['no-storage-binding', 'simplified-render', 'compatibility-mode'].includes(journalEmptyStateKind);
         %>
-        <section class="glass liquid-card p-3 mb-3">
+        <% if (showClosureDashboard) { %>
+        <section class="glass liquid-card p-3 mb-3 journal-shell-section">
           <div class="journal-closure-shell">
             <div class="journal-closure-copy">
-              <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+              <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
-                  <div class="fw-semibold"><%= journalCopy.closureTitle %></div>
+                  <span class="journal-shell-kicker"><%= journalCopy.closureTitle %></span>
+                  <div class="fw-semibold journal-shell-section__title"><%= selectedSubject.subject_name %></div>
                   <% if (subjectClosure && subjectClosure.is_closed) { %>
                     <div class="text-muted small">
                       <%= journalCopy.closureClosedPrefix %> <%= subjectClosure.closed_at ? new Date(subjectClosure.closed_at).toLocaleString(localeCode) : '' %>. <%= journalCopy.closureClosedSuffix %>
@@ -654,27 +676,14 @@
                 </div>
               </div>
             </div>
-            <div class="journal-closure-impact">
-              <article class="journal-closure-impact-card">
-                <div class="text-muted small"><%= lang === 'en' ? 'Columns' : 'Колонки' %></div>
-                <div class="journal-closure-impact-value"><%= activeColumnCount %></div>
-                <div class="small text-muted"><%= journalCopy.closureImpactColumnsHint %></div>
-              </article>
-              <article class="journal-closure-impact-card">
-                <div class="text-muted small"><%= lang === 'en' ? 'Students' : 'Студенти' %></div>
-                <div class="journal-closure-impact-value"><%= closureStudentCount %></div>
-                <div class="small text-muted"><%= journalCopy.closureImpactStudentsHint %></div>
-              </article>
-              <article class="journal-closure-impact-card">
-                <div class="text-muted small"><%= lang === 'en' ? 'Snapshot' : 'Знімок' %></div>
-                <% if (subjectClosure && subjectClosure.is_closed && latestClosureEvent && (Number(latestClosureEvent.export_rows_count || 0) > 0 || Number(latestClosureEvent.export_columns_count || 0) > 0)) { %>
-                  <div class="journal-closure-impact-value"><%= Number(latestClosureEvent.export_rows_count || 0) %> × <%= Number(latestClosureEvent.export_columns_count || 0) %></div>
-                  <div class="small text-muted"><%= journalCopy.closureImpactSnapshotReady %></div>
-                <% } else { %>
-                  <div class="journal-closure-impact-value"><%= journalCopy.dash %></div>
-                  <div class="small text-muted"><%= journalCopy.closureImpactSnapshotPending %></div>
-                <% } %>
-              </article>
+            <div class="journal-summary-grid">
+              <% journalSummaryCards.forEach(function(card) { %>
+                <article class="journal-summary-card journal-summary-card--<%= card.tone || 'neutral' %>">
+                  <div class="journal-summary-card__label"><%= card.label %></div>
+                  <div class="journal-summary-card__value"><%= card.value %></div>
+                  <div class="journal-summary-card__meta"><%= card.meta %></div>
+                </article>
+              <% }); %>
             </div>
             <div class="journal-closure-actions-panel">
               <div class="journal-closure-actions-copy">
@@ -727,6 +736,7 @@
             </div>
           </div>
         </section>
+        <% } %>
         <% if (showJournalAttendance) { %>
         <section class="glass liquid-card p-3 mb-3">
           <details class="journal-attendance-details" open>
@@ -971,8 +981,8 @@
           </details>
         </section>
         <% } %>
-        <section class="glass liquid-card p-3 mb-3">
-          <details class="journal-grading-details">
+        <section class="glass liquid-card p-3 mb-3" id="journalGradingSection">
+          <details class="journal-grading-details" <%= gradingDetailsShouldOpen ? 'open' : '' %>>
             <summary class="journal-grading-summary">
               <div class="journal-grading-summary-main">
                 <span class="journal-grading-summary-title"><%= canEditJournal ? journalCopy.gradingSummaryTeacher : journalCopy.gradingSummaryStudent %></span>
@@ -1081,7 +1091,7 @@
                       </div>
                     </form>
                   </div>
-                  <div class="col-12 col-xl-4">
+                  <div class="col-12 col-xl-4" id="journalCreateColumnCard">
                     <h6 class="mb-2"><%= journalCopy.newColumn %></h6>
                     <form method="POST" action="/journal/columns/create" class="row g-2">
                       <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
@@ -1165,12 +1175,35 @@
       <% } %>
 
       <section class="glass liquid-card p-3">
-        <% if (!selectedSubject) { %>
-          <div class="text-muted"><%= journalCopy.subjectNotSelected %></div>
-        <% } else if (!columns || !columns.length) { %>
-          <div class="text-muted"><%= journalCopy.noColumns %></div>
-        <% } else if (!journalRows || !journalRows.length) { %>
-          <div class="text-muted"><%= journalCopy.noStudentsForSubject %></div>
+        <% if (journalEmptyStateKind !== 'none' && journalEmptyState) { %>
+          <div class="journal-empty-state journal-empty-state--<%= journalEmptyState.tone || 'neutral' %>">
+            <div class="journal-empty-state__copy">
+              <span class="journal-shell-kicker">Journal state</span>
+              <h2 class="journal-empty-state__title"><%= journalEmptyState.title %></h2>
+              <p class="journal-empty-state__body"><%= journalEmptyState.body %></p>
+            </div>
+            <% if (Array.isArray(journalEmptyState.actions) && journalEmptyState.actions.length) { %>
+              <div class="journal-empty-state__actions">
+                <% journalEmptyState.actions.forEach(function(action) { %>
+                  <% if (action.kind === 'link' && action.href) { %>
+                    <a class="btn btn-sm <%= action.variant ? `btn-${action.variant}` : 'btn-outline-secondary' %>" href="<%= action.href %>"><%= action.label %></a>
+                  <% } else if (action.kind === 'form' && action.action) { %>
+                    <form
+                      method="<%= action.method || 'POST' %>"
+                      action="<%= action.action %>"
+                      class="journal-empty-state__action-form"
+                      <% if (action.confirm) { %>onsubmit="return confirm(<%- JSON.stringify(action.confirm) %>)"<% } %>
+                    >
+                      <% Object.entries(action.hiddenFields || {}).forEach(function(entry) { %>
+                        <input type="hidden" name="<%= entry[0] %>" value="<%= entry[1] %>" />
+                      <% }); %>
+                      <button class="btn btn-sm <%= action.variant ? `btn-${action.variant}` : 'btn-outline-secondary' %>" type="submit"><%= action.label %></button>
+                    </form>
+                  <% } %>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
         <% } else { %>
           <div class="journal-table-wrap">
             <table class="table journal-table mb-0 align-middle">
@@ -1666,6 +1699,7 @@
       const canEditJournal = <%- canEditJournal ? 'true' : 'false' %>;
       const canEditAttendance = <%- canEditAttendance ? 'true' : 'false' %>;
       const journalText = <%- JSON.stringify(journalCopy).replace(/</g, '\\u003c') %>;
+      const journalPageMeta = <%- JSON.stringify(journalMeta).replace(/</g, '\\u003c') %>;
       const attendanceQuickAutoOpen = <%- attendanceQuickAutoOpen ? 'true' : 'false' %>;
       const journalRequestContext = <%- JSON.stringify({
         subjectId: selectedJournalSubjectId,
