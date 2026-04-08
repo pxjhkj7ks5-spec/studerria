@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.69",
+      "date": "2026-04-08",
+      "items": [
+        "revert(desktop-scale): roll back the Safari/Atlas desktop scale experiments and return the Studerria shell to the previous stable layout after the fallback approach caused horizontal drift and inconsistent browser behavior"
+      ]
+    },
+    {
       "version": "1.4.68",
       "date": "2026-04-08",
       "items": [

@@ -1,5 +1,4 @@
 :root {
-  --schedule-desktop-scale: 0.75;
   --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", Roboto, Arial, sans-serif;
   --t-display: 22px;
   --t-h1: 18px;
@@ -84,16 +83,6 @@ body.page-schedule {
   min-height: 100vh;
   min-height: 100svh;
   min-height: 100dvh;
-}
-
-.schedule-scale-frame {
-  position: relative;
-  width: 100%;
-}
-
-.schedule-scale-content {
-  position: relative;
-  width: 100%;
 }
 
 .topbar .navbar-brand {
@@ -2050,26 +2039,6 @@ body.page-schedule .week-pager .week-carousel-card:hover {
 
 body.page-schedule .app-footer {
   padding-bottom: calc(168px + env(safe-area-inset-bottom));
-}
-
-@media (min-width: 1200px) {
-  html.schedule-scale-fallback,
-  html.schedule-scale-fallback body.page-schedule {
-    overflow-x: hidden;
-  }
-
-  html.schedule-scale-fallback .schedule-scale-content {
-    width: calc(100% / var(--schedule-desktop-scale));
-    margin-inline: auto;
-    transform: scale(var(--schedule-desktop-scale));
-    transform-origin: top center;
-    will-change: transform;
-  }
-
-  html.schedule-scale-fallback body.page-schedule .week-rail {
-    transform: scale(var(--schedule-desktop-scale));
-    transform-origin: bottom center;
-  }
 }
 
 @media (max-width: 991px) {
