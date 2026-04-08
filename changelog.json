@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.20",
+      "date": "2026-04-08",
+      "items": [
+        "fix(bachelor-catalog-term-only-save): skip the nonessential legacy projection resync after bachelor catalog saves that only change stage-term links, so removing an unused subject from a semester no longer shows the false `Saved in Academic v2, but the legacy projection did not sync` warning while real projection-affecting edits still trigger projection rebuilds"
+      ]
+    },
+    {
       "version": "1.5.19",
       "date": "2026-04-08",
       "items": [
