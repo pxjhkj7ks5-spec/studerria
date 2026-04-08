@@ -25,6 +25,11 @@
   const ATLAS_HTML_ZOOM_RESET_ATTR = 'data-studerria-atlas-html-zoom-reset';
   const ATLAS_HTML_ZOOM_PREV_VALUE_ATTR = 'data-studerria-atlas-html-zoom-prev-value';
   const ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR = 'data-studerria-atlas-html-zoom-prev-priority';
+  const ATLAS_MODAL_SCALE_ATTR = 'data-studerria-atlas-modal-scale';
+  const ATLAS_MODAL_SCALE_ZOOM_VALUE_ATTR = 'data-studerria-atlas-modal-scale-zoom-prev-value';
+  const ATLAS_MODAL_SCALE_ZOOM_PRIORITY_ATTR = 'data-studerria-atlas-modal-scale-zoom-prev-priority';
+  const ATLAS_MODAL_SCALE_ORIGIN_VALUE_ATTR = 'data-studerria-atlas-modal-scale-origin-prev-value';
+  const ATLAS_MODAL_SCALE_ORIGIN_PRIORITY_ATTR = 'data-studerria-atlas-modal-scale-origin-prev-priority';
   const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
   const MODAL_FALLBACK_SCENE_ID = 'studerriaModalFallbackScene';
   const MODAL_FALLBACK_SCENE_CLASS = 'studerria-modal-fallback-scene';
@@ -245,6 +250,101 @@
       window.clearTimeout(modalCloseFinalizeTimer);
       modalCloseFinalizeTimer = 0;
     }
+  }
+
+  function getAtlasModalScaleContent(modal) {
+    if (!(modal instanceof HTMLElement)) {
+      return null;
+    }
+    return modal.querySelector('.modal-content');
+  }
+
+  function applyAtlasModalScale(modal) {
+    const body = document.body;
+    const content = getAtlasModalScaleContent(modal);
+    if (
+      !(body instanceof HTMLElement) ||
+      !(content instanceof HTMLElement) ||
+      !body.classList.contains(APPLE_WEBVIEW_CLASS) ||
+      window.innerWidth < 1200
+    ) {
+      return;
+    }
+
+    if (content.getAttribute(ATLAS_MODAL_SCALE_ATTR) !== '1') {
+      content.setAttribute(
+        ATLAS_MODAL_SCALE_ZOOM_VALUE_ATTR,
+        content.style.getPropertyValue('zoom') || EMPTY_STYLE_TOKEN
+      );
+      content.setAttribute(
+        ATLAS_MODAL_SCALE_ZOOM_PRIORITY_ATTR,
+        content.style.getPropertyPriority('zoom') || EMPTY_STYLE_TOKEN
+      );
+      content.setAttribute(
+        ATLAS_MODAL_SCALE_ORIGIN_VALUE_ATTR,
+        content.style.getPropertyValue('transform-origin') || EMPTY_STYLE_TOKEN
+      );
+      content.setAttribute(
+        ATLAS_MODAL_SCALE_ORIGIN_PRIORITY_ATTR,
+        content.style.getPropertyPriority('transform-origin') || EMPTY_STYLE_TOKEN
+      );
+    }
+
+    content.style.setProperty('zoom', '0.75', 'important');
+    content.style.setProperty('transform-origin', 'top center', 'important');
+    content.setAttribute(ATLAS_MODAL_SCALE_ATTR, '1');
+  }
+
+  function restoreAtlasModalScale(modal) {
+    const content = getAtlasModalScaleContent(modal);
+    if (!(content instanceof HTMLElement) || content.getAttribute(ATLAS_MODAL_SCALE_ATTR) !== '1') {
+      return;
+    }
+
+    const previousZoomValue = content.getAttribute(ATLAS_MODAL_SCALE_ZOOM_VALUE_ATTR);
+    const previousZoomPriority = content.getAttribute(ATLAS_MODAL_SCALE_ZOOM_PRIORITY_ATTR);
+    if (previousZoomValue && previousZoomValue !== EMPTY_STYLE_TOKEN) {
+      content.style.setProperty(
+        'zoom',
+        previousZoomValue,
+        previousZoomPriority && previousZoomPriority !== EMPTY_STYLE_TOKEN ? previousZoomPriority : ''
+      );
+    } else {
+      content.style.removeProperty('zoom');
+    }
+
+    const previousOriginValue = content.getAttribute(ATLAS_MODAL_SCALE_ORIGIN_VALUE_ATTR);
+    const previousOriginPriority = content.getAttribute(ATLAS_MODAL_SCALE_ORIGIN_PRIORITY_ATTR);
+    if (previousOriginValue && previousOriginValue !== EMPTY_STYLE_TOKEN) {
+      content.style.setProperty(
+        'transform-origin',
+        previousOriginValue,
+        previousOriginPriority && previousOriginPriority !== EMPTY_STYLE_TOKEN ? previousOriginPriority : ''
+      );
+    } else {
+      content.style.removeProperty('transform-origin');
+    }
+
+    content.removeAttribute(ATLAS_MODAL_SCALE_ATTR);
+    content.removeAttribute(ATLAS_MODAL_SCALE_ZOOM_VALUE_ATTR);
+    content.removeAttribute(ATLAS_MODAL_SCALE_ZOOM_PRIORITY_ATTR);
+    content.removeAttribute(ATLAS_MODAL_SCALE_ORIGIN_VALUE_ATTR);
+    content.removeAttribute(ATLAS_MODAL_SCALE_ORIGIN_PRIORITY_ATTR);
+  }
+
+  function syncAtlasModalScale() {
+    document.querySelectorAll('.modal').forEach((modal) => {
+      if (!(modal instanceof HTMLElement)) {
+        return;
+      }
+
+      if (modal.classList.contains('show')) {
+        applyAtlasModalScale(modal);
+        return;
+      }
+
+      restoreAtlasModalScale(modal);
+    });
   }
 
   function primeEnvironmentFlags() {
@@ -765,6 +865,7 @@
     const blurValue = getModalBlurFallbackValue();
     const sceneOpacity = getModalFallbackSceneOpacity();
     const isSceneTarget = isModalBlurSceneTarget(target);
+    const isCloneTarget = isModalBlurCloneTarget(target);
     const isAlreadyActive = target.getAttribute(MODAL_BLUR_STATE_ATTR) === '1';
 
     if (!isAlreadyActive) {
@@ -778,6 +879,9 @@
 
     target.style.setProperty('transition', MODAL_BLUR_TRANSITION_VALUE, 'important');
     target.style.setProperty('will-change', 'filter, opacity', 'important');
+    if (!isAlreadyActive && (isSceneTarget || isCloneTarget)) {
+      target.style.setProperty('opacity', '0', 'important');
+    }
     target.setAttribute(MODAL_BLUR_STATE_ATTR, '1');
 
     requestAnimationFrame(() => {
@@ -801,6 +905,10 @@
 
       target.style.setProperty('-webkit-filter', blurValue, 'important');
       target.style.setProperty('filter', blurValue, 'important');
+      if (isCloneTarget) {
+        target.style.setProperty('opacity', '1', 'important');
+        return;
+      }
       restoreTrackedInlineStyle(
         target,
         'opacity',
@@ -815,23 +923,31 @@
       return;
     }
 
+    const isSceneTarget = isModalBlurSceneTarget(target);
+    const isCloneTarget = isModalBlurCloneTarget(target);
     clearModalBlurCleanupTimer(target);
     target.style.setProperty('transition', MODAL_BLUR_TRANSITION_VALUE, 'important');
     target.style.setProperty('will-change', 'filter, opacity', 'important');
 
     [
       ['-webkit-filter', 'studerriaModalBlurWebkitFilterValue', 'studerriaModalBlurWebkitFilterPriority'],
-      ['filter', 'studerriaModalBlurFilterValue', 'studerriaModalBlurFilterPriority'],
-      ['opacity', 'studerriaModalBlurOpacityValue', 'studerriaModalBlurOpacityPriority']
+      ['filter', 'studerriaModalBlurFilterValue', 'studerriaModalBlurFilterPriority']
     ].forEach(([cssProperty, valueKey, priorityKey]) => {
       restoreTrackedInlineStyle(target, cssProperty, valueKey, priorityKey);
     });
+    if (isSceneTarget || isCloneTarget) {
+      target.style.setProperty('opacity', '0', 'important');
+    } else {
+      restoreTrackedInlineStyle(
+        target,
+        'opacity',
+        'studerriaModalBlurOpacityValue',
+        'studerriaModalBlurOpacityPriority'
+      );
+    }
 
     const cleanupTimer = window.setTimeout(() => {
-      [
-        ['transition', 'studerriaModalBlurTransitionValue', 'studerriaModalBlurTransitionPriority'],
-        ['will-change', 'studerriaModalBlurWillChangeValue', 'studerriaModalBlurWillChangePriority']
-      ].forEach(([cssProperty, valueKey, priorityKey]) => {
+      MODAL_BLUR_STYLE_FIELDS.forEach(([cssProperty, valueKey, priorityKey]) => {
         restoreTrackedInlineStyle(target, cssProperty, valueKey, priorityKey);
       });
 
@@ -922,6 +1038,7 @@
     if (hasVisibleModal()) {
       clearModalCloseFinalizeTimer();
       syncBodyOpenClasses(true, hasVisibleChangelogModal());
+      syncAtlasModalScale();
       requestAnimationFrame(syncModalLayers);
       return;
     }
@@ -933,6 +1050,7 @@
     restoreAtlasBodyZoomReset();
     restoreRootScrollLock();
     syncNoBlurTargets(false);
+    syncAtlasModalScale();
     cleanupBackdrop();
     window.requestAnimationFrame(() => {
       syncModalLayers();
@@ -1000,6 +1118,7 @@
         syncModalBlurFallback(false);
         syncNoBlurTargets(true);
       }
+      syncAtlasModalScale();
       window.requestAnimationFrame(() => {
         window.dispatchEvent(new Event('resize'));
       });
@@ -1032,7 +1151,10 @@
         portalModal(event.target);
         const isChangelogModal = isChangelogModalElement(event.target);
         syncBodyOpenClasses(true, isChangelogModal);
-        requestAnimationFrame(syncModalLayers);
+        requestAnimationFrame(() => {
+          syncAtlasModalScale();
+          syncModalLayers();
+        });
       },
       true
     );
@@ -1046,6 +1168,7 @@
 
         const isChangelogModal = isChangelogModalElement(event.target);
         syncBodyOpenClasses(true, isChangelogModal);
+        syncAtlasModalScale();
         syncModalLayers();
       },
       true
@@ -1062,6 +1185,7 @@
           beginModalCloseSequence();
         }
         requestAnimationFrame(() => {
+          syncAtlasModalScale();
           syncModalLayers();
         });
       },
@@ -1080,7 +1204,10 @@
         } else if (!modalCloseFinalizeTimer) {
           finalizeModalCloseState();
         }
-        requestAnimationFrame(syncModalLayers);
+        requestAnimationFrame(() => {
+          syncAtlasModalScale();
+          syncModalLayers();
+        });
       },
       true
     );
@@ -1117,16 +1244,23 @@
     modal.addEventListener('show.bs.modal', () => {
       portalModal(modal);
       syncBodyOpenClasses(true, true);
-      requestAnimationFrame(syncModalLayers);
+      requestAnimationFrame(() => {
+        syncAtlasModalScale();
+        syncModalLayers();
+      });
     });
 
     modal.addEventListener('shown.bs.modal', () => {
       syncBodyOpenClasses(true, true);
+      syncAtlasModalScale();
       syncModalLayers();
     });
 
     modal.addEventListener('hidden.bs.modal', () => {
-      requestAnimationFrame(syncModalLayers);
+      requestAnimationFrame(() => {
+        syncAtlasModalScale();
+        syncModalLayers();
+      });
     });
 
     modal.addEventListener('pointerdown', (event) => {

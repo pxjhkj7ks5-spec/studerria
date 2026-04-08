@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.5.06",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-content-scale): move the Atlas-only 75% size correction from `.modal-dialog` to an inline `zoom: 0.75` on the real `.modal-content` during modal open, so schedule homework dialogs now use the same visual scale as the manual 75% page zoom screenshot instead of ignoring the earlier dialog-level override",
+        "tune(atlas-modal-blur-fade): animate the Atlas fallback blur layer itself with opacity on the temporary scene/clones and align the shared modal-backdrop timing to the same 420ms Liquid Glass easing, so blur now fades in and out instead of switching abruptly"
+      ]
+    },
+    {
       "version": "1.5.05",
       "date": "2026-04-08",
       "items": [
