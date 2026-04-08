@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.18",
+      "date": "2026-04-08",
+      "items": [
+        "fix(schedule-seminar-groups): preserve the effective seminar subgroup scope from each saved schedule slot instead of re-normalizing it back through stale live subject metadata, so student schedule, runtime course schedule, and legacy schedule projection no longer hide seminar slots, collapse subgroup targeting, or route shared seminar slots to the wrong group after bachelor catalog subgroup changes"
+      ]
+    },
+    {
       "version": "1.5.17",
       "date": "2026-04-08",
       "items": [
