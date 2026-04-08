@@ -2123,7 +2123,6 @@
   <body class="studerria-theme theme-dark page-schedule page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
-    <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
     <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
       <div class="drawer-head">
         <div class="drawer-title"><%= t('schedule.drawer.title') %></div>
@@ -2173,8 +2172,11 @@
       </div>
     </aside>
 
-    <div class="schedule-shell" id="scheduleShell">
-      <main class="container pt-2 pb-4 schedule-content enter">
+    <div class="schedule-scale-frame" id="scheduleScaleFrame">
+      <div class="schedule-scale-content" id="scheduleScaleContent">
+        <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
+        <div class="schedule-shell" id="scheduleShell">
+          <main class="container pt-2 pb-4 schedule-content enter">
         <div class="glass week-hero liquid-card mb-4">
           <div>
             <h1 class="hero-title weekHeadline mb-1"><%= t('schedule.header') %></h1>
@@ -2586,24 +2588,25 @@
         <% } %>
         </div>
         <section class="month-summary glass liquid-card d-none" id="scheduleMonthSummary" aria-live="polite"></section>
-      </main>
-
-      <div class="week-rail week-pager" id="weekPager">
-        <div class="week-pager-shell">
-          <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
-            <div class="week-pill-head week-pill-head--compact">
-              <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
-              <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
-            </div>
-            <span class="week-pill-progress" aria-hidden="true">
-              <span class="week-pill-progress-fill" id="weekPillProgress"></span>
-            </span>
-            <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
-          </div>
+          </main>
+          <%- include('partials/app-footer', { footerSyncStatus: true }) %>
         </div>
       </div>
+    </div>
 
-      <%- include('partials/app-footer', { footerSyncStatus: true }) %>
+    <div class="week-rail week-pager" id="weekPager">
+      <div class="week-pager-shell">
+        <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
+          <div class="week-pill-head week-pill-head--compact">
+            <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
+            <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+          </div>
+          <span class="week-pill-progress" aria-hidden="true">
+            <span class="week-pill-progress-fill" id="weekPillProgress"></span>
+          </span>
+          <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
+        </div>
+      </div>
     </div>
 
     <%- include('partials/changelog-modal') %>
@@ -5801,6 +5804,60 @@
           label.textContent = name;
         });
       });
+
+      (function initDesktopScaleFallback() {
+        const desktopWidth = 1200;
+        const docEl = document.documentElement;
+        const frame = document.getElementById('scheduleScaleFrame');
+        const content = document.getElementById('scheduleScaleContent');
+
+        if (!(frame instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+          return;
+        }
+
+        const supportsEffectiveZoom = () => {
+          const probe = document.createElement('div');
+          probe.style.position = 'absolute';
+          probe.style.left = '-9999px';
+          probe.style.top = '-9999px';
+          probe.style.width = '120px';
+          probe.style.height = '8px';
+          probe.style.visibility = 'hidden';
+          probe.style.pointerEvents = 'none';
+          probe.style.zoom = '2';
+          document.body.appendChild(probe);
+          const width = probe.getBoundingClientRect().width;
+          probe.remove();
+          return Math.round(width) === 240;
+        };
+
+        const nativeZoomWorks = supportsEffectiveZoom();
+
+        const syncFrameHeight = () => {
+          if (!docEl.classList.contains('schedule-scale-fallback')) {
+            frame.style.height = '';
+            return;
+          }
+          frame.style.height = `${Math.ceil(content.getBoundingClientRect().height)}px`;
+        };
+
+        const syncMode = () => {
+          const shouldUseFallback = window.innerWidth >= desktopWidth && !nativeZoomWorks;
+          docEl.classList.toggle('schedule-scale-fallback', shouldUseFallback);
+          window.requestAnimationFrame(syncFrameHeight);
+        };
+
+        if ('ResizeObserver' in window) {
+          const observer = new ResizeObserver(() => {
+            window.requestAnimationFrame(syncFrameHeight);
+          });
+          observer.observe(content);
+        }
+
+        window.addEventListener('resize', syncMode, { passive: true });
+        window.addEventListener('load', syncMode, { once: true });
+        syncMode();
+      }());
 
       window.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;

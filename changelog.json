@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.67",
+      "date": "2026-04-08",
+      "items": [
+        "fix(schedule-desktop-scale): add a Safari-safe 75% desktop scale fallback for the schedule page so the default weekly layout matches the intended compact Liquid Glass view even when CSS zoom is ignored"
+      ]
+    },
+    {
       "version": "1.4.66",
       "date": "2026-04-08",
       "items": [
