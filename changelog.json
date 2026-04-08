@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.96",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-background-root-scale): neutralize the shared Studerria desktop zoom on Atlas and other embedded Apple webviews inside the dynamic background roots themselves, so modal blur and cursor-background layers now fill the full viewport in Atlas instead of shrinking until the page is manually zoomed"
+      ]
+    },
+    {
       "version": "1.4.95",
       "date": "2026-04-08",
       "items": [

@@ -14,9 +14,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const coarsePointerMedia = window.matchMedia('(pointer: coarse)');
   const userAgent = String(window.navigator && window.navigator.userAgent ? window.navigator.userAgent : '');
   const vendor = String(window.navigator && window.navigator.vendor ? window.navigator.vendor : '');
+  const platform = String(window.navigator && window.navigator.platform ? window.navigator.platform : '');
   const isSafariBrowser = /Safari\//.test(userAgent)
     && !/(Chrome|Chromium|CriOS|Edg|OPR|OPT|SamsungBrowser|DuckDuckGo)/.test(userAgent)
     && /Apple/i.test(vendor || userAgent);
+  const isAtlasLikeAppleWebView = (() => {
+    const isApplePlatform = /(Mac|iPhone|iPad|iPod)/i.test(platform) || /(Macintosh|iPhone|iPad|iPod)/i.test(userAgent);
+    const isAppleEngine = /AppleWebKit/i.test(userAgent) || /Apple/i.test(vendor);
+    const isExcludedBrowser = /(Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|OPT|SamsungBrowser|DuckDuckGo|Firefox|FxiOS)/i.test(
+      userAgent
+    );
+    const isAtlasToken = /(Atlas|ChatGPT)/i.test(userAgent);
+    const hasSafariGlobal = typeof window.safari !== 'undefined';
+
+    return Boolean(isAtlasToken || (isApplePlatform && isAppleEngine && !isExcludedBrowser && !hasSafariGlobal));
+  })();
   const DESKTOP_ZOOM_MIN_WIDTH = 1200;
 
   const BLOB_MORPH_SHAPES = {
@@ -92,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     root.style.zoom = '1';
 
     const bodyZoom = readBodyZoom();
-    const shouldNeutralizeZoom = isSafariBrowser
+    const shouldNeutralizeZoom = (isSafariBrowser || isAtlasLikeAppleWebView)
       && body.classList.contains('studerria-theme')
       && window.innerWidth >= DESKTOP_ZOOM_MIN_WIDTH
       && Math.abs(bodyZoom - 1) > 0.001;
