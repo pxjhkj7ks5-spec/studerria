@@ -5092,6 +5092,7 @@
       });
 
       const scheduleTimeZone = 'Europe/Kyiv';
+      const scheduleNextMarkerStorageKey = `schedule-next-marker:<%= selectedCourseId || 'all' %>:<%= userId || 'guest' %>:<%= role || 'user' %>:<%= viewAs || 'none' %>`;
 
       function getTimeZoneOffsetMinutes(timeZone, date) {
         const dtf = new Intl.DateTimeFormat('en-US', {
@@ -5236,29 +5237,68 @@
       function updateSmartHighlights() {
         const now = new Date();
         const kyivToday = now.toLocaleDateString('en-CA', { timeZone: scheduleTimeZone });
+        const markerKeyForCard = (card) => [
+          String(card.dataset.subjectid || ''),
+          String(card.dataset.day || ''),
+          String(card.dataset.classnum || ''),
+          String(card.dataset.date || ''),
+          String(card.dataset.groupnum || ''),
+        ].join('|');
+        const storedNextKey = (() => {
+          try {
+            return localStorage.getItem(scheduleNextMarkerStorageKey) || '';
+          } catch (err) {
+            return '';
+          }
+        })();
         document.querySelectorAll('.day-card').forEach((card) => {
           const dayDate = card.dataset.dayDate || '';
           card.classList.toggle('is-today', dayDate && dayDate === kyivToday);
         });
         const entries = [];
+        const entriesByKey = new Map();
+        let hasTodayCard = false;
         document.querySelectorAll('.schedule-card[data-time-base][data-date]').forEach((btn) => {
           btn.classList.remove('is-now', 'is-next');
           const baseRange = btn.dataset.timeBase || '';
           const dateStr = btn.dataset.date;
+          const key = markerKeyForCard(btn);
+          if (key) {
+            entriesByKey.set(key, btn);
+          }
           const [start, end] = baseRange.split('-').map((s) => s.trim());
           if (!start || !end || !dateStr) return;
           const startDate = buildLocalTime(dateStr, start, scheduleTimeZone);
           const endDate = buildLocalTime(dateStr, end, scheduleTimeZone);
           if (!startDate || !endDate) return;
+          const dayCard = btn.closest('.day-card');
+          if (dayCard && dayCard.dataset.dayDate === kyivToday) {
+            hasTodayCard = true;
+          }
           entries.push({ start: startDate.getTime(), end: endDate.getTime(), el: btn });
         });
         if (!entries.length) return;
         entries.sort((a, b) => a.start - b.start);
         const nowMs = now.getTime();
         const current = entries.find((entry) => nowMs >= entry.start && nowMs < entry.end);
-        const next = entries.find((entry) => entry.start > nowMs);
+        let nextKey = storedNextKey;
         if (current) current.el.classList.add('is-now');
-        if (next) next.el.classList.add('is-next');
+        if (hasTodayCard) {
+          const next = entries.find((entry) => entry.start > nowMs);
+          nextKey = next ? markerKeyForCard(next.el) : '';
+          try {
+            if (nextKey) {
+              localStorage.setItem(scheduleNextMarkerStorageKey, nextKey);
+            } else {
+              localStorage.removeItem(scheduleNextMarkerStorageKey);
+            }
+          } catch (err) {
+            // ignore storage failures
+          }
+        }
+        if (nextKey && entriesByKey.has(nextKey)) {
+          entriesByKey.get(nextKey).classList.add('is-next');
+        }
       }
 
       function bindScheduleCardInteractions(root = document) {

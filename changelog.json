@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.57",
+      "date": "2026-04-08",
+      "items": [
+        "fix(schedule-next-chip): keep the Next marker pinned to the real upcoming class for the current schedule context so it no longer jumps to the first pair when browsing a future week"
+      ]
+    },
+    {
       "version": "1.4.56",
       "date": "2026-04-08",
       "items": [
