@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.88",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-blur-inline-fallback): move the Atlas modal blur workaround from a class-based CSS fallback to a direct inline JS blur on each top-level body layer behind open modals, so embedded webviews that ignore the shared backdrop blur or fallback selectors still visibly soften the full page behind the dialog"
+      ]
+    },
+    {
       "version": "1.4.87",
       "date": "2026-04-08",
       "items": [
