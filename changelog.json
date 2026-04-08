@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.72",
+      "date": "2026-04-08",
+      "items": [
+        "tune(teamwork-subject-picker): match the teamwork subject buttons to the exact subjects-page pill styling, keeping the same Liquid Glass inactive cards and purple active state from the reference screen"
+      ]
+    },
+    {
       "version": "1.4.71",
       "date": "2026-04-08",
       "items": [

@@ -21,27 +21,22 @@
 
 .page-teamwork .subject-nav-form {
   margin: 0;
-  flex: 0 1 220px;
 }
 
 .page-teamwork .subject-nav-pill {
   appearance: none;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  display: block;
   min-width: 220px;
-  width: 100%;
   text-align: left;
   border-radius: 999px;
   padding: 8px 14px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 88%, transparent);
   background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
   color: var(--ds-text0) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-decoration: none;
   cursor: pointer;
   font: inherit;
-  transition: border-color var(--dur-med) var(--ease-apple), background-color var(--dur-med) var(--ease-apple), box-shadow var(--dur-med) var(--ease-apple), color var(--dur-med) var(--ease-apple);
+  transition: border-color var(--dur-med) var(--ease-apple), background-color var(--dur-med) var(--ease-apple), box-shadow var(--dur-med) var(--ease-apple);
 }
 
 .page-teamwork .subject-nav-pill .subject-name {
@@ -55,25 +50,6 @@
   opacity: 0.8;
   line-height: 1.2;
   margin-top: 2px;
-}
-
-.page-teamwork .subject-nav-pill:focus-visible {
-  outline: none;
-  border-color: rgba(120, 167, 255, 0.62);
-  box-shadow: 0 0 0 4px rgba(120, 167, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.62);
-}
-
-.page-teamwork .subject-nav-pill:hover {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
-  border-color: color-mix(in srgb, var(--surface-border) 70%, rgba(120, 167, 255, 0.2));
-}
-
-.page-teamwork .subject-nav-pill:active,
-.page-teamwork .subject-nav-pill.is-pending {
-  border-color: rgba(120, 167, 255, 0.52);
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.94), rgba(59, 130, 246, 0.88));
-  color: rgba(248, 250, 252, 0.98) !important;
-  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.24);
 }
 
 .page-teamwork .subject-nav-pill.is-active {
@@ -261,13 +237,6 @@ body.theme-light.page-teamwork .subject-nav-pill {
 body.theme-light.page-teamwork .subject-nav-pill:hover {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(236, 243, 255, 0.88));
   border-color: rgba(129, 140, 248, 0.26);
-}
-
-body.theme-light.page-teamwork .subject-nav-pill:active,
-body.theme-light.page-teamwork .subject-nav-pill.is-pending {
-  border-color: rgba(120, 167, 255, 0.34);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.92), rgba(168, 85, 247, 0.86));
-  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.18);
 }
 
 body.theme-light.page-teamwork .subject-nav-pill.is-active {
