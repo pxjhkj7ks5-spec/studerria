@@ -19,7 +19,9 @@
   --reg-groups-text: #0f172a;
   --reg-groups-heading: rgba(15, 23, 42, 0.96);
   --reg-groups-sticky-width: min(calc(100vw - 32px), 46rem);
-  padding-bottom: 10.4rem;
+  --reg-groups-sticky-safe-area: 10.4rem;
+  padding-bottom: var(--reg-groups-sticky-safe-area);
+  scroll-padding-bottom: calc(var(--reg-groups-sticky-safe-area) + 1.25rem);
 }
 
 .page-register-subjects.theme-dark {
@@ -666,7 +668,7 @@
 @media (max-width: 767.98px) {
   .page-register-subjects {
     --reg-groups-sticky-width: calc(100vw - 20px);
-    padding-bottom: 12.6rem;
+    --reg-groups-sticky-safe-area: 12.6rem;
   }
 
   .page-register-subjects .reg-groups-card {

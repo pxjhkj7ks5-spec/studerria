@@ -39,6 +39,7 @@
   const progressFill = document.querySelector('[data-reg-groups-progress-bar]');
   const filterInput = document.querySelector('[data-reg-groups-filter]');
   const emptyState = form.querySelector('[data-reg-groups-empty]');
+  const stickyShell = document.querySelector('.reg-groups-sticky-shell');
   const quickButtons = Array.from(document.querySelectorAll('[data-reg-groups-quick-group]'));
   const resetButton = document.querySelector('[data-reg-groups-reset]');
   const baselineSelectedCount = Math.max(0, Number(config.baselineSelectedCount || 0) || 0);
@@ -258,6 +259,22 @@
     return progressState;
   };
 
+  const syncStickySafeArea = () => {
+    if (!(document.body instanceof HTMLElement)) {
+      return;
+    }
+
+    if (!(stickyShell instanceof HTMLElement) || stickyShell.hidden) {
+      document.body.style.removeProperty('--reg-groups-sticky-safe-area');
+      return;
+    }
+
+    const computed = window.getComputedStyle(stickyShell);
+    const bottomOffset = Number.parseFloat(computed.bottom || '0') || 0;
+    const reserve = Math.ceil(stickyShell.offsetHeight + bottomOffset + 24);
+    document.body.style.setProperty('--reg-groups-sticky-safe-area', `${reserve}px`);
+  };
+
   const updateUI = () => {
     rows.forEach(syncRow);
 
@@ -300,6 +317,7 @@
 
     syncQuickButtons();
     syncFilter(progressState);
+    syncStickySafeArea();
 
     return progressState;
   };
@@ -333,6 +351,8 @@
       updateUI();
     });
   }
+
+  window.addEventListener('resize', syncStickySafeArea, { passive: true });
 
   quickButtons.forEach((button) => {
     if (!(button instanceof HTMLButtonElement)) {

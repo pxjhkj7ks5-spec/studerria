@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.26",
+      "date": "2026-04-09",
+      "items": [
+        "fix(registration-sticky-safe-area): reserve the real bottom space used by the floating registration summary bar so the last discipline rows can scroll fully above it and the `Дисципліна не викладається` action stays clickable instead of being hidden under the sticky panel"
+      ]
+    },
+    {
       "version": "1.5.25",
       "date": "2026-04-09",
       "items": [
