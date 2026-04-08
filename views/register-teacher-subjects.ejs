@@ -199,6 +199,7 @@
     </style>
       <link rel="stylesheet" href="/css/auth-actions.css" />
       <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/pages/teacher-subject-picker.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
@@ -206,6 +207,15 @@
     <% const teacherSelectionMode = selectionMode === 'offering' ? 'offering' : 'legacy'; %>
     <% const teacherItems = Array.isArray(subjects) ? subjects : []; %>
     <% const teacherSelectedMap = selections && typeof selections.get === 'function' ? selections : new Map(); %>
+    <% const teacherPickerShowScopeMeta = true; %>
+    <%
+      const teacherPickerTexts = {
+        groupedHint: 'Після фіксації service-cohort ви одразу бачите матрицю дисциплін у розрізі бакалаврів, магістрів і stage.',
+        fallbackHint: 'Поки live offering-структура недоступна, нижче залишається сумісний legacy-каталог.',
+        searchPlaceholder: 'Дисципліна, stage, маршрут, кампус...',
+        serviceScopeCopy: 'Для викладацького треку service cohort зашивається в коді окремо від року, а далі ви просто відмічаєте дисципліни по bachelor/master stage-блоках.',
+      };
+    %>
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <div class="container py-4">
@@ -239,60 +249,7 @@
         <% if (isProfileEdit) { %>
           <input type="hidden" name="legacy" value="1" />
         <% } %>
-        <div class="mb-3">
-          <label class="form-label small" for="teacherSubjectSearch">Quick search</label>
-          <input
-            id="teacherSubjectSearch"
-            class="form-control subject-search"
-            type="search"
-            placeholder="Subject, course, program..."
-            autocomplete="off"
-          />
-        </div>
-
-        <div class="d-grid gap-3">
-          <% (subjects || []).forEach(function(s) { %>
-            <% const selectedGroup = selections && selections.get ? selections.get(s.id) : null; %>
-            <% const isSelected = selections && selections.get ? selections.has(s.id) : false; %>
-            <% const generalFlag = s.is_general === true || Number(s.is_general) === 1; %>
-            <% const pathwayMeta = s.pathway_labels ? ` • ${s.pathway_labels}` : ''; %>
-            <div
-              class="glass subject-card"
-              data-subject-item="1"
-              data-search="<%= `${s.name || ''} ${s.course_name || ''} ${s.pathway_labels || ''}`.toLowerCase() %>"
-            >
-              <div class="subject-row">
-                <div class="subject-info">
-                  <div class="subject-name"><%= s.name %></div>
-                  <div class="subject-course"><%= `${s.course_name || ''}${pathwayMeta}` %></div>
-                </div>
-                <div class="form-check subject-toggle">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    id="subject_<%= s.id %>"
-                    name="subject_<%= s.id %>"
-                    value="1"
-                    data-subject-toggle="<%= s.id %>"
-                    <%= isSelected ? 'checked' : '' %>
-                  />
-                  <label class="form-check-label" for="subject_<%= s.id %>">Викладаю</label>
-                </div>
-              </div>
-              <% if (!generalFlag) { %>
-                <div class="mt-3">
-                  <label class="form-label small">Група</label>
-                  <select class="form-select" name="group_<%= s.id %>" data-subject-group="<%= s.id %>">
-                    <option value="">Оберіть групу</option>
-                    <% for (let g = 1; g <= Number(s.group_count || 1); g += 1) { %>
-                      <option value="<%= g %>" <%= Number(selectedGroup) === g ? 'selected' : '' %>><%= g %></option>
-                    <% } %>
-                  </select>
-                </div>
-              <% } %>
-            </div>
-          <% }); %>
-        </div>
+        <%- include('partials/teacher-subject-picker') %>
 
         <div class="d-grid gap-2 mt-4 auth-action-stack">
           <button class="btn btn-primary auth-action-btn" type="submit"><%= isProfileEdit ? 'Зберегти' : 'Надіслати на підтвердження' %></button>
@@ -329,36 +286,9 @@
           themeToggle.textContent = next === 'theme-dark' ? '☀️' : '🌙';
         });
       }
-
-      document.querySelectorAll('[data-subject-toggle]').forEach((toggle) => {
-        const id = toggle.dataset.subjectToggle;
-        const select = document.querySelector(`[data-subject-group="${id}"]`);
-        const sync = () => {
-          if (!select) return;
-          select.disabled = !toggle.checked;
-          if (!toggle.checked) {
-            select.value = '';
-          }
-        };
-        toggle.addEventListener('change', sync);
-        sync();
-      });
-
-      const teacherSubjectSearch = document.getElementById('teacherSubjectSearch');
-      if (teacherSubjectSearch) {
-        const subjectItems = Array.from(document.querySelectorAll('[data-subject-item]'));
-        const applyFilter = () => {
-          const query = teacherSubjectSearch.value.trim().toLowerCase();
-          subjectItems.forEach((item) => {
-            const source = String(item.dataset.search || '');
-            const visible = !query || source.includes(query);
-            item.style.display = visible ? '' : 'none';
-          });
-        };
-        teacherSubjectSearch.addEventListener('input', applyFilter);
-      }
     </script>
       <script src="/js/design-system.js" defer></script>
+      <script src="/js/teacher-subject-picker.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

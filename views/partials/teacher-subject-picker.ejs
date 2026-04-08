@@ -1,0 +1,426 @@
+<%
+  const pickerSelectionMode = selectionMode === 'offering' ? 'offering' : 'legacy';
+  const pickerItems = Array.isArray(subjects) ? subjects : [];
+  const pickerSelectedMap = selections && typeof selections.get === 'function' ? selections : new Map();
+  const pickerScope = typeof studyContext !== 'undefined' && studyContext && typeof studyContext === 'object' ? studyContext : null;
+  const pickerShowScopeMeta = typeof teacherPickerShowScopeMeta === 'boolean' ? teacherPickerShowScopeMeta : false;
+  const pickerTexts = Object.assign({
+    searchLabel: lang === 'en' ? 'Quick search' : 'Швидкий пошук',
+    searchPlaceholder: lang === 'en' ? 'Discipline, route, stage...' : 'Дисципліна, маршрут, stage...',
+    searchEmpty: lang === 'en' ? 'No disciplines match this query.' : 'За цим запитом дисциплін не знайдено.',
+    catalogLabel: lang === 'en' ? 'Catalog' : 'Каталог',
+    selectedLabel: lang === 'en' ? 'Selected' : 'Обрано',
+    trackCountLabel: lang === 'en' ? 'Tracks' : 'Треки',
+    stageCountLabel: lang === 'en' ? 'Stages' : 'Стейджі',
+    groupedModeLabel: lang === 'en' ? 'Grouped by track and stage' : 'Групування за треком і stage',
+    fallbackModeLabel: lang === 'en' ? 'Compatibility fallback catalog' : 'Fallback-каталог сумісності',
+    groupedHint: lang === 'en'
+      ? 'Open a route, then a stage, and mark the disciplines you actually cover.'
+      : 'Відкрийте маршрут, потім stage, і позначте дисципліни, які реально закриваєте.',
+    fallbackHint: lang === 'en'
+      ? 'This fallback catalog stays flat because no live offering structure is available yet.'
+      : 'У fallback-каталозі лишається плоский список, доки live-offering структура ще недоступна.',
+    serviceScopeTitle: lang === 'en' ? 'Teaching scope' : 'Викладацький scope',
+    serviceScopeCopy: lang === 'en'
+      ? 'Teacher registration keeps a service cohort in code and goes straight to the discipline matrix without a separate cohort step.'
+      : 'Для викладацького маршруту сервісна когорта фіксується в коді, а далі ви одразу переходите до матриці дисциплін без окремого кроку вибору когорти.',
+    serviceScopeLabel: lang === 'en' ? 'Service cohort' : 'Сервісна когорта',
+    admissionYearLabel: lang === 'en' ? 'Admission year' : 'Рік вступу',
+    admissionYearFallback: lang === 'en' ? 'fixed in code' : 'зашито в коді',
+    routeLabel: lang === 'en' ? 'Route' : 'Маршрут',
+    trackBachelors: lang === 'en' ? 'Bachelors' : 'Бакалаври',
+    trackMasters: lang === 'en' ? 'Masters' : 'Магістри',
+    trackTeaching: lang === 'en' ? 'Teaching' : 'Викладацький',
+    trackCatalog: lang === 'en' ? 'Catalog' : 'Каталог',
+    stagePrefix: 'Stage',
+    disciplineCountOne: lang === 'en' ? 'discipline' : 'дисципліна',
+    disciplineCountMany: lang === 'en' ? 'disciplines' : 'дисциплін',
+    contextsSuffix: lang === 'en' ? 'contexts' : 'контекстів',
+    yearsLabel: lang === 'en' ? 'Years' : 'Роки',
+    campusesLabel: lang === 'en' ? 'Campuses' : 'Кампуси',
+    allGroupsLabel: lang === 'en' ? 'All groups' : 'Усі групи',
+    groupRangePrefix: lang === 'en' ? 'Groups' : 'Групи',
+    teachLabel: lang === 'en' ? 'Teach' : 'Викладаю',
+    groupLabel: lang === 'en' ? 'Group' : 'Група',
+    chooseGroupLabel: lang === 'en' ? 'Choose group' : 'Оберіть групу',
+    legacyStageLabel: lang === 'en' ? 'All disciplines' : 'Усі дисципліни',
+    emptyTitle: lang === 'en' ? 'No visible offerings in catalog' : 'У каталозі немає видимих дисциплін',
+    emptyCopy: lang === 'en'
+      ? 'Check offering visibility in Academic Setup and subject settings.'
+      : 'Перевірте видимість offerings в Academic Setup і налаштуваннях предметів.',
+  }, typeof teacherPickerTexts !== 'undefined' ? teacherPickerTexts : {});
+
+  const normalizePickerTrackKey = (rawValue) => {
+    const normalized = String(rawValue || '').trim().toLowerCase();
+    if (normalized === 'master') return 'master';
+    if (normalized === 'teacher') return 'teacher';
+    if (normalized === 'legacy') return 'legacy';
+    return 'bachelor';
+  };
+  const normalizePickerCampusKey = (rawValue) => (
+    String(rawValue || '').trim().toLowerCase() === 'munich' ? 'munich' : 'kyiv'
+  );
+  const formatPickerTrackLabel = (trackKey) => {
+    const normalized = normalizePickerTrackKey(trackKey);
+    if (normalized === 'master') return pickerTexts.trackMasters;
+    if (normalized === 'teacher') return pickerTexts.trackTeaching;
+    if (normalized === 'legacy') return pickerTexts.trackCatalog;
+    return pickerTexts.trackBachelors;
+  };
+  const formatPickerCampusLabel = (campusKey) => (
+    normalizePickerCampusKey(campusKey) === 'munich'
+      ? (lang === 'en' ? 'Munich' : 'Мюнхен')
+      : (lang === 'en' ? 'Kyiv' : 'Київ')
+  );
+  const formatPickerStageLabel = (stageNumber) => `${pickerTexts.stagePrefix} ${Math.max(1, Number(stageNumber || 0) || 1)}`;
+  const pickerTrackOrder = {
+    bachelor: 0,
+    master: 1,
+    teacher: 2,
+    legacy: 3,
+  };
+  const pickerServiceScopeCode = pickerScope
+    ? [
+        'teacher-scope',
+        String(pickerScope.program_code || pickerScope.program_id || 'core').trim().toLowerCase() || 'core',
+        normalizePickerCampusKey(pickerScope.campus_key || 'kyiv'),
+      ].join('-')
+    : '';
+
+  const pickerEntries = pickerItems.map((item) => {
+    const itemId = Number(item && item.id ? item.id : 0) || null;
+    const selectedGroup = itemId ? pickerSelectedMap.get(itemId) : null;
+    const checked = itemId ? pickerSelectedMap.has(itemId) : false;
+    const isGeneral = item && (item.is_general === true || Number(item.is_general) === 1);
+    const rawContexts = pickerSelectionMode === 'offering' && Array.isArray(item && item.contexts) && item.contexts.length
+      ? item.contexts
+      : [];
+    const normalizedContexts = Array.from(new Map(
+      rawContexts.map((context) => {
+        const trackKey = normalizePickerTrackKey(context && context.track_key);
+        const stageNumber = Math.max(1, Number(context && context.stage_number ? context.stage_number : 0) || 1);
+        const admissionYear = Number(context && context.admission_year ? context.admission_year : 0) || null;
+        const campusKey = normalizePickerCampusKey(context && (context.campus_key || context.course_location || pickerScope && pickerScope.campus_key));
+        const label = String(context && context.label ? context.label : '').trim();
+        return [
+          `${trackKey}:${stageNumber}:${admissionYear || 0}:${campusKey}:${label}`,
+          {
+            trackKey,
+            stageNumber,
+            admissionYear,
+            campusKey,
+            label,
+          },
+        ];
+      })
+    ).values()).sort((left, right) => {
+      const trackDiff = Number(pickerTrackOrder[left.trackKey] ?? 99) - Number(pickerTrackOrder[right.trackKey] ?? 99);
+      if (trackDiff !== 0) return trackDiff;
+      const stageDiff = Number(left.stageNumber || 0) - Number(right.stageNumber || 0);
+      if (stageDiff !== 0) return stageDiff;
+      return Number(right.admissionYear || 0) - Number(left.admissionYear || 0);
+    });
+    const primaryContext = normalizedContexts[0] || null;
+    const admissionYears = Array.from(new Set(
+      normalizedContexts
+        .map((context) => Number(context.admissionYear || 0))
+        .filter((value) => Number.isFinite(value) && value > 0)
+    )).sort((left, right) => right - left);
+    const campuses = Array.from(new Set(
+      normalizedContexts.map((context) => formatPickerCampusLabel(context.campusKey))
+    )).filter(Boolean);
+    const contextLabels = Array.from(new Set(
+      normalizedContexts
+        .map((context) => String(context.label || '').trim())
+        .filter(Boolean)
+    ));
+    const primaryTrackKey = primaryContext ? primaryContext.trackKey : 'legacy';
+    const primaryStageNumber = primaryContext ? primaryContext.stageNumber : 1;
+    const courseName = String(item && item.course_name ? item.course_name : '').trim();
+    const pathwayLabels = String(item && item.pathway_labels ? item.pathway_labels : '').trim();
+    const searchText = [
+      String(item && item.search_text ? item.search_text : ''),
+      String(item && item.name ? item.name : ''),
+      courseName,
+      pathwayLabels,
+      formatPickerTrackLabel(primaryTrackKey),
+      formatPickerStageLabel(primaryStageNumber),
+      admissionYears.join(' '),
+      campuses.join(' '),
+      contextLabels.join(' '),
+    ].join(' ').toLowerCase();
+    return {
+      id: itemId,
+      name: String(item && item.name ? item.name : '').trim(),
+      courseName,
+      pathwayLabels,
+      groupCount: Math.max(1, Number(item && item.group_count ? item.group_count : 1) || 1),
+      isGeneral,
+      checked,
+      selectedGroup: Number(selectedGroup || 0) || null,
+      primaryTrackKey,
+      primaryTrackLabel: formatPickerTrackLabel(primaryTrackKey),
+      primaryStageNumber,
+      primaryStageLabel: formatPickerStageLabel(primaryStageNumber),
+      admissionYears,
+      campuses,
+      contextLabels,
+      contextCount: normalizedContexts.length,
+      searchText,
+    };
+  }).filter((entry) => entry.id && entry.name);
+
+  const pickerSections = [];
+  if (pickerSelectionMode === 'offering') {
+    const sectionMap = new Map();
+    pickerEntries.forEach((entry) => {
+      const trackKey = entry.primaryTrackKey;
+      const stageKey = `${trackKey}:${entry.primaryStageNumber}`;
+      if (!sectionMap.has(trackKey)) {
+        sectionMap.set(trackKey, {
+          key: trackKey,
+          label: entry.primaryTrackLabel,
+          stages: new Map(),
+        });
+      }
+      const trackSection = sectionMap.get(trackKey);
+      if (!trackSection.stages.has(stageKey)) {
+        trackSection.stages.set(stageKey, {
+          key: stageKey,
+          label: entry.primaryStageLabel,
+          stageNumber: entry.primaryStageNumber,
+          items: [],
+        });
+      }
+      trackSection.stages.get(stageKey).items.push(entry);
+    });
+
+    Array.from(sectionMap.values())
+      .sort((left, right) => {
+        const trackDiff = Number(pickerTrackOrder[left.key] ?? 99) - Number(pickerTrackOrder[right.key] ?? 99);
+        if (trackDiff !== 0) return trackDiff;
+        return String(left.label || '').localeCompare(String(right.label || ''), 'uk', { sensitivity: 'base' });
+      })
+      .forEach((section, sectionIndex) => {
+        const stages = Array.from(section.stages.values())
+          .sort((left, right) => Number(left.stageNumber || 0) - Number(right.stageNumber || 0))
+          .map((stage, stageIndex) => {
+            const sortedItems = stage.items.slice().sort((left, right) => {
+              const selectedDiff = Number(Boolean(right.checked)) - Number(Boolean(left.checked));
+              if (selectedDiff !== 0) return selectedDiff;
+              return String(left.name || '').localeCompare(String(right.name || ''), 'uk', { sensitivity: 'base' });
+            });
+            return {
+              ...stage,
+              items: sortedItems,
+              initialOpen: sortedItems.some((item) => item.checked) || stageIndex === 0,
+            };
+          });
+        pickerSections.push({
+          key: section.key,
+          label: section.label,
+          stages,
+          initialOpen: stages.some((stage) => stage.items.some((item) => item.checked)) || sectionIndex === 0,
+        });
+      });
+  } else {
+    pickerSections.push({
+      key: 'legacy',
+      label: pickerTexts.trackCatalog,
+      initialOpen: true,
+      stages: [{
+        key: 'legacy:all',
+        label: pickerTexts.legacyStageLabel,
+        stageNumber: 1,
+        initialOpen: true,
+        items: pickerEntries.slice().sort((left, right) => {
+          const selectedDiff = Number(Boolean(right.checked)) - Number(Boolean(left.checked));
+          if (selectedDiff !== 0) return selectedDiff;
+          return String(left.name || '').localeCompare(String(right.name || ''), 'uk', { sensitivity: 'base' });
+        }),
+      }],
+    });
+  }
+
+  const pickerStageCount = pickerSections.reduce((total, section) => total + section.stages.length, 0);
+  const pickerSelectedCount = pickerEntries.reduce((total, entry) => total + (entry.checked ? 1 : 0), 0);
+%>
+
+<section
+  class="teacher-picker-shell"
+  data-teacher-picker-root
+  data-selection-mode="<%= pickerSelectionMode %>"
+>
+  <div class="teacher-picker-toolbar glass">
+    <div class="teacher-picker-toolbar__search">
+      <label class="form-label small" for="teacherSubjectSearch"><%= pickerTexts.searchLabel %></label>
+      <input
+        id="teacherSubjectSearch"
+        class="form-control teacher-picker-search"
+        type="search"
+        placeholder="<%= pickerTexts.searchPlaceholder %>"
+        autocomplete="off"
+        data-teacher-picker-search
+      />
+      <div class="teacher-picker-toolbar__hint">
+        <%= pickerSelectionMode === 'offering' ? pickerTexts.groupedHint : pickerTexts.fallbackHint %>
+      </div>
+    </div>
+    <div class="teacher-picker-toolbar__summary">
+      <span class="teacher-picker-pill"><%= pickerTexts.catalogLabel %>: <%= pickerEntries.length %></span>
+      <span class="teacher-picker-pill"><%= pickerTexts.selectedLabel %>: <span data-teacher-picker-selected-count><%= pickerSelectedCount %></span></span>
+      <span class="teacher-picker-pill"><%= pickerTexts.trackCountLabel %>: <%= pickerSections.length %></span>
+      <span class="teacher-picker-pill"><%= pickerTexts.stageCountLabel %>: <%= pickerStageCount %></span>
+      <span class="teacher-picker-pill teacher-picker-pill--accent">
+        <%= pickerSelectionMode === 'offering' ? pickerTexts.groupedModeLabel : pickerTexts.fallbackModeLabel %>
+      </span>
+    </div>
+  </div>
+
+  <% if (pickerShowScopeMeta && pickerScope) { %>
+    <section class="teacher-picker-scope glass">
+      <div class="teacher-picker-scope__copy">
+        <span class="teacher-picker-scope__eyebrow"><%= pickerTexts.serviceScopeTitle %></span>
+        <p class="teacher-picker-scope__text mb-0"><%= pickerTexts.serviceScopeCopy %></p>
+      </div>
+      <div class="teacher-picker-scope__chips">
+        <span class="teacher-picker-pill teacher-picker-pill--accent"><%= pickerTexts.routeLabel %>: <%= pickerTexts.trackTeaching %></span>
+        <span class="teacher-picker-pill"><%= pickerTexts.serviceScopeLabel %>: <%= pickerServiceScopeCode %></span>
+        <span class="teacher-picker-pill">
+          <%= pickerTexts.admissionYearLabel %>:
+          <%= Number(pickerScope.admission_year || 0) || pickerTexts.admissionYearFallback %>
+        </span>
+      </div>
+    </section>
+  <% } %>
+
+  <% if (pickerSections.length && pickerEntries.length) { %>
+    <div class="teacher-picker-groups">
+      <% pickerSections.forEach((section) => { %>
+        <details
+          class="teacher-picker-track glass"
+          data-teacher-picker-track
+          data-initial-open="<%= section.initialOpen ? '1' : '0' %>"
+          <%= section.initialOpen ? 'open' : '' %>
+        >
+          <summary class="teacher-picker-track__summary">
+            <span>
+              <span class="teacher-picker-track__title"><%= section.label %></span>
+              <span class="teacher-picker-track__meta">
+                <%= section.stages.length %> <%= pickerTexts.stageCountLabel.toLowerCase() %>
+              </span>
+            </span>
+            <span class="teacher-picker-track__count">
+              <%= section.stages.reduce((total, stage) => total + stage.items.length, 0) %> <%= pickerTexts.disciplineCountMany %>
+            </span>
+          </summary>
+
+          <div class="teacher-picker-track__body">
+            <% section.stages.forEach((stage) => { %>
+              <section
+                class="teacher-picker-stage"
+                data-teacher-picker-stage
+                data-initial-open="<%= stage.initialOpen ? '1' : '0' %>"
+              >
+                <details
+                  class="teacher-picker-stage__details"
+                  data-teacher-picker-stage-details
+                  data-initial-open="<%= stage.initialOpen ? '1' : '0' %>"
+                  <%= stage.initialOpen ? 'open' : '' %>
+                >
+                  <summary class="teacher-picker-stage__summary">
+                    <span class="teacher-picker-stage__title"><%= stage.label %></span>
+                    <span class="teacher-picker-stage__count">
+                      <%= stage.items.length %> <%= stage.items.length === 1 ? pickerTexts.disciplineCountOne : pickerTexts.disciplineCountMany %>
+                    </span>
+                  </summary>
+
+                  <div class="teacher-picker-stage__body">
+                    <% stage.items.forEach((entry) => { %>
+                      <article
+                        class="teacher-picker-card glass <%= entry.checked ? 'is-selected' : '' %>"
+                        data-teacher-picker-item
+                        data-search="<%= entry.searchText %>"
+                      >
+                        <div class="teacher-picker-card__main">
+                          <div class="teacher-picker-card__copy">
+                            <h3 class="teacher-picker-card__title"><%= entry.name %></h3>
+                            <% if (entry.courseName || entry.pathwayLabels) { %>
+                              <div class="teacher-picker-card__meta">
+                                <% if (entry.courseName) { %>
+                                  <span><%= entry.courseName %></span>
+                                <% } %>
+                                <% if (entry.pathwayLabels) { %>
+                                  <span><%= entry.pathwayLabels %></span>
+                                <% } %>
+                              </div>
+                            <% } %>
+                            <div class="teacher-picker-card__badges">
+                              <span class="teacher-picker-badge">
+                                <%= entry.isGeneral ? pickerTexts.allGroupsLabel : `${pickerTexts.groupRangePrefix} 1-${entry.groupCount}` %>
+                              </span>
+                              <% if (entry.admissionYears.length) { %>
+                                <span class="teacher-picker-badge"><%= pickerTexts.yearsLabel %>: <%= entry.admissionYears.join(' / ') %></span>
+                              <% } %>
+                              <% if (entry.campuses.length) { %>
+                                <span class="teacher-picker-badge"><%= pickerTexts.campusesLabel %>: <%= entry.campuses.join(' / ') %></span>
+                              <% } %>
+                              <% if (entry.contextCount > 1) { %>
+                                <span class="teacher-picker-badge">+<%= entry.contextCount - 1 %> <%= pickerTexts.contextsSuffix %></span>
+                              <% } %>
+                            </div>
+                          </div>
+
+                          <div class="teacher-picker-card__controls">
+                            <% if (!entry.isGeneral) { %>
+                              <label class="teacher-picker-card__group">
+                                <span class="teacher-picker-card__group-label"><%= pickerTexts.groupLabel %></span>
+                                <select
+                                  class="form-select"
+                                  name="<%= pickerSelectionMode === 'offering' ? `group_offering_${entry.id}` : `group_${entry.id}` %>"
+                                  data-subject-group="<%= entry.id %>"
+                                >
+                                  <option value=""><%= pickerTexts.chooseGroupLabel %></option>
+                                  <% for (let groupIndex = 1; groupIndex <= entry.groupCount; groupIndex += 1) { %>
+                                    <option value="<%= groupIndex %>" <%= Number(entry.selectedGroup) === groupIndex ? 'selected' : '' %>><%= groupIndex %></option>
+                                  <% } %>
+                                </select>
+                              </label>
+                            <% } %>
+
+                            <div class="form-check teacher-picker-card__toggle">
+                              <input
+                                class="form-check-input"
+                                type="checkbox"
+                                id="teacher_picker_subject_<%= entry.id %>"
+                                name="<%= pickerSelectionMode === 'offering' ? `subject_${entry.id}` : `subject_${entry.id}` %>"
+                                value="1"
+                                data-subject-toggle="<%= entry.id %>"
+                                <%= entry.checked ? 'checked' : '' %>
+                              />
+                              <label class="form-check-label" for="teacher_picker_subject_<%= entry.id %>"><%= pickerTexts.teachLabel %></label>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    <% }); %>
+                  </div>
+                </details>
+              </section>
+            <% }); %>
+          </div>
+        </details>
+      <% }); %>
+    </div>
+  <% } else { %>
+    <div class="teacher-picker-empty glass" data-teacher-picker-empty>
+      <div class="teacher-picker-empty__title"><%= pickerTexts.emptyTitle %></div>
+      <div class="teacher-picker-empty__copy"><%= pickerTexts.emptyCopy %></div>
+    </div>
+  <% } %>
+
+  <div class="teacher-picker-empty glass is-search-empty" data-teacher-picker-search-empty hidden>
+    <div class="teacher-picker-empty__title"><%= pickerTexts.searchEmpty %></div>
+    <div class="teacher-picker-empty__copy"><%= pickerTexts.searchPlaceholder %></div>
+  </div>
+</section>

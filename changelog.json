@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.31",
+      "date": "2026-04-09",
+      "items": [
+        "feat(teacher-track-discipline-matrix): regroup both teacher discipline pickers into searchable Liquid Glass disclosure lanes `бакалаври/магістри -> stage -> discipline`, surface a code-level `service cohort` plus admission-year summary on the registration flow instead of a separate visible cohort step, and keep assignment saving compatible with the existing offering/legacy teacher selection backend"
+      ]
+    },
+    {
       "version": "1.5.30",
       "date": "2026-04-09",
       "items": [
