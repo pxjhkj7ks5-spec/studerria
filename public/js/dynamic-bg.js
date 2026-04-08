@@ -12,6 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
   const coarsePointerMedia = window.matchMedia('(pointer: coarse)');
+  const userAgent = String(window.navigator && window.navigator.userAgent ? window.navigator.userAgent : '');
+  const vendor = String(window.navigator && window.navigator.vendor ? window.navigator.vendor : '');
+  const isSafariBrowser = /Safari\//.test(userAgent)
+    && !/(Chrome|Chromium|CriOS|Edg|OPR|OPT|SamsungBrowser|DuckDuckGo)/.test(userAgent)
+    && /Apple/i.test(vendor || userAgent);
 
   const BLOB_MORPH_SHAPES = {
     primary: [
@@ -56,11 +61,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
+  function readBodyZoom() {
+    const zoomValue = Number.parseFloat(window.getComputedStyle(body).zoom || '1');
+    return Number.isFinite(zoomValue) && zoomValue > 0 ? zoomValue : 1;
+  }
+
   function syncViewportMetrics() {
     // Safari can report pointer coordinates in the visual viewport while the scene is rendered in zoomed layout coordinates.
     const rect = root.getBoundingClientRect();
     const renderedWidth = Math.max(Number(rect.width) || window.innerWidth || 1, 1);
     const renderedHeight = Math.max(Number(rect.height) || window.innerHeight || 1, 1);
+    const cssZoom = readBodyZoom();
+
+    if (isSafariBrowser && Math.abs(cssZoom - 1) > 0.001) {
+      state.width = renderedWidth / cssZoom;
+      state.height = renderedHeight / cssZoom;
+      state.viewportLeft = Number.isFinite(rect.left) ? rect.left : 0;
+      state.viewportTop = Number.isFinite(rect.top) ? rect.top : 0;
+      state.inputScaleX = 1 / cssZoom;
+      state.inputScaleY = 1 / cssZoom;
+      return;
+    }
 
     const probe = document.createElement('div');
     probe.style.position = 'absolute';

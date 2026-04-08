@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.77",
+      "date": "2026-04-08",
+      "items": [
+        "fix(safari-cursor-trail-zoom): make the shared cursor-trail backgrounds use Safari-specific body zoom compensation when desktop shell zoom is active, so pointer coordinates are expanded by the real page zoom factor before the floating symbols are placed"
+      ]
+    },
+    {
       "version": "1.4.76",
       "date": "2026-04-08",
       "items": [
