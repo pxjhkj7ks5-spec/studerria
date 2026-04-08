@@ -998,12 +998,12 @@ body.theme-light.studerria-theme input[type="week"] {
 
 body.studerria-theme .modal-backdrop {
   z-index: 1070 !important;
-  --bs-backdrop-bg: rgba(7, 11, 24, 0.24);
-  --bs-backdrop-opacity: 0.48;
+  --bs-backdrop-bg: rgba(7, 11, 24, 0.32);
+  --bs-backdrop-opacity: 1;
   background-color: var(--bs-backdrop-bg);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  transition: opacity 220ms ease;
+  -webkit-backdrop-filter: blur(20px) saturate(1.08) !important;
+  backdrop-filter: blur(20px) saturate(1.08) !important;
+  transition: opacity 220ms ease, background-color 220ms ease, -webkit-backdrop-filter 220ms ease, backdrop-filter 220ms ease;
 }
 
 body.studerria-theme .modal-backdrop.show {
@@ -1012,19 +1012,19 @@ body.studerria-theme .modal-backdrop.show {
 }
 
 body.theme-light.studerria-theme .modal-backdrop {
-  --bs-backdrop-bg: rgba(15, 23, 42, 0.18);
-  --bs-backdrop-opacity: 0.42;
+  --bs-backdrop-bg: rgba(236, 242, 252, 0.34);
+  --bs-backdrop-opacity: 1;
+  -webkit-backdrop-filter: blur(18px) saturate(1.04) !important;
+  backdrop-filter: blur(18px) saturate(1.04) !important;
 }
 
-/* Hard-stop any modal blur so page-level glass rules cannot leak into dialogs or backdrops. */
+/* Keep the dialog shell sharp while the full-viewport blur lives on the backdrop. */
 body.studerria-theme .modal,
 body.studerria-theme .modal-dialog,
 body.studerria-theme .modal-content,
 body.studerria-theme .modal-header,
 body.studerria-theme .modal-body,
 body.studerria-theme .modal-footer,
-body.studerria-theme .modal-backdrop,
-body.studerria-theme .modal-backdrop.show,
 body.studerria-theme .modal .glass,
 body.studerria-theme .modal .glass-card,
 body.studerria-theme .modal .glass-panel,
@@ -1637,7 +1637,6 @@ body.page-schedule .topbar-sync-pill,
 body.page-schedule .footer-sync-pill,
 body.page-schedule .sync-pill,
 body.page-schedule .density-chip,
-body.page-schedule .modal-backdrop,
 body.page-schedule .modal.show .modal-dialog .modal-content,
 body.page-schedule .modal.show .modal-header,
 body.page-schedule .modal.show .modal-footer {
@@ -1710,8 +1709,6 @@ body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-panel,
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .glass-inset,
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface,
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .surface--elevated,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop,
-body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop.show,
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-dialog .modal-content,
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-header,
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal.show .modal-footer {

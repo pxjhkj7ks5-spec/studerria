@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.85",
+      "date": "2026-04-08",
+      "items": [
+        "fix(modal-backdrop-blur): restore a true full-screen backdrop blur for Studerria modals by moving the blur back onto the shared modal backdrop instead of shell fragments, and version modal-enhanced.css so Atlas reloads the updated overlay styles immediately"
+      ]
+    },
+    {
       "version": "1.4.84",
       "date": "2026-04-08",
       "items": [

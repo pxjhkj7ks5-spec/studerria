@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/pages/help.css" />
-    <link rel="stylesheet" href="/css/modal-enhanced.css" />
+    <link rel="stylesheet" href="/css/modal-enhanced.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="studerria-theme theme-dark page-help page-local-topbar">
     <%- include('partials/topbar', { role, username, t, activePage: 'help', pageTitle: t('help.pageTitle') }) %>
