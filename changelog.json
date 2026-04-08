@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.4.59",
+      "version": "1.4.60",
       "date": "2026-04-08",
       "items": [
-        "fix(help-page-layout): remove the inbox digest from Help, move the request history card into the right column under the request form, trim duplicate login/profile/access copy from the FAQ, and strengthen the light-theme card contrast so sections read clearly"
+        "fix(teamwork-subjects-layout): restyle the Teamwork page to match the Subjects page with the same top subject picker, a cleaner tasks toolbar, subject-like task and group cards, and stronger light-theme contrast so the blocks stay visually separated"
       ]
     },
     {

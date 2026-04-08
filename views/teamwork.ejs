@@ -761,21 +761,34 @@
         </div>
       <% } %>
 
-      <div class="glass glass-float glass-float--no-top-glare p-3 mb-4">
-        <h5 class="mb-3"><%= teamworkCopy.subjectsTitle %></h5>
-        <div class="d-flex flex-wrap gap-2 subject-pills-wrap">
+      <div class="glass glass-float glass-float--no-top-glare subject-picker-card p-3 mb-4">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+          <div>
+            <h5 class="mb-1"><%= teamworkCopy.subjectsTitle %></h5>
+            <% if (selectedSubject) { %>
+              <div class="text-muted small">
+                <span class="course-badge"><%= selectedSubject.course_name %></span>
+                <% if (isTeacherMode && selectedSubject.group_label) { %>
+                  <span class="ms-2"><%= selectedSubject.group_label %></span>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+          <span class="status-chip status-chip--info"><%= isTeacherMode ? teamworkCopy.teacherLabel : teamworkCopy.subjectLabel %></span>
+        </div>
+        <div class="subject-chip-grid">
           <% if (!subjects.length) { %>
             <span class="text-muted"><%= teamworkCopy.noSubjects %></span>
           <% } else { %>
             <% subjects.forEach(function(s) { %>
               <a
-                class="btn btn-sm <%= selectedSubjectId === s.subject_id ? 'btn-primary' : 'btn-outline-light' %> subject-pill subject-pill-card"
+                class="subject-nav-pill <%= selectedSubjectId === s.subject_id ? 'is-active' : '' %>"
                 href="/teamwork?subject_id=<%= s.subject_id %>"
               >
-                <span class="subject-pill-title"><%= s.subject_name %></span>
-                <span class="subject-pill-meta"><%= s.course_name %></span>
+                <span class="subject-name"><%= s.subject_name %></span>
+                <span class="subject-meta"><%= s.course_name %></span>
                 <% if (isTeacherMode && s.group_label) { %>
-                  <span class="subject-pill-meta"><%= s.group_label %></span>
+                  <span class="subject-meta"><%= s.group_label %></span>
                 <% } %>
               </a>
             <% }); %>
@@ -785,32 +798,34 @@
       <div class="living-separator mb-4" aria-hidden="true"></div>
 
       <% if (selectedSubjectId) { %>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div>
-              <h4 class="mb-0"><%= teamworkCopy.tasksTitle %></h4>
-            <% if (selectedSubject) { %>
-              <div class="text-muted small mt-1">
-                <span class="course-badge"><%= selectedSubject.course_name %></span>
-                <% if (isTeacherMode && selectedSubject.group_label) { %>
-                  <span class="ms-2"><%= selectedSubject.group_label %></span>
-                <% } %>
-              </div>
+        <section class="glass materials-add-form mb-4">
+          <div class="materials-toolbar mb-3">
+            <div>
+              <h6 class="mb-0"><%= teamworkCopy.tasksTitle %></h6>
+              <% if (selectedSubject) { %>
+                <div class="text-muted small mt-1">
+                  <span class="course-badge"><%= selectedSubject.course_name %></span>
+                  <% if (isTeacherMode && selectedSubject.group_label) { %>
+                    <span class="ms-2"><%= selectedSubject.group_label %></span>
+                  <% } %>
+                </div>
+              <% } %>
+            </div>
+            <% if (isTeacherMode) { %>
+              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+                <%= teamworkCopy.createTask %>
+              </button>
             <% } %>
           </div>
-          <% if (isTeacherMode) { %>
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
-              <%= teamworkCopy.createTask %>
-            </button>
-          <% } %>
-        </div>
-        <div class="living-separator mb-3" aria-hidden="true"></div>
+        </section>
 
         <% if (!tasks.length) { %>
           <div class="glass p-4 text-center text-muted"><%= teamworkCopy.noTasks %></div>
         <% } %>
 
+        <section class="materials-feed">
         <% tasks.forEach(function(task) { %>
-          <div class="glass glass-float p-4 mb-4 task-card">
+          <article class="glass material-card task-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div>
                 <h5 class="mb-1"><%= task.title %></h5>
@@ -877,7 +892,7 @@
 
                 <div class="d-grid gap-3 context-cloud-list">
                   <% task.groups.forEach(function(group) { %>
-                    <div class="glass p-3 group-card context-cloud-item">
+                    <div class="glass material-card group-card context-cloud-item">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <div>
                           <strong><%= group.name %></strong>
@@ -987,8 +1002,9 @@
                 </div>
               </div>
             </div>
-          </div>
+          </article>
         <% }); %>
+        </section>
       <% } %>
     </main>
 
