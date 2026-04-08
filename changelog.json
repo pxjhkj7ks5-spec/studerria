@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.84",
+      "date": "2026-04-08",
+      "items": [
+        "tune(subjects-teamwork-dark-accent): match the dark-theme subject pills and course badges on the subjects and teamwork pages to the same purple accent used in the light theme, and version the subjects page stylesheet so Atlas picks up the new color immediately"
+      ]
+    },
+    {
       "version": "1.4.83",
       "date": "2026-04-08",
       "items": [

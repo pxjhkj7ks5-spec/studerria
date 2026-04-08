@@ -65,6 +65,19 @@
   opacity: 0.9;
 }
 
+body.theme-dark.page-subjects .course-badge {
+  border-color: rgba(139, 92, 246, 0.34);
+  background: rgba(139, 92, 246, 0.16);
+  color: rgba(237, 233, 254, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+body.theme-dark.page-subjects .subject-nav-pill.is-active {
+  border-color: rgba(99, 102, 241, 0.34);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.92), rgba(168, 85, 247, 0.86));
+  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.24);
+}
+
 .page-subjects .materials-toolbar {
   display: flex;
   align-items: center;
