@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.4.63",
+      "version": "1.4.64",
       "date": "2026-04-08",
       "items": [
-        "fix(footer-pills-opacity): remove the footer-wide opacity from the sync and version ovals so the online/offline and release pills keep their soft green, red, and blue colors instead of turning gray"
+        "tune(global-shell-scale): reduce the shared app shell width and page gutters so the whole site reads closer to the cleaner 75% Mac layout across all pages without using browser zoom"
       ]
     },
     {
