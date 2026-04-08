@@ -19,6 +19,12 @@
   const MODAL_BLUR_STATE_ATTR = 'data-studerria-modal-blur-active';
   const EMPTY_STYLE_TOKEN = '__studerria-empty-style__';
   const APPLE_WEBVIEW_CLASS = 'studerria-apple-webview';
+  const ATLAS_BODY_ZOOM_RESET_ATTR = 'data-studerria-atlas-body-zoom-reset';
+  const ATLAS_BODY_ZOOM_PREV_VALUE_ATTR = 'data-studerria-atlas-body-zoom-prev-value';
+  const ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR = 'data-studerria-atlas-body-zoom-prev-priority';
+  const ATLAS_HTML_ZOOM_RESET_ATTR = 'data-studerria-atlas-html-zoom-reset';
+  const ATLAS_HTML_ZOOM_PREV_VALUE_ATTR = 'data-studerria-atlas-html-zoom-prev-value';
+  const ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR = 'data-studerria-atlas-html-zoom-prev-priority';
   const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
   const MODAL_FALLBACK_SCENE_ID = 'studerriaModalFallbackScene';
   const MODAL_FALLBACK_SCENE_CLASS = 'studerria-modal-fallback-scene';
@@ -114,10 +120,115 @@
       /(Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|OPT|SamsungBrowser|DuckDuckGo|Firefox|FxiOS)/i.test(
         userAgent
       );
-    const isAtlasToken = /(Atlas|ChatGPT)/i.test(userAgent);
+    const isAtlasToken = /(Atlas|ChatGPT|OAI|OpenAI)/i.test(userAgent);
     const hasSafariGlobal = typeof window.safari !== 'undefined';
 
-    return Boolean(isAtlasToken || (isApplePlatform && isAppleEngine && !isExcludedBrowser && !hasSafariGlobal));
+    return Boolean(
+      isAtlasToken || (isApplePlatform && isAppleEngine && !isExcludedBrowser && !hasSafariGlobal)
+    );
+  }
+
+  /* Feature probe: detect whether the current body actually shrinks fixed
+     overlays. This catches Atlas regardless of user-agent sniffing — if a
+     position:fixed element sized at window.innerWidth renders narrower than
+     that, we have a body-zoom coverage problem that will also affect the
+     modal backdrop and blur layers. */
+  function probeBodyZoomAffectsFixedOverlays() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) {
+      return false;
+    }
+
+    const probe = document.createElement('div');
+    probe.style.position = 'fixed';
+    probe.style.left = '0';
+    probe.style.top = '0';
+    probe.style.width = `${Math.max(window.innerWidth || 1, 1)}px`;
+    probe.style.height = '2px';
+    probe.style.visibility = 'hidden';
+    probe.style.pointerEvents = 'none';
+    probe.style.zIndex = '-2147483648';
+    body.appendChild(probe);
+    const renderedWidth = probe.getBoundingClientRect().width;
+    probe.remove();
+
+    const viewportWidth = Math.max(window.innerWidth || 1, 1);
+    /* If the rendered width of a fixed element set to innerWidth is smaller
+       than innerWidth by more than 0.5 px, body zoom is eating coverage. */
+    return renderedWidth > 0 && viewportWidth - renderedWidth > 0.5;
+  }
+
+  function applyAtlasBodyZoomReset() {
+    const body = document.body;
+    const root = document.documentElement;
+    if (!(body instanceof HTMLElement) || !(root instanceof HTMLElement)) {
+      return;
+    }
+    if (body.getAttribute(ATLAS_BODY_ZOOM_RESET_ATTR) === '1') {
+      return;
+    }
+    if (!probeBodyZoomAffectsFixedOverlays()) {
+      return;
+    }
+
+    body.setAttribute(
+      ATLAS_BODY_ZOOM_PREV_VALUE_ATTR,
+      body.style.getPropertyValue('zoom') || EMPTY_STYLE_TOKEN
+    );
+    body.setAttribute(
+      ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR,
+      body.style.getPropertyPriority('zoom') || EMPTY_STYLE_TOKEN
+    );
+    body.style.setProperty('zoom', '1', 'important');
+    body.setAttribute(ATLAS_BODY_ZOOM_RESET_ATTR, '1');
+
+    root.setAttribute(
+      ATLAS_HTML_ZOOM_PREV_VALUE_ATTR,
+      root.style.getPropertyValue('zoom') || EMPTY_STYLE_TOKEN
+    );
+    root.setAttribute(
+      ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR,
+      root.style.getPropertyPriority('zoom') || EMPTY_STYLE_TOKEN
+    );
+    root.style.setProperty('zoom', '1', 'important');
+    root.setAttribute(ATLAS_HTML_ZOOM_RESET_ATTR, '1');
+  }
+
+  function restoreAtlasBodyZoomReset() {
+    const body = document.body;
+    const root = document.documentElement;
+    if (body instanceof HTMLElement && body.getAttribute(ATLAS_BODY_ZOOM_RESET_ATTR) === '1') {
+      const prevValue = body.getAttribute(ATLAS_BODY_ZOOM_PREV_VALUE_ATTR);
+      const prevPriority = body.getAttribute(ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR);
+      if (prevValue && prevValue !== EMPTY_STYLE_TOKEN) {
+        body.style.setProperty(
+          'zoom',
+          prevValue,
+          prevPriority && prevPriority !== EMPTY_STYLE_TOKEN ? prevPriority : ''
+        );
+      } else {
+        body.style.removeProperty('zoom');
+      }
+      body.removeAttribute(ATLAS_BODY_ZOOM_RESET_ATTR);
+      body.removeAttribute(ATLAS_BODY_ZOOM_PREV_VALUE_ATTR);
+      body.removeAttribute(ATLAS_BODY_ZOOM_PREV_PRIORITY_ATTR);
+    }
+    if (root instanceof HTMLElement && root.getAttribute(ATLAS_HTML_ZOOM_RESET_ATTR) === '1') {
+      const prevValue = root.getAttribute(ATLAS_HTML_ZOOM_PREV_VALUE_ATTR);
+      const prevPriority = root.getAttribute(ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR);
+      if (prevValue && prevValue !== EMPTY_STYLE_TOKEN) {
+        root.style.setProperty(
+          'zoom',
+          prevValue,
+          prevPriority && prevPriority !== EMPTY_STYLE_TOKEN ? prevPriority : ''
+        );
+      } else {
+        root.style.removeProperty('zoom');
+      }
+      root.removeAttribute(ATLAS_HTML_ZOOM_RESET_ATTR);
+      root.removeAttribute(ATLAS_HTML_ZOOM_PREV_VALUE_ATTR);
+      root.removeAttribute(ATLAS_HTML_ZOOM_PREV_PRIORITY_ATTR);
+    }
   }
 
   function primeEnvironmentFlags() {
@@ -774,6 +885,11 @@
     const changelogIsVisible = hasVisibleChangelogModal();
 
     if (shouldOpen) {
+      /* Atlas / embedded Apple WebView shrinks position:fixed overlays when the
+         body has CSS zoom applied. Probe at open time and, if detected, pin
+         body + html zoom to 1 inline with !important so the modal backdrop
+         and blur fallback layers cover the full viewport. Restored on close. */
+      applyAtlasBodyZoomReset();
       body.classList.add(BOOTSTRAP_OPEN_CLASS);
       body.classList.toggle(MODAL_FALLBACK_OPEN_CLASS, useModalBlurFallback);
       if (includeChangelogClass || changelogIsVisible) {
@@ -813,6 +929,8 @@
     syncModalBlurFallback(false);
     body.classList.remove(BODY_OPEN_CLASS);
     body.classList.remove(BOOTSTRAP_OPEN_CLASS);
+    /* Restore the original body/html CSS zoom that we pinned on open. */
+    restoreAtlasBodyZoomReset();
     const root = document.documentElement;
     if (root instanceof HTMLElement && root.getAttribute(SCROLL_LOCK_STATE_ATTR) === '1') {
       const previousValue = root.getAttribute(SCROLL_LOCK_VALUE_ATTR);

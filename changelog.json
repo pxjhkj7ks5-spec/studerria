@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.03",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-blur-coverage-inline-reset): replace the CSS-class based Atlas body zoom override (which did not take effect on the schedule page) with an inline, feature-probed body+html zoom reset that fires only at modal open time: a temporary position:fixed probe measures whether the current body zoom shrinks fixed overlays, and if so body and html get zoom:1 pinned via inline !important styles, restored on modal close; Safari and Chrome are unaffected because the probe does not detect any shrinkage there, so normal-browse layout in Atlas stays at zoom:0.75 and only flips to 1 while the modal is open so the backdrop + fallback blur layers cover the full viewport; reverted the earlier studerria-apple-webview CSS override and the Atlas-forced studerria-zoom-fallback path"
+      ]
+    },
+    {
       "version": "1.5.02",
       "date": "2026-04-08",
       "items": [
