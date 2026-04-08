@@ -17,6 +17,8 @@
   const SCROLL_LOCK_PRIORITY_ATTR = 'data-studerria-scroll-lock-overflow-priority';
   const NO_BLUR_STATE_ATTR = 'data-studerria-no-blur-active';
   const EMPTY_STYLE_TOKEN = '__studerria-empty-style__';
+  const APPLE_WEBVIEW_CLASS = 'studerria-apple-webview';
+  const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
   const NO_BLUR_SELECTOR = [
     '.glass',
     '.glass-card',
@@ -70,6 +72,35 @@
 
   function hasVisibleChangelogModal() {
     return document.querySelector(`${MODAL_SELECTOR}.show`) instanceof HTMLElement;
+  }
+
+  function isAtlasLikeAppleWebView() {
+    const navigatorRef = window.navigator || {};
+    const userAgent = String(navigatorRef.userAgent || '');
+    const vendor = String(navigatorRef.vendor || '');
+    const platform = String(navigatorRef.platform || '');
+    const isApplePlatform =
+      /(Mac|iPhone|iPad|iPod)/i.test(platform) || /(Macintosh|iPhone|iPad|iPod)/i.test(userAgent);
+    const isAppleEngine = /AppleWebKit/i.test(userAgent) || /Apple/i.test(vendor);
+    const isExcludedBrowser =
+      /(Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|OPT|SamsungBrowser|DuckDuckGo|Firefox|FxiOS)/i.test(
+        userAgent
+      );
+    const isAtlasToken = /(Atlas|ChatGPT)/i.test(userAgent);
+    const hasSafariGlobal = typeof window.safari !== 'undefined';
+
+    return Boolean(isAtlasToken || (isApplePlatform && isAppleEngine && !isExcludedBrowser && !hasSafariGlobal));
+  }
+
+  function primeEnvironmentFlags() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) {
+      return false;
+    }
+
+    const shouldUseAppleWebViewFallback = isAtlasLikeAppleWebView();
+    body.classList.toggle(APPLE_WEBVIEW_CLASS, shouldUseAppleWebViewFallback);
+    return shouldUseAppleWebViewFallback;
   }
 
   function cleanupBackdrop() {
@@ -223,11 +254,13 @@
       return;
     }
 
+    const useModalBlurFallback = primeEnvironmentFlags();
     const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal();
     const changelogIsVisible = hasVisibleChangelogModal();
 
     if (shouldOpen) {
       body.classList.add(BOOTSTRAP_OPEN_CLASS);
+      body.classList.toggle(MODAL_FALLBACK_OPEN_CLASS, useModalBlurFallback);
       if (includeChangelogClass || changelogIsVisible) {
         body.classList.add(BODY_OPEN_CLASS);
       } else {
@@ -248,10 +281,15 @@
       if (root instanceof HTMLElement) {
         root.style.setProperty('overflow', 'hidden', 'important');
       }
-      syncNoBlurTargets(true);
+      if (useModalBlurFallback) {
+        syncNoBlurTargets(false);
+      } else {
+        syncNoBlurTargets(true);
+      }
       return;
     }
 
+    body.classList.remove(MODAL_FALLBACK_OPEN_CLASS);
     body.classList.remove(BODY_OPEN_CLASS);
     body.classList.remove(BOOTSTRAP_OPEN_CLASS);
     const root = document.documentElement;
@@ -407,6 +445,7 @@
   }
 
   function init() {
+    primeEnvironmentFlags();
     bindGlobalModalSync();
     primeStaticModals();
 

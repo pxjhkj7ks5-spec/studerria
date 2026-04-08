@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.87",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-blur-fallback): add an Atlas and embedded Apple webview modal fallback that blurs the top-level page layers behind open modals instead of relying only on the shared backdrop blur, and version changelog-modal.js so Atlas reloads the updated modal sync logic immediately"
+      ]
+    },
+    {
       "version": "1.4.86",
       "date": "2026-04-08",
       "items": [

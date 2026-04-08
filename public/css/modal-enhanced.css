@@ -154,6 +154,20 @@ html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar.top
   filter: none !important;
 }
 
+/* Atlas / embedded Apple webviews do not reliably blur the shared modal backdrop. */
+html body.studerria-theme.studerria-apple-webview.studerria-modal-fallback-open > :not(.modal):not(.modal-backdrop):not(script):not(style):not(link):not(template) {
+  -webkit-filter: blur(18px) saturate(0.94) brightness(0.94) !important;
+  filter: blur(18px) saturate(0.94) brightness(0.94) !important;
+  transition: filter 220ms ease !important, opacity 220ms ease !important;
+  will-change: filter;
+  transform: translateZ(0);
+}
+
+html body.theme-light.studerria-theme.studerria-apple-webview.studerria-modal-fallback-open > :not(.modal):not(.modal-backdrop):not(script):not(style):not(link):not(template) {
+  -webkit-filter: blur(16px) saturate(0.98) brightness(0.98) !important;
+  filter: blur(16px) saturate(0.98) brightness(0.98) !important;
+}
+
 html body.studerria-theme #welcomeModal .modal-dialog,
 html body.studerria-theme #welcomeModal .modal-content,
 html body.studerria-theme #welcomeModal .modal-body,
