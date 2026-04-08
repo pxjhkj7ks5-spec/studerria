@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.78",
+      "date": "2026-04-08",
+      "items": [
+        "fix(safari-cursor-trail-root): counter-scale the shared dynamic background roots on Safari desktop pages with Studerria shell zoom and version all shared background JS/CSS includes, so the floating symbol trail follows the real cursor coordinates instead of drifting up-left behind stale cached assets"
+      ]
+    },
+    {
       "version": "1.4.77",
       "date": "2026-04-08",
       "items": [

@@ -1445,7 +1445,7 @@
     </style>
     <link rel="stylesheet" href="/css/studerria-ui.css" />
     <link rel="stylesheet" href="/css/pages/admin-pathways.css" />
-    <link rel="stylesheet" href="/css/dynamic-bg.css" />
+    <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="studerria-theme theme-dark page-admin-pathways page-journal page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>
@@ -3417,6 +3417,6 @@
         refreshSummary();
       })();
     </script>
-      <script src="/js/dynamic-bg.js" defer></script>
+      <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

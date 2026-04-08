@@ -365,7 +365,7 @@
     <link rel="stylesheet" href="/css/auth-actions.css" />
     <link rel="stylesheet" href="/css/design-system.css" />
     <link rel="stylesheet" href="/css/studerria-ui.css" />
-    <link rel="stylesheet" href="/css/dynamic-bg.css" />
+    <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/register-groups.css" />
   </head>
   <body class="studerria-theme theme-light page-register-subjects">
@@ -699,6 +699,6 @@
     </script>
     <script src="/js/register-groups.js" defer></script>
     <script src="/js/design-system.js" defer></script>
-    <script src="/js/dynamic-bg.js" defer></script>
+    <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
