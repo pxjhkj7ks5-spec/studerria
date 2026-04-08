@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.4.97",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-scene-blur): replace the legacy Atlas per-child modal blur fallback with a single temporary full-scene wrapper under the modal layers, so the blur no longer breaks into dark rectangular slabs and tracks the whole visible page as one layer behind dialogs",
+        "fix(atlas-cursor-trail-regression): roll back the Atlas-specific background root zoom neutralization and keep that compensation Safari-only again, so the animated symbol trail no longer drifts away from the cursor in Atlas"
+      ]
+    },
+    {
       "version": "1.4.96",
       "date": "2026-04-08",
       "items": [

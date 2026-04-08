@@ -20,6 +20,8 @@
   const EMPTY_STYLE_TOKEN = '__studerria-empty-style__';
   const APPLE_WEBVIEW_CLASS = 'studerria-apple-webview';
   const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
+  const MODAL_FALLBACK_SCENE_ID = 'studerriaModalFallbackScene';
+  const MODAL_FALLBACK_SCENE_CLASS = 'studerria-modal-fallback-scene';
   const MODAL_BLUR_TRANSITION_MS = 340;
   const MODAL_BLUR_CLEANUP_DELAY_MS = MODAL_BLUR_TRANSITION_MS + 80;
   const MODAL_BLUR_TRANSITION_VALUE = [
@@ -83,6 +85,7 @@
     ['will-change', 'studerriaModalBlurWillChangeValue', 'studerriaModalBlurWillChangePriority']
   ];
   const modalBlurCleanupTimers = new WeakMap();
+  let modalFallbackSceneCleanupTimer = 0;
 
   function getModal() {
     return document.querySelector(MODAL_SELECTOR);
@@ -246,11 +249,96 @@
   }
 
   function isModalBlurFallbackTarget(target) {
+    if (isModalBlurSceneTarget(target)) {
+      return true;
+    }
+    if (document.body instanceof HTMLElement && document.body.classList.contains(APPLE_WEBVIEW_CLASS)) {
+      return false;
+    }
     return isModalBlurBackgroundTarget(target);
   }
 
   function isModalBlurBackgroundTarget(target) {
     return target instanceof HTMLElement && (target.id === 'dynamic-bg' || target.id === 'studerriaBg');
+  }
+
+  function isModalBlurSceneTarget(target) {
+    return target instanceof HTMLElement && target.id === MODAL_FALLBACK_SCENE_ID;
+  }
+
+  function clearModalFallbackSceneCleanupTimer() {
+    if (modalFallbackSceneCleanupTimer) {
+      window.clearTimeout(modalFallbackSceneCleanupTimer);
+      modalFallbackSceneCleanupTimer = 0;
+    }
+  }
+
+  function getModalFallbackScene() {
+    return document.getElementById(MODAL_FALLBACK_SCENE_ID);
+  }
+
+  function shouldWrapModalFallbackNode(node) {
+    if (!(node instanceof HTMLElement) || isModalBlurSceneTarget(node)) {
+      return false;
+    }
+    if (node.classList.contains('modal') || node.classList.contains('modal-backdrop')) {
+      return false;
+    }
+    return !['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE'].includes(node.tagName);
+  }
+
+  function ensureModalFallbackScene() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement) || !body.classList.contains(APPLE_WEBVIEW_CLASS)) {
+      return null;
+    }
+
+    clearModalFallbackSceneCleanupTimer();
+    let scene = getModalFallbackScene();
+    if (!(scene instanceof HTMLElement)) {
+      scene = document.createElement('div');
+      scene.id = MODAL_FALLBACK_SCENE_ID;
+      scene.className = MODAL_FALLBACK_SCENE_CLASS;
+      body.insertBefore(scene, body.firstChild);
+    }
+
+    Array.from(body.children).forEach((child) => {
+      if (shouldWrapModalFallbackNode(child)) {
+        scene.appendChild(child);
+      }
+    });
+
+    return scene;
+  }
+
+  function dismantleModalFallbackScene() {
+    const body = document.body;
+    const scene = getModalFallbackScene();
+    if (!(body instanceof HTMLElement) || !(scene instanceof HTMLElement)) {
+      return;
+    }
+
+    while (scene.firstChild) {
+      body.insertBefore(scene.firstChild, scene);
+    }
+    scene.remove();
+  }
+
+  function scheduleModalFallbackSceneCleanup() {
+    const scene = getModalFallbackScene();
+    if (!(scene instanceof HTMLElement)) {
+      return;
+    }
+
+    clearModalFallbackSceneCleanupTimer();
+    modalFallbackSceneCleanupTimer = window.setTimeout(() => {
+      if (hasVisibleModal()) {
+        modalFallbackSceneCleanupTimer = 0;
+        return;
+      }
+      dismantleModalFallbackScene();
+      modalFallbackSceneCleanupTimer = 0;
+    }, MODAL_BLUR_CLEANUP_DELAY_MS);
   }
 
   function getModalFallbackBackdropColor() {
@@ -289,6 +377,9 @@
   }
 
   function computeModalBlurZoomCompensation(target) {
+    if (isModalBlurSceneTarget(target)) {
+      return null;
+    }
     const body = document.body;
     if (!(body instanceof HTMLElement) || !body.classList.contains('studerria-theme') || window.innerWidth < 1200) {
       return null;
@@ -414,6 +505,7 @@
     const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal();
 
     if (shouldOpen) {
+      ensureModalFallbackScene();
       Array.from(document.body?.children || []).forEach((target) => {
         applyModalBlurFallback(target);
       });
@@ -423,6 +515,7 @@
     document.querySelectorAll(`[${MODAL_BLUR_STATE_ATTR}="1"]`).forEach((target) => {
       restoreModalBlurFallback(target);
     });
+    scheduleModalFallbackSceneCleanup();
   }
 
   function syncNoBlurTargets(forceOpen) {
