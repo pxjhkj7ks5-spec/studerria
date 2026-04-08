@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.11",
+      "date": "2026-04-08",
+      "items": [
+        "fix(schedule-navbar-first-paint): bootstrap the `studerria-zoom-fallback` class inline in the schedule document head before stylesheets load, so the shared liquid-glass navbar renders at its final narrowed width on first paint instead of flashing full-width for a split second and then shrinking"
+      ]
+    },
+    {
       "version": "1.5.10",
       "date": "2026-04-08",
       "items": [

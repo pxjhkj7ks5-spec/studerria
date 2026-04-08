@@ -2113,6 +2113,31 @@
         font-size: 0.9rem;
       }
 </style>
+    <script>
+      (function bootstrapScheduleZoomFallback() {
+        var root = document.documentElement;
+        if (!root || window.innerWidth < 1200) return;
+
+        var probe = document.createElement('div');
+        probe.style.position = 'absolute';
+        probe.style.left = '-9999px';
+        probe.style.top = '-9999px';
+        probe.style.width = '120px';
+        probe.style.height = '8px';
+        probe.style.visibility = 'hidden';
+        probe.style.pointerEvents = 'none';
+        probe.style.zoom = '2';
+        root.appendChild(probe);
+        var nativeZoomWorks = Math.round(probe.getBoundingClientRect().width) === 240;
+        probe.remove();
+
+        if (!nativeZoomWorks) {
+          root.classList.add('studerria-zoom-fallback');
+        } else {
+          root.classList.remove('studerria-zoom-fallback');
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/schedule.css" />
