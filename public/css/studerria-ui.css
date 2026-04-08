@@ -9,8 +9,8 @@ body.studerria-theme {
   min-height: 100dvh;
   font-family: "SF Pro Display", "Avenir Next", "Segoe UI", "Inter", sans-serif;
   color: var(--studerria-text-primary);
-  --studerria-shell-max-width: 1320px;
-  --studerria-shell-gutter: 40px;
+  --studerria-shell-max-width: 1560px;
+  --studerria-shell-gutter: 64px;
   --studerria-text-primary: #f8fafc;
   --studerria-text-muted: rgba(226, 232, 240, 0.78);
   --studerria-panel-border: rgba(148, 163, 184, 0.24);
@@ -110,7 +110,7 @@ body.theme-light.studerria-theme {
   z-index: 2;
   max-width: var(--studerria-shell-max-width);
   margin: 0 auto;
-  padding: 80px 20px 116px;
+  padding: 86px 24px 128px;
 }
 
 .studerria-navbar {
@@ -393,8 +393,8 @@ body.page-local-topbar .page-container {
 }
 
 body.page-local-topbar .topbar {
-  width: calc(100% - 20px);
-  max-width: calc(100% - 20px);
+  width: calc(100% - 24px);
+  max-width: calc(100% - 24px);
   margin: 0 auto 12px;
   padding: 8px 12px;
   border-radius: 28px;
@@ -1421,8 +1421,8 @@ body.page-profile .auth-card .form-select:focus {
   }
 
   body.page-local-topbar .topbar {
-    width: calc(100% - 14px);
-    max-width: calc(100% - 14px);
+    width: calc(100% - 16px);
+    max-width: calc(100% - 16px);
     border-radius: 22px;
   }
 
