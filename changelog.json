@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.81",
+      "date": "2026-04-08",
+      "items": [
+        "refactor(teamwork-layout): remove the duplicate subject-task header card from the teamwork page and keep the teacher-only create-task action inside the main subject picker so the content flow stays cleaner without losing task creation"
+      ]
+    },
+    {
       "version": "1.4.80",
       "date": "2026-04-08",
       "items": [

@@ -801,31 +801,17 @@
             <% }); %>
           <% } %>
         </div>
+        <% if (selectedSubjectId && isTeacherMode) { %>
+          <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+              <%= teamworkCopy.createTask %>
+            </button>
+          </div>
+        <% } %>
       </div>
       <div class="living-separator mb-4" aria-hidden="true"></div>
 
       <% if (selectedSubjectId) { %>
-        <section class="glass materials-add-form mb-4">
-          <div class="materials-toolbar mb-3">
-            <div>
-              <h6 class="mb-0"><%= teamworkCopy.tasksTitle %></h6>
-              <% if (selectedSubject) { %>
-                <div class="text-muted small mt-1">
-                  <span class="course-badge"><%= selectedSubject.course_name %></span>
-                  <% if (selectedSubject.group_label) { %>
-                    <span class="ms-2"><%= selectedSubject.group_label %></span>
-                  <% } %>
-                </div>
-              <% } %>
-            </div>
-            <% if (isTeacherMode) { %>
-              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
-                <%= teamworkCopy.createTask %>
-              </button>
-            <% } %>
-          </div>
-        </section>
-
         <% if (!tasks.length) { %>
           <div class="glass p-4 text-center text-muted"><%= teamworkCopy.noTasks %></div>
         <% } %>
