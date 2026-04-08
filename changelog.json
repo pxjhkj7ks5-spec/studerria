@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.4.61",
+      "version": "1.4.62",
       "date": "2026-04-08",
       "items": [
-        "fix(footer-status-pills): restore the soft green online pill, soft red offline pill, and soft blue version pill in the footer so the momentick matches the previous visual tone"
+        "fix(teamwork-pill-effects): restore the Teamwork subject pills as real rounded blocks with hover and pressed states so selection feels like the Subjects page instead of turning into plain text links"
       ]
     },
     {

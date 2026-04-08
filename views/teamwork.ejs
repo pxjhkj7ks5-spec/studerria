@@ -1297,12 +1297,12 @@
       initLessonScopeControls();
 
       function initSubjectSwitchFeedback() {
-        const subjectLinks = Array.from(document.querySelectorAll('.subject-pill-card[href]'));
+        const subjectLinks = Array.from(document.querySelectorAll('.subject-nav-pill[href]'));
         if (!subjectLinks.length) return;
 
         const markPending = (link) => {
-          subjectLinks.forEach((item) => item.classList.remove('subject-pill--pending'));
-          link.classList.add('subject-pill--pending');
+          subjectLinks.forEach((item) => item.classList.remove('is-pending'));
+          link.classList.add('is-pending');
         };
 
         subjectLinks.forEach((link) => {
