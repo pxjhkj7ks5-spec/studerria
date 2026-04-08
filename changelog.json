@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.83",
+      "date": "2026-04-08",
+      "items": [
+        "tune(schedule-width): remove the schedule-only Atlas/Safari zoom-fallback shell narrowing so the schedule page uses the same wide shell width as the rest of the Studerria pages"
+      ]
+    },
+    {
       "version": "1.4.82",
       "date": "2026-04-08",
       "items": [

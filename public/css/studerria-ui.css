@@ -1646,11 +1646,6 @@ body.page-schedule .modal.show .modal-footer {
 }
 
 @media (min-width: 1200px) {
-  html.studerria-zoom-fallback body.page-schedule.studerria-theme {
-    --studerria-shell-max-width: 1180px;
-    --studerria-shell-gutter: clamp(120px, 12vw, 240px);
-  }
-
   html.studerria-zoom-fallback body.page-local-topbar.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
     width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
     max-width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
