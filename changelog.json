@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.76",
+      "date": "2026-04-08",
+      "items": [
+        "fix(safari-cursor-trail-scale): switch the shared cursor-trail backgrounds from inferred layout sizing to direct rendered-scale measurement, so Safari desktop pages with CSS zoom use the actual painted layer scale when mapping pointer coordinates and the floating symbols stay under the cursor across the full viewport"
+      ]
+    },
+    {
       "version": "1.4.75",
       "date": "2026-04-08",
       "items": [

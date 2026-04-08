@@ -61,15 +61,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const rect = root.getBoundingClientRect();
     const renderedWidth = Math.max(Number(rect.width) || window.innerWidth || 1, 1);
     const renderedHeight = Math.max(Number(rect.height) || window.innerHeight || 1, 1);
-    const layoutWidth = Math.max(Number(root.offsetWidth) || 0, Math.round(renderedWidth), 1);
-    const layoutHeight = Math.max(Number(root.offsetHeight) || 0, Math.round(renderedHeight), 1);
 
-    state.width = layoutWidth;
-    state.height = layoutHeight;
+    const probe = document.createElement('div');
+    probe.style.position = 'absolute';
+    probe.style.left = '0';
+    probe.style.top = '0';
+    probe.style.width = '100px';
+    probe.style.height = '100px';
+    probe.style.visibility = 'hidden';
+    probe.style.pointerEvents = 'none';
+    root.appendChild(probe);
+    const probeRect = probe.getBoundingClientRect();
+    probe.remove();
+
+    const renderScaleX = Math.max((Number(probeRect.width) || 100) / 100, 0.0001);
+    const renderScaleY = Math.max((Number(probeRect.height) || 100) / 100, 0.0001);
+
+    state.width = renderedWidth / renderScaleX;
+    state.height = renderedHeight / renderScaleY;
     state.viewportLeft = Number.isFinite(rect.left) ? rect.left : 0;
     state.viewportTop = Number.isFinite(rect.top) ? rect.top : 0;
-    state.inputScaleX = renderedWidth > 0 ? layoutWidth / renderedWidth : 1;
-    state.inputScaleY = renderedHeight > 0 ? layoutHeight / renderedHeight : 1;
+    state.inputScaleX = 1 / renderScaleX;
+    state.inputScaleY = 1 / renderScaleY;
   }
 
   function mapPointerToScene(clientX, clientY) {
