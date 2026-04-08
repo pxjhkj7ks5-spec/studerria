@@ -190,39 +190,9 @@
   }
 
   function applyAtlasModalScale(modal) {
-    const body = document.body;
-    const content = getAtlasModalScaleContent(modal);
-    if (
-      !(body instanceof HTMLElement) ||
-      !(content instanceof HTMLElement) ||
-      !body.classList.contains(APPLE_WEBVIEW_CLASS) ||
-      window.innerWidth < 1200
-    ) {
-      return;
-    }
-
-    if (content.getAttribute(ATLAS_MODAL_SCALE_ATTR) !== '1') {
-      content.setAttribute(
-        ATLAS_MODAL_SCALE_ZOOM_VALUE_ATTR,
-        content.style.getPropertyValue('zoom') || EMPTY_STYLE_TOKEN
-      );
-      content.setAttribute(
-        ATLAS_MODAL_SCALE_ZOOM_PRIORITY_ATTR,
-        content.style.getPropertyPriority('zoom') || EMPTY_STYLE_TOKEN
-      );
-      content.setAttribute(
-        ATLAS_MODAL_SCALE_ORIGIN_VALUE_ATTR,
-        content.style.getPropertyValue('transform-origin') || EMPTY_STYLE_TOKEN
-      );
-      content.setAttribute(
-        ATLAS_MODAL_SCALE_ORIGIN_PRIORITY_ATTR,
-        content.style.getPropertyPriority('transform-origin') || EMPTY_STYLE_TOKEN
-      );
-    }
-
-    content.style.setProperty('zoom', '0.75', 'important');
-    content.style.setProperty('transform-origin', 'top center', 'important');
-    content.setAttribute(ATLAS_MODAL_SCALE_ATTR, '1');
+    /* Atlas modal scaling is intentionally disabled. Keep this hook only
+       to clean up legacy inline scale attributes from previous builds. */
+    restoreAtlasModalScale(modal);
   }
 
   function restoreAtlasModalScale(modal) {
@@ -588,6 +558,16 @@
     }
 
     configureModalFallbackSceneBase(scene);
+    if (shouldUseAtlasModalHost()) {
+      const body = document.body;
+      if (body instanceof HTMLElement) {
+        const bodyZoom = readComputedZoom(body);
+        if (Number.isFinite(bodyZoom) && bodyZoom > 0) {
+          scene.style.zoom = (1 / bodyZoom).toFixed(6);
+          return;
+        }
+      }
+    }
     const compensation = computeViewportFitZoomCompensation(scene);
     if (compensation) {
       scene.style.zoom = compensation.toFixed(6);
@@ -729,10 +709,19 @@
     }
 
     configureModalBlurCloneBase(clone);
-    const rect = clone.getBoundingClientRect();
-    const renderedWidth = Math.max(Number(rect.width) || 0, 1);
-    const renderedHeight = Math.max(Number(rect.height) || 0, 1);
-    const compensation = computeViewportFitZoomCompensation(clone);
+    let compensation = null;
+    if (shouldUseAtlasModalHost()) {
+      const body = document.body;
+      if (body instanceof HTMLElement) {
+        const bodyZoom = readComputedZoom(body);
+        if (Number.isFinite(bodyZoom) && bodyZoom > 0) {
+          compensation = 1 / bodyZoom;
+        }
+      }
+    }
+    if (!compensation) {
+      compensation = computeViewportFitZoomCompensation(clone);
+    }
 
     if (compensation) {
       clone.style.zoom = compensation.toFixed(6);

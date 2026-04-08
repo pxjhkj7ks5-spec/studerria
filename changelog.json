@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.08",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-rectangle-no-scale): disable the Atlas-only modal content zoom path and keep modal-size handling at default scale, then switch modal fallback scene/blur-clone geometry to deterministic body-zoom compensation (`1 / body zoom`) instead of viewport probing, so the large rectangular blur slab is removed without visibly scaling the page or modal content"
+      ]
+    },
+    {
       "version": "1.5.07",
       "date": "2026-04-08",
       "items": [
