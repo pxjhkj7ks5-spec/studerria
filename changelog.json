@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.4.60",
+      "version": "1.4.61",
       "date": "2026-04-08",
       "items": [
-        "fix(teamwork-subjects-layout): restyle the Teamwork page to match the Subjects page with the same top subject picker, a cleaner tasks toolbar, subject-like task and group cards, and stronger light-theme contrast so the blocks stay visually separated"
+        "fix(footer-status-pills): restore the soft green online pill, soft red offline pill, and soft blue version pill in the footer so the momentick matches the previous visual tone"
       ]
     },
     {
