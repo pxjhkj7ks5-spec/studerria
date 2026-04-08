@@ -5263,6 +5263,9 @@
       function updateSmartHighlights() {
         const now = new Date();
         const kyivToday = now.toLocaleDateString('en-CA', { timeZone: scheduleTimeZone });
+        // Keep the "Next" marker working even when today's visible day exists but has no classes.
+        const dayCards = Array.from(document.querySelectorAll('.day-card'));
+        const visibleWeekHasToday = dayCards.some((card) => (card.dataset.dayDate || '') === kyivToday);
         const markerKeyForCard = (card) => [
           String(card.dataset.subjectid || ''),
           String(card.dataset.day || ''),
@@ -5277,13 +5280,12 @@
             return '';
           }
         })();
-        document.querySelectorAll('.day-card').forEach((card) => {
+        dayCards.forEach((card) => {
           const dayDate = card.dataset.dayDate || '';
           card.classList.toggle('is-today', dayDate && dayDate === kyivToday);
         });
         const entries = [];
         const entriesByKey = new Map();
-        let hasTodayCard = false;
         document.querySelectorAll('.schedule-card[data-time-base][data-date]').forEach((btn) => {
           btn.classList.remove('is-now', 'is-next');
           const baseRange = btn.dataset.timeBase || '';
@@ -5297,10 +5299,6 @@
           const startDate = buildLocalTime(dateStr, start, scheduleTimeZone);
           const endDate = buildLocalTime(dateStr, end, scheduleTimeZone);
           if (!startDate || !endDate) return;
-          const dayCard = btn.closest('.day-card');
-          if (dayCard && dayCard.dataset.dayDate === kyivToday) {
-            hasTodayCard = true;
-          }
           entries.push({ start: startDate.getTime(), end: endDate.getTime(), el: btn });
         });
         if (!entries.length) return;
@@ -5309,7 +5307,7 @@
         const current = entries.find((entry) => nowMs >= entry.start && nowMs < entry.end);
         let nextKey = storedNextKey;
         if (current) current.el.classList.add('is-now');
-        if (hasTodayCard) {
+        if (visibleWeekHasToday) {
           const next = entries.find((entry) => entry.start > nowMs);
           nextKey = next ? markerKeyForCard(next.el) : '';
           try {

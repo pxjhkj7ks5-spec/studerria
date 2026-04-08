@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.16",
+      "date": "2026-04-08",
+      "items": [
+        "fix(schedule-next-chip-empty-today): base the `Next` schedule marker on whether the visible week contains today, not on whether today already has class cards, so the upcoming pair still gets highlighted later this week when the current day is empty"
+      ]
+    },
+    {
       "version": "1.5.15",
       "date": "2026-04-08",
       "items": [
