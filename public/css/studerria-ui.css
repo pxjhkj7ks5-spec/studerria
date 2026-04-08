@@ -63,6 +63,15 @@ body.studerria-theme {
   }
 }
 
+/* Atlas / embedded Apple WebView: body zoom breaks position:fixed overlays (modal backdrop,
+   blur layers) — they render at 75 % of viewport instead of full-screen.
+   Neutralise body zoom for Atlas and let the studerria-zoom-fallback path handle layout scaling. */
+@media (min-width: 1200px) {
+  body.studerria-theme.studerria-apple-webview {
+    zoom: 1;
+  }
+}
+
 html[data-theme='light'] body.studerria-theme,
 body.theme-light.studerria-theme {
   --studerria-text-primary: #0f172a;

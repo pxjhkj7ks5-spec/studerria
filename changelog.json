@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.02",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-blur-coverage): neutralise body zoom:0.75 for Atlas/embedded Apple WebView by overriding it to zoom:1 via a studerria-apple-webview CSS selector, and prime that body class early in schedule-zoom-fallback.js (before changelog-modal.js fires) so position:fixed modal overlays cover the full viewport instead of 75% of it; force the studerria-zoom-fallback layout path for Atlas on the schedule page so component-level fallback CSS compensates for the removed body zoom without breaking cursor trail"
+      ]
+    },
+    {
       "version": "1.5.01",
       "date": "2026-04-08",
       "items": [
