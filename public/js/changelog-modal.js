@@ -34,6 +34,7 @@
   const MODAL_BLUR_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
   const MODAL_BLUR_CLEANUP_DELAY_MS = MODAL_BLUR_TRANSITION_MS + 80;
   const MODAL_CLOSE_FINALIZE_DELAY_MS = MODAL_BLUR_CLEANUP_DELAY_MS + 60;
+  const MODAL_BLUR_FALLBACK_ENABLED = false;
   const MODAL_BLUR_TRANSITION_VALUE = [
     `-webkit-filter ${MODAL_BLUR_TRANSITION_MS}ms ${MODAL_BLUR_EASING}`,
     `filter ${MODAL_BLUR_TRANSITION_MS}ms ${MODAL_BLUR_EASING}`,
@@ -1122,7 +1123,7 @@
     }
 
     primeEnvironmentFlags();
-    const useModalBlurFallback = !body.classList.contains(APPLE_WEBVIEW_CLASS);
+    const useModalBlurFallback = MODAL_BLUR_FALLBACK_ENABLED;
     const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : hasVisibleModal();
     const changelogIsVisible = hasVisibleChangelogModal();
 

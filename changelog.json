@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.12",
+      "date": "2026-04-08",
+      "items": [
+        "tune(modal-backdrop-no-blur): remove the shared modal backdrop blur globally, switch every Studerria modal to a clean non-blurred edge vignette in both themes, and disable the changelog modal JS blur-fallback pipeline entirely so no page can reintroduce background blur behind dialogs"
+      ]
+    },
+    {
       "version": "1.5.11",
       "date": "2026-04-08",
       "items": [
