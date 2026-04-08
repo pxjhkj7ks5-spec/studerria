@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.73",
+      "date": "2026-04-08",
+      "items": [
+        "fix(teamwork-subject-picker-safari): fully reset the teamwork subject buttons from native browser control styling so Atlas/Safari renders the same two-line Liquid Glass pills as the subjects page instead of macOS default outlined buttons"
+      ]
+    },
+    {
       "version": "1.4.72",
       "date": "2026-04-08",
       "items": [
