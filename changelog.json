@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.14",
+      "date": "2026-04-08",
+      "items": [
+        "tune(modal-backdrop-flat-dim): replace the modal backdrop vignette with a flat solid dim layer in both themes and fade the shared `#dynamic-bg` / `#studerriaBg` roots to zero whenever a modal is open, so no animated background effects remain visible behind dialogs"
+      ]
+    },
+    {
       "version": "1.5.13",
       "date": "2026-04-08",
       "items": [

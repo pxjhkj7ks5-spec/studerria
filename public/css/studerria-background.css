@@ -61,6 +61,7 @@ body.studerria-theme {
   overflow: hidden;
   pointer-events: none;
   transform: translateZ(0);
+  transition: opacity 220ms ease;
 }
 
 .studerria-bg-gradient,

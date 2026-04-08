@@ -999,41 +999,20 @@ body.theme-light.studerria-theme input[type="week"] {
 body.studerria-theme .modal-backdrop {
   z-index: 1070 !important;
   --bs-backdrop-opacity: 1;
-  background:
-    radial-gradient(
-      ellipse at center,
-      rgba(8, 12, 28, 0.04) 0%,
-      rgba(8, 12, 28, 0.12) 40%,
-      rgba(5, 8, 20, 0.34) 72%,
-      rgba(2, 6, 18, 0.58) 100%
-    ) !important;
+  background: rgba(6, 10, 22, 0.78) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-  transition: opacity 220ms ease, background 220ms ease;
+  transition: opacity 220ms ease, background-color 220ms ease;
 }
 
 body.studerria-theme .modal-backdrop.show {
   opacity: var(--bs-backdrop-opacity);
-  background:
-    radial-gradient(
-      ellipse at center,
-      rgba(8, 12, 28, 0.04) 0%,
-      rgba(8, 12, 28, 0.12) 40%,
-      rgba(5, 8, 20, 0.34) 72%,
-      rgba(2, 6, 18, 0.58) 100%
-    ) !important;
+  background: rgba(6, 10, 22, 0.78) !important;
 }
 
 body.theme-light.studerria-theme .modal-backdrop {
   --bs-backdrop-opacity: 1;
-  background:
-    radial-gradient(
-      ellipse at center,
-      rgba(255, 255, 255, 0.04) 0%,
-      rgba(232, 238, 248, 0.14) 42%,
-      rgba(194, 205, 223, 0.32) 74%,
-      rgba(148, 163, 184, 0.46) 100%
-    ) !important;
+  background: rgba(226, 232, 240, 0.74) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
