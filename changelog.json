@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.74",
+      "date": "2026-04-08",
+      "items": [
+        "fix(teamwork-atlas-cache): force fresh teamwork page styling in Atlas by disabling HTML caching for `/teamwork` and versioning the teamwork stylesheet URL so button pill updates are not stuck behind stale WebKit cache"
+      ]
+    },
+    {
       "version": "1.4.73",
       "date": "2026-04-08",
       "items": [

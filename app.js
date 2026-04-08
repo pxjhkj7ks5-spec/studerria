@@ -34455,6 +34455,7 @@ app.get('/teamwork', requireLogin, async (req, res) => {
   const isTeacherMode = hasSessionRole(req, 'teacher');
   const useStudentAcademicView = !isTeacherMode && isAdminViewingStudentSelf(req);
   const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
 
   try {
     let subjectRows;
