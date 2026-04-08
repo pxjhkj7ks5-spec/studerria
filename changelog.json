@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.05",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-scale): switch the Atlas-only modal size correction from a pure transform shrink to a real `zoom: 0.75` on `.modal-dialog`, keeping the same eased open/close motion while matching the visual proportions users see when manually reducing page zoom to 75%"
+      ]
+    },
+    {
       "version": "1.5.04",
       "date": "2026-04-08",
       "items": [
