@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.00",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-blur-clones): stop filtering the live Studerria background roots in Atlas and create dedicated modal-time fixed blur clones of those roots instead, with viewport-fit compensation applied to the clones only, so the full-screen modal blur can stretch independently without disturbing the real cursor-following background geometry"
+      ]
+    },
+    {
       "version": "1.4.99",
       "date": "2026-04-08",
       "items": [

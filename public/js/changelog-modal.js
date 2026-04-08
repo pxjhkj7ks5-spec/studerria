@@ -22,6 +22,8 @@
   const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
   const MODAL_FALLBACK_SCENE_ID = 'studerriaModalFallbackScene';
   const MODAL_FALLBACK_SCENE_CLASS = 'studerria-modal-fallback-scene';
+  const MODAL_BLUR_CLONE_ATTR = 'data-studerria-modal-blur-clone';
+  const MODAL_BLUR_CLONE_SOURCE_ATTR = 'data-studerria-modal-blur-clone-source';
   const MODAL_BLUR_TRANSITION_MS = 340;
   const MODAL_BLUR_CLEANUP_DELAY_MS = MODAL_BLUR_TRANSITION_MS + 80;
   const MODAL_BLUR_TRANSITION_VALUE = [
@@ -86,6 +88,7 @@
   ];
   const modalBlurCleanupTimers = new WeakMap();
   let modalFallbackSceneCleanupTimer = 0;
+  let modalBlurCloneCleanupTimer = 0;
 
   function getModal() {
     return document.querySelector(MODAL_SELECTOR);
@@ -258,8 +261,11 @@
     if (isModalBlurSceneTarget(target)) {
       return true;
     }
+    if (isModalBlurCloneTarget(target)) {
+      return true;
+    }
     if (document.body instanceof HTMLElement && document.body.classList.contains(APPLE_WEBVIEW_CLASS)) {
-      return isModalBlurBackgroundTarget(target);
+      return false;
     }
     return isModalBlurBackgroundTarget(target);
   }
@@ -270,6 +276,10 @@
 
   function isModalBlurSceneTarget(target) {
     return target instanceof HTMLElement && target.id === MODAL_FALLBACK_SCENE_ID;
+  }
+
+  function isModalBlurCloneTarget(target) {
+    return target instanceof HTMLElement && target.getAttribute(MODAL_BLUR_CLONE_ATTR) === '1';
   }
 
   function clearModalFallbackSceneCleanupTimer() {
@@ -350,6 +360,121 @@
     }, MODAL_BLUR_CLEANUP_DELAY_MS);
   }
 
+  function clearModalBlurCloneCleanupTimer() {
+    if (modalBlurCloneCleanupTimer) {
+      window.clearTimeout(modalBlurCloneCleanupTimer);
+      modalBlurCloneCleanupTimer = 0;
+    }
+  }
+
+  function getModalBlurCloneForSource(sourceId) {
+    if (!sourceId) {
+      return null;
+    }
+
+    return document.querySelector(
+      `[${MODAL_BLUR_CLONE_ATTR}="1"][${MODAL_BLUR_CLONE_SOURCE_ATTR}="${window.CSS?.escape ? window.CSS.escape(sourceId) : sourceId}"]`
+    );
+  }
+
+  function configureModalBlurCloneBase(clone) {
+    if (!(clone instanceof HTMLElement)) {
+      return;
+    }
+
+    clone.style.position = 'fixed';
+    clone.style.left = '0';
+    clone.style.top = '0';
+    clone.style.width = `${Math.max(window.innerWidth || 0, 1)}px`;
+    clone.style.height = `${Math.max(window.innerHeight || 0, 1)}px`;
+    clone.style.overflow = 'hidden';
+    clone.style.pointerEvents = 'none';
+    clone.style.zIndex = '-1';
+    clone.style.transform = 'translateZ(0)';
+    clone.style.transformOrigin = 'top left';
+    clone.style.zoom = '1';
+  }
+
+  function syncModalBlurCloneGeometry(clone) {
+    if (!(clone instanceof HTMLElement)) {
+      return;
+    }
+
+    configureModalBlurCloneBase(clone);
+    const rect = clone.getBoundingClientRect();
+    const renderedWidth = Math.max(Number(rect.width) || 0, 1);
+    const renderedHeight = Math.max(Number(rect.height) || 0, 1);
+    const compensation = Math.max(
+      Math.max(window.innerWidth || 1, 1) / renderedWidth,
+      Math.max(window.innerHeight || 1, 1) / renderedHeight
+    );
+
+    if (Number.isFinite(compensation) && compensation > 0 && Math.abs(compensation - 1) > 0.001) {
+      clone.style.zoom = compensation.toFixed(6);
+    }
+  }
+
+  function createModalBlurCloneFromSource(source) {
+    if (!(source instanceof HTMLElement) || !source.id) {
+      return null;
+    }
+
+    const clone = source.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.setAttribute(MODAL_BLUR_CLONE_ATTR, '1');
+    clone.setAttribute(MODAL_BLUR_CLONE_SOURCE_ATTR, source.id);
+    clone.setAttribute('aria-hidden', 'true');
+    clone.classList.add('studerria-modal-blur-clone');
+
+    clone.querySelectorAll('#dynamicBgTrail, #studerriaBgParticles').forEach((node) => {
+      node.removeAttribute('id');
+    });
+
+    configureModalBlurCloneBase(clone);
+    return clone;
+  }
+
+  function ensureModalBlurClones() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement) || !body.classList.contains(APPLE_WEBVIEW_CLASS)) {
+      return;
+    }
+
+    clearModalBlurCloneCleanupTimer();
+    Array.from(body.children).forEach((child) => {
+      if (!isModalBlurBackgroundTarget(child)) {
+        return;
+      }
+
+      let clone = getModalBlurCloneForSource(child.id);
+      if (!(clone instanceof HTMLElement)) {
+        clone = createModalBlurCloneFromSource(child);
+        if (clone instanceof HTMLElement) {
+          body.appendChild(clone);
+        }
+      }
+
+      syncModalBlurCloneGeometry(clone);
+    });
+  }
+
+  function scheduleModalBlurCloneCleanup() {
+    clearModalBlurCloneCleanupTimer();
+    modalBlurCloneCleanupTimer = window.setTimeout(() => {
+      if (hasVisibleModal()) {
+        modalBlurCloneCleanupTimer = 0;
+        return;
+      }
+
+      document.querySelectorAll(`[${MODAL_BLUR_CLONE_ATTR}="1"]`).forEach((node) => {
+        if (node instanceof HTMLElement) {
+          node.remove();
+        }
+      });
+      modalBlurCloneCleanupTimer = 0;
+    }, MODAL_BLUR_CLEANUP_DELAY_MS);
+  }
+
   function getModalFallbackBackdropColor() {
     const body = document.body;
     const isLightTheme = body instanceof HTMLElement && body.classList.contains('theme-light');
@@ -392,7 +517,7 @@
     const body = document.body;
     if (
       !(body instanceof HTMLElement) ||
-      body.classList.contains(APPLE_WEBVIEW_CLASS) ||
+      (body.classList.contains(APPLE_WEBVIEW_CLASS) && !isModalBlurCloneTarget(target)) ||
       !body.classList.contains('studerria-theme') ||
       window.innerWidth < 1200
     ) {
@@ -529,6 +654,7 @@
 
     if (shouldOpen) {
       ensureModalFallbackScene();
+      ensureModalBlurClones();
       Array.from(document.body?.children || []).forEach((target) => {
         applyModalBlurFallback(target);
       });
@@ -539,6 +665,7 @@
       restoreModalBlurFallback(target);
     });
     scheduleModalFallbackSceneCleanup();
+    scheduleModalBlurCloneCleanup();
   }
 
   function syncNoBlurTargets(forceOpen) {
