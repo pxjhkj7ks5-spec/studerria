@@ -253,7 +253,7 @@
       return true;
     }
     if (document.body instanceof HTMLElement && document.body.classList.contains(APPLE_WEBVIEW_CLASS)) {
-      return false;
+      return isModalBlurBackgroundTarget(target);
     }
     return isModalBlurBackgroundTarget(target);
   }
@@ -279,6 +279,9 @@
 
   function shouldWrapModalFallbackNode(node) {
     if (!(node instanceof HTMLElement) || isModalBlurSceneTarget(node)) {
+      return false;
+    }
+    if (isModalBlurBackgroundTarget(node)) {
       return false;
     }
     if (node.classList.contains('modal') || node.classList.contains('modal-backdrop')) {
@@ -381,7 +384,12 @@
       return null;
     }
     const body = document.body;
-    if (!(body instanceof HTMLElement) || !body.classList.contains('studerria-theme') || window.innerWidth < 1200) {
+    if (
+      !(body instanceof HTMLElement) ||
+      body.classList.contains(APPLE_WEBVIEW_CLASS) ||
+      !body.classList.contains('studerria-theme') ||
+      window.innerWidth < 1200
+    ) {
       return null;
     }
 

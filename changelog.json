@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.98",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-root-split): keep the shared background roots outside the temporary Atlas modal scene wrapper and skip modal-time zoom compensation for Atlas background roots, so opening a modal no longer re-breaks the cursor trail geometry while the full-screen background blur can extend independently behind the foreground scene"
+      ]
+    },
+    {
       "version": "1.4.97",
       "date": "2026-04-08",
       "items": [
