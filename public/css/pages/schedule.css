@@ -2041,6 +2041,49 @@ body.page-schedule .app-footer {
   padding-bottom: calc(168px + env(safe-area-inset-bottom));
 }
 
+@media (min-width: 1200px) {
+  html.studerria-zoom-fallback body.page-schedule {
+    --t-display: 18px;
+    --t-h1: 15px;
+    --t-h2: 13px;
+    --t-body: 12px;
+    --t-meta: 10px;
+    --t-chip: 10px;
+    --space-1: 6px;
+    --space-2: 12px;
+    --space-3: 18px;
+    --radius-md: 14px;
+    --radius-lg: 18px;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .schedule-content.container {
+    width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter))) !important;
+    max-width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter))) !important;
+    padding-top: calc(1.2rem + 8px) !important;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .week-hero {
+    padding: 18px 20px;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .badge-glow {
+    padding: 9px 14px;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .day-header {
+    padding: 16px 18px 10px;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .day-card .list-group {
+    padding: 12px 16px 16px;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .schedule-card {
+    padding: 16px;
+    gap: 6px;
+  }
+}
+
 @media (max-width: 991px) {
   body.page-schedule .schedule-content {
     padding-top: 10px !important;

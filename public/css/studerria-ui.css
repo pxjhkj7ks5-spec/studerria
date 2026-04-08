@@ -1582,6 +1582,55 @@ body.page-schedule .modal.show .modal-footer {
   backdrop-filter: none !important;
 }
 
+@media (min-width: 1200px) {
+  html.studerria-zoom-fallback body.page-schedule.studerria-theme {
+    --studerria-shell-max-width: 1180px;
+    --studerria-shell-gutter: clamp(120px, 12vw, 240px);
+  }
+
+  html.studerria-zoom-fallback body.page-local-topbar.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
+    max-width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
+    margin: 0 auto 10px;
+    padding: 6px 10px !important;
+    border-radius: 24px;
+  }
+
+  html.studerria-zoom-fallback body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .container {
+    min-height: 38px;
+    gap: 10px 14px;
+    padding-inline: 1rem !important;
+  }
+
+  html.studerria-zoom-fallback body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .navbar-brand.topbar-title-spotlight {
+    font-size: 1rem !important;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .app-footer {
+    margin-top: 0.9rem;
+    padding-top: 0.75rem !important;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .app-footer .footer-meta,
+  html.studerria-zoom-fallback body.page-schedule .app-footer .footer-meta.glass-dock {
+    min-height: 38px;
+    gap: 0.7rem;
+    padding: 0.46rem 1rem;
+    font-size: 10.5px;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .app-footer .footer-sync-pill {
+    font-size: 9.5px;
+    padding: 3px 7px;
+  }
+
+  html.studerria-zoom-fallback body.page-schedule .app-footer .footer-sync-pill .sync-dot {
+    width: 5px;
+    height: 5px;
+    flex: 0 0 5px;
+  }
+}
+
 /* Late no-blur guard: wins over page-specific blur rules whenever any modal is open. */
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .page-container,
 body.studerria-theme:is(.modal-open, .studerria-changelog-open) .topbar,
