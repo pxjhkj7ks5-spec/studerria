@@ -57,6 +57,12 @@ body.studerria-theme {
   --studerria-empty-accent: rgba(129, 140, 248, 0.6);
 }
 
+@media (min-width: 1200px) {
+  body.studerria-theme {
+    zoom: 0.75;
+  }
+}
+
 html[data-theme='light'] body.studerria-theme,
 body.theme-light.studerria-theme {
   --studerria-text-primary: #0f172a;

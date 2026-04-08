@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.4.65",
+      "version": "1.4.66",
       "date": "2026-04-08",
       "items": [
-        "revert(global-shell-scale): restore the shared app shell width and page gutters to the previous full-size layout after the compact 75% look proved too small across all pages"
+        "tune(global-desktop-zoom): apply a 75% desktop zoom to the shared Studerria shell so all pages match the cleaner smaller-scale Mac layout without requiring manual browser zoom"
       ]
     },
     {
