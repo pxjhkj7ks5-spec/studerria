@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.82",
+      "date": "2026-04-08",
+      "items": [
+        "fix(teamwork-default-subject): make the teamwork page auto-select the first available subject when no subject_id is passed, so the first subject pill is active on initial open just like the subjects page"
+      ]
+    },
+    {
       "version": "1.4.81",
       "date": "2026-04-08",
       "items": [

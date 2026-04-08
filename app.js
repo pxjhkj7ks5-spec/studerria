@@ -34450,8 +34450,10 @@ app.post('/subjects/materials/:id/delete', requireLogin, writeLimiter, async (re
 
 app.get('/teamwork', requireLogin, async (req, res) => {
   const { id: userId, username, role, course_id: fallbackCourseId } = req.session.user;
-  const selectedSubjectIdRaw = req.query.subject_id ? Number(req.query.subject_id) : null;
-  const selectedSubjectId = Number.isFinite(selectedSubjectIdRaw) ? selectedSubjectIdRaw : null;
+  const requestedSubjectId = Number(req.query.subject_id);
+  const selectedSubjectId = Number.isFinite(requestedSubjectId) && requestedSubjectId > 0
+    ? requestedSubjectId
+    : null;
   const isTeacherMode = hasSessionRole(req, 'teacher');
   const useStudentAcademicView = !isTeacherMode && isAdminViewingStudentSelf(req);
   const activeUserFilter = usersHasIsActive ? ' AND u.is_active = 1' : '';
@@ -34567,8 +34569,8 @@ app.get('/teamwork', requireLogin, async (req, res) => {
       .sort((a, b) => a.course_id - b.course_id || a.subject_name.localeCompare(b.subject_name));
 
     const selectedSubject = selectedSubjectId
-      ? subjects.find((subject) => Number(subject.subject_id) === Number(selectedSubjectId))
-      : null;
+      ? (subjects.find((subject) => Number(subject.subject_id) === Number(selectedSubjectId)) || null)
+      : (subjects[0] || null);
 
     if (!selectedSubject) {
       return res.render('teamwork', {
