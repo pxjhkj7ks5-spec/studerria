@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.13",
+      "date": "2026-04-08",
+      "items": [
+        "tune(modal-shell-outline): remove the shared modal content border and inset highlight globally, and clear the remaining schedule-specific modal border override, so dialogs no longer render a visible rectangular outline around the liquid-glass shell"
+      ]
+    },
+    {
       "version": "1.5.12",
       "date": "2026-04-08",
       "items": [
