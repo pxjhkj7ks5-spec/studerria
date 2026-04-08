@@ -898,7 +898,6 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   padding-bottom: var(--space-16);
 }
 
-.app-footer small,
 .app-footer .footer-meta,
 .app-footer .footer-version,
 .app-footer .footer-build,
@@ -909,6 +908,13 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   font-weight: var(--w-medium);
   line-height: 1.25;
   opacity: 0.58;
+}
+
+.app-footer small {
+  color: var(--ds-text2) !important;
+  font-size: 11.5px;
+  font-weight: var(--w-medium);
+  line-height: 1.25;
 }
 
 .app-footer .footer-release-slot {
@@ -928,6 +934,7 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   font-size: 10.5px;
   letter-spacing: 0.01em;
   line-height: 1;
+  opacity: 1;
 }
 
 .footer-release-pill__dot {
@@ -956,6 +963,7 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   letter-spacing: 0.01em;
   line-height: 1;
   white-space: nowrap;
+  opacity: 1;
 }
 
 .app-footer .footer-sync-pill .sync-dot {
