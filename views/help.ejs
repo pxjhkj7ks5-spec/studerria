@@ -23,9 +23,6 @@
 
     <%
       const localeCode = lang === 'uk' ? 'uk-UA' : 'en-US';
-      const legacyAnnouncementFeed = typeof announcementFeed !== 'undefined' ? announcementFeed : [];
-      const legacyAnnouncementSummary = typeof announcementSummary !== 'undefined' ? announcementSummary : null;
-      const legacyAnnouncementDigestFlag = typeof showAnnouncementDigest !== 'undefined' ? showAnnouncementDigest : undefined;
       const formatStamp = (value) => {
         if (!value) return '—';
         const date = new Date(value);
@@ -36,9 +33,6 @@
         });
       };
       const historyList = Array.isArray(supportRequests) ? supportRequests : [];
-      const inboxList = Array.isArray(inboxFeed)
-        ? inboxFeed
-        : (Array.isArray(legacyAnnouncementFeed) ? legacyAnnouncementFeed : []);
       const requestChipClass = (status) => (
         status === 'resolved'
           ? 'status-chip status-chip--active'
@@ -47,58 +41,11 @@
             : 'status-chip status-chip--pending')
       );
       const supportSummary = supportStats || {};
-      const inboxDigest = inboxSummary || legacyAnnouncementSummary || {};
-      const inboxDigestVisible = typeof showInboxDigest === 'boolean'
-        ? showInboxDigest
-        : Boolean(legacyAnnouncementDigestFlag);
       const threadRoleLabel = (roleName) => (
         roleName === 'admin'
           ? (lang === 'uk' ? 'Підтримка' : 'Support')
           : (lang === 'uk' ? 'Ви' : 'You')
       );
-      const messageKindLabel = (item) => {
-        const kind = String(item && item.message_kind ? item.message_kind : 'broadcast');
-        if (lang === 'en') {
-          if (kind === 'broadcast') return 'All-course broadcast';
-          if (kind === 'group') return 'Group update';
-          if (kind === 'subject') return 'Subject update';
-          if (kind === 'direct') return 'Direct update';
-          return 'Inbox update';
-        }
-        if (kind === 'broadcast') return 'Загальне оголошення';
-        if (kind === 'group') return 'Оновлення групи';
-        if (kind === 'subject') return 'Оновлення предмета';
-        if (kind === 'direct') return 'Адресне повідомлення';
-        return 'Оновлення inbox';
-      };
-      const messageCardTitle = (item) => {
-        if (item && item.message_title) return item.message_title;
-        if (item && item.body_preview) return item.body_preview;
-        if (item && item.body) return item.body;
-        return lang === 'en' ? 'Inbox update' : 'Оновлення inbox';
-      };
-      const messageCardBody = (item) => {
-        if (item && item.message_title) {
-          return item.body_preview || item.body || '';
-        }
-        return '';
-      };
-      const messageMetaLine = (item) => {
-        const parts = [];
-        if (item && item.message_scope_line) {
-          parts.push(item.message_scope_line);
-        } else {
-          if (item && item.subject_name) parts.push(item.subject_name);
-          if (item && Number(item.group_number || 0) > 0) {
-            parts.push(`${lang === 'en' ? 'Group' : 'Група'} ${Number(item.group_number)}`);
-          }
-          if (item && item.created_by) parts.push(item.created_by);
-        }
-        if (item && item.rating_snapshot_card && item.rating_snapshot_card.updated_label) {
-          parts.push(item.rating_snapshot_card.updated_label);
-        }
-        return parts.join(' · ');
-      };
     %>
 
     <section class="studerria-help-shell" aria-labelledby="studerria-help-title">
@@ -132,7 +79,6 @@
             <h1 class="studerria-help-title" id="studerria-help-title"><%= helpPage.hero.title %></h1>
             <p class="studerria-help-subtitle"><%= helpPage.hero.subtitle %></p>
             <p class="studerria-help-lead"><%= helpPage.hero.lead %></p>
-            <p class="studerria-help-note"><%= helpPage.hero.note %></p>
           </div>
         </div>
       </article>
@@ -214,148 +160,99 @@
               <button class="btn btn-primary" type="submit"><%= t('help.formSubmit') %></button>
             </form>
           </article>
-          <% if (inboxDigestVisible) { %>
-            <article class="glass-panel studerria-help-messages-card" id="inbox-digest">
-              <div class="studerria-help-section-head">
-                <div>
-                  <p class="studerria-help-section-kicker"><%= lang === 'en' ? 'Inbox' : 'Inbox' %></p>
-                  <h2 class="studerria-help-section-title"><%= lang === 'en' ? 'Inbox updates' : 'Оновлення inbox' %></h2>
-                </div>
-                <p class="studerria-help-section-copy"><%= lang === 'en' ? 'Broadcast, group, subject, and direct updates stay in the schedule inbox. Support threads remain separate here in Help.' : 'Загальні, групові, предметні й адресні оновлення живуть в inbox розкладу. Треди підтримки лишаються окремо тут, у Help.' %></p>
+          <article class="glass-panel studerria-help-history" aria-labelledby="studerria-help-history-title">
+            <div class="studerria-help-section-head">
+              <div>
+                <p class="studerria-help-section-kicker"><%= t('help.pageTitle') %></p>
+                <h2 class="studerria-help-section-title" id="studerria-help-history-title"><%= t('help.historyTitle') %></h2>
               </div>
+              <p class="studerria-help-section-copy"><%= t('help.historySubtitle') %></p>
+            </div>
 
-              <div class="studerria-help-history-summary">
-                <span class="status-chip status-chip--info"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(inboxDigest.unread || 0) %></span>
-                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Broadcast' : 'Загальні' %>: <%= Number(inboxDigest.broadcast || 0) %></span>
-                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Group' : 'Групові' %>: <%= Number(inboxDigest.group || 0) %></span>
-                <span class="status-chip status-chip--neutral"><%= lang === 'en' ? 'Subject' : 'Предметні' %>: <%= Number(inboxDigest.subject || 0) %></span>
-                <span class="status-chip status-chip--muted"><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(inboxDigest.direct || 0) %></span>
-              </div>
-
-              <% if (inboxList.length) { %>
-                <div class="studerria-help-announcement-list">
-                  <% inboxList.forEach(function(item) { %>
-                    <article class="studerria-help-announcement-item <%= !item.read_id ? 'is-unread' : '' %>">
-                      <div class="studerria-help-announcement-head">
-                        <div class="studerria-help-history-meta">
-                          <span class="status-chip status-chip--neutral"><%= messageKindLabel(item) %></span>
-                          <% if (!item.read_id) { %>
-                            <span class="status-chip status-chip--info"><%= lang === 'en' ? 'Unread' : 'Нове' %></span>
-                          <% } %>
-                        </div>
-                        <span class="studerria-help-announcement-date"><%= formatStamp(item.published_at || item.created_at) %></span>
-                      </div>
-                      <p class="studerria-help-announcement-body"><strong><%= messageCardTitle(item) %></strong></p>
-                      <% if (messageCardBody(item)) { %>
-                        <p class="studerria-help-announcement-body"><%= messageCardBody(item) %></p>
-                      <% } %>
-                      <% if (messageMetaLine(item)) { %>
-                        <p class="studerria-help-announcement-meta"><%= messageMetaLine(item) %></p>
-                      <% } %>
-                    </article>
-                  <% }); %>
-                </div>
-              <% } else { %>
-                <p class="studerria-help-empty"><%= lang === 'en' ? 'No fresh inbox updates right now. Older items remain available from the schedule inbox.' : 'Зараз немає свіжих оновлень inbox. Старіші елементи залишаються доступними в inbox розкладу.' %></p>
+            <div class="studerria-help-history-summary">
+              <span class="status-chip status-chip--info"><%= lang === 'uk' ? 'Активні' : 'Open' %>: <%= Number(supportSummary.open || 0) %></span>
+              <span class="status-chip status-chip--active"><%= lang === 'uk' ? 'Закриті' : 'Resolved' %>: <%= Number(supportSummary.resolved || 0) %></span>
+              <span class="status-chip status-chip--neutral"><%= lang === 'uk' ? 'Всього' : 'Total' %>: <%= Number(supportSummary.total || historyList.length || 0) %></span>
+              <% if (supportSummary.response) { %>
+                <span class="status-chip status-chip--muted"><%= lang === 'uk' ? 'SLA' : 'SLA' %>: <%= supportSummary.response %></span>
               <% } %>
+            </div>
 
-              <a class="btn btn-outline-secondary glass" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open schedule inbox' : 'Відкрити inbox розкладу' %></a>
-            </article>
-          <% } %>
+            <% if (historyList.length) { %>
+              <div class="studerria-help-history-list">
+                <% historyList.forEach(function(request) { %>
+                  <article class="studerria-help-history-card">
+                    <div class="studerria-help-history-top">
+                      <div>
+                        <div class="studerria-help-history-meta">
+                          <span class="<%= requestChipClass(request.status) %>"><%= t(`help.status.${request.status === 'in_progress' ? 'inProgress' : request.status}`) %></span>
+                          <span class="status-chip status-chip--muted"><%= t(`help.topic.${request.category}`) %></span>
+                        </div>
+                        <h3 class="studerria-help-history-title"><%= request.subject %></h3>
+                      </div>
+                      <div class="studerria-help-history-dates">
+                        <span><%= t('help.historyCreated') %>: <%= formatStamp(request.created_at) %></span>
+                        <span><%= t('help.historyUpdated') %>: <%= formatStamp(request.updated_at || request.created_at) %></span>
+                      </div>
+                    </div>
+                    <div class="studerria-help-thread">
+                      <% (request.messages || []).forEach(function(message) { %>
+                        <div class="studerria-help-thread-message <%= message.author_role === 'admin' ? 'is-admin' : 'is-user' %>">
+                          <div class="studerria-help-thread-head">
+                            <strong><%= threadRoleLabel(message.author_role) %></strong>
+                            <span><%= formatStamp(message.created_at) %></span>
+                          </div>
+                          <p class="studerria-help-history-body"><%= message.body %></p>
+                        </div>
+                      <% }) %>
+                    </div>
+                    <% if (request.last_message_preview) { %>
+                      <div class="studerria-help-history-note">
+                        <span><%= lang === 'uk' ? 'Останнє оновлення' : 'Latest update' %></span>
+                        <p><%= request.last_message_preview %></p>
+                      </div>
+                    <% } %>
+                    <% if (request.needs_reply) { %>
+                      <div class="studerria-help-thread-toolbar">
+                        <p class="studerria-help-thread-toolbar-copy"><%= t('help.closePrompt') %></p>
+                        <form
+                          method="POST"
+                          action="/help/support/<%= request.id %>/close"
+                          class="studerria-help-close-form"
+                          data-confirm="<%= t('help.closeConfirm') %>"
+                          onsubmit="return confirm(this.dataset.confirm || '')"
+                        >
+                          <button class="btn btn-outline-secondary glass btn-sm studerria-help-close-button" type="submit">
+                            <%= t('help.closeAction') %>
+                          </button>
+                        </form>
+                      </div>
+                      <form method="POST" action="/help/support/<%= request.id %>/reply" class="studerria-help-reply-form">
+                        <label class="form-label" for="supportReply<%= request.id %>"><%= lang === 'uk' ? 'Уточнити контекст' : 'Add reply' %></label>
+                        <textarea
+                          class="form-control"
+                          id="supportReply<%= request.id %>"
+                          name="body"
+                          rows="3"
+                          maxlength="2000"
+                          minlength="2"
+                          placeholder="<%= lang === 'uk' ? 'Наприклад: проблема відтворюється і після зміни групи...' : 'For example: the issue still reproduces after the group change...' %>"
+                          required
+                        ></textarea>
+                        <div class="studerria-help-reply-actions">
+                          <button class="btn btn-primary btn-sm" type="submit"><%= lang === 'uk' ? 'Відправити відповідь' : 'Send reply' %></button>
+                        </div>
+                      </form>
+                    <% } %>
+                  </article>
+                <% }); %>
+              </div>
+            <% } else { %>
+              <p class="studerria-help-empty"><%= t('help.historyEmpty') %></p>
+            <% } %>
+          </article>
         </div>
       </section>
-
-      <article class="glass-panel studerria-help-history" aria-labelledby="studerria-help-history-title">
-        <div class="studerria-help-section-head">
-          <div>
-            <p class="studerria-help-section-kicker"><%= t('help.pageTitle') %></p>
-            <h2 class="studerria-help-section-title" id="studerria-help-history-title"><%= t('help.historyTitle') %></h2>
-          </div>
-          <p class="studerria-help-section-copy"><%= t('help.historySubtitle') %></p>
-        </div>
-
-        <div class="studerria-help-history-summary">
-          <span class="status-chip status-chip--info"><%= lang === 'uk' ? 'Активні' : 'Open' %>: <%= Number(supportSummary.open || 0) %></span>
-          <span class="status-chip status-chip--active"><%= lang === 'uk' ? 'Закриті' : 'Resolved' %>: <%= Number(supportSummary.resolved || 0) %></span>
-          <span class="status-chip status-chip--neutral"><%= lang === 'uk' ? 'Всього' : 'Total' %>: <%= Number(supportSummary.total || historyList.length || 0) %></span>
-          <% if (supportSummary.response) { %>
-            <span class="status-chip status-chip--muted"><%= lang === 'uk' ? 'SLA' : 'SLA' %>: <%= supportSummary.response %></span>
-          <% } %>
-        </div>
-
-        <% if (historyList.length) { %>
-          <div class="studerria-help-history-list">
-            <% historyList.forEach(function(request) { %>
-              <article class="studerria-help-history-card">
-                <div class="studerria-help-history-top">
-                  <div>
-                    <div class="studerria-help-history-meta">
-                      <span class="<%= requestChipClass(request.status) %>"><%= t(`help.status.${request.status === 'in_progress' ? 'inProgress' : request.status}`) %></span>
-                      <span class="status-chip status-chip--muted"><%= t(`help.topic.${request.category}`) %></span>
-                    </div>
-                    <h3 class="studerria-help-history-title"><%= request.subject %></h3>
-                  </div>
-                  <div class="studerria-help-history-dates">
-                    <span><%= t('help.historyCreated') %>: <%= formatStamp(request.created_at) %></span>
-                    <span><%= t('help.historyUpdated') %>: <%= formatStamp(request.updated_at || request.created_at) %></span>
-                  </div>
-                </div>
-                <div class="studerria-help-thread">
-                  <% (request.messages || []).forEach(function(message) { %>
-                    <div class="studerria-help-thread-message <%= message.author_role === 'admin' ? 'is-admin' : 'is-user' %>">
-                      <div class="studerria-help-thread-head">
-                        <strong><%= threadRoleLabel(message.author_role) %></strong>
-                        <span><%= formatStamp(message.created_at) %></span>
-                      </div>
-                      <p class="studerria-help-history-body"><%= message.body %></p>
-                    </div>
-                  <% }) %>
-                </div>
-                <% if (request.last_message_preview) { %>
-                  <div class="studerria-help-history-note">
-                    <span><%= lang === 'uk' ? 'Останнє оновлення' : 'Latest update' %></span>
-                    <p><%= request.last_message_preview %></p>
-                  </div>
-                <% } %>
-                <% if (request.needs_reply) { %>
-                  <div class="studerria-help-thread-toolbar">
-                    <p class="studerria-help-thread-toolbar-copy"><%= t('help.closePrompt') %></p>
-                    <form
-                      method="POST"
-                      action="/help/support/<%= request.id %>/close"
-                      class="studerria-help-close-form"
-                      data-confirm="<%= t('help.closeConfirm') %>"
-                      onsubmit="return confirm(this.dataset.confirm || '')"
-                    >
-                      <button class="btn btn-outline-secondary glass btn-sm studerria-help-close-button" type="submit">
-                        <%= t('help.closeAction') %>
-                      </button>
-                    </form>
-                  </div>
-                  <form method="POST" action="/help/support/<%= request.id %>/reply" class="studerria-help-reply-form">
-                    <label class="form-label" for="supportReply<%= request.id %>"><%= lang === 'uk' ? 'Уточнити контекст' : 'Add reply' %></label>
-                    <textarea
-                      class="form-control"
-                      id="supportReply<%= request.id %>"
-                      name="body"
-                      rows="3"
-                      maxlength="2000"
-                      minlength="2"
-                      placeholder="<%= lang === 'uk' ? 'Наприклад: проблема відтворюється і після зміни групи...' : 'For example: the issue still reproduces after the group change...' %>"
-                      required
-                    ></textarea>
-                    <div class="studerria-help-reply-actions">
-                      <button class="btn btn-primary btn-sm" type="submit"><%= lang === 'uk' ? 'Відправити відповідь' : 'Send reply' %></button>
-                    </div>
-                  </form>
-                <% } %>
-              </article>
-            <% }); %>
-          </div>
-        <% } else { %>
-          <p class="studerria-help-empty"><%= t('help.historyEmpty') %></p>
-        <% } %>
-      </article>
 
       <%- include('partials/app-footer') %>
     </section>

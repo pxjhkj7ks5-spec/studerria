@@ -101,12 +101,50 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   color: #bbf7d0;
 }
 
+body.theme-light .flash-alert {
+  border-color: rgba(123, 140, 166, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(243, 247, 255, 0.88));
+  box-shadow: 0 24px 44px rgba(130, 146, 173, 0.16);
+}
+
+body.theme-light .flash-alert__title {
+  color: #182235;
+}
+
+body.theme-light .flash-alert__text {
+  color: rgba(51, 65, 85, 0.84);
+}
+
+body.theme-light .flash-alert.alert-danger {
+  color: #9f1239;
+  border-color: rgba(225, 29, 72, 0.18);
+  background: linear-gradient(180deg, rgba(255, 247, 247, 0.98), rgba(255, 239, 240, 0.88));
+}
+
+body.theme-light .flash-alert.alert-success {
+  color: #166534;
+  border-color: rgba(34, 197, 94, 0.18);
+  background: linear-gradient(180deg, rgba(244, 253, 246, 0.98), rgba(235, 251, 239, 0.88));
+}
+
 .studerria-help-hero,
 .studerria-help-faq,
 .studerria-help-form-card,
 .studerria-help-history {
   position: relative;
   overflow: hidden;
+}
+
+body.theme-light .studerria-help-faq,
+body.theme-light .studerria-help-form-card,
+body.theme-light .studerria-help-history {
+  border: 1px solid rgba(123, 140, 166, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(244, 248, 255, 0.88)),
+    rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 28px 50px rgba(130, 146, 173, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .studerria-help-hero {
@@ -187,6 +225,11 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   padding: 1rem;
 }
 
+body.theme-light .studerria-help-history-card {
+  border-color: rgba(123, 140, 166, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 255, 0.9));
+}
+
 .studerria-help-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.95fr);
@@ -228,6 +271,11 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   border: 1px solid color-mix(in srgb, var(--studerria-border-soft, rgba(255, 255, 255, 0.1)) 75%, transparent);
 }
 
+body.theme-light .studerria-help-faq-group {
+  border-color: rgba(123, 140, 166, 0.16);
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.98), rgba(241, 245, 255, 0.88));
+}
+
 .studerria-help-faq-list {
   display: grid;
   gap: 0.65rem;
@@ -238,6 +286,11 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   border: 1px solid color-mix(in srgb, var(--studerria-border-soft, rgba(255, 255, 255, 0.1)) 75%, transparent);
   background: color-mix(in srgb, var(--studerria-surface-raised, rgba(255, 255, 255, 0.05)) 82%, transparent);
   transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+body.theme-light .studerria-help-faq-item {
+  border-color: rgba(123, 140, 166, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(247, 250, 255, 0.9));
 }
 
 .studerria-help-faq-item[open] {
@@ -279,6 +332,19 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   content: "−";
   color: var(--studerria-text-primary);
   transform: rotate(180deg);
+}
+
+body.theme-light .studerria-help-faq-item summary {
+  color: #182235;
+}
+
+body.theme-light .studerria-help-faq-item summary::after {
+  border-color: rgba(123, 140, 166, 0.22);
+  color: rgba(51, 65, 85, 0.8);
+}
+
+body.theme-light .studerria-help-faq-item[open] summary::after {
+  color: #182235;
 }
 
 .studerria-help-faq-item p {
@@ -334,6 +400,10 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   border-top: 1px solid color-mix(in srgb, var(--studerria-border-soft, rgba(255, 255, 255, 0.08)) 75%, transparent);
 }
 
+body.theme-light .studerria-help-history-note {
+  border-top-color: rgba(123, 140, 166, 0.16);
+}
+
 .studerria-help-history-note span {
   color: var(--studerria-text-primary);
   font-size: 0.8rem;
@@ -347,47 +417,6 @@ body.theme-dark .flash-alert.alert-success .flash-alert__icon {
   flex-wrap: wrap;
   gap: 0.55rem;
   margin-bottom: 1rem;
-}
-
-.studerria-help-announcement-list {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.studerria-help-announcement-item {
-  display: grid;
-  gap: 0.65rem;
-  padding: 0.95rem 1rem;
-  border-radius: 1rem;
-  border: 1px solid color-mix(in srgb, var(--studerria-border-soft, rgba(255, 255, 255, 0.1)) 75%, transparent);
-  background: color-mix(in srgb, var(--studerria-surface-base, rgba(255, 255, 255, 0.05)) 90%, transparent);
-}
-
-.studerria-help-announcement-item.is-unread {
-  border-color: color-mix(in srgb, var(--studerria-accent, #6ea8fe) 34%, transparent);
-  background: color-mix(in srgb, var(--studerria-accent, #6ea8fe) 10%, transparent);
-}
-
-.studerria-help-announcement-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 0.85rem;
-}
-
-.studerria-help-announcement-date,
-.studerria-help-announcement-meta {
-  margin: 0;
-  color: var(--studerria-text-muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-
-.studerria-help-announcement-body {
-  margin: 0;
-  color: var(--studerria-text-primary);
-  line-height: 1.65;
-  white-space: pre-wrap;
 }
 
 .studerria-help-thread {

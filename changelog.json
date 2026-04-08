@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.59",
+      "date": "2026-04-08",
+      "items": [
+        "fix(help-page-layout): remove the inbox digest from Help, move the request history card into the right column under the request form, trim duplicate login/profile/access copy from the FAQ, and strengthen the light-theme card contrast so sections read clearly"
+      ]
+    },
+    {
       "version": "1.4.58",
       "date": "2026-04-08",
       "items": [
