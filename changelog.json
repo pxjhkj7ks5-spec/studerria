@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.30",
+      "date": "2026-04-09",
+      "items": [
+        "fix(workspace-term-editor-canonical-upsert): make the Academic V2 workspace term editor save canonical `Term 1/2/3` rows by `group + term number` even when the right-side form has no `term_id`, so switching the active term from the editor no longer drops back to `Term 1`; also preserve the existing term title and start date when that editor-driven upsert happens"
+      ]
+    },
+    {
       "version": "1.5.29",
       "date": "2026-04-09",
       "items": [
