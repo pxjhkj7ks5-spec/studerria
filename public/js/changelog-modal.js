@@ -138,7 +138,7 @@
 
   function syncModalLayers() {
     cleanupBackdrop();
-    const fallbackBackdropIsTransparent =
+    const fallbackBackdropUsesTint =
       document.body instanceof HTMLElement && document.body.classList.contains(MODAL_FALLBACK_OPEN_CLASS);
 
     const visibleModals = Array.from(document.querySelectorAll('.modal.show')).filter(
@@ -155,12 +155,13 @@
       }
 
       backdrop.style.pointerEvents = index === backdrops.length - 1 ? 'auto' : 'none';
-      backdrop.style.opacity = fallbackBackdropIsTransparent ? '1' : 'var(--bs-backdrop-opacity, 0.42)';
+      backdrop.style.opacity = fallbackBackdropUsesTint ? '1' : 'var(--bs-backdrop-opacity, 0.42)';
       backdrop.style.zIndex = String(BASE_BACKDROP_Z_INDEX + (index * MODAL_LAYER_STEP));
-      if (fallbackBackdropIsTransparent) {
-        backdrop.style.setProperty('--bs-backdrop-bg', 'transparent');
-        backdrop.style.background = 'transparent';
-        backdrop.style.backgroundColor = 'transparent';
+      if (fallbackBackdropUsesTint) {
+        const fallbackBackdropColor = getModalFallbackBackdropColor();
+        backdrop.style.setProperty('--bs-backdrop-bg', fallbackBackdropColor);
+        backdrop.style.background = fallbackBackdropColor;
+        backdrop.style.backgroundColor = fallbackBackdropColor;
       }
       backdrop.style.webkitBackdropFilter = 'none';
       backdrop.style.backdropFilter = 'none';
@@ -236,22 +237,18 @@
       : 'blur(18px) saturate(0.94) brightness(0.94)';
   }
 
-  function getModalForegroundFadeValue() {
-    const body = document.body;
-    const isLightTheme = body instanceof HTMLElement && body.classList.contains('theme-light');
-    return isLightTheme ? '0.84' : '0.76';
-  }
-
   function isModalBlurFallbackTarget(target) {
-    return (
-      target instanceof HTMLElement &&
-      target.parentElement === document.body &&
-      !target.matches('.modal, .modal-backdrop, script, style, link, template, noscript')
-    );
+    return isModalBlurBackgroundTarget(target);
   }
 
   function isModalBlurBackgroundTarget(target) {
     return target instanceof HTMLElement && (target.id === 'dynamic-bg' || target.id === 'studerriaBg');
+  }
+
+  function getModalFallbackBackdropColor() {
+    const body = document.body;
+    const isLightTheme = body instanceof HTMLElement && body.classList.contains('theme-light');
+    return isLightTheme ? 'rgba(236, 242, 252, 0.14)' : 'rgba(7, 11, 24, 0.18)';
   }
 
   function restoreTrackedInlineStyle(target, cssProperty, valueKey, priorityKey) {
@@ -284,8 +281,6 @@
 
     clearModalBlurCleanupTimer(target);
     const blurValue = getModalBlurFallbackValue();
-    const foregroundFadeValue = getModalForegroundFadeValue();
-    const isBackgroundTarget = isModalBlurBackgroundTarget(target);
     const isAlreadyActive = target.getAttribute(MODAL_BLUR_STATE_ATTR) === '1';
 
     if (!isAlreadyActive) {
@@ -306,31 +301,14 @@
         return;
       }
 
-      if (isBackgroundTarget) {
-        target.style.setProperty('-webkit-filter', blurValue, 'important');
-        target.style.setProperty('filter', blurValue, 'important');
-        restoreTrackedInlineStyle(
-          target,
-          'opacity',
-          'studerriaModalBlurOpacityValue',
-          'studerriaModalBlurOpacityPriority'
-        );
-        return;
-      }
-
+      target.style.setProperty('-webkit-filter', blurValue, 'important');
+      target.style.setProperty('filter', blurValue, 'important');
       restoreTrackedInlineStyle(
         target,
-        '-webkit-filter',
-        'studerriaModalBlurWebkitFilterValue',
-        'studerriaModalBlurWebkitFilterPriority'
+        'opacity',
+        'studerriaModalBlurOpacityValue',
+        'studerriaModalBlurOpacityPriority'
       );
-      restoreTrackedInlineStyle(
-        target,
-        'filter',
-        'studerriaModalBlurFilterValue',
-        'studerriaModalBlurFilterPriority'
-      );
-      target.style.setProperty('opacity', foregroundFadeValue, 'important');
     });
   }
 

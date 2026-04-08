@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.92",
+      "date": "2026-04-08",
+      "items": [
+        "fix(atlas-modal-single-backdrop): limit the Atlas modal blur fallback to the true full-screen background roots only and bring back one subtle viewport-wide backdrop tint, so schedule/page shell containers no longer create a persistent darker slab in the top-left while dialogs animate out"
+      ]
+    },
+    {
       "version": "1.4.91",
       "date": "2026-04-08",
       "items": [
