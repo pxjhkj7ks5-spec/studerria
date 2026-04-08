@@ -27,6 +27,10 @@
     `filter ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
     'opacity 260ms ease-out'
   ].join(', ');
+  const MODAL_BACKDROP_TRANSITION_VALUE = [
+    `opacity ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+    `background-color ${MODAL_BLUR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+  ].join(', ');
   const NO_BLUR_SELECTOR = [
     '.glass',
     '.glass-card',
@@ -131,6 +135,7 @@
       backdrop.style.background = '';
       backdrop.style.backgroundColor = '';
       backdrop.style.removeProperty('--bs-backdrop-bg');
+      backdrop.style.transition = '';
       backdrop.style.webkitBackdropFilter = '';
       backdrop.style.backdropFilter = '';
     });
@@ -162,6 +167,7 @@
         backdrop.style.setProperty('--bs-backdrop-bg', fallbackBackdropColor);
         backdrop.style.background = fallbackBackdropColor;
         backdrop.style.backgroundColor = fallbackBackdropColor;
+        backdrop.style.transition = MODAL_BACKDROP_TRANSITION_VALUE;
       }
       backdrop.style.webkitBackdropFilter = 'none';
       backdrop.style.backdropFilter = 'none';

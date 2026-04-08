@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.93",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-blur-sync): synchronize the Atlas fallback backdrop fade timing with the background-root blur timing, so the residual dark patch in the top-left no longer outlives the main modal blur while dialogs animate closed"
+      ]
+    },
+    {
       "version": "1.4.92",
       "date": "2026-04-08",
       "items": [
