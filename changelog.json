@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.29",
+      "date": "2026-04-09",
+      "items": [
+        "fix(bachelor-projection-term-reset): preserve the group’s currently active term number when stage-template structure is re-applied, instead of resetting bachelor groups back to the stage-template default term 1 during catalog saves or projection resyncs; also align bachelor stage-template coverage checks so zero linked terms mean `not taught`, not `all terms`"
+      ]
+    },
+    {
       "version": "1.5.28",
       "date": "2026-04-09",
       "items": [

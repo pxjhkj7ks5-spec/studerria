@@ -180,3 +180,50 @@ test('non-bachelor stage-template projection keeps the previous all-terms fallba
     [201, 202, 203]
   );
 });
+
+test('bachelor desired term numbers stay empty when a stage subject has no linked terms', () => {
+  const stageTermNumberById = new Map([
+    [101, 1],
+    [102, 2],
+    [103, 3],
+  ]);
+
+  assert.deepEqual(
+    academicV2Helpers.resolveProjectedStageSubjectTermNumbers(
+      { stage_term_template_ids: [] },
+      stageTermNumberById,
+      { trackKey: 'bachelor' }
+    ),
+    []
+  );
+});
+
+test('projected active term preserves the currently active group term number', () => {
+  const projectedTermNumber = academicV2Helpers.resolveProjectedActiveTermNumber(
+    [
+      { id: 201, term_number: 2, is_active: true, is_archived: false, updated_at: '2026-04-09T10:00:00.000Z' },
+      { id: 202, term_number: 1, is_active: false, is_archived: false, updated_at: '2026-04-08T10:00:00.000Z' },
+    ],
+    [
+      { id: 101, term_number: 1, is_active_default: true, sort_order: 1 },
+      { id: 102, term_number: 2, is_active_default: false, sort_order: 2 },
+    ]
+  );
+
+  assert.equal(projectedTermNumber, 2);
+});
+
+test('projected active term falls back to the stage-template default when the group has no active term', () => {
+  const projectedTermNumber = academicV2Helpers.resolveProjectedActiveTermNumber(
+    [
+      { id: 201, term_number: 1, is_active: false, is_archived: false, updated_at: '2026-04-08T10:00:00.000Z' },
+      { id: 202, term_number: 2, is_active: false, is_archived: false, updated_at: '2026-04-09T10:00:00.000Z' },
+    ],
+    [
+      { id: 101, term_number: 1, is_active_default: false, sort_order: 1 },
+      { id: 102, term_number: 2, is_active_default: true, sort_order: 2 },
+    ]
+  );
+
+  assert.equal(projectedTermNumber, 2);
+});
