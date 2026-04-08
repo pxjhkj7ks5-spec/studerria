@@ -100,7 +100,7 @@ const navConfig = {
         },
         {
           id: 'subjects',
-          label: 'Предмети',
+          label: 'Дисципліни',
           href: '/subjects',
           section: 'main',
           rolesAllowed: APP_ROLES,

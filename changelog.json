@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.95",
+      "date": "2026-04-08",
+      "items": [
+        "tune(navbar-subjects-copy): rename the shared navbar `Предмети` entry to `Дисципліни` in the canonical navigation config so the top navigation matches the updated terminology used across the rest of the student-facing UI"
+      ]
+    },
+    {
       "version": "1.4.94",
       "date": "2026-04-08",
       "items": [
