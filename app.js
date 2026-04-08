@@ -23,6 +23,8 @@ const journalInsightHelpers = require('./lib/journalInsights');
 const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
+const csrfHelpers = require('./lib/csrf');
+const fileValidation = require('./lib/fileValidation');
 const sessionGeneratorHelpers = require('./lib/sessionGenerator');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
@@ -311,9 +313,9 @@ process.on('unhandledRejection', (err) => {
   console.error('Unhandled rejection:', err);
 });
 
-const adminSeed = process.env.ADMIN_HASHED_PASS
+const adminSeed = process.env.ADMIN_HASHED_PASS && process.env.ADMIN_NAME
   ? {
-      full_name: process.env.ADMIN_NAME || 'Марченко Андрій Юрійович',
+      full_name: process.env.ADMIN_NAME,
       role: 'admin',
       password_hash: process.env.ADMIN_HASHED_PASS,
     }
@@ -900,6 +902,7 @@ const sessionMiddleware = session({
 });
 
 app.use(sessionMiddleware);
+app.use(csrfHelpers.csrfProtection());
 
 const buildSessionRoleFingerprint = (roles = []) => {
   const normalizedRoles = normalizeRoleList(roles);
@@ -2351,11 +2354,46 @@ const upload = multer({
   },
 });
 
+function validateUploadedFileMagicBytes(req, res, next) {
+  const files = [];
+  if (req.file) files.push(req.file);
+  if (Array.isArray(req.files)) files.push(...req.files);
+  for (const file of files) {
+    if (file.mimetype === 'text/plain') continue;
+    let buffer = null;
+    if (file.buffer) {
+      buffer = file.buffer.subarray(0, 16);
+    } else if (file.path) {
+      try {
+        const fd = fs.openSync(file.path, 'r');
+        buffer = Buffer.alloc(16);
+        fs.readSync(fd, buffer, 0, 16, 0);
+        fs.closeSync(fd);
+      } catch (_err) {
+        continue;
+      }
+    }
+    if (!buffer) continue;
+    const result = fileValidation.validateFileContent(buffer, file.mimetype);
+    if (!result.valid && result.reason !== 'unknown_mime') {
+      if (file.path) {
+        try { fs.unlinkSync(file.path); } catch (_e) { /* cleanup */ }
+      }
+      const wantsJson = req.accepts('json') || req.path.startsWith('/api');
+      if (wantsJson) {
+        return res.status(400).json({ ok: false, error: 'file_content_mismatch', reason: result.reason });
+      }
+      return res.status(400).send('Uploaded file content does not match its type');
+    }
+  }
+  return next();
+}
+
 const csvUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const okTypes = new Set(['text/csv', 'application/vnd.ms-excel', 'application/csv', 'text/plain', 'application/octet-stream']);
+    const okTypes = new Set(['text/csv', 'application/vnd.ms-excel', 'application/csv', 'text/plain']);
     if (!okTypes.has(file.mimetype)) {
       return cb(new Error('Invalid file type'));
     }
@@ -10150,13 +10188,7 @@ function handleDbError(res, err, label) {
         || String(req.headers && req.headers.accept ? req.headers.accept : '').toLowerCase().includes('application/json')
       );
     if (wantsJson) {
-      if (process.env.DB_DEBUG === 'true') {
-        return res.status(500).json({ error: `Database error (${label})`, details: message });
-      }
       return res.status(500).json({ error: 'Database error' });
-    }
-    if (process.env.DB_DEBUG === 'true') {
-      return res.status(500).send(`Database error (${label})`);
     }
     return res.status(500).send('Database error');
   }
@@ -15105,6 +15137,10 @@ app.post('/login', authLimiter, async (req, res) => {
         `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
         [normalizedName]
       );
+      const DUMMY_HASH = '$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234';
+      if (!user || !user.password_hash) {
+        bcrypt.compareSync(password, DUMMY_HASH);
+      }
       const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
       if (!user || !validHash) {
         try {
@@ -16673,7 +16709,7 @@ app.post('/teacher/workspace/offerings', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/teacher/workspace/assets', requireLogin, uploadLimiter, upload.single('asset'), async (req, res) => {
+app.post('/teacher/workspace/assets', requireLogin, uploadLimiter, upload.single('asset'), validateUploadedFileMagicBytes, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
@@ -16789,7 +16825,7 @@ app.post('/teacher/workspace/assets/:id/delete', requireLogin, async (req, res) 
   }
 });
 
-app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.array('template_files', 8), async (req, res) => {
+app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.array('template_files', 8), validateUploadedFileMagicBytes, async (req, res) => {
   const uploadedFiles = Array.isArray(req.files) ? req.files : [];
   try {
     await ensureDbReady();
@@ -16916,7 +16952,7 @@ app.post('/teacher/workspace/templates', requireLogin, uploadLimiter, upload.arr
   }
 });
 
-app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter, upload.array('template_files', 8), async (req, res) => {
+app.post('/teacher/workspace/templates/:id/update', requireLogin, uploadLimiter, upload.array('template_files', 8), validateUploadedFileMagicBytes, async (req, res) => {
   const uploadedFiles = Array.isArray(req.files) ? req.files : [];
   try {
     await ensureDbReady();
@@ -21406,7 +21442,7 @@ app.post('/api/homework/:id/complete', requireLogin, writeLimiter, async (req, r
   }
 });
 
-app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('submission_attachment'), async (req, res) => {
+app.post('/homework/:id/submit', requireLogin, uploadLimiter, upload.single('submission_attachment'), validateUploadedFileMagicBytes, async (req, res) => {
   const homeworkId = Number(req.params.id);
   const requestedRedirect = typeof req.body.redirect_to === 'string' ? String(req.body.redirect_to).trim() : '';
   const redirectBase = (requestedRedirect.startsWith('/my-day') || requestedRedirect.startsWith('/home'))
@@ -32576,7 +32612,7 @@ app.get('/subjects', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
+app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('attachment'), validateUploadedFileMagicBytes, async (req, res) => {
   if (!hasSessionRole(req, 'teacher')) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
@@ -50059,7 +50095,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
   }
 });
 
-app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
+app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment'), validateUploadedFileMagicBytes, async (req, res) => {
   const {
     description,
     link_url,
@@ -50402,7 +50438,7 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
   }
 });
 
-app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachment'), async (req, res) => {
+app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachment'), validateUploadedFileMagicBytes, async (req, res) => {
   if (!canSessionUseCustomDeadlines(req)) {
     return res.status(403).send('Custom deadlines disabled');
   }
@@ -54886,16 +54922,7 @@ app.use((err, req, res, next) => {
   const wantsJson = String(req.get && req.get('accept') ? req.get('accept') : '').toLowerCase().includes('application/json')
     || String(req.headers && req.headers.accept ? req.headers.accept : '').toLowerCase().includes('application/json');
   if (wantsJson) {
-    if (process.env.DB_DEBUG === 'true') {
-      return res.status(500).json({
-        error: err && err.message ? String(err.message) : 'Internal Server Error',
-        details: err && err.stack ? String(err.stack) : String(err),
-      });
-    }
     return res.status(500).json({ error: 'Internal Server Error' });
-  }
-  if (process.env.DB_DEBUG === 'true') {
-    return res.status(500).send(err && err.stack ? err.stack : String(err));
   }
   return res.status(500).send('Internal Server Error');
 });

@@ -24,6 +24,7 @@
         window.__studerriaThemeBoot = theme;
       })();
     </script>
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><meta name="csrf-token" content="<%= csrfToken %>" /><% } %>
     <%- pageHead || '' %>
     <link rel="stylesheet" href="/css/navbar-enhanced.css" />
     <link rel="stylesheet" href="/css/studerria-background.css" />
@@ -48,6 +49,7 @@
       <%- body %>
     </main>
 
+    <script src="/js/csrf.js" defer></script>
     <script src="/js/studerria-background.js" defer></script>
     <script src="/js/navbar.js" defer></script>
   </body>

@@ -18,5 +18,7 @@
     window.__studerriaThemeBoot = theme;
   })();
 </script>
+<% if (typeof csrfToken !== 'undefined' && csrfToken) { %><meta name="csrf-token" content="<%= csrfToken %>" /><% } %>
 <link rel="stylesheet" href="/css/navbar-enhanced.css" />
 <link rel="stylesheet" href="/css/modal-enhanced.css" />
+<script src="/js/csrf.js" defer></script>

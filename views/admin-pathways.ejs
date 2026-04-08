@@ -1,5 +1,5 @@
 <%
-  const canonicalPathwaysFocus = pathwaysFocus && typeof pathwaysFocus === 'object' ? pathwaysFocus : {};
+  const canonicalPathwaysFocus = typeof pathwaysFocus !== 'undefined' && pathwaysFocus && typeof pathwaysFocus === 'object' ? pathwaysFocus : {};
   const normalizeFocusPositiveInt = (value) => {
     const normalized = Number(value || 0);
     return Number.isInteger(normalized) && normalized > 0 ? normalized : 0;

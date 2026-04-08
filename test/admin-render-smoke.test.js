@@ -5,10 +5,19 @@ const ejs = require('ejs');
 
 const viewsDir = path.join(__dirname, '..', 'views');
 
+const EJS_INTERNALS = new Set([
+  'escapeFn', 'include', 'rethrow',
+  '__append', '__line', '__lines', '__filename', '__output',
+  '_ENCODE_HTML_RULES', '_MATCH_HTML', 'encode_char',
+]);
+
 function withFallbackLocals(base = {}) {
   return new Proxy(base, {
     has(target, prop) {
-      if (prop === Symbol.unscopables) {
+      if (typeof prop === 'symbol') {
+        return false;
+      }
+      if (EJS_INTERNALS.has(prop)) {
         return false;
       }
       if (Object.prototype.hasOwnProperty.call(target, prop)) {
@@ -17,7 +26,7 @@ function withFallbackLocals(base = {}) {
       return !(prop in globalThis);
     },
     get(target, prop) {
-      if (prop === Symbol.unscopables) {
+      if (typeof prop === 'symbol') {
         return undefined;
       }
       if (Object.prototype.hasOwnProperty.call(target, prop)) {
@@ -117,6 +126,8 @@ function baseRenderLocals(overrides = {}) {
     messages: { error: '', success: '', operationId: '' },
     deaneryMonitoring: null,
     backLink: '/admin?track=bachelor&course=1',
+    canManagePathways: false,
+    pathwaysPanelHref: '/admin/pathways',
     ...overrides,
   });
 }

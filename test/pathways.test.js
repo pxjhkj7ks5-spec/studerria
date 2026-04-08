@@ -332,11 +332,11 @@ test('legacy subject student helper normalizes course, group, and user filters',
   });
 
   assert.equal(rows.length, 1);
-  assert.match(calls[0].sql, /u\.course_id = \?/i);
+  assert.match(calls[0].sql, /u\.course_id = \?|v2_group\.legacy_course_id/i);
   assert.match(calls[0].sql, /sg\.group_number = ANY/i);
   assert.match(calls[0].sql, /u\.id = ANY/i);
   assert.match(calls[0].sql, /u\.is_active/i);
-  assert.deepEqual(calls[0].params, [12, 3, [2], [5]]);
+  assert.deepEqual(calls[0].params, [12, 3, 3, [2], [5]]);
 });
 
 test('legacy student subject group helper supports active-user filter through facade', async () => {
@@ -382,7 +382,7 @@ test('legacy course student group assignments use bindings when available', asyn
   assert.match(calls[0].sql, /sg\.student_id = ANY/i);
   assert.match(calls[0].sql, /sg\.subject_id = ANY/i);
   assert.match(calls[0].sql, /u\.is_active/i);
-  assert.deepEqual(calls[0].params, [7, [4, 5], [9]]);
+  assert.deepEqual(calls[0].params, [7, 7, [4, 5], [9]]);
 });
 
 test('legacy course student group assignments fall back to subject owner course on compatibility error', async () => {
@@ -410,7 +410,7 @@ test('legacy course student group assignments fall back to subject owner course 
   assert.equal(calls.length, 2);
   assert.match(calls[1].sql, /s\.course_id = \?/i);
   assert.match(calls[1].sql, /NULL AS subject_name/i);
-  assert.deepEqual(calls[1].params, [11]);
+  assert.deepEqual(calls[1].params, [11, 11]);
 });
 
 test('legacy subject student counts aggregate distinct students through service layer', async () => {
@@ -434,7 +434,7 @@ test('legacy subject student counts aggregate distinct students through service 
   assert.match(calls[0].sql, /scb\.course_id = \?/i);
   assert.match(calls[0].sql, /sg\.subject_id = ANY/i);
   assert.match(calls[0].sql, /sg\.group_number = \?/i);
-  assert.deepEqual(calls[0].params, [5, [12, 13], 5, 2]);
+  assert.deepEqual(calls[0].params, [5, [12, 13], 5, 5, 2]);
 });
 
 test('legacy message recipient counts batch subject-group targets', async () => {
@@ -460,7 +460,7 @@ test('legacy message recipient counts batch subject-group targets', async () => 
   assert.match(calls[0].sql, /WITH target_scope/i);
   assert.match(calls[0].sql, /VALUES \(\?, \?\), \(\?, \?\)/i);
   assert.match(calls[0].sql, /COUNT\(DISTINCT u\.id\)/i);
-  assert.deepEqual(calls[0].params, [7, 1, 8, 2, 3]);
+  assert.deepEqual(calls[0].params, [7, 1, 8, 2, 3, 3, 3]);
 });
 
 test('legacy admission id helper resolves subject bindings through service layer', async () => {
@@ -561,11 +561,11 @@ test('legacy course users helper normalizes filters through service layer facade
   });
 
   assert.equal(rows.length, 1);
-  assert.match(calls[0].sql, /u\.course_id = \?/i);
+  assert.match(calls[0].sql, /v2_group\.legacy_course_id|u\.course_id/i);
   assert.match(calls[0].sql, /u\.id = ANY/i);
   assert.match(calls[0].sql, /ANY\(\?::text\[\]\)/i);
   assert.match(calls[0].sql, /is_active/i);
-  assert.deepEqual(calls[0].params, [4, [7, 8], ['admin', 'teacher']]);
+  assert.deepEqual(calls[0].params, [4, 4, [7, 8], ['admin', 'teacher']]);
 });
 
 test('legacy course dependency counts normalize count aliases', async () => {
