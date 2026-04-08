@@ -293,6 +293,55 @@
     return document.getElementById(MODAL_FALLBACK_SCENE_ID);
   }
 
+  function configureModalFallbackSceneBase(scene) {
+    if (!(scene instanceof HTMLElement)) {
+      return;
+    }
+
+    scene.style.position = 'fixed';
+    scene.style.left = '0';
+    scene.style.top = '0';
+    scene.style.width = `${Math.max(window.innerWidth || 0, 1)}px`;
+    scene.style.height = `${Math.max(window.innerHeight || 0, 1)}px`;
+    scene.style.overflow = 'hidden';
+    scene.style.pointerEvents = 'none';
+    scene.style.zIndex = '0';
+    scene.style.transformOrigin = 'top left';
+    scene.style.zoom = '1';
+  }
+
+  function computeViewportFitZoomCompensation(target) {
+    if (!(target instanceof HTMLElement)) {
+      return null;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const renderedWidth = Math.max(Number(rect.width) || 0, 1);
+    const renderedHeight = Math.max(Number(rect.height) || 0, 1);
+    const compensation = Math.max(
+      Math.max(window.innerWidth || 1, 1) / renderedWidth,
+      Math.max(window.innerHeight || 1, 1) / renderedHeight
+    );
+
+    if (!Number.isFinite(compensation) || compensation <= 0 || Math.abs(compensation - 1) < 0.001) {
+      return null;
+    }
+
+    return compensation;
+  }
+
+  function syncModalFallbackSceneGeometry(scene) {
+    if (!(scene instanceof HTMLElement)) {
+      return;
+    }
+
+    configureModalFallbackSceneBase(scene);
+    const compensation = computeViewportFitZoomCompensation(scene);
+    if (compensation) {
+      scene.style.zoom = compensation.toFixed(6);
+    }
+  }
+
   function shouldWrapModalFallbackNode(node) {
     if (!(node instanceof HTMLElement) || isModalBlurSceneTarget(node)) {
       return false;
@@ -327,6 +376,7 @@
       }
     });
 
+    syncModalFallbackSceneGeometry(scene);
     return scene;
   }
 
@@ -404,12 +454,9 @@
     const rect = clone.getBoundingClientRect();
     const renderedWidth = Math.max(Number(rect.width) || 0, 1);
     const renderedHeight = Math.max(Number(rect.height) || 0, 1);
-    const compensation = Math.max(
-      Math.max(window.innerWidth || 1, 1) / renderedWidth,
-      Math.max(window.innerHeight || 1, 1) / renderedHeight
-    );
+    const compensation = computeViewportFitZoomCompensation(clone);
 
-    if (Number.isFinite(compensation) && compensation > 0 && Math.abs(compensation - 1) > 0.001) {
+    if (compensation) {
       clone.style.zoom = compensation.toFixed(6);
     }
   }
@@ -595,8 +642,9 @@
       }
 
       if (isSceneTarget) {
-        target.style.setProperty('-webkit-filter', 'none', 'important');
-        target.style.setProperty('filter', 'none', 'important');
+        syncModalFallbackSceneGeometry(target);
+        target.style.setProperty('-webkit-filter', blurValue, 'important');
+        target.style.setProperty('filter', blurValue, 'important');
         target.style.setProperty('opacity', sceneOpacity, 'important');
         return;
       }

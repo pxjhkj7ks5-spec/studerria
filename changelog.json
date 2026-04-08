@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.01",
+      "date": "2026-04-08",
+      "items": [
+        "tune(atlas-modal-foreground-blur-layer): turn the temporary Atlas foreground scene wrapper into its own fixed full-screen blur layer with viewport-fit compensation instead of only dimming it, while keeping the separate background blur clones underneath, so the modal backdrop effect can cover both the UI chrome and the background field as two fullscreen layers"
+      ]
+    },
+    {
       "version": "1.5.00",
       "date": "2026-04-08",
       "items": [
