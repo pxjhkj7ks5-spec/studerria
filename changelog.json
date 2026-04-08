@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.80",
+      "date": "2026-04-08",
+      "items": [
+        "fix(footer-ovals-atlas): retint the footer online/version pills with explicit green and blue glass fills and version the shared Studerria footer CSS/island assets so Atlas stops serving stale oval colors from cached shared bundles"
+      ]
+    },
+    {
       "version": "1.4.79",
       "date": "2026-04-08",
       "items": [

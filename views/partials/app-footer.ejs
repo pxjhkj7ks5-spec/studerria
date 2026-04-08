@@ -93,7 +93,7 @@
   crossorigin="anonymous"
   defer
 ></script>
-<script src="/js/islands/runtime.js" defer></script>
-<script src="/js/islands/footer-release-island.js" defer></script>
+<script src="/js/islands/runtime.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+<script src="/js/islands/footer-release-island.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
 <script src="/js/islands/checklist-toolbar-island.js" defer></script>
 <script src="/js/islands/insights-period-preset-island.js" defer></script>

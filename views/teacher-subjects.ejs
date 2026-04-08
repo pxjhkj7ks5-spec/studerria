@@ -32,7 +32,7 @@
       integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="/css/design-system.css" />
+    <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <style>
       :root {
         --teacher-subjects-border-dark: rgba(255, 255, 255, 0.14);
@@ -188,7 +188,7 @@
         font-size: 0.82rem;
       }
     </style>
-    <link rel="stylesheet" href="/css/studerria-ui.css" />
+    <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="studerria-theme theme-dark page-teacher-subjects page-journal page-local-topbar">
