@@ -16,37 +16,38 @@
     const normalized = String(trackKey || '').trim().toLowerCase();
     if (normalized === 'bachelor') return lang === 'en' ? 'Bachelor' : 'Бакалаврат';
     if (normalized === 'master') return lang === 'en' ? "Master's" : 'Магістратура';
-    if (normalized === 'teacher') return lang === 'en' ? 'Teacher' : 'Викладач';
+    if (normalized === 'teacher') return lang === 'en' ? 'Teaching' : 'Викладацький';
     return fallback || normalized;
   };
   const registerCourseText = lang === 'en'
     ? {
         themeToggleAria: 'Change theme',
-        introLabel: 'Track registration',
-        introTitle: 'Track registration',
-        introSubtitle: 'Choose level, program, cohort, and campus.',
-        stepTrack: 'Level',
-        stepTrackCopy: 'Choose the academic level.',
+        introLabel: 'Registration path',
+        introTitle: 'Registration path',
+        introSubtitle: 'Choose a route, program, and the available steps for registration.',
+        stepTrack: 'Route',
+        stepTrackCopy: 'Choose bachelor, master, or teaching registration.',
         stepProgram: 'Program',
-        stepProgramCopy: 'Program defines the working context.',
+        stepProgramCopy: 'Program defines the next available steps.',
         stepCohort: 'Cohort',
         stepCohortCopy: 'Pick the cohort you want to join.',
         stepCampus: 'Campus',
-        stepCampusCopyStudent: 'Choose the campus that resolves the academic group.',
-        stepCampusCopyTeacher: 'Choose the campus for the teacher academic group.',
+        stepCampusCopyStudent: 'Choose the campus that matches your registration route.',
+        stepCampusCopyTeacher: 'Choose the campus that matches your teaching route.',
         chooseProgram: 'Choose a program',
-        chooseProgramFirst: 'Choose a program first to unlock cohort choices.',
-        noPrograms: 'No programs available for this route yet.',
+        chooseProgramFirst: 'Choose a program first to see the next available steps.',
+        chooseProgramForCampusTeacher: 'Choose a program first to see available campuses.',
+        noPrograms: 'This route is not open for registration yet.',
         noCohorts: 'No cohort is available for this program yet.',
-        noReadyCohorts: 'This program has no ready cohort for registration yet.',
+        noReadyCohorts: 'Cohorts for this program are still being prepared.',
         chooseCohortFirst: 'Choose a cohort to review available campuses.',
         chooseCohortOption: 'Choose cohort',
-        noCampuses: 'No campuses are available for this scope yet.',
-        noReadyCampuses: 'This scope has no ready campus for registration yet.',
-        chooseCampus: 'Choose a campus to confirm the academic scope.',
+        noCampuses: 'No campuses are available for this route yet.',
+        noReadyCampuses: 'This route has no ready campus for registration yet.',
+        chooseCampus: 'Choose a campus to continue.',
         ready: 'Ready',
-        blocked: 'Blocked',
-        needsSetup: 'Needs setup',
+        blocked: 'Unavailable',
+        needsSetup: 'Needs attention',
         cohortLabel: 'Cohort',
         admissionYearLabel: 'Admission year',
         campusLabel: 'Campus',
@@ -62,35 +63,36 @@
         cohortMetaReady: 'ready',
         cohortMetaBlocked: 'blocked',
         continueLockedStudent: 'Choose cohort and campus before continuing.',
-        continueLockedTeacher: 'Choose campus before continuing.',
+        continueLockedTeacher: 'Choose a program and campus before continuing.',
       }
     : {
         themeToggleAria: 'Змінити тему',
-        introLabel: 'Реєстрація треку',
-        introTitle: 'Реєстрація треку',
-        introSubtitle: 'Оберіть рівень, програму, когорту та кампус.',
-        stepTrack: 'Рівень',
-        stepTrackCopy: 'Оберіть академічний рівень.',
+        introLabel: 'Маршрут реєстрації',
+        introTitle: 'Маршрут реєстрації',
+        introSubtitle: 'Оберіть маршрут, програму і доступні кроки для реєстрації.',
+        stepTrack: 'Маршрут',
+        stepTrackCopy: 'Оберіть бакалаврський, магістерський або викладацький маршрут.',
         stepProgram: 'Програма',
-        stepProgramCopy: 'Програма задає робочий контекст.',
+        stepProgramCopy: 'Програма визначає наступні доступні кроки.',
         stepCohort: 'Когорта',
         stepCohortCopy: 'Оберіть когорту, до якої хочете приєднатись.',
         stepCampus: 'Кампус',
-        stepCampusCopyStudent: 'Оберіть кампус, який привʼязує академічну групу.',
-        stepCampusCopyTeacher: 'Оберіть кампус для викладацької академічної групи.',
+        stepCampusCopyStudent: 'Оберіть кампус, який відповідає вашому маршруту реєстрації.',
+        stepCampusCopyTeacher: 'Оберіть кампус, який відповідає викладацькому маршруту.',
         chooseProgram: 'Оберіть програму',
-        chooseProgramFirst: 'Спершу оберіть програму, щоб побачити когорти.',
-        noPrograms: 'Для цього маршруту ще немає доступних програм.',
+        chooseProgramFirst: 'Спершу оберіть програму, щоб побачити доступні варіанти далі.',
+        chooseProgramForCampusTeacher: 'Спершу оберіть програму, щоб побачити доступні кампуси.',
+        noPrograms: 'Цей маршрут поки не відкритий для реєстрації.',
         noCohorts: 'Для цієї програми поки немає жодної когорти.',
-        noReadyCohorts: 'Для цієї програми поки немає готової когорти для реєстрації.',
+        noReadyCohorts: 'Когорти для цієї програми ще готуються до реєстрації.',
         chooseCohortFirst: 'Оберіть когорту, щоб переглянути доступні кампуси.',
         chooseCohortOption: 'Оберіть когорту',
-        noCampuses: 'Для цього контексту поки немає доступних кампусів.',
-        noReadyCampuses: 'Для цього контексту поки немає готового кампусу для реєстрації.',
-        chooseCampus: 'Оберіть кампус, щоб підтвердити академічний маршрут.',
+        noCampuses: 'Для цього маршруту поки немає доступних кампусів.',
+        noReadyCampuses: 'Для цього маршруту поки немає готового кампусу для реєстрації.',
+        chooseCampus: 'Оберіть кампус, щоб продовжити реєстрацію.',
         ready: 'Готово',
-        blocked: 'Заблоковано',
-        needsSetup: 'Потрібне налаштування',
+        blocked: 'Недоступно',
+        needsSetup: 'Потребує уваги',
         cohortLabel: 'Когорта',
         admissionYearLabel: 'Рік вступу',
         campusLabel: 'Кампус',
@@ -106,7 +108,7 @@
         cohortMetaReady: 'готово',
         cohortMetaBlocked: 'заблоковано',
         continueLockedStudent: 'Оберіть когорту і кампус перед продовженням.',
-        continueLockedTeacher: 'Оберіть кампус перед продовженням.',
+        continueLockedTeacher: 'Оберіть програму і кампус перед продовженням.',
       };
 %>
 <!doctype html>
@@ -744,7 +746,7 @@
               <form method="POST" action="/register/course" id="registerCourseForm">
                 <section class="registration-step">
                   <div class="registration-step-header">
-                    <span class="registration-step-index">1</span>
+                    <span class="registration-step-index" id="trackStepIndex">1</span>
                     <div>
                       <h2 class="registration-step-title"><%= registerCourseText.stepTrack %></h2>
                       <p class="registration-step-copy"><%= registerCourseText.stepTrackCopy %></p>
@@ -777,7 +779,7 @@
 
                 <section class="registration-step">
                   <div class="registration-step-header">
-                    <span class="registration-step-index">2</span>
+                    <span class="registration-step-index" id="programStepIndex">2</span>
                     <div>
                       <h2 class="registration-step-title"><%= registerCourseText.stepProgram %></h2>
                       <p class="registration-step-copy"><%= registerCourseText.stepProgramCopy %></p>
@@ -798,7 +800,7 @@
 
                 <section class="registration-step" id="cohortStep">
                   <div class="registration-step-header">
-                    <span class="registration-step-index">3</span>
+                    <span class="registration-step-index" id="cohortStepIndex">3</span>
                     <div>
                       <h2 class="registration-step-title"><%= registerCourseText.stepCohort %></h2>
                       <p class="registration-step-copy"><%= registerCourseText.stepCohortCopy %></p>
@@ -819,7 +821,7 @@
 
                 <section class="registration-step" id="campusStep">
                   <div class="registration-step-header">
-                    <span class="registration-step-index">4</span>
+                    <span class="registration-step-index" id="campusStepIndex">4</span>
                     <div>
                       <h2 class="registration-step-title"><%= registerCourseText.stepCampus %></h2>
                       <p class="registration-step-copy" id="campusStepCopy"><%= registerCourseText.stepCampusCopyStudent %></p>
@@ -855,6 +857,10 @@
       const registerCourseText = <%- JSON.stringify(registerCourseText) %>;
       const scopeMatrix = <%- JSON.stringify(scopeMatrix) %>;
       const trackDiagnostics = <%- JSON.stringify(trackDiagnostics) %>;
+      const trackStepIndex = document.getElementById('trackStepIndex');
+      const programStepIndex = document.getElementById('programStepIndex');
+      const cohortStepIndex = document.getElementById('cohortStepIndex');
+      const campusStepIndex = document.getElementById('campusStepIndex');
       const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
       const programSelect = document.getElementById('studyProgramSelect');
       const programField = document.getElementById('programField');
@@ -923,7 +929,7 @@
       function formatTrackLabelClient(trackKey) {
         const normalized = normalizeTrackKey(trackKey);
         if (normalized === 'master') return currentLang === 'en' ? "Master's" : 'Магістратура';
-        if (normalized === 'teacher') return currentLang === 'en' ? 'Teacher' : 'Викладач';
+        if (normalized === 'teacher') return currentLang === 'en' ? 'Teaching' : 'Викладацький';
         return currentLang === 'en' ? 'Bachelor' : 'Бакалаврат';
       }
 
@@ -1026,6 +1032,16 @@
         return Boolean(state.programId && state.cohortConfirmed && state.campusConfirmed && state.groupId);
       }
 
+      function syncStepIndices() {
+        const teacherMode = isTeacherTrack(state.trackKey);
+        if (trackStepIndex) trackStepIndex.textContent = '1';
+        if (programStepIndex) programStepIndex.textContent = '2';
+        if (cohortStepIndex) cohortStepIndex.textContent = '3';
+        if (campusStepIndex) {
+          campusStepIndex.textContent = teacherMode ? '3' : '4';
+        }
+      }
+
       function syncTrackCards() {
         document.querySelectorAll('[data-track-card]').forEach((card) => {
           const trackKey = normalizeTrackKey(card.dataset.trackCard);
@@ -1061,9 +1077,8 @@
           trackDiagnosticAction.style.display = diagnostic.action ? '' : 'none';
         }
         if (trackDiagnosticMeta) {
-          trackDiagnosticMeta.textContent = currentLang === 'en'
-            ? `Programs ${Number(diagnostic.program_count || 0)} · Cohorts ${Number(diagnostic.cohort_count || 0)} · Groups ${Number(diagnostic.group_count || 0)} · Ready ${Number(diagnostic.ready_group_count || 0)}`
-            : `Програм ${Number(diagnostic.program_count || 0)} · Когорт ${Number(diagnostic.cohort_count || 0)} · Груп ${Number(diagnostic.group_count || 0)} · Готових ${Number(diagnostic.ready_group_count || 0)}`;
+          trackDiagnosticMeta.textContent = diagnostic.summary || '';
+          trackDiagnosticMeta.style.display = diagnostic.summary ? '' : 'none';
         }
         trackDiagnostic.hidden = false;
       }
@@ -1219,8 +1234,8 @@
         }
         if (teacherMode) {
           if (!state.programId) {
-            campusOptions.appendChild(createEmptyCard(registerCourseText.chooseProgram, registerCourseText.chooseProgramFirst));
-            setHint(campusHint, registerCourseText.chooseProgramFirst);
+            campusOptions.appendChild(createEmptyCard(registerCourseText.chooseProgram, registerCourseText.chooseProgramForCampusTeacher));
+            setHint(campusHint, registerCourseText.chooseProgramForCampusTeacher);
             clearCampusSelection();
             return;
           }
@@ -1317,6 +1332,7 @@
       }
 
       function renderAll() {
+        syncStepIndices();
         syncTrackCards();
         renderTrackDiagnostic();
         renderProgramField();

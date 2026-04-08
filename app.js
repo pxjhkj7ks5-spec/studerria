@@ -3196,18 +3196,30 @@ function formatRegistrationScopeCampusLabel(campusKey, lang = 'uk') {
   return normalizedCampus === 'munich' ? 'Мюнхен' : 'Київ';
 }
 
+function formatRegistrationTrackDisplayLabel(trackKey, lang = 'uk') {
+  const normalizedTrack = normalizeRegistrationTrack(trackKey, 'bachelor');
+  if (lang === 'en') {
+    if (normalizedTrack === 'master') return "Master's";
+    if (normalizedTrack === 'teacher') return 'Teaching';
+    return 'Bachelor';
+  }
+  if (normalizedTrack === 'master') return 'Магістратура';
+  if (normalizedTrack === 'teacher') return 'Викладацький';
+  return 'Бакалаврат';
+}
+
 function getRegistrationScopeStatusLabel(statusKey, lang = 'uk') {
   const normalizedStatus = sanitizeCompactText(statusKey, 40) || 'needs_setup';
   if (lang === 'en') {
     if (normalizedStatus === 'ready') return 'Ready';
-    if (normalizedStatus === 'repair') return 'Repairable';
-    if (normalizedStatus === 'blocked') return 'Blocked';
-    return 'Needs setup';
+    if (normalizedStatus === 'repair') return 'Almost ready';
+    if (normalizedStatus === 'blocked') return 'Unavailable';
+    return 'Needs attention';
   }
-  if (normalizedStatus === 'ready') return 'Готова';
-  if (normalizedStatus === 'repair') return 'Можна виправити';
-  if (normalizedStatus === 'blocked') return 'Заблоковано';
-  return 'Потрібне налаштування';
+  if (normalizedStatus === 'ready') return 'Готово';
+  if (normalizedStatus === 'repair') return 'Майже готово';
+  if (normalizedStatus === 'blocked') return 'Недоступно';
+  return 'Потребує уваги';
 }
 
 function getRegistrationScopeIssueMeta(issueCode, lang = 'uk') {
@@ -3216,145 +3228,145 @@ function getRegistrationScopeIssueMeta(issueCode, lang = 'uk') {
   const fallback = isEn
     ? {
         code: normalizedCode,
-        label: 'Registration path needs setup.',
-        shortLabel: 'Needs setup',
+        label: 'This registration option is still being prepared.',
+        shortLabel: 'Needs attention',
         tone: 'warning',
       }
     : {
         code: normalizedCode,
-        label: 'Маршрут реєстрації потребує налаштування.',
-        shortLabel: 'Потрібне налаштування',
+        label: 'Цей варіант реєстрації ще готується.',
+        shortLabel: 'Потребує уваги',
         tone: 'warning',
       };
   const dictionary = {
     duplicate_stage_campus: isEn
       ? {
           code: normalizedCode,
-          label: 'No unambiguous academic group is available for this campus.',
-          shortLabel: 'Campus conflict',
+          label: 'This campus is still being clarified for registration.',
+          shortLabel: 'Unavailable',
           tone: 'blocked',
         }
       : {
           code: normalizedCode,
-          label: 'Немає однозначної академічної групи для цього кампусу.',
-          shortLabel: 'Конфлікт кампусу',
+          label: 'Для цього кампусу ще уточнюють маршрут реєстрації.',
+          shortLabel: 'Недоступно',
           tone: 'blocked',
         },
     registration_group_duplicate_stage_campus: isEn
       ? {
           code: normalizedCode,
-          label: 'No unambiguous academic group is available for this campus.',
-          shortLabel: 'Campus conflict',
+          label: 'This campus is still being clarified for registration.',
+          shortLabel: 'Unavailable',
           tone: 'blocked',
         }
       : {
           code: normalizedCode,
-          label: 'Немає однозначної академічної групи для цього кампусу.',
-          shortLabel: 'Конфлікт кампусу',
+          label: 'Для цього кампусу ще уточнюють маршрут реєстрації.',
+          shortLabel: 'Недоступно',
           tone: 'blocked',
         },
     registration_teacher_multiple_defaults: isEn
       ? {
           code: normalizedCode,
-          label: 'This campus has several default teacher groups.',
-          shortLabel: 'Multiple defaults',
+          label: 'This teacher route is still being configured for the campus.',
+          shortLabel: 'Unavailable',
           tone: 'blocked',
         }
       : {
           code: normalizedCode,
-          label: 'Для цього кампусу позначено кілька default-викладацьких груп.',
-          shortLabel: 'Кілька default-груп',
+          label: 'Для цього кампусу викладацький маршрут ще налаштовується.',
+          shortLabel: 'Недоступно',
           tone: 'blocked',
         },
     registration_teacher_default_required: isEn
       ? {
           code: normalizedCode,
-          label: 'This campus still needs one default teacher group.',
-          shortLabel: 'Default required',
+          label: 'This teacher route is not ready for the campus yet.',
+          shortLabel: 'Unavailable',
           tone: 'blocked',
         }
       : {
           code: normalizedCode,
-          label: 'Для цього кампусу потрібно визначити одну default-викладацьку групу.',
-          shortLabel: 'Потрібен default',
+          label: 'Для цього кампусу ще не завершено налаштування викладацького маршруту.',
+          shortLabel: 'Недоступно',
           tone: 'blocked',
         },
     registration_teacher_not_default: isEn
       ? {
           code: normalizedCode,
-          label: 'This campus resolves through another default teacher group.',
-          shortLabel: 'Another default active',
+          label: 'Another main teacher route is currently used for this campus.',
+          shortLabel: 'Needs attention',
           tone: 'warning',
         }
       : {
           code: normalizedCode,
-          label: 'Цей кампус уже маршрутизується через іншу default-викладацьку групу.',
-          shortLabel: 'Інша default-група',
+          label: 'Для цього кампусу зараз використовується інший основний викладацький маршрут.',
+          shortLabel: 'Потребує уваги',
           tone: 'warning',
         },
     missing_visible_subjects: isEn
       ? {
           code: normalizedCode,
-          label: 'No visible disciplines are ready for registration yet.',
-          shortLabel: 'No disciplines',
+          label: 'Subjects for this option are still being prepared.',
+          shortLabel: 'Needs attention',
           tone: 'warning',
         }
       : {
           code: normalizedCode,
-          label: 'Для реєстрації ще немає готових видимих дисциплін.',
-          shortLabel: 'Немає дисциплін',
+          label: 'Для цього варіанта ще готують дисципліни для вибору.',
+          shortLabel: 'Потребує уваги',
           tone: 'warning',
         },
     missing_mapped_subjects: isEn
       ? {
           code: normalizedCode,
-          label: 'Visible disciplines still are not mapped into legacy projection.',
-          shortLabel: 'No mapped disciplines',
+          label: 'This option is still being updated. Some subjects are not available yet.',
+          shortLabel: 'Needs attention',
           tone: 'warning',
         }
       : {
           code: normalizedCode,
-          label: 'Видимі дисципліни ще не спроєктовані в legacy mapping.',
-          shortLabel: 'Немає mapped subjects',
+          label: 'Цей варіант ще оновлюється. Частина дисциплін поки недоступна.',
+          shortLabel: 'Потребує уваги',
           tone: 'warning',
         },
     missing_compat_bridge: isEn
       ? {
           code: normalizedCode,
-          label: 'Legacy compatibility ids still are not ready for this path.',
-          shortLabel: 'No legacy bridge',
+          label: 'This route is still finishing setup. Try again a bit later.',
+          shortLabel: 'Needs attention',
           tone: 'warning',
         }
       : {
           code: normalizedCode,
-          label: 'Для цього маршруту ще не підготовлено legacy compatibility ids.',
-          shortLabel: 'Немає legacy bridge',
+          label: 'Цей маршрут ще доготовлюється. Спробуйте трохи пізніше.',
+          shortLabel: 'Потребує уваги',
           tone: 'warning',
         },
     missing_active_term: isEn
       ? {
           code: normalizedCode,
-          label: 'The path has no active term yet.',
-          shortLabel: 'No active term',
+          label: 'Registration is not open for this option yet.',
+          shortLabel: 'Needs attention',
           tone: 'warning',
         }
       : {
           code: normalizedCode,
-          label: 'Для цього маршруту ще немає активного терму.',
-          shortLabel: 'Немає активного терму',
+          label: 'Для цього варіанта ще не відкрито період реєстрації.',
+          shortLabel: 'Потребує уваги',
           tone: 'warning',
         },
     registration_path_missing: isEn
       ? {
           code: normalizedCode,
-          label: 'No ready registration path is available yet.',
-          shortLabel: 'No ready path',
+          label: 'No ready registration option is available yet.',
+          shortLabel: 'Needs attention',
           tone: 'warning',
         }
       : {
           code: normalizedCode,
-          label: 'Поки немає готового маршруту реєстрації.',
-          shortLabel: 'Немає готового маршруту',
+          label: 'Поки немає готового варіанта реєстрації.',
+          shortLabel: 'Потребує уваги',
           tone: 'warning',
         },
   };
@@ -3456,9 +3468,9 @@ function buildRegistrationSelectableCampusCopy(row = {}, lang = 'uk') {
   return {
     reasonCode: blockingCode || 'repair_on_continue',
     reasonCopy: lang === 'en'
-      ? `${issueMeta.label} We will try to repair this route when you continue.`
-      : `${issueMeta.label} Спробуємо автоматично доремонтувати цей маршрут під час продовження.`,
-    reasonShort: lang === 'en' ? 'Repair on continue' : 'Виправимо далі',
+      ? `${issueMeta.label} You can continue, and we will finish the remaining setup automatically.`
+      : `${issueMeta.label} Можна продовжити, а решту система завершить автоматично.`,
+    reasonShort: lang === 'en' ? 'Almost ready' : 'Майже готово',
     reasonTone: 'repair',
     requiresRepair: true,
   };
@@ -3687,8 +3699,8 @@ function buildRegistrationScopeMatrix(rows = [], options = {}) {
       )
       : statusKey === 'repair'
         ? (lang === 'en'
-          ? `Selectable on ${availableCampusesCount} of ${totalCampusesCount} campuses. We will try to repair the route on continue.`
-          : `Доступно для ${availableCampusesCount} з ${totalCampusesCount} кампусів. Спробуємо доремонтувати маршрут під час продовження.`)
+          ? `Available on ${availableCampusesCount} of ${totalCampusesCount} campuses. You can continue, and we will finish the remaining setup automatically.`
+          : `Доступно для ${availableCampusesCount} з ${totalCampusesCount} кампусів. Можна продовжити, а решту система завершить автоматично.`)
       : topIssueMeta.label;
     const entry = {
       id: parsePositiveIntStrict(sample.cohort_id) || null,
@@ -3769,95 +3781,83 @@ function buildRegistrationTrackDiagnostics(data = {}, lang = 'uk') {
     );
     const topIssueCode = issueCodes[0] || '';
     const topIssueMeta = getRegistrationScopeIssueMeta(topIssueCode, lang);
+    const trackLabel = formatRegistrationTrackDisplayLabel(trackKey, lang);
+    const isTeacherTrack = trackKey === 'teacher';
 
     let statusKey = 'ready';
-    let message = lang === 'en' ? 'Registration route is ready.' : 'Маршрут готовий до реєстрації.';
+    let message = lang === 'en' ? 'This route is ready for registration.' : 'Цей маршрут готовий до реєстрації.';
     let action = '';
 
     if (topIssueCode === 'registration_teacher_multiple_defaults') {
       statusKey = 'blocked';
       message = lang === 'en'
-        ? 'Teacher registration is blocked because one campus/stage has several default teacher groups.'
-        : 'Викладацька реєстрація заблокована: для одного кампусу або стейджу позначено кілька default-викладацьких груп.';
+        ? 'One of the campuses is still finishing setup for teacher registration.'
+        : 'Для одного з кампусів ще завершують налаштування викладацького маршруту.';
       action = lang === 'en'
-        ? 'Leave exactly one default teacher group per campus and stage in Academic Setup v2.'
-        : 'Залиш рівно одну default-викладацьку групу на кожен кампус і стейдж у Academic Setup v2.';
+        ? 'Try again a bit later or contact an administrator.'
+        : 'Спробуйте трохи пізніше або зверніться до адміністратора.';
     } else if (topIssueCode === 'registration_teacher_default_required') {
       statusKey = 'blocked';
       message = lang === 'en'
-        ? 'Teacher registration is blocked because one campus/stage still has no default teacher group.'
-        : 'Викладацька реєстрація заблокована: для одного кампусу або стейджу ще не визначено default-викладацьку групу.';
+        ? 'One of the campuses is not ready for teacher registration yet.'
+        : 'Один із кампусів ще не готовий до викладацької реєстрації.';
       action = lang === 'en'
-        ? 'Mark one teacher group as the registration default for that campus and stage.'
-        : 'Познач одну викладацьку групу як registration default для цього кампусу і стейджу.';
+        ? 'Try again a bit later or contact an administrator.'
+        : 'Спробуйте трохи пізніше або зверніться до адміністратора.';
     } else if (!programs.length) {
       statusKey = 'blocked';
       message = lang === 'en'
-        ? `Academic V2 has no ${trackKey} program yet.`
-        : `У Academic V2 ще немає програми для треку "${track.label}".`;
+        ? `${trackLabel} registration is not open yet.`
+        : `Маршрут "${trackLabel}" поки не відкритий для реєстрації.`;
       action = lang === 'en'
-        ? `Create an academic_v2 program with track_key="${trackKey}".`
-        : `Створи academic_v2 program з track_key="${trackKey}".`;
-    } else if (!cohorts.length) {
+        ? 'Try again a bit later or contact an administrator.'
+        : 'Спробуйте трохи пізніше або зверніться до адміністратора.';
+    } else if (!isTeacherTrack && !cohorts.length) {
       statusKey = 'needs_setup';
       message = lang === 'en'
-        ? 'The track has a program, but no cohort yet.'
-        : 'Для цього треку є програма, але ще немає когорти.';
+        ? 'Programs are available, but cohorts are still being prepared.'
+        : 'Програми вже є, але когорти ще готуються.';
       action = lang === 'en'
-        ? 'Create at least one cohort for this track.'
-        : 'Створи хоча б одну когорту для цього треку.';
+        ? 'Try again a bit later or contact an administrator.'
+        : 'Спробуйте трохи пізніше або зверніться до адміністратора.';
     } else if (!groups.length) {
       statusKey = 'needs_setup';
       message = lang === 'en'
-        ? 'The track has a cohort, but no academic groups yet.'
-        : 'Для цього треку є когорта, але ще немає академічних груп.';
+        ? (isTeacherTrack
+          ? 'Teacher groups for this route are still being prepared.'
+          : 'Academic groups for this route are still being prepared.')
+        : (isTeacherTrack
+          ? 'Для цього маршруту ще готують викладацькі групи.'
+          : 'Для цього маршруту ще готують академічні групи.');
       action = lang === 'en'
-        ? 'Create the academic groups for the needed campus.'
-        : 'Створи академічні групи для потрібного кампусу.';
+        ? 'Try again a bit later or contact an administrator.'
+        : 'Спробуйте трохи пізніше або зверніться до адміністратора.';
     } else if (scopedReadyGroups.length > 0) {
       statusKey = 'ready';
       message = lang === 'en'
-        ? 'The track has ready registration routes.'
-        : 'Для цього треку вже є готові маршрути реєстрації.';
+        ? 'Ready registration options are available for this route.'
+        : 'Для цього маршруту вже є готові варіанти реєстрації.';
     } else if (scopedCatalogGroups.length > 0) {
       statusKey = 'repair';
       message = lang === 'en'
-        ? 'The route is selectable, but some legacy compatibility data still needs repair on continue.'
-        : 'Маршрут можна вибрати, але під час продовження ще знадобиться repair legacy-сумісності.';
-      action = topIssueCode === 'missing_mapped_subjects'
-        ? (lang === 'en'
-          ? 'Project at least one visible subject into legacy mapping or run Resync.'
-          : 'Спроєктуй хоча б один visible subject у legacy mapping або запусти Resync.')
-        : topIssueCode === 'missing_compat_bridge'
-          ? (lang === 'en'
-            ? 'Run projection repair or resync to restore legacy bridge ids.'
-            : 'Запусти repair або resync проєкції, щоб відновити legacy bridge ids.')
-          : topIssueCode === 'missing_active_term'
-            ? (lang === 'en'
-              ? 'Activate a term for the selected academic group.'
-              : 'Увімкни активний терм для вибраної академічної групи.')
-            : '';
+        ? 'This route is almost ready. You can continue, and the remaining setup will finish automatically.'
+        : 'Цей маршрут майже готовий. Можна продовжити, а решту система завершить автоматично.';
+      action = '';
     } else if (topIssueCode) {
       statusKey = topIssueMeta.tone === 'blocked' ? 'blocked' : 'needs_setup';
       message = topIssueMeta.label;
-      action = topIssueCode === 'missing_visible_subjects'
-        ? (lang === 'en'
-          ? 'Add at least one visible subject to the academic group.'
-          : 'Додай хоча б один visible subject до академічної групи.')
-        : topIssueCode === 'missing_mapped_subjects'
-          ? (lang === 'en'
-            ? 'Run Resync or create mapped visible subjects for this route.'
-            : 'Запусти Resync або додай mapped visible subjects для цього маршруту.')
-          : topIssueCode === 'missing_compat_bridge'
-            ? (lang === 'en'
-              ? 'Repair the legacy compatibility bridge for the selected group.'
-              : 'Відремонтуй legacy compatibility bridge для вибраної групи.')
-            : topIssueCode === 'missing_active_term'
-              ? (lang === 'en'
-                ? 'Mark one term as active for this academic group.'
-                : 'Познач один терм як active для цієї академічної групи.')
-              : '';
+      action = lang === 'en'
+        ? 'Try again a bit later or contact an administrator.'
+        : 'Спробуйте трохи пізніше або зверніться до адміністратора.';
     }
+
+    const summary = isTeacherTrack
+      ? (lang === 'en'
+        ? `Programs ${programs.length} · Teacher groups ${groups.length} · Ready routes ${scopedReadyGroups.length}`
+        : `Програм ${programs.length} · Викладацьких груп ${groups.length} · Готових маршрутів ${scopedReadyGroups.length}`)
+      : (lang === 'en'
+        ? `Programs ${programs.length} · Cohorts ${cohorts.length} · Groups ${groups.length} · Ready routes ${scopedReadyGroups.length}`
+        : `Програм ${programs.length} · Когорт ${cohorts.length} · Груп ${groups.length} · Готових маршрутів ${scopedReadyGroups.length}`);
 
     diagnostics[trackKey] = {
       key: trackKey,
@@ -3873,6 +3873,7 @@ function buildRegistrationTrackDiagnostics(data = {}, lang = 'uk') {
       status_label: getRegistrationScopeStatusLabel(statusKey, lang),
       message,
       action,
+      summary,
     };
   });
   return diagnostics;
@@ -3885,55 +3886,55 @@ function buildRegistrationAcademicGroupErrorMessage(issue, lang = 'uk', options 
   const copy = {
     missing_selection: isEn
       ? (isTeacher
-        ? 'Choose program, campus, and teacher academic group before continuing.'
-        : 'Choose program, cohort, campus, and academic course before continuing.')
+        ? 'Choose a program and campus before continuing.'
+        : 'Choose a program, cohort, and campus before continuing.')
       : (isTeacher
-        ? 'Оберіть програму, кампус і викладацьку академічну групу перед продовженням.'
-        : 'Оберіть програму, когорту, кампус і академічний курс перед продовженням.'),
+        ? 'Оберіть програму і кампус перед продовженням.'
+        : 'Оберіть програму, когорту і кампус перед продовженням.'),
     invalid_group: isEn
-      ? 'The selected academic course is no longer available for registration.'
-      : 'Обраний академічний курс більше недоступний для реєстрації.',
+      ? 'The selected option is no longer available for registration.'
+      : 'Обраний варіант більше недоступний для реєстрації.',
     invalid_scope: isEn
       ? (isTeacher
-        ? 'The selected teacher academic group no longer matches this program and campus.'
-        : 'The selected academic course no longer matches this registration path.')
+        ? 'The selected option no longer matches this program and campus.'
+        : 'The selected option no longer matches this registration path.')
       : (isTeacher
-        ? 'Обрана викладацька академічна група більше не відповідає цій програмі та кампусу.'
-        : 'Обраний академічний курс більше не відповідає цьому шляху реєстрації.'),
+        ? 'Обраний варіант більше не відповідає цій програмі та кампусу.'
+        : 'Обраний варіант більше не відповідає цьому маршруту реєстрації.'),
     group_required: isEn
       ? (isTeacher
-        ? 'Finish teacher academic group selection first. Legacy-only registration is disabled.'
-        : 'Finish academic course selection first. Legacy-only registration is disabled.')
+        ? 'Finish choosing a program and campus first.'
+        : 'Finish choosing a program, cohort, and campus first.')
       : (isTeacher
-        ? 'Спершу завершіть вибір викладацької академічної групи. Legacy-реєстрацію вимкнено.'
-        : 'Спершу завершіть вибір академічного курсу. Legacy-реєстрацію вимкнено.'),
+        ? 'Спершу завершіть вибір програми і кампусу.'
+        : 'Спершу завершіть вибір програми, когорти і кампусу.'),
     selection_blocked: isEn
       ? (
         blockingIssueCode === 'registration_teacher_multiple_defaults'
-          ? 'This teacher campus has multiple default academic groups. Ask an administrator to leave exactly one.'
+          ? 'This campus is still finishing setup for teacher registration.'
           : blockingIssueCode === 'registration_teacher_default_required'
-            ? 'This teacher campus still needs one default academic group before registration can continue.'
-            : 'This registration path is currently blocked by an unresolved academic-group conflict.'
+            ? 'This campus is not ready for teacher registration yet.'
+            : 'This registration path is temporarily unavailable.'
       )
       : (
         blockingIssueCode === 'registration_teacher_multiple_defaults'
-          ? 'Для цього кампусу позначено кілька default-викладацьких груп. Адміністратор має залишити лише одну.'
+          ? 'Для цього кампусу ще завершують налаштування викладацького маршруту.'
           : blockingIssueCode === 'registration_teacher_default_required'
-            ? 'Для цього викладацького кампусу потрібно визначити одну default-академічну групу перед продовженням реєстрації.'
-            : 'Цей шлях реєстрації зараз заблокований через нерозв’язаний конфлікт академічних груп.'
+            ? 'Цей кампус ще не готовий до викладацької реєстрації.'
+            : 'Цей маршрут реєстрації тимчасово недоступний.'
       ),
     repair_missing_mapped_subjects: isEn
-      ? 'The selected academic group still has no mapped visible subjects after repair. Ask an administrator to resync subject projection.'
-      : 'Після repair в обраної академічної групи все ще немає спроєктованих видимих предметів. Попросіть адміністратора пересинхронізувати subject projection.',
+      ? 'The selected route is still being updated. Some subjects are not available yet. Try again later.'
+      : 'Обраний маршрут ще оновлюється. Деякі дисципліни поки недоступні. Спробуйте пізніше.',
     repair_missing_compat_bridge: isEn
-      ? 'The selected academic group could not rebuild the required legacy compatibility ids during registration.'
-      : 'Під час реєстрації не вдалося відновити потрібні legacy compatibility ids для обраної академічної групи.',
+      ? 'The selected route could not finish setup during registration. Try again later.'
+      : 'Не вдалося завершити підготовку обраного маршруту під час реєстрації. Спробуйте пізніше.',
     repair_missing_study_context: isEn
-      ? 'The selected academic group could not rebuild its legacy study context during registration.'
-      : 'Під час реєстрації не вдалося відновити legacy study context для обраної академічної групи.',
+      ? 'The selected academic group could not finish setup during registration. Try again later.'
+      : 'Не вдалося завершити налаштування академічної групи під час реєстрації. Спробуйте пізніше.',
     repair_failed: isEn
-      ? 'The selected academic group could not finish compatibility repair during registration.'
-      : 'Під час реєстрації не вдалося завершити compatibility repair для обраної академічної групи.',
+      ? 'The selected route could not finish setup during registration. Try again later.'
+      : 'Не вдалося завершити підготовку обраного маршруту під час реєстрації. Спробуйте пізніше.',
   };
   return copy[issue] || copy.invalid_group;
 }
