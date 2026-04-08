@@ -49,6 +49,7 @@
 
   const getHiddenInput = (row) => row.querySelector('[data-reg-groups-input]');
   const getOptoutInput = (row) => row.querySelector('[data-reg-groups-optout]');
+  const getOptoutButton = (row) => row.querySelector('[data-reg-groups-optout-btn]');
   const getButtons = (row) => Array.from(row.querySelectorAll('[data-reg-groups-group]'));
   const getSubjectId = (row) => String(row.dataset.subjectId || '').trim();
   const getSubjectName = (row) => String(row.dataset.subjectName || '').trim();
@@ -96,7 +97,17 @@
 
   const isOptedOut = (row) => {
     const optout = getOptoutInput(row);
-    return optout instanceof HTMLInputElement ? optout.checked : false;
+    return optout instanceof HTMLInputElement
+      ? String(optout.value || '').trim() === '1'
+      : false;
+  };
+
+  const setOptedOut = (row, nextOptedOut) => {
+    const optout = getOptoutInput(row);
+    if (!(optout instanceof HTMLInputElement)) {
+      return;
+    }
+    optout.value = nextOptedOut ? '1' : '0';
   };
 
   const updateStateForRow = (row, selectedGroup) => {
@@ -139,9 +150,13 @@
       const isActive = !optedOut && selectedGroup === buttonGroup;
       button.classList.toggle('is-active', isActive);
       button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-      button.disabled = optedOut;
-      button.setAttribute('aria-disabled', optedOut ? 'true' : 'false');
     });
+
+    const optoutButton = getOptoutButton(row);
+    if (optoutButton instanceof HTMLButtonElement) {
+      optoutButton.classList.toggle('is-active', optedOut);
+      optoutButton.setAttribute('aria-pressed', optedOut ? 'true' : 'false');
+    }
   };
 
   const syncRow = (row) => {
@@ -296,22 +311,18 @@
       }
 
       button.addEventListener('click', () => {
-        if (button.disabled) {
-          return;
-        }
-
         const nextGroup = Number(button.dataset.regGroupsGroup || button.getAttribute('data-reg-groups-group'));
+        setOptedOut(row, false);
         setSelectedGroup(row, nextGroup);
         updateUI();
       });
     });
 
-    const optout = getOptoutInput(row);
-    if (optout instanceof HTMLInputElement) {
-      optout.addEventListener('change', () => {
-        if (optout.checked) {
-          setSelectedGroup(row, null);
-        }
+    const optoutButton = getOptoutButton(row);
+    if (optoutButton instanceof HTMLButtonElement) {
+      optoutButton.addEventListener('click', () => {
+        setOptedOut(row, true);
+        setSelectedGroup(row, null);
         updateUI();
       });
     }
@@ -346,10 +357,11 @@
   if (resetButton instanceof HTMLButtonElement) {
     resetButton.addEventListener('click', () => {
       rows.forEach((row) => {
-        if (isOptedOut(row) || !isManualSelectable(row)) {
+        if (!isManualSelectable(row)) {
           return;
         }
 
+        setOptedOut(row, false);
         setSelectedGroup(row, null);
       });
       updateUI();

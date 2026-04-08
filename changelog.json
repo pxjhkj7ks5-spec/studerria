@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.23",
+      "date": "2026-04-09",
+      "items": [
+        "fix(bachelor-registration-catalog-authority): make the bachelor catalog the source of truth for student discipline visibility by filtering bachelor student surfaces only through stage-template matches and selected terms, stop empty catalog terms from projecting as taught in all terms, and switch registration to an explicit choice matrix where optional single-group disciplines require either `Група 1` or `Дисципліна не викладається` instead of silent auto-assignment"
+      ]
+    },
+    {
       "version": "1.5.22",
       "date": "2026-04-09",
       "items": [

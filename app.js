@@ -20,6 +20,7 @@ const academicV2StudentHelpers = require('./lib/academicV2Students');
 const academicV2RuntimeHelpers = require('./lib/academicV2Runtime');
 const academicSetupHelpers = require('./lib/academicSetup');
 const journalInsightHelpers = require('./lib/journalInsights');
+const registerSubjectHelpers = require('./lib/registerSubjects');
 const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
@@ -16029,18 +16030,7 @@ app.get('/register/subjects', async (req, res) => {
     }
 
     const subjects = Array.isArray(subjectState.subjects) ? subjectState.subjects : [];
-    const selectedGroups = {};
-    const optouts = [];
-    subjects.forEach((subject) => {
-      const subjectId = parsePositiveIntStrict(subject && (subject.id || subject.subject_id));
-      const groupNumber = parsePositiveIntStrict(subject && subject.selected_group);
-      if (subject && subject.opted_out && subjectId) {
-        optouts.push(subjectId);
-      }
-      if (subjectId && groupNumber) {
-        selectedGroups[subjectId] = groupNumber;
-      }
-    });
+    const registerSubjectCards = registerSubjectHelpers.buildRegisterSubjectCards(subjects);
 
     const lang = getPreferredLang(req);
     const mappedCourses = subjectState.scope ? 1 : 0;
@@ -16092,8 +16082,7 @@ app.get('/register/subjects', async (req, res) => {
 
     return res.render('register-subjects', {
       subjects,
-      optouts,
-      selectedGroups,
+      registerSubjectCards,
       studyContext: subjectState.scope,
       pathwayRegistrationHint,
       registrationPathwayReadiness,
@@ -16163,39 +16152,33 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
     }
 
     const subjects = Array.isArray(subjectState.subjects) ? subjectState.subjects : [];
-    const isRequired = (subject) =>
-      subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
     let hasMissingRequired = false;
 
     for (const subject of subjects || []) {
-      const subjectId = Number(subject.id || 0);
+      const choice = registerSubjectHelpers.readRegisterSubjectChoice(subject, req.body);
+      const subjectId = Number(choice.id || 0);
       if (!Number.isFinite(subjectId) || subjectId < 1) continue;
 
-      const groupCount = Math.max(1, Number(subject.group_count || 1));
-      const selectedValue = req.body[`subject_${subjectId}`];
-      const selectedGroup = Number(selectedValue);
-      const optout = req.body[`optout_${subjectId}`] === '1' || req.body[`optout_${subjectId}`] === 'on';
-      const requiredFlag = isRequired(subject);
-
-      if (requiredFlag) {
+      if (choice.requiredFlag) {
         await db.run('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?', [userId, subjectId]);
-        if (groupCount === 1) {
+        if (choice.autoAssigned) {
           await db.run(upsertStudentGroupSql, [userId, subjectId, 1]);
           continue;
         }
-        if (!selectedValue) {
+        if (choice.missingChoice || choice.invalidGroup || !choice.selectedGroup) {
           hasMissingRequired = true;
           continue;
         }
-        if (Number.isFinite(selectedGroup) && selectedGroup >= 1 && selectedGroup <= groupCount) {
-          await db.run(upsertStudentGroupSql, [userId, subjectId, selectedGroup]);
-        } else {
-          hasMissingRequired = true;
-        }
+        await db.run(upsertStudentGroupSql, [userId, subjectId, choice.selectedGroup]);
         continue;
       }
 
-      if (optout) {
+      if (choice.missingChoice || choice.invalidGroup) {
+        hasMissingRequired = true;
+        continue;
+      }
+
+      if (choice.optedOut) {
         await db.run('DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?', [userId, subjectId]);
         await db.run(
           `
@@ -16209,17 +16192,7 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
       }
 
       await db.run('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?', [userId, subjectId]);
-      if (!selectedValue) {
-        if (groupCount === 1) {
-          await db.run(upsertStudentGroupSql, [userId, subjectId, 1]);
-        }
-        continue;
-      }
-      if (Number.isFinite(selectedGroup) && selectedGroup >= 1 && selectedGroup <= groupCount) {
-        await db.run(upsertStudentGroupSql, [userId, subjectId, selectedGroup]);
-      } else {
-        hasMissingRequired = true;
-      }
+      await db.run(upsertStudentGroupSql, [userId, subjectId, choice.selectedGroup]);
     }
 
     if (hasMissingRequired) {
