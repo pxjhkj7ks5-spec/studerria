@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.4.75",
+      "date": "2026-04-08",
+      "items": [
+        "fix(safari-cursor-trail): normalize cursor-trail scene coordinates against rendered viewport size in the shared dynamic backgrounds so Safari no longer drifts the floating symbol effect away from the pointer toward the lower-right corner on zoomed desktop pages"
+      ]
+    },
+    {
       "version": "1.4.74",
       "date": "2026-04-08",
       "items": [

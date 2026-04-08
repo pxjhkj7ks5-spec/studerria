@@ -66,6 +66,10 @@
     const state = {
       width: Math.max(window.innerWidth, 1),
       height: Math.max(window.innerHeight, 1),
+      viewportLeft: 0,
+      viewportTop: 0,
+      inputScaleX: 1,
+      inputScaleY: 1,
       targetX: Math.max(window.innerWidth, 1) / 2,
       targetY: Math.max(window.innerHeight, 1) / 2,
       currentX: Math.max(window.innerWidth, 1) / 2,
@@ -90,6 +94,29 @@
     const recentStampCells = new Map();
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+    function syncViewportMetrics() {
+      // Safari can report pointer coordinates in the visual viewport while the scene is rendered in zoomed layout coordinates.
+      const rect = root.getBoundingClientRect();
+      const renderedWidth = Math.max(Number(rect.width) || window.innerWidth || 1, 1);
+      const renderedHeight = Math.max(Number(rect.height) || window.innerHeight || 1, 1);
+      const layoutWidth = Math.max(Number(root.offsetWidth) || 0, Math.round(renderedWidth), 1);
+      const layoutHeight = Math.max(Number(root.offsetHeight) || 0, Math.round(renderedHeight), 1);
+
+      state.width = layoutWidth;
+      state.height = layoutHeight;
+      state.viewportLeft = Number.isFinite(rect.left) ? rect.left : 0;
+      state.viewportTop = Number.isFinite(rect.top) ? rect.top : 0;
+      state.inputScaleX = renderedWidth > 0 ? layoutWidth / renderedWidth : 1;
+      state.inputScaleY = renderedHeight > 0 ? layoutHeight / renderedHeight : 1;
+    }
+
+    function mapPointerToScene(clientX, clientY) {
+      return {
+        x: clamp((Number(clientX || 0) - state.viewportLeft) * state.inputScaleX, 0, state.width),
+        y: clamp((Number(clientY || 0) - state.viewportTop) * state.inputScaleY, 0, state.height),
+      };
+    }
 
     function toBlobPath(values) {
       return `M${values[0].toFixed(2)} ${values[1].toFixed(2)} C${values[2].toFixed(2)} ${values[3].toFixed(2)} ${values[4].toFixed(2)} ${values[5].toFixed(2)} ${values[6].toFixed(2)} ${values[7].toFixed(2)} C${values[8].toFixed(2)} ${values[9].toFixed(2)} ${values[10].toFixed(2)} ${values[11].toFixed(2)} ${values[12].toFixed(2)} ${values[13].toFixed(2)} C${values[14].toFixed(2)} ${values[15].toFixed(2)} ${values[16].toFixed(2)} ${values[17].toFixed(2)} ${values[18].toFixed(2)} ${values[19].toFixed(2)} C${values[20].toFixed(2)} ${values[21].toFixed(2)} ${values[22].toFixed(2)} ${values[23].toFixed(2)} ${values[24].toFixed(2)} ${values[25].toFixed(2)} Z`;
@@ -523,8 +550,9 @@
 
     function onPointerMove(event) {
       if (state.reducedMotion || state.coarsePointer) return;
-      const x = clamp(Number(event.clientX || 0), 0, state.width);
-      const y = clamp(Number(event.clientY || 0), 0, state.height);
+      const point = mapPointerToScene(event.clientX, event.clientY);
+      const x = point.x;
+      const y = point.y;
       const now = performance.now();
 
       state.targetX = x;
@@ -544,8 +572,7 @@
       if (state.resizeTimerId) return;
       state.resizeTimerId = window.setTimeout(() => {
         state.resizeTimerId = 0;
-        state.width = Math.max(window.innerWidth, 1);
-        state.height = Math.max(window.innerHeight, 1);
+        syncViewportMetrics();
         state.targetX = clamp(state.targetX, 0, state.width);
         state.targetY = clamp(state.targetY, 0, state.height);
         state.currentX = clamp(state.currentX, 0, state.width);
@@ -609,6 +636,7 @@
     applyTheme(resolveTheme(), true, false);
     writeStoredTheme(resolveTheme());
     initThemeToggle();
+    syncViewportMetrics();
     resetState();
     applyMotionMode();
   });
