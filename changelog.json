@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.62",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-pending-status-footer): make the blue pending indicator next to `Статус: очікує підтвердження` pulse softly like a live review signal and restore the shared footer with the changelog button on the teacher pending screen so it matches the rest of the app shell"
+      ]
+    },
+    {
       "version": "1.5.61",
       "date": "2026-04-09",
       "items": [
