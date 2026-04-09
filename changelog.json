@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.69",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-student-light-surfaces): add student-specific light-theme polish for the profile card so homework/teamwork stat tiles, name/password/language fields, action surfaces, and the student reset block now sit on clearer white Apple-style inner panels instead of visually blending into the main glass card"
+      ]
+    },
+    {
       "version": "1.5.68",
       "date": "2026-04-09",
       "items": [
