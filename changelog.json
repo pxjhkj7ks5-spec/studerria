@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.68",
+      "date": "2026-04-09",
+      "items": [
+        "fix(schedule-week-hero-light-surface): flatten the light-theme surface of the `Твій тиждень` hero card by replacing its gradient and inset sheen with a clean solid background plus regular outer shadow, removing the remaining faint blue horizontal seam when the previous overlay-only fixes were not enough"
+      ]
+    },
+    {
       "version": "1.5.67",
       "date": "2026-04-09",
       "items": [

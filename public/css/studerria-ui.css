@@ -1230,6 +1230,11 @@ body.theme-light.page-schedule .week-rail {
   box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.44);
 }
 
+body.theme-light.page-schedule .week-hero {
+  background: rgba(248, 250, 255, 0.96);
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09);
+}
+
 body.page-schedule .schedule-card {
   border-color: color-mix(in srgb, var(--studerria-panel-border) 88%, rgba(255, 255, 255, 0.14));
   background: color-mix(in srgb, var(--studerria-panel-bg-strong) 92%, rgba(255, 255, 255, 0.06));
@@ -1262,6 +1267,11 @@ body.theme-light.page-schedule .week-rail:hover {
   border-color: color-mix(in srgb, rgba(100, 116, 139, 0.28) 62%, var(--studerria-panel-border)) !important;
   background: linear-gradient(180deg, rgba(248, 250, 255, 0.94), rgba(236, 242, 251, 0.9)) !important;
   box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.44) !important;
+}
+
+body.theme-light.page-schedule .week-hero:hover {
+  background: rgba(248, 250, 255, 0.96) !important;
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09) !important;
 }
 
 body.page-schedule .schedule-card:hover {
