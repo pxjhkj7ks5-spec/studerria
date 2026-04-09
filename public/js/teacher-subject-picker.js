@@ -1,10 +1,23 @@
 (function initTeacherSubjectPicker() {
+  function getGroupChoices(root, subjectId) {
+    return Array.from(root.querySelectorAll(`[data-subject-group-choice="${subjectId}"]`))
+      .filter((input) => input instanceof HTMLInputElement);
+  }
+
   function updateSelectedCount(root) {
     const toggles = Array.from(root.querySelectorAll('[data-subject-toggle]'));
     const selectedCount = toggles.filter((toggle) => toggle instanceof HTMLInputElement && toggle.checked).length;
     root.querySelectorAll('[data-teacher-picker-selected-count]').forEach((node) => {
       node.textContent = String(selectedCount);
     });
+  }
+
+  function ensureDefaultGroupChoice(choices) {
+    if (!Array.isArray(choices) || choices.some((choice) => choice.checked)) return;
+    const defaultChoice = choices.find((choice) => choice.dataset.defaultGroup === '1') || choices[0] || null;
+    if (defaultChoice) {
+      defaultChoice.checked = true;
+    }
   }
 
   function syncCardState(root, toggle) {
@@ -15,12 +28,31 @@
     if (card instanceof HTMLElement) {
       card.classList.toggle('is-selected', toggle.checked);
     }
-    const select = root.querySelector(`[data-subject-group="${subjectId}"]`);
-    if (!(select instanceof HTMLSelectElement)) return;
-    select.disabled = !toggle.checked;
+    const groupChoices = getGroupChoices(root, subjectId);
+    if (!groupChoices.length) return;
     if (!toggle.checked) {
-      select.value = '';
+      groupChoices.forEach((choice) => {
+        choice.checked = false;
+        choice.disabled = true;
+      });
+      return;
     }
+    groupChoices.forEach((choice) => {
+      choice.disabled = false;
+    });
+    ensureDefaultGroupChoice(groupChoices);
+  }
+
+  function syncToggleFromGroups(root, choice) {
+    if (!(choice instanceof HTMLInputElement)) return;
+    const subjectId = String(choice.dataset.subjectGroupChoice || '').trim();
+    if (!subjectId) return;
+    const toggle = root.querySelector(`[data-subject-toggle="${subjectId}"]`);
+    if (!(toggle instanceof HTMLInputElement)) return;
+    const groupChoices = getGroupChoices(root, subjectId);
+    const hasCheckedGroups = groupChoices.some((item) => item.checked);
+    toggle.checked = hasCheckedGroups;
+    syncCardState(root, toggle);
   }
 
   function restoreDisclosureState(container, query) {
@@ -80,6 +112,14 @@
       syncCardState(root, toggle);
       toggle.addEventListener('change', () => {
         syncCardState(root, toggle);
+        updateSelectedCount(root);
+      });
+    });
+
+    root.querySelectorAll('[data-subject-group-choice]').forEach((choice) => {
+      if (!(choice instanceof HTMLInputElement)) return;
+      choice.addEventListener('change', () => {
+        syncToggleFromGroups(root, choice);
         updateSelectedCount(root);
       });
     });

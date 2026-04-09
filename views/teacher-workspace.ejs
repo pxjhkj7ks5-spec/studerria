@@ -760,6 +760,9 @@
         <% if (teacherOfferingList.length) { %>
           <div class="workspace-scope-list">
             <% teacherOfferingList.forEach(function(offering) { %>
+              <% const offeringGroupScope = Array.isArray(offering.group_numbers) && offering.group_numbers.length
+                ? offering.group_numbers.join(', ')
+                : (offering.has_all_groups ? 'all' : (offering.group_number || 'all')); %>
               <article class="workspace-scope-card">
                 <div class="workspace-scope-head">
                   <div>
@@ -771,7 +774,7 @@
                   <span class="badge bg-<%= offering.template_id ? 'info' : 'secondary' %>"><%= offering.template_id ? 'template matched' : 'live override' %></span>
                 </div>
                 <div class="workspace-scope-chip-row">
-                  <span class="workspace-scope-chip">Group: <%= offering.group_number || 'all' %></span>
+                  <span class="workspace-scope-chip">Groups: <%= offeringGroupScope %></span>
                   <span class="workspace-scope-chip">Contexts: <%= Array.isArray(offering.contexts) ? offering.contexts.length : 0 %></span>
                   <% if (offering.is_shared) { %><span class="workspace-scope-chip">Shared</span><% } %>
                   <% if (offering.is_general) { %><span class="workspace-scope-chip">General</span><% } %>

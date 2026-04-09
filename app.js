@@ -6718,14 +6718,8 @@ async function applyTeacherAssignmentTemplatesForStudyContexts(studyContextIds =
     }
     let upsertedCount = 0;
     for (const row of bestRows.values()) {
-      let groupNumber = null;
-      try {
-        const parsed = row.notes ? JSON.parse(String(row.notes)) : null;
-        const candidate = parsePositiveIntStrict(parsed && parsed.group_number);
-        groupNumber = candidate || null;
-      } catch (_) {
-        groupNumber = null;
-      }
+      const selectionState = parseTeacherAssignmentTemplateSelectionState(row.notes);
+      const groupNumber = getTeacherSelectionStatePrimaryGroup(selectionState);
       await db.run(
         `
           INSERT INTO teacher_offering_assignments
@@ -12215,19 +12209,131 @@ async function getTeacherSubjectCatalog() {
   }
 }
 
-async function getTeacherSelections(userId) {
-  const rows = await teacherTemplateHelpers.listTeacherSubjectSelections(getTeacherTemplateStore(), userId);
-  const map = new Map();
-  (rows || []).forEach((row) => {
-    map.set(Number(row.subject_id), row.group_number === null ? null : Number(row.group_number));
-  });
-  return map;
+function normalizeTeacherGroupNumberList(values = [], options = {}) {
+  const maxGroupCount = parsePositiveIntStrict(options.maxGroupCount);
+  const normalizedValues = (Array.isArray(values) ? values : [values])
+    .flatMap((value) => {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string' && value.includes(',')) {
+        return value.split(',');
+      }
+      return [value];
+    })
+    .map((value) => parsePositiveIntStrict(value))
+    .filter((value) => Number.isInteger(value) && value > 0 && (!maxGroupCount || value <= maxGroupCount));
+  return Array.from(new Set(normalizedValues)).sort((left, right) => left - right);
 }
 
-function buildTeacherAssignmentTemplateNotes(groupNumber) {
-  const normalizedGroupNumber = parsePositiveIntStrict(groupNumber);
+function normalizeTeacherSelectionState(rawValue = null) {
+  const candidate = rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue)
+    ? rawValue
+    : { group_number: rawValue };
+  const general = candidate.general === true || candidate.all_groups === true;
+  const groups = general
+    ? []
+    : normalizeTeacherGroupNumberList([
+      ...(Array.isArray(candidate.groups) ? candidate.groups : []),
+      ...(Array.isArray(candidate.group_numbers) ? candidate.group_numbers : []),
+      candidate.group_number,
+    ], {
+      maxGroupCount: candidate.group_count,
+    });
+  return {
+    general,
+    groups,
+  };
+}
+
+function cloneTeacherSelectionState(rawValue = null) {
+  const normalized = normalizeTeacherSelectionState(rawValue);
+  return {
+    general: normalized.general,
+    groups: normalized.groups.slice(),
+  };
+}
+
+function buildTeacherSelectionStateMap(rows = [], idField = 'subject_id') {
+  const stateMap = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const entityId = parsePositiveIntStrict(row && row[idField]);
+    if (!entityId) {
+      return;
+    }
+    const current = stateMap.get(entityId) || { general: false, groups: [] };
+    const groupNumber = parsePositiveIntStrict(row && row.group_number);
+    if (!groupNumber) {
+      current.general = true;
+      current.groups = [];
+    } else if (!current.general) {
+      current.groups = normalizeTeacherGroupNumberList([...current.groups, groupNumber]);
+    }
+    stateMap.set(entityId, current);
+  });
+  return stateMap;
+}
+
+function getTeacherSelectionStateSingleGroup(rawValue = null) {
+  const normalized = normalizeTeacherSelectionState(rawValue);
+  if (normalized.general || normalized.groups.length !== 1) {
+    return null;
+  }
+  return normalized.groups[0] || null;
+}
+
+function getTeacherSelectionStatePrimaryGroup(rawValue = null) {
+  const normalized = normalizeTeacherSelectionState(rawValue);
+  if (normalized.general) {
+    return null;
+  }
+  return normalized.groups[0] || null;
+}
+
+function parseTeacherAssignmentTemplateSelectionState(rawNotes = null) {
+  try {
+    const parsed = rawNotes ? JSON.parse(String(rawNotes)) : null;
+    return normalizeTeacherSelectionState(parsed);
+  } catch (_err) {
+    return { general: false, groups: [] };
+  }
+}
+
+function extractTeacherSelectedGroupNumbers(body = {}, options = {}) {
+  const normalizedOfferingId = parsePositiveIntStrict(options.offeringId);
+  const normalizedSubjectId = parsePositiveIntStrict(options.subjectId);
+  const normalizedEntityId = normalizedOfferingId || normalizedSubjectId;
+  const maxGroupCount = Math.max(1, parsePositiveIntStrict(options.groupCount) || 1);
+  if (!normalizedEntityId) {
+    return [];
+  }
+  const keyPrefixes = normalizedOfferingId
+    ? [`group_offering_${normalizedEntityId}`, `group_${normalizedEntityId}`]
+    : [`group_${normalizedEntityId}`];
+  const values = [];
+  keyPrefixes.forEach((prefix) => {
+    if (typeof body[prefix] !== 'undefined') {
+      values.push(body[prefix]);
+    }
+    for (let groupIndex = 1; groupIndex <= maxGroupCount; groupIndex += 1) {
+      const groupKey = `${prefix}_${groupIndex}`;
+      if (parseBooleanFlag(body[groupKey], false)) {
+        values.push(groupIndex);
+      }
+    }
+  });
+  return normalizeTeacherGroupNumberList(values, { maxGroupCount });
+}
+
+async function getTeacherSelections(userId) {
+  const rows = await teacherTemplateHelpers.listTeacherSubjectSelections(getTeacherTemplateStore(), userId);
+  return buildTeacherSelectionStateMap(rows, 'subject_id');
+}
+
+function buildTeacherAssignmentTemplateNotes(selectionState) {
+  const normalizedSelectionState = normalizeTeacherSelectionState(selectionState);
   return JSON.stringify({
-    group_number: normalizedGroupNumber || null,
+    all_groups: normalizedSelectionState.general,
+    group_number: getTeacherSelectionStateSingleGroup(normalizedSelectionState),
+    group_numbers: normalizedSelectionState.general ? [] : normalizedSelectionState.groups,
   });
 }
 
@@ -12254,12 +12360,13 @@ function buildTeacherAssignmentTemplateDedupeKey({
   ].join(':')}`;
 }
 
-function buildTeacherAssignmentTemplateRowsForOffering(userId, offering, groupNumber, preferenceOrder = 0) {
+function buildTeacherAssignmentTemplateRowsForOffering(userId, offering, selectionState, preferenceOrder = 0) {
   const normalizedUserId = parsePositiveIntStrict(userId);
   const normalizedCatalogId = parsePositiveIntStrict(offering && offering.subject_catalog_id);
   if (!normalizedUserId || !normalizedCatalogId) {
     return [];
   }
+  const normalizedSelectionState = normalizeTeacherSelectionState(selectionState);
   const rowsByKey = new Map();
   const contexts = Array.isArray(offering && offering.contexts) ? offering.contexts : [];
   contexts.forEach((context) => {
@@ -12283,7 +12390,7 @@ function buildTeacherAssignmentTemplateRowsForOffering(userId, offering, groupNu
       stage_number: normalizeStudyContextStage(context && context.stage_number, 1),
       campus_key: normalizeCourseCampus((context && context.campus_key) || 'kyiv'),
       preference_order: Number.isFinite(Number(preferenceOrder)) ? Number(preferenceOrder) : 0,
-      notes: buildTeacherAssignmentTemplateNotes(groupNumber),
+      notes: buildTeacherAssignmentTemplateNotes(normalizedSelectionState),
     });
   });
   return Array.from(rowsByKey.values());
@@ -12346,13 +12453,22 @@ async function syncTeacherAcademicAssignments(userId, selections = []) {
     return { templateCount: 0, assignmentCount: 0 };
   }
 
-  const normalizedSelections = (Array.isArray(selections) ? selections : [])
-    .map((item, index) => ({
-      subject_id: parsePositiveIntStrict(item && item.subject_id),
-      group_number: parsePositiveIntStrict(item && item.group_number) || null,
-      sort_order: index,
-    }))
-    .filter((item) => item.subject_id);
+  const normalizedSelections = teacherTemplateHelpers.normalizeTeacherSubjectSelections(
+    (Array.isArray(selections) ? selections : [])
+      .map((item, index) => ({
+        subject_id: parsePositiveIntStrict(item && item.subject_id),
+        group_number: parsePositiveIntStrict(item && item.group_number) || null,
+        sort_order: index,
+      }))
+      .filter((item) => item.subject_id)
+  );
+  const selectionStateBySubjectId = buildTeacherSelectionStateMap(normalizedSelections, 'subject_id');
+  const selectionSortOrderBySubjectId = new Map();
+  normalizedSelections.forEach((item, index) => {
+    if (!selectionSortOrderBySubjectId.has(item.subject_id)) {
+      selectionSortOrderBySubjectId.set(item.subject_id, Number(index || 0));
+    }
+  });
 
   if (!normalizedSelections.length) {
     try {
@@ -12365,8 +12481,7 @@ async function syncTeacherAcademicAssignments(userId, selections = []) {
     return { templateCount: 0, assignmentCount: 0 };
   }
 
-  const subjectIds = Array.from(new Set(normalizedSelections.map((item) => item.subject_id)));
-  const selectionBySubjectId = new Map(normalizedSelections.map((item) => [item.subject_id, item]));
+  const subjectIds = Array.from(selectionStateBySubjectId.keys());
 
   try {
     await syncSubjectOfferingsForSubjectIds(subjectIds);
@@ -12399,8 +12514,11 @@ async function syncTeacherAcademicAssignments(userId, selections = []) {
       const subjectId = parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key);
       const offeringId = parsePositiveIntStrict(row.subject_offering_id);
       const catalogId = parsePositiveIntStrict(row.subject_catalog_id);
-      const selection = subjectId ? selectionBySubjectId.get(subjectId) : null;
-      if (!subjectId || !offeringId || !catalogId || !selection) {
+      const selectionState = subjectId ? selectionStateBySubjectId.get(subjectId) : null;
+      const selectionSortOrder = subjectId
+        ? Number(selectionSortOrderBySubjectId.get(subjectId) || 0)
+        : 0;
+      if (!subjectId || !offeringId || !catalogId || !selectionState) {
         continue;
       }
 
@@ -12421,16 +12539,16 @@ async function syncTeacherAcademicAssignments(userId, selections = []) {
           track_key: normalizeRegistrationTrack(row.track_key, '') || null,
           stage_number: normalizeStudyContextStage(row.stage_number, 1),
           campus_key: normalizeCourseCampus(row.campus_key || 'kyiv'),
-          preference_order: Number(selection.sort_order || 0),
-          notes: buildTeacherAssignmentTemplateNotes(selection.group_number),
+          preference_order: selectionSortOrder,
+          notes: buildTeacherAssignmentTemplateNotes(selectionState),
         });
       }
 
       if (!assignmentRows.has(offeringId)) {
         assignmentRows.set(offeringId, {
           subject_offering_id: offeringId,
-          group_number: selection.group_number,
-          sort_order: Number(selection.sort_order || 0),
+          group_number: getTeacherSelectionStatePrimaryGroup(selectionState),
+          sort_order: selectionSortOrder,
         });
       }
     }
@@ -12991,19 +13109,26 @@ async function getTeacherAssignedSubjects(userId) {
   const assignedOfferings = await getTeacherAssignedOfferings(userId);
   if (assignedOfferings.length) {
     return assignedOfferings.flatMap((offering) => {
+      const hasAllGroups = offering.has_all_groups === true;
+      const selectedGroupNumbers = hasAllGroups
+        ? []
+        : normalizeTeacherGroupNumberList(offering.group_numbers);
+      const scopedGroupNumbers = hasAllGroups || !selectedGroupNumbers.length
+        ? [null]
+        : selectedGroupNumbers;
       const baseRow = {
         subject_id: Number(offering.legacy_subject_id || 0) || null,
         subject_offering_id: Number(offering.subject_offering_id || 0) || null,
-        group_number: offering.group_number,
         subject_name: String(offering.name || ''),
         group_count: Math.max(1, Number(offering.group_count || 1) || 1),
         is_general: offering.is_general === true || Number(offering.is_general) === 1,
         show_in_teamwork: offering.show_in_teamwork === true || Number(offering.show_in_teamwork) === 1,
         is_shared: offering.is_shared === true || Number(offering.is_shared) === 1,
+        has_all_groups: hasAllGroups,
+        group_numbers: selectedGroupNumbers,
       };
-      if (Array.isArray(offering.contexts) && offering.contexts.length) {
-        return offering.contexts.map((context) => ({
-          ...baseRow,
+      const contextRows = Array.isArray(offering.contexts) && offering.contexts.length
+        ? offering.contexts.map((context) => ({
           course_id: Number(context.course_id || 0) || null,
           owner_course_id: Number(context.course_id || 0) || null,
           course_name: String(context.course_name || ''),
@@ -13016,23 +13141,26 @@ async function getTeacherAssignedSubjects(userId) {
           program_code: String(context.program_code || ''),
           program_name: String(context.program_name || ''),
           semester_titles: Array.isArray(context.semester_titles) ? context.semester_titles.slice() : [],
-        }));
-      }
-      return [{
+        }))
+        : [{
+          course_id: null,
+          owner_course_id: null,
+          course_name: '',
+          study_context_id: null,
+          study_context_label: '',
+          stage_number: null,
+          campus_key: '',
+          admission_year: null,
+          program_id: null,
+          program_code: '',
+          program_name: '',
+          semester_titles: [],
+        }];
+      return contextRows.flatMap((contextRow) => scopedGroupNumbers.map((groupNumber) => ({
         ...baseRow,
-        course_id: null,
-        owner_course_id: null,
-        course_name: '',
-        study_context_id: null,
-        study_context_label: '',
-        stage_number: null,
-        campus_key: '',
-        admission_year: null,
-        program_id: null,
-        program_code: '',
-        program_name: '',
-        semester_titles: [],
-      }];
+        ...contextRow,
+        group_number: groupNumber,
+      })));
     });
   }
   return teacherTemplateHelpers.listTeacherAssignedSubjectRows(getTeacherTemplateStore(), userId);
@@ -13543,7 +13671,7 @@ async function getTeacherOfferingSelections(userId) {
       const offeringId = parsePositiveIntStrict(row.id);
       const subjectId = parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key);
       if (!offeringId || !subjectId || !legacySelections.has(subjectId)) return;
-      selectionMap.set(offeringId, parsePositiveIntStrict(legacySelections.get(subjectId)) || null);
+      selectionMap.set(offeringId, getTeacherSelectionStatePrimaryGroup(legacySelections.get(subjectId)));
     });
   } catch (err) {
     if (!isDbSchemaCompatibilityError(err)) {
@@ -13551,6 +13679,66 @@ async function getTeacherOfferingSelections(userId) {
     }
   }
   return selectionMap;
+}
+
+async function getTeacherOfferingPickerSelections(userId) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const selectionMap = new Map();
+  if (!normalizedUserId) {
+    return selectionMap;
+  }
+
+  const legacySelections = await getTeacherSelections(normalizedUserId);
+  const legacySubjectIds = Array.from(new Set(
+    Array.from(legacySelections.keys())
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (legacySubjectIds.length) {
+    try {
+      const rows = await db.all(
+        `
+          SELECT id, dedupe_key
+          FROM subject_offerings
+          WHERE dedupe_key = ANY(?::text[])
+            AND is_active = true
+        `,
+        [legacySubjectIds.map((subjectId) => buildLegacySubjectOfferingDedupeKey(subjectId))]
+      );
+      (rows || []).forEach((row) => {
+        const offeringId = parsePositiveIntStrict(row.id);
+        const subjectId = parseLegacySubjectIdFromOfferingDedupeKey(row.dedupe_key);
+        if (!offeringId || !subjectId || !legacySelections.has(subjectId)) {
+          return;
+        }
+        selectionMap.set(offeringId, cloneTeacherSelectionState(legacySelections.get(subjectId)));
+      });
+      if (selectionMap.size) {
+        return selectionMap;
+      }
+    } catch (err) {
+      if (!isDbSchemaCompatibilityError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  try {
+    const rows = await db.all(
+      `
+        SELECT subject_offering_id, group_number
+        FROM teacher_offering_assignments
+        WHERE teacher_id = ?
+      `,
+      [normalizedUserId]
+    );
+    return buildTeacherSelectionStateMap(rows, 'subject_offering_id');
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return selectionMap;
+    }
+    throw err;
+  }
 }
 
 async function loadTeacherPickerState(userId, options = {}) {
@@ -13575,7 +13763,7 @@ async function loadTeacherPickerState(userId, options = {}) {
   if (Array.isArray(teacherOfferingCatalog) && teacherOfferingCatalog.length) {
     let selections = new Map();
     try {
-      selections = await getTeacherOfferingSelections(normalizedUserId);
+      selections = await getTeacherOfferingPickerSelections(normalizedUserId);
     } catch (err) {
       console.error('Teacher offering selections load failed', err);
     }
@@ -13795,6 +13983,26 @@ async function getTeacherAssignedOfferings(userId) {
       }
     });
     if (offeringsById.size) {
+      let exactSelectionStateBySubjectId = new Map();
+      try {
+        exactSelectionStateBySubjectId = await getTeacherSelections(normalizedUserId);
+      } catch (err) {
+        if (!isDbSchemaCompatibilityError(err)) {
+          throw err;
+        }
+      }
+      offeringsById.forEach((offering) => {
+        const exactSelectionState = exactSelectionStateBySubjectId.get(Number(offering.legacy_subject_id || 0)) || null;
+        const normalizedSelectionState = exactSelectionState
+          ? normalizeTeacherSelectionState(exactSelectionState)
+          : normalizeTeacherSelectionState({
+            general: offering.is_general === true || Number(offering.is_general) === 1,
+            group_number: offering.group_number,
+          });
+        offering.group_numbers = normalizedSelectionState.general ? [] : normalizedSelectionState.groups.slice();
+        offering.has_all_groups = normalizedSelectionState.general;
+        offering.group_number = getTeacherSelectionStatePrimaryGroup(normalizedSelectionState);
+      });
       return Array.from(offeringsById.values()).sort((a, b) => {
         const sortDiff = Number(a.assignment_sort_order || 0) - Number(b.assignment_sort_order || 0);
         if (sortDiff !== 0) return sortDiff;
@@ -14557,19 +14765,27 @@ async function saveTeacherOfferingSelections(userId, body, options = {}) {
       return { ok: false, error: 'Offering%20not%20ready' };
     }
     const isGeneral = offering.is_general === true || Number(offering.is_general) === 1;
-    let groupNumber = null;
-    if (!isGeneral) {
-      const rawGroupValue = body[`group_offering_${offeringId}`] ?? body[`group_${offeringId}`];
-      const parsedGroupNumber = parsePositiveIntStrict(rawGroupValue);
-      if (!parsedGroupNumber || parsedGroupNumber > Number(offering.group_count || 1)) {
-        return { ok: false, error: 'Select%20group' };
-      }
-      groupNumber = parsedGroupNumber;
+    if (isGeneral) {
+      selections.push({
+        subject_id: parsePositiveIntStrict(offering.legacy_subject_id),
+        subject_offering_id: offeringId,
+        group_number: null,
+      });
+      continue;
     }
-    selections.push({
-      subject_id: parsePositiveIntStrict(offering.legacy_subject_id),
-      subject_offering_id: offeringId,
-      group_number: groupNumber,
+    const selectedGroups = extractTeacherSelectedGroupNumbers(body, {
+      offeringId,
+      groupCount: offering.group_count,
+    });
+    if (!selectedGroups.length) {
+      return { ok: false, error: 'Select%20group' };
+    }
+    selectedGroups.forEach((groupNumber) => {
+      selections.push({
+        subject_id: parsePositiveIntStrict(offering.legacy_subject_id),
+        subject_offering_id: offeringId,
+        group_number: groupNumber,
+      });
     });
   }
 
@@ -14609,12 +14825,16 @@ async function saveTeacherAcademicV2Selections(userId, body, options = {}) {
       selections.push({ subject_id: subject.id, group_number: null });
       continue;
     }
-    const groupVal = body[`group_${subject.id}`];
-    const groupNum = Number(groupVal);
-    if (!groupVal || Number.isNaN(groupNum) || groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
+    const selectedGroups = extractTeacherSelectedGroupNumbers(body, {
+      subjectId: subject.id,
+      groupCount: subject.group_count,
+    });
+    if (!selectedGroups.length) {
       return { ok: false, error: 'Select%20group' };
     }
-    selections.push({ subject_id: subject.id, group_number: groupNum });
+    selectedGroups.forEach((groupNumber) => {
+      selections.push({ subject_id: subject.id, group_number: groupNumber });
+    });
   }
   if (!hasAny) {
     return { ok: false, error: 'Select%20subject' };
@@ -14651,12 +14871,16 @@ async function saveTeacherSubjects(userId, body, options = {}) {
       selections.push({ subject_id: subject.id, group_number: null });
       continue;
     }
-    const groupVal = body[`group_${subject.id}`];
-    const groupNum = Number(groupVal);
-    if (!groupVal || Number.isNaN(groupNum) || groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
+    const selectedGroups = extractTeacherSelectedGroupNumbers(body, {
+      subjectId: subject.id,
+      groupCount: subject.group_count,
+    });
+    if (!selectedGroups.length) {
       return { ok: false, error: 'Select%20group' };
     }
-    selections.push({ subject_id: subject.id, group_number: groupNum });
+    selectedGroups.forEach((groupNumber) => {
+      selections.push({ subject_id: subject.id, group_number: groupNumber });
+    });
   }
   if (!hasAny) {
     return { ok: false, error: 'Select%20subject' };

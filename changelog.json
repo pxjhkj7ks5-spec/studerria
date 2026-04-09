@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.45",
+      "date": "2026-04-09",
+      "items": [
+        "feat(teacher-picker-multi-group-chips): let the teacher registration picker save one or more groups per discipline instead of a single dropdown value, switching the card UI to Liquid Glass multi-select chips, preserving the exact group set in the legacy teacher mirror, and carrying the grouped selection through the offerings-based assignment sync without collapsing it at submit time"
+      ]
+    },
+    {
       "version": "1.5.44",
       "date": "2026-04-09",
       "items": [

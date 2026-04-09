@@ -1,0 +1,79 @@
+<article
+  class="teacher-picker-card glass <%= entry.checked ? 'is-selected' : '' %>"
+  data-teacher-picker-item
+  data-search="<%= entry.searchText %>"
+>
+  <div class="teacher-picker-card__main">
+    <div class="teacher-picker-card__copy">
+      <h3 class="teacher-picker-card__title"><%= entry.name %></h3>
+      <% if (entry.courseName || entry.pathwayLabels) { %>
+        <div class="teacher-picker-card__meta">
+          <% if (entry.courseName) { %>
+            <span><%= entry.courseName %></span>
+          <% } %>
+          <% if (entry.pathwayLabels) { %>
+            <span><%= entry.pathwayLabels %></span>
+          <% } %>
+        </div>
+      <% } %>
+      <div class="teacher-picker-card__badges">
+        <span class="teacher-picker-badge">
+          <%= entry.isGeneral ? pickerTexts.allGroupsLabel : `${pickerTexts.groupRangePrefix} 1-${entry.groupCount}` %>
+        </span>
+        <% if (entry.admissionYears.length) { %>
+          <span class="teacher-picker-badge"><%= pickerTexts.yearsLabel %>: <%= entry.admissionYears.join(' / ') %></span>
+        <% } %>
+        <% if (entry.campuses.length) { %>
+          <span class="teacher-picker-badge"><%= pickerTexts.campusesLabel %>: <%= entry.campuses.join(' / ') %></span>
+        <% } %>
+        <% if (entry.contextCount > 1) { %>
+          <span class="teacher-picker-badge">+<%= entry.contextCount - 1 %> <%= pickerTexts.contextsSuffix %></span>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="teacher-picker-card__controls">
+      <% if (!entry.isGeneral) { %>
+        <div class="teacher-picker-card__group">
+          <span class="teacher-picker-card__group-label"><%= pickerTexts.groupLabel %></span>
+          <div class="teacher-picker-card__group-grid" data-subject-groups="<%= entry.id %>">
+            <% for (let groupIndex = 1; groupIndex <= entry.groupCount; groupIndex += 1) { %>
+              <% const groupInputId = `teacher_picker_group_${entry.id}_${groupIndex}`; %>
+              <% const groupInputName = pickerSelectionMode === 'offering' ? `group_offering_${entry.id}_${groupIndex}` : `group_${entry.id}_${groupIndex}`; %>
+              <% const isSelectedGroup = Array.isArray(entry.selectedGroups) && entry.selectedGroups.includes(groupIndex); %>
+              <input
+                class="teacher-picker-group-input"
+                type="checkbox"
+                id="<%= groupInputId %>"
+                name="<%= groupInputName %>"
+                value="1"
+                data-subject-group-choice="<%= entry.id %>"
+                data-group-number="<%= groupIndex %>"
+                data-default-group="<%= entry.defaultGroup === groupIndex ? '1' : '0' %>"
+                <%= entry.checked ? '' : 'disabled' %>
+                <%= isSelectedGroup ? 'checked' : '' %>
+              />
+              <label class="teacher-picker-group-chip" for="<%= groupInputId %>">
+                <span class="teacher-picker-group-chip__title"><%= pickerTexts.groupChipPrefix %> <%= groupIndex %></span>
+              </label>
+            <% } %>
+          </div>
+          <div class="teacher-picker-card__group-hint"><%= pickerTexts.chooseGroupsLabel %></div>
+        </div>
+      <% } %>
+
+      <div class="form-check teacher-picker-card__toggle">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="teacher_picker_subject_<%= entry.id %>"
+          name="subject_<%= entry.id %>"
+          value="1"
+          data-subject-toggle="<%= entry.id %>"
+          <%= entry.checked ? 'checked' : '' %>
+        />
+        <label class="form-check-label" for="teacher_picker_subject_<%= entry.id %>"><%= pickerTexts.teachLabel %></label>
+      </div>
+    </div>
+  </div>
+</article>
