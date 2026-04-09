@@ -257,36 +257,6 @@
   data-teacher-picker-root
   data-selection-mode="<%= pickerSelectionMode %>"
 >
-  <div class="teacher-picker-toolbar glass">
-    <div class="teacher-picker-toolbar__search">
-      <label class="form-label small" for="teacherSubjectSearch"><%= pickerTexts.searchLabel %></label>
-      <input
-        id="teacherSubjectSearch"
-        class="form-control teacher-picker-search"
-        type="search"
-        placeholder="<%= pickerTexts.searchPlaceholder %>"
-        autocomplete="off"
-        data-teacher-picker-search
-      />
-      <div class="teacher-picker-toolbar__hint">
-        <%= pickerSelectionMode === 'offering'
-          ? pickerTexts.groupedHint
-          : (pickerSelectionMode === 'academic_v2' ? pickerTexts.academicV2Hint : pickerTexts.fallbackHint) %>
-      </div>
-    </div>
-    <div class="teacher-picker-toolbar__summary">
-      <span class="teacher-picker-pill"><%= pickerTexts.catalogLabel %>: <%= pickerEntries.length %></span>
-      <span class="teacher-picker-pill"><%= pickerTexts.selectedLabel %>: <span data-teacher-picker-selected-count><%= pickerSelectedCount %></span></span>
-      <span class="teacher-picker-pill"><%= pickerTexts.trackCountLabel %>: <%= pickerSections.length %></span>
-      <span class="teacher-picker-pill"><%= pickerTexts.stageCountLabel %>: <%= pickerStageCount %></span>
-      <span class="teacher-picker-pill teacher-picker-pill--accent">
-        <%= pickerSelectionMode === 'offering'
-          ? pickerTexts.groupedModeLabel
-          : (pickerSelectionMode === 'academic_v2' ? pickerTexts.academicV2ModeLabel : pickerTexts.fallbackModeLabel) %>
-      </span>
-    </div>
-  </div>
-
   <% if (pickerShowScopeMeta && pickerScope) { %>
     <section class="teacher-picker-scope glass">
       <div class="teacher-picker-scope__copy">
@@ -428,9 +398,4 @@
       <div class="teacher-picker-empty__copy"><%= pickerTexts.emptyCopy %></div>
     </div>
   <% } %>
-
-  <div class="teacher-picker-empty glass is-search-empty" data-teacher-picker-search-empty hidden>
-    <div class="teacher-picker-empty__title"><%= pickerTexts.searchEmpty %></div>
-    <div class="teacher-picker-empty__copy"><%= pickerTexts.searchPlaceholder %></div>
-  </div>
 </section>

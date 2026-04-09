@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.40",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-picker-toolbar): remove the extra quick-search toolbar card from the teacher discipline picker so registration and the primary Teacher workspace open straight into the grouped discipline matrix without the redundant search/summary block"
+      ]
+    },
+    {
       "version": "1.5.39",
       "date": "2026-04-09",
       "items": [
