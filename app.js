@@ -453,6 +453,21 @@ const COURSE_KIND_OPTIONS = [
   { key: 'regular', label: 'Regular courses' },
   { key: 'teacher', label: 'Teacher courses' },
 ];
+const DEFAULT_ROLE_COURSE_KINDS = {
+  admin: ['regular', 'teacher'],
+  teacher: ['regular', 'teacher'],
+  deanery: ['regular'],
+  starosta: ['regular'],
+  student: ['regular'],
+};
+const DEFAULT_ROLE_MULTICOURSE = {
+  admin: true,
+  teacher: false,
+  deanery: false,
+  starosta: false,
+  student: false,
+};
+const PASSWORD_MIN_LENGTH = 8;
 const REGISTRATION_TRACK_OPTIONS = [
   { key: 'bachelor', label: 'Bachelor' },
   { key: 'master', label: 'Master' },
@@ -1608,40 +1623,94 @@ const getRoleAllowedSections = (role) => {
 const isTeacherCourseRow = (course) =>
   course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
 
-async function getAllowedCourseKindsForRoleKeys(roleKeys = []) {
+const isEnabledRoleFlag = (value) => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return value === true
+    || Number(value) === 1
+    || ['1', 'true', 't', 'yes', 'on'].includes(normalized);
+};
+
+function getDefaultAllowedCourseKindsForRoleKeys(roleKeys = []) {
+  const normalizedRoles = normalizeRoleList(roleKeys);
+  const allowedKinds = new Set();
+  normalizedRoles.forEach((roleKey) => {
+    const defaults = Array.isArray(DEFAULT_ROLE_COURSE_KINDS[roleKey])
+      ? DEFAULT_ROLE_COURSE_KINDS[roleKey]
+      : ['regular'];
+    defaults.forEach((kind) => {
+      if (kind === 'regular' || kind === 'teacher') {
+        allowedKinds.add(kind);
+      }
+    });
+  });
+  if (!allowedKinds.size) {
+    allowedKinds.add('regular');
+  }
+  return allowedKinds;
+}
+
+function getDefaultMulticourseEnabledForRoleKeys(roleKeys = []) {
+  const normalizedRoles = normalizeRoleList(roleKeys);
+  return normalizedRoles.some((roleKey) => DEFAULT_ROLE_MULTICOURSE[roleKey] === true);
+}
+
+async function getRoleCourseAccessPolicy(roleKeys = []) {
   const normalizedRoles = normalizeRoleList(roleKeys);
   if (!normalizedRoles.length) {
-    return new Set(['regular']);
-  }
-  if (normalizedRoles.includes('admin')) {
-    return new Set(['regular', 'teacher']);
+    return {
+      allowedKinds: new Set(['regular']),
+      multicourseEnabled: false,
+    };
   }
   try {
     const rows = await db.all(
       `
-        SELECT DISTINCT rca.course_kind
-        FROM access_role_course_access rca
-        JOIN access_roles ar ON ar.id = rca.role_id
-        WHERE rca.allowed = true
-          AND ar.is_active = true
+        SELECT
+          ar.key AS role_key,
+          ar.multicourse_enabled,
+          rca.course_kind
+        FROM access_roles ar
+        LEFT JOIN access_role_course_access rca
+          ON rca.role_id = ar.id
+         AND rca.allowed = true
+        WHERE ar.is_active = true
           AND ar.key = ANY(?)
       `,
       [normalizedRoles]
     );
-    const courseKinds = new Set((rows || []).map((row) => String(row.course_kind)));
-    if (courseKinds.size) return courseKinds;
+    if (Array.isArray(rows) && rows.length) {
+      const allowedKinds = new Set(
+        (rows || [])
+          .map((row) => String(row.course_kind || ''))
+          .filter((kind) => kind === 'regular' || kind === 'teacher')
+      );
+      return {
+        allowedKinds: allowedKinds.size
+          ? allowedKinds
+          : getDefaultAllowedCourseKindsForRoleKeys(normalizedRoles),
+        multicourseEnabled: (rows || []).some((row) => isEnabledRoleFlag(row.multicourse_enabled)),
+      };
+    }
   } catch (err) {
     // fallback below
   }
-  if (normalizedRoles.includes('teacher')) {
-    return new Set(['regular', 'teacher']);
-  }
-  return new Set(['regular']);
+  return {
+    allowedKinds: getDefaultAllowedCourseKindsForRoleKeys(normalizedRoles),
+    multicourseEnabled: getDefaultMulticourseEnabledForRoleKeys(normalizedRoles),
+  };
+}
+
+async function getAllowedCourseKindsForRoleKeys(roleKeys = []) {
+  const policy = await getRoleCourseAccessPolicy(roleKeys);
+  return policy.allowedKinds;
 }
 
 async function buildStaffCourseAccess(userCourseId, courses, roleOrRoles = '') {
   const roleKeys = normalizeRoleList(roleOrRoles);
-  const allowedKinds = await getAllowedCourseKindsForRoleKeys(roleKeys);
+  const {
+    allowedKinds,
+    multicourseEnabled,
+  } = await getRoleCourseAccessPolicy(roleKeys);
   const allowedCourseIds = new Set();
   const baseCourseId = Number(userCourseId);
   if (Number.isFinite(baseCourseId)) {
@@ -1651,14 +1720,21 @@ async function buildStaffCourseAccess(userCourseId, courses, roleOrRoles = '') {
       allowedCourseIds.add(baseCourseId);
     }
   }
-  (courses || []).forEach((course) => {
-    const courseKind = isTeacherCourseRow(course) ? 'teacher' : 'regular';
-    if (allowedKinds.has(courseKind)) {
-      allowedCourseIds.add(Number(course.id));
-    }
-  });
+  if (multicourseEnabled) {
+    (courses || []).forEach((course) => {
+      const courseKind = isTeacherCourseRow(course) ? 'teacher' : 'regular';
+      if (allowedKinds.has(courseKind)) {
+        allowedCourseIds.add(Number(course.id));
+      }
+    });
+  }
   const allowedCourses = (courses || []).filter((course) => allowedCourseIds.has(Number(course.id)));
-  return { allowedCourseIds, allowedCourses, allowedKinds };
+  return {
+    allowedCourseIds,
+    allowedCourses,
+    allowedKinds,
+    multicourseEnabled,
+  };
 }
 
 async function getRbacRolesDetailed() {
@@ -1666,7 +1742,7 @@ async function getRbacRolesDetailed() {
     const [roleRows, permissionRows, courseRows, memberRows] = await Promise.all([
       db.all(
         `
-          SELECT id, key, label, description, is_system, is_active
+          SELECT id, key, label, description, is_system, is_active, multicourse_enabled
           FROM access_roles
           ORDER BY is_system DESC, key ASC
         `
@@ -1718,6 +1794,7 @@ async function getRbacRolesDetailed() {
       description: String(row.description || ''),
       is_system: row.is_system === true || Number(row.is_system) === 1,
       is_active: row.is_active === true || Number(row.is_active) === 1,
+      multicourse_enabled: isEnabledRoleFlag(row.multicourse_enabled),
       permission_keys: Array.from(permissionsByRole[row.key] || []).sort(),
       course_kinds: Array.from(courseByRole[row.key] || []).sort(),
       members_count: membersByRole[row.key] || 0,
@@ -8599,6 +8676,7 @@ const { runMigrations } = require('./lib/migrations');
 const migrationCatalog = require('./migrations');
 
 const authLimiter = createRateLimiter({
+  pool,
   windowMs: 60 * 1000,
   max: 8,
   keyFn: (req) => `auth:${getClientIp(req)}`,
@@ -8606,6 +8684,7 @@ const authLimiter = createRateLimiter({
 });
 
 const registerLimiter = createRateLimiter({
+  pool,
   windowMs: 60 * 1000,
   max: 5,
   keyFn: (req) => `register:${getClientIp(req)}`,
@@ -8613,18 +8692,21 @@ const registerLimiter = createRateLimiter({
 });
 
 const writeLimiter = createRateLimiter({
+  pool,
   windowMs: 30 * 1000,
   max: 30,
   keyFn: (req) => `write:${req.session?.user?.id || getClientIp(req)}`,
 });
 
 const readLimiter = createRateLimiter({
+  pool,
   windowMs: 60 * 1000,
   max: 90,
   keyFn: (req) => `read:${req.session?.user?.id || getClientIp(req)}`,
 });
 
 const uploadLimiter = createRateLimiter({
+  pool,
   windowMs: 60 * 1000,
   max: 6,
   keyFn: (req) => `upload:${req.session?.user?.id || getClientIp(req)}`,
@@ -10499,6 +10581,18 @@ function getStoredAdminAcademicScope(req) {
   return scope;
 }
 
+function getStoredAdminAllowedCourseIds(req) {
+  return Array.from(
+    new Set(
+      (Array.isArray(req?.session?.adminAcademicScope?.allowedCourseIds)
+        ? req.session.adminAcademicScope.allowedCourseIds
+        : [])
+        .map((value) => parsePositiveIntStrict(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )
+  );
+}
+
 function buildAdminScopeStatePayload(scopeState = {}, overrides = {}) {
   const next = Object.assign({}, scopeState || {}, overrides || {});
   const track = String(next.track || next.mode || '').trim().toLowerCase();
@@ -10511,6 +10605,13 @@ function buildAdminScopeStatePayload(scopeState = {}, overrides = {}) {
     campus: campus === 'munich' ? 'munich' : (campus === 'kyiv' ? 'kyiv' : ''),
     studyContextId: parsePositiveIntStrict(next.studyContextId || next.study_context_id),
     courseId: parsePositiveIntStrict(next.courseId || next.course || next.course_id),
+    allowedCourseIds: Array.from(
+      new Set(
+        (Array.isArray(next.allowedCourseIds) ? next.allowedCourseIds : [])
+          .map((value) => parsePositiveIntStrict(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      )
+    ),
   };
 }
 
@@ -11169,6 +11270,25 @@ function appendQueryParamToUrl(url, key, value) {
   return `${url}${separator}${encodeURIComponent(String(key))}=${encodeURIComponent(String(value))}`;
 }
 
+function resolveSafeInternalRedirectPath(req, rawUrl, allowedPathnames = []) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return null;
+  try {
+    const requestOrigin = `${req.protocol}://${req.get('host') || 'localhost'}`;
+    const parsed = new URL(value, requestOrigin);
+    if (parsed.origin !== requestOrigin) {
+      return null;
+    }
+    const pathname = String(parsed.pathname || '').trim();
+    if (!allowedPathnames.some((allowedPathname) => pathname === allowedPathname)) {
+      return null;
+    }
+    return `${pathname}${parsed.search || ''}${parsed.hash || ''}`;
+  } catch (err) {
+    return null;
+  }
+}
+
 async function loadAcademicV2LegacyStudentRows(userOrId, options = {}) {
   const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
     getAcademicV2Store(),
@@ -11356,7 +11476,7 @@ async function buildAdminAcademicScopeState(req, options = {}) {
   const studyContexts = Array.isArray(options.studyContexts)
     ? options.studyContexts
     : await listStudyContextOptions();
-  const allowedCourseIdSet = options.allowedCourseIds instanceof Set
+  let allowedCourseIdSet = options.allowedCourseIds instanceof Set
     ? options.allowedCourseIds
     : (Array.isArray(options.allowedCourseIds)
       ? new Set(
@@ -11365,6 +11485,11 @@ async function buildAdminAcademicScopeState(req, options = {}) {
           .filter((value) => Number.isInteger(value) && value > 0)
       )
       : null);
+  if (!allowedCourseIdSet) {
+    const baseCourseId = parsePositiveIntStrict(req?.session?.user?.course_id) || getAdminCourse(req) || 1;
+    const scopedCourseAccess = await buildStaffCourseAccess(baseCourseId, courses, getSessionRoleList(req));
+    allowedCourseIdSet = scopedCourseAccess.allowedCourseIds;
+  }
   const resetScope = String(
     (req.body && req.body.reset_scope)
     || (req.query && req.query.reset_scope)
@@ -11412,6 +11537,7 @@ async function buildAdminAcademicScopeState(req, options = {}) {
     resolvedScopeState.availableAcademicGroups = await listAssignableAdminAcademicGroups(resolvedScopeState);
   }
   const storedPayload = buildAdminScopeStatePayload(resolvedScopeState);
+  storedPayload.allowedCourseIds = Array.from(allowedCourseIdSet || []).sort((a, b) => a - b);
   req.session.adminAcademicScope = storedPayload;
   if (storedPayload.courseId) {
     req.session.adminCourse = storedPayload.courseId;
@@ -11427,20 +11553,43 @@ function getAdminCourse(req) {
   if (!Number.isNaN(scopedCourse) && scopedCourse > 0) {
     return scopedCourse;
   }
+  const allowedCourseIds = getStoredAdminAllowedCourseIds(req);
+  const allowedCourseIdSet = new Set(allowedCourseIds);
+  const fallbackAllowedCourseId = allowedCourseIds.length ? allowedCourseIds[0] : null;
+  const userCourseId = parsePositiveIntStrict(req?.session?.user?.course_id) || 1;
   if (hasSessionRole(req, 'admin')) {
     const queryCourse = Number(req.query.course);
-    if (!Number.isNaN(queryCourse) && queryCourse > 0) {
+    if (
+      !Number.isNaN(queryCourse)
+      && queryCourse > 0
+      && (!allowedCourseIdSet.size || allowedCourseIdSet.has(queryCourse))
+    ) {
       req.session.adminCourse = queryCourse;
     }
     const sessionCourse = Number(req.session.adminCourse);
-    return Number.isNaN(sessionCourse) ? 1 : sessionCourse;
+    if (allowedCourseIdSet.size) {
+      if (!Number.isNaN(sessionCourse) && allowedCourseIdSet.has(sessionCourse)) {
+        return sessionCourse;
+      }
+      if (allowedCourseIdSet.has(userCourseId)) {
+        return userCourseId;
+      }
+      return fallbackAllowedCourseId || userCourseId;
+    }
+    return Number.isNaN(sessionCourse) ? userCourseId : sessionCourse;
   }
   const sessionCourse = Number(req?.session?.adminCourse);
-  if (!Number.isNaN(sessionCourse) && sessionCourse > 0) {
+  if (
+    !Number.isNaN(sessionCourse)
+    && sessionCourse > 0
+    && (!allowedCourseIdSet.size || allowedCourseIdSet.has(sessionCourse))
+  ) {
     return sessionCourse;
   }
-  const userCourse = Number(req?.session?.user?.course_id || 1);
-  return Number.isNaN(userCourse) ? 1 : userCourse;
+  if (allowedCourseIdSet.size && !allowedCourseIdSet.has(userCourseId)) {
+    return fallbackAllowedCourseId || userCourseId;
+  }
+  return userCourseId;
 }
 
 function getStaffCourse(req) {
@@ -11457,6 +11606,185 @@ function getStaffCourse(req) {
   }
   const userCourse = Number(req?.session?.user?.course_id || 1);
   return Number.isNaN(userCourse) ? 1 : userCourse;
+}
+
+const ADMIN_SCOPED_USER_BASE_FROM_SQL = `
+  FROM users u
+  LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+  LEFT JOIN academic_v2_cohorts v2_cohort ON v2_cohort.id = v2_group.cohort_id
+  LEFT JOIN academic_v2_programs v2_program ON v2_program.id = v2_cohort.program_id
+  LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
+  LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
+  LEFT JOIN study_programs p ON p.id = coh.program_id
+  LEFT JOIN courses group_course_meta ON group_course_meta.id = v2_group.legacy_course_id
+  LEFT JOIN courses course_meta ON course_meta.id = u.course_id
+`;
+
+function buildAdminScopedUserFilters(adminAcademicScope = {}, options = {}) {
+  const scopeState = adminAcademicScope && typeof adminAcademicScope === 'object'
+    ? adminAcademicScope
+    : {};
+  const courseId = parsePositiveIntStrict(scopeState.courseId || scopeState.course_id) || 0;
+  const userFilters = [];
+  const userParams = [];
+  if (scopeState && scopeState.studyContextId) {
+    userFilters.push(
+      `
+        (
+          u.study_context_id = ?
+          OR COALESCE(v2_group.legacy_study_context_id, 0) = ?
+          OR (
+            u.study_context_id IS NULL
+            AND u.course_id = ?
+            AND COALESCE(v2_program.id, coh.program_id, u.study_program_id, 0) = ?
+            AND COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id, 0) = ?
+            AND LOWER(
+              COALESCE(
+                NULLIF(TRIM(v2_program.track_key), ''),
+                NULLIF(TRIM(p.track_key), ''),
+                NULLIF(TRIM(u.study_track), ''),
+                ?
+              )
+            ) = ?
+          )
+        )
+      `
+    );
+    userParams.push(
+      Number(scopeState.studyContextId || 0),
+      Number(scopeState.studyContextId || 0),
+      Number(courseId || 0),
+      Number(scopeState.programId || 0),
+      Number(scopeState.admissionId || 0),
+      String(scopeState.track || 'bachelor'),
+      String(scopeState.track || 'bachelor')
+    );
+  } else {
+    userFilters.push('(u.course_id = ?)');
+    userParams.push(Number(courseId || 0));
+  }
+  if (scopeState && scopeState.programId && !scopeState.studyContextId) {
+    userFilters.push('COALESCE(v2_program.id, coh.program_id, u.study_program_id) = ?');
+    userParams.push(Number(scopeState.programId || 0));
+  }
+  if (scopeState && scopeState.admissionId && !scopeState.studyContextId) {
+    userFilters.push('COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id) = ?');
+    userParams.push(Number(scopeState.admissionId || 0));
+  }
+  if (scopeState && scopeState.track && !scopeState.studyContextId) {
+    userFilters.push(
+      `
+        LOWER(
+          COALESCE(
+            NULLIF(TRIM(v2_program.track_key), ''),
+            NULLIF(TRIM(p.track_key), ''),
+            NULLIF(TRIM(u.study_track), ''),
+            CASE
+              WHEN COALESCE(group_course_meta.is_teacher_course, course_meta.is_teacher_course, 0) = 1 THEN 'teacher'
+              ELSE 'bachelor'
+            END
+          )
+        ) = ?
+      `
+    );
+    userParams.push(String(scopeState.track || 'bachelor'));
+  }
+  if (scopeState && scopeState.stage && !scopeState.studyContextId) {
+    userFilters.push('COALESCE(v2_group.stage_number, sc.stage_number, ?) = ?');
+    userParams.push(Number(scopeState.stage || 1), Number(scopeState.stage || 1));
+  }
+  if (scopeState && scopeState.campus && !scopeState.studyContextId) {
+    userFilters.push(
+      `
+        LOWER(
+          COALESCE(
+            NULLIF(TRIM(v2_group.campus_key), ''),
+            NULLIF(TRIM(sc.campus_key), ''),
+            NULLIF(TRIM(group_course_meta.location), ''),
+            NULLIF(TRIM(course_meta.location), ''),
+            'kyiv'
+          )
+        ) = ?
+      `
+    );
+    userParams.push(String(scopeState.campus || 'kyiv'));
+  }
+
+  const userIds = Array.from(
+    new Set(
+      (Array.isArray(options.userIds) ? options.userIds : [])
+        .map((value) => parsePositiveIntStrict(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )
+  );
+  if (userIds.length) {
+    userFilters.push('u.id = ANY(?::int[])');
+    userParams.push(userIds);
+  } else {
+    const userId = parsePositiveIntStrict(options.userId);
+    if (userId) {
+      userFilters.push('u.id = ?');
+      userParams.push(userId);
+    }
+  }
+
+  if (usersHasIsActive) {
+    const status = String(options.status || '').trim().toLowerCase();
+    if (status === 'inactive') {
+      userFilters.push('u.is_active = 0');
+    } else if (status === 'active') {
+      userFilters.push('u.is_active = 1');
+    }
+  }
+  if (options.q) {
+    userFilters.push('u.full_name ILIKE ?');
+    userParams.push(`%${options.q}%`);
+  }
+  if (options.group) {
+    userFilters.push('u.schedule_group = ?');
+    userParams.push(options.group);
+  }
+  return {
+    courseId,
+    whereSql: userFilters.length ? `WHERE ${userFilters.join(' AND ')}` : '',
+    params: userParams,
+  };
+}
+
+async function listAdminScopedUsers(adminAcademicScope = {}, options = {}) {
+  const {
+    courseId,
+    whereSql,
+    params,
+  } = buildAdminScopedUserFilters(adminAcademicScope, options);
+  if (!whereSql) {
+    return [];
+  }
+  const selectClause = String(
+    options.selectClause
+      || 'u.id, u.full_name, u.role, u.course_id, u.study_context_id, u.group_id'
+  );
+  const orderBy = String(options.orderBy || 'u.id ASC');
+  const limit = parsePositiveIntStrict(options.limit);
+  const limitSql = limit ? ` LIMIT ${limit}` : '';
+  return db.all(
+    `
+      SELECT ${selectClause}
+      ${ADMIN_SCOPED_USER_BASE_FROM_SQL}
+      ${whereSql}
+      ORDER BY ${orderBy}${limitSql}
+    `,
+    params
+  );
+}
+
+async function getAdminScopedUser(adminAcademicScope = {}, userId, options = {}) {
+  const rows = await listAdminScopedUsers(adminAcademicScope, {
+    ...options,
+    userId,
+    limit: 1,
+  });
+  return rows && rows[0] ? rows[0] : null;
 }
 
 function getStaffPanelBase(req, courseId) {
@@ -11868,7 +12196,7 @@ async function getRbacRoleStateByKey(roleKeyRaw) {
   if (!roleKey) return null;
   const roleRow = await db.get(
     `
-      SELECT id, key, label, description, is_system, is_active
+      SELECT id, key, label, description, is_system, is_active, multicourse_enabled
       FROM access_roles
       WHERE key = ?
       LIMIT 1
@@ -11903,6 +12231,7 @@ async function getRbacRoleStateByKey(roleKeyRaw) {
     description: String(roleRow.description || ''),
     is_system: Number(roleRow.is_system) === 1 || roleRow.is_system === true,
     is_active: Number(roleRow.is_active) === 1 || roleRow.is_active === true,
+    multicourse_enabled: isEnabledRoleFlag(roleRow.multicourse_enabled),
     permission_keys: (permissionRows || []).map((row) => String(row.key)),
     course_kinds: (courseRows || []).map((row) => String(row.course_kind)),
   };
@@ -11920,7 +12249,9 @@ async function upsertRbacRoleState(client, state) {
   ));
   const roleCourseKinds = normalizedCourseKinds.length
     ? normalizedCourseKinds
-    : (key === 'admin' ? ['regular', 'teacher'] : ['regular']);
+    : (Array.isArray(DEFAULT_ROLE_COURSE_KINDS[key]) && DEFAULT_ROLE_COURSE_KINDS[key].length
+      ? DEFAULT_ROLE_COURSE_KINDS[key]
+      : ['regular']);
   const requestedPermissions = Array.from(new Set(
     (Array.isArray(state.permission_keys) ? state.permission_keys : [])
       .map((permissionKey) => String(permissionKey || '').trim())
@@ -11950,6 +12281,9 @@ async function upsertRbacRoleState(client, state) {
   const isActive = key === 'admin'
     ? true
     : Boolean(state && (state.is_active === true || Number(state.is_active) === 1));
+  const multicourseEnabled = Boolean(
+    state && (state.multicourse_enabled === true || Number(state.multicourse_enabled) === 1)
+  );
   const label = String(state && state.label ? state.label : key).trim() || key;
   const description = String(state && state.description ? state.description : '').trim();
 
@@ -11961,19 +12295,20 @@ async function upsertRbacRoleState(client, state) {
             description = $2,
             is_system = $3,
             is_active = $4,
+            multicourse_enabled = $5,
             updated_at = NOW()
-        WHERE id = $5
+        WHERE id = $6
       `,
-      [label, description, isSystem, isActive, roleId]
+      [label, description, isSystem, isActive, multicourseEnabled, roleId]
     );
   } else {
     const inserted = await client.query(
       `
-        INSERT INTO access_roles (key, label, description, is_system, is_active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        INSERT INTO access_roles (key, label, description, is_system, is_active, multicourse_enabled, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         RETURNING id
       `,
-      [key, label, description, isSystem, isActive]
+      [key, label, description, isSystem, isActive, multicourseEnabled]
     );
     roleId = Number(inserted.rows[0].id);
   }
@@ -16327,7 +16662,7 @@ app.post('/register', registerLimiter, async (req, res) => {
 
   if (!full_name) return redirectRegisterError('missing-name');
   if (!password) return redirectRegisterError('missing-password');
-  if (password.length < 4) return redirectRegisterError('short-password');
+  if (password.length < PASSWORD_MIN_LENGTH) return redirectRegisterError('short-password');
   if (!confirm_password) return redirectRegisterError('missing-confirm-password');
   if (password !== confirm_password) return redirectRegisterError('password-mismatch');
   if (!hasConsent) return redirectRegisterError('consent-required');
@@ -18956,6 +19291,9 @@ app.post('/profile', requireLogin, (req, res) => {
   }
   if ((password || confirm_password) && password !== confirm_password) {
     return res.redirect('/profile?error=Passwords%20do%20not%20match');
+  }
+  if (password && password.length < PASSWORD_MIN_LENGTH) {
+    return res.redirect(`/profile?error=${encodeURIComponent(`Password must contain at least ${PASSWORD_MIN_LENGTH} characters`)}`);
   }
 
   const updates = [];
@@ -22823,13 +23161,18 @@ async function getHomeworkReactionAccess(req, homeworkId) {
       userId,
       {
         subjectId: homework.subject_id,
+        courseId: homework.course_id,
         includeHidden: true,
       }
     );
     if (!teacherRows || !teacherRows.length) {
       return { status: 'forbidden', homework: null };
     }
-    const teacherAccess = buildTeacherSubjectAccess(teacherRows, Number(teacherRows[0].group_count || 1));
+    const teacherAccess = buildTeacherSubjectAccess(
+      teacherRows,
+      Number(teacherRows[0].group_count || 1),
+      { courseId: homework.course_id }
+    );
     const targetGroupNumber = Number(homework.group_number || 0);
     if (Number.isInteger(targetGroupNumber) && targetGroupNumber > 0 && !teacherAccess.allowAll && !teacherAccess.groups.has(targetGroupNumber)) {
       return { status: 'forbidden', homework: null };
@@ -25508,14 +25851,21 @@ const buildTeamworkRandomDistribution = ({
   return distribution;
 };
 
-const buildTeacherSubjectAccess = (rows, maxGroupCount = 1) => {
+const buildTeacherSubjectAccess = (rows, maxGroupCount = 1, options = {}) => {
   const safeMaxGroupCount = Math.max(1, Number(maxGroupCount) || 1);
-  const hasRows = Array.isArray(rows) && rows.length > 0;
+  const scopedCourseId = parsePositiveIntStrict(options.courseId || options.course_id);
+  const scopedRows = scopedCourseId
+    ? (Array.isArray(rows) ? rows : []).filter((row) => {
+      const rowCourseId = parsePositiveIntStrict(row && (row.course_id || row.owner_course_id));
+      return rowCourseId === scopedCourseId;
+    })
+    : (Array.isArray(rows) ? rows : []);
+  const hasRows = scopedRows.length > 0;
   if (!hasRows) {
     return { hasRows: false, allowAll: false, groups: new Set() };
   }
 
-  const allowAll = rows.some((row) => row.group_number === null || typeof row.group_number === 'undefined');
+  const allowAll = scopedRows.some((row) => row.group_number === null || typeof row.group_number === 'undefined');
   if (allowAll) {
     return {
       hasRows: true,
@@ -25525,7 +25875,7 @@ const buildTeacherSubjectAccess = (rows, maxGroupCount = 1) => {
   }
 
   const groups = new Set();
-  rows.forEach((row) => {
+  scopedRows.forEach((row) => {
     const groupNum = Number(row.group_number);
     if (Number.isInteger(groupNum) && groupNum >= 1 && groupNum <= safeMaxGroupCount) {
       groups.add(groupNum);
@@ -28068,13 +28418,23 @@ async function trySyncJournalColumnsAfterHomeworkCreate({
   }
 }
 
-async function getTeacherJournalSubjectAccess(userId, subjectId) {
-  const rows = (await getTeacherAssignedSubjects(userId))
-    .filter((row) => Number(row.subject_id || 0) === Number(subjectId || 0));
+async function getTeacherJournalSubjectAccess(userId, subjectId, courseId = null) {
+  const normalizedCourseId = parsePositiveIntStrict(courseId) || null;
+  const rows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
+    getTeacherTemplateStore(),
+    userId,
+    {
+      subjectId,
+      courseId: normalizedCourseId,
+      includeHidden: true,
+    }
+  );
   if (!rows || !rows.length) {
     return { hasRows: false, allowAll: false, groups: new Set() };
   }
-  return buildTeacherSubjectAccess(rows, Number(rows[0].group_count || 1));
+  return buildTeacherSubjectAccess(rows, Number(rows[0].group_count || 1), {
+    courseId: normalizedCourseId,
+  });
 }
 
 function buildJournalRuntimeSubjectId({
@@ -32070,7 +32430,11 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
         return res.status(403).json({ error: 'Forbidden' });
       }
     } else if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).json({ error: 'Forbidden' });
       }
@@ -32503,7 +32867,11 @@ app.post('/journal/grades/save', requireLogin, writeLimiter, async (req, res) =>
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -32706,7 +33074,11 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -32723,7 +33095,11 @@ app.post('/journal/grades/bulk-save', requireLogin, writeLimiter, async (req, re
       (studentRows || []).map((row) => [Number(row.student_id || row.id), Number(row.group_number || 0)])
     );
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       for (const studentId of uniqueStudentIds) {
         const groupNumber = Number(studentGroups.get(studentId) || 0);
         if (!groupNumber) {
@@ -32945,7 +33321,11 @@ app.post('/journal/grades/delete', requireLogin, writeLimiter, async (req, res) 
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -33100,7 +33480,11 @@ app.post('/journal/grades/restore', requireLogin, writeLimiter, async (req, res)
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -33251,7 +33635,11 @@ app.post('/journal/retakes/create', requireLogin, writeLimiter, async (req, res)
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -33408,7 +33796,11 @@ app.post('/journal/retakes/update', requireLogin, writeLimiter, async (req, res)
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -33832,7 +34224,11 @@ app.post('/journal/appeals/update', requireLogin, writeLimiter, async (req, res)
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -34073,7 +34469,11 @@ app.post('/journal/moderation/update', requireLogin, writeLimiter, async (req, r
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -34253,7 +34653,11 @@ app.post('/journal/competency/add', requireLogin, writeLimiter, async (req, res)
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -34383,7 +34787,11 @@ app.post('/journal/competency/checklist/save', requireLogin, writeLimiter, async
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), Number(column.subject_id));
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        Number(column.subject_id),
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -34514,7 +34922,11 @@ app.post('/journal/columns/final-toggle', requireLogin, writeLimiter, async (req
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        subjectId,
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -34597,7 +35009,11 @@ app.post('/journal/columns/lock-toggle', requireLogin, writeLimiter, async (req,
     }
 
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        subjectId,
+        Number(column.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -34677,7 +35093,11 @@ app.post('/journal/columns/create', requireLogin, writeLimiter, async (req, res)
       return res.redirect(buildJournalClosedRedirectPathFromRequest(req, subjectId));
     }
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        subjectId,
+        Number(subject.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -34966,7 +35386,11 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
       return res.redirect(buildJournalClosedRedirectPathFromRequest(req, subjectId));
     }
     if (!journalScope.fullAccess) {
-      const access = await getTeacherJournalSubjectAccess(Number(req.session.user.id), subjectId);
+      const access = await getTeacherJournalSubjectAccess(
+        Number(req.session.user.id),
+        subjectId,
+        Number(subject.course_id || 0) || null
+      );
       if (!access.hasRows) {
         return res.status(403).send('Forbidden (journal)');
       }
@@ -35432,7 +35856,11 @@ app.post('/subjects/materials', requireLogin, uploadLimiter, upload.single('atta
     const selectedCourseId = Number(subjectRow.course_id || req.session.user.course_id || 1);
     const teacherRows = (await getTeacherAssignedSubjects(userId))
       .filter((row) => Number(row.subject_id || 0) === Number(subjectId || 0));
-    const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], Number(subjectRow.group_count || 1));
+    const teacherAccess = buildTeacherSubjectAccess(
+      teacherRows || [],
+      Number(subjectRow.group_count || 1),
+      { courseId: selectedCourseId }
+    );
     if (!teacherAccess.hasRows) {
       if (req.file) {
         fs.unlink(req.file.path, () => {});
@@ -35580,7 +36008,9 @@ app.post('/subjects/materials/:id/delete', requireLogin, writeLimiter, async (re
         (maxCount, row) => Math.max(maxCount, Number(row && row.group_count ? row.group_count : 1) || 1),
         1
       );
-      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], teacherGroupCount);
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], teacherGroupCount, {
+        courseId: material.course_id,
+      });
       if (!teacherAccess.hasRows) {
         return res.redirect(`/subjects?subject_id=${material.subject_id}&err=No%20access%20to%20subject`);
       }
@@ -35867,7 +36297,9 @@ app.get('/teamwork', requireLogin, async (req, res) => {
     const audienceByTaskId = {};
     const tasks = (taskRows || []).filter((task) => {
       const teacherRows = creatorAssignmentsByUser[Number(task.created_by || 0)] || [];
-      const access = buildTeacherSubjectAccess(teacherRows, selectedSubjectGroupCount);
+      const access = buildTeacherSubjectAccess(teacherRows, selectedSubjectGroupCount, {
+        courseId: task.course_id,
+      });
       const audience = buildTeamworkTaskAudience(task, access, selectedSubjectGroupCount);
       audienceByTaskId[task.id] = audience;
       if (isTeacherMode) return true;
@@ -36121,7 +36553,9 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
     }
 
     const maxSubjectGroups = Math.max(1, Number(subjectRow.group_count || 1));
-    const teacherAccess = buildTeacherSubjectAccess(teacherRows, maxSubjectGroups);
+    const teacherAccess = buildTeacherSubjectAccess(teacherRows, maxSubjectGroups, {
+      courseId: subjectRow.course_id,
+    });
     const baseTargetGroups = teacherAccess.allowAll
       ? Array.from({ length: maxSubjectGroups }, (_value, index) => index + 1)
       : Array.from(teacherAccess.groups || []).sort((a, b) => a - b);
@@ -36394,7 +36828,7 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
   try {
     const taskRow = await db.get(
       `SELECT t.id, t.subject_id, t.created_by, t.group_count, t.member_limits_enabled, t.max_members,
-              t.lesson_scope, t.seminar_group_numbers, s.group_count AS subject_group_count
+              t.lesson_scope, t.seminar_group_numbers, t.course_id, s.group_count AS subject_group_count
        FROM teamwork_tasks t
        JOIN subjects s ON s.id = t.subject_id
        WHERE t.id = ?`,
@@ -36419,10 +36853,13 @@ app.post('/teamwork/group/create', requireLogin, writeLimiter, async (req, res) 
         taskRow.created_by,
         {
           subjectId: taskRow.subject_id,
+          courseId: taskRow.course_id,
           includeHidden: true,
         }
       );
-      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], taskRow.subject_group_count || 1);
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], taskRow.subject_group_count || 1, {
+        courseId: taskRow.course_id,
+      });
       const audience = buildTeamworkTaskAudience(taskRow, teacherAccess, taskRow.subject_group_count || 1);
       const seminarGroups = Array.from(audience.groups || []).sort((a, b) => a - b);
       if (!seminarGroups.length) {
@@ -36512,6 +36949,7 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
                g.seminar_group_number,
                t.subject_id,
                t.created_by,
+               t.course_id,
                t.group_lock_enabled,
                t.lesson_scope,
                t.seminar_group_numbers,
@@ -36541,6 +36979,7 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
       grpRow.created_by,
       {
         subjectId: grpRow.subject_id,
+        courseId: grpRow.course_id,
         includeHidden: true,
       }
     );
@@ -36548,7 +36987,9 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
     }
 
-    const teacherAccess = buildTeacherSubjectAccess(teacherRows, grpRow.subject_group_count || 1);
+    const teacherAccess = buildTeacherSubjectAccess(teacherRows, grpRow.subject_group_count || 1, {
+      courseId: grpRow.course_id,
+    });
     const audience = buildTeamworkTaskAudience(grpRow, teacherAccess, grpRow.subject_group_count || 1);
     if (!audience.allowAll && !audience.groups.has(Number(sgRow.group_number))) {
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
@@ -37431,6 +37872,7 @@ async function getTeamworkReactionAccess(req, taskId) {
       userId,
       {
         subjectId: task.subject_id,
+        courseId: task.course_id,
         includeHidden: true,
       }
     );
@@ -37468,13 +37910,16 @@ async function getTeamworkReactionAccess(req, taskId) {
     task.created_by,
     {
       subjectId: task.subject_id,
+      courseId: task.course_id,
       includeHidden: true,
     }
   );
   if (!teacherRows || !teacherRows.length) {
     return { status: 'forbidden', task: null };
   }
-  const teacherAccess = buildTeacherSubjectAccess(teacherRows, task.subject_group_count || 1);
+  const teacherAccess = buildTeacherSubjectAccess(teacherRows, task.subject_group_count || 1, {
+    courseId: task.course_id,
+  });
   const audience = buildTeamworkTaskAudience(task, teacherAccess, task.subject_group_count || 1);
   const canViewTask = audience.allowAll || studentGroups.some((groupNum) => audience.groups.has(Number(groupNum)));
   return canViewTask ? { status: 'ok', task } : { status: 'forbidden', task: null };
@@ -37681,6 +38126,7 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
   settingsMeta: null,
   rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
   defaultRolePermissions: DEFAULT_ROLE_PERMISSIONS,
+  defaultRoleMulticourse: DEFAULT_ROLE_MULTICOURSE,
   adminSectionOptions: ADMIN_SECTION_OPTIONS,
   rbacRoles: [],
   rbacPermissionOptions: RBAC_PERMISSION_OPTIONS,
@@ -37723,9 +38169,27 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       : (hasSessionRole(req, 'starosta')
         ? 'starosta'
         : normalizeRoleKey(req.session.role || 'student')));
+  const roleKeys = getSessionRoleList(req);
+  const baseCourseId = Number(req.session.user?.course_id || 1);
+  let courses = [];
+  let semesters = [];
+  let teacherRequests = [];
   let adminAcademicScope = null;
   try {
-    adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
+    const allCourses = await getCoursesCached();
+    const scopedCourseAccess = await buildStaffCourseAccess(baseCourseId, allCourses, roleKeys);
+    if (!scopedCourseAccess.allowedCourses.length) {
+      return res.status(403).send('Forbidden (course access)');
+    }
+    courses = scopedCourseAccess.allowedCourses;
+    adminAcademicScope = await buildAdminAcademicScopeState(req, {
+      courses,
+      allowedCourseIds: Array.from(scopedCourseAccess.allowedCourseIds),
+      fallbackCourseId: scopedCourseAccess.allowedCourseIds.has(baseCourseId)
+        ? baseCourseId
+        : (courses.length ? Number(courses[0].id || baseCourseId) : baseCourseId),
+      includeAcademicGroups: true,
+    });
   } catch (err) {
     return handleDbError(res, err, 'admin.scope');
   }
@@ -37833,11 +38297,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     ORDER BY se.week_number, se.day_of_week, se.class_number
   `;
 
-  let courses = [];
-  let semesters = [];
-  let teacherRequests = [];
   try {
-    courses = await getCoursesCached();
     semesters = await getSemestersCached(courseId);
     teacherRequests = await teacherTemplateHelpers.listTeacherRequestSummaries(getTeacherTemplateStore());
   } catch (err) {
@@ -38600,7 +39060,15 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       adminAcademicScope,
                                       academicV2ScheduleLocked: courseSubjectScope && courseSubjectScope.source === 'academic_v2',
                                       adminHomeHref: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
-                                      allowCourseSelect: isAdminPanelOwner && Array.isArray(courses) && courses.length > 1,
+                                      allowCourseSelect: Boolean(adminAcademicScope && (
+                                        (Array.isArray(courses) && courses.length > 1)
+                                        || (adminAcademicScope.trackOptions || []).length > 1
+                                        || (adminAcademicScope.programOptions || []).length > 1
+                                        || (adminAcademicScope.admissionOptions || []).length > 1
+                                        || (adminAcademicScope.stageOptions || []).length > 1
+                                        || (adminAcademicScope.campusOptions || []).length > 1
+                                        || (adminAcademicScope.availableStudyContexts || []).length > 1
+                                      )),
                                       limitedStaffView: !isAdminPanelOwner,
                                       allowedSections,
         projectionAlert,
@@ -38613,6 +39081,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       settingsMeta,
                                       rolePermissions: settingsCache.role_permissions || { ...DEFAULT_ROLE_PERMISSIONS },
                                       defaultRolePermissions: DEFAULT_ROLE_PERMISSIONS,
+                                      defaultRoleMulticourse: DEFAULT_ROLE_MULTICOURSE,
                                       adminSectionOptions: ADMIN_SECTION_OPTIONS,
                                       rbacRoles,
                                       rbacPermissionOptions: RBAC_PERMISSION_OPTIONS,
@@ -44000,16 +44469,15 @@ app.get('/admin/schedule-list', requireScheduleSectionAccess, async (req, res) =
     return handleDbError(res, err, 'admin.scheduleList.init');
   }
   const roleKeys = getSessionRoleList(req);
-  const isAdmin = roleKeys.includes('admin');
   let courses = [];
   let courseId = getStaffCourse(req);
-  let allowCourseSelect = isAdmin;
+  let allowCourseSelect = false;
   try {
     courses = await getCoursesCached();
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleList.courses');
   }
-  if (!isAdmin) {
+  {
     const baseCourseId = Number(req.session.user.course_id || 1);
     const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
     if (!allowedCourses.length) {
@@ -44361,16 +44829,15 @@ app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res
     return handleDbError(res, err, 'admin.scheduleSummary.init');
   }
   const roleKeys = getSessionRoleList(req);
-  const isAdmin = roleKeys.includes('admin');
   let courses = [];
   let courseId = getStaffCourse(req);
-  let allowCourseSelect = isAdmin;
+  let allowCourseSelect = false;
   try {
     courses = await getCoursesCached();
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleSummary.courses');
   }
-  if (!isAdmin) {
+  {
     const baseCourseId = Number(req.session.user.course_id || 1);
     const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
     if (!allowedCourses.length) {
@@ -50866,23 +51333,18 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.courses');
   }
-  let fallbackCourseId = isAdmin ? getAdminCourse(req) : Number(req.session.user.course_id || 1);
-  let allowCourseSelect = isAdmin;
-  let allowedCourseIds = null;
-  if (!isAdmin) {
-    const baseCourseId = Number(req.session.user.course_id || 1);
-    const scopedCourseAccess = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
-    const { allowedCourses } = scopedCourseAccess;
-    if (!allowedCourses.length) {
-      return res.status(403).send('Forbidden (course access)');
-    }
-    courses = allowedCourses;
-    allowedCourseIds = scopedCourseAccess.allowedCourseIds;
-    fallbackCourseId = allowedCourseIds.has(baseCourseId)
-      ? baseCourseId
-      : (courses.length ? Number(courses[0].id) : baseCourseId);
-    allowCourseSelect = courses.length > 1;
+  const baseCourseId = Number(req.session.user.course_id || 1);
+  const scopedCourseAccess = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+  const { allowedCourses } = scopedCourseAccess;
+  if (!allowedCourses.length) {
+    return res.status(403).send('Forbidden (course access)');
   }
+  courses = allowedCourses;
+  const allowedCourseIds = scopedCourseAccess.allowedCourseIds;
+  let fallbackCourseId = allowedCourseIds.has(baseCourseId)
+    ? baseCourseId
+    : (courses.length ? Number(courses[0].id) : baseCourseId);
+  let allowCourseSelect = courses.length > 1;
   let adminAcademicScope = null;
   try {
     adminAcademicScope = await buildAdminAcademicScopeState(req, {
@@ -51046,115 +51508,15 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   ensureUsersSchema(() => {});
   try {
     const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
-    const courseId = adminAcademicScope && adminAcademicScope.courseId
-      ? Number(adminAcademicScope.courseId)
-      : getAdminCourse(req);
-    const userFilters = [];
-    const userParams = [];
-    if (adminAcademicScope && adminAcademicScope.studyContextId) {
-      userFilters.push(
-        `
-          (
-            u.study_context_id = ?
-            OR COALESCE(v2_group.legacy_study_context_id, 0) = ?
-            OR (
-              u.study_context_id IS NULL
-              AND u.course_id = ?
-              AND COALESCE(v2_program.id, coh.program_id, u.study_program_id, 0) = ?
-              AND COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id, 0) = ?
-              AND LOWER(
-                COALESCE(
-                  NULLIF(TRIM(v2_program.track_key), ''),
-                  NULLIF(TRIM(p.track_key), ''),
-                  NULLIF(TRIM(u.study_track), ''),
-                  ?
-                )
-              ) = ?
-            )
-          )
-        `
-      );
-      userParams.push(
-        Number(adminAcademicScope.studyContextId || 0),
-        Number(adminAcademicScope.studyContextId || 0),
-        Number(courseId || 0),
-        Number(adminAcademicScope.programId || 0),
-        Number(adminAcademicScope.admissionId || 0),
-        String(adminAcademicScope.track || 'bachelor'),
-        String(adminAcademicScope.track || 'bachelor')
-      );
-    } else {
-      userFilters.push(
-        `
-          (
-            u.course_id = ?
-          )
-        `
-      );
-      userParams.push(Number(courseId || 0));
-    }
-    if (usersHasIsActive) {
-      if (status === 'inactive') {
-        userFilters.push('u.is_active = 0');
-      } else if (status === 'active') {
-        userFilters.push('u.is_active = 1');
-      }
-    }
-    if (adminAcademicScope && adminAcademicScope.programId && !adminAcademicScope.studyContextId) {
-      userFilters.push('COALESCE(v2_program.id, coh.program_id, u.study_program_id) = ?');
-      userParams.push(Number(adminAcademicScope.programId || 0));
-    }
-    if (adminAcademicScope && adminAcademicScope.admissionId && !adminAcademicScope.studyContextId) {
-      userFilters.push('COALESCE(v2_cohort.legacy_admission_id, coh.legacy_admission_id, u.admission_id) = ?');
-      userParams.push(Number(adminAcademicScope.admissionId || 0));
-    }
-    if (adminAcademicScope && adminAcademicScope.track && !adminAcademicScope.studyContextId) {
-      userFilters.push(
-        `
-          LOWER(
-            COALESCE(
-              NULLIF(TRIM(v2_program.track_key), ''),
-              NULLIF(TRIM(p.track_key), ''),
-              NULLIF(TRIM(u.study_track), ''),
-              CASE
-                WHEN COALESCE(group_course_meta.is_teacher_course, course_meta.is_teacher_course, 0) = 1 THEN 'teacher'
-                ELSE 'bachelor'
-              END
-            )
-          ) = ?
-        `
-      );
-      userParams.push(String(adminAcademicScope.track || 'bachelor'));
-    }
-    if (adminAcademicScope && adminAcademicScope.stage && !adminAcademicScope.studyContextId) {
-      userFilters.push('COALESCE(v2_group.stage_number, sc.stage_number, ?) = ?');
-      userParams.push(Number(adminAcademicScope.stage || 1), Number(adminAcademicScope.stage || 1));
-    }
-    if (adminAcademicScope && adminAcademicScope.campus && !adminAcademicScope.studyContextId) {
-      userFilters.push(
-        `
-          LOWER(
-            COALESCE(
-              NULLIF(TRIM(v2_group.campus_key), ''),
-              NULLIF(TRIM(sc.campus_key), ''),
-              NULLIF(TRIM(group_course_meta.location), ''),
-              NULLIF(TRIM(course_meta.location), ''),
-              'kyiv'
-            )
-          ) = ?
-        `
-      );
-      userParams.push(String(adminAcademicScope.campus || 'kyiv'));
-    }
-    if (q) {
-      userFilters.push('u.full_name ILIKE ?');
-      userParams.push(`%${q}%`);
-    }
-    if (group) {
-      userFilters.push('u.schedule_group = ?');
-      userParams.push(group);
-    }
-    const userWhere = userFilters.length ? `WHERE ${userFilters.join(' AND ')}` : '';
+    const {
+      courseId,
+      whereSql: userWhere,
+      params: userParams,
+    } = buildAdminScopedUserFilters(adminAcademicScope, {
+      status,
+      q,
+      group,
+    });
     const activeColumn = usersHasIsActive ? 'u.is_active,' : '';
     const users = await db.all(
       `
@@ -52071,21 +52433,28 @@ app.get('/admin/history.json', requireHistorySectionAccess, (req, res) => {
   });
 });
 
-app.get('/admin/user-logins.json', requireActivitySectionAccess, (req, res) => {
-  const { user_id } = req.query;
-  if (!user_id) {
+app.get('/admin/user-logins.json', requireActivitySectionAccess, async (req, res) => {
+  const userId = parsePositiveIntStrict(req.query.user_id);
+  if (!userId) {
     return res.status(400).json({ error: 'Missing user_id' });
   }
-  db.all(
-    'SELECT id, ip, user_agent, created_at FROM login_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 20',
-    [user_id],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ logins: rows });
+  try {
+    await ensureDbReady();
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const targetUser = await getAdminScopedUser(adminAcademicScope, userId, {
+      selectClause: 'u.id',
+    });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
     }
-  );
+    const rows = await db.all(
+      'SELECT id, ip, user_agent, created_at FROM login_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 20',
+      [userId]
+    );
+    return res.json({ logins: rows });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.userLogins.fetch');
+  }
 });
 
 app.get('/admin/users/:id/sessions.json', requireUsersSectionAccess, async (req, res) => {
@@ -52095,14 +52464,10 @@ app.get('/admin/users/:id/sessions.json', requireUsersSectionAccess, async (req,
   }
   try {
     await ensureDbReady();
-    const scopedCourseId = getAdminCourse(req);
-    const canCrossCourse = hasSessionRole(req, 'admin');
-    const targetUser = canCrossCourse
-      ? await db.get('SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1', [targetUserId])
-      : await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
-        userId: targetUserId,
-        courseId: scopedCourseId,
-      });
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const targetUser = await getAdminScopedUser(adminAcademicScope, targetUserId, {
+      selectClause: 'u.id, u.full_name, u.course_id',
+    });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -52124,14 +52489,11 @@ app.post('/admin/users/:id/sessions/revoke-all', requireUsersSectionAccess, writ
   }
   try {
     await ensureDbReady();
-    const scopedCourseId = getAdminCourse(req);
-    const canCrossCourse = hasSessionRole(req, 'admin');
-    const targetUser = canCrossCourse
-      ? await db.get('SELECT id, full_name, course_id FROM users WHERE id = ? LIMIT 1', [targetUserId])
-      : await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
-        userId: targetUserId,
-        courseId: scopedCourseId,
-      });
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const scopedCourseId = parsePositiveIntStrict(adminAcademicScope.courseId) || getAdminCourse(req);
+    const targetUser = await getAdminScopedUser(adminAcademicScope, targetUserId, {
+      selectClause: 'u.id, u.full_name, u.course_id',
+    });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -52171,14 +52533,10 @@ app.post('/admin/users/:id/risk-case', requireUsersSectionAccess, writeLimiter, 
   }
   try {
     await ensureDbReady();
-    const scopedCourseId = getAdminCourse(req);
-    const canCrossCourse = hasSessionRole(req, 'admin');
-    const targetUser = canCrossCourse
-      ? await db.get('SELECT id, full_name, course_id, is_active, role FROM users WHERE id = ? LIMIT 1', [targetUserId])
-      : await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
-        userId: targetUserId,
-        courseId: scopedCourseId,
-      });
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const targetUser = await getAdminScopedUser(adminAcademicScope, targetUserId, {
+      selectClause: 'u.id, u.full_name, u.course_id, u.is_active, u.role',
+    });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -52346,8 +52704,10 @@ app.post('/admin/users/:id/risk-case', requireUsersSectionAccess, writeLimiter, 
 });
 
 app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req, res) => {
+  let adminAcademicScope = null;
   try {
     await ensureDbReady();
+    adminAcademicScope = await buildAdminAcademicScopeState(req);
   } catch (err) {
     return handleDbError(res, err, 'admin.users.forensics.init');
   }
@@ -52356,8 +52716,6 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
   if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
     return res.status(400).json({ error: 'Invalid user id' });
   }
-  const scopedCourseId = getAdminCourse(req);
-  const canCrossCourseForensics = hasSessionRole(req, 'admin');
 
   const addIfPresent = (setRef, rawValue, normalizer) => {
     const normalized = normalizer(rawValue);
@@ -52379,21 +52737,16 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
   };
 
   try {
-    const targetSql = canCrossCourseForensics
-      ? `
-        SELECT id, full_name, role, schedule_group, course_id, created_at, last_login_ip, last_user_agent, last_login_at
-        FROM users
-        WHERE id = ?
-      `
-      : `
-        SELECT id, full_name, role, schedule_group, course_id, created_at, last_login_ip, last_user_agent, last_login_at
-        FROM users
-        WHERE id = ? AND course_id = ?
-      `;
-    const targetParams = canCrossCourseForensics ? [targetUserId] : [targetUserId, scopedCourseId];
-    const targetUser = await db.get(targetSql, targetParams);
+    const targetUser = await getAdminScopedUser(adminAcademicScope, targetUserId, {
+      selectClause: 'u.id, u.full_name, u.role, u.schedule_group, u.course_id, u.created_at, u.last_login_ip, u.last_user_agent, u.last_login_at',
+    });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
+    }
+    const scopedCourseId = parsePositiveIntStrict(targetUser.course_id)
+      || parsePositiveIntStrict(adminAcademicScope && adminAcademicScope.courseId);
+    if (!scopedCourseId) {
+      return res.status(403).json({ error: 'Invalid scope' });
     }
 
     const targetCreatedAtIso = toIsoStringSafe(targetUser.created_at);
@@ -52539,7 +52892,6 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
 
     if (evidenceSessions.length) {
       const placeholders = buildInClause(evidenceSessions);
-      const scopedClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
       const rows = await db.all(
         `
           SELECT
@@ -52555,12 +52907,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           WHERE v.user_id IS NOT NULL
             AND v.user_id <> ?
             AND v.session_id IN (${placeholders})
-            ${scopedClause}
+            AND u.course_id = ?
           GROUP BY v.user_id, u.full_name, u.role, u.course_id, u.schedule_group, v.session_id
         `,
-        canCrossCourseForensics
-          ? [targetUserId, ...evidenceSessions]
-          : [targetUserId, ...evidenceSessions, scopedCourseId]
+        [targetUserId, ...evidenceSessions, scopedCourseId]
       );
       (rows || []).forEach((row) => {
         addMatch(row, {
@@ -52575,8 +52925,6 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
 
     if (evidenceIps.length) {
       const placeholders = buildInClause(evidenceIps);
-      const scopedUsersClause = canCrossCourseForensics ? '' : ' AND course_id = ? ';
-      const scopedJoinClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
 
       const userIpRows = await db.all(
         `
@@ -52591,11 +52939,9 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           FROM users
           WHERE id <> ?
             AND last_login_ip IN (${placeholders})
-            ${scopedUsersClause}
+            AND course_id = ?
         `,
-        canCrossCourseForensics
-          ? [targetUserId, ...evidenceIps]
-          : [targetUserId, ...evidenceIps, scopedCourseId]
+        [targetUserId, ...evidenceIps, scopedCourseId]
       );
       (userIpRows || []).forEach((row) => {
         addMatch(row, {
@@ -52621,12 +52967,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           JOIN users u ON u.id = lh.user_id
           WHERE lh.user_id <> ?
             AND lh.ip IN (${placeholders})
-            ${scopedJoinClause}
+            AND u.course_id = ?
           GROUP BY lh.user_id, u.full_name, u.role, u.course_id, u.schedule_group, lh.ip
         `,
-        canCrossCourseForensics
-          ? [targetUserId, ...evidenceIps]
-          : [targetUserId, ...evidenceIps, scopedCourseId]
+        [targetUserId, ...evidenceIps, scopedCourseId]
       );
       (loginIpRows || []).forEach((row) => {
         addMatch(row, {
@@ -52653,12 +52997,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           WHERE v.user_id IS NOT NULL
             AND v.user_id <> ?
             AND v.ip IN (${placeholders})
-            ${scopedJoinClause}
+            AND u.course_id = ?
           GROUP BY v.user_id, u.full_name, u.role, u.course_id, u.schedule_group, v.ip
         `,
-        canCrossCourseForensics
-          ? [targetUserId, ...evidenceIps]
-          : [targetUserId, ...evidenceIps, scopedCourseId]
+        [targetUserId, ...evidenceIps, scopedCourseId]
       );
       (visitIpRows || []).forEach((row) => {
         addMatch(row, {
@@ -52685,12 +53027,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
             JOIN users u ON u.id = re.user_id
             WHERE re.user_id <> ?
               AND re.ip IN (${placeholders})
-              ${scopedJoinClause}
+              AND u.course_id = ?
             GROUP BY re.user_id, u.full_name, u.role, u.course_id, u.schedule_group, re.ip
           `,
-          canCrossCourseForensics
-            ? [targetUserId, ...evidenceIps]
-            : [targetUserId, ...evidenceIps, scopedCourseId]
+          [targetUserId, ...evidenceIps, scopedCourseId]
         );
         (registrationIpRows || []).forEach((row) => {
           addMatch(row, {
@@ -52708,8 +53048,6 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
 
     if (evidenceAgents.length) {
       const placeholders = buildInClause(evidenceAgents);
-      const scopedUsersClause = canCrossCourseForensics ? '' : ' AND course_id = ? ';
-      const scopedJoinClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
 
       const userAgentRows = await db.all(
         `
@@ -52724,11 +53062,9 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           FROM users
           WHERE id <> ?
             AND last_user_agent IN (${placeholders})
-            ${scopedUsersClause}
+            AND course_id = ?
         `,
-        canCrossCourseForensics
-          ? [targetUserId, ...evidenceAgents]
-          : [targetUserId, ...evidenceAgents, scopedCourseId]
+        [targetUserId, ...evidenceAgents, scopedCourseId]
       );
       (userAgentRows || []).forEach((row) => {
         addMatch(row, {
@@ -52754,12 +53090,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
           JOIN users u ON u.id = lh.user_id
           WHERE lh.user_id <> ?
             AND lh.user_agent IN (${placeholders})
-            ${scopedJoinClause}
+            AND u.course_id = ?
           GROUP BY lh.user_id, u.full_name, u.role, u.course_id, u.schedule_group, lh.user_agent
         `,
-        canCrossCourseForensics
-          ? [targetUserId, ...evidenceAgents]
-          : [targetUserId, ...evidenceAgents, scopedCourseId]
+        [targetUserId, ...evidenceAgents, scopedCourseId]
       );
       (loginAgentRows || []).forEach((row) => {
         addMatch(row, {
@@ -52774,7 +53108,6 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
 
     if (evidenceFingerprints.length) {
       const placeholders = buildInClause(evidenceFingerprints);
-      const scopedJoinClause = canCrossCourseForensics ? '' : ' AND u.course_id = ? ';
       try {
         const registrationFingerprintRows = await db.all(
           `
@@ -52790,12 +53123,10 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
             JOIN users u ON u.id = re.user_id
             WHERE re.user_id <> ?
               AND re.device_fingerprint IN (${placeholders})
-              ${scopedJoinClause}
+              AND u.course_id = ?
             GROUP BY re.user_id, u.full_name, u.role, u.course_id, u.schedule_group, re.device_fingerprint
           `,
-          canCrossCourseForensics
-            ? [targetUserId, ...evidenceFingerprints]
-            : [targetUserId, ...evidenceFingerprints, scopedCourseId]
+          [targetUserId, ...evidenceFingerprints, scopedCourseId]
         );
         (registrationFingerprintRows || []).forEach((row) => {
           addMatch(row, {
@@ -53137,9 +53468,11 @@ app.post('/homework/add', requireLogin, uploadLimiter, upload.single('attachment
       const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
         getTeacherTemplateStore(),
         userId,
-        { subjectId, includeHidden: true }
+        { subjectId, courseId: storageCourseId, includeHidden: true }
       );
-      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups);
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups, {
+        courseId: storageCourseId,
+      });
       if (!teacherAccess.hasRows) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
@@ -53462,10 +53795,12 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       const teacherRows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
         getTeacherTemplateStore(),
         userId,
-        { subjectId, includeHidden: true }
+        { subjectId, courseId: storageCourseId, includeHidden: true }
       );
       const maxGroups = Number(subjectRow.group_count || 1);
-      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups);
+      const teacherAccess = buildTeacherSubjectAccess(teacherRows || [], maxGroups, {
+        courseId: storageCourseId,
+      });
       if (!teacherAccess.hasRows) {
         if (req.file) {
           fs.unlink(req.file.path, () => {});
@@ -54703,7 +55038,7 @@ app.post('/admin/schedule/delete/:id', requireScheduleSectionAccess, async (req,
   }
   const referer = req.get('referer');
   const fallbackBase = getStaffPanelBase(req, courseId);
-  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
+  const redirectBase = resolveSafeInternalRedirectPath(req, referer, ['/admin/schedule-list']) || fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   try {
     let scopedRow = null;
@@ -54747,8 +55082,8 @@ app.post('/admin/schedule/delete-multiple', requireScheduleSectionAccess, async 
   }
   const fallback = getStaffPanelBase(req, courseId);
   const redirectBase =
-    (returnTo && returnTo.startsWith('/admin/schedule-list') ? returnTo : null) ||
-    (referer && referer.includes('/admin/schedule-list') ? referer : null) ||
+    resolveSafeInternalRedirectPath(req, returnTo, ['/admin/schedule-list']) ||
+    resolveSafeInternalRedirectPath(req, referer, ['/admin/schedule-list']) ||
     fallback;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   if (!ids) {
@@ -54802,7 +55137,7 @@ app.post('/admin/schedule/clear-all', requireScheduleSectionAccess, async (req, 
   }
   const referer = req.get('referer');
   const fallbackBase = getStaffPanelBase(req, courseId);
-  const redirectBase = referer && referer.includes('/admin/schedule-list') ? referer : fallbackBase;
+  const redirectBase = resolveSafeInternalRedirectPath(req, referer, ['/admin/schedule-list']) || fallbackBase;
   const withStatus = (base, status) => (base.includes('?') ? `${base}&${status}` : `${base}?${status}`);
   try {
     try {
@@ -56675,14 +57010,22 @@ app.post('/admin/semesters/hard-delete/:id', requireSemestersSectionAccess, asyn
 app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);
-  const courseId = getAdminCourse(req);
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
     tab: 'admin-students',
   });
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
     return res.redirect(redirectWith('err', 'Invalid group assignment'));
   }
-  getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
+  return (async () => {
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const courseId = Number(adminAcademicScope && adminAcademicScope.courseId ? adminAcademicScope.courseId : getAdminCourse(req));
+    const user = await getAdminScopedUser(adminAcademicScope, student_id, {
+      selectClause: 'u.id, u.role',
+    });
+    if (!user) {
+      return res.redirect(redirectWith('err', 'User not found'));
+    }
+    const subject = await getSubjectForCourse(subject_id, courseId, { includeHidden: true });
     if (!subject) {
       return res.redirect(redirectWith('err', 'Database error'));
     }
@@ -56707,9 +57050,7 @@ app.post('/admin/student-groups/set', requireUsersSectionAccess, (req, res) => {
         return res.redirect(redirectWith('ok', 'Group updated'));
       }
     );
-  }).catch(() => {
-    return res.redirect(redirectWith('err', 'Database error'));
-  });
+  })().catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/group/remove', requireUsersSectionAccess, (req, res) => {
@@ -56720,93 +57061,102 @@ app.post('/admin/group/remove', requireUsersSectionAccess, (req, res) => {
   if (!student_id || !subject_id) {
     return res.redirect(redirectWith('err', 'Invalid remove request'));
   }
-  db.run(
-    'DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?',
-    [student_id, subject_id],
-    (err) => {
-    if (err) {
-      return res.redirect(redirectWith('err', 'Database error'));
+  return (async () => {
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const courseId = Number(adminAcademicScope && adminAcademicScope.courseId ? adminAcademicScope.courseId : getAdminCourse(req));
+    const user = await getAdminScopedUser(adminAcademicScope, student_id, {
+      selectClause: 'u.id, u.role',
+    });
+    if (!user) {
+      return res.redirect(redirectWith('err', 'User not found'));
     }
-    logAction(db, req, 'student_group_remove', { student_id, subject_id });
-    logActivity(db, req, 'group_remove', 'student_group', null, { student_id, subject_id }, getAdminCourse(req));
-    broadcast('users_updated');
-    return res.redirect(redirectWith('ok', 'Subject removed'));
-  }
-  );
+    db.run(
+      'DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?',
+      [student_id, subject_id],
+      (err) => {
+        if (err) {
+          return res.redirect(redirectWith('err', 'Database error'));
+        }
+        logAction(db, req, 'student_group_remove', { student_id, subject_id });
+        logActivity(db, req, 'group_remove', 'student_group', null, { student_id, subject_id }, courseId);
+        broadcast('users_updated');
+        return res.redirect(redirectWith('ok', 'Subject removed'));
+      }
+    );
+  })().catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/students/groups/set', requireUsersOrStudentsSectionAccess, (req, res) => {
   const { student_id, subject_id, group_number } = req.body;
   const groupNum = Number(group_number);
-  const courseId = getAdminCourse(req);
   const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-students', {
     [kind]: String(message || ''),
   });
   if (!student_id || !subject_id || Number.isNaN(groupNum)) {
     return res.redirect(redirectWith('err', 'Invalid group assignment'));
   }
-  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
-    userId: student_id,
-    courseId,
-  }).then((user) => {
+  return (async () => {
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const courseId = Number(adminAcademicScope && adminAcademicScope.courseId ? adminAcademicScope.courseId : getAdminCourse(req));
+    const user = await getAdminScopedUser(adminAcademicScope, student_id, {
+      selectClause: 'u.id, u.role',
+    });
     if (!user) {
       return res.redirect(redirectWith('err', 'User not found'));
     }
     if (canManageStudentOnlyScope(req) && !isStudentLikeLegacyRole(user.role)) {
       return res.redirect(redirectWith('err', 'Forbidden student scope'));
     }
-    getSubjectForCourse(subject_id, courseId, { includeHidden: true }).then((subject) => {
-      if (!subject) {
-        return res.redirect(redirectWith('err', 'Database error'));
-      }
-      if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
-        return res.redirect(redirectWith('err', 'Group out of range'));
-      }
-      db.run(
-        `
-          INSERT INTO student_groups (student_id, subject_id, group_number)
-          VALUES (?, ?, ?)
-          ON CONFLICT(student_id, subject_id)
-          DO UPDATE SET group_number = excluded.group_number
-        `,
-        [student_id, subject_id, groupNum],
-        (setErr) => {
-          if (setErr) {
-            return res.redirect(redirectWith('err', 'Database error'));
-          }
-          logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
-          logActivity(
-            db,
-            req,
-            'group_set',
-            'student_group',
-            null,
-            { student_id, subject_id, group_number: groupNum, scope: 'students' },
-            courseId
-          );
-          broadcast('users_updated');
-          return res.redirect(redirectWith('ok', 'Group updated'));
-        }
-      );
-    }).catch(() => {
+    const subject = await getSubjectForCourse(subject_id, courseId, { includeHidden: true });
+    if (!subject) {
       return res.redirect(redirectWith('err', 'Database error'));
-    });
-  }).catch(() => res.redirect(redirectWith('err', 'Database error')));
+    }
+    if (groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
+      return res.redirect(redirectWith('err', 'Group out of range'));
+    }
+    db.run(
+      `
+        INSERT INTO student_groups (student_id, subject_id, group_number)
+        VALUES (?, ?, ?)
+        ON CONFLICT(student_id, subject_id)
+        DO UPDATE SET group_number = excluded.group_number
+      `,
+      [student_id, subject_id, groupNum],
+      (setErr) => {
+        if (setErr) {
+          return res.redirect(redirectWith('err', 'Database error'));
+        }
+        logAction(db, req, 'student_group_set', { student_id, subject_id, group_number: groupNum });
+        logActivity(
+          db,
+          req,
+          'group_set',
+          'student_group',
+          null,
+          { student_id, subject_id, group_number: groupNum, scope: 'students' },
+          courseId
+        );
+        broadcast('users_updated');
+        return res.redirect(redirectWith('ok', 'Group updated'));
+      }
+    );
+  })().catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/students/group/remove', requireUsersOrStudentsSectionAccess, (req, res) => {
   const { student_id, subject_id } = req.body;
-  const courseId = getAdminCourse(req);
   const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-students', {
     [kind]: String(message || ''),
   });
   if (!student_id || !subject_id) {
     return res.redirect(redirectWith('err', 'Invalid remove request'));
   }
-  academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
-    userId: student_id,
-    courseId,
-  }).then((user) => {
+  return (async () => {
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const courseId = Number(adminAcademicScope && adminAcademicScope.courseId ? adminAcademicScope.courseId : getAdminCourse(req));
+    const user = await getAdminScopedUser(adminAcademicScope, student_id, {
+      selectClause: 'u.id, u.role',
+    });
     if (!user) {
       return res.redirect(redirectWith('err', 'User not found'));
     }
@@ -56834,7 +57184,7 @@ app.post('/admin/students/group/remove', requireUsersOrStudentsSectionAccess, (r
         return res.redirect(redirectWith('ok', 'Subject removed'));
       }
     );
-  }).catch(() => res.redirect(redirectWith('err', 'Database error')));
+  })().catch(() => res.redirect(redirectWith('err', 'Database error')));
 });
 
 app.post('/admin/students/deactivate', requireUsersOrStudentsSectionAccess, (req, res) => {
@@ -57079,14 +57429,25 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
       await client.query('BEGIN');
       const inserted = await client.query(
         `
-          INSERT INTO access_roles (key, label, description, is_system, is_active, created_at, updated_at)
-          VALUES ($1, $2, $3, false, true, NOW(), NOW())
+          INSERT INTO access_roles (key, label, description, is_system, is_active, multicourse_enabled, created_at, updated_at)
+          VALUES ($1, $2, $3, false, true, false, NOW(), NOW())
           RETURNING id
         `,
         [key, label, description]
       );
       const roleId = Number(inserted.rows[0].id);
       if (cloneFrom) {
+        await client.query(
+          `
+            UPDATE access_roles dst
+            SET multicourse_enabled = COALESCE(src.multicourse_enabled, false),
+                updated_at = NOW()
+            FROM access_roles src
+            WHERE dst.id = $1
+              AND src.key = $2
+          `,
+          [roleId, cloneFrom]
+        );
         await client.query(
           `
             INSERT INTO access_role_permissions (role_id, permission_id, allowed, created_at, updated_at)
@@ -57187,12 +57548,18 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
     if (!roleRow) {
       return res.redirect(redirectWith('err', 'Role not found'));
     }
-    const requestedActive = String(req.body.is_active || '').toLowerCase();
-    let isActive = requestedActive === '1' || requestedActive === 'true' || requestedActive === 'on';
-    if (roleRow.key === 'admin') isActive = true;
+  const requestedActive = String(req.body.is_active || '').toLowerCase();
+  let isActive = requestedActive === '1' || requestedActive === 'true' || requestedActive === 'on';
+  if (roleRow.key === 'admin') isActive = true;
+  const requestedMulticourse = String(req.body.multicourse_enabled || '').toLowerCase();
+  const multicourseEnabled = requestedMulticourse === '1'
+    || requestedMulticourse === 'true'
+    || requestedMulticourse === 'on';
     const courseKinds = selectedCourseKinds.length
       ? selectedCourseKinds
-      : (roleRow.key === 'admin' ? ['regular', 'teacher'] : ['regular']);
+      : (Array.isArray(DEFAULT_ROLE_COURSE_KINDS[roleRow.key]) && DEFAULT_ROLE_COURSE_KINDS[roleRow.key].length
+        ? DEFAULT_ROLE_COURSE_KINDS[roleRow.key]
+        : ['regular']);
     const permissionRows = await db.all(
       "SELECT key FROM access_permissions WHERE category IN ('admin_section', 'feature')"
     );
@@ -57207,10 +57574,11 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
           SET label = $1,
               description = $2,
               is_active = $3,
+              multicourse_enabled = $4,
               updated_at = NOW()
-          WHERE id = $4
+          WHERE id = $5
         `,
-        [label, description, isActive, roleRow.id]
+        [label, description, isActive, multicourseEnabled, roleRow.id]
       );
       await client.query('DELETE FROM access_role_permissions WHERE role_id = $1', [roleRow.id]);
       if (permissionKeys.length) {
@@ -57252,6 +57620,7 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
         key: roleRow.key,
         label,
         is_active: isActive,
+        multicourse_enabled: multicourseEnabled,
         permission_keys: permissionKeys,
         course_kinds: courseKinds,
       });
@@ -57335,6 +57704,13 @@ app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
         .map((group) => Number(group && group.group_id ? group.group_id : 0))
         .filter((value) => Number.isInteger(value) && value > 0)
     );
+    const allowedCourseIds = new Set(
+      (Array.isArray(adminAcademicScope && adminAcademicScope.allowedCourseIds)
+        ? adminAcademicScope.allowedCourseIds
+        : [])
+        .map((value) => parsePositiveIntStrict(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
     let targetGroup = null;
     if (explicitGroupId) {
       targetGroup = await db.get(
@@ -57362,13 +57738,17 @@ app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
         [explicitGroupId]
       );
     } else if (fallbackCourseId) {
-      const courseGroups = await listAssignableAdminAcademicGroups({ courseId: fallbackCourseId });
+      if (allowedCourseIds.size && !allowedCourseIds.has(Number(fallbackCourseId || 0))) {
+        return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course outside current scope'));
+      }
+      const courseGroups = (allowedGroups || []).filter(
+        (group) => Number(group && (group.course_id || group.legacy_course_id || 0)) === Number(fallbackCourseId || 0)
+      );
       targetGroup = courseGroups.find((group) => Number(group && group.stage_number) === 1) || courseGroups[0] || null;
     }
-    const user = await db.get(
-      'SELECT id, role, full_name, course_id, study_context_id, group_id FROM users WHERE id = ?',
-      [userId]
-    );
+    const user = await getAdminScopedUser(adminAcademicScope, userId, {
+      selectClause: 'u.id, u.role, u.full_name, u.course_id, u.study_context_id, u.group_id',
+    });
     if (!targetGroup) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course not found'));
     }
@@ -57385,8 +57765,8 @@ app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
     logAction(db, req, 'user_academic_group_change', {
       user_id: userId,
       group_id: Number(targetGroup.group_id || 0),
-      course_id: Number(targetGroup.legacy_course_id || 0) || null,
-      study_context_id: Number(targetGroup.legacy_study_context_id || 0) || null,
+      course_id: Number(targetGroup.legacy_course_id || targetGroup.course_id || 0) || null,
+      study_context_id: Number(targetGroup.legacy_study_context_id || targetGroup.study_context_id || 0) || null,
     });
     broadcast('users_updated');
     return res.redirect(
@@ -57397,8 +57777,8 @@ app.post('/admin/users/group', requireUsersSectionAccess, async (req, res) => {
           admissionId: targetGroup.admission_id,
           stage: targetGroup.stage_number,
           campus: targetGroup.campus_key,
-          studyContextId: targetGroup.legacy_study_context_id,
-          courseId: targetGroup.legacy_course_id,
+          studyContextId: targetGroup.legacy_study_context_id || targetGroup.study_context_id,
+          courseId: targetGroup.legacy_course_id || targetGroup.course_id,
         }),
         'ok',
         'Academic course updated'
@@ -57452,15 +57832,14 @@ app.post('/admin/users/group/batch', requireUsersSectionAccess, async (req, res)
     if (allowedGroupIds.size && !allowedGroupIds.has(Number(targetGroup.group_id || 0))) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Academic course outside current scope'));
     }
-    const users = await db.all(
-      `
-        SELECT id, role
-        FROM users
-        WHERE id = ANY(?::int[])
-      `,
-      [userIds]
-    );
-    const movableUsers = (users || []).filter((user) => Number.isInteger(Number(user.id)) && Number(user.id) > 0);
+    const movableUsers = await listAdminScopedUsers(adminAcademicScope, {
+      userIds,
+      selectClause: 'u.id, u.role',
+      orderBy: 'u.id ASC',
+    });
+    if (movableUsers.length !== userIds.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Some users are outside current scope'));
+    }
     if (!movableUsers.length) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No movable users selected'));
     }
@@ -57500,27 +57879,40 @@ app.post('/admin/users/course', requireUsersSectionAccess, async (req, res) => {
 });
 
 app.post('/admin/users/reset-password', requireUsersSectionAccess, (req, res) => {
-  const { user_id, new_password } = req.body;
-  const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
-  if (!user_id || !new_password) {
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Password required'));
-  }
-  if (new_password.length < 4) {
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Password too short'));
-  }
-  const hash = bcrypt.hashSync(new_password, 10);
-  db.run(
-    'UPDATE users SET password_hash = ? WHERE id = ?',
-    [hash, user_id],
-    (err) => {
-      if (err) {
-        return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
-      }
-      logAction(db, req, 'user_password_reset', { user_id });
-      broadcast('users_updated');
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'Password updated'));
+  return (async () => {
+    const userId = parsePositiveIntStrict(req.body.user_id);
+    const newPassword = String(req.body.new_password || '');
+    const adminAcademicScope = await buildAdminAcademicScopeState(req);
+    const redirectBase = buildStaffPanelScopeUrl(req, adminAcademicScope || {});
+    if (!userId || !newPassword) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Password required'));
     }
-  );
+    if (newPassword.length < PASSWORD_MIN_LENGTH) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', `Password must be at least ${PASSWORD_MIN_LENGTH} characters`));
+    }
+    const targetUser = await getAdminScopedUser(adminAcademicScope, userId, {
+      selectClause: 'u.id',
+    });
+    if (!targetUser) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'User not found'));
+    }
+    const hash = bcrypt.hashSync(newPassword, 10);
+    db.run(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [hash, userId],
+      (err) => {
+        if (err) {
+          return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
+        }
+        logAction(db, req, 'user_password_reset', { user_id: userId });
+        broadcast('users_updated');
+        return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', 'Password updated'));
+      }
+    );
+  })().catch((err) => {
+    console.error('User password reset failed', err);
+    return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
+  });
 });
 
 app.post('/admin/homework/migrate', requireHomeworkSectionAccess, (req, res) => {

@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.5.71",
+      "date": "2026-04-09",
+      "items": [
+        "fix(security-rbac-scope): add a Role Studio multi-course toggle and enforce scoped target validation for admin user mutations, login history, active sessions, risk cases, and forensics so cross-course management now depends on explicit RBAC policy instead of raw user ids",
+        "fix(security-teacher-course-context): make teacher shared-subject access course-aware across homework, materials, teamwork, and journal flows so a shared subject in one course no longer grants write access in another",
+        "fix(security-hardening): escape admin history and login-history renders, sanitize subject-group payload attributes, harden schedule redirects, raise the password minimum to 8 characters across register/profile/admin reset, and move request throttling to Postgres-backed shared counters"
+      ]
+    },
+    {
       "version": "1.5.70",
       "date": "2026-04-09",
       "items": [

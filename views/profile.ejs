@@ -583,11 +583,11 @@
                 </div>
                 <div class="mb-3 profile-field-surface">
                   <label for="password" class="form-label"><%= t('profile.newPassword') %></label>
-                  <input id="password" name="password" type="password" class="form-control" />
+                  <input id="password" name="password" type="password" class="form-control" minlength="8" autocomplete="new-password" />
                 </div>
                 <div class="mb-3 profile-field-surface">
                   <label for="confirm_password" class="form-label"><%= t('profile.confirmPassword') %></label>
-                  <input id="confirm_password" name="confirm_password" type="password" class="form-control" />
+                  <input id="confirm_password" name="confirm_password" type="password" class="form-control" minlength="8" autocomplete="new-password" />
                 </div>
                 <div class="mb-3 profile-field-surface">
                   <label for="language" class="form-label"><%= t('profile.language') %></label>

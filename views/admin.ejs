@@ -1724,6 +1724,18 @@
                             </label>
                           <% }); %>
                         </div>
+                        <div class="form-check form-switch mt-3">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="multicourse_enabled"
+                            value="1"
+                            id="rbacMulticourse_<%= roleRow.key %>"
+                            <%= roleRow.multicourse_enabled ? 'checked' : '' %>
+                          />
+                          <label class="form-check-label" for="rbacMulticourse_<%= roleRow.key %>">Multi-course access</label>
+                        </div>
+                        <div class="small text-muted mt-1">Дозволяє ролі перемикатися між усіма доступними курсами вибраних типів. Якщо вимкнено, роль працює лише в поточному курсі.</div>
                       </div>
                       <div class="mb-3">
                         <div class="small fw-semibold mb-2">Admin sections</div>
@@ -2509,13 +2521,18 @@
                             }
                           });
                         }
+                        const subjectListAttr = JSON.stringify(subjectList)
+                          .replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .replace(/'/g, '&#39;');
                       %>
                       <button
                         class="btn btn-sm btn-outline-primary subject-groups-btn"
                         type="button"
                         data-user-id="<%= u.id %>"
                         data-user-name="<%= u.full_name %>"
-                        data-subjects='<%- JSON.stringify(subjectList) %>'
+                        data-subjects='<%- subjectListAttr %>'
                       >
                         <%= t('admin.subjects') %> (<%= subjectList.length %>)
                       </button>
@@ -2637,6 +2654,11 @@
                             }
                           });
                         }
+                        const subjectListAttr = JSON.stringify(subjectList)
+                          .replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .replace(/'/g, '&#39;');
                       %>
                       <button
                         class="btn btn-sm btn-outline-primary subject-groups-btn"
@@ -2644,7 +2666,7 @@
                         data-user-id="<%= u.id %>"
                         data-user-name="<%= u.full_name %>"
                         data-remove-action="/admin/students/group/remove"
-                        data-subjects='<%- JSON.stringify(subjectList) %>'
+                        data-subjects='<%- subjectListAttr %>'
                       >
                         <%= t('admin.subjects') %> (<%= subjectList.length %>)
                       </button>
@@ -4049,7 +4071,7 @@
               <input type="hidden" name="user_id" id="uaPassUserId" />
               <label class="form-label">Reset password</label>
               <div class="d-flex gap-2">
-                <input class="form-control" name="new_password" placeholder="New password" required />
+                <input class="form-control" name="new_password" placeholder="New password" minlength="8" autocomplete="new-password" required />
                 <button class="btn btn-outline-secondary glass" type="submit">Set</button>
               </div>
             </form>
@@ -6554,6 +6576,7 @@
             starosta: ['regular'],
             student: ['regular'],
           };
+          const rbacMulticourseDefaults = <%- JSON.stringify((typeof defaultRoleMulticourse !== 'undefined' && defaultRoleMulticourse) ? defaultRoleMulticourse : {}) %>;
           const roleSnapshots = new Map();
           const ROLE_DRAFT_PREFIX = 'admin:rbac:draft:';
           let draftRestoreNotified = false;
@@ -6573,6 +6596,10 @@
             })(),
             permission_keys: Array.from(form.querySelectorAll('input[name="permission_keys"]:checked')).map((input) => input.value),
             course_kinds: Array.from(form.querySelectorAll('input[name="course_kinds"]:checked')).map((input) => input.value),
+            multicourse_enabled: (() => {
+              const field = form.querySelector('input[name="multicourse_enabled"]');
+              return !!(field && field.checked);
+            })(),
           });
           const setCheckedValues = (form, name, values) => {
             const allowed = new Set(Array.isArray(values) ? values : []);
@@ -6653,9 +6680,11 @@
             const labelField = form.querySelector('input[name="label"]');
             const descField = form.querySelector('input[name="description"]');
             const activeField = form.querySelector('input[name="is_active"]');
+            const multicourseField = form.querySelector('input[name="multicourse_enabled"]');
             if (labelField && typeof payload.label === 'string') labelField.value = payload.label;
             if (descField && typeof payload.description === 'string') descField.value = payload.description;
             if (activeField && !activeField.disabled) activeField.checked = !!payload.is_active;
+            if (multicourseField) multicourseField.checked = !!payload.multicourse_enabled;
             setCheckedValues(form, 'permission_keys', payload.permission_keys || []);
             setCheckedValues(form, 'course_kinds', payload.course_kinds || []);
             renderRolePermissionSimulation(form);
@@ -6686,10 +6715,15 @@
               ? allAdminSectionKeys
               : (rbacPermissionDefaults[normalizedRole] || []);
             const courseKinds = rbacCourseDefaults[normalizedRole] || ['regular'];
+            const multicourseEnabled = Object.prototype.hasOwnProperty.call(rbacMulticourseDefaults, normalizedRole)
+              ? !!rbacMulticourseDefaults[normalizedRole]
+              : false;
             setCheckedValues(form, 'permission_keys', permissions);
             setCheckedValues(form, 'course_kinds', courseKinds);
             const activeField = form.querySelector('input[name="is_active"]');
+            const multicourseField = form.querySelector('input[name="multicourse_enabled"]');
             if (activeField && !activeField.disabled) activeField.checked = true;
+            if (multicourseField) multicourseField.checked = multicourseEnabled;
             saveRoleDraft(form);
             renderRolePermissionSimulation(form);
             return true;
@@ -7355,18 +7389,24 @@
           const res = await fetch(`/admin/history.json?${params}`);
           if (!res.ok) return;
           const data = await res.json();
-          tbody.innerHTML = data.logs
-            .map(
-              (log) => `
+          const logs = Array.isArray(data.logs) ? data.logs : [];
+          tbody.innerHTML = logs
+            .map((log) => {
+              const logId = escapeHtml(log && typeof log.id !== 'undefined' ? String(log.id) : '');
+              const actorName = escapeHtml(log && log.actor_name ? String(log.actor_name) : '-');
+              const action = escapeHtml(log && log.action ? String(log.action) : '-');
+              const details = escapeHtml(log && log.details ? String(log.details) : '-');
+              const createdAt = escapeHtml(log && log.created_at ? String(log.created_at) : '-');
+              return `
                 <tr>
-                  <td>${log.id}</td>
-                  <td>${log.actor_name || '-'}</td>
-                  <td>${log.action}</td>
-                  <td>${log.details || '-'}</td>
-                  <td>${log.created_at}</td>
+                  <td>${logId}</td>
+                  <td>${actorName}</td>
+                  <td>${action}</td>
+                  <td>${details}</td>
+                  <td>${createdAt}</td>
                 </tr>
-              `
-            )
+              `;
+            })
             .join('');
         } catch (err) {
           return;
@@ -7846,10 +7886,12 @@
                   return;
                 }
                 historyList.innerHTML = data.logins
-                  .map(
-                    (l) =>
-                      `<li class="list-group-item">${l.created_at} — ${l.ip || '-'} — ${l.user_agent || '-'}</li>`
-                  )
+                  .map((l) => {
+                    const createdAt = escapeHtml(l && l.created_at ? String(l.created_at) : '-');
+                    const ip = escapeHtml(l && l.ip ? String(l.ip) : '-');
+                    const userAgent = escapeHtml(l && l.user_agent ? String(l.user_agent) : '-');
+                    return `<li class="list-group-item">${createdAt} — ${ip} — ${userAgent}</li>`;
+                  })
                   .join('');
               })
               .catch(() => {
@@ -7884,11 +7926,20 @@
               items.forEach((item) => {
                 const row = document.createElement('div');
                 row.className = 'list-group-item d-flex justify-content-between align-items-center';
+                const itemName = escapeHtml(item && item.name ? String(item.name) : 'Subject');
+                const groupNumber = escapeHtml(
+                  Number.isFinite(Number(item && item.group_number))
+                    ? String(Number(item.group_number))
+                    : '—'
+                );
+                const safeRemoveAction = escapeHtml(removeAction || '/admin/group/remove');
+                const safeUserId = escapeHtml(userId || '');
+                const safeSubjectId = escapeHtml(Number(item && item.subject_id ? item.subject_id : 0) || '');
                 row.innerHTML = `
-                  <div>${item.name} — Group ${item.group_number}</div>
-                  <form method="POST" action="${removeAction}" class="ms-2">
-                    <input type="hidden" name="student_id" value="${userId}">
-                    <input type="hidden" name="subject_id" value="${item.subject_id}">
+                  <div>${itemName} — Group ${groupNumber}</div>
+                  <form method="POST" action="${safeRemoveAction}" class="ms-2">
+                    <input type="hidden" name="student_id" value="${safeUserId}">
+                    <input type="hidden" name="subject_id" value="${safeSubjectId}">
                     <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
                   </form>
                 `;

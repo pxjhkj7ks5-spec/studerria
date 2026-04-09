@@ -28,7 +28,7 @@
   "register.errorCheckDetails": "Check your registration details.",
   "register.errorFullNameRequired": "Enter your full name.",
   "register.errorPasswordRequired": "Enter a password.",
-  "register.errorPasswordTooShort": "Password must contain at least 4 characters.",
+  "register.errorPasswordTooShort": "Password must contain at least 8 characters.",
   "register.errorConfirmPasswordRequired": "Confirm your password.",
   "register.errorPasswordMismatch": "Passwords do not match.",
   "register.errorConsentRequired": "Confirm your consent to personal data processing.",

@@ -503,14 +503,14 @@
                 <div class="mb-3">
                   <label for="password" class="form-label"><%= t('register.password') %></label>
                   <div class="input-with-icon">
-                    <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" minlength="4" required />
+                    <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" minlength="8" required />
                     <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
                   </div>
                 </div>
                 <div class="mb-3">
                   <label for="confirm_password" class="form-label"><%= t('register.confirmPassword') %></label>
                   <div class="input-with-icon">
-                    <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" minlength="4" required />
+                    <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" minlength="8" required />
                     <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">👀</button>
                   </div>
                 </div>
@@ -714,7 +714,7 @@
         if (el === passwordInput && !passwordInput.value) {
           return registerValidationCopy.passwordRequired;
         }
-        if (el === passwordInput && passwordInput.value.length < 4) {
+        if (el === passwordInput && passwordInput.value.length < 8) {
           return registerValidationCopy.passwordTooShort;
         }
         if (el === confirmInput && !confirmInput.value) {

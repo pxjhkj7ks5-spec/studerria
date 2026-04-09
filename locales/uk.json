@@ -726,7 +726,7 @@
   ,"register.errorCheckDetails": "Перевірте дані реєстрації."
   ,"register.errorFullNameRequired": "Введіть ПІБ."
   ,"register.errorPasswordRequired": "Введіть пароль."
-  ,"register.errorPasswordTooShort": "Пароль має містити щонайменше 4 символи."
+  ,"register.errorPasswordTooShort": "Пароль має містити щонайменше 8 символів."
   ,"register.errorConfirmPasswordRequired": "Підтвердіть пароль."
   ,"register.errorPasswordMismatch": "Паролі не співпадають."
   ,"register.errorConsentRequired": "Підтвердьте згоду на обробку персональних даних."
