@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.56",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-register-render): restore the teacher subject picker render after course selection by correcting the nested EJS include path for `teacher-subject-picker-card`, eliminating the blank `Internal Server Error` page that appeared right after pressing `Продовжити` on the teaching course flow"
+      ]
+    },
+    {
       "version": "1.5.55",
       "date": "2026-04-09",
       "items": [

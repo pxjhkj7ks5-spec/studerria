@@ -367,7 +367,7 @@
                             </div>
                             <div class="teacher-picker-campus__items">
                               <% campusGroup.items.forEach((entry) => { %>
-                                <%- include('partials/teacher-subject-picker-card', { entry, pickerSelectionMode, pickerTexts }) %>
+                                <%- include('teacher-subject-picker-card', { entry, pickerSelectionMode, pickerTexts }) %>
                               <% }); %>
                             </div>
                           </section>
@@ -375,7 +375,7 @@
                       </div>
                     <% } else { %>
                       <% stage.items.forEach((entry) => { %>
-                        <%- include('partials/teacher-subject-picker-card', { entry, pickerSelectionMode, pickerTexts }) %>
+                        <%- include('teacher-subject-picker-card', { entry, pickerSelectionMode, pickerTexts }) %>
                       <% }); %>
                     <% } %>
                   </div>
