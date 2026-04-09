@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.73",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-card-hover-shadow): remove the hover shadow lift from the profile card itself so the block stays visually flat when the pointer moves over it"
+      ]
+    },
+    {
       "version": "1.5.72",
       "date": "2026-04-09",
       "items": [

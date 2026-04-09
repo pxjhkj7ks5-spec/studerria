@@ -197,6 +197,11 @@ body.page-profile .studerria-profile-card {
   margin-inline: auto;
 }
 
+body.page-profile .studerria-profile-card:hover {
+  transform: none;
+  box-shadow: var(--shadow-soft);
+}
+
 body.page-profile .studerria-profile-card-body {
   padding: 1.7rem 1.7rem 1.8rem !important;
 }
