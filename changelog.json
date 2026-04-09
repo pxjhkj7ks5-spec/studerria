@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.43",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-picker-campus-groups): split each teacher `stage` lane into inner `Кампуси` sections, grouping the discipline cards by `Київ` and `Мюнхен` so the matrix now reads as `track -> stage -> campus -> discipline` without changing the existing selection and submit logic"
+      ]
+    },
+    {
       "version": "1.5.42",
       "date": "2026-04-09",
       "items": [

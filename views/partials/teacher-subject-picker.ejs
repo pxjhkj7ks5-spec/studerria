@@ -85,6 +85,10 @@
     teacher: 2,
     legacy: 3,
   };
+  const pickerCampusOrder = {
+    kyiv: 0,
+    munich: 1,
+  };
   const pickerServiceScopeCode = pickerScope
     ? [
         'teacher-scope',
@@ -142,6 +146,7 @@
     ));
     const primaryTrackKey = primaryContext ? primaryContext.trackKey : 'legacy';
     const primaryStageNumber = primaryContext ? primaryContext.stageNumber : 1;
+    const primaryCampusKey = primaryContext ? primaryContext.campusKey : 'kyiv';
     const courseName = String(item && item.course_name ? item.course_name : '').trim();
     const pathwayLabels = String(item && item.pathway_labels ? item.pathway_labels : '').trim();
     const searchText = [
@@ -168,6 +173,8 @@
       primaryTrackLabel: formatPickerTrackLabel(primaryTrackKey),
       primaryStageNumber,
       primaryStageLabel: formatPickerStageLabel(primaryStageNumber),
+      primaryCampusKey,
+      primaryCampusLabel: formatPickerCampusLabel(primaryCampusKey),
       admissionYears,
       campuses,
       contextLabels,
@@ -216,9 +223,26 @@
               if (selectedDiff !== 0) return selectedDiff;
               return String(left.name || '').localeCompare(String(right.name || ''), 'uk', { sensitivity: 'base' });
             });
+            const campusMap = new Map();
+            sortedItems.forEach((item) => {
+              const campusKey = String(item.primaryCampusKey || 'kyiv');
+              if (!campusMap.has(campusKey)) {
+                campusMap.set(campusKey, {
+                  key: campusKey,
+                  label: item.primaryCampusLabel || formatPickerCampusLabel(campusKey),
+                  items: [],
+                });
+              }
+              campusMap.get(campusKey).items.push(item);
+            });
             return {
               ...stage,
               items: sortedItems,
+              campusGroups: Array.from(campusMap.values()).sort((left, right) => {
+                const campusDiff = Number(pickerCampusOrder[left.key] ?? 99) - Number(pickerCampusOrder[right.key] ?? 99);
+                if (campusDiff !== 0) return campusDiff;
+                return String(left.label || '').localeCompare(String(right.label || ''), 'uk', { sensitivity: 'base' });
+              }),
               initialOpen: false,
             };
           });
@@ -316,74 +340,160 @@
                   </summary>
 
                   <div class="teacher-picker-stage__body">
-                    <% stage.items.forEach((entry) => { %>
-                      <article
-                        class="teacher-picker-card glass <%= entry.checked ? 'is-selected' : '' %>"
-                        data-teacher-picker-item
-                        data-search="<%= entry.searchText %>"
-                      >
-                        <div class="teacher-picker-card__main">
-                          <div class="teacher-picker-card__copy">
-                            <h3 class="teacher-picker-card__title"><%= entry.name %></h3>
-                            <% if (entry.courseName || entry.pathwayLabels) { %>
-                              <div class="teacher-picker-card__meta">
-                                <% if (entry.courseName) { %>
-                                  <span><%= entry.courseName %></span>
+                    <% if (Array.isArray(stage.campusGroups) && stage.campusGroups.length) { %>
+                      <div class="teacher-picker-stage__campuses-label"><%= pickerTexts.campusesLabel %></div>
+                      <div class="teacher-picker-campus-groups">
+                        <% stage.campusGroups.forEach((campusGroup) => { %>
+                          <section class="teacher-picker-campus glass">
+                            <div class="teacher-picker-campus__header">
+                              <span class="teacher-picker-campus__title"><%= campusGroup.label %></span>
+                              <span class="teacher-picker-campus__count">
+                                <%= campusGroup.items.length %> <%= campusGroup.items.length === 1 ? pickerTexts.disciplineCountOne : pickerTexts.disciplineCountMany %>
+                              </span>
+                            </div>
+                            <div class="teacher-picker-campus__items">
+                              <% campusGroup.items.forEach((entry) => { %>
+                                <article
+                                  class="teacher-picker-card glass <%= entry.checked ? 'is-selected' : '' %>"
+                                  data-teacher-picker-item
+                                  data-search="<%= entry.searchText %>"
+                                >
+                                  <div class="teacher-picker-card__main">
+                                    <div class="teacher-picker-card__copy">
+                                      <h3 class="teacher-picker-card__title"><%= entry.name %></h3>
+                                      <% if (entry.courseName || entry.pathwayLabels) { %>
+                                        <div class="teacher-picker-card__meta">
+                                          <% if (entry.courseName) { %>
+                                            <span><%= entry.courseName %></span>
+                                          <% } %>
+                                          <% if (entry.pathwayLabels) { %>
+                                            <span><%= entry.pathwayLabels %></span>
+                                          <% } %>
+                                        </div>
+                                      <% } %>
+                                      <div class="teacher-picker-card__badges">
+                                        <span class="teacher-picker-badge">
+                                          <%= entry.isGeneral ? pickerTexts.allGroupsLabel : `${pickerTexts.groupRangePrefix} 1-${entry.groupCount}` %>
+                                        </span>
+                                        <% if (entry.admissionYears.length) { %>
+                                          <span class="teacher-picker-badge"><%= pickerTexts.yearsLabel %>: <%= entry.admissionYears.join(' / ') %></span>
+                                        <% } %>
+                                        <% if (entry.campuses.length) { %>
+                                          <span class="teacher-picker-badge"><%= pickerTexts.campusesLabel %>: <%= entry.campuses.join(' / ') %></span>
+                                        <% } %>
+                                        <% if (entry.contextCount > 1) { %>
+                                          <span class="teacher-picker-badge">+<%= entry.contextCount - 1 %> <%= pickerTexts.contextsSuffix %></span>
+                                        <% } %>
+                                      </div>
+                                    </div>
+
+                                    <div class="teacher-picker-card__controls">
+                                      <% if (!entry.isGeneral) { %>
+                                        <label class="teacher-picker-card__group">
+                                          <span class="teacher-picker-card__group-label"><%= pickerTexts.groupLabel %></span>
+                                          <select
+                                            class="form-select"
+                                            name="<%= pickerSelectionMode === 'offering' ? `group_offering_${entry.id}` : `group_${entry.id}` %>"
+                                            data-subject-group="<%= entry.id %>"
+                                          >
+                                            <option value=""><%= pickerTexts.chooseGroupLabel %></option>
+                                            <% for (let groupIndex = 1; groupIndex <= entry.groupCount; groupIndex += 1) { %>
+                                              <option value="<%= groupIndex %>" <%= Number(entry.selectedGroup) === groupIndex ? 'selected' : '' %>><%= groupIndex %></option>
+                                            <% } %>
+                                          </select>
+                                        </label>
+                                      <% } %>
+
+                                      <div class="form-check teacher-picker-card__toggle">
+                                        <input
+                                          class="form-check-input"
+                                          type="checkbox"
+                                          id="teacher_picker_subject_<%= entry.id %>"
+                                          name="<%= pickerSelectionMode === 'offering' ? `subject_${entry.id}` : `subject_${entry.id}` %>"
+                                          value="1"
+                                          data-subject-toggle="<%= entry.id %>"
+                                          <%= entry.checked ? 'checked' : '' %>
+                                        />
+                                        <label class="form-check-label" for="teacher_picker_subject_<%= entry.id %>"><%= pickerTexts.teachLabel %></label>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </article>
+                              <% }); %>
+                            </div>
+                          </section>
+                        <% }); %>
+                      </div>
+                    <% } else { %>
+                      <% stage.items.forEach((entry) => { %>
+                        <article
+                          class="teacher-picker-card glass <%= entry.checked ? 'is-selected' : '' %>"
+                          data-teacher-picker-item
+                          data-search="<%= entry.searchText %>"
+                        >
+                          <div class="teacher-picker-card__main">
+                            <div class="teacher-picker-card__copy">
+                              <h3 class="teacher-picker-card__title"><%= entry.name %></h3>
+                              <% if (entry.courseName || entry.pathwayLabels) { %>
+                                <div class="teacher-picker-card__meta">
+                                  <% if (entry.courseName) { %>
+                                    <span><%= entry.courseName %></span>
+                                  <% } %>
+                                  <% if (entry.pathwayLabels) { %>
+                                    <span><%= entry.pathwayLabels %></span>
+                                  <% } %>
+                                </div>
+                              <% } %>
+                              <div class="teacher-picker-card__badges">
+                                <span class="teacher-picker-badge">
+                                  <%= entry.isGeneral ? pickerTexts.allGroupsLabel : `${pickerTexts.groupRangePrefix} 1-${entry.groupCount}` %>
+                                </span>
+                                <% if (entry.admissionYears.length) { %>
+                                  <span class="teacher-picker-badge"><%= pickerTexts.yearsLabel %>: <%= entry.admissionYears.join(' / ') %></span>
                                 <% } %>
-                                <% if (entry.pathwayLabels) { %>
-                                  <span><%= entry.pathwayLabels %></span>
+                                <% if (entry.campuses.length) { %>
+                                  <span class="teacher-picker-badge"><%= pickerTexts.campusesLabel %>: <%= entry.campuses.join(' / ') %></span>
+                                <% } %>
+                                <% if (entry.contextCount > 1) { %>
+                                  <span class="teacher-picker-badge">+<%= entry.contextCount - 1 %> <%= pickerTexts.contextsSuffix %></span>
                                 <% } %>
                               </div>
-                            <% } %>
-                            <div class="teacher-picker-card__badges">
-                              <span class="teacher-picker-badge">
-                                <%= entry.isGeneral ? pickerTexts.allGroupsLabel : `${pickerTexts.groupRangePrefix} 1-${entry.groupCount}` %>
-                              </span>
-                              <% if (entry.admissionYears.length) { %>
-                                <span class="teacher-picker-badge"><%= pickerTexts.yearsLabel %>: <%= entry.admissionYears.join(' / ') %></span>
+                            </div>
+
+                            <div class="teacher-picker-card__controls">
+                              <% if (!entry.isGeneral) { %>
+                                <label class="teacher-picker-card__group">
+                                  <span class="teacher-picker-card__group-label"><%= pickerTexts.groupLabel %></span>
+                                  <select
+                                    class="form-select"
+                                    name="<%= pickerSelectionMode === 'offering' ? `group_offering_${entry.id}` : `group_${entry.id}` %>"
+                                    data-subject-group="<%= entry.id %>"
+                                  >
+                                    <option value=""><%= pickerTexts.chooseGroupLabel %></option>
+                                    <% for (let groupIndex = 1; groupIndex <= entry.groupCount; groupIndex += 1) { %>
+                                      <option value="<%= groupIndex %>" <%= Number(entry.selectedGroup) === groupIndex ? 'selected' : '' %>><%= groupIndex %></option>
+                                    <% } %>
+                                  </select>
+                                </label>
                               <% } %>
-                              <% if (entry.campuses.length) { %>
-                                <span class="teacher-picker-badge"><%= pickerTexts.campusesLabel %>: <%= entry.campuses.join(' / ') %></span>
-                              <% } %>
-                              <% if (entry.contextCount > 1) { %>
-                                <span class="teacher-picker-badge">+<%= entry.contextCount - 1 %> <%= pickerTexts.contextsSuffix %></span>
-                              <% } %>
+
+                              <div class="form-check teacher-picker-card__toggle">
+                                <input
+                                  class="form-check-input"
+                                  type="checkbox"
+                                  id="teacher_picker_subject_<%= entry.id %>"
+                                  name="<%= pickerSelectionMode === 'offering' ? `subject_${entry.id}` : `subject_${entry.id}` %>"
+                                  value="1"
+                                  data-subject-toggle="<%= entry.id %>"
+                                  <%= entry.checked ? 'checked' : '' %>
+                                />
+                                <label class="form-check-label" for="teacher_picker_subject_<%= entry.id %>"><%= pickerTexts.teachLabel %></label>
+                              </div>
                             </div>
                           </div>
-
-                          <div class="teacher-picker-card__controls">
-                            <% if (!entry.isGeneral) { %>
-                              <label class="teacher-picker-card__group">
-                                <span class="teacher-picker-card__group-label"><%= pickerTexts.groupLabel %></span>
-                                <select
-                                  class="form-select"
-                                  name="<%= pickerSelectionMode === 'offering' ? `group_offering_${entry.id}` : `group_${entry.id}` %>"
-                                  data-subject-group="<%= entry.id %>"
-                                >
-                                  <option value=""><%= pickerTexts.chooseGroupLabel %></option>
-                                  <% for (let groupIndex = 1; groupIndex <= entry.groupCount; groupIndex += 1) { %>
-                                    <option value="<%= groupIndex %>" <%= Number(entry.selectedGroup) === groupIndex ? 'selected' : '' %>><%= groupIndex %></option>
-                                  <% } %>
-                                </select>
-                              </label>
-                            <% } %>
-
-                            <div class="form-check teacher-picker-card__toggle">
-                              <input
-                                class="form-check-input"
-                                type="checkbox"
-                                id="teacher_picker_subject_<%= entry.id %>"
-                                name="<%= pickerSelectionMode === 'offering' ? `subject_${entry.id}` : `subject_${entry.id}` %>"
-                                value="1"
-                                data-subject-toggle="<%= entry.id %>"
-                                <%= entry.checked ? 'checked' : '' %>
-                              />
-                              <label class="form-check-label" for="teacher_picker_subject_<%= entry.id %>"><%= pickerTexts.teachLabel %></label>
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    <% }); %>
+                        </article>
+                      <% }); %>
+                    <% } %>
                   </div>
                 </details>
               </section>

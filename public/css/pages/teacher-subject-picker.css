@@ -216,6 +216,67 @@ body.theme-light .teacher-picker-stage {
   padding: 0 0.3rem 0.35rem;
 }
 
+.teacher-picker-stage__campuses-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.2rem 0;
+}
+
+body.theme-dark .teacher-picker-stage__campuses-label {
+  color: rgba(191, 219, 254, 0.72);
+}
+
+body.theme-light .teacher-picker-stage__campuses-label {
+  color: rgba(17, 76, 149, 0.72);
+}
+
+.teacher-picker-campus-groups {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.teacher-picker-campus {
+  padding: 0.7rem;
+  border-radius: 18px;
+}
+
+body.theme-dark .teacher-picker-campus {
+  border: 1px solid rgba(191, 219, 254, 0.1);
+  background: rgba(15, 23, 42, 0.18);
+}
+
+body.theme-light .teacher-picker-campus {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.teacher-picker-campus__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.1rem 0.55rem;
+}
+
+.teacher-picker-campus__title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.teacher-picker-campus__count {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.teacher-picker-campus__items {
+  display: grid;
+  gap: 0.7rem;
+}
+
 .teacher-picker-card {
   padding: 0.95rem;
   border-radius: 20px;
