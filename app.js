@@ -18756,6 +18756,9 @@ app.get('/teacher/pending', requireLogin, async (req, res) => {
       return res.redirect('/schedule');
     }
     return res.render('teacher-pending', {
+      role: 'teacher',
+      username: req.session.user && req.session.user.username ? req.session.user.username : '',
+      currentPath: '/teacher/pending',
       status: requestStatus || 'pending',
     });
   } catch (err) {

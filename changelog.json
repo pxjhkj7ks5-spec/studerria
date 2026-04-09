@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.49",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-pending-liquid-status): restyle the teacher pending page with the shared floating topbar, remove the local light/dark toggle block, and replace the plain waiting state with a calmer macOS-style animated hourglass glass hero so the review screen matches the rest of the Tahoe / Liquid Glass UI"
+      ]
+    },
+    {
       "version": "1.5.48",
       "date": "2026-04-09",
       "items": [
