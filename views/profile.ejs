@@ -498,6 +498,19 @@
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <style>
+      /* Lock the profile card shadow so global hover elevation rules cannot override it. */
+      body.page-profile.studerria-theme .studerria-profile-card,
+      body.page-profile.studerria-theme .studerria-profile-card:hover,
+      body.page-profile.studerria-theme .studerria-profile-card:focus-within,
+      body.page-profile.studerria-theme .studerria-profile-card:active {
+        transform: none !important;
+        box-shadow:
+          var(--studerria-panel-shadow),
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          inset 0 -1px 0 rgba(15, 23, 42, 0.08) !important;
+      }
+    </style>
   </head>
   <body class="studerria-theme theme-light page-profile page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.75",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-card-hover-shadow-lock): add a final profile-page-specific shadow override after the global stylesheet stack so hovering the whole profile card no longer triggers elevated shadow rules from shared card systems"
+      ]
+    },
+    {
       "version": "1.5.74",
       "date": "2026-04-09",
       "items": [
