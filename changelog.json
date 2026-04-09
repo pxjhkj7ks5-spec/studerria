@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.35",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-live-catalog-only): stop the teacher registration flow and primary Teacher workspace from bootstrapping or falling back to the old legacy teacher-subject catalog, so these screens now show only live offerings from study contexts while the explicit `/teacher/subjects?legacy=1` compatibility route keeps the old picker"
+      ]
+    },
+    {
       "version": "1.5.34",
       "date": "2026-04-09",
       "items": [

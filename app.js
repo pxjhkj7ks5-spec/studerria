@@ -12495,13 +12495,15 @@ async function syncTeacherAcademicAssignments(userId, selections = []) {
   }
 }
 
-async function saveTeacherWorkspaceOfferingAssignments(userId, body = {}) {
+async function saveTeacherWorkspaceOfferingAssignments(userId, body = {}, options = {}) {
   const normalizedUserId = parsePositiveIntStrict(userId);
   if (!normalizedUserId) {
     return { ok: false, error: 'Invalid teacher' };
   }
 
-  const offeringCatalog = await listTeacherOfferingCatalog();
+  const offeringCatalog = await listTeacherOfferingCatalog({
+    allowLegacyBootstrap: options.allowLegacyBootstrap !== false,
+  });
   if (!offeringCatalog.length) {
     return { ok: false, error: 'Offering catalog is not ready' };
   }
@@ -13029,7 +13031,8 @@ async function getTeacherAssignedSubjects(userId) {
   return teacherTemplateHelpers.listTeacherAssignedSubjectRows(getTeacherTemplateStore(), userId);
 }
 
-async function listTeacherOfferingCatalog() {
+async function listTeacherOfferingCatalog(options = {}) {
+  const allowLegacyBootstrap = options.allowLegacyBootstrap !== false;
   const buildOfferingsFromRows = (rows = []) => {
     const offeringsById = new Map();
     (rows || []).forEach((row) => {
@@ -13202,7 +13205,7 @@ async function listTeacherOfferingCatalog() {
 
   try {
     let rows = await loadOfferingRows();
-    if ((!rows || !rows.length)) {
+    if (allowLegacyBootstrap && (!rows || !rows.length)) {
       const legacySubjects = await getTeacherSubjectCatalog();
       const legacySubjectIds = Array.from(new Set(
         (legacySubjects || [])
@@ -13285,11 +13288,15 @@ async function getTeacherOfferingSelections(userId) {
   return selectionMap;
 }
 
-async function loadTeacherPickerState(userId) {
+async function loadTeacherPickerState(userId, options = {}) {
   const normalizedUserId = parsePositiveIntStrict(userId);
+  const allowLegacyBootstrap = options.allowLegacyBootstrap !== false;
+  const allowLegacyFallback = options.allowLegacyFallback !== false;
   let teacherOfferingCatalog = [];
   try {
-    teacherOfferingCatalog = await listTeacherOfferingCatalog();
+    teacherOfferingCatalog = await listTeacherOfferingCatalog({
+      allowLegacyBootstrap,
+    });
   } catch (err) {
     console.error('Teacher offering catalog load failed', err);
   }
@@ -13304,6 +13311,14 @@ async function loadTeacherPickerState(userId) {
       selectionMode: 'offering',
       subjects: teacherOfferingCatalog,
       selections,
+    };
+  }
+
+  if (!allowLegacyFallback) {
+    return {
+      selectionMode: 'offering',
+      subjects: [],
+      selections: new Map(),
     };
   }
 
@@ -14220,7 +14235,9 @@ function extractTeacherOfferingSelectionIds(body = {}) {
 }
 
 async function saveTeacherOfferingSelections(userId, body, options = {}) {
-  const offeringCatalog = await listTeacherOfferingCatalog();
+  const offeringCatalog = await listTeacherOfferingCatalog({
+    allowLegacyBootstrap: options.allowLegacyBootstrap !== false,
+  });
   const selectedOfferingIds = extractTeacherOfferingSelectionIds(body);
   if (!selectedOfferingIds.length) {
     return { ok: false, error: 'Select%20subject' };
@@ -14277,9 +14294,10 @@ async function saveTeacherOfferingSelections(userId, body, options = {}) {
 }
 
 async function saveTeacherSubjects(userId, body, options = {}) {
+  const allowLegacyFallback = options.allowLegacyFallback !== false;
   const selectionMode = String(body && body.selection_mode || '').trim().toLowerCase();
   const offeringIds = extractTeacherOfferingSelectionIds(body);
-  if (selectionMode === 'offering' || offeringIds.length) {
+  if (selectionMode === 'offering' || offeringIds.length || !allowLegacyFallback) {
     return saveTeacherOfferingSelections(userId, body, options);
   }
   const catalog = await getTeacherSubjectCatalog();
@@ -16348,7 +16366,10 @@ app.get('/register/teacher-subjects', (req, res) => {
           selectionMode,
           subjects,
           selections,
-        } = await loadTeacherPickerState(user.id);
+        } = await loadTeacherPickerState(user.id, {
+          allowLegacyBootstrap: false,
+          allowLegacyFallback: false,
+        });
         return res.render('register-teacher-subjects', {
           subjects,
           selections,
@@ -16388,7 +16409,10 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
     if (normalizeRegistrationTrack(scope.track_key, 'bachelor') !== 'teacher') {
       return res.redirect('/register/subjects');
     }
-    const result = await saveTeacherSubjects(userId, req.body);
+    const result = await saveTeacherSubjects(userId, req.body, {
+      allowLegacyBootstrap: false,
+      allowLegacyFallback: false,
+    });
     if (!result.ok) {
       return res.redirect(`/register/teacher-subjects?error=${result.error || 'Select%20subject'}`);
     }
@@ -16739,7 +16763,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     const [teacherSubjects, teacherAssignedOfferings, teacherOfferingCatalog, teacherOfferingSelections] = await Promise.all([
       getTeacherAssignedSubjects(userId),
       getTeacherAssignedOfferings(userId),
-      listTeacherOfferingCatalog(),
+      listTeacherOfferingCatalog({ allowLegacyBootstrap: false }),
       getTeacherOfferingSelections(userId),
     ]);
     const teacherCourses = buildTeacherCourseList(teacherSubjects);
@@ -17039,7 +17063,7 @@ app.post('/teacher/workspace/offering-templates/sync', requireLogin, async (req,
       }));
     }
     const [teacherOfferingCatalog, teacherOfferingSelections, teacherAssignedOfferings] = await Promise.all([
-      listTeacherOfferingCatalog(),
+      listTeacherOfferingCatalog({ allowLegacyBootstrap: false }),
       getTeacherOfferingSelections(userId),
       getTeacherAssignedOfferings(userId),
     ]);
@@ -17113,7 +17137,9 @@ app.post('/teacher/workspace/offerings', requireLogin, async (req, res) => {
     semesterId: parsePositiveIntStrict(req.body.semester_id),
   });
   try {
-    const result = await saveTeacherWorkspaceOfferingAssignments(userId, req.body);
+    const result = await saveTeacherWorkspaceOfferingAssignments(userId, req.body, {
+      allowLegacyBootstrap: false,
+    });
     if (!result.ok) {
       return res.redirect(buildTeacherWorkspaceUrl({
         ...redirectState,
