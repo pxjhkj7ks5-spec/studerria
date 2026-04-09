@@ -12201,7 +12201,14 @@ async function isCourseDayActive(courseId, dayName) {
 }
 
 async function getTeacherSubjectCatalog() {
-  return academicSetupHelpers.listLegacyTeacherCatalogRows(getAcademicSetupStore());
+  try {
+    return await academicSetupHelpers.listLegacyTeacherCatalogRows(getAcademicSetupStore());
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
 }
 
 async function getTeacherSelections(userId) {
@@ -13276,6 +13283,47 @@ async function getTeacherOfferingSelections(userId) {
     }
   }
   return selectionMap;
+}
+
+async function loadTeacherPickerState(userId) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  let teacherOfferingCatalog = [];
+  try {
+    teacherOfferingCatalog = await listTeacherOfferingCatalog();
+  } catch (err) {
+    console.error('Teacher offering catalog load failed', err);
+  }
+  if (Array.isArray(teacherOfferingCatalog) && teacherOfferingCatalog.length) {
+    let selections = new Map();
+    try {
+      selections = await getTeacherOfferingSelections(normalizedUserId);
+    } catch (err) {
+      console.error('Teacher offering selections load failed', err);
+    }
+    return {
+      selectionMode: 'offering',
+      subjects: teacherOfferingCatalog,
+      selections,
+    };
+  }
+
+  let legacySubjects = [];
+  try {
+    legacySubjects = await getTeacherSubjectCatalog();
+  } catch (err) {
+    console.error('Teacher legacy catalog load failed', err);
+  }
+  let selections = new Map();
+  try {
+    selections = await getTeacherSelections(normalizedUserId);
+  } catch (err) {
+    console.error('Teacher legacy selections load failed', err);
+  }
+  return {
+    selectionMode: 'legacy',
+    subjects: Array.isArray(legacySubjects) ? legacySubjects : [],
+    selections,
+  };
 }
 
 async function getTeacherAssignedOfferings(userId) {
@@ -16296,14 +16344,11 @@ app.get('/register/teacher-subjects', (req, res) => {
         if (normalizeRegistrationTrack(scope.track_key, 'bachelor') !== 'teacher') {
           return res.redirect('/register/subjects');
         }
-        const teacherOfferingCatalog = await listTeacherOfferingCatalog();
-        const selectionMode = teacherOfferingCatalog.length ? 'offering' : 'legacy';
-        const subjects = selectionMode === 'offering'
-          ? teacherOfferingCatalog
-          : await getTeacherSubjectCatalog();
-        const selections = selectionMode === 'offering'
-          ? await getTeacherOfferingSelections(user.id)
-          : await getTeacherSelections(user.id);
+        const {
+          selectionMode,
+          subjects,
+          selections,
+        } = await loadTeacherPickerState(user.id);
         return res.render('register-teacher-subjects', {
           subjects,
           selections,
@@ -16506,14 +16551,11 @@ app.get('/teacher/subjects', requireLogin, async (req, res) => {
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/schedule');
     }
-    const teacherOfferingCatalog = await listTeacherOfferingCatalog();
-    const selectionMode = teacherOfferingCatalog.length ? 'offering' : 'legacy';
-    const subjects = selectionMode === 'offering'
-      ? teacherOfferingCatalog
-      : await getTeacherSubjectCatalog();
-    const selections = selectionMode === 'offering'
-      ? await getTeacherOfferingSelections(userId)
-      : await getTeacherSelections(userId);
+    const {
+      selectionMode,
+      subjects,
+      selections,
+    } = await loadTeacherPickerState(userId);
     return res.render('teacher-subjects', {
       role: 'teacher',
       username,
