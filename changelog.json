@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.39",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-registration-intro-card): remove the extra explanatory glass card above the teacher discipline picker on the registration screen so the flow opens directly into the actual search and grouped discipline matrix without the redundant approval/workspace notice block"
+      ]
+    },
+    {
       "version": "1.5.38",
       "date": "2026-04-09",
       "items": [
