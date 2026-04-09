@@ -1103,6 +1103,26 @@
         });
       }
 
+      function applyTeacherDefaultCampus(campusChoices) {
+        if (!isTeacherTrack(state.trackKey) || state.campusConfirmed) {
+          return false;
+        }
+        const selectableChoices = Array.isArray(campusChoices)
+          ? campusChoices.filter((choice) => choice && choice.is_selectable)
+          : [];
+        if (!selectableChoices.length) {
+          return false;
+        }
+        const preferredChoice = selectableChoices.find((choice) => normalizeCampusKey(choice.campus_key) === 'kyiv')
+          || selectableChoices[0];
+        state.campusKey = normalizeCampusKey(preferredChoice.campus_key);
+        state.groupId = Number(preferredChoice.group_id || 0) || null;
+        state.studyContextId = Number(preferredChoice.study_context_id || preferredChoice.group_id || 0) || null;
+        state.courseId = Number(preferredChoice.course_id || 0) || null;
+        state.campusConfirmed = true;
+        return true;
+      }
+
       function renderCampuses() {
         if (!(campusOptions instanceof HTMLElement)) return;
         const teacherMode = isTeacherTrack(state.trackKey);
@@ -1135,6 +1155,10 @@
           setHint(campusHint, registerCourseText.noReadyCampuses, true);
           clearCampusSelection();
           return;
+        }
+
+        if (teacherMode) {
+          applyTeacherDefaultCampus(campusChoices);
         }
 
         const hasSelectableCampus = campusChoices.some((choice) => choice && choice.is_selectable);

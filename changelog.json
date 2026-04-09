@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.54",
+      "date": "2026-04-09",
+      "items": [
+        "fix(register-course-teacher-default-location): when the teaching level is selected in the course-registration picker, the location step now auto-selects the `Київ` option by default whenever it is available for registration, with a fallback to the first selectable location so the teacher flow no longer requires an extra location click in the common Kyiv case"
+      ]
+    },
+    {
       "version": "1.5.53",
       "date": "2026-04-09",
       "items": [
