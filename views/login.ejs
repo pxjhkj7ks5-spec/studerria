@@ -141,7 +141,8 @@
         content: '';
         position: absolute;
         bottom: -6px;
-        left: 20px;
+        left: var(--tooltip-arrow-left, 20px);
+        transform: translateX(-50%);
         border: 6px solid transparent;
         border-top-color: rgba(255, 255, 255, 0.08);
       }
@@ -432,7 +433,7 @@
     <script>
       function showCustomTooltip(el, message) {
         document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
-        const anchor = el.closest('.form-check') || el.closest('.input-group') || el;
+        const anchor = el.closest('.input-with-icon') || el.closest('.form-check') || el.closest('.input-group') || el;
         const key = el.id || el.name || anchor.id || '';
         const tip = document.createElement('div');
         tip.className = 'custom-tooltip';
@@ -443,19 +444,27 @@
         const rect = anchor.getBoundingClientRect();
         const tipRect = tip.getBoundingClientRect();
         const margin = 10;
+        const viewportPadding = 8;
+        const arrowPadding = 18;
+        const anchorCenter = rect.left + (rect.width / 2);
         let top = rect.bottom + margin;
-        let left = rect.left;
+        let left = anchorCenter - (tipRect.width / 2);
         let placeBelow = true;
-        if (top + tipRect.height > window.innerHeight - 8) {
+        if (top + tipRect.height > window.innerHeight - viewportPadding) {
           top = rect.top - tipRect.height - margin;
           placeBelow = false;
         }
-        if (left + tipRect.width > window.innerWidth - 8) {
-          left = window.innerWidth - tipRect.width - 8;
+        if (left + tipRect.width > window.innerWidth - viewportPadding) {
+          left = window.innerWidth - tipRect.width - viewportPadding;
         }
-        if (left < 8) left = 8;
+        if (left < viewportPadding) left = viewportPadding;
+        const arrowLeft = Math.max(
+          arrowPadding,
+          Math.min(tipRect.width - arrowPadding, anchorCenter - left)
+        );
         tip.style.top = `${Math.round(top)}px`;
         tip.style.left = `${Math.round(left)}px`;
+        tip.style.setProperty('--tooltip-arrow-left', `${Math.round(arrowLeft)}px`);
         if (placeBelow) tip.classList.add('below');
         requestAnimationFrame(() => tip.classList.add('show'));
         const remove = () => tip.remove();

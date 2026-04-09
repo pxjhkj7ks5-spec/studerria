@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.52",
+      "date": "2026-04-09",
+      "items": [
+        "fix(validation-tooltip-alignment): recenter the custom validation hints on login, register, and profile so prompts like `Введіть ПІБ` and `Введіть пароль` align to the actual field midpoint, keep their arrow attached to the correct anchor, and stop looking offset from the input surface"
+      ]
+    },
+    {
       "version": "1.5.51",
       "date": "2026-04-09",
       "items": [
