@@ -525,19 +525,23 @@
     <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'profile', pageTitle: t('schedule.profile') }) %>
     <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'profile' }) %>
+    <div
+      id="profileToastStack"
+      class="profile-toast-stack"
+      data-toast-success="<%= success %>"
+      data-toast-error="<%= error %>"
+      data-success-title="<%= lang === 'uk' ? 'Збережено' : 'Saved' %>"
+      data-error-title="<%= lang === 'uk' ? 'Потрібна дія' : 'Action needed' %>"
+      data-close-label="<%= lang === 'uk' ? 'Закрити повідомлення' : 'Dismiss notice' %>"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
     <div class="container py-4">
       <div class="row justify-content-center">
         <div class="col-12 col-md-6 studerria-profile-column">
           <div class="card auth-card glass studerria-profile-card">
             <div class="card-body p-4 studerria-profile-card-body">
               <h1 class="h4 mb-3"><%= t('profile.title') %></h1>
-
-              <% if (error) { %>
-                <div class="alert alert-danger"><%= error %></div>
-              <% } %>
-              <% if (success) { %>
-                <div class="alert alert-success"><%= success %></div>
-              <% } %>
 
               <div class="d-flex align-items-center justify-content-between mb-3">
                 <div class="text-muted small"><%= t('profile.activity') %></div>
@@ -694,6 +698,74 @@
       }
 
       attachValidationTooltips();
+
+      function initProfileToasts() {
+        const toastStack = document.getElementById('profileToastStack');
+        if (!toastStack) return;
+
+        const dismissToast = (toast) => {
+          if (!toast || toast.dataset.hiding === '1') return;
+          toast.dataset.hiding = '1';
+          toast.classList.remove('is-visible');
+          toast.classList.add('is-hiding');
+          window.setTimeout(() => {
+            toast.remove();
+          }, 260);
+        };
+
+        const showToast = (type, message) => {
+          if (!message) return;
+
+          const toast = document.createElement('section');
+          toast.className = `profile-toast profile-toast--${type}`;
+          toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+
+          const icon = document.createElement('span');
+          icon.className = 'profile-toast__icon';
+          icon.setAttribute('aria-hidden', 'true');
+          icon.textContent = type === 'error' ? '!' : '✓';
+
+          const body = document.createElement('div');
+          body.className = 'profile-toast__body';
+
+          const title = document.createElement('strong');
+          title.className = 'profile-toast__title';
+          title.textContent = type === 'error'
+            ? (toastStack.dataset.errorTitle || 'Потрібна дія')
+            : (toastStack.dataset.successTitle || 'Збережено');
+
+          const text = document.createElement('p');
+          text.className = 'profile-toast__text';
+          text.textContent = message;
+
+          const close = document.createElement('button');
+          close.className = 'profile-toast__close';
+          close.type = 'button';
+          close.setAttribute('aria-label', toastStack.dataset.closeLabel || 'Закрити повідомлення');
+          close.textContent = '×';
+          close.addEventListener('click', () => dismissToast(toast));
+
+          body.appendChild(title);
+          body.appendChild(text);
+          toast.appendChild(icon);
+          toast.appendChild(body);
+          toast.appendChild(close);
+          toastStack.appendChild(toast);
+
+          requestAnimationFrame(() => {
+            toast.classList.add('is-visible');
+          });
+
+          window.setTimeout(() => dismissToast(toast), type === 'error' ? 6200 : 4600);
+        };
+
+        const successMsg = toastStack.dataset.toastSuccess;
+        const errorMsg = toastStack.dataset.toastError;
+        if (successMsg) showToast('success', successMsg);
+        if (errorMsg) showToast('error', errorMsg);
+      }
+
+      initProfileToasts();
 
       const themeToggles = document.querySelectorAll('.theme-toggle');
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.50",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-floating-apple-notices): replace the old inline profile success/error alerts with floating Apple-style glass notices that appear under the topbar, animate in and out like system toasts, and keep the form layout visually clean in both light and dark themes"
+      ]
+    },
+    {
       "version": "1.5.49",
       "date": "2026-04-09",
       "items": [
