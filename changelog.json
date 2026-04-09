@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.48",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-light-surface-contrast): strengthen the inner surfaces of the light-theme profile card so activity stats, form fields, language select, and the secondary back action render on cleaner white panels with clearer borders and softer elevation instead of blending into the parent glass block"
+      ]
+    },
+    {
       "version": "1.5.47",
       "date": "2026-04-09",
       "items": [
