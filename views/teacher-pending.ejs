@@ -28,8 +28,6 @@
 
       body {
         min-height: 100vh;
-        display: flex;
-        flex-direction: column;
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
           "Helvetica Neue", "Inter", Arial, sans-serif;
       }
@@ -51,23 +49,8 @@
       }
 
       .pending-shell {
-        flex: 1 0 auto;
         padding-top: 10px;
         padding-bottom: 20px;
-      }
-
-      body.page-teacher-pending.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
-        width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
-        max-width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
-        margin: 0 auto 12px;
-      }
-
-      @media (max-width: 960px) {
-        body.page-teacher-pending.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
-          width: 100%;
-          max-width: 100%;
-          margin: calc(8px + env(safe-area-inset-top)) 0 12px;
-        }
       }
 
       .pending-card {
@@ -299,10 +282,6 @@
       .pending-status--rejected::before {
         background: #f87171;
         box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.12);
-      }
-
-      .app-footer {
-        margin-top: auto;
       }
 
       body.theme-dark .pending-status {

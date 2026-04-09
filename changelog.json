@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.64",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-pending-navbar-layout): remove the pending-page-specific flex shell and local navbar width overrides so the shared topbar falls back to the same standard layout rules as the rest of the app, preventing the teacher pending navbar from appearing visually compressed after the footer restore"
+      ]
+    },
+    {
       "version": "1.5.63",
       "date": "2026-04-09",
       "items": [
