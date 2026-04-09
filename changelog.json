@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.70",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-student-light-contrast): make the student light-theme profile modules much more explicit by switching stat tiles, field surfaces, action panels, reset panel, and the inner form controls to nearly white Apple-style surfaces with stronger borders and shadows so they stop visually dissolving into the outer glass card"
+      ]
+    },
+    {
       "version": "1.5.69",
       "date": "2026-04-09",
       "items": [
