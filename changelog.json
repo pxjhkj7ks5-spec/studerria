@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.58",
+      "date": "2026-04-09",
+      "items": [
+        "fix(ultrawide-validation-tooltips): stabilize custom validation hints on login, register, and profile for wide and ultra-wide layouts by anchoring the tooltip to a local visible host around the form column instead of positioning it only against the full viewport, so prompts like `Підтвердіть пароль` stay aligned with their field on 3440×1440-class screens"
+      ]
+    },
+    {
       "version": "1.5.57",
       "date": "2026-04-09",
       "items": [

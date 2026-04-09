@@ -117,8 +117,12 @@
       body.theme-dark .text-muted {
         color: rgba(255, 255, 255, 0.35) !important;
       }
+      .tooltip-host {
+        position: relative;
+        overflow: visible;
+      }
       .custom-tooltip {
-        position: fixed;
+        position: absolute;
         z-index: 2000;
         backdrop-filter: blur(10px);
         background: rgba(255, 255, 255, 0.08);
@@ -132,6 +136,9 @@
         opacity: 0;
         transform: translateY(6px);
         transition: opacity 220ms ease, transform 220ms ease;
+      }
+      .tooltip-host .custom-tooltip {
+        max-width: min(300px, calc(100% - 16px));
       }
       .custom-tooltip.show {
         opacity: 1;
@@ -368,7 +375,7 @@
     </div>
     <div class="container">
       <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
-        <div class="col-11 col-sm-8 col-md-6 col-lg-4">
+        <div class="col-11 col-sm-8 col-md-6 col-lg-4 tooltip-host">
           <div class="card login-card glass">
             <div class="card-body p-4">
               <h1 class="h4 mb-3 text-center"><%= t('login.title') %></h1>
@@ -434,30 +441,50 @@
       function showCustomTooltip(el, message) {
         document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
         const anchor = el.closest('.input-with-icon') || el.closest('.form-check') || el.closest('.input-group') || el;
+        const tooltipHost = anchor.closest('.tooltip-host');
+        const renderHost = tooltipHost || document.body;
         const key = el.id || el.name || anchor.id || '';
         const tip = document.createElement('div');
         tip.className = 'custom-tooltip';
         tip.textContent = message || 'Перевірте поле';
         if (key) tip.dataset.for = key;
-        document.body.appendChild(tip);
+        renderHost.appendChild(tip);
 
         const rect = anchor.getBoundingClientRect();
         const tipRect = tip.getBoundingClientRect();
         const margin = 10;
         const viewportPadding = 8;
         const arrowPadding = 18;
-        const anchorCenter = rect.left + (rect.width / 2);
+        let anchorCenter = rect.left + (rect.width / 2);
         let top = rect.bottom + margin;
         let left = anchorCenter - (tipRect.width / 2);
         let placeBelow = true;
-        if (top + tipRect.height > window.innerHeight - viewportPadding) {
-          top = rect.top - tipRect.height - margin;
-          placeBelow = false;
+        if (tooltipHost) {
+          const hostRect = tooltipHost.getBoundingClientRect();
+          const hostHeight = Math.max(hostRect.height, tooltipHost.scrollHeight, tooltipHost.clientHeight);
+          anchorCenter = (rect.left - hostRect.left) + (rect.width / 2);
+          top = (rect.bottom - hostRect.top) + margin;
+          left = anchorCenter - (tipRect.width / 2);
+          const aboveTop = (rect.top - hostRect.top) - tipRect.height - margin;
+          if (top + tipRect.height > hostHeight - viewportPadding && aboveTop >= -viewportPadding) {
+            top = aboveTop;
+            placeBelow = false;
+          }
+          const maxLeft = Math.max(viewportPadding, hostRect.width - tipRect.width - viewportPadding);
+          if (left > maxLeft) left = maxLeft;
+          if (left < viewportPadding) left = viewportPadding;
+          tip.style.position = 'absolute';
+        } else {
+          if (top + tipRect.height > window.innerHeight - viewportPadding) {
+            top = rect.top - tipRect.height - margin;
+            placeBelow = false;
+          }
+          if (left + tipRect.width > window.innerWidth - viewportPadding) {
+            left = window.innerWidth - tipRect.width - viewportPadding;
+          }
+          if (left < viewportPadding) left = viewportPadding;
+          tip.style.position = 'fixed';
         }
-        if (left + tipRect.width > window.innerWidth - viewportPadding) {
-          left = window.innerWidth - tipRect.width - viewportPadding;
-        }
-        if (left < viewportPadding) left = viewportPadding;
         const arrowLeft = Math.max(
           arrowPadding,
           Math.min(tipRect.width - arrowPadding, anchorCenter - left)
