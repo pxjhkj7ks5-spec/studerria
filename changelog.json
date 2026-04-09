@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.53",
+      "date": "2026-04-09",
+      "items": [
+        "fix(register-course-setup-ui): simplify the course-registration setup card by replacing the old `registration route` intro with a cleaner `Реєстрація курсу` title, renaming `маршрут` to `рівень`, `когорта` to `рік вступу`, and `кампус` to `локація`, removing the route diagnostics and cohort meta-preview blocks, emphasizing the single-program state as a selected glass card, and restyling Kyiv/Munich into smaller Apple-like location chips instead of the previous large campus pills"
+      ]
+    },
+    {
       "version": "1.5.52",
       "date": "2026-04-09",
       "items": [
