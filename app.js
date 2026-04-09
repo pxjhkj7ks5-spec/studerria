@@ -2608,6 +2608,10 @@ function formatStudyContextCampusLabel(campusKey, lang = 'uk') {
   return normalized === 'munich' ? 'Мюнхен' : 'Київ';
 }
 
+function formatPathwaysCampusLabel(campusKey, lang = 'uk') {
+  return formatStudyContextCampusLabel(campusKey, lang);
+}
+
 function formatStudyContextStageLabel(stage, trackKey = 'bachelor', lang = 'uk') {
   const normalizedStage = normalizeStudyContextStage(stage, 1);
   if (lang === 'en') {

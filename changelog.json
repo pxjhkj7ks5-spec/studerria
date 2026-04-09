@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.38",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-catalog-campus-helper): expose the shared campus-label formatter in app scope so the Academic V2 teacher-catalog fallback no longer crashes with `ReferenceError: formatPathwaysCampusLabel is not defined`, allowing the grouped bachelor/master fallback picker to render on registration and in the primary Teacher workspace"
+      ]
+    },
+    {
       "version": "1.5.37",
       "date": "2026-04-09",
       "items": [
