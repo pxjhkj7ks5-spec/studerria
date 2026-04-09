@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.61",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-pending-review-badge): remove the extra `Teacher review` oval from the teacher pending screen so the waiting state starts directly from the animated review hero and title without the redundant English kicker chip"
+      ]
+    },
+    {
       "version": "1.5.60",
       "date": "2026-04-09",
       "items": [
