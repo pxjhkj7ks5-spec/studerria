@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.32",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-route-service-cohort-readiness): stop requiring visible mapped `academic_v2_group_subjects` and the full legacy `study_context/program/admission` bridge on teacher service groups before the registration route unlocks, and preserve existing placement values when those optional teacher-only bridge fields are empty, so a teacher default group can proceed straight to the offerings-based discipline picker without a fake placeholder subject on the cohort itself"
+      ]
+    },
+    {
       "version": "1.5.31",
       "date": "2026-04-09",
       "items": [

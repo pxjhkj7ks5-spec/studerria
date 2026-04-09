@@ -3944,13 +3944,17 @@ function getRegistrationRepairFailureIssue(group = {}) {
   const missingCompatFields = Array.isArray(group && group.missing_compat_fields)
     ? group.missing_compat_fields.map((field) => sanitizeCompactText(field, 80)).filter(Boolean)
     : [];
+  const isTeacherGroup = normalizeRegistrationTrack(group && group.track_key, 'bachelor') === 'teacher';
   if (missingCompatFields.includes('legacy_study_context_id')) {
     return 'repair_missing_study_context';
   }
   if (missingCompatFields.length) {
     return 'repair_missing_compat_bridge';
   }
-  if (Math.max(0, Number(group && group.visible_mapped_subject_count ? group.visible_mapped_subject_count : 0) || 0) < 1) {
+  if (
+    !isTeacherGroup
+    && Math.max(0, Number(group && group.visible_mapped_subject_count ? group.visible_mapped_subject_count : 0) || 0) < 1
+  ) {
     return 'repair_missing_mapped_subjects';
   }
   if (group && group.selection_blocked) {
@@ -4044,8 +4048,34 @@ async function resolveStrictAcademicV2RegistrationScope(userOrId) {
 async function persistRegistrationAcademicGroupPlacement(userId, group) {
   const normalizedUserId = parsePositiveIntStrict(userId);
   const normalizedGroupId = parsePositiveIntStrict(group && group.group_id);
+  const isTeacherGroup = normalizeRegistrationTrack(group && group.track_key, 'bachelor') === 'teacher';
   if (!normalizedUserId || !normalizedGroupId) {
     throw new Error('Academic group required');
+  }
+  if (isTeacherGroup) {
+    await db.run(
+      `
+        UPDATE users
+        SET
+          group_id = ?,
+          course_id = COALESCE(?, course_id),
+          study_context_id = COALESCE(?, study_context_id),
+          study_program_id = COALESCE(?, study_program_id),
+          admission_id = COALESCE(?, admission_id),
+          study_track = ?
+        WHERE id = ?
+      `,
+      [
+        normalizedGroupId,
+        parsePositiveIntStrict(group && group.legacy_course_id),
+        parsePositiveIntStrict(group && group.legacy_study_context_id),
+        parsePositiveIntStrict(group && group.legacy_program_id),
+        parsePositiveIntStrict(group && group.legacy_admission_id),
+        normalizeRegistrationTrack(group && group.track_key, 'bachelor'),
+        normalizedUserId,
+      ]
+    );
+    return;
   }
   await db.run(
     `
