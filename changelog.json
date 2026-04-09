@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.74",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-light-surface-cleanup): flatten the light-theme profile layout by removing the extra inner panels around fields and actions, keeping the inputs white while preserving the dark-theme shell"
+      ]
+    },
+    {
       "version": "1.5.73",
       "date": "2026-04-09",
       "items": [
