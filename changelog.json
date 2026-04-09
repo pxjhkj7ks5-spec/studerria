@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.42",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-picker-stage-collapse): keep the inner `stage` disclosures collapsed on initial render too, so the teacher discipline matrix now opens in a fully folded state and the user explicitly opens both the track lane and the needed stage before seeing subjects"
+      ]
+    },
+    {
       "version": "1.5.41",
       "date": "2026-04-09",
       "items": [

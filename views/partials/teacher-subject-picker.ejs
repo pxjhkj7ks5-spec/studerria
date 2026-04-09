@@ -210,7 +210,7 @@
       .forEach((section) => {
         const stages = Array.from(section.stages.values())
           .sort((left, right) => Number(left.stageNumber || 0) - Number(right.stageNumber || 0))
-          .map((stage, stageIndex) => {
+          .map((stage) => {
             const sortedItems = stage.items.slice().sort((left, right) => {
               const selectedDiff = Number(Boolean(right.checked)) - Number(Boolean(left.checked));
               if (selectedDiff !== 0) return selectedDiff;
@@ -219,7 +219,7 @@
             return {
               ...stage,
               items: sortedItems,
-              initialOpen: sortedItems.some((item) => item.checked) || stageIndex === 0,
+              initialOpen: false,
             };
           });
         pickerSections.push({
