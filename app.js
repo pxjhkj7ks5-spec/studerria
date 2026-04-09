@@ -13042,6 +13042,175 @@ function normalizeTeacherCatalogTrackKeys(values = []) {
   ));
 }
 
+async function listTeacherAcademicV2FallbackCatalog(options = {}) {
+  const allowedTrackKeys = normalizeTeacherCatalogTrackKeys(options.allowedTrackKeys);
+  if (!allowedTrackKeys.length) {
+    return [];
+  }
+  try {
+    const loadRows = async ({ requireLegacySubjectId = true } = {}) => db.all(
+      `
+        SELECT
+          gs.group_id,
+          gs.legacy_subject_id,
+          COALESCE(NULLIF(TRIM(CAST(gs.title AS TEXT)), ''), st.name) AS subject_name,
+          gs.group_count,
+          gs.default_group,
+          gs.is_general,
+          gs.sort_order,
+          g.stage_number,
+          g.campus_key,
+          g.legacy_course_id AS course_id,
+          cohort.admission_year,
+          program.id AS program_id,
+          program.code AS program_code,
+          program.name AS program_name,
+          program.track_key,
+          course.name AS course_name,
+          COALESCE(course.location, g.campus_key, 'kyiv') AS course_location
+        FROM academic_v2_group_subjects gs
+        JOIN academic_v2_groups g ON g.id = gs.group_id
+        JOIN academic_v2_cohorts cohort ON cohort.id = g.cohort_id
+        JOIN academic_v2_programs program ON program.id = cohort.program_id
+        JOIN academic_v2_subject_templates st ON st.id = gs.subject_template_id
+        LEFT JOIN courses course ON course.id = g.legacy_course_id
+        WHERE COALESCE(gs.is_visible, TRUE) = TRUE
+          ${requireLegacySubjectId ? 'AND gs.legacy_subject_id IS NOT NULL' : ''}
+          AND COALESCE(g.is_active, TRUE) = TRUE
+          AND COALESCE(program.is_active, TRUE) = TRUE
+          AND program.track_key = ANY(?::text[])
+        ORDER BY
+          CASE program.track_key
+            WHEN 'bachelor' THEN 0
+            WHEN 'master' THEN 1
+            WHEN 'teacher' THEN 2
+            ELSE 3
+          END,
+          cohort.admission_year DESC,
+          g.stage_number ASC,
+          gs.sort_order ASC,
+          subject_name ASC,
+          gs.id ASC
+      `,
+      [allowedTrackKeys]
+    );
+
+    let rows = await loadRows({ requireLegacySubjectId: true });
+    const projectionSeedRows = await loadRows({ requireLegacySubjectId: false });
+    const projectionRepairGroupIds = Array.from(new Set(
+      (projectionSeedRows || [])
+        .filter((row) => !parsePositiveIntStrict(row && row.legacy_subject_id))
+        .map((row) => parsePositiveIntStrict(row && row.group_id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    if (projectionRepairGroupIds.length) {
+      const store = getAcademicV2Store();
+      for (const groupId of projectionRepairGroupIds) {
+        try {
+          await academicV2Helpers.resyncGroupProjection(store, groupId);
+        } catch (err) {
+          console.error('Teacher academic_v2 fallback projection repair failed', { groupId, error: err });
+        }
+      }
+      rows = await loadRows({ requireLegacySubjectId: true });
+    }
+    const catalogBySubjectId = new Map();
+    for (const row of rows || []) {
+      const subjectId = parsePositiveIntStrict(row && row.legacy_subject_id);
+      if (!subjectId) {
+        continue;
+      }
+      if (!catalogBySubjectId.has(subjectId)) {
+        catalogBySubjectId.set(subjectId, {
+          id: subjectId,
+          legacy_subject_id: subjectId,
+          name: sanitizeCompactText(row && row.subject_name ? row.subject_name : '', 140),
+          group_count: Math.max(1, Number(row && row.group_count ? row.group_count : 1) || 1),
+          default_group: Math.max(1, Number(row && row.default_group ? row.default_group : 1) || 1),
+          is_general: row && (row.is_general === true || Number(row.is_general) === 1),
+          sort_order: Number(row && row.sort_order ? row.sort_order : 0) || 0,
+          course_labels: [],
+          context_labels: [],
+          semester_labels: [],
+          contexts: [],
+        });
+      }
+      const entry = catalogBySubjectId.get(subjectId);
+      entry.group_count = Math.max(entry.group_count, Math.max(1, Number(row && row.group_count ? row.group_count : 1) || 1));
+      entry.default_group = Math.max(1, Math.min(entry.group_count, Number(row && row.default_group ? row.default_group : entry.default_group) || entry.default_group || 1));
+      entry.is_general = Boolean(entry.is_general && (row.is_general === true || Number(row.is_general) === 1));
+      const campusKey = normalizeCourseCampus(row && row.campus_key ? row.campus_key : 'kyiv');
+      const courseLabel = parsePositiveIntStrict(row && row.course_id)
+        ? `${sanitizeCompactText(row && row.course_name ? row.course_name : `Course ${row.course_id}`, 120)} / ${formatPathwaysCampusLabel(row && row.course_location ? row.course_location : campusKey)}`
+        : sanitizeCompactText(row && row.course_name ? row.course_name : '', 120);
+      const contextLabel = sanitizeCompactText(
+        buildStudyContextLabel({
+          program_code: row && row.program_code,
+          program_name: row && row.program_name,
+          admission_year: Number(row && row.admission_year ? row.admission_year : 0) || null,
+          campus_key: campusKey,
+          stage: Number(row && row.stage_number ? row.stage_number : 0) || 1,
+          track_key: row && row.track_key,
+        }, 'uk'),
+        180
+      );
+      if (courseLabel && !entry.course_labels.includes(courseLabel)) {
+        entry.course_labels.push(courseLabel);
+      }
+      if (contextLabel && !entry.context_labels.includes(contextLabel)) {
+        entry.context_labels.push(contextLabel);
+      }
+      const contextKey = [
+        normalizeRegistrationTrack(row && row.track_key, 'bachelor'),
+        Number(row && row.stage_number ? row.stage_number : 0) || 1,
+        Number(row && row.admission_year ? row.admission_year : 0) || 0,
+        campusKey,
+        parsePositiveIntStrict(row && row.program_id) || 0,
+      ].join(':');
+      if (!entry.contexts.some((context) => String(context.key || '') === contextKey)) {
+        entry.contexts.push({
+          key: contextKey,
+          track_key: normalizeRegistrationTrack(row && row.track_key, 'bachelor'),
+          stage_number: Number(row && row.stage_number ? row.stage_number : 0) || 1,
+          admission_year: Number(row && row.admission_year ? row.admission_year : 0) || null,
+          campus_key: campusKey,
+          course_id: parsePositiveIntStrict(row && row.course_id) || null,
+          course_name: sanitizeCompactText(row && row.course_name ? row.course_name : '', 120),
+          course_location: normalizeCourseCampus(row && row.course_location ? row.course_location : campusKey),
+          program_id: parsePositiveIntStrict(row && row.program_id) || null,
+          program_code: sanitizeCompactText(row && row.program_code ? row.program_code : '', 40),
+          program_name: sanitizeCompactText(row && row.program_name ? row.program_name : '', 140),
+          label: contextLabel,
+          semester_titles: [],
+          semester_ids: [],
+          semester_numbers: [],
+        });
+      }
+    }
+    return Array.from(catalogBySubjectId.values())
+      .map((entry) => ({
+        ...entry,
+        course_name: entry.course_labels.join(' • '),
+        pathway_labels: entry.context_labels.join(' • '),
+        search_text: [
+          entry.name,
+          entry.course_labels.join(' '),
+          entry.context_labels.join(' '),
+        ].join(' ').toLowerCase(),
+      }))
+      .sort((left, right) => {
+        const sortDiff = Number(left.sort_order || 0) - Number(right.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return String(left.name || '').localeCompare(String(right.name || ''), 'uk', { sensitivity: 'base' });
+      });
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 async function ensureTeacherPresetOfferingCatalog(options = {}) {
   const allowedTrackKeys = normalizeTeacherCatalogTrackKeys(options.allowedTrackKeys);
   if (!allowedTrackKeys.length) {
@@ -13384,6 +13553,7 @@ async function loadTeacherPickerState(userId, options = {}) {
   const normalizedUserId = parsePositiveIntStrict(userId);
   const allowLegacyBootstrap = options.allowLegacyBootstrap !== false;
   const allowLegacyFallback = options.allowLegacyFallback !== false;
+  const allowAcademicV2Fallback = options.allowAcademicV2Fallback === true;
   const allowPresetBootstrap = options.allowPresetBootstrap !== false;
   const requirePresetStageSubject = options.requirePresetStageSubject === true;
   const allowedTrackKeys = normalizeTeacherCatalogTrackKeys(options.allowedTrackKeys);
@@ -13410,6 +13580,30 @@ async function loadTeacherPickerState(userId, options = {}) {
       subjects: teacherOfferingCatalog,
       selections,
     };
+  }
+
+  if (allowAcademicV2Fallback) {
+    let academicV2Subjects = [];
+    try {
+      academicV2Subjects = await listTeacherAcademicV2FallbackCatalog({
+        allowedTrackKeys: allowedTrackKeys.length ? allowedTrackKeys : ['bachelor', 'master'],
+      });
+    } catch (err) {
+      console.error('Teacher academic_v2 fallback catalog load failed', err);
+    }
+    if (Array.isArray(academicV2Subjects) && academicV2Subjects.length) {
+      let selections = new Map();
+      try {
+        selections = await getTeacherSelections(normalizedUserId);
+      } catch (err) {
+        console.error('Teacher academic_v2 fallback selections load failed', err);
+      }
+      return {
+        selectionMode: 'academic_v2',
+        subjects: academicV2Subjects,
+        selections,
+      };
+    }
   }
 
   if (!allowLegacyFallback) {
@@ -14394,10 +14588,48 @@ async function saveTeacherOfferingSelections(userId, body, options = {}) {
   };
 }
 
+async function saveTeacherAcademicV2Selections(userId, body, options = {}) {
+  const catalog = await listTeacherAcademicV2FallbackCatalog({
+    allowedTrackKeys: options.allowedTrackKeys,
+  });
+  const selections = [];
+  let hasAny = false;
+  for (const subject of catalog || []) {
+    const selected = body[`subject_${subject.id}`];
+    if (!selected) {
+      continue;
+    }
+    hasAny = true;
+    const isGeneral = subject.is_general === true || Number(subject.is_general) === 1;
+    if (isGeneral) {
+      selections.push({ subject_id: subject.id, group_number: null });
+      continue;
+    }
+    const groupVal = body[`group_${subject.id}`];
+    const groupNum = Number(groupVal);
+    if (!groupVal || Number.isNaN(groupNum) || groupNum < 1 || groupNum > Number(subject.group_count || 1)) {
+      return { ok: false, error: 'Select%20group' };
+    }
+    selections.push({ subject_id: subject.id, group_number: groupNum });
+  }
+  if (!hasAny) {
+    return { ok: false, error: 'Select%20subject' };
+  }
+  await teacherTemplateHelpers.replaceTeacherSubjectsMirror({
+    run: (sql, params) => db.run(sql, params),
+  }, userId, selections);
+  const nextStatus = await upsertTeacherRequestStatus(userId, options);
+  const academicAssignments = await syncTeacherAcademicAssignments(userId, selections);
+  return { ok: true, status: nextStatus, selections, academicAssignments };
+}
+
 async function saveTeacherSubjects(userId, body, options = {}) {
   const allowLegacyFallback = options.allowLegacyFallback !== false;
   const selectionMode = String(body && body.selection_mode || '').trim().toLowerCase();
   const offeringIds = extractTeacherOfferingSelectionIds(body);
+  if (selectionMode === 'academic_v2') {
+    return saveTeacherAcademicV2Selections(userId, body, options);
+  }
   if (selectionMode === 'offering' || offeringIds.length || !allowLegacyFallback) {
     return saveTeacherOfferingSelections(userId, body, options);
   }
@@ -16470,6 +16702,7 @@ app.get('/register/teacher-subjects', (req, res) => {
         } = await loadTeacherPickerState(user.id, {
           allowLegacyBootstrap: false,
           allowLegacyFallback: false,
+          allowAcademicV2Fallback: true,
           allowPresetBootstrap: true,
           requirePresetStageSubject: true,
           allowedTrackKeys: ['bachelor', 'master'],
@@ -16516,6 +16749,7 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
     const result = await saveTeacherSubjects(userId, req.body, {
       allowLegacyBootstrap: false,
       allowLegacyFallback: false,
+      allowAcademicV2Fallback: true,
       allowPresetBootstrap: true,
       requirePresetStageSubject: true,
       allowedTrackKeys: ['bachelor', 'master'],
@@ -16686,7 +16920,10 @@ app.get('/teacher/subjects', requireLogin, async (req, res) => {
       selectionMode,
       subjects,
       selections,
-    } = await loadTeacherPickerState(userId);
+    } = await loadTeacherPickerState(userId, {
+      allowAcademicV2Fallback: true,
+      allowedTrackKeys: ['bachelor', 'master'],
+    });
     return res.render('teacher-subjects', {
       role: 'teacher',
       username,
@@ -16722,7 +16959,10 @@ app.post('/teacher/subjects', requireLogin, async (req, res) => {
     if (!course || !(course.is_teacher_course === true || Number(course.is_teacher_course) === 1)) {
       return res.redirect('/schedule');
     }
-    const result = await saveTeacherSubjects(userId, req.body);
+    const result = await saveTeacherSubjects(userId, req.body, {
+      allowAcademicV2Fallback: true,
+      allowedTrackKeys: ['bachelor', 'master'],
+    });
     if (!result.ok) {
       return res.redirect(buildTeacherSubjectsLegacyUrl({
         ...redirectState,

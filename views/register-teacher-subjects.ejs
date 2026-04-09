@@ -204,7 +204,7 @@
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="studerria-theme theme-dark">
-    <% const teacherSelectionMode = selectionMode === 'offering' ? 'offering' : 'legacy'; %>
+    <% const teacherSelectionMode = selectionMode === 'offering' || selectionMode === 'academic_v2' ? selectionMode : 'legacy'; %>
     <% const teacherItems = Array.isArray(subjects) ? subjects : []; %>
     <% const teacherSelectedMap = selections && typeof selections.get === 'function' ? selections : new Map(); %>
     <% const teacherPickerShowScopeMeta = true; %>

@@ -1,5 +1,7 @@
 <%
-  const teacherSelectionMode = selectionMode === 'offering' ? 'offering' : 'legacy';
+  const teacherSelectionMode = selectionMode === 'offering' || selectionMode === 'academic_v2'
+    ? selectionMode
+    : 'legacy';
   const teacherSubjects = Array.isArray(subjects) ? subjects : [];
   const selectedMap = selections && typeof selections.get === 'function' ? selections : new Map();
   const selectedCount = teacherSubjects.reduce((total, item) => (selectedMap.has(Number(item.id)) ? total + 1 : total), 0);
@@ -221,7 +223,7 @@
         <div class="chip-row">
           <span class="chip">Catalog: <%= teacherSubjects.length %></span>
           <span class="chip">Selected: <%= selectedCount %></span>
-          <span class="chip">Mode: <%= teacherSelectionMode === 'offering' ? 'offering-based' : 'compatibility fallback' %></span>
+          <span class="chip">Mode: <%= teacherSelectionMode === 'offering' ? 'offering-based' : (teacherSelectionMode === 'academic_v2' ? 'academic_v2 fallback' : 'compatibility fallback') %></span>
         </div>
         <div class="hero-actions">
           <a class="btn btn-primary" href="<%= workspaceHref || '/teacher/workspace' %>">Open teacher workspace</a>

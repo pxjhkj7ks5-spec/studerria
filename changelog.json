@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.37",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-academic-v2-catalog-fallback): when live preset offerings are still absent, teacher registration and the primary Teacher workspace now fall back to the visible Academic V2 bachelor/master group-subject catalog, keep the grouped `track -> stage -> discipline` picker, and proactively resync missing group projections so mapped disciplines appear without reviving the old legacy teacher catalog"
+      ]
+    },
+    {
       "version": "1.5.36",
       "date": "2026-04-09",
       "items": [

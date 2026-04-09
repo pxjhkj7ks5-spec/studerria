@@ -1,5 +1,7 @@
 <%
-  const pickerSelectionMode = selectionMode === 'offering' ? 'offering' : 'legacy';
+  const pickerSelectionMode = selectionMode === 'offering' || selectionMode === 'academic_v2'
+    ? selectionMode
+    : 'legacy';
   const pickerItems = Array.isArray(subjects) ? subjects : [];
   const pickerSelectedMap = selections && typeof selections.get === 'function' ? selections : new Map();
   const pickerScope = typeof studyContext !== 'undefined' && studyContext && typeof studyContext === 'object' ? studyContext : null;
@@ -14,12 +16,16 @@
     stageCountLabel: lang === 'en' ? 'Stages' : 'Стейджі',
     groupedModeLabel: lang === 'en' ? 'Grouped by track and stage' : 'Групування за треком і stage',
     fallbackModeLabel: lang === 'en' ? 'Compatibility fallback catalog' : 'Fallback-каталог сумісності',
+    academicV2ModeLabel: lang === 'en' ? 'Academic V2 catalog fallback' : 'Fallback з Academic V2 каталогу',
     groupedHint: lang === 'en'
       ? 'Open a route, then a stage, and mark the disciplines you actually cover.'
       : 'Відкрийте маршрут, потім stage, і позначте дисципліни, які реально закриваєте.',
     fallbackHint: lang === 'en'
       ? 'This fallback catalog stays flat because no live offering structure is available yet.'
       : 'У fallback-каталозі лишається плоский список, доки live-offering структура ще недоступна.',
+    academicV2Hint: lang === 'en'
+      ? 'Live offerings are still missing, so the teacher picker is grouped from the visible Academic V2 bachelor/master catalog.'
+      : 'Live offerings ще не зібрані, тому picker тимчасово показує згрупований видимий каталог Academic V2 для бакалаврів/магістрів.',
     serviceScopeTitle: lang === 'en' ? 'Teaching scope' : 'Викладацький scope',
     serviceScopeCopy: lang === 'en'
       ? 'Teacher registration keeps a service cohort in code and goes straight to the discipline matrix without a separate cohort step.'
@@ -92,7 +98,7 @@
     const selectedGroup = itemId ? pickerSelectedMap.get(itemId) : null;
     const checked = itemId ? pickerSelectedMap.has(itemId) : false;
     const isGeneral = item && (item.is_general === true || Number(item.is_general) === 1);
-    const rawContexts = pickerSelectionMode === 'offering' && Array.isArray(item && item.contexts) && item.contexts.length
+    const rawContexts = pickerSelectionMode !== 'legacy' && Array.isArray(item && item.contexts) && item.contexts.length
       ? item.contexts
       : [];
     const normalizedContexts = Array.from(new Map(
@@ -171,7 +177,7 @@
   }).filter((entry) => entry.id && entry.name);
 
   const pickerSections = [];
-  if (pickerSelectionMode === 'offering') {
+  if (pickerSelectionMode !== 'legacy') {
     const sectionMap = new Map();
     pickerEntries.forEach((entry) => {
       const trackKey = entry.primaryTrackKey;
@@ -263,7 +269,9 @@
         data-teacher-picker-search
       />
       <div class="teacher-picker-toolbar__hint">
-        <%= pickerSelectionMode === 'offering' ? pickerTexts.groupedHint : pickerTexts.fallbackHint %>
+        <%= pickerSelectionMode === 'offering'
+          ? pickerTexts.groupedHint
+          : (pickerSelectionMode === 'academic_v2' ? pickerTexts.academicV2Hint : pickerTexts.fallbackHint) %>
       </div>
     </div>
     <div class="teacher-picker-toolbar__summary">
@@ -272,7 +280,9 @@
       <span class="teacher-picker-pill"><%= pickerTexts.trackCountLabel %>: <%= pickerSections.length %></span>
       <span class="teacher-picker-pill"><%= pickerTexts.stageCountLabel %>: <%= pickerStageCount %></span>
       <span class="teacher-picker-pill teacher-picker-pill--accent">
-        <%= pickerSelectionMode === 'offering' ? pickerTexts.groupedModeLabel : pickerTexts.fallbackModeLabel %>
+        <%= pickerSelectionMode === 'offering'
+          ? pickerTexts.groupedModeLabel
+          : (pickerSelectionMode === 'academic_v2' ? pickerTexts.academicV2ModeLabel : pickerTexts.fallbackModeLabel) %>
       </span>
     </div>
   </div>
