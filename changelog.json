@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.46",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-teacher-discipline-reset): make the teacher profile action `Обрати дисципліни заново` use the same red reset styling as the student reset control and route it back into the initial `/register/teacher-subjects` picker screen instead of the later teacher workspace flow"
+      ]
+    },
+    {
       "version": "1.5.45",
       "date": "2026-04-09",
       "items": [

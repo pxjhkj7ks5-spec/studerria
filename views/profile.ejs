@@ -593,7 +593,9 @@
               <div class="mt-4">
                 <% if (teacherCourse) { %>
                   <div class="text-muted small mb-2">Викладацькі дисципліни</div>
-                  <a class="btn btn-outline-primary w-100" href="/teacher/subjects">Обрати дисципліни заново</a>
+                  <form method="POST" action="/profile/reset-subjects" onsubmit="return confirm('Перейти до повторного вибору викладацьких дисциплін?')">
+                    <button class="btn btn-outline-danger w-100 profile-reset-btn" type="submit">Обрати дисципліни заново</button>
+                  </form>
                   <% if (teacherStatus) { %>
                     <div class="text-muted small mt-2">
                       Статус: <%= teacherStatus === 'approved' ? 'Підтверджено' : (teacherStatus === 'rejected' ? 'Відхилено' : 'Очікує підтвердження') %>

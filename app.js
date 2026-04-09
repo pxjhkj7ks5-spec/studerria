@@ -18891,6 +18891,12 @@ app.post('/profile', requireLogin, (req, res) => {
 app.post('/profile/reset-subjects', requireLogin, async (req, res) => {
   const { id } = req.session.user;
   try {
+    if (hasSessionRole(req, 'teacher')) {
+      req.session.pendingUserId = id;
+      logAction(db, req, 'reset_teacher_subjects', { user_id: id });
+      broadcast('users_updated');
+      return req.session.save(() => res.redirect('/register/teacher-subjects'));
+    }
     await db.run('DELETE FROM student_groups WHERE student_id = ?', [id]);
     await db.run('DELETE FROM user_subject_optouts WHERE user_id = ?', [id]);
     req.session.pendingUserId = id;
