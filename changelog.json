@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.44",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-picker-default-bachelor-open): open the top-level `Бакалаври` lane by default again while keeping the inner `stage` disclosures folded, so the initial teacher matrix immediately shows the available stage rows like `Stage 1` and `Stage 2` without fully expanding the discipline cards"
+      ]
+    },
+    {
       "version": "1.5.43",
       "date": "2026-04-09",
       "items": [
