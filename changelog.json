@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.36",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-preset-catalog-bootstrap): make the live teacher registration/workspace catalog resolve only preset-driven bachelor/master offerings and, when those offerings have not been materialized yet, auto-apply active program presets to active study contexts before loading the picker so the teacher flow surfaces the intended bachelor/master catalog instead of an empty state or old legacy subjects"
+      ]
+    },
+    {
       "version": "1.5.35",
       "date": "2026-04-09",
       "items": [

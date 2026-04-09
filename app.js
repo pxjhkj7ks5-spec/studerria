@@ -12503,6 +12503,9 @@ async function saveTeacherWorkspaceOfferingAssignments(userId, body = {}, option
 
   const offeringCatalog = await listTeacherOfferingCatalog({
     allowLegacyBootstrap: options.allowLegacyBootstrap !== false,
+    allowPresetBootstrap: options.allowPresetBootstrap !== false,
+    requirePresetStageSubject: options.requirePresetStageSubject === true,
+    allowedTrackKeys: options.allowedTrackKeys,
   });
   if (!offeringCatalog.length) {
     return { ok: false, error: 'Offering catalog is not ready' };
@@ -13031,8 +13034,75 @@ async function getTeacherAssignedSubjects(userId) {
   return teacherTemplateHelpers.listTeacherAssignedSubjectRows(getTeacherTemplateStore(), userId);
 }
 
+function normalizeTeacherCatalogTrackKeys(values = []) {
+  return Array.from(new Set(
+    (Array.isArray(values) ? values : [values])
+      .map((value) => normalizeRegistrationTrack(value, ''))
+      .filter((value) => value === 'bachelor' || value === 'master' || value === 'teacher')
+  ));
+}
+
+async function ensureTeacherPresetOfferingCatalog(options = {}) {
+  const allowedTrackKeys = normalizeTeacherCatalogTrackKeys(options.allowedTrackKeys);
+  if (!allowedTrackKeys.length) {
+    return { contextCount: 0, touchedCount: 0 };
+  }
+  try {
+    const contextRows = await db.all(
+      `
+        SELECT sc.id
+        FROM study_contexts sc
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        WHERE sc.is_active = true
+          AND COALESCE(p.is_active, true) = true
+          AND p.track_key = ANY(?::text[])
+        ORDER BY
+          coh.admission_year DESC,
+          sc.stage_number ASC,
+          sc.id ASC
+      `,
+      [allowedTrackKeys]
+    );
+    let touchedCount = 0;
+    for (const row of contextRows || []) {
+      const contextId = parsePositiveIntStrict(row && row.id);
+      if (!contextId) continue;
+      const result = await applyProgramPresetToStudyContext(contextId).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return null;
+        }
+        throw err;
+      });
+      if (!result) {
+        continue;
+      }
+      if (
+        Number(result.created_offerings || 0) > 0
+        || Number(result.updated_offerings || 0) > 0
+        || Number(result.created_semesters || 0) > 0
+        || Number(result.updated_semesters || 0) > 0
+      ) {
+        touchedCount += 1;
+      }
+    }
+    return {
+      contextCount: Array.isArray(contextRows) ? contextRows.length : 0,
+      touchedCount,
+    };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { contextCount: 0, touchedCount: 0 };
+    }
+    throw err;
+  }
+}
+
 async function listTeacherOfferingCatalog(options = {}) {
   const allowLegacyBootstrap = options.allowLegacyBootstrap !== false;
+  const allowPresetBootstrap = options.allowPresetBootstrap !== false;
+  const requirePresetStageSubject = options.requirePresetStageSubject === true;
+  const allowedTrackKeys = normalizeTeacherCatalogTrackKeys(options.allowedTrackKeys);
   const buildOfferingsFromRows = (rows = []) => {
     const offeringsById = new Map();
     (rows || []).forEach((row) => {
@@ -13140,71 +13210,93 @@ async function listTeacherOfferingCatalog(options = {}) {
       });
   };
 
-  const loadOfferingRows = async () => db.all(
-    `
-      SELECT
-        so.id AS subject_offering_id,
-        so.subject_catalog_id,
-        so.title AS offering_title,
-        so.is_shared,
-        so.sort_order,
-        cat.name AS catalog_name,
-        legacy_subject.id AS legacy_subject_id,
-        COALESCE(legacy_subject.name, so.title, cat.name) AS subject_name,
-        COALESCE(legacy_subject.group_count, 1) AS group_count,
-        COALESCE(legacy_subject.default_group, 1) AS default_group,
-        COALESCE(legacy_subject.is_general, true) AS is_general,
-        COALESCE(legacy_subject.show_in_teamwork, true) AS show_in_teamwork,
-        sc.id AS study_context_id,
-        sc.label AS study_context_label,
-        sc.stage_number,
-        sc.campus_key,
-        coh.admission_year,
-        coh.program_id,
-        p.code AS program_code,
-        p.name AS program_name,
-        p.track_key,
-        binding.course_id,
-        c.name AS course_name,
-        COALESCE(c.location, sc.campus_key, 'kyiv') AS course_location,
-        semester_scope.semester_ids,
-        semester_scope.semester_numbers,
-        semester_scope.semester_titles
-      FROM subject_offerings so
-      JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
-      JOIN study_contexts sc ON sc.id = soc.study_context_id
-      JOIN cohorts coh ON coh.id = sc.cohort_id
-      JOIN study_programs p ON p.id = coh.program_id
-      LEFT JOIN subject_catalog cat ON cat.id = so.subject_catalog_id
-      LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
-      LEFT JOIN LATERAL (
-        SELECT sccb.course_id
-        FROM study_context_course_bindings sccb
-        WHERE sccb.study_context_id = sc.id
-        ORDER BY sccb.is_primary DESC, sccb.course_id ASC
-        LIMIT 1
-      ) binding ON true
-      LEFT JOIN courses c ON c.id = binding.course_id
-      LEFT JOIN LATERAL (
+  const loadOfferingRows = async () => {
+    const params = [];
+    const where = [
+      'so.is_active = true',
+      'sc.is_active = true',
+      'COALESCE(p.is_active, true) = true',
+    ];
+    if (requirePresetStageSubject) {
+      where.push('so.preset_stage_subject_id IS NOT NULL');
+    }
+    if (allowedTrackKeys.length) {
+      where.push('p.track_key = ANY(?::text[])');
+      params.push(allowedTrackKeys);
+    }
+    return db.all(
+      `
         SELECT
-          ARRAY_AGG(scs.id ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_ids,
-          ARRAY_AGG(scs.semester_number ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_numbers,
-          ARRAY_AGG(scs.title ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_titles
-        FROM subject_offering_semesters sos
-        JOIN study_context_semesters scs ON scs.id = sos.study_context_semester_id
-        WHERE sos.subject_offering_id = so.id
-          AND sos.is_active = true
-          AND scs.study_context_id = sc.id
-          AND COALESCE(scs.is_archived, false) = false
-      ) semester_scope ON true
-      WHERE so.is_active = true
-        AND sc.is_active = true
-      ORDER BY p.track_key ASC, coh.admission_year DESC, sc.stage_number ASC, so.sort_order ASC, so.id ASC
-    `
-  );
+          so.id AS subject_offering_id,
+          so.subject_catalog_id,
+          so.preset_stage_subject_id,
+          so.title AS offering_title,
+          so.is_shared,
+          so.sort_order,
+          cat.name AS catalog_name,
+          legacy_subject.id AS legacy_subject_id,
+          COALESCE(legacy_subject.name, so.title, cat.name) AS subject_name,
+          COALESCE(legacy_subject.group_count, 1) AS group_count,
+          COALESCE(legacy_subject.default_group, 1) AS default_group,
+          COALESCE(legacy_subject.is_general, true) AS is_general,
+          COALESCE(legacy_subject.show_in_teamwork, true) AS show_in_teamwork,
+          sc.id AS study_context_id,
+          sc.label AS study_context_label,
+          sc.stage_number,
+          sc.campus_key,
+          coh.admission_year,
+          coh.program_id,
+          p.code AS program_code,
+          p.name AS program_name,
+          p.track_key,
+          binding.course_id,
+          c.name AS course_name,
+          COALESCE(c.location, sc.campus_key, 'kyiv') AS course_location,
+          semester_scope.semester_ids,
+          semester_scope.semester_numbers,
+          semester_scope.semester_titles
+        FROM subject_offerings so
+        JOIN subject_offering_contexts soc ON soc.subject_offering_id = so.id
+        JOIN study_contexts sc ON sc.id = soc.study_context_id
+        JOIN cohorts coh ON coh.id = sc.cohort_id
+        JOIN study_programs p ON p.id = coh.program_id
+        LEFT JOIN subject_catalog cat ON cat.id = so.subject_catalog_id
+        LEFT JOIN subjects legacy_subject ON so.dedupe_key = CONCAT('legacy-subject:', legacy_subject.id::text)
+        LEFT JOIN LATERAL (
+          SELECT sccb.course_id
+          FROM study_context_course_bindings sccb
+          WHERE sccb.study_context_id = sc.id
+          ORDER BY sccb.is_primary DESC, sccb.course_id ASC
+          LIMIT 1
+        ) binding ON true
+        LEFT JOIN courses c ON c.id = binding.course_id
+        LEFT JOIN LATERAL (
+          SELECT
+            ARRAY_AGG(scs.id ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_ids,
+            ARRAY_AGG(scs.semester_number ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_numbers,
+            ARRAY_AGG(scs.title ORDER BY scs.semester_number ASC, scs.id ASC) AS semester_titles
+          FROM subject_offering_semesters sos
+          JOIN study_context_semesters scs ON scs.id = sos.study_context_semester_id
+          WHERE sos.subject_offering_id = so.id
+            AND sos.is_active = true
+            AND scs.study_context_id = sc.id
+            AND COALESCE(scs.is_archived, false) = false
+        ) semester_scope ON true
+        WHERE ${where.join('\n          AND ')}
+        ORDER BY p.track_key ASC, coh.admission_year DESC, sc.stage_number ASC, so.sort_order ASC, so.id ASC
+      `,
+      params
+    );
+  };
 
   try {
     let rows = await loadOfferingRows();
+    if (allowPresetBootstrap && requirePresetStageSubject && (!rows || !rows.length)) {
+      await ensureTeacherPresetOfferingCatalog({
+        allowedTrackKeys: allowedTrackKeys.length ? allowedTrackKeys : ['bachelor', 'master'],
+      });
+      rows = await loadOfferingRows();
+    }
     if (allowLegacyBootstrap && (!rows || !rows.length)) {
       const legacySubjects = await getTeacherSubjectCatalog();
       const legacySubjectIds = Array.from(new Set(
@@ -13292,10 +13384,16 @@ async function loadTeacherPickerState(userId, options = {}) {
   const normalizedUserId = parsePositiveIntStrict(userId);
   const allowLegacyBootstrap = options.allowLegacyBootstrap !== false;
   const allowLegacyFallback = options.allowLegacyFallback !== false;
+  const allowPresetBootstrap = options.allowPresetBootstrap !== false;
+  const requirePresetStageSubject = options.requirePresetStageSubject === true;
+  const allowedTrackKeys = normalizeTeacherCatalogTrackKeys(options.allowedTrackKeys);
   let teacherOfferingCatalog = [];
   try {
     teacherOfferingCatalog = await listTeacherOfferingCatalog({
       allowLegacyBootstrap,
+      allowPresetBootstrap,
+      requirePresetStageSubject,
+      allowedTrackKeys,
     });
   } catch (err) {
     console.error('Teacher offering catalog load failed', err);
@@ -14237,6 +14335,9 @@ function extractTeacherOfferingSelectionIds(body = {}) {
 async function saveTeacherOfferingSelections(userId, body, options = {}) {
   const offeringCatalog = await listTeacherOfferingCatalog({
     allowLegacyBootstrap: options.allowLegacyBootstrap !== false,
+    allowPresetBootstrap: options.allowPresetBootstrap !== false,
+    requirePresetStageSubject: options.requirePresetStageSubject === true,
+    allowedTrackKeys: options.allowedTrackKeys,
   });
   const selectedOfferingIds = extractTeacherOfferingSelectionIds(body);
   if (!selectedOfferingIds.length) {
@@ -16369,6 +16470,9 @@ app.get('/register/teacher-subjects', (req, res) => {
         } = await loadTeacherPickerState(user.id, {
           allowLegacyBootstrap: false,
           allowLegacyFallback: false,
+          allowPresetBootstrap: true,
+          requirePresetStageSubject: true,
+          allowedTrackKeys: ['bachelor', 'master'],
         });
         return res.render('register-teacher-subjects', {
           subjects,
@@ -16412,6 +16516,9 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
     const result = await saveTeacherSubjects(userId, req.body, {
       allowLegacyBootstrap: false,
       allowLegacyFallback: false,
+      allowPresetBootstrap: true,
+      requirePresetStageSubject: true,
+      allowedTrackKeys: ['bachelor', 'master'],
     });
     if (!result.ok) {
       return res.redirect(`/register/teacher-subjects?error=${result.error || 'Select%20subject'}`);
@@ -16763,7 +16870,12 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     const [teacherSubjects, teacherAssignedOfferings, teacherOfferingCatalog, teacherOfferingSelections] = await Promise.all([
       getTeacherAssignedSubjects(userId),
       getTeacherAssignedOfferings(userId),
-      listTeacherOfferingCatalog({ allowLegacyBootstrap: false }),
+      listTeacherOfferingCatalog({
+        allowLegacyBootstrap: false,
+        allowPresetBootstrap: true,
+        requirePresetStageSubject: true,
+        allowedTrackKeys: ['bachelor', 'master'],
+      }),
       getTeacherOfferingSelections(userId),
     ]);
     const teacherCourses = buildTeacherCourseList(teacherSubjects);
@@ -17063,7 +17175,12 @@ app.post('/teacher/workspace/offering-templates/sync', requireLogin, async (req,
       }));
     }
     const [teacherOfferingCatalog, teacherOfferingSelections, teacherAssignedOfferings] = await Promise.all([
-      listTeacherOfferingCatalog({ allowLegacyBootstrap: false }),
+      listTeacherOfferingCatalog({
+        allowLegacyBootstrap: false,
+        allowPresetBootstrap: true,
+        requirePresetStageSubject: true,
+        allowedTrackKeys: ['bachelor', 'master'],
+      }),
       getTeacherOfferingSelections(userId),
       getTeacherAssignedOfferings(userId),
     ]);
@@ -17139,6 +17256,9 @@ app.post('/teacher/workspace/offerings', requireLogin, async (req, res) => {
   try {
     const result = await saveTeacherWorkspaceOfferingAssignments(userId, req.body, {
       allowLegacyBootstrap: false,
+      allowPresetBootstrap: true,
+      requirePresetStageSubject: true,
+      allowedTrackKeys: ['bachelor', 'master'],
     });
     if (!result.ok) {
       return res.redirect(buildTeacherWorkspaceUrl({
