@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.66",
+      "date": "2026-04-09",
+      "items": [
+        "fix(schedule-week-hero-seam): remove the decorative `glass` and `liquid-card` overlay layers from the `Твій тиждень` hero card on the schedule page so the faint horizontal blue line that became visible slightly above the middle in light theme no longer renders"
+      ]
+    },
+    {
       "version": "1.5.65",
       "date": "2026-04-09",
       "items": [
