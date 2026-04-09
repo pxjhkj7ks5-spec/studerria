@@ -371,6 +371,10 @@ body.theme-light .teacher-picker-card.is-selected {
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease, color 180ms ease, opacity 180ms ease;
 }
 
+.teacher-picker-group-chip--all {
+  font-weight: 700;
+}
+
 body.theme-dark .teacher-picker-group-chip {
   border: 1px solid rgba(191, 219, 254, 0.12);
   background: rgba(255, 255, 255, 0.05);
@@ -381,6 +385,17 @@ body.theme-light .teacher-picker-group-chip {
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.76);
   color: rgba(15, 23, 42, 0.82);
+}
+
+body.theme-dark .teacher-picker-group-chip--all {
+  border-color: rgba(125, 211, 252, 0.22);
+  background: rgba(14, 165, 233, 0.08);
+}
+
+body.theme-light .teacher-picker-group-chip--all {
+  border-color: rgba(14, 165, 233, 0.16);
+  background: rgba(240, 249, 255, 0.92);
+  color: rgba(8, 92, 141, 0.9);
 }
 
 .teacher-picker-group-input:checked + .teacher-picker-group-chip {

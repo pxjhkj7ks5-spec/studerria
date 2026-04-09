@@ -33,34 +33,49 @@
     </div>
 
     <div class="teacher-picker-card__controls">
-      <% if (!entry.isGeneral) { %>
-        <div class="teacher-picker-card__group">
-          <span class="teacher-picker-card__group-label"><%= pickerTexts.groupLabel %></span>
-          <div class="teacher-picker-card__group-grid" data-subject-groups="<%= entry.id %>">
-            <% for (let groupIndex = 1; groupIndex <= entry.groupCount; groupIndex += 1) { %>
-              <% const groupInputId = `teacher_picker_group_${entry.id}_${groupIndex}`; %>
-              <% const groupInputName = pickerSelectionMode === 'offering' ? `group_offering_${entry.id}_${groupIndex}` : `group_${entry.id}_${groupIndex}`; %>
-              <% const isSelectedGroup = Array.isArray(entry.selectedGroups) && entry.selectedGroups.includes(groupIndex); %>
-              <input
-                class="teacher-picker-group-input"
-                type="checkbox"
-                id="<%= groupInputId %>"
-                name="<%= groupInputName %>"
-                value="1"
-                data-subject-group-choice="<%= entry.id %>"
-                data-group-number="<%= groupIndex %>"
-                data-default-group="<%= entry.defaultGroup === groupIndex ? '1' : '0' %>"
-                <%= entry.checked ? '' : 'disabled' %>
-                <%= isSelectedGroup ? 'checked' : '' %>
-              />
-              <label class="teacher-picker-group-chip" for="<%= groupInputId %>">
-                <span class="teacher-picker-group-chip__title"><%= pickerTexts.groupChipPrefix %> <%= groupIndex %></span>
-              </label>
-            <% } %>
-          </div>
-          <div class="teacher-picker-card__group-hint"><%= pickerTexts.chooseGroupsLabel %></div>
+      <div class="teacher-picker-card__group">
+        <span class="teacher-picker-card__group-label"><%= pickerTexts.groupLabel %></span>
+        <div class="teacher-picker-card__group-grid" data-subject-groups="<%= entry.id %>">
+          <% if (entry.isGeneral && entry.groupCount > 1) { %>
+            <% const allGroupsInputId = `teacher_picker_group_all_${entry.id}`; %>
+            <% const allGroupsInputName = pickerSelectionMode === 'offering' ? `group_offering_all_${entry.id}` : `group_all_${entry.id}`; %>
+            <input
+              class="teacher-picker-group-input"
+              type="checkbox"
+              id="<%= allGroupsInputId %>"
+              name="<%= allGroupsInputName %>"
+              value="1"
+              data-subject-all-groups="<%= entry.id %>"
+              <%= entry.checked ? '' : 'disabled' %>
+              <%= entry.selectedAllGroups ? 'checked' : '' %>
+            />
+            <label class="teacher-picker-group-chip teacher-picker-group-chip--all" for="<%= allGroupsInputId %>">
+              <span class="teacher-picker-group-chip__title"><%= pickerTexts.allGroupsLabel %></span>
+            </label>
+          <% } %>
+          <% for (let groupIndex = 1; groupIndex <= entry.groupCount; groupIndex += 1) { %>
+            <% const groupInputId = `teacher_picker_group_${entry.id}_${groupIndex}`; %>
+            <% const groupInputName = pickerSelectionMode === 'offering' ? `group_offering_${entry.id}_${groupIndex}` : `group_${entry.id}_${groupIndex}`; %>
+            <% const isSelectedGroup = Array.isArray(entry.selectedGroups) && entry.selectedGroups.includes(groupIndex); %>
+            <input
+              class="teacher-picker-group-input"
+              type="checkbox"
+              id="<%= groupInputId %>"
+              name="<%= groupInputName %>"
+              value="1"
+              data-subject-group-choice="<%= entry.id %>"
+              data-group-number="<%= groupIndex %>"
+              data-default-group="<%= entry.defaultGroup === groupIndex ? '1' : '0' %>"
+              <%= entry.checked ? '' : 'disabled' %>
+              <%= isSelectedGroup ? 'checked' : '' %>
+            />
+            <label class="teacher-picker-group-chip" for="<%= groupInputId %>">
+              <span class="teacher-picker-group-chip__title"><%= pickerTexts.groupChipPrefix %> <%= groupIndex %></span>
+            </label>
+          <% } %>
         </div>
-      <% } %>
+        <div class="teacher-picker-card__group-hint"><%= entry.isGeneral && entry.groupCount > 1 ? pickerTexts.chooseGroupsOrAllLabel : pickerTexts.chooseGroupsLabel %></div>
+      </div>
 
       <div class="form-check teacher-picker-card__toggle">
         <input

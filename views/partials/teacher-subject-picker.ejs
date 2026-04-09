@@ -51,6 +51,7 @@
     groupChipPrefix: lang === 'en' ? 'Group' : 'Група',
     chooseGroupLabel: lang === 'en' ? 'Choose group' : 'Оберіть групу',
     chooseGroupsLabel: lang === 'en' ? 'Choose one or more groups' : 'Оберіть одну або більше груп',
+    chooseGroupsOrAllLabel: lang === 'en' ? 'Choose one or more groups, or explicitly mark all groups' : 'Оберіть одну або більше груп або явно позначте всі групи',
     legacyStageLabel: lang === 'en' ? 'All disciplines' : 'Усі дисципліни',
     emptyTitle: lang === 'en' ? 'No visible offerings in catalog' : 'У каталозі немає видимих дисциплін',
     emptyCopy: lang === 'en'
@@ -112,6 +113,12 @@
         const numericValue = Number(rawSelectionState || 0);
         return Number.isInteger(numericValue) && numericValue > 0 ? [numericValue] : [];
       })();
+    const selectedAllGroups = Boolean(
+      rawSelectionState
+      && typeof rawSelectionState === 'object'
+      && !Array.isArray(rawSelectionState)
+      && (rawSelectionState.general === true || rawSelectionState.all_groups === true)
+    );
     const checked = itemId ? pickerSelectedMap.has(itemId) : false;
     const isGeneral = item && (item.is_general === true || Number(item.is_general) === 1);
     const groupCount = Math.max(1, Number(item && item.group_count ? item.group_count : 1) || 1);
@@ -183,6 +190,7 @@
       isGeneral,
       checked,
       selectedGroups,
+      selectedAllGroups,
       primaryTrackKey,
       primaryTrackLabel: formatPickerTrackLabel(primaryTrackKey),
       primaryStageNumber,

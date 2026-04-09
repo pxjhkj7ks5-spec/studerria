@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.60",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-group-selection): stop silently assigning `усі групи` when a teacher marks a multi-group discipline as taught; the picker now always exposes explicit group chips for such subjects, shows `Усі групи` only as a separate deliberate option, and backend saving requires a real group choice instead of collapsing a checked subject into every available group"
+      ]
+    },
+    {
       "version": "1.5.59",
       "date": "2026-04-09",
       "items": [

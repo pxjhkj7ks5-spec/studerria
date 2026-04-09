@@ -12359,6 +12359,19 @@ function extractTeacherSelectedGroupNumbers(body = {}, options = {}) {
   return normalizeTeacherGroupNumberList(values, { maxGroupCount });
 }
 
+function extractTeacherAllGroupsFlag(body = {}, options = {}) {
+  const normalizedOfferingId = parsePositiveIntStrict(options.offeringId);
+  const normalizedSubjectId = parsePositiveIntStrict(options.subjectId);
+  const normalizedEntityId = normalizedOfferingId || normalizedSubjectId;
+  if (!normalizedEntityId) {
+    return false;
+  }
+  const keyPrefixes = normalizedOfferingId
+    ? [`group_offering_all_${normalizedEntityId}`, `group_all_${normalizedEntityId}`]
+    : [`group_all_${normalizedEntityId}`];
+  return keyPrefixes.some((key) => parseBooleanFlag(body[key], false));
+}
+
 async function getTeacherSelections(userId) {
   const rows = await teacherTemplateHelpers.listTeacherSubjectSelections(getTeacherTemplateStore(), userId);
   return buildTeacherSelectionStateMap(rows, 'subject_id');
@@ -14801,7 +14814,12 @@ async function saveTeacherOfferingSelections(userId, body, options = {}) {
       return { ok: false, error: 'Offering%20not%20ready' };
     }
     const isGeneral = offering.is_general === true || Number(offering.is_general) === 1;
-    if (isGeneral) {
+    const selectedGroups = extractTeacherSelectedGroupNumbers(body, {
+      offeringId,
+      groupCount: offering.group_count,
+    });
+    const selectedAllGroups = isGeneral && extractTeacherAllGroupsFlag(body, { offeringId });
+    if (selectedAllGroups) {
       selections.push({
         subject_id: parsePositiveIntStrict(offering.legacy_subject_id),
         subject_offering_id: offeringId,
@@ -14809,11 +14827,15 @@ async function saveTeacherOfferingSelections(userId, body, options = {}) {
       });
       continue;
     }
-    const selectedGroups = extractTeacherSelectedGroupNumbers(body, {
-      offeringId,
-      groupCount: offering.group_count,
-    });
     if (!selectedGroups.length) {
+      if (Math.max(1, Number(offering.group_count || 1) || 1) === 1) {
+        selections.push({
+          subject_id: parsePositiveIntStrict(offering.legacy_subject_id),
+          subject_offering_id: offeringId,
+          group_number: 1,
+        });
+        continue;
+      }
       return { ok: false, error: 'Select%20group' };
     }
     selectedGroups.forEach((groupNumber) => {
@@ -14857,15 +14879,20 @@ async function saveTeacherAcademicV2Selections(userId, body, options = {}) {
     }
     hasAny = true;
     const isGeneral = subject.is_general === true || Number(subject.is_general) === 1;
-    if (isGeneral) {
-      selections.push({ subject_id: subject.id, group_number: null });
-      continue;
-    }
     const selectedGroups = extractTeacherSelectedGroupNumbers(body, {
       subjectId: subject.id,
       groupCount: subject.group_count,
     });
+    const selectedAllGroups = isGeneral && extractTeacherAllGroupsFlag(body, { subjectId: subject.id });
+    if (selectedAllGroups) {
+      selections.push({ subject_id: subject.id, group_number: null });
+      continue;
+    }
     if (!selectedGroups.length) {
+      if (Math.max(1, Number(subject.group_count || 1) || 1) === 1) {
+        selections.push({ subject_id: subject.id, group_number: 1 });
+        continue;
+      }
       return { ok: false, error: 'Select%20group' };
     }
     selectedGroups.forEach((groupNumber) => {
@@ -14903,15 +14930,20 @@ async function saveTeacherSubjects(userId, body, options = {}) {
     }
     hasAny = true;
     const isGeneral = subject.is_general === true || Number(subject.is_general) === 1;
-    if (isGeneral) {
-      selections.push({ subject_id: subject.id, group_number: null });
-      continue;
-    }
     const selectedGroups = extractTeacherSelectedGroupNumbers(body, {
       subjectId: subject.id,
       groupCount: subject.group_count,
     });
+    const selectedAllGroups = isGeneral && extractTeacherAllGroupsFlag(body, { subjectId: subject.id });
+    if (selectedAllGroups) {
+      selections.push({ subject_id: subject.id, group_number: null });
+      continue;
+    }
     if (!selectedGroups.length) {
+      if (Math.max(1, Number(subject.group_count || 1) || 1) === 1) {
+        selections.push({ subject_id: subject.id, group_number: 1 });
+        continue;
+      }
       return { ok: false, error: 'Select%20group' };
     }
     selectedGroups.forEach((groupNumber) => {

@@ -4,6 +4,11 @@
       .filter((input) => input instanceof HTMLInputElement);
   }
 
+  function getAllGroupsChoice(root, subjectId) {
+    const choice = root.querySelector(`[data-subject-all-groups="${subjectId}"]`);
+    return choice instanceof HTMLInputElement ? choice : null;
+  }
+
   function updateSelectedCount(root) {
     const toggles = Array.from(root.querySelectorAll('[data-subject-toggle]'));
     const selectedCount = toggles.filter((toggle) => toggle instanceof HTMLInputElement && toggle.checked).length;
@@ -12,8 +17,9 @@
     });
   }
 
-  function ensureDefaultGroupChoice(choices) {
+  function ensureDefaultGroupChoice(choices, allGroupsChoice = null) {
     if (!Array.isArray(choices) || choices.some((choice) => choice.checked)) return;
+    if (allGroupsChoice instanceof HTMLInputElement && allGroupsChoice.checked) return;
     const defaultChoice = choices.find((choice) => choice.dataset.defaultGroup === '1') || choices[0] || null;
     if (defaultChoice) {
       defaultChoice.checked = true;
@@ -29,18 +35,26 @@
       card.classList.toggle('is-selected', toggle.checked);
     }
     const groupChoices = getGroupChoices(root, subjectId);
-    if (!groupChoices.length) return;
+    const allGroupsChoice = getAllGroupsChoice(root, subjectId);
+    if (!groupChoices.length && !(allGroupsChoice instanceof HTMLInputElement)) return;
     if (!toggle.checked) {
       groupChoices.forEach((choice) => {
         choice.checked = false;
         choice.disabled = true;
       });
+      if (allGroupsChoice instanceof HTMLInputElement) {
+        allGroupsChoice.checked = false;
+        allGroupsChoice.disabled = true;
+      }
       return;
     }
     groupChoices.forEach((choice) => {
       choice.disabled = false;
     });
-    ensureDefaultGroupChoice(groupChoices);
+    if (allGroupsChoice instanceof HTMLInputElement) {
+      allGroupsChoice.disabled = false;
+    }
+    ensureDefaultGroupChoice(groupChoices, allGroupsChoice);
   }
 
   function syncToggleFromGroups(root, choice) {
@@ -50,8 +64,30 @@
     const toggle = root.querySelector(`[data-subject-toggle="${subjectId}"]`);
     if (!(toggle instanceof HTMLInputElement)) return;
     const groupChoices = getGroupChoices(root, subjectId);
+    const allGroupsChoice = getAllGroupsChoice(root, subjectId);
+    if (choice.checked && allGroupsChoice instanceof HTMLInputElement) {
+      allGroupsChoice.checked = false;
+    }
     const hasCheckedGroups = groupChoices.some((item) => item.checked);
     toggle.checked = hasCheckedGroups;
+    syncCardState(root, toggle);
+  }
+
+  function syncToggleFromAllGroups(root, choice) {
+    if (!(choice instanceof HTMLInputElement)) return;
+    const subjectId = String(choice.dataset.subjectAllGroups || '').trim();
+    if (!subjectId) return;
+    const toggle = root.querySelector(`[data-subject-toggle="${subjectId}"]`);
+    if (!(toggle instanceof HTMLInputElement)) return;
+    const groupChoices = getGroupChoices(root, subjectId);
+    if (choice.checked) {
+      groupChoices.forEach((item) => {
+        item.checked = false;
+      });
+    } else {
+      ensureDefaultGroupChoice(groupChoices);
+    }
+    toggle.checked = choice.checked || groupChoices.some((item) => item.checked);
     syncCardState(root, toggle);
   }
 
@@ -120,6 +156,14 @@
       if (!(choice instanceof HTMLInputElement)) return;
       choice.addEventListener('change', () => {
         syncToggleFromGroups(root, choice);
+        updateSelectedCount(root);
+      });
+    });
+
+    root.querySelectorAll('[data-subject-all-groups]').forEach((choice) => {
+      if (!(choice instanceof HTMLInputElement)) return;
+      choice.addEventListener('change', () => {
+        syncToggleFromAllGroups(root, choice);
         updateSelectedCount(root);
       });
     });
