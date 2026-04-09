@@ -15930,7 +15930,15 @@ app.post('/register/course', registerLimiter, async (req, res) => {
     }
 
     const repairedSelection = await repairRegistrationCatalogGroup(selectedGroup);
-    if (!repairedSelection.group) {
+    const isTeacherRegistration = normalizeRegistrationTrack(selectedGroup.track_key, 'bachelor') === 'teacher';
+    const placementGroup = repairedSelection.group || (
+      isTeacherRegistration
+      && repairedSelection.catalogGroup
+      && !repairedSelection.catalogGroup.selection_blocked
+        ? repairedSelection.catalogGroup
+        : (isTeacherRegistration ? selectedGroup : null)
+    );
+    if (!placementGroup) {
       logAction(db, req, 'register_group_rejected', {
         user_id: userId,
         group_id: requestedGroupId,
@@ -15953,7 +15961,7 @@ app.post('/register/course', registerLimiter, async (req, res) => {
       );
     }
 
-    const repairedGroup = repairedSelection.group;
+    const repairedGroup = placementGroup;
     const repairedLegacyCourseId = parsePositiveIntStrict(repairedGroup.legacy_course_id);
     await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
       group_id: requestedGroupId,

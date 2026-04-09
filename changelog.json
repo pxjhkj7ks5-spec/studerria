@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.33",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-registration-submit-fallback): let the teacher registration submit continue from a valid unblocked service group even when the legacy repair step cannot fully reclassify that group as `ready`, so route selection no longer hard-stops before `/register/teacher-subjects` while the offerings-based picker is already the real next step"
+      ]
+    },
+    {
       "version": "1.5.32",
       "date": "2026-04-09",
       "items": [
