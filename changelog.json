@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.63",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-pending-topbar-width): widen the shared navbar shell on the teacher pending screen so it uses the same broad desktop width as the rest of the app instead of looking visually squeezed after the recent pending-page shell updates, while preserving the full-width mobile behavior"
+      ]
+    },
+    {
       "version": "1.5.62",
       "date": "2026-04-09",
       "items": [
