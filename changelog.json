@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.51",
+      "date": "2026-04-09",
+      "items": [
+        "fix(auth-password-emoji-hover): override the shared button hover transform for the login and register password visibility emoji controls so they keep their centered baseline and lift slightly upward on hover/focus instead of visually dropping down inside the input field"
+      ]
+    },
+    {
       "version": "1.5.50",
       "date": "2026-04-09",
       "items": [

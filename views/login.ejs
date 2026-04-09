@@ -326,6 +326,17 @@
         color: var(--text-secondary);
         padding: 4px;
         border-radius: 999px;
+        transition: transform 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+      }
+      .input-with-icon .icon-btn:hover,
+      .input-with-icon .icon-btn:focus-visible {
+        transform: translateY(calc(-50% - 1px));
+        background: rgba(59, 130, 246, 0.08);
+        color: var(--text-primary);
+        box-shadow: 0 8px 18px rgba(59, 130, 246, 0.12);
+      }
+      .input-with-icon .icon-btn:active {
+        transform: translateY(-50%);
       }
       .input-with-icon .form-control {
         padding-right: 38px;
@@ -526,4 +537,3 @@
     <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
-
