@@ -43,6 +43,16 @@ body.page-profile .studerria-profile-card .btn {
   min-height: 3rem;
 }
 
+body.page-profile .studerria-profile-card .btn {
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+body.page-profile .studerria-profile-card .btn:hover,
+body.page-profile .studerria-profile-card .btn:active {
+  transform: none;
+  box-shadow: none;
+}
+
 @media (max-width: 767.98px) {
   body.page-profile .studerria-profile-column,
   body.page-profile .studerria-profile-card {

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.47",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-button-hover): remove the aggressive lift and shadow hover effect from the main buttons inside the profile card, so the full-width profile actions stay visually calmer on hover without changing their layout or color styling"
+      ]
+    },
+    {
       "version": "1.5.46",
       "date": "2026-04-09",
       "items": [
