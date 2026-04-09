@@ -460,6 +460,7 @@ body.schedule-mode-month .week-rail {
 }
 
 /* Soften Liquid Card visuals on schedule page to avoid bright glare artifacts in dark theme. */
+.week-hero.liquid-card::before,
 .week-hero.liquid-card::after {
   display: none;
 }

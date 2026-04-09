@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.67",
+      "date": "2026-04-09",
+      "items": [
+        "fix(schedule-week-hero-liquid-border): disable the remaining `liquid-card::before` border-mask layer for the `Твій тиждень` hero card, removing another likely source of the faint horizontal blue seam that could still appear in the middle of the block in light theme after the first overlay cleanup"
+      ]
+    },
+    {
       "version": "1.5.66",
       "date": "2026-04-09",
       "items": [
