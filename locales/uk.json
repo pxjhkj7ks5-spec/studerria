@@ -3,6 +3,8 @@
   "theme.dark": "Темна",
   "login.title": "Вхід",
   "login.error": "Невірне імʼя користувача або пароль.",
+  "login.errorQuarantineLater": "Акаунт тимчасово на перевірці безпеки. Спробуйте пізніше.",
+  "login.errorQuarantineAdmin": "Акаунт заблоковано для входу. Зверніться до адміністратора.",
   "login.fullName": "ПІБ",
   "login.fullNamePlaceholder": "Введіть повне імʼя",
   "login.password": "Пароль",

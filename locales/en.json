@@ -3,6 +3,8 @@
   "theme.dark": "Dark",
   "login.title": "Login",
   "login.error": "Invalid username or password.",
+  "login.errorQuarantineLater": "This account is temporarily under security review. Please try again later.",
+  "login.errorQuarantineAdmin": "This account is blocked from sign-in. Please contact an administrator.",
   "login.fullName": "Full Name",
   "login.fullNamePlaceholder": "Enter your full name",
   "login.password": "Password",

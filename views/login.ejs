@@ -382,7 +382,7 @@
 
               <% if (error) { %>
               <div class="alert alert-danger login-feedback-stack" role="alert">
-                <%= t('login.error') %>
+                <%= loginErrorText || t('login.error') %>
               </div>
               <% } %>
 

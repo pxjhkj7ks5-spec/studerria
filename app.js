@@ -283,6 +283,42 @@ const translate = (lang, key) => {
   return key;
 };
 
+function normalizeLoginErrorCode(rawCode) {
+  const normalized = String(rawCode || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized === '1' || normalized === 'invalid' || normalized === 'auth') return 'invalid';
+  if (
+    normalized === 'quarantine-later'
+    || normalized === 'pending-review'
+    || normalized === 'pending_review'
+    || normalized === 'account pending review'
+  ) {
+    return 'quarantine-later';
+  }
+  if (
+    normalized === 'quarantine-admin'
+    || normalized === 'inactive-admin'
+    || normalized === 'inactive'
+    || normalized === 'contact-admin'
+    || normalized === 'contact_administrator'
+  ) {
+    return 'quarantine-admin';
+  }
+  return 'invalid';
+}
+
+function buildLoginErrorMessage(lang, rawCode) {
+  const code = normalizeLoginErrorCode(rawCode);
+  if (!code) return '';
+  if (code === 'quarantine-later') {
+    return translate(lang, 'login.errorQuarantineLater');
+  }
+  if (code === 'quarantine-admin') {
+    return translate(lang, 'login.errorQuarantineAdmin');
+  }
+  return translate(lang, 'login.error');
+}
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const server = http.createServer(app);
@@ -15758,14 +15794,24 @@ app.get('/', (req, res) => {
   if (req.session && req.session.user) {
     return res.redirect('/home');
   }
-  res.render('login', { error: req.query.error === '1' });
+  const lang = getPreferredLang(req);
+  const loginErrorText = buildLoginErrorMessage(lang, req.query.error);
+  res.render('login', {
+    error: Boolean(loginErrorText),
+    loginErrorText,
+  });
 });
 
 app.get('/login', (req, res) => {
   if (req.session && req.session.user) {
     return res.redirect('/home');
   }
-  res.render('login', { error: req.query.error === '1' });
+  const lang = getPreferredLang(req);
+  const loginErrorText = buildLoginErrorMessage(lang, req.query.error);
+  res.render('login', {
+    error: Boolean(loginErrorText),
+    loginErrorText,
+  });
 });
 
 app.get('/about', requireLogin, (req, res) => {
@@ -16127,10 +16173,9 @@ app.post('/login', authLimiter, async (req, res) => {
   }
   return ensureUsersSchema(async () => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
-    const activeClause = usersHasIsActive ? ' AND is_active = 1' : '';
     try {
       const user = await db.get(
-        `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language FROM users WHERE LOWER(full_name) = LOWER(?)${activeClause}`,
+        `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, ${usersHasIsActive ? 'is_active' : '1 AS is_active'} FROM users WHERE LOWER(full_name) = LOWER(?) LIMIT 1`,
         [normalizedName]
       );
       const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
@@ -16148,6 +16193,28 @@ app.post('/login', authLimiter, async (req, res) => {
           console.error('Database error (login.auth_failure)', failureErr);
         }
         return res.redirect('/login?error=1');
+      }
+      const isActive = !usersHasIsActive || user.is_active === true || Number(user.is_active) === 1;
+      if (!isActive) {
+        let loginErrorCode = 'quarantine-admin';
+        try {
+          const securityCase = await getUserSecurityCaseWithActors(user.id);
+          const isAutoQuarantined = securityCase
+            && (securityCase.auto_quarantined === true || Number(securityCase.auto_quarantined) === 1)
+            && normalizeSecurityCaseStatus(securityCase.status) === 'open';
+          if (isAutoQuarantined) {
+            loginErrorCode = 'quarantine-later';
+          }
+          logAction(db, req, 'login_inactive_blocked', {
+            user_id: user.id,
+            auto_quarantined: isAutoQuarantined ? 1 : 0,
+            security_status: securityCase ? normalizeSecurityCaseStatus(securityCase.status) : null,
+            security_level: securityCase ? normalizeSecurityCaseLevel(securityCase.risk_level) : null,
+          });
+        } catch (securityErr) {
+          console.error('Database error (login.security_case)', securityErr);
+        }
+        return res.redirect(`/login?error=${encodeURIComponent(loginErrorCode)}`);
       }
 
       const role = normalizeRoleKey(user.role);
@@ -16303,7 +16370,7 @@ app.post('/register', registerLimiter, async (req, res) => {
         logAction(db, req, 'register_quarantined', { user_id: row.id, full_name: normalizedName });
         req.session.pendingUserId = null;
         req.session.rememberMe = false;
-        return res.redirect('/login?error=Account%20pending%20review');
+        return res.redirect('/login?error=quarantine-later');
       }
     } catch (securityErr) {
       console.error('Database error (register.security_case)', securityErr);

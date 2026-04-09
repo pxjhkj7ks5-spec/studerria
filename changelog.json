@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.59",
+      "date": "2026-04-09",
+      "items": [
+        "fix(login-quarantine-copy): differentiate blocked sign-in messages for quarantine states so automatic security review now tells the user to `Спробуйте пізніше`, while inactive or manually blocked accounts show `Зверніться до адміністратора`, and the login form no longer collapses all of these cases into the generic invalid-credentials alert"
+      ]
+    },
+    {
       "version": "1.5.58",
       "date": "2026-04-09",
       "items": [
