@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.65",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-pending-copy-actions): shorten the teacher pending copy to a warmer, cleaner approval message and remove the extra `Вийти` action from the main button stack so the card stays more focused on the current waiting state"
+      ]
+    },
+    {
       "version": "1.5.64",
       "date": "2026-04-09",
       "items": [
