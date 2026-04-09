@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.55",
+      "date": "2026-04-09",
+      "items": [
+        "fix(register-course-location-empty-state): keep the `Локація` section visually empty until an admission year is actually chosen, removing the extra placeholder card that repeated `Рік вступу` and the `Оберіть рік вступу, щоб переглянути доступні локації` copy under the location step"
+      ]
+    },
+    {
       "version": "1.5.54",
       "date": "2026-04-09",
       "items": [

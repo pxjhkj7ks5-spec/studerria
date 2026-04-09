@@ -1140,8 +1140,7 @@
             return;
           }
         } else if (!state.cohortConfirmed || !state.cohortId) {
-          campusOptions.appendChild(createEmptyCard(registerCourseText.cohortLabel, registerCourseText.chooseCohortFirst));
-          setHint(campusHint, registerCourseText.chooseCohortFirst);
+          setHint(campusHint, '');
           clearCampusSelection();
           return;
         }
