@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.72",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-hover-removal): remove hover lift and highlight effects from the profile page buttons, theme toggle, mobile actions, reset action, and toast close controls so the profile view now stays visually static on hover"
+      ]
+    },
+    {
       "version": "1.5.71",
       "date": "2026-04-09",
       "items": [

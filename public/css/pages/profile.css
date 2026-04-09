@@ -106,11 +106,6 @@
   transition: opacity 140ms ease, background 140ms ease, transform 140ms ease;
 }
 
-.profile-toast__close:hover {
-  opacity: 1;
-  transform: scale(1.03);
-}
-
 body.theme-light .profile-toast {
   border: 1px solid rgba(148, 163, 184, 0.16);
   background: rgba(255, 255, 255, 0.76);
@@ -147,10 +142,6 @@ body.theme-light .profile-toast__text {
 
 body.theme-light .profile-toast__close {
   color: rgba(15, 23, 42, 0.52);
-}
-
-body.theme-light .profile-toast__close:hover {
-  background: rgba(15, 23, 42, 0.06);
 }
 
 body.theme-dark .profile-toast {
@@ -191,20 +182,10 @@ body.theme-dark .profile-toast__close {
   color: rgba(226, 232, 240, 0.68);
 }
 
-body.theme-dark .profile-toast__close:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 body.theme-light .profile-reset-btn {
   background: rgba(239, 68, 68, 0.18);
   border-color: rgba(239, 68, 68, 0.45);
   color: #991b1b;
-}
-
-body.theme-light .profile-reset-btn:hover {
-  background: rgba(239, 68, 68, 0.28);
-  border-color: rgba(239, 68, 68, 0.6);
-  color: #7f1d1d;
 }
 
 body.page-profile .studerria-profile-column {
@@ -271,12 +252,6 @@ body.theme-light.page-profile .studerria-profile-card .btn-outline-secondary {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.88),
     0 10px 22px rgba(15, 23, 42, 0.05);
-}
-
-body.theme-light.page-profile .studerria-profile-card .btn-outline-secondary:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(250, 252, 255, 0.96));
-  border-color: rgba(148, 163, 184, 0.34);
-  color: #0f172a;
 }
 
 body.theme-light.page-profile .studerria-profile-card .profile-reset-surface .text-muted,
@@ -369,7 +344,6 @@ body.page-profile .studerria-profile-card .btn {
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
-body.page-profile .studerria-profile-card .btn:hover,
 body.page-profile .studerria-profile-card .btn:active {
   transform: none;
   box-shadow: none;
