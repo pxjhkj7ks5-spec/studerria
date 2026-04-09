@@ -207,7 +207,7 @@
         if (trackDiff !== 0) return trackDiff;
         return String(left.label || '').localeCompare(String(right.label || ''), 'uk', { sensitivity: 'base' });
       })
-      .forEach((section, sectionIndex) => {
+      .forEach((section) => {
         const stages = Array.from(section.stages.values())
           .sort((left, right) => Number(left.stageNumber || 0) - Number(right.stageNumber || 0))
           .map((stage, stageIndex) => {
@@ -226,14 +226,14 @@
           key: section.key,
           label: section.label,
           stages,
-          initialOpen: stages.some((stage) => stage.items.some((item) => item.checked)) || sectionIndex === 0,
+          initialOpen: false,
         });
       });
   } else {
     pickerSections.push({
       key: 'legacy',
       label: pickerTexts.trackCatalog,
-      initialOpen: true,
+      initialOpen: false,
       stages: [{
         key: 'legacy:all',
         label: pickerTexts.legacyStageLabel,

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.41",
+      "date": "2026-04-09",
+      "items": [
+        "fix(teacher-picker-default-collapse): keep the top-level teacher discipline lanes collapsed on initial render, so the user first taps the `Бакалаври` or `Магістри` block to reveal the matrix while the inner stage disclosure remains ready to show disciplines immediately after that one click"
+      ]
+    },
+    {
       "version": "1.5.40",
       "date": "2026-04-09",
       "items": [
