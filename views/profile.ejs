@@ -570,32 +570,32 @@
               </div>
 
               <form method="POST" action="/profile">
-                <div class="mb-3">
+                <div class="mb-3 profile-field-surface">
                   <label for="full_name" class="form-label"><%= t('profile.fullName') %></label>
                   <input id="full_name" name="full_name" class="form-control" value="<%= user.full_name %>" required />
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 profile-field-surface">
                   <label for="password" class="form-label"><%= t('profile.newPassword') %></label>
                   <input id="password" name="password" type="password" class="form-control" />
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 profile-field-surface">
                   <label for="confirm_password" class="form-label"><%= t('profile.confirmPassword') %></label>
                   <input id="confirm_password" name="confirm_password" type="password" class="form-control" />
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 profile-field-surface">
                   <label for="language" class="form-label"><%= t('profile.language') %></label>
                   <select id="language" name="language" class="form-select">
                     <option value="uk" <%= (user.language || 'uk') === 'uk' ? 'selected' : '' %>><%= t('language.uk') %></option>
                     <option value="en" <%= (user.language || 'uk') === 'en' ? 'selected' : '' %>><%= t('language.en') %></option>
                   </select>
                 </div>
-                <div class="d-grid gap-2">
+                <div class="d-grid gap-2 profile-actions-surface">
                   <button class="btn btn-primary" type="submit"><%= t('profile.save') %></button>
                   <a href="/schedule" class="btn btn-outline-secondary"><%= t('profile.back') %></a>
                 </div>
               </form>
 
-              <div class="mt-4">
+              <div class="mt-4 profile-reset-surface">
                 <% if (teacherCourse) { %>
                   <div class="text-muted small mb-2">Викладацькі дисципліни</div>
                   <form method="POST" action="/profile/reset-subjects" onsubmit="return confirm('Перейти до повторного вибору викладацьких дисциплін?')">

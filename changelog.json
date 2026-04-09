@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.57",
+      "date": "2026-04-09",
+      "items": [
+        "fix(profile-light-surface-contrast): add distinct light-theme inner surfaces for the profile field modules, action buttons, reset block, and stat tiles so `ПІБ`, password fields, language, and `Назад до розкладу` no longer visually merge into the outer glass card and instead keep the same kind of readable contrast the dark theme already had"
+      ]
+    },
+    {
       "version": "1.5.56",
       "date": "2026-04-09",
       "items": [
