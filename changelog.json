@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.78",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-legacy-transfer-delete-submit): make the legacy transfer bulk delete action use its own submit mode so the delete button no longer triggers the move validation that asks for a target course"
+      ]
+    },
+    {
       "version": "1.5.77",
       "date": "2026-04-10",
       "items": [

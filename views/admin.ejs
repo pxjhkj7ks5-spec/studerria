@@ -7028,6 +7028,7 @@
       const legacyTransferMoveSelected = document.getElementById('legacyTransferMoveSelected');
       const legacyTransferDeleteSelected = document.getElementById('legacyTransferDeleteSelected');
       const legacyTransferBulkForm = document.getElementById('legacyTransferBulkForm');
+      const legacyTransferModeKey = 'legacyTransferSubmitMode';
 
       function updateLegacyTransferBulkBar() {
         if (!legacyTransferBulkBar || !legacyTransferBulkCount || !legacyTransferTargetSelect || !legacyTransferMoveSelected || !legacyTransferDeleteSelected) {
@@ -7038,6 +7039,11 @@
         legacyTransferBulkBar.classList.toggle('is-visible', selected > 0);
         legacyTransferMoveSelected.disabled = !(selected > 0 && String(legacyTransferTargetSelect.value || '').trim());
         legacyTransferDeleteSelected.disabled = selected < 1;
+      }
+
+      function setLegacyTransferSubmitMode(mode) {
+        if (!legacyTransferBulkForm) return;
+        legacyTransferBulkForm.dataset[legacyTransferModeKey] = mode || '';
       }
 
       if (legacyTransferSelectAll) {
@@ -7057,18 +7063,26 @@
       if (legacyTransferTargetSelect) {
         legacyTransferTargetSelect.addEventListener('change', updateLegacyTransferBulkBar);
       }
+      if (legacyTransferMoveSelected) {
+        legacyTransferMoveSelected.addEventListener('click', () => setLegacyTransferSubmitMode('move'));
+      }
+      if (legacyTransferDeleteSelected) {
+        legacyTransferDeleteSelected.addEventListener('click', () => setLegacyTransferSubmitMode('delete'));
+      }
       if (legacyTransferBulkForm) {
         legacyTransferBulkForm.addEventListener('submit', (event) => {
           updateLegacyTransferBulkBar();
           const selectedIds = document.querySelectorAll('#legacyTransferUsersBody input[name="user_ids[]"]:checked').length;
-          const targetAction = String((event.submitter && event.submitter.getAttribute('formaction')) || legacyTransferBulkForm.getAttribute('action') || '');
+          const submitMode = String(legacyTransferBulkForm.dataset[legacyTransferModeKey] || '').trim();
           if (!selectedIds) {
             event.preventDefault();
+            setLegacyTransferSubmitMode('');
             return;
           }
-          if (targetAction.indexOf('/delete-permanent/batch') === -1 && !String(legacyTransferTargetSelect && legacyTransferTargetSelect.value || '').trim()) {
+          if (submitMode !== 'delete' && !String(legacyTransferTargetSelect && legacyTransferTargetSelect.value || '').trim()) {
             event.preventDefault();
           }
+          setLegacyTransferSubmitMode('');
         });
       }
       updateLegacyTransferBulkBar();
