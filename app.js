@@ -39028,6 +39028,38 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         console.error('Database error (admin.supportRequests)', supportErr);
       }
     }
+    const legacyCourseCleanupRows = await Promise.all(
+      (allCourses || []).map(async (course) => {
+        const courseIdValue = Number(course && course.id ? course.id : 0);
+        let dependencyCounts = { users: 0, subjects: 0, semesters: 0 };
+        try {
+          dependencyCounts = await academicSetupHelpers.getLegacyCourseDependencyCounts(
+            getAcademicSetupStore(),
+            courseIdValue
+          );
+        } catch (cleanupErr) {
+          console.error('Database error (admin.legacyCourseCleanup)', cleanupErr);
+        }
+        const usersCount = Number(dependencyCounts.users || 0);
+        const subjectsCount = Number(dependencyCounts.subjects || 0);
+        const semestersCount = Number(dependencyCounts.semesters || 0);
+        const campusKey = normalizeCourseCampus(course && course.location ? course.location : 'kyiv');
+        return {
+          ...course,
+          campus_key: campusKey,
+          campus_label: campusKey === 'munich' ? 'Munich' : 'Kyiv',
+          kind_label: course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)
+            ? 'Teacher course'
+            : 'Legacy course',
+          dependency_counts: {
+            users: usersCount,
+            subjects: subjectsCount,
+            semesters: semestersCount,
+          },
+          deletable: usersCount === 0 && subjectsCount === 0 && semestersCount === 0,
+        };
+      })
+    );
 
     try {
         const projectionAlert = buildAcademicV2CourseProjectionAlert(req, courseSubjectScope.projectionIssues, 'course');
@@ -39054,6 +39086,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       activeAdminTab: typeof req.query.tab === 'string' ? req.query.tab : '',
                                       courses,
                                       allCourses,
+                                      legacyCourseCleanupRows,
                                       teacherRequests,
         semesters,
         semestersByCourse,
@@ -56086,7 +56119,7 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) =>
   const { id } = req.params;
   const courseId = Number(id);
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
-    tab: 'admin-courses',
+    tab: 'admin-legacy-courses',
   });
   if (Number.isNaN(courseId)) {
     return res.redirect(redirectWith('err', 'Invalid course'));
