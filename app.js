@@ -13810,24 +13810,26 @@ async function createAdminAuditEntry(req, {
   rollbackSourceAuditId = null,
   isCritical = false,
 }) {
-  const actorId = req && req.session && req.session.user ? Number(req.session.user.id) : null;
+  const actorId = req && req.session && req.session.user
+    ? parsePositiveIntStrict(req.session.user.id)
+    : null;
   const actorName = req && req.session && req.session.user ? String(req.session.user.username || '') : '';
   const normalizedEntry = {
     scope_key: scopeKey,
     action_type: normalizeAdminAuditActionType(actionType),
     target_type: targetType,
     target_key: targetKey || null,
-    target_id: Number.isFinite(Number(targetId)) ? Number(targetId) : null,
+    target_id: parsePositiveIntStrict(targetId),
     summary: String(summary || '').trim() || null,
     before_state: beforeState == null ? null : beforeState,
     after_state: afterState == null ? null : afterState,
     metadata: metadata && typeof metadata === 'object' ? { ...metadata } : null,
     operation_id: operationId || null,
-    actor_user_id: Number.isFinite(actorId) ? actorId : null,
+    actor_user_id: actorId,
     actor_name_snapshot: actorName || null,
-    rollback_source_audit_id: Number.isFinite(Number(rollbackSourceAuditId)) ? Number(rollbackSourceAuditId) : null,
+    rollback_source_audit_id: parsePositiveIntStrict(rollbackSourceAuditId),
     is_critical: Boolean(isCritical),
-    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    course_id: parsePositiveIntStrict(courseId),
     created_at: new Date().toISOString(),
   };
   const row = await withTransaction(async (client) => {

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.90",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-settings-audit-fk): stop coercing null rollback and target ids to 0 when writing admin audit rows, which was causing system settings saves to fail with a rollback_source_audit_id foreign key error"
+      ]
+    },
+    {
       "version": "1.5.89",
       "date": "2026-04-10",
       "items": [
