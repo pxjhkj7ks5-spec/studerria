@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.79",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-legacy-transfer-confirm-submit): preserve the clicked submitter when the global confirm flow resubmits legacy transfer actions so the permanent delete button keeps its own formaction instead of falling back to the move path that asks for a target course"
+      ]
+    },
+    {
       "version": "1.5.78",
       "date": "2026-04-10",
       "items": [

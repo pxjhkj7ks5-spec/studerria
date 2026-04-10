@@ -6112,7 +6112,11 @@
             stepupInput.value = typed;
           }
         }
-        form.submit();
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit(trigger);
+        } else {
+          form.submit();
+        }
       });
 
       const importScopeData = {
