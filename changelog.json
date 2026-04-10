@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.92",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-legacy-course-force-delete): allow legacy cleanup deletes to remove related legacy subjects, semesters, homework, messages, activity logs, and user rows automatically while keeping teacher courses protected, with semester cleanup ordered before course deletion to avoid FK conflicts"
+      ]
+    },
+    {
       "version": "1.5.90",
       "date": "2026-04-10",
       "items": [

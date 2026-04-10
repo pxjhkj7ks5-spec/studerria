@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="<%= lang %>">
   <head>
     <meta charset="utf-8" />
@@ -2248,7 +2248,8 @@
                 <div class="small text-muted">Показано <%= legacyCourseCleanupRowsData.length %> курсів</div>
               </div>
               <div class="alert alert-warning glass-inset border-0 mb-3">
-                Видаляйте лише курси без залежностей. Якщо є users, subjects або semesters, кнопка буде заблокована.
+                Legacy cleanup deletes remove related legacy users, subjects, semesters, and linked data automatically.
+                Teacher courses stay protected.
               </div>
               <div class="table-responsive">
                 <table class="table align-middle mb-0">
@@ -2268,7 +2269,8 @@
                     <% if (legacyCourseCleanupRowsData.length) { %>
                       <% legacyCourseCleanupRowsData.forEach(function(course) { %>
                         <% const dep = course.dependency_counts || { users: 0, subjects: 0, semesters: 0 }; %>
-                        <% const safeToDelete = Boolean(course.deletable); %>
+                        <% const isTeacherCourse = course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1); %>
+                        <% const safeToDelete = !isTeacherCourse; %>
                         <tr class="<%= safeToDelete ? '' : 'table-warning-subtle' %>">
                           <td class="fw-semibold"><%= course.name %> <span class="text-muted">#<%= course.id %></span></td>
                           <td><%= course.campus_label || 'Kyiv' %></td>
@@ -2280,7 +2282,7 @@
                             <% if (safeToDelete) { %>
                               <span class="badge text-bg-success">Ready</span>
                             <% } else { %>
-                              <span class="badge text-bg-warning">Locked</span>
+                              <span class="badge text-bg-warning">Protected</span>
                             <% } %>
                           </td>
                           <td class="text-end">
@@ -8988,3 +8990,4 @@
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
+

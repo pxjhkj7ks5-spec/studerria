@@ -40546,19 +40546,18 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         const subjectsCount = Number(dependencyCounts.subjects || 0);
         const semestersCount = Number(dependencyCounts.semesters || 0);
         const campusKey = normalizeCourseCampus(course && course.location ? course.location : 'kyiv');
+        const isTeacherCourse = course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
         return {
           ...course,
           campus_key: campusKey,
           campus_label: campusKey === 'munich' ? 'Munich' : 'Kyiv',
-          kind_label: course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)
-            ? 'Teacher course'
-            : 'Legacy course',
+          kind_label: isTeacherCourse ? 'Teacher course' : 'Legacy course',
           dependency_counts: {
             users: usersCount,
             subjects: subjectsCount,
             semesters: semestersCount,
           },
-          deletable: usersCount === 0 && subjectsCount === 0 && semestersCount === 0,
+          deletable: !isTeacherCourse,
         };
       })
     );
@@ -57725,7 +57724,7 @@ app.post('/admin/courses/normalize-legacy', requireCoursesSectionAccess, writeLi
   }
 });
 
-app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) => {
+app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, res) => {
   const { id } = req.params;
   const courseId = Number(id);
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
@@ -57734,8 +57733,17 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) =>
   if (Number.isNaN(courseId)) {
     return res.redirect(redirectWith('err', 'Invalid course'));
   }
-  academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId)
-    .then((counts) => {
+  try {
+    const courseRow = await db.get(
+      'SELECT id, name, is_teacher_course FROM courses WHERE id = ? LIMIT 1',
+      [courseId]
+    );
+    if (!courseRow) {
+      return res.redirect(redirectWith('err', 'Course not found'));
+    }
+    const isTeacherCourse = courseRow.is_teacher_course === true || Number(courseRow.is_teacher_course) === 1;
+    if (isTeacherCourse) {
+      const counts = await academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId);
       if (Number(counts.users || 0) > 0) {
         return res.redirect(redirectWith('err', 'Course has users'));
       }
@@ -57745,20 +57753,74 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, (req, res) =>
       if (Number(counts.semesters || 0) > 0) {
         return res.redirect(redirectWith('err', 'Course has semesters'));
       }
-      db.run('DELETE FROM courses WHERE id = ?', [courseId], (err) => {
-        if (err) {
-          return res.redirect(redirectWith('err', 'Database error'));
+      await db.run('DELETE FROM courses WHERE id = ?', [courseId]);
+      logAction(db, req, 'course_delete', { id: courseId, forced_cleanup: false });
+      invalidateCoursesCache();
+      invalidateRegistrationPathwaysCache();
+      invalidateSubjectsCache(courseId);
+      invalidateSemestersCache(courseId);
+      invalidateStudyDaysCache(courseId);
+      return res.redirect(redirectWith('ok', 'Course deleted'));
+    }
+
+    const dependencyCounts = await academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId);
+    const semesterRows = await db.all('SELECT id FROM semesters WHERE course_id = ?', [courseId]);
+    const semesterIds = Array.isArray(semesterRows)
+      ? semesterRows.map((row) => Number(row.id)).filter((value) => Number.isInteger(value) && value > 0)
+      : [];
+    await withTransaction(async (client) => {
+      const deleteWithCourseAndSemesters = async (sql, extraParams = []) => {
+        const params = [courseId, ...extraParams];
+        if (semesterIds.length) {
+          params.push(semesterIds);
+          return txRun(client, sql, params);
         }
-        logAction(db, req, 'course_delete', { id: courseId });
-        invalidateCoursesCache();
-        invalidateRegistrationPathwaysCache();
-        invalidateSubjectsCache(courseId);
-        invalidateSemestersCache(courseId);
-        invalidateStudyDaysCache(courseId);
-        return res.redirect(redirectWith('ok', 'Course deleted'));
-      });
-    })
-    .catch(() => res.redirect(redirectWith('err', 'Database error')));
+        return txRun(client, sql.replace(/\s+OR\s+semester_id = ANY\(\?::int\[\]\)/i, ''), [courseId, ...extraParams]);
+      };
+
+      await deleteWithCourseAndSemesters(
+        'DELETE FROM subject_materials WHERE course_id = ? OR semester_id = ANY(?::int[])'
+      );
+      await deleteWithCourseAndSemesters(
+        'DELETE FROM messages WHERE course_id = ? OR semester_id = ANY(?::int[])'
+      );
+      await deleteWithCourseAndSemesters(
+        'DELETE FROM teamwork_tasks WHERE course_id = ? OR semester_id = ANY(?::int[])'
+      );
+      await deleteWithCourseAndSemesters(
+        'DELETE FROM homework WHERE course_id = ? OR semester_id = ANY(?::int[])'
+      );
+      await deleteWithCourseAndSemesters(
+        'DELETE FROM schedule_entries WHERE course_id = ? OR semester_id = ANY(?::int[])'
+      );
+      await deleteWithCourseAndSemesters(
+        'DELETE FROM activity_log WHERE course_id = ? OR semester_id = ANY(?::int[])'
+      );
+      await deleteWithCourseAndSemesters(
+        'DELETE FROM personal_reminders WHERE course_id = ? OR semester_id = ANY(?::int[])'
+      );
+      await txRun(client, 'DELETE FROM history_log WHERE course_id = ?', [courseId]);
+      await txRun(client, 'DELETE FROM login_history WHERE course_id = ?', [courseId]);
+      await txRun(client, 'DELETE FROM subjects WHERE course_id = ?', [courseId]);
+      await txRun(client, 'DELETE FROM users WHERE course_id = ?', [courseId]);
+      await txRun(client, 'DELETE FROM semesters WHERE course_id = ?', [courseId]);
+      await txRun(client, 'DELETE FROM courses WHERE id = ?', [courseId]);
+    });
+    logAction(db, req, 'course_delete', {
+      id: courseId,
+      forced_cleanup: true,
+      dependency_counts: dependencyCounts,
+    });
+    invalidateCoursesCache();
+    invalidateRegistrationPathwaysCache();
+    invalidateSubjectsCache(courseId);
+    invalidateSemestersCache(courseId);
+    invalidateStudyDaysCache(courseId);
+    return res.redirect(redirectWith('ok', 'Legacy course deleted'));
+  } catch (err) {
+    console.error('Legacy course delete failed', err);
+    return res.redirect(redirectWith('err', 'Database error'));
+  }
 });
 
 app.post('/admin/teacher-requests/:userId/approve', requireTeachersSectionAccess, async (req, res) => {
