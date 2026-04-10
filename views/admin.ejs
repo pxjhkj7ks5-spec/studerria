@@ -1045,9 +1045,6 @@
           </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Schedule</div>
-            <% if (sectionAllowed('admin-schedule')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-validate">Validate Schedule</button>
-            <% } %>
             <% if (sectionAllowed('admin-import-export')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
             <% } %>
@@ -2097,20 +2094,6 @@
           </div>
         </div>
         <% } %>
-
-        <div id="admin-schedule-validate" class="admin-panel" data-admin-title="Schedule / Validate">
-          <div class="card mb-4">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                <div>
-                  <h5 class="card-title mb-1">Validate Schedule</h5>
-                  <div class="small text-muted">Швидка перевірка конфліктів та недоліків.</div>
-                </div>
-                <button class="btn btn-outline-primary btn-sm" type="button" id="validateScheduleBtn">Перевірити розклад</button>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <% } %>
 
@@ -4196,30 +4179,6 @@
       </div>
     </div>
 
-    <div class="modal fade" id="scheduleValidateModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-scrollable modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Перевірка розкладу</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
-              <div>
-                <label class="form-label mb-1">Тиждень (опц.)</label>
-                <input class="form-control form-control-sm" type="number" min="1" max="15" id="validateWeekInput" placeholder="Напр. 3" />
-              </div>
-              <button class="btn btn-sm btn-outline-primary mt-3" type="button" id="runValidateBtn">Запустити</button>
-              <div class="ms-auto text-muted">
-                Errors: <span id="validateErrors">0</span> · Warnings: <span id="validateWarnings">0</span>
-              </div>
-            </div>
-            <div id="validateIssues" class="list-group"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -4273,39 +4232,6 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
             <button type="button" class="btn btn-primary glass" id="cloneSubjectSubmit">Clone</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal fade" id="scheduleCloneModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Clone week</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="row g-2">
-              <div class="col-6">
-                <label class="form-label">Source week</label>
-                <input class="form-control" type="number" min="1" max="15" id="cloneWeekSource" />
-              </div>
-              <div class="col-6">
-                <label class="form-label">Target week</label>
-                <input class="form-control" type="number" min="1" max="15" id="cloneWeekTarget" />
-              </div>
-              <div class="col-12">
-                <select class="form-select" id="cloneWeekMode">
-                  <option value="skip_conflicts">Skip conflicts</option>
-                  <option value="overwrite">Overwrite</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal">Close</button>
-            <button type="button" class="btn btn-primary glass" id="cloneWeekSubmit">Clone</button>
           </div>
         </div>
       </div>
@@ -8333,70 +8259,6 @@
         });
       }
 
-      const validateScheduleBtn = document.getElementById('validateScheduleBtn');
-      const scheduleValidateModal = document.getElementById('scheduleValidateModal');
-      const runValidateBtn = document.getElementById('runValidateBtn');
-      const validateWeekInput = document.getElementById('validateWeekInput');
-      const validateIssues = document.getElementById('validateIssues');
-      const validateErrors = document.getElementById('validateErrors');
-      const validateWarnings = document.getElementById('validateWarnings');
-
-      function renderValidateIssues(issues = []) {
-        if (!validateIssues) return;
-        if (!issues.length) {
-          validateIssues.innerHTML = '<div class="text-muted">Проблем не знайдено</div>';
-          return;
-        }
-        validateIssues.innerHTML = issues
-          .map((issue) => {
-            const badge =
-              issue.severity === 'error'
-                ? '<span class="badge text-bg-danger">error</span>'
-                : '<span class="badge text-bg-warning">warning</span>';
-            const meta = issue.context
-              ? `week ${issue.context.week || '-'} · ${issue.context.day_of_week || '-'} · #${issue.context.class_number || '-'} · група ${issue.context.group || '-'}`
-              : '';
-            return `
-              <div class="list-group-item validate-issue">
-                <div>
-                  ${badge}
-                  <div class="fw-semibold mt-1">${issue.message}</div>
-                  <div class="text-muted validate-meta">${meta}</div>
-                </div>
-                <a class="btn btn-sm btn-outline-primary" href="${issue.fix_url}">Перейти</a>
-              </div>
-            `;
-          })
-          .join('');
-      }
-
-      async function runScheduleValidation() {
-        if (!validateIssues) return;
-        validateIssues.innerHTML = '<div class="text-muted">Перевірка...</div>';
-        const week = validateWeekInput && validateWeekInput.value ? Number(validateWeekInput.value) : null;
-        const url = week ? `/admin/api/schedule/validate?week=${week}` : '/admin/api/schedule/validate';
-        const res = await fetch(url);
-        if (!res.ok) {
-          validateIssues.innerHTML = '<div class="text-danger">Помилка перевірки</div>';
-          return;
-        }
-        const data = await res.json();
-        if (validateErrors) validateErrors.textContent = data.summary?.errors ?? 0;
-        if (validateWarnings) validateWarnings.textContent = data.summary?.warnings ?? 0;
-        renderValidateIssues(data.issues || []);
-      }
-
-      if (validateScheduleBtn && scheduleValidateModal) {
-        validateScheduleBtn.addEventListener('click', async () => {
-          const modal = new bootstrap.Modal(scheduleValidateModal);
-          modal.show();
-          await runScheduleValidation();
-        });
-      }
-      if (runValidateBtn) {
-        runValidateBtn.addEventListener('click', runScheduleValidation);
-      }
-
       const subjectCloneModal = document.getElementById('subjectCloneModal');
       const cloneSubjectId = document.getElementById('cloneSubjectId');
       const cloneSubjectName = document.getElementById('cloneSubjectName');
@@ -8423,39 +8285,6 @@
             }),
           });
           if (!res.ok) return alert('Помилка клонування');
-          window.location.reload();
-        });
-      }
-
-      const scheduleCloneModal = document.getElementById('scheduleCloneModal');
-      const cloneWeekSubmit = document.getElementById('cloneWeekSubmit');
-      const cloneWeekSource = document.getElementById('cloneWeekSource');
-      const cloneWeekTarget = document.getElementById('cloneWeekTarget');
-      const cloneWeekMode = document.getElementById('cloneWeekMode');
-      const validateScheduleBtnEl = document.getElementById('validateScheduleBtn');
-      if (validateScheduleBtnEl && scheduleCloneModal) {
-        const cloneBtn = document.createElement('button');
-        cloneBtn.type = 'button';
-        cloneBtn.className = 'btn btn-outline-primary btn-sm';
-        cloneBtn.textContent = 'Clone week';
-        validateScheduleBtnEl.parentElement.insertBefore(cloneBtn, validateScheduleBtnEl);
-        cloneBtn.addEventListener('click', () => {
-          const modal = new bootstrap.Modal(scheduleCloneModal);
-          modal.show();
-        });
-      }
-      if (cloneWeekSubmit) {
-        cloneWeekSubmit.addEventListener('click', async () => {
-          const res = await fetch('/admin/api/schedule/weeks/clone', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              source_week: Number(cloneWeekSource.value || 0),
-              target_week: Number(cloneWeekTarget.value || 0),
-              mode: cloneWeekMode.value,
-            }),
-          });
-          if (!res.ok) return alert('Помилка клонування тижня');
           window.location.reload();
         });
       }

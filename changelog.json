@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.86",
+      "date": "2026-04-10",
+      "items": [
+        "chore(admin-schedule-validate-removal): remove the schedule validation panel, its clone-week helper, and the sidebar entry from the admin schedule section"
+      ]
+    },
+    {
       "version": "1.5.85",
       "date": "2026-04-10",
       "items": [
