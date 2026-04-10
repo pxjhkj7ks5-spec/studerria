@@ -58185,14 +58185,17 @@ app.post('/admin/users/delete-permanent/batch', requireUsersSectionAccess, async
     if (!userIds.length) {
       return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Select users to delete'));
     }
-    const courseId = getAdminCourse(req);
     const currentUserId = Number(req.session.user && req.session.user.id ? req.session.user.id : 0);
-    const selectedUsers = await academicSetupHelpers.listLegacyCourseUsers(getAcademicSetupStore(), {
-      courseId,
-      userIds,
-      excludeRoles: ['admin'],
-    });
+    const selectedUsers = await db.all(
+      `
+        SELECT id, role
+        FROM users
+        WHERE id = ANY(?::int[])
+      `,
+      [userIds]
+    );
     const deletableIds = (selectedUsers || [])
+      .filter((user) => normalizeRoleKey(user.role || 'student') !== 'admin')
       .map((user) => Number(user.id || 0))
       .filter((value) => Number.isInteger(value) && value > 0)
       .filter((value) => value !== currentUserId);

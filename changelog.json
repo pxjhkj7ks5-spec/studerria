@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.80",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-legacy-transfer-batch-delete-scope): make the temporary legacy transfer bulk delete action look up selected users directly from the users table instead of the legacy course-scoped list so chosen users can actually be deleted without the old course filter blocking them"
+      ]
+    },
+    {
       "version": "1.5.79",
       "date": "2026-04-10",
       "items": [
