@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.81",
+      "date": "2026-04-10",
+      "items": [
+        "chore(admin-legacy-transfer-removal): remove the temporary legacy transfer admin section, its bulk actions, and the related backend helpers so the admin panel returns to the standard people workflow"
+      ]
+    },
+    {
       "version": "1.5.80",
       "date": "2026-04-10",
       "items": [

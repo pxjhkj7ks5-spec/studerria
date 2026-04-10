@@ -364,7 +364,6 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-role-access', label: 'Role Studio' },
   { id: 'admin-visit-analytics', label: 'Security analytics' },
   { id: 'admin-students', label: 'Students' },
-  { id: 'admin-legacy-transfer', label: 'Legacy transfer' },
   { id: 'admin-schedule', label: 'Розклад' },
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
   { id: 'admin-schedule-generator', label: 'Генератори' },
@@ -11468,180 +11467,6 @@ async function listAssignableAdminAcademicGroups(scopeState = {}) {
       summary: buildAdminAcademicGroupSummary(mapped),
     };
   });
-}
-
-async function listAllAssignableAdminAcademicGroups() {
-  const activeGroupFilter = "COALESCE(NULLIF(LOWER(TRIM(CAST(g.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')";
-  const activeCohortFilter = "COALESCE(NULLIF(LOWER(TRIM(CAST(c.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')";
-  const activeProgramFilter = "COALESCE(NULLIF(LOWER(TRIM(CAST(p.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')";
-  const rows = await db.all(
-    `
-      SELECT
-        g.id AS group_id,
-        g.label AS group_label,
-        g.stage_number,
-        g.campus_key,
-        g.legacy_course_id,
-        g.legacy_study_context_id,
-        c.id AS cohort_id,
-        c.label AS cohort_label,
-        c.admission_year,
-        c.legacy_admission_id AS admission_id,
-        p.id AS program_id,
-        p.name AS program_name,
-        p.code AS program_code,
-        p.track_key,
-        legacy_course.name AS legacy_course_name
-      FROM academic_v2_groups g
-      JOIN academic_v2_cohorts c ON c.id = g.cohort_id
-      JOIN academic_v2_programs p ON p.id = c.program_id
-      LEFT JOIN courses legacy_course ON legacy_course.id = g.legacy_course_id
-      WHERE ${activeGroupFilter}
-        AND ${activeCohortFilter}
-        AND ${activeProgramFilter}
-      ORDER BY
-        p.name ASC,
-        c.admission_year DESC,
-        g.stage_number ASC,
-        g.campus_key ASC,
-        g.label ASC,
-        g.id ASC
-    `
-  );
-  return (rows || []).map((row) => {
-    const stageNumber = normalizeStudyContextStage(row.stage_number, 1);
-    const trackKey = normalizeRegistrationTrack(row.track_key, 'bachelor');
-    const campusKey = normalizeCourseCampus(row.campus_key || 'kyiv');
-    const mapped = {
-      id: Number(row.group_id || 0),
-      group_id: Number(row.group_id || 0),
-      label: sanitizeCompactText(row.group_label || row.legacy_course_name || `Course ${row.group_id}`, 160),
-      group_label: sanitizeCompactText(row.group_label || row.legacy_course_name || `Course ${row.group_id}`, 160),
-      course_id: Number(row.legacy_course_id || 0) || null,
-      study_context_id: Number(row.legacy_study_context_id || 0) || null,
-      cohort_id: Number(row.cohort_id || 0) || null,
-      cohort_label: sanitizeCompactText(row.cohort_label || '', 120),
-      admission_year: Number(row.admission_year || 0) || null,
-      admission_id: Number(row.admission_id || 0) || null,
-      program_id: Number(row.program_id || 0) || null,
-      program_name: sanitizeCompactText(row.program_name || '', 160),
-      program_code: sanitizeCompactText(row.program_code || '', 80),
-      track_key: trackKey,
-      track_label: formatAdminAcademicTrackLabel(trackKey),
-      stage_number: stageNumber,
-      stage_label: `Stage ${stageNumber}`,
-      campus_key: campusKey,
-      campus_label: formatAdminAcademicCampusLabel(campusKey),
-      legacy_course_name: sanitizeCompactText(row.legacy_course_name || '', 160),
-    };
-    return {
-      ...mapped,
-      summary: buildAdminAcademicGroupSummary(mapped),
-    };
-  });
-}
-
-async function listAdminLegacyTransferUsers(options = {}) {
-  const filters = [];
-  const params = [];
-  const status = String(options.status || 'all').trim().toLowerCase();
-  const role = String(options.role || 'all').trim().toLowerCase();
-  const q = String(options.q || '').trim();
-  const legacyOnly = normalizeBoolean(options.legacyOnly, false);
-  if (status === 'active') {
-    filters.push('COALESCE(u.is_active, 1) <> 0');
-  } else if (status === 'inactive') {
-    filters.push('COALESCE(u.is_active, 1) = 0');
-  }
-  if (role && role !== 'all') {
-    filters.push('LOWER(COALESCE(u.role, \'student\')) = ?');
-    params.push(role);
-  }
-  if (q) {
-    filters.push('u.full_name ILIKE ?');
-    params.push(`%${q}%`);
-  }
-  if (legacyOnly) {
-    filters.push('(COALESCE(u.group_id, 0) = 0 OR COALESCE(u.study_context_id, 0) = 0)');
-  }
-  const whereSql = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-  return db.all(
-    `
-      SELECT
-        u.id,
-        u.full_name,
-        u.role,
-        u.schedule_group,
-        u.course_id,
-        u.group_id,
-        u.study_context_id,
-        u.study_program_id,
-        u.admission_id,
-        u.study_track,
-        u.is_active,
-        COALESCE(v2_group.label, sc.label, '') AS academic_group_label,
-        COALESCE(v2_group.legacy_course_id, primary_binding.course_id, u.course_id) AS resolved_course_id,
-        COALESCE(group_course.name, primary_course.name, course_meta.name, '') AS course_name,
-        COALESCE(sc.label, '') AS study_context_label,
-        COALESCE(v2_group.stage_number, sc.stage_number, 1) AS stage_number,
-        COALESCE(
-          NULLIF(TRIM(v2_group.campus_key), ''),
-          NULLIF(TRIM(sc.campus_key), ''),
-          NULLIF(TRIM(course_meta.location), ''),
-          'kyiv'
-        ) AS campus_key
-      FROM users u
-      LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
-      LEFT JOIN academic_v2_cohorts v2_cohort ON v2_cohort.id = v2_group.cohort_id
-      LEFT JOIN academic_v2_programs v2_program ON v2_program.id = v2_cohort.program_id
-      LEFT JOIN study_contexts sc ON sc.id = u.study_context_id
-      LEFT JOIN cohorts coh ON coh.id = sc.cohort_id
-      LEFT JOIN study_programs p ON p.id = coh.program_id
-      LEFT JOIN courses group_course ON group_course.id = v2_group.legacy_course_id
-      LEFT JOIN courses course_meta ON course_meta.id = u.course_id
-      LEFT JOIN LATERAL (
-        SELECT sccb.course_id
-        FROM study_context_course_bindings sccb
-        WHERE sccb.study_context_id = sc.id
-        ORDER BY sccb.is_primary DESC, sccb.course_id ASC
-        LIMIT 1
-      ) primary_binding ON true
-      LEFT JOIN courses primary_course ON primary_course.id = primary_binding.course_id
-      ${whereSql}
-      ORDER BY u.full_name ASC, u.id ASC
-    `,
-    params
-  ).then((rows) => (rows || []).map((row) => {
-    const stageNumber = normalizeStudyContextStage(row.stage_number, 1);
-    const campusKey = normalizeCourseCampus(row.campus_key || 'kyiv');
-    const resolvedCourseId = Number(row.resolved_course_id || row.course_id || 0) || null;
-    const courseName = sanitizeCompactText(row.course_name || '', 160);
-    const contextLabel = sanitizeCompactText(row.academic_group_label || row.study_context_label || '', 160);
-    const summaryParts = [];
-    if (contextLabel) summaryParts.push(contextLabel);
-    if (courseName) summaryParts.push(courseName);
-    if (stageNumber) summaryParts.push(`Stage ${stageNumber}`);
-    if (campusKey) summaryParts.push(formatAdminAcademicCampusLabel(campusKey));
-    return {
-      id: Number(row.id || 0),
-      full_name: sanitizeCompactText(row.full_name || '', 220),
-      role: normalizeRoleKey(row.role || 'student'),
-      schedule_group: sanitizeCompactText(row.schedule_group || '', 80),
-      course_id: Number(row.course_id || 0) || null,
-      group_id: Number(row.group_id || 0) || null,
-      study_context_id: Number(row.study_context_id || 0) || null,
-      study_program_id: Number(row.study_program_id || 0) || null,
-      admission_id: Number(row.admission_id || 0) || null,
-      study_track: normalizeRegistrationTrack(row.study_track || 'bachelor'),
-      is_active: Number(row.is_active || 0) === 0 ? 0 : 1,
-      academic_group_label: contextLabel,
-      study_context_label: sanitizeCompactText(row.study_context_label || '', 160),
-      current_course_label: courseName || (resolvedCourseId ? `Course ${resolvedCourseId}` : ''),
-      current_summary: summaryParts.filter(Boolean).join(' · '),
-      campus_key: campusKey,
-      stage_number: stageNumber,
-    };
-  }));
 }
 
 async function buildAdminAcademicScopeState(req, options = {}) {
@@ -39184,20 +39009,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     });
     let supportRequests = [];
     let selectedSupportRequest = null;
-    let legacyTransferUsers = [];
-    let legacyTransferGroups = [];
-    let legacyTransferFilters = {
-      q: String(req.query.legacy_transfer_q || '').trim(),
-      status: String(req.query.legacy_transfer_status || 'all').trim().toLowerCase(),
-      role: String(req.query.legacy_transfer_role || 'all').trim().toLowerCase(),
-      legacyOnly: normalizeBoolean(req.query.legacy_transfer_legacy_only, false),
-    };
-    if (!['active', 'inactive', 'all'].includes(legacyTransferFilters.status)) {
-      legacyTransferFilters.status = 'all';
-    }
-    if (!legacyTransferFilters.role) {
-      legacyTransferFilters.role = 'all';
-    }
     if (isAdminPanelOwner) {
       try {
         supportRequests = await listSupportRequestsForCourse(courseId, 40);
@@ -39215,14 +39026,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         }
       } catch (supportErr) {
         console.error('Database error (admin.supportRequests)', supportErr);
-      }
-      try {
-        [legacyTransferUsers, legacyTransferGroups] = await Promise.all([
-          listAdminLegacyTransferUsers(legacyTransferFilters),
-          listAllAssignableAdminAcademicGroups(),
-        ]);
-      } catch (legacyErr) {
-        console.error('Database error (admin.legacyTransfer)', legacyErr);
       }
     }
 
@@ -39287,9 +39090,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       courseKindOptions: COURSE_KIND_OPTIONS,
                                       userRoleAssignments: roleKeysByUser,
                                       userPrimaryRoleMap: primaryRoleByUser,
-                                      legacyTransferUsers,
-                                      legacyTransferGroups,
-                                      legacyTransferFilters,
         activeScheduleDays,
         filters: {
           group_number: group_number || '',
@@ -58060,157 +57860,6 @@ app.post('/admin/users/group/batch', requireUsersSectionAccess, async (req, res)
   } catch (err) {
     console.error('Academic v2 batch group move failed', err);
     return res.redirect(appendQueryParamToUrl(buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req)), 'err', 'Database error'));
-  }
-});
-
-app.post('/admin/users/legacy-transfer/batch', requireUsersSectionAccess, async (req, res) => {
-  const groupId = parsePositiveIntStrict(req.body.target_group_id || req.body.group_id);
-  const rawUserIds = Array.isArray(req.body.user_ids) ? req.body.user_ids : (req.body.user_ids ? [req.body.user_ids] : []);
-  const userIds = Array.from(new Set(
-    rawUserIds
-      .map((value) => parsePositiveIntStrict(value))
-      .filter((value) => Number.isInteger(value) && value > 0)
-  ));
-  const redirectWith = (kind, message) => buildAdminTabUrl(req, 'admin-legacy-transfer', {
-    legacy_transfer_q: String(req.body.legacy_transfer_q || req.query.legacy_transfer_q || '').trim(),
-    legacy_transfer_status: String(req.body.legacy_transfer_status || req.query.legacy_transfer_status || 'all').trim().toLowerCase() || 'all',
-    legacy_transfer_role: String(req.body.legacy_transfer_role || req.query.legacy_transfer_role || 'all').trim().toLowerCase() || 'all',
-    legacy_transfer_legacy_only: normalizeBoolean(req.body.legacy_transfer_legacy_only || req.query.legacy_transfer_legacy_only, false) ? '1' : '0',
-    [kind]: String(message || ''),
-  });
-  try {
-    await ensureDbReady();
-    if (!groupId || !userIds.length) {
-      return res.redirect(redirectWith('err', 'Select users and a target course'));
-    }
-    const targetGroup = await db.get(
-      `
-        SELECT
-          g.id AS group_id,
-          g.label AS group_label,
-          g.stage_number,
-          g.campus_key,
-          g.legacy_course_id,
-          g.legacy_study_context_id,
-          c.id AS cohort_id,
-          c.label AS cohort_label,
-          c.admission_year,
-          c.legacy_admission_id AS admission_id,
-          p.id AS program_id,
-          p.name AS program_name,
-          p.code AS program_code,
-          p.track_key,
-          legacy_course.name AS legacy_course_name
-        FROM academic_v2_groups g
-        JOIN academic_v2_cohorts c ON c.id = g.cohort_id
-        JOIN academic_v2_programs p ON p.id = c.program_id
-        LEFT JOIN courses legacy_course ON legacy_course.id = g.legacy_course_id
-        WHERE g.id = ?
-        LIMIT 1
-      `,
-      [groupId]
-    );
-    if (!targetGroup) {
-      return res.redirect(redirectWith('err', 'Target course not found'));
-    }
-    const selectedUsers = await db.all(
-      `
-        SELECT id, full_name, role, group_id, course_id, study_context_id, study_program_id, admission_id, study_track
-        FROM users
-        WHERE id = ANY(?::int[])
-      `,
-      [userIds]
-    );
-    const movableUsers = (selectedUsers || [])
-      .filter((user) => normalizeRoleKey(user.role || 'student') !== 'admin');
-    if (!movableUsers.length) {
-      return res.redirect(redirectWith('err', 'No movable users selected'));
-    }
-    const movableUserIds = movableUsers.map((user) => Number(user.id || 0)).filter((value) => Number.isInteger(value) && value > 0);
-    await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
-      group_id: Number(targetGroup.group_id || 0),
-      user_ids: movableUserIds,
-    });
-    for (const user of movableUsers) {
-      await persistRegistrationAcademicGroupPlacement(user.id, targetGroup);
-    }
-    logAction(db, req, 'legacy_transfer_users_batch', {
-      group_id: Number(targetGroup.group_id || 0),
-      user_ids: movableUserIds,
-      user_count: movableUserIds.length,
-    });
-    broadcast('users_updated');
-    return res.redirect(redirectWith('ok', `Moved ${movableUserIds.length} users`));
-  } catch (err) {
-    console.error('Legacy transfer batch failed', err);
-    return res.redirect(redirectWith('err', 'Database error'));
-  }
-});
-
-async function permanentlyDeleteAdminUser(userId, replacementUserId) {
-  const normalizedUserId = parsePositiveIntStrict(userId);
-  const normalizedReplacementUserId = parsePositiveIntStrict(replacementUserId);
-  if (!normalizedUserId) {
-    throw new Error('Invalid user');
-  }
-  await db.run('DELETE FROM student_groups WHERE student_id = ?', [normalizedUserId]);
-  await db.run('DELETE FROM login_history WHERE user_id = ?', [normalizedUserId]);
-  await db.run('DELETE FROM message_reads WHERE user_id = ?', [normalizedUserId]);
-  await db.run('DELETE FROM message_targets WHERE user_id = ?', [normalizedUserId]);
-  await db.run('DELETE FROM teamwork_members WHERE user_id = ?', [normalizedUserId]);
-  await db.run('UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [normalizedUserId]);
-  if (normalizedReplacementUserId) {
-    await db.run('UPDATE messages SET created_by_id = ? WHERE created_by_id = ?', [normalizedReplacementUserId, normalizedUserId]);
-    await db.run('UPDATE teamwork_tasks SET created_by = ? WHERE created_by = ?', [normalizedReplacementUserId, normalizedUserId]);
-    await db.run('UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [normalizedReplacementUserId, normalizedUserId]);
-  }
-  await db.run('DELETE FROM users WHERE id = ?', [normalizedUserId]);
-}
-
-app.post('/admin/users/delete-permanent/batch', requireUsersSectionAccess, async (req, res) => {
-  const rawUserIds = Array.isArray(req.body.user_ids) ? req.body.user_ids : (req.body.user_ids ? [req.body.user_ids] : []);
-  const userIds = Array.from(new Set(
-    rawUserIds
-      .map((value) => parsePositiveIntStrict(value))
-      .filter((value) => Number.isInteger(value) && value > 0)
-  ));
-  const redirectBase = buildAdminTabUrl(req, 'admin-legacy-transfer', {
-    legacy_transfer_q: String(req.body.legacy_transfer_q || req.query.legacy_transfer_q || '').trim(),
-    legacy_transfer_status: String(req.body.legacy_transfer_status || req.query.legacy_transfer_status || 'all').trim().toLowerCase() || 'all',
-    legacy_transfer_role: String(req.body.legacy_transfer_role || req.query.legacy_transfer_role || 'all').trim().toLowerCase() || 'all',
-    legacy_transfer_legacy_only: normalizeBoolean(req.body.legacy_transfer_legacy_only || req.query.legacy_transfer_legacy_only, false) ? '1' : '0',
-  });
-  try {
-    await ensureDbReady();
-    if (!userIds.length) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Select users to delete'));
-    }
-    const currentUserId = Number(req.session.user && req.session.user.id ? req.session.user.id : 0);
-    const selectedUsers = await db.all(
-      `
-        SELECT id, role
-        FROM users
-        WHERE id = ANY(?::int[])
-      `,
-      [userIds]
-    );
-    const deletableIds = (selectedUsers || [])
-      .filter((user) => normalizeRoleKey(user.role || 'student') !== 'admin')
-      .map((user) => Number(user.id || 0))
-      .filter((value) => Number.isInteger(value) && value > 0)
-      .filter((value) => value !== currentUserId);
-    if (!deletableIds.length) {
-      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No deletable users selected'));
-    }
-    for (const userId of deletableIds) {
-      await permanentlyDeleteAdminUser(userId, req.session.user.id);
-    }
-    logAction(db, req, 'users_delete_permanent_batch', { user_ids: deletableIds, count: deletableIds.length });
-    broadcast('users_updated');
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', `Deleted ${deletableIds.length} users`));
-  } catch (err) {
-    console.error('Bulk permanent delete failed', err);
-    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
   }
 });
 
