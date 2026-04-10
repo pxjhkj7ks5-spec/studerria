@@ -1046,7 +1046,6 @@
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Schedule</div>
             <% if (sectionAllowed('admin-schedule')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-editor">Schedule Editor</button>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-validate">Validate Schedule</button>
             <% } %>
             <% if (sectionAllowed('admin-import-export')) { %>
@@ -1773,7 +1772,7 @@
         </div>
         <% } %>
 
-        <% if (sectionAllowed('admin-schedule')) { %>
+        <% if (false && sectionAllowed('admin-schedule')) { %>
         <div id="admin-schedule-editor" class="admin-panel" data-admin-title="Schedule / Editor">
           <div class="card mb-4">
             <div class="card-body">

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.85",
+      "date": "2026-04-10",
+      "items": [
+        "chore(admin-schedule-editor-removal): hide the legacy Schedule Editor block from the admin sidebar and panel so the admin view no longer exposes that manual editing section"
+      ]
+    },
+    {
       "version": "1.5.84",
       "date": "2026-04-10",
       "items": [
