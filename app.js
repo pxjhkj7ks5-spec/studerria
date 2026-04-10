@@ -58971,11 +58971,11 @@ app.get('/admin/users/:id/roles.json', requireRoleAccessSectionAccess, async (re
   }
 });
 
-app.post('/admin/users/roles', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
+app.post('/admin/users/roles', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-users' }), async (req, res) => {
   const userId = Number(req.body.user_id);
   const courseId = getAdminCourse(req);
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
-    tab: 'admin-role-studio',
+    tab: 'admin-users',
   });
   const selectedRoles = normalizeRoleList(
     Array.isArray(req.body.role_keys) ? req.body.role_keys : (req.body.role_keys ? [req.body.role_keys] : [])
@@ -59063,11 +59063,11 @@ app.post('/admin/users/roles', requireRoleAccessSectionAccess, requireSensitiveA
   }
 });
 
-app.post('/admin/users/role', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
+app.post('/admin/users/role', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-users' }), async (req, res) => {
   const { user_id, role } = req.body;
   const roleKey = normalizeRoleKey(role);
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
-    tab: 'admin-role-studio',
+    tab: 'admin-users',
   });
   if (!user_id || !roleKey || !['student', 'admin', 'starosta', 'deanery', 'teacher'].includes(roleKey)) {
     return res.redirect(redirectWith('err', 'Invalid role'));

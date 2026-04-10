@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.5.93",
+      "version": "1.5.94",
       "date": "2026-04-10",
       "items": [
-        "fix(admin-legacy-course-force-delete): allow legacy cleanup deletes to remove related legacy subjects, semesters, homework, messages, activity logs, and user rows automatically, with cleanup panel rows always deletable and semester cleanup ordered before course deletion to avoid FK conflicts"
+        "fix(admin-user-role-redirect): keep user role changes on the users tab instead of redirecting into Role Studio"
       ]
     },
     {
