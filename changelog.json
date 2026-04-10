@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.5.95",
+      "version": "1.5.96",
       "date": "2026-04-10",
       "items": [
-        "fix(admin-legacy-course-delete): add fallback cleanup for all course/semester-scoped tables so legacy course deletion no longer fails on leftover FK rows"
+        "fix(admin-users-modal-scroll): make the user actions modal scroll internally and keep the admin navbar/sidebar stable when reaching the bottom of the dialog"
       ]
     },
     {
