@@ -1747,11 +1747,6 @@
                             </label>
                           <% }); %>
                         </div>
-                        <div class="role-studio-simulator role-studio-simulator--compact mb-0" data-rbac-simulator>
-                          <div class="small text-muted mb-2" data-rbac-sim-summary>Оберіть permissions для перегляду доступу.</div>
-                          <div class="d-flex flex-wrap gap-1 mb-2" data-rbac-sim-admin></div>
-                          <div class="d-flex flex-wrap gap-1" data-rbac-sim-feature></div>
-                        </div>
                       </div>
                       <div class="d-flex flex-wrap gap-2">
                         <button class="btn btn-outline-primary" type="submit">Зберегти роль</button>
@@ -6569,10 +6564,6 @@
             acc[section.id] = section.label;
             return acc;
           }, {})) %>;
-          const rbacPermissionMeta = <%- JSON.stringify((rbacPermissionOptionsList || []).reduce((acc, permission) => {
-            acc[permission.key] = { label: permission.label, category: permission.category };
-            return acc;
-          }, {})) %>;
           const rbacCourseDefaults = {
             admin: ['regular', 'teacher'],
             teacher: ['regular', 'teacher'],
@@ -6581,8 +6572,8 @@
             student: ['regular'],
           };
           const rbacMulticourseDefaults = <%- JSON.stringify((typeof defaultRoleMulticourse !== 'undefined' && defaultRoleMulticourse) ? defaultRoleMulticourse : {}) %>;
-          const roleSnapshots = new Map();
           const ROLE_DRAFT_PREFIX = 'admin:rbac:draft:';
+          const roleSnapshots = new Map();
           let draftRestoreNotified = false;
 
           const getRoleForm = (roleKey) =>
@@ -6611,74 +6602,6 @@
               input.checked = allowed.has(input.value);
             });
           };
-          const renderRolePermissionSimulation = (form) => {
-            if (!form) return;
-            const summaryEl = form.querySelector('[data-rbac-sim-summary]');
-            const adminListEl = form.querySelector('[data-rbac-sim-admin]');
-            const featureListEl = form.querySelector('[data-rbac-sim-feature]');
-            if (!summaryEl || !adminListEl || !featureListEl) return;
-
-            const renderPreviewChips = (items, labelMap, maxVisible = 6) => {
-              const visibleItems = items.slice(0, maxVisible);
-              const hiddenCount = Math.max(0, items.length - visibleItems.length);
-              const chipsHtml = visibleItems.map((key) => `<span class="badge admin-chip role-studio-sim-chip">${labelMap[key] || key}</span>`);
-              if (hiddenCount > 0) {
-                chipsHtml.push(`<span class="badge admin-chip role-studio-sim-chip role-studio-sim-chip--more">+${hiddenCount}</span>`);
-              }
-              return chipsHtml.join('');
-            };
-
-            const selectedPermissions = Array.from(form.querySelectorAll('input[name="permission_keys"]:checked'))
-              .map((input) => String(input.value || '').trim())
-              .filter(Boolean);
-            const adminSections = selectedPermissions.filter((key) => Object.prototype.hasOwnProperty.call(adminSectionLabelMap, key));
-            const featurePermissions = selectedPermissions.filter((key) => !Object.prototype.hasOwnProperty.call(adminSectionLabelMap, key));
-            const featureLabelMap = Object.fromEntries(featurePermissions.map((key) => {
-              const meta = rbacPermissionMeta[key] || { label: key, category: 'feature' };
-              return [key, meta.label];
-            }));
-
-            if (adminSections.length) {
-              summaryEl.textContent = `Адмін-доступ: ${adminSections.length} секцій`;
-            } else {
-              summaryEl.textContent = 'Немає адмін-доступу';
-            }
-
-            adminListEl.innerHTML = adminSections.length
-              ? renderPreviewChips(
-                adminSections
-                  .sort((a, b) => String(adminSectionLabelMap[a] || a).localeCompare(String(adminSectionLabelMap[b] || b), 'uk-UA')),
-                adminSectionLabelMap,
-                window.innerWidth <= 768 ? 4 : 6
-              )
-              : '<span class="text-muted small">Немає секцій</span>';
-
-            featureListEl.innerHTML = featurePermissions.length
-              ? renderPreviewChips(
-                featurePermissions
-                .sort((a, b) => {
-                  const aLabel = rbacPermissionMeta[a] && rbacPermissionMeta[a].label ? rbacPermissionMeta[a].label : a;
-                  const bLabel = rbacPermissionMeta[b] && rbacPermissionMeta[b].label ? rbacPermissionMeta[b].label : b;
-                  return String(aLabel).localeCompare(String(bLabel), 'uk-UA');
-                })
-                .map((key) => key),
-                featureLabelMap,
-                window.innerWidth <= 768 ? 4 : 6
-              )
-              : '<span class="text-muted small">Немає feature-доступів</span>';
-          };
-          const renderAllRolePermissionSimulations = () => {
-            rbacRoleForms.forEach((form) => renderRolePermissionSimulation(form));
-          };
-          let roleStudioPreviewResizeTimer = null;
-          window.addEventListener('resize', () => {
-            if (roleStudioPreviewResizeTimer) {
-              window.clearTimeout(roleStudioPreviewResizeTimer);
-            }
-            roleStudioPreviewResizeTimer = window.setTimeout(() => {
-              renderAllRolePermissionSimulations();
-            }, 120);
-          });
           const applyRoleDraft = (form, payload) => {
             if (!payload || typeof payload !== 'object') return;
             const labelField = form.querySelector('input[name="label"]');
@@ -6691,7 +6614,6 @@
             if (multicourseField) multicourseField.checked = !!payload.multicourse_enabled;
             setCheckedValues(form, 'permission_keys', payload.permission_keys || []);
             setCheckedValues(form, 'course_kinds', payload.course_kinds || []);
-            renderRolePermissionSimulation(form);
           };
           const saveRoleDraft = (form) => {
             const draftKey = getRoleDraftKey(form);
@@ -6729,7 +6651,6 @@
             if (activeField && !activeField.disabled) activeField.checked = true;
             if (multicourseField) multicourseField.checked = multicourseEnabled;
             saveRoleDraft(form);
-            renderRolePermissionSimulation(form);
             return true;
           };
           const revertRoleSnapshots = () => {
@@ -6740,7 +6661,6 @@
               applyRoleDraft(form, snapshot);
               clearRoleDraft(form);
             });
-            renderAllRolePermissionSimulations();
           };
           const applySystemDefaults = () => {
             ['admin', 'deanery', 'starosta', 'teacher', 'student'].forEach((roleKey) => {
@@ -6762,21 +6682,17 @@
                 clearRoleDraft(form);
               }
             }
-            renderRolePermissionSimulation(form);
           });
           captureRoleSnapshots();
-          renderAllRolePermissionSimulations();
           rbacRoleForms.forEach((form) => {
             const fields = Array.from(form.querySelectorAll('input, select, textarea'));
             fields.forEach((field) => {
               if (!field || field.disabled || !field.name) return;
               field.addEventListener('input', () => {
                 saveRoleDraft(form);
-                renderRolePermissionSimulation(form);
               });
               field.addEventListener('change', () => {
                 saveRoleDraft(form);
-                renderRolePermissionSimulation(form);
               });
             });
             form.addEventListener('submit', () => {

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.84",
+      "date": "2026-04-10",
+      "items": [
+        "chore(admin-role-studio-preview-removal): remove the access preview block from Role Studio so role editing now shows only the permission controls without the generated scope summary chips"
+      ]
+    },
+    {
       "version": "1.5.83",
       "date": "2026-04-10",
       "items": [
