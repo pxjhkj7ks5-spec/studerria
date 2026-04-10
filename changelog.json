@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.82",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-users-hydration): refresh the users table on initial admin page load so the placement subtitle under each username is hydrated immediately instead of appearing only after the first interaction"
+      ]
+    },
+    {
       "version": "1.5.81",
       "date": "2026-04-10",
       "items": [
