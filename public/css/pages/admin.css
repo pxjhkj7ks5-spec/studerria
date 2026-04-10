@@ -883,6 +883,21 @@ body.theme-light .admin-chip {
   color: #334155;
 }
 
+.teacher-request-subject-chip {
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+body.theme-light .teacher-request-subject-chip {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(238, 243, 255, 0.88));
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  color: #1d4ed8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 8px 18px rgba(148, 163, 184, 0.12);
+}
+
 .settings-section {
   padding: 14px 16px;
   border-radius: var(--r-md);

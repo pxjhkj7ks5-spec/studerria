@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.83",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-teacher-requests-subject-chips): restyle the teacher request subject list as light-theme-friendly chips so selected disciplines stay readable instead of collapsing into the darker default badge styling"
+      ]
+    },
+    {
       "version": "1.5.82",
       "date": "2026-04-10",
       "items": [
