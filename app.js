@@ -40546,18 +40546,19 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         const subjectsCount = Number(dependencyCounts.subjects || 0);
         const semestersCount = Number(dependencyCounts.semesters || 0);
         const campusKey = normalizeCourseCampus(course && course.location ? course.location : 'kyiv');
-        const isTeacherCourse = course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1);
         return {
           ...course,
           campus_key: campusKey,
           campus_label: campusKey === 'munich' ? 'Munich' : 'Kyiv',
-          kind_label: isTeacherCourse ? 'Teacher course' : 'Legacy course',
+          kind_label: course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)
+            ? 'Teacher course'
+            : 'Legacy course',
           dependency_counts: {
             users: usersCount,
             subjects: subjectsCount,
             semesters: semestersCount,
           },
-          deletable: !isTeacherCourse,
+          deletable: true,
         };
       })
     );
@@ -57734,35 +57735,10 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
     return res.redirect(redirectWith('err', 'Invalid course'));
   }
   try {
-    const courseRow = await db.get(
-      'SELECT id, name, is_teacher_course FROM courses WHERE id = ? LIMIT 1',
-      [courseId]
-    );
+    const courseRow = await db.get('SELECT id, name FROM courses WHERE id = ? LIMIT 1', [courseId]);
     if (!courseRow) {
       return res.redirect(redirectWith('err', 'Course not found'));
     }
-    const isTeacherCourse = courseRow.is_teacher_course === true || Number(courseRow.is_teacher_course) === 1;
-    if (isTeacherCourse) {
-      const counts = await academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId);
-      if (Number(counts.users || 0) > 0) {
-        return res.redirect(redirectWith('err', 'Course has users'));
-      }
-      if (Number(counts.subjects || 0) > 0) {
-        return res.redirect(redirectWith('err', 'Course has subjects'));
-      }
-      if (Number(counts.semesters || 0) > 0) {
-        return res.redirect(redirectWith('err', 'Course has semesters'));
-      }
-      await db.run('DELETE FROM courses WHERE id = ?', [courseId]);
-      logAction(db, req, 'course_delete', { id: courseId, forced_cleanup: false });
-      invalidateCoursesCache();
-      invalidateRegistrationPathwaysCache();
-      invalidateSubjectsCache(courseId);
-      invalidateSemestersCache(courseId);
-      invalidateStudyDaysCache(courseId);
-      return res.redirect(redirectWith('ok', 'Course deleted'));
-    }
-
     const dependencyCounts = await academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId);
     const semesterRows = await db.all('SELECT id FROM semesters WHERE course_id = ?', [courseId]);
     const semesterIds = Array.isArray(semesterRows)

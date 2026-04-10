@@ -2269,8 +2269,7 @@
                     <% if (legacyCourseCleanupRowsData.length) { %>
                       <% legacyCourseCleanupRowsData.forEach(function(course) { %>
                         <% const dep = course.dependency_counts || { users: 0, subjects: 0, semesters: 0 }; %>
-                        <% const isTeacherCourse = course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1); %>
-                        <% const safeToDelete = !isTeacherCourse; %>
+                        <% const safeToDelete = Boolean(course.deletable); %>
                         <tr class="<%= safeToDelete ? '' : 'table-warning-subtle' %>">
                           <td class="fw-semibold"><%= course.name %> <span class="text-muted">#<%= course.id %></span></td>
                           <td><%= course.campus_label || 'Kyiv' %></td>
