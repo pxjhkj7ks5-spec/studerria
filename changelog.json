@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.76",
+      "date": "2026-04-10",
+      "items": [
+        "feat(admin-legacy-transfer): add a temporary admin section that lists all users with global filters and a bulk move action so legacy users can be reassigned into new Academic V2 groups without touching the scoped users workflow"
+      ]
+    },
+    {
       "version": "1.5.75",
       "date": "2026-04-09",
       "items": [

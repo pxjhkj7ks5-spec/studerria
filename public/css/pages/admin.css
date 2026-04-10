@@ -964,6 +964,10 @@ body.theme-light .bulk-bar {
   display: contents;
 }
 
+.legacy-transfer-target-select {
+  min-width: min(58vw, 760px);
+}
+
 .bulk-bar-content > .btn {
   flex: 0 0 auto;
   white-space: nowrap;
@@ -1336,6 +1340,11 @@ body.theme-light .admin-toast.is-error {
   }
 
   #moveUsersContextForm .form-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .legacy-transfer-target-select {
     min-width: 0;
     width: 100%;
   }
