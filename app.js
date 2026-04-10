@@ -58147,6 +58147,70 @@ app.post('/admin/users/legacy-transfer/batch', requireUsersSectionAccess, async 
   }
 });
 
+async function permanentlyDeleteAdminUser(userId, replacementUserId) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  const normalizedReplacementUserId = parsePositiveIntStrict(replacementUserId);
+  if (!normalizedUserId) {
+    throw new Error('Invalid user');
+  }
+  await db.run('DELETE FROM student_groups WHERE student_id = ?', [normalizedUserId]);
+  await db.run('DELETE FROM login_history WHERE user_id = ?', [normalizedUserId]);
+  await db.run('DELETE FROM message_reads WHERE user_id = ?', [normalizedUserId]);
+  await db.run('DELETE FROM message_targets WHERE user_id = ?', [normalizedUserId]);
+  await db.run('DELETE FROM teamwork_members WHERE user_id = ?', [normalizedUserId]);
+  await db.run('UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [normalizedUserId]);
+  if (normalizedReplacementUserId) {
+    await db.run('UPDATE messages SET created_by_id = ? WHERE created_by_id = ?', [normalizedReplacementUserId, normalizedUserId]);
+    await db.run('UPDATE teamwork_tasks SET created_by = ? WHERE created_by = ?', [normalizedReplacementUserId, normalizedUserId]);
+    await db.run('UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [normalizedReplacementUserId, normalizedUserId]);
+  }
+  await db.run('DELETE FROM users WHERE id = ?', [normalizedUserId]);
+}
+
+app.post('/admin/users/delete-permanent/batch', requireUsersSectionAccess, async (req, res) => {
+  const rawUserIds = Array.isArray(req.body.user_ids) ? req.body.user_ids : (req.body.user_ids ? [req.body.user_ids] : []);
+  const userIds = Array.from(new Set(
+    rawUserIds
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  const redirectBase = buildAdminTabUrl(req, 'admin-legacy-transfer', {
+    legacy_transfer_q: String(req.body.legacy_transfer_q || req.query.legacy_transfer_q || '').trim(),
+    legacy_transfer_status: String(req.body.legacy_transfer_status || req.query.legacy_transfer_status || 'all').trim().toLowerCase() || 'all',
+    legacy_transfer_role: String(req.body.legacy_transfer_role || req.query.legacy_transfer_role || 'all').trim().toLowerCase() || 'all',
+    legacy_transfer_legacy_only: normalizeBoolean(req.body.legacy_transfer_legacy_only || req.query.legacy_transfer_legacy_only, false) ? '1' : '0',
+  });
+  try {
+    await ensureDbReady();
+    if (!userIds.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Select users to delete'));
+    }
+    const courseId = getAdminCourse(req);
+    const currentUserId = Number(req.session.user && req.session.user.id ? req.session.user.id : 0);
+    const selectedUsers = await academicSetupHelpers.listLegacyCourseUsers(getAcademicSetupStore(), {
+      courseId,
+      userIds,
+      excludeRoles: ['admin'],
+    });
+    const deletableIds = (selectedUsers || [])
+      .map((user) => Number(user.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+      .filter((value) => value !== currentUserId);
+    if (!deletableIds.length) {
+      return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'No deletable users selected'));
+    }
+    for (const userId of deletableIds) {
+      await permanentlyDeleteAdminUser(userId, req.session.user.id);
+    }
+    logAction(db, req, 'users_delete_permanent_batch', { user_ids: deletableIds, count: deletableIds.length });
+    broadcast('users_updated');
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'ok', `Deleted ${deletableIds.length} users`));
+  } catch (err) {
+    console.error('Bulk permanent delete failed', err);
+    return res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error'));
+  }
+});
+
 app.post('/admin/users/study-context', requireUsersSectionAccess, async (req, res) => {
   return res.redirect(buildLegacyUserAssignmentFreezeUrl(req));
 });

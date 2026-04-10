@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.77",
+      "date": "2026-04-10",
+      "items": [
+        "feat(admin-legacy-transfer-delete): extend the temporary legacy transfer admin section with permanent delete actions so selected users can now be reassigned or fully removed from the same queue"
+      ]
+    },
+    {
       "version": "1.5.76",
       "date": "2026-04-10",
       "items": [

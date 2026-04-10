@@ -2799,6 +2799,18 @@
                 <% }); %>
               </select>
               <button class="btn btn-primary btn-sm" type="submit" form="legacyTransferBulkForm" id="legacyTransferMoveSelected" data-confirm="Move selected users to the chosen course?" data-confirm-level="warning">Move selected</button>
+              <button
+                class="btn btn-danger btn-sm"
+                type="submit"
+                form="legacyTransferBulkForm"
+                formaction="/admin/users/delete-permanent/batch"
+                id="legacyTransferDeleteSelected"
+                data-confirm="Permanently delete the selected users? This cannot be undone."
+                data-confirm-level="danger"
+                data-confirm-typed="DELETE PERMANENTLY"
+              >
+                Delete permanently
+              </button>
             </div>
           </div>
 
@@ -7014,16 +7026,18 @@
       const legacyTransferBulkCount = document.getElementById('legacyTransferBulkCount');
       const legacyTransferTargetSelect = document.getElementById('legacyTransferTargetSelect');
       const legacyTransferMoveSelected = document.getElementById('legacyTransferMoveSelected');
+      const legacyTransferDeleteSelected = document.getElementById('legacyTransferDeleteSelected');
       const legacyTransferBulkForm = document.getElementById('legacyTransferBulkForm');
 
       function updateLegacyTransferBulkBar() {
-        if (!legacyTransferBulkBar || !legacyTransferBulkCount || !legacyTransferTargetSelect || !legacyTransferMoveSelected) {
+        if (!legacyTransferBulkBar || !legacyTransferBulkCount || !legacyTransferTargetSelect || !legacyTransferMoveSelected || !legacyTransferDeleteSelected) {
           return;
         }
         const selected = document.querySelectorAll('#legacyTransferUsersBody input[name="user_ids[]"]:checked').length;
         legacyTransferBulkCount.textContent = String(selected);
         legacyTransferBulkBar.classList.toggle('is-visible', selected > 0);
         legacyTransferMoveSelected.disabled = !(selected > 0 && String(legacyTransferTargetSelect.value || '').trim());
+        legacyTransferDeleteSelected.disabled = selected < 1;
       }
 
       if (legacyTransferSelectAll) {
@@ -7047,7 +7061,12 @@
         legacyTransferBulkForm.addEventListener('submit', (event) => {
           updateLegacyTransferBulkBar();
           const selectedIds = document.querySelectorAll('#legacyTransferUsersBody input[name="user_ids[]"]:checked').length;
-          if (!selectedIds || !String(legacyTransferTargetSelect && legacyTransferTargetSelect.value || '').trim()) {
+          const targetAction = String((event.submitter && event.submitter.getAttribute('formaction')) || legacyTransferBulkForm.getAttribute('action') || '');
+          if (!selectedIds) {
+            event.preventDefault();
+            return;
+          }
+          if (targetAction.indexOf('/delete-permanent/batch') === -1 && !String(legacyTransferTargetSelect && legacyTransferTargetSelect.value || '').trim()) {
             event.preventDefault();
           }
         });
