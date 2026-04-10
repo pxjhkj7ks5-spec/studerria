@@ -1036,7 +1036,7 @@ const probeSessionStoreHealth = async (reason = 'interval') => {
   }
 };
 
-sessionStore = new PgSession({
+const sessionStore = new PgSession({
   pool,
   tableName: sessionTableName,
   createTableIfMissing: true,
@@ -1520,15 +1520,13 @@ const withTransaction = async (work) => {
 };
 
 let usersHasIsActive = true;
-let sessionStore = null;
-
-const syncSessionStoreSecurityState = () => {
+function syncSessionStoreSecurityState() {
   if (!sessionStore) return;
   sessionStore.ttl = Math.max(
     60,
     Math.floor(resolveSessionAbsoluteTimeoutMs(settingsCache.session_absolute_timeout_hours) / 1000)
   );
-};
+}
 
 const refreshSettingsCache = async () => {
   const settingsRows = await pool.query('SELECT key, value FROM settings');

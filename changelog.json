@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.89",
+      "date": "2026-04-10",
+      "items": [
+        "fix(admin-security-startup): move session store initialization and security sync setup ahead of first use so the app boots cleanly instead of crashing into 502 responses after the security hardening update"
+      ]
+    },
+    {
       "version": "1.5.88",
       "date": "2026-04-10",
       "items": [
