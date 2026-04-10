@@ -483,45 +483,126 @@ const PATHWAY_TRACK_FILTER_KEYS = new Set(PATHWAY_TRACK_FILTER_OPTIONS.map((item
 
 const SETTINGS_RETENTION_MIN_DAYS = 14;
 const SETTINGS_RETENTION_MAX_DAYS = 3650;
+const LOGIN_HISTORY_RETENTION_MIN_DAYS = 30;
+const ACTIVITY_LOG_RETENTION_MIN_DAYS = 14;
+const SECURITY_LOGS_RETENTION_MIN_DAYS = 30;
+const SECURITY_IP_RETENTION_MIN_DAYS = 30;
+const SECURITY_DEVICE_RETENTION_MIN_DAYS = 30;
+const SESSION_IDLE_TIMEOUT_MINUTES_MIN = 5;
+const SESSION_IDLE_TIMEOUT_MINUTES_MAX = 1440;
+const SESSION_ABSOLUTE_TIMEOUT_HOURS_MIN = 1;
+const SESSION_ABSOLUTE_TIMEOUT_HOURS_MAX = 24 * 90;
+const SECURITY_STEPUP_REAUTH_MINUTES_MIN = 5;
+const SECURITY_STEPUP_REAUTH_MINUTES_MAX = 1440;
+const SECURITY_RISK_THRESHOLD_MIN = 5;
+const SECURITY_RISK_THRESHOLD_MAX = 1000;
 const SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN = 2;
 const SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX = 20;
 const SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MIN = 15;
 const SECURITY_REGISTRATION_ALERT_WINDOW_MINUTES_MAX = 1440;
-const SECURITY_ADMIN_IP_ALLOWLIST_LIMIT = 120;
-const SECURITY_ADMIN_IP_RULE_MAX_LENGTH = 64;
+const SECURITY_ADMIN_IP_ALLOWLIST_LIMIT = securityHelpers.ADMIN_IP_ALLOWLIST_LIMIT;
+const SECURITY_ADMIN_IP_RULE_MAX_LENGTH = securityHelpers.ADMIN_IP_RULE_MAX_LENGTH;
 
 function normalizeRetentionDays(rawValue, fallbackDays) {
+  return normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+    min: SETTINGS_RETENTION_MIN_DAYS,
+    max: SETTINGS_RETENTION_MAX_DAYS,
+  });
+}
+
+function normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+  min = SETTINGS_RETENTION_MIN_DAYS,
+  max = SETTINGS_RETENTION_MAX_DAYS,
+} = {}) {
   const parsed = Number(rawValue);
   if (!Number.isFinite(parsed)) return fallbackDays;
   const rounded = Math.floor(parsed);
-  if (rounded < SETTINGS_RETENTION_MIN_DAYS) return fallbackDays;
-  if (rounded > SETTINGS_RETENTION_MAX_DAYS) return SETTINGS_RETENTION_MAX_DAYS;
+  if (rounded < min) return fallbackDays;
+  if (rounded > max) return max;
   return rounded;
+}
+
+function normalizeSiteVisitRetentionDays(rawValue, fallbackDays = DEFAULT_SETTINGS?.site_visit_retention_days || SITE_VISIT_RETENTION_DAYS_DEFAULT) {
+  return normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+    min: SETTINGS_RETENTION_MIN_DAYS,
+    max: SETTINGS_RETENTION_MAX_DAYS,
+  });
+}
+
+function normalizeLoginHistoryRetentionDays(rawValue, fallbackDays = DEFAULT_SETTINGS?.login_history_retention_days || LOGIN_HISTORY_RETENTION_DAYS_DEFAULT) {
+  return normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+    min: LOGIN_HISTORY_RETENTION_MIN_DAYS,
+    max: SETTINGS_RETENTION_MAX_DAYS,
+  });
+}
+
+function normalizeActivityLogRetentionDays(rawValue, fallbackDays = DEFAULT_SETTINGS?.activity_log_retention_days || ACTIVITY_LOG_RETENTION_DAYS_DEFAULT) {
+  return normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+    min: ACTIVITY_LOG_RETENTION_MIN_DAYS,
+    max: SETTINGS_RETENTION_MAX_DAYS,
+  });
+}
+
+function normalizeSecurityLogsRetentionDays(rawValue, fallbackDays = DEFAULT_SETTINGS?.security_logs_retention_days || SECURITY_LOGS_RETENTION_DAYS_DEFAULT) {
+  return normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+    min: SECURITY_LOGS_RETENTION_MIN_DAYS,
+    max: SETTINGS_RETENTION_MAX_DAYS,
+  });
+}
+
+function normalizeSecurityIpRetentionDays(rawValue, fallbackDays = DEFAULT_SETTINGS?.security_ip_retention_days || SECURITY_IP_RETENTION_DAYS_DEFAULT) {
+  return normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+    min: SECURITY_IP_RETENTION_MIN_DAYS,
+    max: SETTINGS_RETENTION_MAX_DAYS,
+  });
+}
+
+function normalizeSecurityDeviceRetentionDays(rawValue, fallbackDays = DEFAULT_SETTINGS?.security_device_retention_days || SECURITY_DEVICE_RETENTION_DAYS_DEFAULT) {
+  return normalizeRetentionDaysWithBounds(rawValue, fallbackDays, {
+    min: SECURITY_DEVICE_RETENTION_MIN_DAYS,
+    max: SETTINGS_RETENTION_MAX_DAYS,
+  });
 }
 
 const SITE_VISIT_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
   process.env.SITE_VISIT_RETENTION_DAYS,
   120
 );
-const LOGIN_HISTORY_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+const LOGIN_HISTORY_RETENTION_DAYS_DEFAULT = normalizeLoginHistoryRetentionDays(
   process.env.LOGIN_HISTORY_RETENTION_DAYS,
-  180
+  60
 );
-const ACTIVITY_LOG_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+const ACTIVITY_LOG_RETENTION_DAYS_DEFAULT = normalizeActivityLogRetentionDays(
   process.env.ACTIVITY_LOG_RETENTION_DAYS,
-  365
+  21
 );
-const SECURITY_IP_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
+const SECURITY_IP_RETENTION_DAYS_DEFAULT = normalizeSecurityIpRetentionDays(
   process.env.SECURITY_IP_RETENTION_DAYS,
-  180
+  45
 );
-const SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT = normalizeRetentionDays(
-  process.env.SECURITY_USER_AGENT_RETENTION_DAYS,
+const SECURITY_DEVICE_RETENTION_DAYS_DEFAULT = normalizeSecurityDeviceRetentionDays(
+  process.env.SECURITY_DEVICE_RETENTION_DAYS || process.env.SECURITY_USER_AGENT_RETENTION_DAYS,
+  45
+);
+const SECURITY_LOGS_RETENTION_DAYS_DEFAULT = normalizeSecurityLogsRetentionDays(
+  process.env.SECURITY_LOGS_RETENTION_DAYS,
   120
 );
+const SESSION_SECURITY_DEFAULTS = securityHelpers.normalizeSessionSecuritySettings({
+  idleTimeoutMinutes: process.env.SESSION_IDLE_TIMEOUT_MINUTES,
+  absoluteTimeoutHours: process.env.SESSION_ABSOLUTE_TIMEOUT_HOURS,
+  stepUpReauthMinutes: process.env.SECURITY_STEPUP_REAUTH_MINUTES,
+});
+const SECURITY_RISK_THRESHOLDS_DEFAULTS = securityHelpers.buildRiskThresholds({
+  low: process.env.SECURITY_RISK_THRESHOLD_LOW,
+  medium: process.env.SECURITY_RISK_THRESHOLD_MEDIUM,
+  high: process.env.SECURITY_RISK_THRESHOLD_HIGH,
+}, securityHelpers.SECURITY_RISK_THRESHOLDS_DEFAULTS);
 
 const DEFAULT_SETTINGS = {
   session_duration_days: 14,
+  session_idle_timeout_minutes: SESSION_SECURITY_DEFAULTS.idleTimeoutMinutes,
+  session_absolute_timeout_hours: SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours,
   max_file_size_mb: 20,
   allow_homework_creation: true,
   min_team_members: 2,
@@ -530,22 +611,33 @@ const DEFAULT_SETTINGS = {
   allow_messages: true,
   schedule_refresh_minutes: 5,
   site_visit_retention_days: SITE_VISIT_RETENTION_DAYS_DEFAULT,
+  security_logs_retention_days: SECURITY_LOGS_RETENTION_DAYS_DEFAULT,
   login_history_retention_days: LOGIN_HISTORY_RETENTION_DAYS_DEFAULT,
   activity_log_retention_days: ACTIVITY_LOG_RETENTION_DAYS_DEFAULT,
   security_admin_ip_allowlist: '',
+  security_stepup_reauth_minutes: SESSION_SECURITY_DEFAULTS.stepUpReauthMinutes,
+  security_risk_threshold_low: SECURITY_RISK_THRESHOLDS_DEFAULTS.low,
+  security_risk_threshold_medium: SECURITY_RISK_THRESHOLDS_DEFAULTS.medium,
+  security_risk_threshold_high: SECURITY_RISK_THRESHOLDS_DEFAULTS.high,
   security_registration_alert_threshold: 3,
   security_registration_alert_window_minutes: 120,
   security_auto_quarantine_enabled: true,
   security_ip_retention_days: SECURITY_IP_RETENTION_DAYS_DEFAULT,
-  security_user_agent_retention_days: SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT,
+  security_user_agent_retention_days: SECURITY_DEVICE_RETENTION_DAYS_DEFAULT,
+  security_device_retention_days: SECURITY_DEVICE_RETENTION_DAYS_DEFAULT,
   role_permissions: { ...DEFAULT_ROLE_PERMISSIONS },
 };
 let settingsCache = { ...DEFAULT_SETTINGS };
 const SESSION_DAY_MS = 24 * 60 * 60 * 1000;
+const SESSION_HOUR_MS = 60 * 60 * 1000;
+const SESSION_MINUTE_MS = 60 * 1000;
+const SESSION_ACTIVITY_TOUCH_INTERVAL_MS = 30 * 1000;
 const ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS = 'system_settings';
 const ADMIN_AUDIT_SCOPE_ROLE_STUDIO = 'role_studio';
 const SYSTEM_SETTINGS_AUDIT_KEYS = [
   'session_duration_days',
+  'session_idle_timeout_minutes',
+  'session_absolute_timeout_hours',
   'max_file_size_mb',
   'allow_homework_creation',
   'min_team_members',
@@ -554,26 +646,57 @@ const SYSTEM_SETTINGS_AUDIT_KEYS = [
   'allow_messages',
   'schedule_refresh_minutes',
   'site_visit_retention_days',
+  'security_logs_retention_days',
   'login_history_retention_days',
   'activity_log_retention_days',
   'security_admin_ip_allowlist',
+  'security_stepup_reauth_minutes',
+  'security_risk_threshold_low',
+  'security_risk_threshold_medium',
+  'security_risk_threshold_high',
   'security_registration_alert_threshold',
   'security_registration_alert_window_minutes',
   'security_auto_quarantine_enabled',
   'security_ip_retention_days',
   'security_user_agent_retention_days',
+  'security_device_retention_days',
 ];
 
-function resolveSessionTtlDays(rawDays) {
-  const parsedDays = Number(rawDays);
-  if (!Number.isFinite(parsedDays) || parsedDays < 1) {
-    return DEFAULT_SETTINGS.session_duration_days;
-  }
-  return Math.floor(parsedDays);
+function resolveSessionIdleTimeoutMinutes(rawMinutes) {
+  return securityHelpers.normalizeSessionSecuritySettings({
+    idleTimeoutMinutes: rawMinutes,
+    absoluteTimeoutHours: DEFAULT_SETTINGS.session_absolute_timeout_hours,
+    stepUpReauthMinutes: DEFAULT_SETTINGS.security_stepup_reauth_minutes,
+  }).idleTimeoutMinutes;
 }
 
-function resolveSessionTtlMs(rawDays) {
-  return resolveSessionTtlDays(rawDays) * SESSION_DAY_MS;
+function resolveSessionAbsoluteTimeoutHours(rawHours) {
+  return securityHelpers.normalizeSessionSecuritySettings({
+    idleTimeoutMinutes: DEFAULT_SETTINGS.session_idle_timeout_minutes,
+    absoluteTimeoutHours: rawHours,
+    stepUpReauthMinutes: DEFAULT_SETTINGS.security_stepup_reauth_minutes,
+  }).absoluteTimeoutHours;
+}
+
+function resolveStepUpReauthMinutes(rawMinutes) {
+  return securityHelpers.normalizeSessionSecuritySettings({
+    idleTimeoutMinutes: DEFAULT_SETTINGS.session_idle_timeout_minutes,
+    absoluteTimeoutHours: DEFAULT_SETTINGS.session_absolute_timeout_hours,
+    stepUpReauthMinutes: rawMinutes,
+  }).stepUpReauthMinutes;
+}
+
+function resolveSessionAbsoluteTimeoutMs(rawHours) {
+  return resolveSessionAbsoluteTimeoutHours(rawHours) * SESSION_HOUR_MS;
+}
+
+function resolveSessionIdleTimeoutMs(rawMinutes) {
+  return resolveSessionIdleTimeoutMinutes(rawMinutes) * SESSION_MINUTE_MS;
+}
+
+function resolveSessionCompatibilityDays(rawHours) {
+  const absoluteHours = resolveSessionAbsoluteTimeoutHours(rawHours);
+  return Math.max(1, Math.ceil(absoluteHours / 24));
 }
 
 function isRememberRequested(rawValue) {
@@ -913,12 +1036,12 @@ const probeSessionStoreHealth = async (reason = 'interval') => {
   }
 };
 
-const sessionStore = new PgSession({
+sessionStore = new PgSession({
   pool,
   tableName: sessionTableName,
   createTableIfMissing: true,
   pruneSessionInterval: pruneIntervalSeconds,
-  ttl: Math.floor(resolveSessionTtlMs(DEFAULT_SETTINGS.session_duration_days) / 1000),
+  ttl: Math.floor(resolveSessionAbsoluteTimeoutMs(DEFAULT_SETTINGS.session_absolute_timeout_hours) / 1000),
   errorLog: (...args) => {
     const nowIso = new Date().toISOString();
     const message = normalizeSessionHealthError(args
@@ -947,9 +1070,11 @@ const sessionMiddleware = session({
     httpOnly: true,
     sameSite: 'lax',
     secure: isProd,
-    maxAge: resolveSessionTtlMs(DEFAULT_SETTINGS.session_duration_days),
+    maxAge: resolveSessionAbsoluteTimeoutMs(DEFAULT_SETTINGS.session_absolute_timeout_hours),
   },
 });
+
+syncSessionStoreSecurityState();
 
 app.use(sessionMiddleware);
 
@@ -975,6 +1100,16 @@ const destroyRequestSession = (req) => new Promise((resolve, reject) => {
   return req.session.destroy((err) => (err ? reject(err) : resolve()));
 });
 
+function clearSessionCookie(res) {
+  if (!res || typeof res.clearCookie !== 'function') return;
+  res.clearCookie(sessionCookieName, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd,
+    path: '/',
+  });
+}
+
 const establishAuthenticatedSession = async (req, {
   user,
   role,
@@ -988,6 +1123,7 @@ const establishAuthenticatedSession = async (req, {
   }
   const safeRole = normalizeRoleKey(role || 'student');
   const existingLang = req.session && req.session.lang ? req.session.lang : null;
+  const nowIso = new Date().toISOString();
   await regenerateRequestSession(req);
   req.session.user = normalizedUser;
   req.session.role = safeRole;
@@ -995,7 +1131,12 @@ const establishAuthenticatedSession = async (req, {
   req.session.role_fingerprint = buildSessionRoleFingerprint(req.session.roles);
   req.session.lang = normalizedUser.language || existingLang || getPreferredLang(req);
   req.session.rememberMe = remember;
-  Object.assign(req.session, sessionData);
+  Object.assign(req.session, {
+    session_created_at: nowIso,
+    last_seen_at: nowIso,
+    last_activity_at: nowIso,
+    last_sensitive_reauth_at: nowIso,
+  }, sessionData);
   applyRememberMe(req, remember);
 };
 
@@ -1021,6 +1162,8 @@ const rotateSessionForRoleChange = async (req, nextRoleKeys = [], nextLegacyRole
     last_seen_ip: req.session.last_seen_ip || null,
     last_seen_user_agent: req.session.last_seen_user_agent || null,
     session_created_at: req.session.session_created_at || null,
+    last_activity_at: req.session.last_activity_at || null,
+    last_sensitive_reauth_at: req.session.last_sensitive_reauth_at || null,
   };
   await regenerateRequestSession(req);
   req.session.user = sessionUser;
@@ -1040,12 +1183,61 @@ const rotateSessionForRoleChange = async (req, nextRoleKeys = [], nextLegacyRole
 app.use((req, _res, next) => {
   if (req.session && req.session.cookie) {
     if (req.session.rememberMe) {
-      req.session.cookie.maxAge = resolveSessionTtlMs(settingsCache.session_duration_days);
+      req.session.cookie.maxAge = resolveSessionAbsoluteTimeoutMs(settingsCache.session_absolute_timeout_hours);
     } else {
       req.session.cookie.expires = false;
       req.session.cookie.maxAge = null;
     }
   }
+  return next();
+});
+
+app.use(async (req, res, next) => {
+  if (!req.session || !req.session.user) {
+    return next();
+  }
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  if (!req.session.session_created_at) {
+    req.session.session_created_at = nowIso;
+  }
+  if (!req.session.last_activity_at) {
+    req.session.last_activity_at = req.session.last_seen_at || nowIso;
+  }
+
+  const createdAtMs = new Date(req.session.session_created_at).getTime();
+  const lastActivityMs = new Date(req.session.last_activity_at).getTime();
+  const absoluteTimeoutMs = resolveSessionAbsoluteTimeoutMs(settingsCache.session_absolute_timeout_hours);
+  const idleTimeoutMs = resolveSessionIdleTimeoutMs(settingsCache.session_idle_timeout_minutes);
+  const idleExpired = Number.isFinite(lastActivityMs) && (nowMs - lastActivityMs) > idleTimeoutMs;
+  const absoluteExpired = Number.isFinite(createdAtMs) && (nowMs - createdAtMs) > absoluteTimeoutMs;
+
+  if (idleExpired || absoluteExpired) {
+    try {
+      await destroyRequestSession(req);
+    } catch (destroyErr) {
+      console.error('Session destroy after timeout failed', destroyErr);
+    }
+    clearSessionCookie(res);
+    const timeoutCode = idleExpired ? 'idle-timeout' : 'absolute-timeout';
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.status(440).json({ error: timeoutCode });
+    }
+    return res.redirect(`/login?error=${encodeURIComponent(timeoutCode)}`);
+  }
+
+  if (
+    !Number.isFinite(lastActivityMs)
+    || (nowMs - lastActivityMs) >= SESSION_ACTIVITY_TOUCH_INTERVAL_MS
+    || req.method !== 'GET'
+  ) {
+    req.session.last_activity_at = nowIso;
+  }
+  res.locals.sessionSecurity = {
+    last_sensitive_reauth_at: req.session.last_sensitive_reauth_at || null,
+    idle_timeout_minutes: resolveSessionIdleTimeoutMinutes(settingsCache.session_idle_timeout_minutes),
+    absolute_timeout_hours: resolveSessionAbsoluteTimeoutHours(settingsCache.session_absolute_timeout_hours),
+  };
   return next();
 });
 
@@ -1061,6 +1253,11 @@ app.use((req, res, next) => {
   res.locals.authorName = 'Andrii Marchenko';
   res.locals.changelog = appChangelog;
   res.locals.settings = settingsCache;
+  res.locals.sessionSecurity = Object.assign({
+    last_sensitive_reauth_at: req && req.session ? (req.session.last_sensitive_reauth_at || null) : null,
+    idle_timeout_minutes: resolveSessionIdleTimeoutMinutes(settingsCache.session_idle_timeout_minutes),
+    absolute_timeout_hours: resolveSessionAbsoluteTimeoutHours(settingsCache.session_absolute_timeout_hours),
+  }, res.locals.sessionSecurity || {});
   res.locals.lang = lang;
   res.locals.t = (key) => translate(lang, key);
   next();
@@ -1323,6 +1520,15 @@ const withTransaction = async (work) => {
 };
 
 let usersHasIsActive = true;
+let sessionStore = null;
+
+const syncSessionStoreSecurityState = () => {
+  if (!sessionStore) return;
+  sessionStore.ttl = Math.max(
+    60,
+    Math.floor(resolveSessionAbsoluteTimeoutMs(settingsCache.session_absolute_timeout_hours) / 1000)
+  );
+};
 
 const refreshSettingsCache = async () => {
   const settingsRows = await pool.query('SELECT key, value FROM settings');
@@ -1331,7 +1537,17 @@ const refreshSettingsCache = async () => {
     if (!row || !row.key) continue;
     if (row.key === 'session_duration_days') {
       const n = Number(row.value);
-      if (!Number.isNaN(n) && n > 0) parsed.session_duration_days = n;
+      if (!Number.isNaN(n) && n > 0) {
+        parsed.session_duration_days = n;
+        parsed.session_absolute_timeout_hours = Math.max(
+          SESSION_ABSOLUTE_TIMEOUT_HOURS_MIN,
+          Math.min(SESSION_ABSOLUTE_TIMEOUT_HOURS_MAX, n * 24)
+        );
+      }
+    } else if (row.key === 'session_idle_timeout_minutes') {
+      parsed.session_idle_timeout_minutes = resolveSessionIdleTimeoutMinutes(row.value);
+    } else if (row.key === 'session_absolute_timeout_hours') {
+      parsed.session_absolute_timeout_hours = resolveSessionAbsoluteTimeoutHours(row.value);
     } else if (row.key === 'max_file_size_mb') {
       const n = Number(row.value);
       if (!Number.isNaN(n) && n > 0) parsed.max_file_size_mb = n;
@@ -1350,13 +1566,44 @@ const refreshSettingsCache = async () => {
       const n = Number(row.value);
       if (!Number.isNaN(n) && n > 0) parsed.schedule_refresh_minutes = n;
     } else if (row.key === 'site_visit_retention_days') {
-      parsed.site_visit_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.site_visit_retention_days);
+      parsed.site_visit_retention_days = normalizeSiteVisitRetentionDays(
+        row.value,
+        DEFAULT_SETTINGS.site_visit_retention_days
+      );
+    } else if (row.key === 'security_logs_retention_days') {
+      parsed.security_logs_retention_days = normalizeSecurityLogsRetentionDays(
+        row.value,
+        DEFAULT_SETTINGS.security_logs_retention_days
+      );
     } else if (row.key === 'login_history_retention_days') {
-      parsed.login_history_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.login_history_retention_days);
+      parsed.login_history_retention_days = normalizeLoginHistoryRetentionDays(
+        row.value,
+        DEFAULT_SETTINGS.login_history_retention_days
+      );
     } else if (row.key === 'activity_log_retention_days') {
-      parsed.activity_log_retention_days = normalizeRetentionDays(row.value, DEFAULT_SETTINGS.activity_log_retention_days);
+      parsed.activity_log_retention_days = normalizeActivityLogRetentionDays(
+        row.value,
+        DEFAULT_SETTINGS.activity_log_retention_days
+      );
     } else if (row.key === 'security_admin_ip_allowlist') {
       parsed.security_admin_ip_allowlist = normalizeSecurityAdminIpAllowlist(row.value);
+    } else if (row.key === 'security_stepup_reauth_minutes') {
+      parsed.security_stepup_reauth_minutes = resolveStepUpReauthMinutes(row.value);
+    } else if (row.key === 'security_risk_threshold_low') {
+      parsed.security_risk_threshold_low = normalizeSecurityRiskThresholdValue(
+        row.value,
+        DEFAULT_SETTINGS.security_risk_threshold_low
+      );
+    } else if (row.key === 'security_risk_threshold_medium') {
+      parsed.security_risk_threshold_medium = normalizeSecurityRiskThresholdValue(
+        row.value,
+        DEFAULT_SETTINGS.security_risk_threshold_medium
+      );
+    } else if (row.key === 'security_risk_threshold_high') {
+      parsed.security_risk_threshold_high = normalizeSecurityRiskThresholdValue(
+        row.value,
+        DEFAULT_SETTINGS.security_risk_threshold_high
+      );
     } else if (row.key === 'security_registration_alert_threshold') {
       parsed.security_registration_alert_threshold = normalizeSecurityRegistrationAlertThreshold(
         row.value,
@@ -1370,15 +1617,22 @@ const refreshSettingsCache = async () => {
     } else if (row.key === 'security_auto_quarantine_enabled') {
       parsed.security_auto_quarantine_enabled = String(row.value).toLowerCase() === 'true';
     } else if (row.key === 'security_ip_retention_days') {
-      parsed.security_ip_retention_days = normalizeRetentionDays(
+      parsed.security_ip_retention_days = normalizeSecurityIpRetentionDays(
         row.value,
         DEFAULT_SETTINGS.security_ip_retention_days
       );
     } else if (row.key === 'security_user_agent_retention_days') {
-      parsed.security_user_agent_retention_days = normalizeRetentionDays(
+      parsed.security_user_agent_retention_days = normalizeSecurityDeviceRetentionDays(
         row.value,
         DEFAULT_SETTINGS.security_user_agent_retention_days
       );
+      parsed.security_device_retention_days = parsed.security_user_agent_retention_days;
+    } else if (row.key === 'security_device_retention_days') {
+      parsed.security_device_retention_days = normalizeSecurityDeviceRetentionDays(
+        row.value,
+        DEFAULT_SETTINGS.security_device_retention_days
+      );
+      parsed.security_user_agent_retention_days = parsed.security_device_retention_days;
     } else if (row.key === 'role_permissions') {
       try {
         const raw = JSON.parse(row.value);
@@ -1419,7 +1673,22 @@ const refreshSettingsCache = async () => {
       }
     }
   }
+  const normalizedThresholds = securityHelpers.buildRiskThresholds({
+    low: parsed.security_risk_threshold_low,
+    medium: parsed.security_risk_threshold_medium,
+    high: parsed.security_risk_threshold_high,
+  }, SECURITY_RISK_THRESHOLDS_DEFAULTS);
+  parsed.security_risk_threshold_low = normalizedThresholds.low;
+  parsed.security_risk_threshold_medium = normalizedThresholds.medium;
+  parsed.security_risk_threshold_high = normalizedThresholds.high;
+  parsed.session_duration_days = resolveSessionCompatibilityDays(parsed.session_absolute_timeout_hours);
+  parsed.security_user_agent_retention_days = normalizeSecurityDeviceRetentionDays(
+    parsed.security_device_retention_days,
+    DEFAULT_SETTINGS.security_user_agent_retention_days
+  );
+  parsed.security_device_retention_days = parsed.security_user_agent_retention_days;
   settingsCache = parsed;
+  syncSessionStoreSecurityState();
 };
 
 function normalizeRoleKey(rawRole) {
@@ -2189,6 +2458,95 @@ app.use(async (req, res, next) => {
   }
   return next();
 });
+
+function getSensitiveReauthWindowMs() {
+  return resolveStepUpReauthMinutes(settingsCache.security_stepup_reauth_minutes) * SESSION_MINUTE_MS;
+}
+
+function hasFreshSensitiveReauth(req, nowMs = Date.now()) {
+  const lastReauthAt = req && req.session ? req.session.last_sensitive_reauth_at : null;
+  const lastReauthMs = lastReauthAt ? new Date(lastReauthAt).getTime() : NaN;
+  if (!Number.isFinite(lastReauthMs)) return false;
+  return (nowMs - lastReauthMs) <= getSensitiveReauthWindowMs();
+}
+
+async function ensureSensitiveActionReauth(req) {
+  if (!req || !req.session || !req.session.user) {
+    return { ok: false, error: 'Login required' };
+  }
+  if (hasFreshSensitiveReauth(req)) {
+    return {
+      ok: true,
+      reused: true,
+      last_sensitive_reauth_at: req.session.last_sensitive_reauth_at || null,
+    };
+  }
+
+  const confirmPassword = String(req.body?.confirm_password || req.query?.confirm_password || '').trim();
+  if (!confirmPassword) {
+    return {
+      ok: false,
+      error: 'Sensitive action requires password confirmation',
+      code: 'reauth_required',
+    };
+  }
+
+  await ensureDbReady();
+  const actorId = Number(req.session.user.id || 0);
+  const actorRow = await db.get(
+    'SELECT password_hash FROM users WHERE id = ? LIMIT 1',
+    [actorId]
+  );
+  const valid = actorRow && actorRow.password_hash
+    ? bcrypt.compareSync(confirmPassword, actorRow.password_hash)
+    : false;
+  if (!valid) {
+    return {
+      ok: false,
+      error: 'Password confirmation failed',
+      code: 'reauth_failed',
+    };
+  }
+
+  req.session.last_sensitive_reauth_at = new Date().toISOString();
+  await saveRequestSession(req);
+  return {
+    ok: true,
+    reused: false,
+    last_sensitive_reauth_at: req.session.last_sensitive_reauth_at,
+  };
+}
+
+function requireSensitiveActionReauth({ tab = 'admin-settings', json = false } = {}) {
+  return async (req, res, next) => {
+    try {
+      const state = await ensureSensitiveActionReauth(req);
+      if (state.ok) {
+        req.sensitiveReauth = state;
+        return next();
+      }
+      const wantsJson = json || (req.headers.accept && req.headers.accept.includes('application/json'));
+      if (wantsJson) {
+        return res.status(403).json({
+          error: state.error || 'Sensitive action requires password confirmation',
+          sensitive_reauth_required: true,
+        });
+      }
+      return res.redirect(buildAdminScopedNoticeUrl(
+        req,
+        'err',
+        state.error || 'Sensitive action requires password confirmation',
+        { tab }
+      ));
+    } catch (err) {
+      console.error('Sensitive reauth failed', err);
+      if (json || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+        return res.status(500).json({ error: 'Sensitive reauth failed' });
+      }
+      return res.redirect(buildAdminScopedNoticeUrl(req, 'err', 'Sensitive reauth failed', { tab }));
+    }
+  };
+}
 
 function requireAdminPanelAccess(req, res, next) {
   if (!req.session || !req.session.user) {
@@ -8721,10 +9079,15 @@ function logAction(dbRef, req, action, details) {
     ? req.session.user.course_id || 1
     : null;
   const createdAt = new Date().toISOString();
-  dbRef.run(
+  const insertPromise = dbRef.run(
     'INSERT INTO history_log (actor_id, actor_name, action, details, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
     [actorId, actorName, action, details ? JSON.stringify(details) : null, createdAt, courseId]
   );
+  Promise.resolve(insertPromise).catch((err) => {
+    console.error('Database error (history_log.insert)', err);
+    return null;
+  });
+  queueAdminSecurityTelemetry(req, action, details, insertPromise);
   broadcast('history_updated');
 }
 
@@ -8796,97 +9159,43 @@ function normalizeSecurityRegistrationAlertWindowMinutes(rawValue, fallback = DE
   return rounded;
 }
 
+function normalizeSecurityRiskThresholdValue(rawValue, fallback) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return Number(fallback);
+  const rounded = Math.floor(parsed);
+  if (rounded < SECURITY_RISK_THRESHOLD_MIN) return Number(fallback);
+  if (rounded > SECURITY_RISK_THRESHOLD_MAX) return SECURITY_RISK_THRESHOLD_MAX;
+  return rounded;
+}
+
+function resolveSecurityRiskThresholds() {
+  return securityHelpers.buildRiskThresholds({
+    low: settingsCache.security_risk_threshold_low,
+    medium: settingsCache.security_risk_threshold_medium,
+    high: settingsCache.security_risk_threshold_high,
+  }, SECURITY_RISK_THRESHOLDS_DEFAULTS);
+}
+
 function parseSecurityAdminIpAllowlist(rawValue) {
-  const input = String(rawValue || '');
-  const seen = new Set();
-  const rules = [];
-  input
-    .split(/[\n,;]+/)
-    .map((chunk) => String(chunk || '').trim())
-    .filter(Boolean)
-    .forEach((chunk) => {
-      const cleaned = chunk.replace(/\s+/g, '').slice(0, SECURITY_ADMIN_IP_RULE_MAX_LENGTH);
-      if (!cleaned) return;
-      const normalized = normalizeForensicsIp(cleaned) || cleaned;
-      const key = normalized.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      rules.push(normalized);
-    });
-  return rules.slice(0, SECURITY_ADMIN_IP_ALLOWLIST_LIMIT);
+  return securityHelpers.parseAdminIpAllowlist(rawValue, {
+    limit: SECURITY_ADMIN_IP_ALLOWLIST_LIMIT,
+  });
 }
 
 function normalizeSecurityAdminIpAllowlist(rawValue) {
-  return parseSecurityAdminIpAllowlist(rawValue).join('\n');
+  return securityHelpers.formatAdminIpAllowlist(rawValue);
 }
 
-function parseIpv4ToInt(rawIp) {
-  const ip = String(rawIp || '').trim();
-  const parts = ip.split('.');
-  if (parts.length !== 4) return null;
-  let acc = 0;
-  for (const part of parts) {
-    if (!/^\d{1,3}$/.test(part)) return null;
-    const value = Number(part);
-    if (!Number.isInteger(value) || value < 0 || value > 255) return null;
-    acc = (acc << 8) + value;
-  }
-  return acc >>> 0;
-}
-
-function parseIpv4CidrRule(rawRule) {
-  const value = String(rawRule || '').trim();
-  const segments = value.split('/');
-  if (segments.length !== 2) return null;
-  const ipInt = parseIpv4ToInt(segments[0]);
-  if (ipInt === null) return null;
-  const prefix = Number(segments[1]);
-  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) return null;
-  const mask = prefix === 0 ? 0 : ((0xffffffff << (32 - prefix)) >>> 0);
-  return {
-    network: ipInt & mask,
-    mask,
-  };
+function getTrustedAdminIpAssessment(rawIp, rawAllowlist = settingsCache.security_admin_ip_allowlist) {
+  return securityHelpers.matchAdminIpAllowlist(rawIp, rawAllowlist);
 }
 
 function isSecurityAdminIpAllowlisted(rawIp, rawAllowlist = settingsCache.security_admin_ip_allowlist) {
-  const ip = normalizeForensicsIp(rawIp);
-  if (!ip) return false;
-  const rules = Array.isArray(rawAllowlist)
-    ? rawAllowlist
-    : parseSecurityAdminIpAllowlist(rawAllowlist);
-  if (!rules.length) return false;
-  const normalizedIp = String(ip).toLowerCase();
-  const ipInt = parseIpv4ToInt(normalizedIp);
-  for (const rawRule of rules) {
-    const rule = String(rawRule || '').trim().toLowerCase();
-    if (!rule) continue;
-    if (rule === normalizedIp) return true;
-    if (rule.endsWith('*')) {
-      const prefix = rule.slice(0, -1);
-      if (prefix && normalizedIp.startsWith(prefix)) return true;
-      continue;
-    }
-    if (rule.includes('/')) {
-      const cidr = parseIpv4CidrRule(rule);
-      if (!cidr || ipInt === null) continue;
-      if ((ipInt & cidr.mask) === cidr.network) return true;
-    }
-  }
-  return false;
+  return getTrustedAdminIpAssessment(rawIp, rawAllowlist).matched;
 }
 
 function buildForensicsDeviceFingerprint(rawValue) {
-  const normalized = normalizeForensicsAgent(rawValue);
-  if (!normalized) return null;
-  const compact = normalized.toLowerCase();
-  const browserMatch = compact.match(/(edg|chrome|safari|firefox|opr|opera|trident|msie)\/[0-9.]+/);
-  const osMatch = compact.match(/(windows nt [0-9.]+|android [0-9.]+|iphone os [0-9_]+|ipad; cpu os [0-9_]+|mac os x [0-9_]+|linux)/);
-  const deviceMatch = compact.match(/(mobile|tablet|desktop)/);
-  const browser = browserMatch ? browserMatch[1] : 'browser';
-  const os = osMatch ? osMatch[1].replace(/\s+/g, '-') : 'os';
-  const device = deviceMatch ? deviceMatch[1] : 'device';
-  return `${browser}|${os}|${device}`.slice(0, 180);
+  return securityHelpers.buildDeviceFingerprint(rawValue);
 }
 
 function resolveForensicsConfidence(scoreRaw) {
@@ -8905,8 +9214,6 @@ function resolveForensicsRiskState(scoreRaw) {
   return { key: 'clear', label: 'Ознак ризику не виявлено' };
 }
 
-const SECURITY_CASE_SCORE_WATCH = 50;
-const SECURITY_CASE_SCORE_HIGH = 90;
 const SECURITY_ALERT_LOOKBACK_HOURS = 72;
 const SECURITY_SESSION_LIST_LIMIT = 120;
 const SECURITY_DASHBOARD_RECOMPUTE_LIMIT_DEFAULT = 220;
@@ -8929,12 +9236,20 @@ function normalizeSecurityCaseStatus(rawStatus) {
   return 'open';
 }
 
+function getSecurityCaseScoreWatch() {
+  return resolveSecurityRiskThresholds().medium;
+}
+
+function getSecurityCaseScoreHigh() {
+  return resolveSecurityRiskThresholds().high;
+}
+
 function resolveSecurityCaseLevel(scoreRaw) {
   const score = Number(scoreRaw || 0);
-  if (score >= SECURITY_CASE_SCORE_HIGH) {
+  if (score >= getSecurityCaseScoreHigh()) {
     return { key: 'high-risk', label: 'Високий ризик' };
   }
-  if (score >= SECURITY_CASE_SCORE_WATCH) {
+  if (score >= getSecurityCaseScoreWatch()) {
     return { key: 'watch', label: 'Під наглядом' };
   }
   return { key: 'normal', label: 'Нормально' };
@@ -9127,6 +9442,459 @@ function normalizeOptionalCourseId(courseId) {
   return parsePositiveIntStrict(courseId) || null;
 }
 
+function normalizeTriggeredSecurityRules(rawRules = []) {
+  return (Array.isArray(rawRules) ? rawRules : [])
+    .map((rule) => {
+      const key = String(rule && rule.key ? rule.key : '').trim().toLowerCase();
+      const label = trimSecurityText(rule && rule.label ? rule.label : key, 220) || key;
+      const points = Number(rule && rule.points ? rule.points : 0);
+      if (!key || !label || !Number.isFinite(points) || points === 0) return null;
+      return {
+        key,
+        label,
+        points: Math.round(points),
+        category: String(rule && rule.category ? rule.category : '').trim().toLowerCase() || null,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function buildSecurityRule(key, points, label, extra = {}) {
+  return {
+    key,
+    points,
+    label,
+    ...extra,
+  };
+}
+
+function extractTriggeredSecurityRuleLabels(rules = []) {
+  return normalizeTriggeredSecurityRules(rules).map((rule) => rule.label);
+}
+
+async function recordSecurityRiskEvent({
+  userId = null,
+  actorUserId = null,
+  courseId = null,
+  sessionId = null,
+  ip = null,
+  userAgent = null,
+  sourceType = 'behavior',
+  actionType = 'security_event',
+  triggeredRules = [],
+  title = null,
+  message = null,
+  metadata = null,
+  forceAlert = false,
+  allowAutoQuarantine = true,
+}) {
+  const normalizedRules = normalizeTriggeredSecurityRules(triggeredRules);
+  if (!normalizedRules.length) {
+    return {
+      skipped: true,
+      risk: { score: 0, level: 'none', label: 'None' },
+      triggered_rules: [],
+    };
+  }
+
+  const normalizedIp = normalizeForensicsIp(ip);
+  const normalizedUserAgent = normalizeForensicsAgent(userAgent);
+  const allowlistAssessment = getTrustedAdminIpAssessment(normalizedIp);
+  const trustRule = allowlistAssessment.matched
+    ? buildSecurityRule(
+        'trusted_admin_ip_bonus',
+        -Math.abs(Number(allowlistAssessment.trustBonus || securityHelpers.TRUSTED_ADMIN_IP_RISK_BONUS || 0)),
+        `Trusted admin IP matched (${allowlistAssessment.rule?.normalized || normalizedIp})`,
+        { category: 'trust' }
+      )
+    : null;
+  const rulesForStorage = trustRule ? [...normalizedRules, trustRule] : [...normalizedRules];
+  const baseScore = normalizedRules.reduce((acc, rule) => acc + Number(rule.points || 0), 0);
+  const trustBonus = allowlistAssessment.matched
+    ? Math.abs(Number(allowlistAssessment.trustBonus || securityHelpers.TRUSTED_ADMIN_IP_RISK_BONUS || 0))
+    : 0;
+  const finalScore = Math.max(0, baseScore - trustBonus);
+  const thresholds = resolveSecurityRiskThresholds();
+  const risk = securityHelpers.resolveRiskLevel(finalScore, thresholds);
+  const normalizedSourceType = trimSecurityText(sourceType || 'behavior', 64) || 'behavior';
+  const normalizedActionType = trimSecurityText(actionType || 'security_event', 96) || 'security_event';
+  const normalizedCourseId = normalizeOptionalCourseId(courseId);
+  const normalizedUserId = Number.isFinite(Number(userId)) ? Number(userId) : null;
+  const normalizedActorUserId = Number.isFinite(Number(actorUserId)) ? Number(actorUserId) : null;
+  const normalizedSessionId = normalizeForensicsToken(sessionId);
+  const normalizedMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+  const deviceFingerprint = buildForensicsDeviceFingerprint(normalizedUserAgent);
+  const geoKey = securityHelpers.buildGeoFingerprint(normalizedIp);
+
+  let alertStatus = 'none';
+  let alertEventId = null;
+  if (forceAlert || risk.key === 'medium' || risk.key === 'high') {
+    const alertEvent = await emitSecurityAlertEvent({
+      alertKey: `risk-${normalizedActionType}`,
+      severity: risk.key === 'high' ? 'high' : 'medium',
+      title: title || `Security risk: ${normalizedActionType}`,
+      message: message || extractTriggeredSecurityRuleLabels(normalizedRules).join(' · ') || normalizedActionType,
+      userId: normalizedUserId,
+      courseId: normalizedCourseId,
+      details: {
+        source_type: normalizedSourceType,
+        action_type: normalizedActionType,
+        risk_score: finalScore,
+        risk_level: risk.key,
+        triggered_rules: rulesForStorage,
+        ...normalizedMetadata,
+      },
+      dedupKey: `risk|${normalizedActionType}|${normalizedUserId || normalizedActorUserId || normalizedIp || 'global'}|${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+    });
+    alertStatus = alertEvent && alertEvent.deduped ? 'deduped' : 'open';
+    alertEventId = alertEvent && alertEvent.id ? Number(alertEvent.id) : null;
+  }
+
+  let quarantineStatus = 'none';
+  if (normalizedUserId) {
+    try {
+      const recomputed = await recomputeUserSecurityCase(normalizedUserId, {
+        courseId: normalizedCourseId,
+        allowAutoQuarantine: Boolean(allowAutoQuarantine),
+        extraScore: finalScore,
+        extraReasons: extractTriggeredSecurityRuleLabels(normalizedRules),
+      });
+      const isAutoQuarantined = recomputed
+        && recomputed.case
+        && (recomputed.case.auto_quarantined === true || Number(recomputed.case.auto_quarantined) === 1);
+      if (isAutoQuarantined) {
+        quarantineStatus = 'applied';
+      } else if (allowAutoQuarantine && risk.key === 'high') {
+        quarantineStatus = 'skipped';
+      }
+    } catch (riskErr) {
+      console.error('Security risk recompute failed', riskErr);
+    }
+  }
+
+  const row = await db.get(
+    `
+      INSERT INTO security_risk_events
+        (
+          user_id,
+          actor_user_id,
+          course_id,
+          session_id,
+          ip,
+          device_fingerprint,
+          geo_key,
+          source_type,
+          action_type,
+          risk_score,
+          risk_level,
+          trust_bonus,
+          allowlisted,
+          triggered_rules,
+          metadata,
+          alert_status,
+          alert_event_id,
+          quarantine_status,
+          created_at
+        )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      RETURNING id, created_at
+    `,
+    [
+      normalizedUserId,
+      normalizedActorUserId,
+      normalizedCourseId,
+      normalizedSessionId,
+      normalizedIp,
+      deviceFingerprint,
+      geoKey,
+      normalizedSourceType,
+      normalizedActionType,
+      finalScore,
+      risk.key,
+      trustBonus,
+      allowlistAssessment.matched ? 1 : 0,
+      JSON.stringify(rulesForStorage),
+      Object.keys(normalizedMetadata).length ? JSON.stringify(normalizedMetadata) : null,
+      alertStatus,
+      alertEventId,
+      quarantineStatus,
+    ]
+  );
+
+  return {
+    id: row && row.id ? Number(row.id) : null,
+    created_at: row && row.created_at ? toIsoStringSafe(row.created_at) : new Date().toISOString(),
+    risk: {
+      score: finalScore,
+      level: risk.key,
+      label: risk.label,
+      trust_bonus: trustBonus,
+      allowlisted: allowlistAssessment.matched,
+    },
+    triggered_rules: rulesForStorage,
+    alert_status: alertStatus,
+    alert_event_id: alertEventId,
+    quarantine_status: quarantineStatus,
+  };
+}
+
+async function evaluateLoginRiskEvent({
+  user,
+  loginIp = null,
+  loginUserAgent = null,
+  loginAt = null,
+  sessionId = null,
+}) {
+  if (!user || !user.id) return null;
+  const normalizedIp = normalizeForensicsIp(loginIp);
+  const normalizedUserAgent = normalizeForensicsAgent(loginUserAgent);
+  const currentFingerprint = buildForensicsDeviceFingerprint(normalizedUserAgent);
+  const currentGeo = securityHelpers.buildGeoFingerprint(normalizedIp);
+  const priorLoginRows = await db.all(
+    `
+      SELECT ip, user_agent, created_at
+      FROM login_history
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 12
+    `,
+    [Number(user.id)]
+  );
+
+  const seenIps = new Set();
+  const seenDevices = new Set();
+  const seenGeos = new Set();
+  (priorLoginRows || []).forEach((row) => {
+    const priorIp = normalizeForensicsIp(row.ip);
+    const priorFingerprint = buildForensicsDeviceFingerprint(row.user_agent);
+    const priorGeo = securityHelpers.buildGeoFingerprint(priorIp);
+    if (priorIp) seenIps.add(priorIp);
+    if (priorFingerprint) seenDevices.add(priorFingerprint);
+    if (priorGeo) seenGeos.add(priorGeo);
+  });
+
+  const previousIp = normalizeForensicsIp(user.last_login_ip || (priorLoginRows[0] && priorLoginRows[0].ip));
+  const previousFingerprint = buildForensicsDeviceFingerprint(
+    user.last_user_agent || (priorLoginRows[0] && priorLoginRows[0].user_agent)
+  );
+  const previousGeo = securityHelpers.buildGeoFingerprint(previousIp);
+  const previousAt = toIsoStringSafe(user.last_login_at || (priorLoginRows[0] && priorLoginRows[0].created_at));
+
+  const rules = [];
+  if (normalizedIp && currentFingerprint && !seenIps.has(normalizedIp) && !seenDevices.has(currentFingerprint)) {
+    rules.push(buildSecurityRule(
+      'login_new_ip_and_device',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.login_new_ip_and_device,
+      'New IP + new device'
+    ));
+  }
+  if (currentGeo && seenGeos.size > 0 && !seenGeos.has(currentGeo)) {
+    rules.push(buildSecurityRule(
+      'login_unusual_geo',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.login_unusual_geo,
+      `Login from unusual geo bucket (${currentGeo})`
+    ));
+  }
+  if (securityHelpers.evaluateImpossibleTravel({
+    previousGeo,
+    nextGeo: currentGeo,
+    previousAt,
+    nextAt: loginAt,
+  })) {
+    rules.push(buildSecurityRule(
+      'login_impossible_travel',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.login_impossible_travel,
+      'Impossible travel / abrupt geo shift'
+    ));
+  }
+  if (
+    previousIp && normalizedIp && previousIp !== normalizedIp
+    && previousFingerprint && currentFingerprint && previousFingerprint !== currentFingerprint
+  ) {
+    rules.push(buildSecurityRule(
+      'login_environment_shift',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.login_environment_shift,
+      'Abrupt login environment change'
+    ));
+  }
+  if (!rules.length) return null;
+
+  return recordSecurityRiskEvent({
+    userId: Number(user.id),
+    actorUserId: Number(user.id),
+    courseId: normalizeOptionalCourseId(user.course_id),
+    sessionId,
+    ip: normalizedIp,
+    userAgent: normalizedUserAgent,
+    sourceType: 'login',
+    actionType: 'login_anomaly',
+    triggeredRules: rules,
+    title: 'Login risk detected',
+    message: `${String(user.full_name || `User ${user.id}`)} login triggered security rules`,
+    metadata: {
+      previous_ip: previousIp,
+      previous_geo: previousGeo,
+      current_geo: currentGeo,
+      last_login_at: previousAt,
+      login_at: loginAt,
+    },
+    allowAutoQuarantine: true,
+  });
+}
+
+async function evaluateAdminActionSecurityTelemetry(req, action, details = {}) {
+  if (!req || !req.session || !req.session.user) return null;
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  const actorId = Number(req.session.user.id || 0);
+  if (!Number.isFinite(actorId) || actorId < 1) return null;
+  const actorName = String(req.session.user.username || actorId);
+  const rules = [];
+  const metadata = details && typeof details === 'object' ? { ...details } : {};
+
+  if (normalizedAction === 'system_settings_update') {
+    const changes = Array.isArray(metadata.changes) ? metadata.changes : [];
+    const securityKeysChanged = changes.some((item) => /^(security_|session_)/.test(String(item && item.key ? item.key : '')));
+    const retentionKeysChanged = changes.some((item) => /retention/.test(String(item && item.key ? item.key : '')));
+    if (securityKeysChanged) {
+      rules.push(buildSecurityRule(
+        'admin_security_settings_changed',
+        securityHelpers.SECURITY_RISK_RULE_WEIGHTS.admin_security_settings_changed,
+        'Security settings changed',
+        { category: 'admin' }
+      ));
+    }
+    if (retentionKeysChanged) {
+      rules.push(buildSecurityRule(
+        'admin_retention_policy_changed',
+        securityHelpers.SECURITY_RISK_RULE_WEIGHTS.admin_retention_policy_changed,
+        'Retention policy changed',
+        { category: 'admin' }
+      ));
+    }
+  } else if (normalizedAction.includes('rollback')) {
+    rules.push(buildSecurityRule(
+      'admin_rollback',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.admin_rollback,
+      'Rollback performed',
+      { category: 'admin' }
+    ));
+  } else if (
+    normalizedAction === 'user_roles_change'
+    || normalizedAction === 'user_role_change'
+    || normalizedAction === 'role_access_update'
+  ) {
+    rules.push(buildSecurityRule(
+      'admin_role_changed',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.admin_role_changed,
+      'Admin changed user roles',
+      { category: 'admin' }
+    ));
+  } else if (
+    normalizedAction.startsWith('rbac_role_')
+    || normalizedAction === 'role_permissions_rollback'
+    || normalizedAction === 'rbac_role_rollback'
+  ) {
+    rules.push(buildSecurityRule(
+      'admin_permissions_changed',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.admin_permissions_changed,
+      'Admin permissions changed',
+      { category: 'admin' }
+    ));
+  }
+
+  if (
+    normalizedAction.includes('import')
+    || normalizedAction.includes('export')
+  ) {
+    rules.push(buildSecurityRule(
+      'bulk_import_export',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.bulk_import_export,
+      'Bulk import/export action',
+      { category: 'bulk' }
+    ));
+  }
+
+  if (
+    normalizedAction.includes('delete_multiple')
+    || normalizedAction.includes('clear_all')
+    || normalizedAction.includes('bulk_delete')
+    || normalizedAction.includes('deactivate_multiple')
+    || normalizedAction.includes('deactivate_all')
+  ) {
+    rules.push(buildSecurityRule(
+      'bulk_delete',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.bulk_delete,
+      'Bulk destructive action',
+      { category: 'bulk' }
+    ));
+  }
+
+  const burstRow = await db.get(
+    `
+      SELECT
+        COUNT(*)::int AS action_count,
+        COUNT(DISTINCT action)::int AS distinct_actions
+      FROM history_log
+      WHERE actor_id = ?
+        AND created_at::timestamptz >= NOW() - INTERVAL '10 seconds'
+    `,
+    [actorId]
+  );
+  const actionCount = Number(burstRow && burstRow.action_count ? burstRow.action_count : 0);
+  const distinctActions = Number(burstRow && burstRow.distinct_actions ? burstRow.distinct_actions : 0);
+  if (actionCount > 10) {
+    rules.push(buildSecurityRule(
+      'behavior_admin_burst',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.behavior_admin_burst + Math.min(18, actionCount - 10),
+      `${actionCount} admin actions in 10 seconds`,
+      { category: 'behavior' }
+    ));
+  } else if (actionCount >= 6 && distinctActions >= 4) {
+    rules.push(buildSecurityRule(
+      'behavior_fast_admin_flow',
+      securityHelpers.SECURITY_RISK_RULE_WEIGHTS.behavior_fast_admin_flow,
+      `Fast admin flow (${actionCount} actions / ${distinctActions} types)`,
+      { category: 'behavior' }
+    ));
+  }
+
+  const uniqueRules = Array.from(new Map(rules.map((rule) => [rule.key, rule])).values());
+  if (!uniqueRules.length) return null;
+
+  return recordSecurityRiskEvent({
+    userId: actorId,
+    actorUserId: actorId,
+    courseId: getAdminCourse(req),
+    sessionId: req.sessionID || null,
+    ip: getClientIp(req),
+    userAgent: req.headers['user-agent'] || null,
+    sourceType: 'admin_action',
+    actionType: normalizedAction || 'admin_action',
+    triggeredRules: uniqueRules,
+    title: `Admin action risk: ${normalizedAction || 'admin_action'}`,
+    message: `${actorName} triggered admin security telemetry`,
+    metadata: {
+      action: normalizedAction,
+      actor_name: actorName,
+      is_critical: uniqueRules.some((rule) => ['admin', 'bulk'].includes(String(rule.category || ''))),
+      ...metadata,
+    },
+    allowAutoQuarantine: false,
+  });
+}
+
+function queueAdminSecurityTelemetry(req, action, details = {}, insertPromise = null) {
+  const job = Promise.resolve(insertPromise)
+    .catch(() => null)
+    .then(() => evaluateAdminActionSecurityTelemetry(req, action, details))
+    .catch((err) => {
+      console.error('Admin security telemetry failed', err);
+      return null;
+    });
+  return job;
+}
+
 async function evaluateRegistrationSecuritySignals({
   userId,
   ip,
@@ -9154,20 +9922,7 @@ async function evaluateRegistrationSecuritySignals({
     };
   }
 
-  const allowlist = parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist);
-  const isAllowlistedIp = isSecurityAdminIpAllowlisted(normalizedIp, allowlist);
-  if (isAllowlistedIp) {
-    return {
-      risk: {
-        score: 0,
-        level: 'none',
-        label: 'Suppressed',
-        reasons: [`IP ${normalizedIp} is in admin allowlist`],
-      },
-      allowlisted: true,
-      skipped: true,
-    };
-  }
+  const allowlistAssessment = getTrustedAdminIpAssessment(normalizedIp);
 
   const windowMinutes = normalizeSecurityRegistrationAlertWindowMinutes(
     settingsCache.security_registration_alert_window_minutes,
@@ -9229,41 +9984,49 @@ async function evaluateRegistrationSecuritySignals({
   if (reasons.length >= 2) {
     score += 12;
   }
+  if (allowlistAssessment.matched) {
+    reasons.push(`Trusted admin IP matched (${allowlistAssessment.rule?.normalized || normalizedIp})`);
+  }
   const risk = resolveRegistrationSecurityRiskLevel(score);
   const shouldAlert = risk.key === 'high' || risk.key === 'medium';
+  const riskResponse = {
+    risk: {
+      score: Math.max(0, score - (allowlistAssessment.matched ? Number(allowlistAssessment.trustBonus || 0) : 0)),
+      level: risk.key,
+      label: risk.label,
+      reasons: reasons.slice(0, 4),
+    },
+    allowlisted: allowlistAssessment.matched,
+    skipped: false,
+  };
   if (!shouldAlert) {
-    return {
-      risk: {
-        score,
-        level: risk.key,
-        label: risk.label,
-        reasons: reasons.slice(0, 4),
-      },
-      allowlisted: false,
-      skipped: false,
-    };
+    if (reasons.length) {
+      await recordSecurityRiskEvent({
+        userId: Number(userId) || null,
+        actorUserId: Number(userId) || null,
+        courseId: Number.isFinite(numericCourseId) ? numericCourseId : null,
+        sessionId: normalizedSession,
+        ip: normalizedIp,
+        userAgent: null,
+        sourceType: 'registration',
+        actionType: 'registration_signal',
+        triggeredRules: reasons.map((reason, index) => buildSecurityRule(`registration_signal_${index + 1}`, Math.max(8, Math.round(score / Math.max(reasons.length, 1))), reason)),
+        title: 'Registration risk signal',
+        message: reasons.join(' · '),
+        metadata: {
+          counts: {
+            ip_users: Number(ipSignal.users_count || 0),
+            session_users: Number(sessionSignal.users_count || 0),
+            fingerprint_users: Number(fingerprintSignal.users_count || 0),
+          },
+          threshold,
+          window_minutes: windowMinutes,
+        },
+        allowAutoQuarantine: false,
+      });
+    }
+    return riskResponse;
   }
-  const signature = [
-    'registration-pattern',
-    normalizedIp || '-',
-    normalizedSession || '-',
-    normalizedFingerprint || '-',
-    String(risk.key),
-  ].join('|');
-  if (!shouldEmitSecurityAlert(signature)) {
-    return {
-      risk: {
-        score,
-        level: risk.key,
-        label: risk.label,
-        reasons: reasons.slice(0, 4),
-      },
-      allowlisted: false,
-      skipped: false,
-      deduped: true,
-    };
-  }
-
   const signalPayload = {
     user_id: Number(userId) || null,
     ip: normalizedIp || null,
@@ -9284,25 +10047,34 @@ async function evaluateRegistrationSecuritySignals({
     ])).filter((id) => Number(id) !== Number(userId)).slice(0, 12),
   };
   const message = `Registration anomaly: ${reasons.slice(0, 3).join(' | ') || 'multi-account pattern'}`;
-  await emitSecurityAlertEvent({
-    alertKey: 'registration-anomaly',
-    severity: risk.key === 'high' ? 'high' : 'medium',
+  await recordSecurityRiskEvent({
+    userId: Number(userId) || null,
+    actorUserId: Number(userId) || null,
+    courseId: Number.isFinite(numericCourseId) ? numericCourseId : null,
+    sessionId: normalizedSession,
+    ip: normalizedIp,
+    userAgent: null,
+    sourceType: 'registration',
+    actionType: 'registration_anomaly',
+    triggeredRules: [
+      normalizedIp && ipSignal.users_count >= threshold
+        ? buildSecurityRule('registration_ip_cluster', 44 + Math.max(0, (ipSignal.users_count - threshold) * 6), `IP reused by ${ipSignal.users_count} accounts in ${windowMinutes}m`)
+        : null,
+      normalizedSession && sessionSignal.users_count >= 2
+        ? buildSecurityRule('registration_session_reuse', 62 + Math.max(0, (sessionSignal.users_count - 2) * 8), `Session reused by ${sessionSignal.users_count} accounts`)
+        : null,
+      normalizedFingerprint && fingerprintSignal.users_count >= threshold
+        ? buildSecurityRule('registration_device_cluster', 30 + Math.max(0, (fingerprintSignal.users_count - threshold) * 5), `Fingerprint reused by ${fingerprintSignal.users_count} accounts`)
+        : null,
+    ].filter(Boolean),
     title: 'Registration anomaly detected',
     message,
-    userId: Number(userId) || null,
-    courseId: Number.isFinite(numericCourseId) ? numericCourseId : null,
-    details: signalPayload,
-    dedupKey: `registration|${normalizedIp || '-'}|${normalizedSession || '-'}|${normalizedFingerprint || '-'}|${risk.key}`,
+    metadata: signalPayload,
+    forceAlert: true,
+    allowAutoQuarantine: false,
   });
   return {
-    risk: {
-      score,
-      level: risk.key,
-      label: risk.label,
-      reasons: reasons.slice(0, 4),
-    },
-    allowlisted: false,
-    skipped: false,
+    ...riskResponse,
     alerted: true,
   };
 }
@@ -9630,7 +10402,7 @@ async function recordAuthFailureEvent({
     ]
   );
 
-  if (normalizedIp && !isSecurityAdminIpAllowlisted(normalizedIp)) {
+  if (normalizedIp) {
     const ipBurstRow = await db.get(
       `
         SELECT COUNT(*)::int AS count, COUNT(DISTINCT COALESCE(user_id, -id))::int AS actors_count
@@ -9642,18 +10414,31 @@ async function recordAuthFailureEvent({
     );
     const burstCount = Number(ipBurstRow && ipBurstRow.count ? ipBurstRow.count : 0);
     if (burstCount >= 10) {
-      await emitSecurityAlertEvent({
-        alertKey: 'auth-failure-ip-burst',
-        severity: 'high',
+      await recordSecurityRiskEvent({
+        userId: normalizedUserId,
+        actorUserId: normalizedUserId,
+        courseId: normalizedCourseId,
+        sessionId: normalizedSessionId,
+        ip: normalizedIp,
+        userAgent: normalizedAgent,
+        sourceType: 'auth_failure',
+        actionType: 'auth_failure_ip_burst',
+        triggeredRules: [
+          buildSecurityRule(
+            'auth_failure_ip_burst',
+            securityHelpers.SECURITY_RISK_RULE_WEIGHTS.auth_failure_spike + Math.min(20, burstCount - 10),
+            `${burstCount} failed logins from one IP in 10 minutes`,
+            { category: 'behavior' }
+          ),
+        ],
         title: 'Mass failed logins from one IP',
         message: `${normalizedIp}: ${burstCount} невдалих логінів за 10 хв`,
-        userId: normalizedUserId,
-        courseId: normalizedCourseId,
-        details: {
+        metadata: {
           ip: normalizedIp,
           failures_10m: burstCount,
         },
-        dedupKey: `auth-failure-ip|${normalizedIp}|${Math.floor(Date.now() / (10 * 60 * 1000))}`,
+        forceAlert: true,
+        allowAutoQuarantine: false,
       });
     }
   }
@@ -9671,18 +10456,30 @@ async function recordAuthFailureEvent({
     );
     const failed24h = Number(userFailureRow && userFailureRow.failed_24h ? userFailureRow.failed_24h : 0);
     if (failed24h >= 6) {
-      await emitSecurityAlertEvent({
-        alertKey: 'auth-failure-user-spike',
-        severity: 'medium',
+      await recordSecurityRiskEvent({
+        userId: normalizedUserId,
+        actorUserId: normalizedUserId,
+        courseId: normalizedCourseId,
+        sessionId: normalizedSessionId,
+        ip: normalizedIp,
+        userAgent: normalizedAgent,
+        sourceType: 'auth_failure',
+        actionType: 'auth_failure_user_spike',
+        triggeredRules: [
+          buildSecurityRule(
+            'auth_failure_user_spike',
+            securityHelpers.SECURITY_RISK_RULE_WEIGHTS.auth_failure_spike + Math.min(16, failed24h - 6),
+            `${failed24h} failed logins for one account in 24 hours`,
+            { category: 'behavior' }
+          ),
+        ],
         title: 'User login failures spike',
         message: `${normalizedName || `User ${normalizedUserId}`}: ${failed24h} невдалих входів за 24г`,
-        userId: normalizedUserId,
-        courseId: normalizedCourseId,
-        details: {
+        metadata: {
           failed_24h: failed24h,
           failed_7d: Number(userFailureRow && userFailureRow.failed_7d ? userFailureRow.failed_7d : 0),
         },
-        dedupKey: `auth-failure-user|${normalizedUserId}|${Math.floor(Date.now() / (60 * 60 * 1000))}`,
+        allowAutoQuarantine: false,
       });
     }
     try {
@@ -9728,18 +10525,39 @@ async function listUserSessions(userId, currentSessionId = null) {
     const user = payload && payload.user && typeof payload.user === 'object' ? payload.user : {};
     const current = String(row.sid || '') === String(currentSessionId || '');
     const lastSeenAt = payload && payload.last_seen_at ? toIsoStringSafe(payload.last_seen_at) : null;
+    const createdAt = payload && payload.session_created_at ? toIsoStringSafe(payload.session_created_at) : null;
+    const lastActivityAt = payload && payload.last_activity_at ? toIsoStringSafe(payload.last_activity_at) : null;
+    const lastSensitiveReauthAt = payload && payload.last_sensitive_reauth_at
+      ? toIsoStringSafe(payload.last_sensitive_reauth_at)
+      : null;
+    const nowMs = Date.now();
+    const createdAtMs = createdAt ? new Date(createdAt).getTime() : NaN;
+    const lastActivityMs = lastActivityAt ? new Date(lastActivityAt).getTime() : NaN;
+    const expireAt = toIsoStringSafe(row.expire);
+    const expireAtMs = expireAt ? new Date(expireAt).getTime() : NaN;
     return {
       sid: String(row.sid || ''),
       is_current: current,
-      expire_at: toIsoStringSafe(row.expire),
-      created_at: payload && payload.session_created_at ? toIsoStringSafe(payload.session_created_at) : null,
+      expire_at: expireAt,
+      created_at: createdAt,
       last_seen_at: lastSeenAt,
+      last_activity_at: lastActivityAt,
+      last_sensitive_reauth_at: lastSensitiveReauthAt,
       last_seen_route: payload && payload.last_seen_route ? String(payload.last_seen_route) : null,
       ip: payload && payload.last_seen_ip ? normalizeForensicsIp(payload.last_seen_ip) : null,
       user_agent: payload && payload.last_seen_user_agent ? normalizeForensicsAgent(payload.last_seen_user_agent) : null,
       remember_me: payload && typeof payload.rememberMe !== 'undefined' ? Boolean(payload.rememberMe) : null,
       user_name: user && user.username ? String(user.username) : null,
       user_id: getSessionUserId(payload),
+      idle_age_minutes: Number.isFinite(lastActivityMs)
+        ? Math.max(0, Math.round((nowMs - lastActivityMs) / SESSION_MINUTE_MS))
+        : null,
+      absolute_age_hours: Number.isFinite(createdAtMs)
+        ? Math.max(0, Math.round(((nowMs - createdAtMs) / SESSION_HOUR_MS) * 10) / 10)
+        : null,
+      expires_in_minutes: Number.isFinite(expireAtMs)
+        ? Math.max(0, Math.round((expireAtMs - nowMs) / SESSION_MINUTE_MS))
+        : null,
     };
   });
 }
@@ -9786,8 +10604,13 @@ async function recomputeUserSecurityCase(userId, options = {}) {
   const courseId = Number.isFinite(Number(options.courseId))
     ? Number(options.courseId)
     : (Number.isFinite(Number(user.course_id)) ? Number(user.course_id) : null);
-  const allowlistedIp = isSecurityAdminIpAllowlisted(user.last_login_ip);
-  const userFingerprint = buildForensicsDeviceFingerprint(user.last_user_agent);
+  const currentLoginIp = normalizeForensicsIp(user.last_login_ip);
+  const allowlistAssessment = getTrustedAdminIpAssessment(currentLoginIp);
+  const trustedIpBonus = Math.abs(Number(
+    allowlistAssessment.trustBonus || securityHelpers.TRUSTED_ADMIN_IP_RISK_BONUS || 0
+  ));
+  const currentDeviceFingerprint = buildForensicsDeviceFingerprint(user.last_user_agent);
+  const currentGeoFingerprint = securityHelpers.buildGeoFingerprint(currentLoginIp);
 
   const registrationEvent = await db.get(
     `
@@ -9796,6 +10619,16 @@ async function recomputeUserSecurityCase(userId, options = {}) {
       WHERE user_id = ?
       ORDER BY created_at DESC
       LIMIT 1
+    `,
+    [normalizedUserId]
+  );
+  const loginHistoryRows = await db.all(
+    `
+      SELECT ip, user_agent, created_at
+      FROM login_history
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 16
     `,
     [normalizedUserId]
   );
@@ -9816,12 +10649,62 @@ async function recomputeUserSecurityCase(userId, options = {}) {
     .filter(Boolean);
 
   const userDeviceSet = new Set();
-  if (userFingerprint) userDeviceSet.add(userFingerprint);
+  if (currentDeviceFingerprint) userDeviceSet.add(currentDeviceFingerprint);
   if (registrationEvent && registrationEvent.device_fingerprint) {
     userDeviceSet.add(String(registrationEvent.device_fingerprint));
   }
+  const olderLoginRows = Array.isArray(loginHistoryRows) ? loginHistoryRows.slice(1) : [];
+  olderLoginRows.forEach((row) => {
+    const fingerprint = buildForensicsDeviceFingerprint(row.user_agent);
+    if (fingerprint) userDeviceSet.add(fingerprint);
+  });
 
-  const [failureRow, roleChangeRow, alertRow, sharedIpRow, sharedSessionRow, sharedDeviceRow, loginIpRow] = await Promise.all([
+  const olderSeenIps = new Set();
+  const olderSeenDevices = new Set();
+  const olderSeenGeos = new Set();
+  olderLoginRows.forEach((row) => {
+    const ip = normalizeForensicsIp(row.ip);
+    const fingerprint = buildForensicsDeviceFingerprint(row.user_agent);
+    const geo = securityHelpers.buildGeoFingerprint(ip);
+    if (ip) olderSeenIps.add(ip);
+    if (fingerprint) olderSeenDevices.add(fingerprint);
+    if (geo) olderSeenGeos.add(geo);
+  });
+  const previousLoginContext = olderLoginRows.find((row) =>
+    normalizeForensicsIp(row.ip) || buildForensicsDeviceFingerprint(row.user_agent)
+  ) || null;
+  const previousGeoFingerprint = previousLoginContext
+    ? securityHelpers.buildGeoFingerprint(previousLoginContext.ip)
+    : null;
+  const previousLoginAt = previousLoginContext ? toIsoStringSafe(previousLoginContext.created_at) : null;
+  const newDeviceDetected = Boolean(
+    currentDeviceFingerprint
+    && olderSeenDevices.size > 0
+    && !olderSeenDevices.has(currentDeviceFingerprint)
+  );
+  const newGeoDetected = Boolean(
+    currentGeoFingerprint
+    && olderSeenGeos.size > 0
+    && !olderSeenGeos.has(currentGeoFingerprint)
+  );
+  const impossibleTravelDetected = securityHelpers.evaluateImpossibleTravel({
+    previousGeo: previousGeoFingerprint,
+    nextGeo: currentGeoFingerprint,
+    previousAt: previousLoginAt,
+    nextAt: toIsoStringSafe(user.last_login_at),
+  });
+  const targetSharedIp = normalizeForensicsIp(currentLoginIp || (registrationEvent && registrationEvent.ip));
+
+  const [
+    failureRow,
+    roleChangeRow,
+    alertRow,
+    sharedIpRow,
+    sharedSessionRow,
+    sharedDeviceRow,
+    loginIpRow,
+    riskSummaryRow,
+  ] = await Promise.all([
     db.get(
       `
         SELECT
@@ -9860,7 +10743,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
       `,
       [SECURITY_ALERT_LOOKBACK_HOURS, normalizedUserId]
     ),
-    registrationEvent && registrationEvent.ip && !isSecurityAdminIpAllowlisted(registrationEvent.ip)
+    targetSharedIp
       ? db.get(
           `
             SELECT COUNT(DISTINCT user_id)::int AS users_count
@@ -9877,7 +10760,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
             ) src
             WHERE user_id <> ?
           `,
-          [registrationEvent.ip, registrationEvent.ip, normalizedUserId]
+          [targetSharedIp, targetSharedIp, normalizedUserId]
         )
       : Promise.resolve({ users_count: 0 }),
     userSessionIds.length
@@ -9904,7 +10787,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
           [Array.from(userDeviceSet), normalizedUserId]
         )
       : Promise.resolve({ users_count: 0 }),
-    user.last_login_ip && !allowlistedIp
+    targetSharedIp
       ? db.get(
           `
             SELECT
@@ -9916,16 +10799,43 @@ async function recomputeUserSecurityCase(userId, options = {}) {
             FROM login_history
             WHERE user_id = ?
           `,
-          [user.last_login_ip, normalizedUserId]
+          [targetSharedIp, normalizedUserId]
         )
       : Promise.resolve({ total_30d: 0, ip_hits_30d: 0 }),
+    db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS risk_events_7d,
+          COUNT(*) FILTER (
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+              AND risk_level = 'high'
+          )::int AS high_risk_events_30d,
+          COUNT(*) FILTER (
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+              AND action_type IN (
+                'system_settings_update',
+                'role_access_update',
+                'rbac_role_update',
+                'rbac_role_create',
+                'rbac_role_delete',
+                'system_settings_rollback',
+                'role_permissions_rollback',
+                'rbac_role_rollback'
+              )
+          )::int AS critical_events_30d
+        FROM security_risk_events
+        WHERE user_id = ?
+           OR actor_user_id = ?
+      `,
+      [normalizedUserId, normalizedUserId]
+    ),
   ]);
 
   let registrationIpCluster = 0;
   let registrationDeviceCluster = 0;
   if (registrationEvent && registrationEvent.created_at) {
     const createdAtIso = toIsoStringSafe(registrationEvent.created_at);
-    if (createdAtIso && registrationEvent.ip && !isSecurityAdminIpAllowlisted(registrationEvent.ip)) {
+    if (createdAtIso && registrationEvent.ip) {
       const row = await db.get(
         `
           SELECT COUNT(DISTINCT user_id)::int AS users_count
@@ -9964,6 +10874,13 @@ async function recomputeUserSecurityCase(userId, options = {}) {
     shared_device_users: Number(sharedDeviceRow && sharedDeviceRow.users_count ? sharedDeviceRow.users_count : 0),
     registration_ip_cluster_10m: Number(registrationIpCluster || 0),
     registration_device_cluster_10m: Number(registrationDeviceCluster || 0),
+    recent_risk_events_7d: Number(riskSummaryRow && riskSummaryRow.risk_events_7d ? riskSummaryRow.risk_events_7d : 0),
+    high_risk_events_30d: Number(riskSummaryRow && riskSummaryRow.high_risk_events_30d ? riskSummaryRow.high_risk_events_30d : 0),
+    critical_events_30d: Number(riskSummaryRow && riskSummaryRow.critical_events_30d ? riskSummaryRow.critical_events_30d : 0),
+    new_device: newDeviceDetected ? 1 : 0,
+    new_geo: newGeoDetected ? 1 : 0,
+    impossible_travel: impossibleTravelDetected ? 1 : 0,
+    trust_bonus: trustedIpBonus,
   };
 
   let score = Number(options.extraScore || 0);
@@ -9972,7 +10889,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
     score += 48 + Math.min(24, counters.shared_session_users * 6);
     reasons.push(`Спільна session з іншими акаунтами (${counters.shared_session_users})`);
   }
-  if (counters.shared_ip_users >= 2 && !allowlistedIp) {
+  if (counters.shared_ip_users >= 2) {
     score += 18 + Math.min(22, (counters.shared_ip_users - 2) * 7);
     reasons.push(`IP збігається з іншими акаунтами (${counters.shared_ip_users})`);
   }
@@ -10003,24 +10920,47 @@ async function recomputeUserSecurityCase(userId, options = {}) {
     score += 26;
     reasons.push(`Кластер реєстрацій з одного device за 10 хв (${counters.registration_device_cluster_10m})`);
   }
-  if (!allowlistedIp) {
-    const total30d = Number(loginIpRow && loginIpRow.total_30d ? loginIpRow.total_30d : 0);
-    const ipHits30d = Number(loginIpRow && loginIpRow.ip_hits_30d ? loginIpRow.ip_hits_30d : 0);
-    const lastLoginAt = toIsoStringSafe(user.last_login_at);
-    if (total30d >= 4 && ipHits30d <= 1 && lastLoginAt) {
-      const lastLoginTs = new Date(lastLoginAt).getTime();
-      if (Number.isFinite(lastLoginTs) && Date.now() - lastLoginTs <= (7 * 24 * 60 * 60 * 1000)) {
-        score += 10;
-        reasons.push('Новий IP в останній активності');
-      }
+  const total30d = Number(loginIpRow && loginIpRow.total_30d ? loginIpRow.total_30d : 0);
+  const ipHits30d = Number(loginIpRow && loginIpRow.ip_hits_30d ? loginIpRow.ip_hits_30d : 0);
+  const lastLoginAt = toIsoStringSafe(user.last_login_at);
+  if (total30d >= 4 && ipHits30d <= 1 && lastLoginAt) {
+    const lastLoginTs = new Date(lastLoginAt).getTime();
+    if (Number.isFinite(lastLoginTs) && Date.now() - lastLoginTs <= (7 * 24 * 60 * 60 * 1000)) {
+      score += 10;
+      reasons.push('Новий IP в останній активності');
     }
+  }
+  if (newDeviceDetected) {
+    score += securityHelpers.SECURITY_RISK_RULE_WEIGHTS.login_new_ip_and_device;
+    reasons.push('Новий device для акаунта');
+  }
+  if (newGeoDetected) {
+    score += securityHelpers.SECURITY_RISK_RULE_WEIGHTS.login_unusual_geo;
+    reasons.push(`Новий geo bucket (${currentGeoFingerprint || 'unknown'})`);
+  }
+  if (impossibleTravelDetected) {
+    score += securityHelpers.SECURITY_RISK_RULE_WEIGHTS.login_impossible_travel;
+    reasons.push('Impossible travel / різка зміна географії');
+  }
+  if (counters.recent_risk_events_7d > 0) {
+    score += Math.min(24, counters.recent_risk_events_7d * 6);
+    reasons.push(`Є risk events за 7д (${counters.recent_risk_events_7d})`);
+  }
+  if (counters.high_risk_events_30d > 0) {
+    score += Math.min(28, counters.high_risk_events_30d * 10);
+    reasons.push(`Є high-risk події за 30д (${counters.high_risk_events_30d})`);
+  }
+  if (counters.critical_events_30d > 0) {
+    score += Math.min(18, counters.critical_events_30d * 6);
+    reasons.push(`Є critical admin/security події за 30д (${counters.critical_events_30d})`);
   }
   if (counters.open_alerts_72h > 0) {
     score += Math.min(20, counters.open_alerts_72h * 5);
     reasons.push(`Є активні security alerts (${counters.open_alerts_72h})`);
   }
-  if (allowlistedIp) {
-    reasons.push('IP у allowlist адміністратора (знижено чутливість)');
+  if (trustedIpBonus > 0) {
+    score = Math.max(0, score - trustedIpBonus);
+    reasons.push(`Trusted admin IP знизив risk на ${trustedIpBonus}`);
   }
 
   const resolvedLevel = resolveSecurityCaseLevel(score);
@@ -10083,18 +11023,18 @@ async function recomputeUserSecurityCase(userId, options = {}) {
             closed_at = CASE WHEN ? THEN NULL ELSE closed_at END
         WHERE user_id = ?
       `,
-      [
-        Math.round(score),
-        resolvedLevel.key,
-        nextStatus,
-        reasons.length ? reasons.slice(0, 6).join(' · ') : null,
-        reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
-        JSON.stringify(counters),
-        allowlistedIp ? 1 : 0,
-        autoQuarantined ? 1 : 0,
-        shouldReopen ? 1 : 0,
-        shouldReopen ? 1 : 0,
-        normalizedUserId,
+        [
+          Math.round(score),
+          resolvedLevel.key,
+          nextStatus,
+          reasons.length ? reasons.slice(0, 6).join(' · ') : null,
+          reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
+          JSON.stringify(counters),
+          allowlistAssessment.matched ? 1 : 0,
+          autoQuarantined ? 1 : 0,
+          shouldReopen ? 1 : 0,
+          shouldReopen ? 1 : 0,
+          normalizedUserId,
       ]
     );
   } else {
@@ -10118,18 +11058,18 @@ async function recomputeUserSecurityCase(userId, options = {}) {
           )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW(), NOW())
       `,
-      [
-        normalizedUserId,
-        Math.round(score),
-        resolvedLevel.key,
-        resolvedLevel.key === 'high-risk' ? 'open' : 'open',
-        reasons.length ? reasons.slice(0, 6).join(' · ') : null,
-        reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
-        JSON.stringify(counters),
-        autoQuarantined ? 1 : 0,
-        allowlistedIp ? 1 : 0,
-      ]
-    );
+        [
+          normalizedUserId,
+          Math.round(score),
+          resolvedLevel.key,
+          resolvedLevel.key === 'high-risk' ? 'open' : 'open',
+          reasons.length ? reasons.slice(0, 6).join(' · ') : null,
+          reasons.length ? JSON.stringify(reasons.slice(0, 10)) : null,
+          JSON.stringify(counters),
+          autoQuarantined ? 1 : 0,
+          allowlistAssessment.matched ? 1 : 0,
+        ]
+      );
   }
 
   const updatedCase = await db.get(
@@ -10154,7 +11094,7 @@ async function recomputeUserSecurityCase(userId, options = {}) {
     label: resolvedLevel.label,
     reasons: reasons.slice(0, 10),
     counters,
-    allowlisted: allowlistedIp,
+    allowlisted: allowlistAssessment.matched,
     case: updatedCase,
   };
 }
@@ -10254,7 +11194,7 @@ function buildForensicsGraphPayload(targetUser, evidence = {}, matches = []) {
 }
 
 function applyRememberMe(req, remember) {
-  const ttlMs = resolveSessionTtlMs(settingsCache.session_duration_days);
+  const ttlMs = resolveSessionAbsoluteTimeoutMs(settingsCache.session_absolute_timeout_hours);
   if (remember) {
     req.session.cookie.maxAge = ttlMs;
   } else {
@@ -10405,98 +11345,329 @@ const maybeCleanupVisitEvents = async () => {
   if ((nowMs - visitLastCleanupAt) < VISIT_CLEANUP_INTERVAL_MS) return;
   visitCleanupInFlight = true;
   visitLastCleanupAt = nowMs;
-  const visitRetentionDays = normalizeRetentionDays(settingsCache.site_visit_retention_days, VISIT_RETENTION_DAYS);
-  const loginHistoryRetentionDays = normalizeRetentionDays(
+  const startedAtIso = new Date(nowMs).toISOString();
+  const visitRetentionDays = normalizeSiteVisitRetentionDays(settingsCache.site_visit_retention_days, VISIT_RETENTION_DAYS);
+  const loginHistoryRetentionDays = normalizeLoginHistoryRetentionDays(
     settingsCache.login_history_retention_days,
     LOGIN_HISTORY_RETENTION_DAYS
   );
-  const activityLogRetentionDays = normalizeRetentionDays(
+  const activityLogRetentionDays = normalizeActivityLogRetentionDays(
     settingsCache.activity_log_retention_days,
     ACTIVITY_LOG_RETENTION_DAYS
   );
-  const securityIpRetentionDays = normalizeRetentionDays(
+  const securityLogsRetentionDays = normalizeSecurityLogsRetentionDays(
+    settingsCache.security_logs_retention_days,
+    SECURITY_LOGS_RETENTION_DAYS_DEFAULT
+  );
+  const securityIpRetentionDays = normalizeSecurityIpRetentionDays(
     settingsCache.security_ip_retention_days,
     SECURITY_IP_RETENTION_DAYS_DEFAULT
   );
-  const securityUserAgentRetentionDays = normalizeRetentionDays(
-    settingsCache.security_user_agent_retention_days,
-    SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT
+  const securityDeviceRetentionDays = normalizeSecurityDeviceRetentionDays(
+    settingsCache.security_device_retention_days || settingsCache.security_user_agent_retention_days,
+    SECURITY_DEVICE_RETENTION_DAYS_DEFAULT
   );
+  const summary = {
+    started_at: startedAtIso,
+    settings: {
+      site_visit_retention_days: visitRetentionDays,
+      security_logs_retention_days: securityLogsRetentionDays,
+      login_history_retention_days: loginHistoryRetentionDays,
+      activity_log_retention_days: activityLogRetentionDays,
+      security_ip_retention_days: securityIpRetentionDays,
+      security_device_retention_days: securityDeviceRetentionDays,
+    },
+    deleted: {},
+    redacted: {},
+    skipped_frozen_records: true,
+  };
+  const runMutation = async (bucket, key, sql, params = []) => {
+    const result = await db.run(sql, params);
+    summary[bucket][key] = Number(result && result.changes ? result.changes : 0);
+    return summary[bucket][key];
+  };
   try {
-    await db.run(
-      "DELETE FROM site_visit_events WHERE created_at < NOW() - (?::int * INTERVAL '1 day')",
+    await runMutation(
+      'deleted',
+      'site_visit_events',
+      `
+        DELETE FROM site_visit_events
+        WHERE created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
       [visitRetentionDays]
     );
-  } catch (err) {
-    console.error('Database error (visit.cleanup.events)', err);
-  }
-  try {
-    await db.run(
-      "DELETE FROM login_history WHERE created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
+    await runMutation(
+      'deleted',
+      'login_history',
+      `
+        DELETE FROM login_history
+        WHERE created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
       [loginHistoryRetentionDays]
     );
-  } catch (err) {
-    console.error('Database error (visit.cleanup.login_history)', err);
-  }
-  try {
-    await db.run(
-      "DELETE FROM activity_log WHERE created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
+    await runMutation(
+      'deleted',
+      'activity_log',
+      `
+        DELETE FROM activity_log
+        WHERE created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
       [activityLogRetentionDays]
     );
+    await runMutation(
+      'deleted',
+      'security_alert_events',
+      `
+        DELETE FROM security_alert_events
+        WHERE created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityLogsRetentionDays]
+    );
+    await runMutation(
+      'deleted',
+      'security_risk_events',
+      `
+        DELETE FROM security_risk_events
+        WHERE created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityLogsRetentionDays]
+    );
+    await runMutation(
+      'deleted',
+      'auth_failure_events',
+      `
+        DELETE FROM auth_failure_events
+        WHERE created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityLogsRetentionDays]
+    );
+    await runMutation(
+      'deleted',
+      'user_registration_events',
+      `
+        DELETE FROM user_registration_events
+        WHERE created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityLogsRetentionDays]
+    );
+    await runMutation(
+      'deleted',
+      'user_role_change_events',
+      `
+        DELETE FROM user_role_change_events
+        WHERE created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityLogsRetentionDays]
+    );
+
+    await runMutation(
+      'redacted',
+      'site_visit_events_ip',
+      `
+        UPDATE site_visit_events
+        SET ip = NULL
+        WHERE ip IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityIpRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'login_history_ip',
+      `
+        UPDATE login_history
+        SET ip = NULL
+        WHERE ip IS NOT NULL
+          AND created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityIpRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'user_registration_events_ip',
+      `
+        UPDATE user_registration_events
+        SET ip = NULL
+        WHERE ip IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityIpRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'auth_failure_events_ip',
+      `
+        UPDATE auth_failure_events
+        SET ip = NULL
+        WHERE ip IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityIpRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'security_risk_events_ip',
+      `
+        UPDATE security_risk_events
+        SET ip = NULL
+        WHERE ip IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityIpRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'users_last_login_ip',
+      `
+        UPDATE users
+        SET last_login_ip = NULL
+        WHERE last_login_ip IS NOT NULL
+          AND last_login_at < NOW() - (?::int * INTERVAL '1 day')
+      `,
+      [securityIpRetentionDays]
+    );
+
+    await runMutation(
+      'redacted',
+      'site_visit_events_user_agent',
+      `
+        UPDATE site_visit_events
+        SET user_agent = NULL
+        WHERE user_agent IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityDeviceRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'login_history_user_agent',
+      `
+        UPDATE login_history
+        SET user_agent = NULL
+        WHERE user_agent IS NOT NULL
+          AND created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityDeviceRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'user_registration_events_user_agent',
+      `
+        UPDATE user_registration_events
+        SET user_agent = NULL
+        WHERE user_agent IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityDeviceRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'auth_failure_events_user_agent',
+      `
+        UPDATE auth_failure_events
+        SET user_agent = NULL
+        WHERE user_agent IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityDeviceRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'user_registration_events_device_fingerprint',
+      `
+        UPDATE user_registration_events
+        SET device_fingerprint = NULL
+        WHERE device_fingerprint IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityDeviceRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'security_risk_events_device_fingerprint',
+      `
+        UPDATE security_risk_events
+        SET device_fingerprint = NULL
+        WHERE device_fingerprint IS NOT NULL
+          AND created_at < NOW() - (?::int * INTERVAL '1 day')
+          AND COALESCE(is_frozen, false) = false
+          AND (hold_until IS NULL OR hold_until < NOW())
+      `,
+      [securityDeviceRetentionDays]
+    );
+    await runMutation(
+      'redacted',
+      'users_last_user_agent',
+      `
+        UPDATE users
+        SET last_user_agent = NULL
+        WHERE last_user_agent IS NOT NULL
+          AND last_login_at < NOW() - (?::int * INTERVAL '1 day')
+      `,
+      [securityDeviceRetentionDays]
+    );
+
+    try {
+      await db.run(
+        `
+          INSERT INTO security_cleanup_runs (status, summary, started_at, finished_at, created_at)
+          VALUES ('ok', ?::jsonb, ?::timestamptz, NOW(), NOW())
+        `,
+        [JSON.stringify(summary), startedAtIso]
+      );
+    } catch (logErr) {
+      console.error('Database error (visit.cleanup.log.ok)', logErr);
+    }
   } catch (err) {
-    console.error('Database error (visit.cleanup.activity_log)', err);
-  }
-  try {
-    await Promise.all([
-      db.run(
-        "UPDATE site_visit_events SET ip = NULL WHERE ip IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityIpRetentionDays]
-      ),
-      db.run(
-        "UPDATE login_history SET ip = NULL WHERE ip IS NOT NULL AND created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
-        [securityIpRetentionDays]
-      ),
-      db.run(
-        "UPDATE user_registration_events SET ip = NULL WHERE ip IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityIpRetentionDays]
-      ),
-      db.run(
-        "UPDATE auth_failure_events SET ip = NULL WHERE ip IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityIpRetentionDays]
-      ),
-      db.run(
-        "UPDATE users SET last_login_ip = NULL WHERE last_login_ip IS NOT NULL AND last_login_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityIpRetentionDays]
-      ),
-    ]);
-  } catch (err) {
-    console.error('Database error (visit.cleanup.security_ip)', err);
-  }
-  try {
-    await Promise.all([
-      db.run(
-        "UPDATE site_visit_events SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityUserAgentRetentionDays]
-      ),
-      db.run(
-        "UPDATE login_history SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at::timestamp < NOW() - (?::int * INTERVAL '1 day')",
-        [securityUserAgentRetentionDays]
-      ),
-      db.run(
-        "UPDATE user_registration_events SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityUserAgentRetentionDays]
-      ),
-      db.run(
-        "UPDATE auth_failure_events SET user_agent = NULL WHERE user_agent IS NOT NULL AND created_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityUserAgentRetentionDays]
-      ),
-      db.run(
-        "UPDATE users SET last_user_agent = NULL WHERE last_user_agent IS NOT NULL AND last_login_at < NOW() - (?::int * INTERVAL '1 day')",
-        [securityUserAgentRetentionDays]
-      ),
-    ]);
-  } catch (err) {
-    console.error('Database error (visit.cleanup.security_user_agent)', err);
+    summary.error = normalizeRuntimeErrorMessage(err && err.message ? err.message : err);
+    try {
+      await db.run(
+        `
+          INSERT INTO security_cleanup_runs (status, summary, started_at, finished_at, created_at)
+          VALUES ('error', ?::jsonb, ?::timestamptz, NOW(), NOW())
+        `,
+        [JSON.stringify(summary), startedAtIso]
+      );
+    } catch (logErr) {
+      console.error('Database error (visit.cleanup.log.error)', logErr);
+    }
+    console.error('Database error (visit.cleanup.worker)', err);
   } finally {
     visitCleanupInFlight = false;
   }
@@ -12097,24 +13268,51 @@ function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[k
     const sourceValue = rawValue === undefined || rawValue === null ? (fallback || '') : rawValue;
     return normalizeSecurityAdminIpAllowlist(sourceValue);
   }
+  if (key === 'session_idle_timeout_minutes') {
+    return resolveSessionIdleTimeoutMinutes(rawValue === undefined || rawValue === null ? fallback : rawValue);
+  }
+  if (key === 'session_absolute_timeout_hours') {
+    return resolveSessionAbsoluteTimeoutHours(rawValue === undefined || rawValue === null ? fallback : rawValue);
+  }
+  if (key === 'security_stepup_reauth_minutes') {
+    return resolveStepUpReauthMinutes(rawValue === undefined || rawValue === null ? fallback : rawValue);
+  }
+  if (key === 'session_duration_days') {
+    const sourceHours = rawValue === undefined || rawValue === null
+      ? resolveSessionAbsoluteTimeoutHours(settingsCache.session_absolute_timeout_hours || (Number(fallback || 0) * 24))
+      : resolveSessionAbsoluteTimeoutHours(Number(rawValue) * 24);
+    return resolveSessionCompatibilityDays(sourceHours);
+  }
   const parsed = Number(rawValue);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return Number(fallback || 0);
   }
   if (key === 'site_visit_retention_days') {
-    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.site_visit_retention_days);
+    return normalizeSiteVisitRetentionDays(parsed, DEFAULT_SETTINGS.site_visit_retention_days);
+  }
+  if (key === 'security_logs_retention_days') {
+    return normalizeSecurityLogsRetentionDays(parsed, DEFAULT_SETTINGS.security_logs_retention_days);
   }
   if (key === 'login_history_retention_days') {
-    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.login_history_retention_days);
+    return normalizeLoginHistoryRetentionDays(parsed, DEFAULT_SETTINGS.login_history_retention_days);
   }
   if (key === 'activity_log_retention_days') {
-    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.activity_log_retention_days);
+    return normalizeActivityLogRetentionDays(parsed, DEFAULT_SETTINGS.activity_log_retention_days);
   }
   if (key === 'security_ip_retention_days') {
-    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.security_ip_retention_days);
+    return normalizeSecurityIpRetentionDays(parsed, DEFAULT_SETTINGS.security_ip_retention_days);
   }
-  if (key === 'security_user_agent_retention_days') {
-    return normalizeRetentionDays(parsed, DEFAULT_SETTINGS.security_user_agent_retention_days);
+  if (key === 'security_user_agent_retention_days' || key === 'security_device_retention_days') {
+    return normalizeSecurityDeviceRetentionDays(parsed, DEFAULT_SETTINGS.security_device_retention_days);
+  }
+  if (key === 'security_risk_threshold_low') {
+    return normalizeSecurityRiskThresholdValue(parsed, DEFAULT_SETTINGS.security_risk_threshold_low);
+  }
+  if (key === 'security_risk_threshold_medium') {
+    return normalizeSecurityRiskThresholdValue(parsed, DEFAULT_SETTINGS.security_risk_threshold_medium);
+  }
+  if (key === 'security_risk_threshold_high') {
+    return normalizeSecurityRiskThresholdValue(parsed, DEFAULT_SETTINGS.security_risk_threshold_high);
   }
   if (key === 'security_registration_alert_threshold') {
     return normalizeSecurityRegistrationAlertThreshold(parsed, DEFAULT_SETTINGS.security_registration_alert_threshold);
@@ -12130,9 +13328,65 @@ function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[k
 
 function buildSystemSettingsAuditState(source = settingsCache) {
   const snapshot = {};
-  SYSTEM_SETTINGS_AUDIT_KEYS.forEach((key) => {
-    snapshot[key] = normalizeAdminSettingValue(key, source ? source[key] : undefined, DEFAULT_SETTINGS[key]);
+  const rawSource = source && typeof source === 'object' ? { ...source } : {};
+  const sessionSecurity = securityHelpers.normalizeSessionSecuritySettings({
+    idleTimeoutMinutes: rawSource.session_idle_timeout_minutes,
+    absoluteTimeoutHours: rawSource.session_absolute_timeout_hours || (Number(rawSource.session_duration_days || 0) * 24),
+    stepUpReauthMinutes: rawSource.security_stepup_reauth_minutes,
   });
+  const riskThresholds = securityHelpers.buildRiskThresholds({
+    low: rawSource.security_risk_threshold_low,
+    medium: rawSource.security_risk_threshold_medium,
+    high: rawSource.security_risk_threshold_high,
+  }, SECURITY_RISK_THRESHOLDS_DEFAULTS);
+  const normalizedSource = {
+    ...rawSource,
+    session_idle_timeout_minutes: sessionSecurity.idleTimeoutMinutes,
+    session_absolute_timeout_hours: sessionSecurity.absoluteTimeoutHours,
+    session_duration_days: resolveSessionCompatibilityDays(sessionSecurity.absoluteTimeoutHours),
+    security_stepup_reauth_minutes: sessionSecurity.stepUpReauthMinutes,
+    site_visit_retention_days: normalizeSiteVisitRetentionDays(
+      rawSource.site_visit_retention_days,
+      DEFAULT_SETTINGS.site_visit_retention_days
+    ),
+    security_logs_retention_days: normalizeSecurityLogsRetentionDays(
+      rawSource.security_logs_retention_days,
+      DEFAULT_SETTINGS.security_logs_retention_days
+    ),
+    login_history_retention_days: normalizeLoginHistoryRetentionDays(
+      rawSource.login_history_retention_days,
+      DEFAULT_SETTINGS.login_history_retention_days
+    ),
+    activity_log_retention_days: normalizeActivityLogRetentionDays(
+      rawSource.activity_log_retention_days,
+      DEFAULT_SETTINGS.activity_log_retention_days
+    ),
+    security_ip_retention_days: normalizeSecurityIpRetentionDays(
+      rawSource.security_ip_retention_days,
+      DEFAULT_SETTINGS.security_ip_retention_days
+    ),
+    security_device_retention_days: normalizeSecurityDeviceRetentionDays(
+      rawSource.security_device_retention_days || rawSource.security_user_agent_retention_days,
+      DEFAULT_SETTINGS.security_device_retention_days
+    ),
+    security_user_agent_retention_days: normalizeSecurityDeviceRetentionDays(
+      rawSource.security_user_agent_retention_days || rawSource.security_device_retention_days,
+      DEFAULT_SETTINGS.security_device_retention_days
+    ),
+    security_risk_threshold_low: riskThresholds.low,
+    security_risk_threshold_medium: riskThresholds.medium,
+    security_risk_threshold_high: riskThresholds.high,
+    security_admin_ip_allowlist: normalizeSecurityAdminIpAllowlist(rawSource.security_admin_ip_allowlist || ''),
+  };
+  SYSTEM_SETTINGS_AUDIT_KEYS.forEach((key) => {
+    snapshot[key] = normalizeAdminSettingValue(key, normalizedSource[key], DEFAULT_SETTINGS[key]);
+  });
+  snapshot.security_device_retention_days = normalizeSecurityDeviceRetentionDays(
+    snapshot.security_device_retention_days,
+    DEFAULT_SETTINGS.security_device_retention_days
+  );
+  snapshot.security_user_agent_retention_days = snapshot.security_device_retention_days;
+  snapshot.session_duration_days = resolveSessionCompatibilityDays(snapshot.session_absolute_timeout_hours);
   return snapshot;
 }
 
@@ -12372,64 +13626,290 @@ async function deleteRbacRoleByKey(client, roleKeyRaw) {
   await client.query('DELETE FROM access_roles WHERE id = $1', [role.id]);
 }
 
+function normalizeAdminAuditActionType(rawValue, fallback = 'admin_change') {
+  const normalized = String(rawValue || '').trim().toLowerCase().replace(/[^a-z0-9:_-]+/g, '_');
+  return normalized || fallback;
+}
+
+function buildAdminAuditHashPayload(entry = {}) {
+  return {
+    scope_key: String(entry.scope_key || ''),
+    action_type: String(entry.action_type || ''),
+    target_type: String(entry.target_type || ''),
+    target_key: entry.target_key ? String(entry.target_key) : null,
+    target_id: Number.isFinite(Number(entry.target_id)) ? Number(entry.target_id) : null,
+    summary: entry.summary ? String(entry.summary) : null,
+    before_state: entry.before_state == null ? null : entry.before_state,
+    after_state: entry.after_state == null ? null : entry.after_state,
+    metadata: entry.metadata == null ? null : entry.metadata,
+    operation_id: entry.operation_id ? String(entry.operation_id) : null,
+    actor_user_id: Number.isFinite(Number(entry.actor_user_id)) ? Number(entry.actor_user_id) : null,
+    actor_name_snapshot: entry.actor_name_snapshot ? String(entry.actor_name_snapshot) : null,
+    rollback_source_audit_id: Number.isFinite(Number(entry.rollback_source_audit_id))
+      ? Number(entry.rollback_source_audit_id)
+      : null,
+    is_critical: entry.is_critical === true || Number(entry.is_critical) === 1,
+    course_id: Number.isFinite(Number(entry.course_id)) ? Number(entry.course_id) : null,
+    created_at: entry.created_at ? toIsoStringSafe(entry.created_at) : null,
+  };
+}
+
+function enrichAdminAuditEntriesWithIntegrity(rows = []) {
+  const sortedAsc = [...rows].sort((left, right) => {
+    const leftTs = left && left.created_at ? new Date(left.created_at).getTime() : 0;
+    const rightTs = right && right.created_at ? new Date(right.created_at).getTime() : 0;
+    if (leftTs !== rightTs) return leftTs - rightTs;
+    return Number(left && left.id ? left.id : 0) - Number(right && right.id ? right.id : 0);
+  });
+  let previousHash = null;
+  const integrityById = new Map();
+  sortedAsc.forEach((row) => {
+    const id = Number(row && row.id ? row.id : 0);
+    if (!id) return;
+    const currentHash = String(row && row.current_hash ? row.current_hash : '').trim();
+    const currentActionType = String(row && row.action_type ? row.action_type : '').trim().toLowerCase();
+    if (!currentHash || currentActionType === 'legacy_entry') {
+      integrityById.set(id, {
+        key: 'legacy',
+        label: 'Legacy',
+      });
+      return;
+    }
+    const recalculatedHash = securityHelpers.computeHashChainValue(
+      buildAdminAuditHashPayload({
+        ...row,
+        before_state: parseAuditState(row.before_state),
+        after_state: parseAuditState(row.after_state),
+        metadata: safeJsonParse(row.metadata, null),
+      }),
+      String(row && row.previous_hash ? row.previous_hash : '').trim()
+    );
+    if (recalculatedHash !== currentHash) {
+      integrityById.set(id, {
+        key: 'tampered',
+        label: 'Hash mismatch',
+      });
+      previousHash = currentHash;
+      return;
+    }
+    if (!previousHash) {
+      const partial = Boolean(String(row && row.previous_hash ? row.previous_hash : '').trim());
+      integrityById.set(id, {
+        key: partial ? 'partial' : 'verified',
+        label: partial ? 'Partial chain' : 'Verified',
+      });
+      previousHash = currentHash;
+      return;
+    }
+    const valid = String(row && row.previous_hash ? row.previous_hash : '').trim() === previousHash;
+    integrityById.set(id, {
+      key: valid ? 'verified' : 'tampered',
+      label: valid ? 'Verified' : 'Hash mismatch',
+    });
+    previousHash = currentHash;
+  });
+
+  return rows.map((row) => {
+    const integrity = integrityById.get(Number(row && row.id ? row.id : 0)) || {
+      key: 'legacy',
+      label: 'Legacy',
+    };
+    return {
+      ...row,
+      integrity_status: integrity.key,
+      integrity_label: integrity.label,
+    };
+  });
+}
+
+function supportsAdminAuditRollbackTarget(targetType) {
+  const normalized = String(targetType || '').trim().toLowerCase();
+  return normalized === 'system_settings'
+    || normalized === 'role_permissions'
+    || normalized === 'rbac_role';
+}
+
+async function listAdminAuditEntries(scopeKey, courseId, limit = 20) {
+  const rows = await db.all(
+    `
+      SELECT
+        a.id,
+        a.scope_key,
+        a.action_type,
+        a.target_type,
+        a.target_key,
+        a.target_id,
+        a.summary,
+        a.operation_id,
+        a.actor_user_id,
+        a.actor_name_snapshot,
+        a.created_by_name,
+        a.created_at,
+        a.before_state,
+        a.after_state,
+        a.metadata,
+        a.is_critical,
+        a.rollback_source_audit_id,
+        a.previous_hash,
+        a.current_hash,
+        EXISTS (
+          SELECT 1
+          FROM admin_change_audit rb
+          WHERE rb.rollback_source_audit_id = a.id
+        ) AS is_rollback_target
+      FROM admin_change_audit a
+      WHERE a.scope_key = ?
+        AND (a.course_id = ? OR a.course_id IS NULL)
+      ORDER BY a.created_at DESC, a.id DESC
+      LIMIT ?
+    `,
+    [scopeKey, courseId, limit]
+  );
+  return enrichAdminAuditEntriesWithIntegrity(rows || []).map((row) => {
+    const rollbackSourceAuditId = Number.isFinite(Number(row.rollback_source_audit_id))
+      ? Number(row.rollback_source_audit_id)
+      : null;
+    return {
+      id: Number(row.id),
+      action_type: String(row.action_type || ''),
+      target_type: String(row.target_type || ''),
+      target_key: row.target_key ? String(row.target_key) : '',
+      target_id: Number.isFinite(Number(row.target_id)) ? Number(row.target_id) : null,
+      summary: String(row.summary || 'Admin audit entry'),
+      operation_id: row.operation_id ? String(row.operation_id) : '',
+      actor_user_id: Number.isFinite(Number(row.actor_user_id)) ? Number(row.actor_user_id) : null,
+      created_by_name: row.actor_name_snapshot
+        ? String(row.actor_name_snapshot)
+        : (row.created_by_name ? String(row.created_by_name) : ''),
+      created_at: toIsoStringSafe(row.created_at),
+      is_critical: row.is_critical === true || Number(row.is_critical) === 1,
+      is_rollback_entry: rollbackSourceAuditId !== null || String(row.action_type || '').includes('rollback'),
+      rollback_source_audit_id: rollbackSourceAuditId,
+      is_rollback_target: row.is_rollback_target === true || Number(row.is_rollback_target) === 1,
+      can_rollback: Boolean(row.before_state)
+        && supportsAdminAuditRollbackTarget(row.target_type)
+        && rollbackSourceAuditId === null
+        && !(row.is_rollback_target === true || Number(row.is_rollback_target) === 1),
+      metadata: safeJsonParse(row.metadata, null),
+      integrity_status: String(row.integrity_status || 'legacy'),
+      integrity_label: String(row.integrity_label || 'Legacy'),
+    };
+  });
+}
+
 async function createAdminAuditEntry(req, {
   scopeKey,
+  actionType = 'admin_change',
   targetType,
+  targetId = null,
   targetKey = null,
   summary = '',
   beforeState = null,
   afterState = null,
   operationId = null,
   courseId = null,
+  metadata = null,
+  rollbackSourceAuditId = null,
+  isCritical = false,
 }) {
   const actorId = req && req.session && req.session.user ? Number(req.session.user.id) : null;
   const actorName = req && req.session && req.session.user ? String(req.session.user.username || '') : '';
-  const row = await db.get(
-    `
-      INSERT INTO admin_change_audit
-      (
-        scope_key,
-        target_type,
-        target_key,
-        summary,
-        before_state,
-        after_state,
-        operation_id,
-        created_by,
-        created_by_name,
-        created_at,
-        course_id
-      )
-      VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, NOW(), ?)
-      RETURNING id
-    `,
-    [
-      scopeKey,
-      targetType,
-      targetKey || null,
-      String(summary || '').trim() || null,
-      beforeState == null ? null : JSON.stringify(beforeState),
-      afterState == null ? null : JSON.stringify(afterState),
-      operationId || null,
-      Number.isFinite(actorId) ? actorId : null,
-      actorName || null,
-      Number.isFinite(Number(courseId)) ? Number(courseId) : null,
-    ]
-  );
+  const normalizedEntry = {
+    scope_key: scopeKey,
+    action_type: normalizeAdminAuditActionType(actionType),
+    target_type: targetType,
+    target_key: targetKey || null,
+    target_id: Number.isFinite(Number(targetId)) ? Number(targetId) : null,
+    summary: String(summary || '').trim() || null,
+    before_state: beforeState == null ? null : beforeState,
+    after_state: afterState == null ? null : afterState,
+    metadata: metadata && typeof metadata === 'object' ? { ...metadata } : null,
+    operation_id: operationId || null,
+    actor_user_id: Number.isFinite(actorId) ? actorId : null,
+    actor_name_snapshot: actorName || null,
+    rollback_source_audit_id: Number.isFinite(Number(rollbackSourceAuditId)) ? Number(rollbackSourceAuditId) : null,
+    is_critical: Boolean(isCritical),
+    course_id: Number.isFinite(Number(courseId)) ? Number(courseId) : null,
+    created_at: new Date().toISOString(),
+  };
+  const row = await withTransaction(async (client) => {
+    try {
+      await txRun(client, 'LOCK TABLE admin_change_audit IN SHARE ROW EXCLUSIVE MODE');
+    } catch (_) {
+      // Ignore on adapters that do not support explicit table locks.
+    }
+    const previousRow = await txGet(
+      client,
+      `
+        SELECT current_hash
+        FROM admin_change_audit
+        WHERE current_hash IS NOT NULL
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `
+    );
+    const createdAtRow = await txGet(client, 'SELECT NOW() AS created_at');
+    const createdAt = toIsoStringSafe(createdAtRow && createdAtRow.created_at) || new Date().toISOString();
+    normalizedEntry.created_at = createdAt;
+    const previousHash = previousRow && previousRow.current_hash ? String(previousRow.current_hash) : '';
+    const currentHash = securityHelpers.computeHashChainValue(
+      buildAdminAuditHashPayload(normalizedEntry),
+      previousHash
+    );
+    return txGet(
+      client,
+      `
+        INSERT INTO admin_change_audit
+        (
+          scope_key,
+          action_type,
+          target_type,
+          target_key,
+          target_id,
+          summary,
+          before_state,
+          after_state,
+          metadata,
+          operation_id,
+          actor_user_id,
+          actor_name_snapshot,
+          created_by,
+          created_by_name,
+          rollback_source_audit_id,
+          is_critical,
+          previous_hash,
+          current_hash,
+          created_at,
+          course_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::timestamptz, ?)
+        RETURNING id
+      `,
+      [
+        normalizedEntry.scope_key,
+        normalizedEntry.action_type,
+        normalizedEntry.target_type,
+        normalizedEntry.target_key,
+        normalizedEntry.target_id,
+        normalizedEntry.summary,
+        normalizedEntry.before_state == null ? null : JSON.stringify(normalizedEntry.before_state),
+        normalizedEntry.after_state == null ? null : JSON.stringify(normalizedEntry.after_state),
+        normalizedEntry.metadata == null ? null : JSON.stringify(normalizedEntry.metadata),
+        normalizedEntry.operation_id,
+        normalizedEntry.actor_user_id,
+        normalizedEntry.actor_name_snapshot,
+        normalizedEntry.actor_user_id,
+        normalizedEntry.actor_name_snapshot,
+        normalizedEntry.rollback_source_audit_id,
+        normalizedEntry.is_critical ? 1 : 0,
+        previousHash || null,
+        currentHash,
+        normalizedEntry.created_at,
+        normalizedEntry.course_id,
+      ]
+    );
+  });
   return row && row.id ? Number(row.id) : null;
-}
-
-async function markAdminAuditEntryRolledBack(auditId, req) {
-  await db.run(
-    `
-      UPDATE admin_change_audit
-      SET is_rolled_back = true,
-          rolled_back_by = ?,
-          rolled_back_at = NOW()
-      WHERE id = ?
-    `,
-    [Number(req?.session?.user?.id || 0) || null, Number(auditId)]
-  );
 }
 
 app.use((req, _res, next) => {
@@ -16542,7 +18022,7 @@ app.post('/login', authLimiter, async (req, res) => {
     const normalizedName = full_name.trim().replace(/\s+/g, ' ');
     try {
       const user = await db.get(
-        `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, ${usersHasIsActive ? 'is_active' : '1 AS is_active'} FROM users WHERE LOWER(full_name) = LOWER(?) LIMIT 1`,
+        `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, last_login_ip, last_user_agent, last_login_at, ${usersHasIsActive ? 'is_active' : '1 AS is_active'} FROM users WHERE LOWER(full_name) = LOWER(?) LIMIT 1`,
         [normalizedName]
       );
       const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
@@ -16616,11 +18096,24 @@ app.post('/login', authLimiter, async (req, res) => {
         sessionData: {
           session_created_at: loginAt,
           last_seen_at: loginAt,
+          last_activity_at: loginAt,
           last_seen_route: '/login',
           last_seen_ip: loginIp,
           last_seen_user_agent: loginUserAgent,
+          last_sensitive_reauth_at: loginAt,
         },
       });
+      try {
+        await evaluateLoginRiskEvent({
+          user,
+          loginIp,
+          loginUserAgent,
+          loginAt,
+          sessionId: req.sessionID || null,
+        });
+      } catch (riskErr) {
+        console.error('Database error (login.risk_event)', riskErr);
+      }
       await saveRequestSession(req);
       return res.redirect('/home');
     } catch (err) {
@@ -38768,8 +40261,17 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                     }),
                                     db.all('SELECT id, title, weeks_count, course_id, start_date FROM semesters ORDER BY start_date DESC'),
                                     db.get(
-                                      'SELECT actor_name, created_at FROM history_log WHERE action = ? ORDER BY created_at DESC LIMIT 1',
-                                      ['system_settings_update']
+                                      `
+                                        SELECT
+                                          COALESCE(actor_name_snapshot, created_by_name) AS actor_name,
+                                          created_at
+                                        FROM admin_change_audit
+                                        WHERE scope_key = ?
+                                          AND target_type = 'system_settings'
+                                        ORDER BY created_at DESC, id DESC
+                                        LIMIT 1
+                                      `,
+                                      [ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS]
                                     ),
                                   ]);
                                   const overviewCompatibilityWarning = dashboardStats && dashboardStats.compatibilityWarning
@@ -50036,7 +51538,7 @@ app.post('/admin/api/scheduler/run', requireScheduleGeneratorSectionAccess, asyn
   });
 });
 
-app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
+app.post('/admin/settings', requireSettingsSectionAccess, requireSensitiveActionReauth({ tab: 'admin-settings' }), async (req, res) => {
   const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
     tab: 'admin-settings',
     extraParams,
@@ -50047,7 +51549,8 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     return handleDbError(res, err, 'admin.settings.init');
   }
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const sessionDays = Number(body.session_duration_days);
+  const idleTimeoutMinutes = Number(body.session_idle_timeout_minutes);
+  const absoluteTimeoutHours = Number(body.session_absolute_timeout_hours);
   const maxFileSize = Number(body.max_file_size_mb);
   const minTeamMembers = Number(body.min_team_members);
   const allowHomework = String(body.allow_homework_creation).toLowerCase() === 'true';
@@ -50059,12 +51562,15 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   const allowMessages = String(body.allow_messages).toLowerCase() === 'true';
   const scheduleRefreshMinutes = Number(body.schedule_refresh_minutes);
   const siteVisitRetentionDays = Number(body.site_visit_retention_days);
+  const securityLogsRetentionDays = Number(body.security_logs_retention_days);
   const loginHistoryRetentionDays = Number(body.login_history_retention_days);
   const activityLogRetentionDays = Number(body.activity_log_retention_days);
+  const stepUpReauthMinutes = Number(body.security_stepup_reauth_minutes);
   const securityAllowlistSource = Object.prototype.hasOwnProperty.call(body, 'security_admin_ip_allowlist')
     ? body.security_admin_ip_allowlist
     : settingsCache.security_admin_ip_allowlist;
-  const securityAdminIpAllowlist = String(securityAllowlistSource || '');
+  const parsedAdminAllowlist = parseSecurityAdminIpAllowlist(securityAllowlistSource);
+  const securityAdminIpAllowlist = normalizeSecurityAdminIpAllowlist(parsedAdminAllowlist);
   const thresholdRaw = Object.prototype.hasOwnProperty.call(body, 'security_registration_alert_threshold')
     ? body.security_registration_alert_threshold
     : settingsCache.security_registration_alert_threshold;
@@ -50085,25 +51591,50 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     ? body.security_auto_quarantine_enabled
     : settingsCache.security_auto_quarantine_enabled;
   const securityAutoQuarantineEnabled = String(securityAutoQuarantineSource).toLowerCase() === 'true';
+  const riskThresholdLow = Number(
+    Object.prototype.hasOwnProperty.call(body, 'security_risk_threshold_low')
+      ? body.security_risk_threshold_low
+      : settingsCache.security_risk_threshold_low
+  );
+  const riskThresholdMedium = Number(
+    Object.prototype.hasOwnProperty.call(body, 'security_risk_threshold_medium')
+      ? body.security_risk_threshold_medium
+      : settingsCache.security_risk_threshold_medium
+  );
+  const riskThresholdHigh = Number(
+    Object.prototype.hasOwnProperty.call(body, 'security_risk_threshold_high')
+      ? body.security_risk_threshold_high
+      : settingsCache.security_risk_threshold_high
+  );
   const securityIpRetentionRaw = Object.prototype.hasOwnProperty.call(body, 'security_ip_retention_days')
     ? body.security_ip_retention_days
     : settingsCache.security_ip_retention_days;
-  const securityUaRetentionRaw = Object.prototype.hasOwnProperty.call(body, 'security_user_agent_retention_days')
-    ? body.security_user_agent_retention_days
-    : settingsCache.security_user_agent_retention_days;
+  const securityDeviceRetentionRaw = Object.prototype.hasOwnProperty.call(body, 'security_device_retention_days')
+    ? body.security_device_retention_days
+    : (
+      Object.prototype.hasOwnProperty.call(body, 'security_user_agent_retention_days')
+        ? body.security_user_agent_retention_days
+        : settingsCache.security_device_retention_days
+    );
   const securityIpRetentionDays = Number(securityIpRetentionRaw);
-  const securityUserAgentRetentionDays = Number(securityUaRetentionRaw);
+  const securityDeviceRetentionDays = Number(securityDeviceRetentionRaw);
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   if (
-    Number.isNaN(sessionDays) || sessionDays <= 0 ||
+    Number.isNaN(idleTimeoutMinutes) || idleTimeoutMinutes <= 0 ||
+    Number.isNaN(absoluteTimeoutHours) || absoluteTimeoutHours <= 0 ||
     Number.isNaN(maxFileSize) || maxFileSize <= 0 ||
     Number.isNaN(minTeamMembers) || minTeamMembers <= 0 ||
     Number.isNaN(scheduleRefreshMinutes) || scheduleRefreshMinutes <= 0 ||
     Number.isNaN(siteVisitRetentionDays) ||
+    Number.isNaN(securityLogsRetentionDays) ||
     Number.isNaN(loginHistoryRetentionDays) ||
     Number.isNaN(activityLogRetentionDays) ||
+    Number.isNaN(stepUpReauthMinutes) ||
     Number.isNaN(securityIpRetentionDays) ||
-    Number.isNaN(securityUserAgentRetentionDays) ||
+    Number.isNaN(securityDeviceRetentionDays) ||
+    Number.isNaN(riskThresholdLow) ||
+    Number.isNaN(riskThresholdMedium) ||
+    Number.isNaN(riskThresholdHigh) ||
     (thresholdProvided && Number.isNaN(securityRegistrationAlertThreshold)) ||
     (windowProvided && Number.isNaN(securityRegistrationAlertWindowMinutes))
   ) {
@@ -50113,17 +51644,31 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
     return res.redirect(redirectWith('err', 'Invalid settings'));
   }
   if (
+    idleTimeoutMinutes < SESSION_IDLE_TIMEOUT_MINUTES_MIN ||
+    idleTimeoutMinutes > SESSION_IDLE_TIMEOUT_MINUTES_MAX ||
+    absoluteTimeoutHours < SESSION_ABSOLUTE_TIMEOUT_HOURS_MIN ||
+    absoluteTimeoutHours > SESSION_ABSOLUTE_TIMEOUT_HOURS_MAX ||
+    stepUpReauthMinutes < SECURITY_STEPUP_REAUTH_MINUTES_MIN ||
+    stepUpReauthMinutes > SECURITY_STEPUP_REAUTH_MINUTES_MAX ||
     scheduleRefreshMinutes > 120 ||
     siteVisitRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
     siteVisitRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
-    loginHistoryRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    securityLogsRetentionDays < SECURITY_LOGS_RETENTION_MIN_DAYS ||
+    securityLogsRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    loginHistoryRetentionDays < LOGIN_HISTORY_RETENTION_MIN_DAYS ||
     loginHistoryRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
-    activityLogRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    activityLogRetentionDays < ACTIVITY_LOG_RETENTION_MIN_DAYS ||
     activityLogRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
-    securityIpRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
+    securityIpRetentionDays < SECURITY_IP_RETENTION_MIN_DAYS ||
     securityIpRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
-    securityUserAgentRetentionDays < SETTINGS_RETENTION_MIN_DAYS ||
-    securityUserAgentRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    securityDeviceRetentionDays < SECURITY_DEVICE_RETENTION_MIN_DAYS ||
+    securityDeviceRetentionDays > SETTINGS_RETENTION_MAX_DAYS ||
+    riskThresholdLow < SECURITY_RISK_THRESHOLD_MIN ||
+    riskThresholdLow > SECURITY_RISK_THRESHOLD_MAX ||
+    riskThresholdMedium < SECURITY_RISK_THRESHOLD_MIN ||
+    riskThresholdMedium > SECURITY_RISK_THRESHOLD_MAX ||
+    riskThresholdHigh < SECURITY_RISK_THRESHOLD_MIN ||
+    riskThresholdHigh > SECURITY_RISK_THRESHOLD_MAX ||
     (thresholdProvided && (
       securityRegistrationAlertThreshold < SECURITY_REGISTRATION_ALERT_THRESHOLD_MIN ||
       securityRegistrationAlertThreshold > SECURITY_REGISTRATION_ALERT_THRESHOLD_MAX
@@ -50141,8 +51686,20 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   try {
     const courseId = getAdminCourse(req);
     const beforeState = buildSystemSettingsAuditState(settingsCache);
+    const normalizedThresholds = securityHelpers.buildRiskThresholds({
+      low: riskThresholdLow,
+      medium: riskThresholdMedium,
+      high: riskThresholdHigh,
+    }, SECURITY_RISK_THRESHOLDS_DEFAULTS);
+    const normalizedSessionSecurity = securityHelpers.normalizeSessionSecuritySettings({
+      idleTimeoutMinutes,
+      absoluteTimeoutHours,
+      stepUpReauthMinutes,
+    });
     const nextSettings = {
-      session_duration_days: sessionDays,
+      session_idle_timeout_minutes: normalizedSessionSecurity.idleTimeoutMinutes,
+      session_absolute_timeout_hours: normalizedSessionSecurity.absoluteTimeoutHours,
+      session_duration_days: resolveSessionCompatibilityDays(normalizedSessionSecurity.absoluteTimeoutHours),
       max_file_size_mb: maxFileSize,
       allow_homework_creation: allowHomework,
       min_team_members: minTeamMembers,
@@ -50150,10 +51707,27 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
       myday_show_student_homework: myDayShowStudentHomework,
       allow_messages: allowMessages,
       schedule_refresh_minutes: scheduleRefreshMinutes,
-      site_visit_retention_days: normalizeRetentionDays(siteVisitRetentionDays, DEFAULT_SETTINGS.site_visit_retention_days),
-      login_history_retention_days: normalizeRetentionDays(loginHistoryRetentionDays, DEFAULT_SETTINGS.login_history_retention_days),
-      activity_log_retention_days: normalizeRetentionDays(activityLogRetentionDays, DEFAULT_SETTINGS.activity_log_retention_days),
-      security_admin_ip_allowlist: normalizeSecurityAdminIpAllowlist(securityAdminIpAllowlist),
+      site_visit_retention_days: normalizeSiteVisitRetentionDays(
+        siteVisitRetentionDays,
+        DEFAULT_SETTINGS.site_visit_retention_days
+      ),
+      security_logs_retention_days: normalizeSecurityLogsRetentionDays(
+        securityLogsRetentionDays,
+        DEFAULT_SETTINGS.security_logs_retention_days
+      ),
+      login_history_retention_days: normalizeLoginHistoryRetentionDays(
+        loginHistoryRetentionDays,
+        DEFAULT_SETTINGS.login_history_retention_days
+      ),
+      activity_log_retention_days: normalizeActivityLogRetentionDays(
+        activityLogRetentionDays,
+        DEFAULT_SETTINGS.activity_log_retention_days
+      ),
+      security_admin_ip_allowlist: securityAdminIpAllowlist,
+      security_stepup_reauth_minutes: normalizedSessionSecurity.stepUpReauthMinutes,
+      security_risk_threshold_low: normalizedThresholds.low,
+      security_risk_threshold_medium: normalizedThresholds.medium,
+      security_risk_threshold_high: normalizedThresholds.high,
       security_registration_alert_threshold: normalizeSecurityRegistrationAlertThreshold(
         securityRegistrationAlertThreshold,
         DEFAULT_SETTINGS.security_registration_alert_threshold
@@ -50163,36 +51737,68 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
         DEFAULT_SETTINGS.security_registration_alert_window_minutes
       ),
       security_auto_quarantine_enabled: Boolean(securityAutoQuarantineEnabled),
-      security_ip_retention_days: normalizeRetentionDays(
+      security_ip_retention_days: normalizeSecurityIpRetentionDays(
         securityIpRetentionDays,
         DEFAULT_SETTINGS.security_ip_retention_days
       ),
-      security_user_agent_retention_days: normalizeRetentionDays(
-        securityUserAgentRetentionDays,
-        DEFAULT_SETTINGS.security_user_agent_retention_days
+      security_device_retention_days: normalizeSecurityDeviceRetentionDays(
+        securityDeviceRetentionDays,
+        DEFAULT_SETTINGS.security_device_retention_days
+      ),
+      security_user_agent_retention_days: normalizeSecurityDeviceRetentionDays(
+        securityDeviceRetentionDays,
+        DEFAULT_SETTINGS.security_device_retention_days
       ),
     };
-    const changes = Object.keys(nextSettings).reduce((acc, key) => {
-      if (String(settingsCache[key]) !== String(nextSettings[key])) {
-        acc.push({ key, from: settingsCache[key], to: nextSettings[key] });
+    const normalizedNextState = buildSystemSettingsAuditState(nextSettings);
+    const changes = Object.keys(normalizedNextState).reduce((acc, key) => {
+      const beforeValue = beforeState[key];
+      const afterValue = normalizedNextState[key];
+      if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
+        acc.push({ key, from: beforeValue, to: afterValue });
       }
       return acc;
     }, []);
     const operationId = randomUUID();
-    const afterState = await persistSystemSettingsState(nextSettings);
+    const afterState = await persistSystemSettingsState(normalizedNextState);
     await createAdminAuditEntry(req, {
       scopeKey: ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS,
+      actionType: 'system_settings_update',
       targetType: 'system_settings',
       summary: 'System settings updated',
       beforeState,
       afterState,
       operationId,
       courseId,
+      metadata: {
+        changes,
+        invalid_allowlist_entries: parsedAdminAllowlist.invalidEntries || [],
+      },
+      isCritical: changes.some((change) => {
+        const key = String(change && change.key ? change.key : '');
+        return /^(security_|session_)/.test(key) || /retention|history|activity/.test(key);
+      }),
     });
     logAction(db, req, 'system_settings_update', {
       operation_id: operationId,
       changes,
     });
+    if (parsedAdminAllowlist.invalidEntries && parsedAdminAllowlist.invalidEntries.length) {
+      console.warn('Invalid admin IP allowlist entries ignored', parsedAdminAllowlist.invalidEntries);
+      await emitSecurityAlertEvent({
+        alertKey: 'invalid-admin-ip-allowlist',
+        severity: 'low',
+        title: 'Invalid admin IP allowlist entries ignored',
+        message: `${parsedAdminAllowlist.invalidEntries.length} invalid trusted IP rules were skipped`,
+        courseId,
+        details: {
+          invalid_entries: parsedAdminAllowlist.invalidEntries,
+          actor_user_id: Number(req.session.user.id || 0) || null,
+          operation_id: operationId,
+        },
+        dedupKey: `invalid-admin-ip-allowlist|${Math.floor(Date.now() / (60 * 60 * 1000))}`,
+      });
+    }
     if (wantsJson) {
       return res.json({
         ok: true,
@@ -50200,6 +51806,10 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
         updated_at: new Date().toISOString(),
         updated_by: req.session.user ? req.session.user.username : null,
         changes,
+        warnings: parsedAdminAllowlist.invalidEntries || [],
+        last_sensitive_reauth_at: req.sensitiveReauth && req.sensitiveReauth.last_sensitive_reauth_at
+          ? req.sensitiveReauth.last_sensitive_reauth_at
+          : null,
       });
     }
     return res.redirect(redirectWith('ok', 'Settings saved', { op: operationId }));
@@ -50208,7 +51818,7 @@ app.post('/admin/settings', requireSettingsSectionAccess, async (req, res) => {
   }
 });
 
-app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) => {
+app.post('/admin/role-access', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
   const redirectWith = (kind, message, extraParams = {}) => buildAdminScopedNoticeUrl(req, kind, message, {
     tab: 'admin-role-studio',
     extraParams,
@@ -50239,6 +51849,7 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
     const afterState = await persistLegacyRolePermissions(nextPermissions);
     await createAdminAuditEntry(req, {
       scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+      actionType: 'role_access_update',
       targetType: 'role_permissions',
       targetKey: 'legacy',
       summary: 'Role permissions updated',
@@ -50246,6 +51857,8 @@ app.post('/admin/role-access', requireRoleAccessSectionAccess, async (req, res) 
       afterState,
       operationId,
       courseId,
+      metadata: { changes },
+      isCritical: true,
     });
     logAction(db, req, 'role_access_update', {
       operation_id: operationId,
@@ -50276,42 +51889,7 @@ app.get('/admin/audit/settings.json', requireSettingsSectionAccess, async (req, 
   }
   try {
     const courseId = getAdminCourse(req);
-    const rows = await db.all(
-      `
-        SELECT
-          a.id,
-          a.target_type,
-          a.target_key,
-          a.summary,
-          a.operation_id,
-          a.created_by_name,
-          a.created_at,
-          a.is_rolled_back,
-          a.rolled_back_at,
-          ur.full_name AS rolled_back_by_name,
-          (a.before_state IS NOT NULL) AS can_rollback
-        FROM admin_change_audit a
-        LEFT JOIN users ur ON ur.id = a.rolled_back_by
-        WHERE a.scope_key = ?
-          AND (a.course_id = ? OR a.course_id IS NULL)
-        ORDER BY a.created_at DESC, a.id DESC
-        LIMIT 20
-      `,
-      [ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS, courseId]
-    );
-    const entries = (rows || []).map((row) => ({
-      id: Number(row.id),
-      target_type: String(row.target_type || ''),
-      target_key: row.target_key ? String(row.target_key) : '',
-      summary: String(row.summary || 'System settings update'),
-      operation_id: row.operation_id ? String(row.operation_id) : '',
-      created_by_name: row.created_by_name ? String(row.created_by_name) : '',
-      created_at: row.created_at || null,
-      is_rolled_back: row.is_rolled_back === true || Number(row.is_rolled_back) === 1,
-      rolled_back_at: row.rolled_back_at || null,
-      rolled_back_by_name: row.rolled_back_by_name ? String(row.rolled_back_by_name) : '',
-      can_rollback: row.can_rollback === true || Number(row.can_rollback) === 1,
-    }));
+    const entries = await listAdminAuditEntries(ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS, courseId, 20);
     return res.json({ entries });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
@@ -50326,49 +51904,14 @@ app.get('/admin/audit/role-studio.json', requireRoleAccessSectionAccess, async (
   }
   try {
     const courseId = getAdminCourse(req);
-    const rows = await db.all(
-      `
-        SELECT
-          a.id,
-          a.target_type,
-          a.target_key,
-          a.summary,
-          a.operation_id,
-          a.created_by_name,
-          a.created_at,
-          a.is_rolled_back,
-          a.rolled_back_at,
-          ur.full_name AS rolled_back_by_name,
-          (a.before_state IS NOT NULL) AS can_rollback
-        FROM admin_change_audit a
-        LEFT JOIN users ur ON ur.id = a.rolled_back_by
-        WHERE a.scope_key = ?
-          AND (a.course_id = ? OR a.course_id IS NULL)
-        ORDER BY a.created_at DESC, a.id DESC
-        LIMIT 30
-      `,
-      [ADMIN_AUDIT_SCOPE_ROLE_STUDIO, courseId]
-    );
-    const entries = (rows || []).map((row) => ({
-      id: Number(row.id),
-      target_type: String(row.target_type || ''),
-      target_key: row.target_key ? String(row.target_key) : '',
-      summary: String(row.summary || 'Role Studio update'),
-      operation_id: row.operation_id ? String(row.operation_id) : '',
-      created_by_name: row.created_by_name ? String(row.created_by_name) : '',
-      created_at: row.created_at || null,
-      is_rolled_back: row.is_rolled_back === true || Number(row.is_rolled_back) === 1,
-      rolled_back_at: row.rolled_back_at || null,
-      rolled_back_by_name: row.rolled_back_by_name ? String(row.rolled_back_by_name) : '',
-      can_rollback: row.can_rollback === true || Number(row.can_rollback) === 1,
-    }));
+    const entries = await listAdminAuditEntries(ADMIN_AUDIT_SCOPE_ROLE_STUDIO, courseId, 30);
     return res.json({ entries });
   } catch (err) {
     return res.status(500).json({ error: 'Database error' });
   }
 });
 
-app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, res) => {
+app.post('/admin/settings/rollback', requireSettingsSectionAccess, requireSensitiveActionReauth({ tab: 'admin-settings' }), async (req, res) => {
   const auditId = Number(req.body.audit_id);
   const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-settings', {
     ...extraParams,
@@ -50382,7 +51925,7 @@ app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, r
     const courseId = getAdminCourse(req);
     const auditRow = await db.get(
       `
-        SELECT id, target_type, before_state, after_state
+        SELECT id, target_type, action_type, before_state, after_state, rollback_source_audit_id
         FROM admin_change_audit
         WHERE id = ?
           AND scope_key = ?
@@ -50397,6 +51940,16 @@ app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, r
       if (String(auditRow.target_type || '') !== 'system_settings') {
       return res.redirect(redirectWith('err', 'Unsupported audit target'));
       }
+      if (Number.isFinite(Number(auditRow.rollback_source_audit_id))) {
+      return res.redirect(redirectWith('err', 'Rollback of rollback entry is blocked'));
+      }
+      const existingRollback = await db.get(
+        'SELECT id FROM admin_change_audit WHERE rollback_source_audit_id = ? LIMIT 1',
+        [auditId]
+      );
+      if (existingRollback && existingRollback.id) {
+      return res.redirect(redirectWith('err', 'Audit entry already has rollback'));
+      }
       const rollbackStateRaw = parseAuditState(auditRow.before_state);
       if (!rollbackStateRaw || typeof rollbackStateRaw !== 'object') {
       return res.redirect(redirectWith('err', 'Rollback snapshot is invalid'));
@@ -50406,15 +51959,21 @@ app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, r
     const rollbackState = buildSystemSettingsAuditState(rollbackStateRaw);
     const operationId = randomUUID();
     const afterRollbackState = await persistSystemSettingsState(rollbackState);
-    await markAdminAuditEntryRolledBack(auditId, req);
     await createAdminAuditEntry(req, {
       scopeKey: ADMIN_AUDIT_SCOPE_SYSTEM_SETTINGS,
+      actionType: 'system_settings_rollback',
       targetType: 'system_settings',
       summary: `Rollback from audit #${auditId}`,
       beforeState: beforeRollbackState,
       afterState: afterRollbackState,
       operationId,
       courseId,
+      rollbackSourceAuditId: auditId,
+      metadata: {
+        rolled_back_audit_id: auditId,
+        rolled_back_action_type: String(auditRow.action_type || ''),
+      },
+      isCritical: true,
     });
     logAction(db, req, 'system_settings_rollback', {
       operation_id: operationId,
@@ -50426,7 +51985,7 @@ app.post('/admin/settings/rollback', requireSettingsSectionAccess, async (req, r
   }
 });
 
-app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (req, res) => {
+app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
   const auditId = Number(req.body.audit_id);
   const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-role-studio', {
     ...extraParams,
@@ -50440,7 +51999,7 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
     const courseId = getAdminCourse(req);
     const auditRow = await db.get(
       `
-        SELECT id, target_type, target_key, before_state, after_state
+        SELECT id, target_type, target_key, action_type, before_state, after_state, rollback_source_audit_id
         FROM admin_change_audit
         WHERE id = ?
           AND scope_key = ?
@@ -50452,6 +52011,16 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
       if (!auditRow) {
       return res.redirect(redirectWith('err', 'Audit entry not found'));
       }
+    if (Number.isFinite(Number(auditRow.rollback_source_audit_id))) {
+      return res.redirect(redirectWith('err', 'Rollback of rollback entry is blocked'));
+    }
+    const existingRollback = await db.get(
+      'SELECT id FROM admin_change_audit WHERE rollback_source_audit_id = ? LIMIT 1',
+      [auditId]
+    );
+    if (existingRollback && existingRollback.id) {
+      return res.redirect(redirectWith('err', 'Audit entry already has rollback'));
+    }
     const targetType = String(auditRow.target_type || '');
     const targetKey = String(auditRow.target_key || '').trim().toLowerCase();
     const rollbackState = parseAuditState(auditRow.before_state);
@@ -50464,9 +52033,9 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
       }
       const beforeRollbackState = sanitizeLegacyRolePermissions(settingsCache.role_permissions || {});
       const appliedState = await persistLegacyRolePermissions(rollbackState);
-      await markAdminAuditEntryRolledBack(auditId, req);
       await createAdminAuditEntry(req, {
         scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        actionType: 'role_permissions_rollback',
         targetType: 'role_permissions',
         targetKey: 'legacy',
         summary: `Rollback from audit #${auditId}`,
@@ -50474,6 +52043,12 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
         afterState: appliedState,
         operationId,
         courseId,
+        rollbackSourceAuditId: auditId,
+        metadata: {
+          rolled_back_audit_id: auditId,
+          rolled_back_action_type: String(auditRow.action_type || ''),
+        },
+        isCritical: true,
       });
       logAction(db, req, 'role_permissions_rollback', {
         operation_id: operationId,
@@ -50499,9 +52074,9 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
         await upsertRbacRoleState(client, rollbackState);
       });
       const appliedState = await getRbacRoleStateByKey(targetKey);
-      await markAdminAuditEntryRolledBack(auditId, req);
       await createAdminAuditEntry(req, {
         scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        actionType: 'rbac_role_rollback',
         targetType: 'rbac_role',
         targetKey,
         summary: `Rollback from audit #${auditId}`,
@@ -50509,6 +52084,12 @@ app.post('/admin/role-studio/rollback', requireRoleAccessSectionAccess, async (r
         afterState: appliedState,
         operationId,
         courseId,
+        rollbackSourceAuditId: auditId,
+        metadata: {
+          rolled_back_audit_id: auditId,
+          rolled_back_action_type: String(auditRow.action_type || ''),
+        },
+        isCritical: true,
       });
       logAction(db, req, 'rbac_role_rollback', {
         operation_id: operationId,
@@ -50923,9 +52504,21 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
             usc.risk_score,
             usc.status,
             usc.reason,
-            usc.updated_at
+            usc.updated_at,
+            sre.action_type AS last_risk_action_type,
+            sre.triggered_rules AS last_triggered_rules,
+            sre.alert_status AS last_alert_status,
+            sre.quarantine_status AS last_quarantine_status,
+            sre.created_at AS last_risk_event_at
           FROM user_security_cases usc
           JOIN users u ON u.id = usc.user_id
+          LEFT JOIN LATERAL (
+            SELECT action_type, triggered_rules, alert_status, quarantine_status, created_at
+            FROM security_risk_events
+            WHERE user_id = usc.user_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+          ) sre ON true
           ${userScopeSql}
           ORDER BY
             CASE usc.risk_level
@@ -51032,13 +52625,18 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
     ]);
 
     const ipItems = (ipRows || [])
-      .filter((row) => row && row.ip && !isSecurityAdminIpAllowlisted(row.ip, adminAllowlist))
-      .map((row) => ({
+      .filter((row) => row && row.ip)
+      .map((row) => {
+        const trust = getTrustedAdminIpAssessment(row.ip, adminAllowlist);
+        return {
         ip: normalizeForensicsIp(row.ip),
         events_count: Number(row.events_count || 0),
         users_count: Number(row.users_count || 0),
         last_seen_at: toIsoStringSafe(row.last_seen_at),
-      }))
+        trusted: trust.matched,
+        trust_bonus: Number(trust.trustBonus || 0),
+      };
+      })
       .slice(0, 10);
 
     const deviceItems = (deviceRows || []).map((row) => ({
@@ -51073,6 +52671,13 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
         status: normalizeSecurityCaseStatus(row.status),
         reason: String(row.reason || ''),
         updated_at: toIsoStringSafe(row.updated_at),
+        last_risk_action_type: row.last_risk_action_type ? String(row.last_risk_action_type) : '',
+        triggered_rule_labels: extractTriggeredSecurityRuleLabels(
+          safeJsonParse(row.last_triggered_rules, [])
+        ),
+        alert_status: row.last_alert_status ? String(row.last_alert_status) : 'none',
+        quarantine_status: row.last_quarantine_status ? String(row.last_quarantine_status) : 'none',
+        last_risk_event_at: toIsoStringSafe(row.last_risk_event_at),
       })),
       open_alerts: (alertsRows || []).map((row) => ({
         id: Number(row.id),
@@ -51088,14 +52693,19 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
       top_devices: deviceItems,
       settings: {
         auto_quarantine_enabled: Boolean(settingsCache.security_auto_quarantine_enabled),
-        allowlist_count: adminAllowlist.length,
-        ip_retention_days: normalizeRetentionDays(
+        allowlist_count: Array.isArray(adminAllowlist.rules) ? adminAllowlist.rules.length : 0,
+        allowlist_invalid_count: Array.isArray(adminAllowlist.invalidEntries) ? adminAllowlist.invalidEntries.length : 0,
+        ip_retention_days: normalizeSecurityIpRetentionDays(
           settingsCache.security_ip_retention_days,
           SECURITY_IP_RETENTION_DAYS_DEFAULT
         ),
-        user_agent_retention_days: normalizeRetentionDays(
-          settingsCache.security_user_agent_retention_days,
-          SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT
+        device_retention_days: normalizeSecurityDeviceRetentionDays(
+          settingsCache.security_device_retention_days || settingsCache.security_user_agent_retention_days,
+          SECURITY_DEVICE_RETENTION_DAYS_DEFAULT
+        ),
+        risk_thresholds: resolveSecurityRiskThresholds(),
+        stepup_reauth_minutes: resolveStepUpReauthMinutes(
+          settingsCache.security_stepup_reauth_minutes
         ),
       },
     });
@@ -51313,7 +52923,7 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
         last_error: schedulerHealthState.last_error || null,
       },
       security: {
-        admin_ip_allowlist_count: parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist).length,
+        admin_ip_allowlist_count: parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist).rules.length,
         registration_alert_threshold: normalizeSecurityRegistrationAlertThreshold(
           settingsCache.security_registration_alert_threshold,
           DEFAULT_SETTINGS.security_registration_alert_threshold
@@ -51323,13 +52933,13 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
           DEFAULT_SETTINGS.security_registration_alert_window_minutes
         ),
         auto_quarantine_enabled: Boolean(settingsCache.security_auto_quarantine_enabled),
-        ip_retention_days: normalizeRetentionDays(
+        ip_retention_days: normalizeSecurityIpRetentionDays(
           settingsCache.security_ip_retention_days,
           SECURITY_IP_RETENTION_DAYS_DEFAULT
         ),
-        user_agent_retention_days: normalizeRetentionDays(
-          settingsCache.security_user_agent_retention_days,
-          SECURITY_USER_AGENT_RETENTION_DAYS_DEFAULT
+        device_retention_days: normalizeSecurityDeviceRetentionDays(
+          settingsCache.security_device_retention_days || settingsCache.security_user_agent_retention_days,
+          SECURITY_DEVICE_RETENTION_DAYS_DEFAULT
         ),
       },
       migrations: {
@@ -52607,11 +54217,11 @@ app.post('/admin/users/:id/risk-case', requireUsersSectionAccess, writeLimiter, 
     let riskScore = Number.isFinite(parsedScore)
       ? Math.max(0, Math.round(parsedScore))
       : Number(existingCase && existingCase.risk_score ? existingCase.risk_score : 0);
-    if (requestedLevel === 'high-risk' && riskScore < SECURITY_CASE_SCORE_HIGH) {
-      riskScore = SECURITY_CASE_SCORE_HIGH;
-    } else if (requestedLevel === 'watch' && riskScore < SECURITY_CASE_SCORE_WATCH) {
-      riskScore = SECURITY_CASE_SCORE_WATCH;
-    } else if (requestedLevel === 'normal' && riskScore >= SECURITY_CASE_SCORE_WATCH) {
+    if (requestedLevel === 'high-risk' && riskScore < getSecurityCaseScoreHigh()) {
+      riskScore = getSecurityCaseScoreHigh();
+    } else if (requestedLevel === 'watch' && riskScore < getSecurityCaseScoreWatch()) {
+      riskScore = getSecurityCaseScoreWatch();
+    } else if (requestedLevel === 'normal' && riskScore >= getSecurityCaseScoreWatch()) {
       riskScore = 20;
     }
     const reason = trimSecurityText(req.body.reason, 600) || null;
@@ -52920,8 +54530,8 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
     const evidenceSessions = Array.from(evidenceSessionsSet).filter((v) => String(v).trim().length);
     const rawEvidenceIps = Array.from(evidenceIpsSet).filter((v) => String(v).trim().length);
     const adminIpAllowlist = parseSecurityAdminIpAllowlist(settingsCache.security_admin_ip_allowlist);
-    const allowlistedEvidenceIps = rawEvidenceIps.filter((ip) => isSecurityAdminIpAllowlisted(ip, adminIpAllowlist));
-    const evidenceIps = rawEvidenceIps.filter((ip) => !isSecurityAdminIpAllowlisted(ip, adminIpAllowlist));
+    const trustedEvidenceIps = rawEvidenceIps.filter((ip) => isSecurityAdminIpAllowlisted(ip, adminIpAllowlist));
+    const evidenceIps = [...rawEvidenceIps];
     const evidenceAgents = Array.from(evidenceAgentsSet).filter((v) => String(v).trim().length);
     const evidenceFingerprints = Array.from(evidenceFingerprintsSet).filter((v) => String(v).trim().length);
 
@@ -53226,17 +54836,16 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
       riskScore += 10;
       riskReasons.push(`Є збіги по IP (${evidenceIps.length})`);
     }
-    if (allowlistedEvidenceIps.length) {
-      riskReasons.push(`IP у allowlist (ігнор): ${allowlistedEvidenceIps.join(', ')}`);
+    const trustBonus = trustedEvidenceIps.length
+      ? Math.abs(Number(securityHelpers.TRUSTED_ADMIN_IP_RISK_BONUS || 0))
+      : 0;
+    if (trustBonus > 0) {
+      riskScore = Math.max(0, riskScore - trustBonus);
+      riskReasons.push(`Trusted admin IP знизив risk на ${trustBonus}`);
     }
-    const hasSuppressedOnly =
-      allowlistedEvidenceIps.length > 0 &&
-      !evidenceIps.length &&
-      !evidenceSessions.length &&
-      !strongMatches;
     const resolvedRisk = resolveForensicsRiskState(riskScore);
-    const riskLevel = hasSuppressedOnly ? 'suppressed' : resolvedRisk.key;
-    const riskLabel = hasSuppressedOnly ? 'Збіги приглушено (allowlist)' : resolvedRisk.label;
+    const riskLevel = resolvedRisk.key;
+    const riskLabel = resolvedRisk.label;
     const securityAlertWindowMs = SYSTEM_INCIDENT_WINDOW_HOURS * 60 * 60 * 1000;
     const securityAlertsForTarget = runtimeErrorEvents
       .filter((event) => {
@@ -53331,7 +54940,7 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
       evidence: {
         source: registrationEvent ? 'registration_event' : (inferredRegistrationRows.length ? 'inferred_site_visits' : 'login_only'),
         ips: evidenceIps,
-        ignored_ips: allowlistedEvidenceIps,
+        trusted_ips: trustedEvidenceIps,
         session_ids: evidenceSessions,
         user_agents: evidenceAgents,
         device_fingerprints: evidenceFingerprints,
@@ -53359,7 +54968,8 @@ app.get('/admin/users/:id/forensics.json', requireUsersSectionAccess, async (req
         level: finalRiskLevel,
         label: finalRiskLabel,
         reasons: riskReasons.slice(0, 5),
-        allowlisted: allowlistedEvidenceIps.length > 0,
+        trusted_ip_match: trustedEvidenceIps.length > 0,
+        trust_bonus: trustBonus,
         recent_alerts_count: securityAlertsForTarget.length,
         recent_alerts: securityAlertsForTarget.map((event) => ({
           created_at: parseTs(event.created_at),
@@ -57323,7 +58933,7 @@ app.get('/admin/users/:id/roles.json', requireRoleAccessSectionAccess, async (re
   }
 });
 
-app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) => {
+app.post('/admin/users/roles', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
   const userId = Number(req.body.user_id);
   const courseId = getAdminCourse(req);
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
@@ -57373,8 +58983,35 @@ app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) 
       afterPrimaryRole: result.primaryRoleKey,
       targetFullName: user.full_name || null,
     });
+    const operationId = randomUUID();
+    await createAdminAuditEntry(req, {
+      scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+      actionType: 'user_roles_change',
+      targetType: 'user_roles_assignment',
+      targetId: userId,
+      targetKey: String(userId),
+      summary: `User roles changed: ${user.full_name || userId}`,
+      beforeState: beforeSnapshot,
+      afterState: {
+        role_keys: result.roleKeys,
+        primary_role: result.primaryRoleKey,
+      },
+      operationId,
+      courseId,
+      metadata: {
+        user_id: userId,
+        full_name: user.full_name || null,
+        primary_role: result.primaryRoleKey,
+      },
+      isCritical: true,
+    });
     await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
-    logAction(db, req, 'user_roles_change', { user_id: userId, role_keys: result.roleKeys, primary_role: result.primaryRoleKey });
+    logAction(db, req, 'user_roles_change', {
+      operation_id: operationId,
+      user_id: userId,
+      role_keys: result.roleKeys,
+      primary_role: result.primaryRoleKey,
+    });
     broadcast('users_updated');
     return res.redirect(redirectWith('ok', 'Roles updated'));
   } catch (err) {
@@ -57388,7 +59025,7 @@ app.post('/admin/users/roles', requireRoleAccessSectionAccess, async (req, res) 
   }
 });
 
-app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) => {
+app.post('/admin/users/role', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
   const { user_id, role } = req.body;
   const roleKey = normalizeRoleKey(role);
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
@@ -57432,8 +59069,30 @@ app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) =
       afterPrimaryRole: roleKey,
       targetFullName: user.full_name || null,
     });
+    const operationId = randomUUID();
+    await createAdminAuditEntry(req, {
+      scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+      actionType: 'user_role_change',
+      targetType: 'user_roles_assignment',
+      targetId: userId,
+      targetKey: String(userId),
+      summary: `Legacy role changed: ${user.full_name || userId}`,
+      beforeState: beforeSnapshot,
+      afterState: {
+        role_keys: [roleKey],
+        primary_role: roleKey,
+      },
+      operationId,
+      courseId,
+      metadata: {
+        user_id: userId,
+        full_name: user.full_name || null,
+        primary_role: roleKey,
+      },
+      isCritical: true,
+    });
     await recomputeUserSecurityCase(userId, { courseId, allowAutoQuarantine: false });
-    logAction(db, req, 'user_role_change', { user_id: userId, role: roleKey });
+    logAction(db, req, 'user_role_change', { operation_id: operationId, user_id: userId, role: roleKey });
     broadcast('users_updated');
     return res.redirect(redirectWith('ok', 'Role updated'));
   } catch (err) {
@@ -57444,7 +59103,7 @@ app.post('/admin/users/role', requireRoleAccessSectionAccess, async (req, res) =
   }
 });
 
-app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req, res) => {
+app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
   const key = String(req.body.key || '').trim().toLowerCase();
   const label = String(req.body.label || '').trim();
   const description = String(req.body.description || '').trim();
@@ -57520,6 +59179,7 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
       const operationId = randomUUID();
       await createAdminAuditEntry(req, {
         scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        actionType: 'rbac_role_create',
         targetType: 'rbac_role',
         targetKey: key,
         summary: `Role created: ${key}`,
@@ -57527,6 +59187,8 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
         afterState,
         operationId,
         courseId,
+        metadata: { key, label, clone_from: cloneFrom || null },
+        isCritical: true,
       });
       logAction(db, req, 'rbac_role_create', { key, label, clone_from: cloneFrom || null });
       broadcast('users_updated');
@@ -57549,7 +59211,7 @@ app.post('/admin/rbac/roles/create', requireRoleAccessSectionAccess, async (req,
   }
 });
 
-app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (req, res) => {
+app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
   const roleKey = String(req.params.key || '').trim().toLowerCase();
   const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-role-studio', {
     ...extraParams,
@@ -57643,6 +59305,7 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
       const operationId = randomUUID();
       await createAdminAuditEntry(req, {
         scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+        actionType: 'rbac_role_update',
         targetType: 'rbac_role',
         targetKey: roleRow.key,
         summary: `Role updated: ${roleRow.key}`,
@@ -57650,6 +59313,14 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
         afterState,
         operationId,
         courseId,
+        metadata: {
+          key: roleRow.key,
+          permission_keys: permissionKeys,
+          course_kinds: courseKinds,
+          multicourse_enabled: multicourseEnabled,
+          is_active: isActive,
+        },
+        isCritical: true,
       });
       logAction(db, req, 'rbac_role_update', {
         key: roleRow.key,
@@ -57676,7 +59347,7 @@ app.post('/admin/rbac/roles/:key/save', requireRoleAccessSectionAccess, async (r
   }
 });
 
-app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async (req, res) => {
+app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, requireSensitiveActionReauth({ tab: 'admin-role-studio' }), async (req, res) => {
   const roleKey = String(req.params.key || '').trim().toLowerCase();
   const redirectWith = (kind, message, extraParams = {}) => buildAdminTabUrl(req, 'admin-role-studio', {
     ...extraParams,
@@ -57704,6 +59375,7 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
     const operationId = randomUUID();
     await createAdminAuditEntry(req, {
       scopeKey: ADMIN_AUDIT_SCOPE_ROLE_STUDIO,
+      actionType: 'rbac_role_delete',
       targetType: 'rbac_role',
       targetKey: roleRow.key,
       summary: `Role deleted: ${roleRow.key}`,
@@ -57711,6 +59383,8 @@ app.post('/admin/rbac/roles/:key/delete', requireRoleAccessSectionAccess, async 
       afterState: null,
       operationId,
       courseId,
+      metadata: { key: roleRow.key },
+      isCritical: true,
     });
     logAction(db, req, 'rbac_role_delete', { key: roleRow.key });
     broadcast('users_updated');
@@ -58004,7 +59678,7 @@ app.post('/admin/homework/migrate', requireHomeworkSectionAccess, (req, res) => 
   );
 });
 
-app.post('/admin/users/delete-multiple', requireUsersSectionAccess, (req, res) => {
+app.post('/admin/users/delete-multiple', requireUsersSectionAccess, requireSensitiveActionReauth({ tab: 'admin-users' }), (req, res) => {
   const ids = req.body.delete_user_ids;
   const courseId = getAdminCourse(req);
   const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
@@ -58033,7 +59707,7 @@ app.post('/admin/users/delete-multiple', requireUsersSectionAccess, (req, res) =
   }).catch(() => res.redirect(appendQueryParamToUrl(redirectBase, 'err', 'Database error')));
 });
 
-app.post('/admin/users/clear-all', requireUsersSectionAccess, (req, res) => {
+app.post('/admin/users/clear-all', requireUsersSectionAccess, requireSensitiveActionReauth({ tab: 'admin-users' }), (req, res) => {
   const courseId = getAdminCourse(req);
   const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
   academicSetupHelpers.listLegacyCourseUsers(getAcademicSetupStore(), {

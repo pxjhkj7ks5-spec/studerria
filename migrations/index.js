@@ -46,6 +46,7 @@ const academicV2SubjectActivities = require('./045_academic_v2_subject_activitie
 const academicV2ActivityBaselines = require('./046_academic_v2_activity_baselines');
 const academicV2SharedGroupSubjectLinks = require('./047_academic_v2_shared_group_subject_links');
 const securityMulticourseRateLimits = require('./048_security_multicourse_rate_limits');
+const securityHardeningAdminControls = require('./049_security_hardening_admin_controls');
 
 module.exports = [
   init,
@@ -96,4 +97,5 @@ module.exports = [
   academicV2ActivityBaselines,
   academicV2SharedGroupSubjectLinks,
   securityMulticourseRateLimits,
+  securityHardeningAdminControls,
 ];

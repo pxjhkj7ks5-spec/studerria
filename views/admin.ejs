@@ -1138,6 +1138,7 @@
       <% const importOperation = msg && msg.operationId ? msg.operationId : ''; %>
       <% const semestersByCourseMap = typeof semestersByCourse !== 'undefined' && semestersByCourse ? semestersByCourse : { [(selectedCourseId || 1)]: (semesters || []) }; %>
       <% const settingsMetaInfo = typeof settingsMeta !== 'undefined' && settingsMeta ? settingsMeta : null; %>
+      <% const sessionSecurityInfo = typeof sessionSecurity !== 'undefined' && sessionSecurity ? sessionSecurity : null; %>
       <div id="toastContainer" data-toast-success="<%= msg && msg.success ? msg.success : '' %>" data-toast-error="<%= msg && msg.error ? msg.error : '' %>"></div>
       <% if (projectionAlert && projectionAlert.body) { %>
         <div class="alert alert-warning glass border-0 mb-3">
@@ -1368,9 +1369,11 @@
                   <h5 class="mb-1"><%= t('admin.settings') %></h5>
                   <% const settingsUpdatedAt = settingsMetaInfo && settingsMetaInfo.updated_at ? new Date(settingsMetaInfo.updated_at).toLocaleString('uk-UA') : '—'; %>
                   <% const settingsUpdatedBy = settingsMetaInfo && settingsMetaInfo.updated_by ? settingsMetaInfo.updated_by : '—'; %>
+                  <% const settingsLastSensitiveReauthAt = sessionSecurityInfo && sessionSecurityInfo.last_sensitive_reauth_at ? new Date(sessionSecurityInfo.last_sensitive_reauth_at).toLocaleString('uk-UA') : '—'; %>
                   <div class="small text-muted" id="settingsMeta">
                     Останнє оновлення: <span data-settings-updated-at><%= settingsUpdatedAt %></span>
                     · Оновив(ла): <span data-settings-updated-by><%= settingsUpdatedBy %></span>
+                    · Sensitive re-auth: <span data-settings-reauth-at><%= settingsLastSensitiveReauthAt %></span>
                   </div>
                 </div>
                 <div class="badge admin-chip">System</div>
@@ -1385,17 +1388,46 @@
                     <div class="settings-section-title">Security</div>
                     <div class="row g-3">
                       <div class="col-12 col-md-4">
-                        <label class="form-label"><%= t('admin.sessionDuration') %></label>
+                        <label class="form-label">Idle timeout (minutes)</label>
                         <input
                           type="number"
-                          min="1"
-                          max="365"
+                          min="5"
+                          max="1440"
                           class="form-control"
-                          name="session_duration_days"
-                          value="<%= (settings && settings.session_duration_days) || 14 %>"
+                          name="session_idle_timeout_minutes"
+                          value="<%= (settings && settings.session_idle_timeout_minutes) || 60 %>"
                           data-settings-field
                           required
                         />
+                        <div class="small text-muted mt-1">Завершує сесію після бездіяльності. Захист від shared machine і stolen cookie.</div>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Absolute timeout (hours)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="2160"
+                          class="form-control"
+                          name="session_absolute_timeout_hours"
+                          value="<%= (settings && settings.session_absolute_timeout_hours) || 336 %>"
+                          data-settings-field
+                          required
+                        />
+                        <div class="small text-muted mt-1">Сесія не живе довше цього часу навіть при активності.</div>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Step-up re-auth window (minutes)</label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="1440"
+                          class="form-control"
+                          name="security_stepup_reauth_minutes"
+                          value="<%= (settings && settings.security_stepup_reauth_minutes) || 15 %>"
+                          data-settings-field
+                          required
+                        />
+                        <div class="small text-muted mt-1">Після підтвердження паролем критичні дії тимчасово проходять без повторного prompt.</div>
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label">Register alert threshold (accounts)</label>
@@ -1430,8 +1462,47 @@
                           <option value="false" <%= (settings && settings.security_auto_quarantine_enabled) ? '' : 'selected' %>>Disabled</option>
                         </select>
                       </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Risk threshold: low</label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="1000"
+                          class="form-control"
+                          name="security_risk_threshold_low"
+                          value="<%= (settings && settings.security_risk_threshold_low) || 35 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Risk threshold: medium</label>
+                        <input
+                          type="number"
+                          min="6"
+                          max="1000"
+                          class="form-control"
+                          name="security_risk_threshold_medium"
+                          value="<%= (settings && settings.security_risk_threshold_medium) || 65 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Risk threshold: high</label>
+                        <input
+                          type="number"
+                          min="7"
+                          max="1000"
+                          class="form-control"
+                          name="security_risk_threshold_high"
+                          value="<%= (settings && settings.security_risk_threshold_high) || 95 %>"
+                          data-settings-field
+                          required
+                        />
+                      </div>
                       <div class="col-12">
-                        <label class="form-label">Admin IP allowlist (ignore in forensics/alerts)</label>
+                        <label class="form-label">Trusted admin IPs (reduce risk, not bypass checks)</label>
                         <textarea
                           class="form-control"
                           name="security_admin_ip_allowlist"
@@ -1439,7 +1510,7 @@
                           placeholder="One IP or rule per line, e.g.&#10;127.0.0.1&#10;192.168.1.*&#10;10.0.0.0/24"
                           data-settings-field
                         ><%= (settings && settings.security_admin_ip_allowlist) || '' %></textarea>
-                        <div class="small text-muted mt-1">Підтримка: exact IP, wildcard with *, CIDR for IPv4.</div>
+                        <div class="small text-muted mt-1">Підтримка: exact IP, wildcard with *, CIDR for IPv4. Невалідні правила ігноруються і логуються як config warning.</div>
                       </div>
                     </div>
                   </div>
@@ -1552,7 +1623,7 @@
                     <div class="settings-section-title">Data retention</div>
                     <div class="row g-3">
                       <div class="col-12 col-md-4">
-                        <label class="form-label">Security analytics (days)</label>
+                        <label class="form-label">Security analytics / site visits (days)</label>
                         <input
                           type="number"
                           min="14"
@@ -1563,19 +1634,35 @@
                           data-settings-field
                           required
                         />
+                        <div class="small text-muted mt-1">Більше днів = кращий behavioral trail, але більше storage.</div>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">Security logs (days)</label>
+                        <input
+                          type="number"
+                          min="30"
+                          max="3650"
+                          class="form-control"
+                          name="security_logs_retention_days"
+                          value="<%= (settings && settings.security_logs_retention_days) || 120 %>"
+                          data-settings-field
+                          required
+                        />
+                        <div class="small text-muted mt-1">Alerts, risk events, auth failures, role/security incidents. Frozen records не чистяться.</div>
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label">Login history (days)</label>
                         <input
                           type="number"
-                          min="14"
+                          min="30"
                           max="3650"
                           class="form-control"
                           name="login_history_retention_days"
-                          value="<%= (settings && settings.login_history_retention_days) || 180 %>"
+                          value="<%= (settings && settings.login_history_retention_days) || 60 %>"
                           data-settings-field
                           required
                         />
+                        <div class="small text-muted mt-1">Рекомендовано 30–90 днів.</div>
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label">Activity log (days)</label>
@@ -1585,41 +1672,66 @@
                           max="3650"
                           class="form-control"
                           name="activity_log_retention_days"
-                          value="<%= (settings && settings.activity_log_retention_days) || 365 %>"
+                          value="<%= (settings && settings.activity_log_retention_days) || 21 %>"
                           data-settings-field
                           required
                         />
+                        <div class="small text-muted mt-1">Рекомендовано 14–30 днів для операційного журналу.</div>
                       </div>
                       <div class="col-12 col-md-4">
-                        <label class="form-label">Security IP retention (days)</label>
+                        <label class="form-label">IP retention (days)</label>
                         <input
                           type="number"
-                          min="14"
+                          min="30"
                           max="3650"
                           class="form-control"
                           name="security_ip_retention_days"
-                          value="<%= (settings && settings.security_ip_retention_days) || 180 %>"
+                          value="<%= (settings && settings.security_ip_retention_days) || 45 %>"
                           data-settings-field
                           required
                         />
+                        <div class="small text-muted mt-1">Після порогу IP редагуються в null, але frozen incident rows зберігаються.</div>
                       </div>
                       <div class="col-12 col-md-4">
-                        <label class="form-label">Security device retention (days)</label>
+                        <label class="form-label">Device retention (days)</label>
                         <input
                           type="number"
-                          min="14"
+                          min="30"
                           max="3650"
                           class="form-control"
-                          name="security_user_agent_retention_days"
-                          value="<%= (settings && settings.security_user_agent_retention_days) || 120 %>"
+                          name="security_device_retention_days"
+                          value="<%= (settings && settings.security_device_retention_days) || 45 %>"
                           data-settings-field
                           required
                         />
+                        <div class="small text-muted mt-1">User-Agent / device fingerprint cleanup без чіпання frozen records.</div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div class="col-12 d-flex align-items-center gap-3">
+                <div class="col-12">
+                  <div class="settings-section">
+                    <div class="settings-section-title">Sensitive confirmation</div>
+                    <div class="row g-3 align-items-end">
+                      <div class="col-12 col-md-5">
+                        <label class="form-label">Confirm password</label>
+                        <input
+                          type="password"
+                          class="form-control"
+                          name="confirm_password"
+                          autocomplete="current-password"
+                          placeholder="Required for security settings updates"
+                        />
+                        <div class="small text-muted mt-1">Потрібно для security settings, rollback та інших sensitive admin actions.</div>
+                      </div>
+                      <div class="col-12 col-md-7 small text-muted">
+                        Останній successful sensitive re-auth:
+                        <span data-settings-reauth-inline><%= settingsLastSensitiveReauthAt %></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
                   <button class="btn btn-primary" type="submit" data-settings-save disabled><%= t('admin.saveSettings') %></button>
                   <div class="small text-muted">Manual save · changes are applied after clicking “Save”.</div>
                 </div>
@@ -1629,7 +1741,7 @@
                   <div class="fw-semibold">Audit + rollback</div>
                   <button class="btn btn-outline-secondary btn-sm" type="button" data-settings-audit-refresh>Refresh</button>
                 </div>
-                <div class="small text-muted mb-2">Останні зміни System Settings. Можна швидко відкотити попередній стан.</div>
+                <div class="small text-muted mb-2">Append-only історія змін System Settings з hash-chain integrity. Rollback створює новий запис і не стирає попередній слід.</div>
                 <div id="settingsAuditList" class="table-responsive">
                   <div class="small text-muted py-2">Loading…</div>
                 </div>
@@ -1661,12 +1773,31 @@
                   <div class="fw-semibold">Audit + rollback</div>
                   <button class="btn btn-outline-secondary btn-sm" type="button" data-role-audit-refresh>Refresh</button>
                 </div>
-                <div class="small text-muted mb-2">Історія змін і відкат.</div>
+                <div class="small text-muted mb-2">Append-only audit trail для ролей і прав. Rollback створює окрему подію з посиланням на джерело.</div>
                 <div id="roleStudioAuditList" class="table-responsive">
                   <div class="small text-muted py-2">Loading…</div>
                 </div>
               </div>
+              <div class="settings-section mb-4">
+                <div class="settings-section-title">Sensitive confirmation</div>
+                <div class="row g-3 align-items-end">
+                  <div class="col-12 col-md-5">
+                    <label class="form-label">Confirm password</label>
+                    <input
+                      class="form-control"
+                      type="password"
+                      id="roleStudioConfirmPassword"
+                      autocomplete="current-password"
+                      placeholder="Required for role updates / rollback"
+                    />
+                  </div>
+                  <div class="col-12 col-md-7 small text-muted">
+                    Використовується для role changes, RBAC edits та rollback.
+                  </div>
+                </div>
+              </div>
               <form method="POST" action="/admin/rbac/roles/create" class="row g-2 align-items-end mb-4">
+                <input type="hidden" name="confirm_password" data-role-confirm-password value="" />
                 <div class="col-12 col-md-3">
                   <label class="form-label">Key</label>
                   <input class="form-control" name="key" placeholder="assistant" pattern="[a-z][a-z0-9_-]{1,31}" required />
@@ -1697,6 +1828,7 @@
                 <div class="d-grid gap-3">
                   <% rbacRolesList.forEach(function(roleRow) { %>
                     <form method="POST" action="/admin/rbac/roles/<%= roleRow.key %>/save" class="role-studio-role-card" data-rbac-role-form data-role-key="<%= roleRow.key %>">
+                      <input type="hidden" name="confirm_password" data-role-confirm-password value="" />
                       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                         <div>
                           <div class="fw-semibold"><%= roleRow.label %> <span class="text-muted">(<%= roleRow.key %>)</span></div>
@@ -2436,6 +2568,13 @@
           <div class="bulk-bar" id="usersBulkBar">
             <div class="bulk-bar-content">
               <span class="bulk-count">Selected: <span id="usersBulkCount">0</span></span>
+              <input
+                class="form-control form-control-sm w-auto"
+                type="password"
+                id="usersBulkConfirmPassword"
+                autocomplete="current-password"
+                placeholder="Confirm password"
+              />
               <form id="moveUsersContextForm" method="POST" action="/admin/users/group/batch" class="d-flex flex-wrap align-items-center gap-2">
                 <input type="hidden" name="track" value="<%= scopeState.track || '' %>" />
                 <input type="hidden" name="program_id" value="<%= scopeState.programId || '' %>" />
@@ -2443,6 +2582,7 @@
                 <input type="hidden" name="stage" value="<%= scopeState.stage || '' %>" />
                 <input type="hidden" name="campus" value="<%= scopeState.campus || '' %>" />
                 <input type="hidden" name="study_context_id" value="<%= scopeState.studyContextId || '' %>" />
+                <input type="hidden" name="confirm_password" data-users-bulk-confirm-password value="" />
                 <div id="usersBulkContextIds"></div>
                 <select class="form-select form-select-sm" name="target_group_id" id="usersBulkContextSelect">
                   <option value="">Move to course</option>
@@ -2647,8 +2787,12 @@
               </tbody>
             </table>
           </div>
-          <form id="deleteUsersForm" method="POST" action="/admin/users/delete-multiple"></form>
-          <form id="clearUsersForm" method="POST" action="/admin/users/clear-all"></form>
+          <form id="deleteUsersForm" method="POST" action="/admin/users/delete-multiple">
+            <input type="hidden" name="confirm_password" data-users-bulk-confirm-password value="" />
+          </form>
+          <form id="clearUsersForm" method="POST" action="/admin/users/clear-all">
+            <input type="hidden" name="confirm_password" data-users-bulk-confirm-password value="" />
+          </form>
           <div class="danger-zone mt-3">
             <div class="danger-zone-header">Danger zone</div>
             <div class="small text-muted mb-2">Це видалить усіх студентів курсу без можливості відновлення.</div>
@@ -3141,11 +3285,13 @@
                           <th>Акаунт</th>
                           <th>Ризик</th>
                           <th>Статус</th>
+                          <th>Rules</th>
+                          <th>Alert / quarantine</th>
                           <th>Score</th>
                         </tr>
                       </thead>
                       <tbody id="securityRiskyBody">
-                        <tr><td colspan="4" class="text-muted">Завантаження…</td></tr>
+                        <tr><td colspan="6" class="text-muted">Завантаження…</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -3177,12 +3323,13 @@
                       <thead>
                         <tr>
                           <th>IP</th>
+                          <th>Trust</th>
                           <th>Users</th>
                           <th>Events</th>
                         </tr>
                       </thead>
                       <tbody id="securityIpsBody">
-                        <tr><td colspan="3" class="text-muted">Завантаження…</td></tr>
+                        <tr><td colspan="4" class="text-muted">Завантаження…</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -4101,12 +4248,16 @@
             <form method="POST" action="/admin/users/roles" class="mb-3" id="uaRolesForm" <%= sectionAllowed('admin-role-access') ? '' : 'style="display:none"' %>>
               <input type="hidden" name="user_id" id="uaRolesUserId" />
               <input type="hidden" name="stepup_code" id="uaRolesStepupCode" value="" />
+              <input type="hidden" name="confirm_password" id="uaRolesConfirmPassword" value="" />
               <label class="form-label">Assign roles</label>
               <select class="form-select mb-2" name="role_keys[]" id="uaRolesSelect" multiple size="6" required></select>
               <label class="form-label">Primary role</label>
               <div class="d-flex gap-2">
                 <select class="form-select" name="primary_role" id="uaPrimaryRole" required></select>
                 <button class="btn btn-outline-primary glass" type="submit">Save</button>
+              </div>
+              <div class="mt-2">
+                <input class="form-control" type="password" id="uaRolesConfirmPasswordInput" autocomplete="current-password" placeholder="Confirm password for role changes" />
               </div>
             </form>
 
@@ -5508,6 +5659,18 @@
         if (key === 'closed') return 'text-bg-success';
         return 'text-bg-secondary';
       };
+      const getSecurityAlertBadgeClass = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'open') return 'text-bg-danger';
+        if (key === 'deduped') return 'text-bg-warning';
+        return 'text-bg-secondary';
+      };
+      const getSecurityQuarantineBadgeClass = (value) => {
+        const key = String(value || '').trim().toLowerCase();
+        if (key === 'applied') return 'text-bg-danger';
+        if (key === 'skipped') return 'text-bg-warning';
+        return 'text-bg-secondary';
+      };
 
       const formatSecurityRiskLabel = (value) => {
         const key = String(value || '').trim().toLowerCase();
@@ -5530,9 +5693,9 @@
           if (securityDashboardGeneratedAt) securityDashboardGeneratedAt.textContent = 'Оновлено: —';
           securityAutoRefreshSummary = null;
           updateSecurityAutoRefreshUi();
-          if (securityRiskyBody) securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити кейси.</td></tr>';
+          if (securityRiskyBody) securityRiskyBody.innerHTML = '<tr><td colspan="6" class="text-muted">Не вдалось завантажити кейси.</td></tr>';
           if (securityAlertsBody) securityAlertsBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити алерти.</td></tr>';
-          if (securityIpsBody) securityIpsBody.innerHTML = '<tr><td colspan="3" class="text-muted">Не вдалось завантажити IP.</td></tr>';
+          if (securityIpsBody) securityIpsBody.innerHTML = '<tr><td colspan="4" class="text-muted">Не вдалось завантажити IP.</td></tr>';
           if (securityDevicesBody) securityDevicesBody.innerHTML = '<tr><td colspan="3" class="text-muted">Не вдалось завантажити devices.</td></tr>';
           return;
         }
@@ -5574,18 +5737,27 @@
         if (securityRiskyBody) {
           const rows = Array.isArray(data.risky_accounts) ? data.risky_accounts.slice(0, 10) : [];
           if (!rows.length) {
-            securityRiskyBody.innerHTML = '<tr><td colspan="4" class="text-muted">Ризикових кейсів немає.</td></tr>';
+            securityRiskyBody.innerHTML = '<tr><td colspan="6" class="text-muted">Ризикових кейсів немає.</td></tr>';
           } else {
             securityRiskyBody.innerHTML = rows.map((row) => {
               const level = String(row && row.risk_level ? row.risk_level : '').trim().toLowerCase();
               const rowClass = level === 'high-risk'
                 ? 'security-risk-row-high'
                 : (level === 'watch' ? 'security-risk-row-watch' : '');
+              const triggeredRules = Array.isArray(row.triggered_rule_labels) ? row.triggered_rule_labels.slice(0, 3) : [];
               return `
               <tr class="${rowClass}">
-                <td>${escapeHtml(row.full_name || '-')}</td>
+                <td>
+                  <div class="fw-semibold">${escapeHtml(row.full_name || '-')}</div>
+                  <div class="small text-muted">${escapeHtml(String(row.role || 'user'))}</div>
+                </td>
                 <td><span class="badge ${getSecurityRiskBadgeClass(row.risk_level)}">${escapeHtml(formatSecurityRiskLabel(row.risk_level))}</span></td>
                 <td><span class="badge ${getSecurityStatusBadgeClass(row.status)}">${escapeHtml(String(row.status || 'open'))}</span></td>
+                <td>${triggeredRules.length ? triggeredRules.map((label) => `<span class="badge text-bg-light me-1">${escapeHtml(label)}</span>`).join('') : '<span class="text-muted">—</span>'}</td>
+                <td>
+                  <span class="badge ${getSecurityAlertBadgeClass(row.alert_status)}">${escapeHtml(String(row.alert_status || 'none'))}</span>
+                  <span class="badge ${getSecurityQuarantineBadgeClass(row.quarantine_status)}">${escapeHtml(String(row.quarantine_status || 'none'))}</span>
+                </td>
                 <td>${formatVisitNumber(row.risk_score)}</td>
               </tr>
             `;
@@ -5616,11 +5788,12 @@
         if (securityIpsBody) {
           const rows = Array.isArray(data.top_ips) ? data.top_ips.slice(0, 10) : [];
           if (!rows.length) {
-            securityIpsBody.innerHTML = '<tr><td colspan="3" class="text-muted">Підозрілих IP за період немає.</td></tr>';
+            securityIpsBody.innerHTML = '<tr><td colspan="4" class="text-muted">Підозрілих IP за період немає.</td></tr>';
           } else {
             securityIpsBody.innerHTML = rows.map((row) => `
               <tr>
                 <td>${escapeHtml(row.ip || '—')}</td>
+                <td>${row.trusted ? `<span class="badge text-bg-success">Trusted -${formatVisitNumber(row.trust_bonus || 0)}</span>` : '<span class="text-muted">—</span>'}</td>
                 <td>${formatVisitNumber(row.users_count)}</td>
                 <td>${formatVisitNumber(row.events_count)}</td>
               </tr>
@@ -6317,6 +6490,8 @@
         const dirtyEl = document.querySelector('[data-settings-dirty]');
         const updatedAtEl = document.querySelector('[data-settings-updated-at]');
         const updatedByEl = document.querySelector('[data-settings-updated-by]');
+        const updatedReauthEl = document.querySelector('[data-settings-reauth-at]');
+        const inlineReauthEl = document.querySelector('[data-settings-reauth-inline]');
         const initialValues = new Map(fields.map((field) => [field.name, field.value]));
 
         const setStatus = (label, variant = 'secondary') => {
@@ -6369,6 +6544,16 @@
           fields.forEach((field) => {
             if (!validateField(field)) valid = false;
           });
+          const thresholdLow = Number((settingsForm.querySelector('input[name="security_risk_threshold_low"]') || {}).value || 0);
+          const thresholdMedium = Number((settingsForm.querySelector('input[name="security_risk_threshold_medium"]') || {}).value || 0);
+          const thresholdHigh = Number((settingsForm.querySelector('input[name="security_risk_threshold_high"]') || {}).value || 0);
+          if (!(thresholdLow < thresholdMedium && thresholdMedium < thresholdHigh)) {
+            valid = false;
+            const mediumField = settingsForm.querySelector('input[name="security_risk_threshold_medium"]');
+            const highField = settingsForm.querySelector('input[name="security_risk_threshold_high"]');
+            setFieldError(mediumField, 'Must be > low');
+            setFieldError(highField, 'Must be > medium');
+          }
           return valid;
         };
         const readJsonSafe = async (response) => {
@@ -6432,7 +6617,21 @@
             if (updatedByEl && data.updated_by) {
               updatedByEl.textContent = data.updated_by;
             }
-            showToast('success', 'Settings saved.');
+            if (data.last_sensitive_reauth_at) {
+              const reauthLabel = new Date(data.last_sensitive_reauth_at).toLocaleString('uk-UA');
+              if (updatedReauthEl) updatedReauthEl.textContent = reauthLabel;
+              if (inlineReauthEl) inlineReauthEl.textContent = reauthLabel;
+            }
+            const confirmPasswordField = settingsForm.querySelector('input[name="confirm_password"]');
+            if (confirmPasswordField) {
+              confirmPasswordField.value = '';
+            }
+            if (Array.isArray(data.warnings) && data.warnings.length) {
+              showToast('error', `Saved with warnings: ${data.warnings.length} invalid trusted IP rule(s) ignored.`);
+            } else {
+              showToast('success', 'Settings saved.');
+            }
+            loadSettingsAudit();
           } catch (err) {
             setStatus('Error', 'danger');
             if (saveBtn) saveBtn.disabled = false;
@@ -6456,6 +6655,13 @@
         if (Number.isNaN(parsed.getTime())) return escapeAuditText(value);
         return parsed.toLocaleString('uk-UA');
       };
+      const getAuditIntegrityBadgeClass = (status) => {
+        const normalized = String(status || '').trim().toLowerCase();
+        if (normalized === 'verified') return 'text-bg-success';
+        if (normalized === 'partial') return 'text-bg-warning';
+        if (normalized === 'tampered') return 'text-bg-danger';
+        return 'text-bg-secondary';
+      };
       const renderAuditTable = (containerEl, entries, rollbackAction, confirmMessage) => {
         if (!containerEl) return;
         if (!Array.isArray(entries) || !entries.length) {
@@ -6468,34 +6674,42 @@
           const createdAt = formatAuditDate(entry.created_at);
           const target = [entry.target_type, entry.target_key].filter(Boolean).join(': ');
           const targetText = target ? escapeAuditText(target) : '—';
-          const rolledBack = entry.is_rolled_back;
-          const rolledMeta = rolledBack
-            ? `${formatAuditDate(entry.rolled_back_at)}${entry.rolled_back_by_name ? ` · ${escapeAuditText(entry.rolled_back_by_name)}` : ''}`
-            : '';
-          const canRollback = !rolledBack && entry.can_rollback;
+          const badges = [];
+          if (entry.is_critical) {
+            badges.push('<span class="badge text-bg-danger">Critical</span>');
+          }
+          if (entry.is_rollback_entry) {
+            badges.push('<span class="badge text-bg-warning">Rollback entry</span>');
+          }
+          if (entry.is_rollback_target) {
+            badges.push('<span class="badge text-bg-secondary">Rollback source</span>');
+          }
+          const integrityBadge = `<span class="badge ${getAuditIntegrityBadgeClass(entry.integrity_status)}">${escapeAuditText(entry.integrity_label || entry.integrity_status || 'Legacy')}</span>`;
+          badges.push(integrityBadge);
+          const canRollback = entry.can_rollback;
           const rollbackButton = canRollback
             ? `
-              <form method="POST" action="${rollbackAction}" class="d-inline">
+              <form method="POST" action="${rollbackAction}" class="d-flex flex-column gap-2">
                 <input type="hidden" name="audit_id" value="${Number(entry.id)}" />
-                <button
-                  class="btn btn-sm btn-outline-warning"
-                  type="submit"
-                  data-confirm="${escapeAuditText(confirmMessage)}"
-                  data-confirm-level="warning"
-                >
+                <input class="form-control form-control-sm" type="password" name="confirm_password" autocomplete="current-password" placeholder="Confirm password" />
+                <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="${escapeAuditText(confirmMessage)}" data-confirm-level="warning">
                   Rollback
                 </button>
               </form>
             `
-            : `<span class="badge text-bg-${rolledBack ? 'secondary' : 'light'}">${rolledBack ? 'Rolled back' : 'No rollback'}</span>`;
+            : '<span class="badge text-bg-light">Read only</span>';
           return `
             <tr>
               <td>#${Number(entry.id)}</td>
-              <td>${summary}</td>
+              <td>
+                <div class="fw-semibold">${summary}</div>
+                <div class="small text-muted mt-1">${badges.join(' ')}</div>
+                <div class="small text-muted mt-1">${escapeAuditText(String(entry.action_type || ''))}</div>
+              </td>
               <td>${targetText}</td>
               <td>${actor}</td>
               <td>${createdAt}</td>
-              <td>${rolledBack ? rolledMeta : '—'}</td>
+              <td>${entry.rollback_source_audit_id ? `#${Number(entry.rollback_source_audit_id)}` : '—'}</td>
               <td>${rollbackButton}</td>
             </tr>
           `;
@@ -6509,7 +6723,7 @@
                 <th>Target</th>
                 <th>Хто</th>
                 <th>Коли</th>
-                <th>Rollback</th>
+                <th>Source</th>
                 <th></th>
               </tr>
             </thead>
@@ -6563,6 +6777,18 @@
       const rbacRoleForms = Array.from(document.querySelectorAll('[data-rbac-role-form]'));
       const rbacTemplateButtons = Array.from(document.querySelectorAll('[data-rbac-template]'));
       const rbacRevertBtn = document.querySelector('[data-rbac-revert]');
+      const roleStudioConfirmPasswordInput = document.getElementById('roleStudioConfirmPassword');
+      const syncRoleStudioConfirmPassword = () => {
+        const value = roleStudioConfirmPasswordInput ? String(roleStudioConfirmPasswordInput.value || '') : '';
+        document.querySelectorAll('[data-role-confirm-password]').forEach((input) => {
+          input.value = value;
+        });
+      };
+      if (roleStudioConfirmPasswordInput) {
+        roleStudioConfirmPasswordInput.addEventListener('input', syncRoleStudioConfirmPassword);
+        roleStudioConfirmPasswordInput.addEventListener('change', syncRoleStudioConfirmPassword);
+        syncRoleStudioConfirmPassword();
+      }
       if (rbacRoleForms.length) {
         try {
           const rbacPermissionDefaults = <%- JSON.stringify((typeof defaultRolePermissions !== 'undefined' && defaultRolePermissions) ? defaultRolePermissions : {}) %>;
@@ -7482,13 +7708,22 @@
             const lastSeenText = lastSeen && !Number.isNaN(lastSeen.getTime())
               ? lastSeen.toLocaleString('uk-UA')
               : '—';
+            const lastActivity = row.last_activity_at ? new Date(row.last_activity_at) : null;
+            const lastActivityText = lastActivity && !Number.isNaN(lastActivity.getTime())
+              ? lastActivity.toLocaleString('uk-UA')
+              : '—';
+            const lastSensitiveReauth = row.last_sensitive_reauth_at ? new Date(row.last_sensitive_reauth_at) : null;
+            const lastSensitiveReauthText = lastSensitiveReauth && !Number.isNaN(lastSensitiveReauth.getTime())
+              ? lastSensitiveReauth.toLocaleString('uk-UA')
+              : '—';
             const route = row.last_seen_route ? String(row.last_seen_route) : '/';
             const ip = row.ip ? String(row.ip) : '—';
             const marker = row.is_current ? '<span class="badge text-bg-success ms-1">current</span>' : '';
             return `
               <li class="list-group-item">
                 <div class="fw-semibold">${escapeHtml(route)}${marker}</div>
-                <div class="small text-muted">${escapeHtml(lastSeenText)} · ${escapeHtml(ip)}</div>
+                <div class="small text-muted">Seen: ${escapeHtml(lastSeenText)} · Active: ${escapeHtml(lastActivityText)} · IP: ${escapeHtml(ip)}</div>
+                <div class="small text-muted">Sensitive re-auth: ${escapeHtml(lastSensitiveReauthText)} · idle ${escapeHtml(String(row.idle_age_minutes ?? '—'))}m · age ${escapeHtml(String(row.absolute_age_hours ?? '—'))}h</div>
               </li>
             `;
           }).join('');
@@ -7555,10 +7790,10 @@
           const evidence = data.evidence || {};
           const sourceLabel = getForensicsSourceLabel(evidence.source);
           const ipCount = Array.isArray(evidence.ips) ? evidence.ips.length : 0;
-          const ignoredIpCount = Array.isArray(evidence.ignored_ips) ? evidence.ignored_ips.length : 0;
+          const trustedIpCount = Array.isArray(evidence.trusted_ips) ? evidence.trusted_ips.length : 0;
           const sessionCount = Array.isArray(evidence.session_ids) ? evidence.session_ids.length : 0;
           const agentCount = Array.isArray(evidence.user_agents) ? evidence.user_agents.length : 0;
-          meta.textContent = `${sourceLabel} · IP: ${ipCount} · Ignored IP: ${ignoredIpCount} · Session: ${sessionCount} · Device: ${agentCount}`;
+          meta.textContent = `${sourceLabel} · IP: ${ipCount} · Trusted IP: ${trustedIpCount} · Session: ${sessionCount} · Device: ${agentCount}`;
 
           const risk = data.risk || {};
           const riskBadgeClass = getForensicsRiskClass(String(risk.level || 'clear'));
@@ -7571,7 +7806,7 @@
               <span>Risk:</span>
               <span class="badge ${riskBadgeClass}">${escapeHtml(riskLabel)} · ${riskScore}</span>
               ${riskAlerts > 0 ? `<span class="badge text-bg-danger">Alerts ${riskAlerts}</span>` : ''}
-              ${risk.allowlisted ? '<span class="badge text-bg-success">Allowlist active</span>' : ''}
+              ${risk.trusted_ip_match ? `<span class="badge text-bg-success">Trusted IP -${escapeHtml(String(risk.trust_bonus || 0))}</span>` : ''}
             </div>
             ${riskReasons.length ? `<div class="small text-muted mt-1">${riskReasons.map((v) => escapeHtml(v)).join(' · ')}</div>` : ''}
           `;
@@ -7905,6 +8140,8 @@
       const uaRolesSelect = document.getElementById('uaRolesSelect');
       const uaRolesForm = document.getElementById('uaRolesForm');
       const uaRolesStepupCode = document.getElementById('uaRolesStepupCode');
+      const uaRolesConfirmPassword = document.getElementById('uaRolesConfirmPassword');
+      const uaRolesConfirmPasswordInput = document.getElementById('uaRolesConfirmPasswordInput');
       if (uaRolesSelect) {
         uaRolesSelect.addEventListener('change', () => {
           const primarySelect = document.getElementById('uaPrimaryRole');
@@ -7927,9 +8164,25 @@
           if (uaRolesStepupCode) {
             uaRolesStepupCode.value = 'ROLE';
           }
+          if (uaRolesConfirmPassword) {
+            uaRolesConfirmPassword.value = uaRolesConfirmPasswordInput ? String(uaRolesConfirmPasswordInput.value || '') : '';
+          }
           uaRolesForm.dataset.stepupConfirmed = '1';
           uaRolesForm.submit();
         });
+      }
+
+      const usersBulkConfirmPasswordInput = document.getElementById('usersBulkConfirmPassword');
+      const syncUsersBulkConfirmPassword = () => {
+        const value = usersBulkConfirmPasswordInput ? String(usersBulkConfirmPasswordInput.value || '') : '';
+        document.querySelectorAll('[data-users-bulk-confirm-password]').forEach((input) => {
+          input.value = value;
+        });
+      };
+      if (usersBulkConfirmPasswordInput) {
+        usersBulkConfirmPasswordInput.addEventListener('input', syncUsersBulkConfirmPassword);
+        usersBulkConfirmPasswordInput.addEventListener('change', syncUsersBulkConfirmPassword);
+        syncUsersBulkConfirmPassword();
       }
 
       function updateMessageTargetFields() {

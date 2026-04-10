@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.88",
+      "date": "2026-04-10",
+      "items": [
+        "feat(admin-security-hardening): ship production-ready security upgrades for Studerria System Settings by moving trusted admin IPs to a risk-reduction model, splitting session security into idle and absolute timeouts with recent re-auth tracking, converting audit + rollback into an append-only hash-chain trail, adding tiered retention cleanup with frozen-record support, and exposing rule-based security analytics with explainable risk rules, alert state, quarantine state, and updated admin UI flows"
+      ]
+    },
+    {
       "version": "1.5.87",
       "date": "2026-04-10",
       "items": [
