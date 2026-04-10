@@ -1,10 +1,10 @@
 {
   "items": [
     {
-      "version": "1.5.94",
+      "version": "1.5.95",
       "date": "2026-04-10",
       "items": [
-        "fix(admin-user-role-redirect): keep user role changes on the users tab instead of redirecting into Role Studio"
+        "fix(admin-legacy-course-delete): add fallback cleanup for all course/semester-scoped tables so legacy course deletion no longer fails on leftover FK rows"
       ]
     },
     {

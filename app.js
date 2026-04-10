@@ -57745,36 +57745,94 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
       ? semesterRows.map((row) => Number(row.id)).filter((value) => Number.isInteger(value) && value > 0)
       : [];
     await withTransaction(async (client) => {
-      const deleteWithCourseAndSemesters = async (sql, extraParams = []) => {
-        const params = [courseId, ...extraParams];
-        if (semesterIds.length) {
-          params.push(semesterIds);
-          return txRun(client, sql, params);
+      const deleteIfHasColumn = async (tableName, columnName = 'course_id', sql = null, params = []) => {
+        const columns = await getTableColumnSet(tableName);
+        if (!columns.has(columnName)) {
+          return;
         }
-        return txRun(client, sql.replace(/\s+OR\s+semester_id = ANY\(\?::int\[\]\)/i, ''), [courseId, ...extraParams]);
+        await txRun(client, sql || `DELETE FROM ${tableName} WHERE ${columnName} = ?`, params.length ? params : [courseId]);
       };
 
-      await deleteWithCourseAndSemesters(
-        'DELETE FROM subject_materials WHERE course_id = ? OR semester_id = ANY(?::int[])'
-      );
-      await deleteWithCourseAndSemesters(
-        'DELETE FROM messages WHERE course_id = ? OR semester_id = ANY(?::int[])'
-      );
-      await deleteWithCourseAndSemesters(
-        'DELETE FROM teamwork_tasks WHERE course_id = ? OR semester_id = ANY(?::int[])'
-      );
-      await deleteWithCourseAndSemesters(
-        'DELETE FROM homework WHERE course_id = ? OR semester_id = ANY(?::int[])'
-      );
-      await deleteWithCourseAndSemesters(
-        'DELETE FROM schedule_entries WHERE course_id = ? OR semester_id = ANY(?::int[])'
-      );
-      await deleteWithCourseAndSemesters(
-        'DELETE FROM activity_log WHERE course_id = ? OR semester_id = ANY(?::int[])'
-      );
-      await deleteWithCourseAndSemesters(
-        'DELETE FROM personal_reminders WHERE course_id = ? OR semester_id = ANY(?::int[])'
-      );
+      const nullifyIfHasColumn = async (tableName, columnName, values) => {
+        if (!Array.isArray(values) || !values.length) return;
+        const columns = await getTableColumnSet(tableName);
+        if (!columns.has(columnName)) {
+          return;
+        }
+        await txRun(client, `UPDATE ${tableName} SET ${columnName} = NULL WHERE ${columnName} = ANY(?::int[])`, [values]);
+      };
+
+      await deleteIfHasColumn('subject_course_bindings');
+      await deleteIfHasColumn('study_context_course_bindings');
+      await deleteIfHasColumn('program_admission_courses');
+      await deleteIfHasColumn('rooms');
+      await deleteIfHasColumn('course_study_days');
+
+      await txRun(client, 'DELETE FROM subject_materials WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM messages WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM teamwork_tasks WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM homework WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM schedule_entries WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM activity_log WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM personal_reminders WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM course_week_time_modes WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM schedule_generator_items WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM schedule_generator_entries WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM subject_grading_settings WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM journal_columns WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM journal_grade_hash_audit WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM attendance_records WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM journal_grade_appeals WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM journal_subject_close_events WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM journal_grade_moderations WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+      await txRun(client, 'DELETE FROM competency_evaluations WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
+
+      await nullifyIfHasColumn('subject_grading_settings', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('journal_columns', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('journal_grade_hash_audit', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('attendance_records', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('journal_grade_appeals', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('journal_subject_close_events', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('journal_grade_moderations', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('competency_evaluations', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('session_generator_drafts', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('rating_publication_snapshots', 'semester_id', semesterIds);
+      await nullifyIfHasColumn('study_context_semesters', 'legacy_semester_id', semesterIds);
+      await nullifyIfHasColumn('academic_v2_terms', 'legacy_semester_id', semesterIds);
+
+      const scopedCleanupTables = await txAll(client, `
+        SELECT
+          table_name,
+          BOOL_OR(column_name = 'course_id') AS has_course_id,
+          BOOL_OR(column_name = 'semester_id') AS has_semester_id
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND column_name IN ('course_id', 'semester_id')
+        GROUP BY table_name
+        ORDER BY table_name
+      `);
+      const scopedCleanupExclusions = new Set(['courses', 'semesters', 'subjects', 'users']);
+      for (const row of scopedCleanupTables) {
+        const tableName = String(row.table_name || '').trim();
+        if (!tableName || scopedCleanupExclusions.has(tableName)) {
+          continue;
+        }
+        const clauses = [];
+        const params = [];
+        if (row.has_course_id) {
+          clauses.push('course_id = ?');
+          params.push(courseId);
+        }
+        if (row.has_semester_id && semesterIds.length) {
+          clauses.push('semester_id = ANY(?::int[])');
+          params.push(semesterIds);
+        }
+        if (!clauses.length) {
+          continue;
+        }
+        await txRun(client, `DELETE FROM ${tableName} WHERE ${clauses.join(' OR ')}`, params);
+      }
+
       await txRun(client, 'DELETE FROM history_log WHERE course_id = ?', [courseId]);
       await txRun(client, 'DELETE FROM login_history WHERE course_id = ?', [courseId]);
       await txRun(client, 'DELETE FROM subjects WHERE course_id = ?', [courseId]);
