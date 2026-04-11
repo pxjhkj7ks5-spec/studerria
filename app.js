@@ -40533,7 +40533,14 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     const legacyCourseCleanupRows = await Promise.all(
       (allCourses || []).map(async (course) => {
         const courseIdValue = Number(course && course.id ? course.id : 0);
-        let dependencyCounts = { users: 0, subjects: 0, semesters: 0 };
+        let dependencyCounts = {
+          users: 0,
+          subjects: 0,
+          semesters: 0,
+          other_blocking_total: 0,
+          other_blocking_rows: [],
+          deletable: true,
+        };
         try {
           dependencyCounts = await academicSetupHelpers.getLegacyCourseDependencyCounts(
             getAcademicSetupStore(),
@@ -40545,6 +40552,17 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         const usersCount = Number(dependencyCounts.users || 0);
         const subjectsCount = Number(dependencyCounts.subjects || 0);
         const semestersCount = Number(dependencyCounts.semesters || 0);
+        const otherBlockingTotal = Number(dependencyCounts.other_blocking_total || 0);
+        const otherBlockingRows = Array.isArray(dependencyCounts.other_blocking_rows)
+          ? dependencyCounts.other_blocking_rows
+          : [];
+        const otherBlockingPreview = otherBlockingRows
+          .slice(0, 3)
+          .map((row) => {
+            const count = Number(row && row.count || 0);
+            return count > 1 ? `${row.label} ${count}` : row.label;
+          })
+          .join(', ');
         const campusKey = normalizeCourseCampus(course && course.location ? course.location : 'kyiv');
         return {
           ...course,
@@ -40557,6 +40575,9 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
             users: usersCount,
             subjects: subjectsCount,
             semesters: semestersCount,
+            other: otherBlockingTotal,
+            other_blocking_rows: otherBlockingRows,
+            other_blocking_preview: otherBlockingPreview,
           },
           deletable: true,
         };
@@ -57731,6 +57752,26 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
     tab: 'admin-legacy-courses',
   });
+  const resolveDependencyMessage = (counts = {}) => {
+    const otherBlockingRows = Array.isArray(counts.other_blocking_rows) ? counts.other_blocking_rows : [];
+    if (otherBlockingRows.length > 0) {
+      return `Legacy course cleanup still has linked rows: ${otherBlockingRows.slice(0, 3).map((row) => row.label).join(', ')}`;
+    }
+    const primaryParts = [];
+    if (Number(counts.users || 0) > 0) {
+      primaryParts.push(`${Number(counts.users || 0)} users`);
+    }
+    if (Number(counts.subjects || 0) > 0) {
+      primaryParts.push(`${Number(counts.subjects || 0)} subjects`);
+    }
+    if (Number(counts.semesters || 0) > 0) {
+      primaryParts.push(`${Number(counts.semesters || 0)} semesters`);
+    }
+    if (primaryParts.length > 0) {
+      return `Legacy course cleanup still has primary rows: ${primaryParts.join(', ')}`;
+    }
+    return 'Legacy course cleanup still has linked rows';
+  };
   if (Number.isNaN(courseId)) {
     return res.redirect(redirectWith('err', 'Invalid course'));
   }
@@ -57853,6 +57894,14 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
     return res.redirect(redirectWith('ok', 'Legacy course deleted'));
   } catch (err) {
     console.error('Legacy course delete failed', err);
+    if (err && err.code === '23503') {
+      try {
+        const counts = await academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId);
+        return res.redirect(redirectWith('err', resolveDependencyMessage(counts)));
+      } catch (_) {
+        return res.redirect(redirectWith('err', 'Legacy course cleanup still has linked rows'));
+      }
+    }
     return res.redirect(redirectWith('err', 'Database error'));
   }
 });

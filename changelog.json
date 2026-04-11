@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.97",
+      "date": "2026-04-11",
+      "items": [
+        "fix(admin-legacy-course-delete): keep force-delete cleanup for Legacy courses, surface extra FK blockers in `Other links`, and replace the generic database error with a precise legacy-link message when hidden references still survive the cleanup pass"
+      ]
+    },
+    {
       "version": "1.5.96",
       "date": "2026-04-10",
       "items": [

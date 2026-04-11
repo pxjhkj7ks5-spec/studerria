@@ -2250,7 +2250,7 @@
               </div>
               <div class="alert alert-warning glass-inset border-0 mb-3">
                 Legacy cleanup deletes remove related legacy users, subjects, semesters, and linked data automatically.
-                Teacher courses stay protected.
+                Extra blockers now surface in `Other links` instead of collapsing into a generic database error. Teacher courses stay protected.
               </div>
               <div class="table-responsive">
                 <table class="table align-middle mb-0">
@@ -2262,6 +2262,7 @@
                       <th>Users</th>
                       <th>Subjects</th>
                       <th>Semesters</th>
+                      <th>Other links</th>
                       <th>Статус</th>
                       <th class="text-end">Дія</th>
                     </tr>
@@ -2269,7 +2270,7 @@
                   <tbody>
                     <% if (legacyCourseCleanupRowsData.length) { %>
                       <% legacyCourseCleanupRowsData.forEach(function(course) { %>
-                        <% const dep = course.dependency_counts || { users: 0, subjects: 0, semesters: 0 }; %>
+                        <% const dep = course.dependency_counts || { users: 0, subjects: 0, semesters: 0, other: 0, other_blocking_preview: '' }; %>
                         <% const safeToDelete = Boolean(course.deletable); %>
                         <tr class="<%= safeToDelete ? '' : 'table-warning-subtle' %>">
                           <td class="fw-semibold"><%= course.name %> <span class="text-muted">#<%= course.id %></span></td>
@@ -2278,6 +2279,12 @@
                           <td><%= Number(dep.users || 0) %></td>
                           <td><%= Number(dep.subjects || 0) %></td>
                           <td><%= Number(dep.semesters || 0) %></td>
+                          <td>
+                            <div><%= Number(dep.other || 0) %></div>
+                            <% if (dep.other_blocking_preview) { %>
+                              <div class="small text-muted"><%= dep.other_blocking_preview %></div>
+                            <% } %>
+                          </td>
                           <td>
                             <% if (safeToDelete) { %>
                               <span class="badge text-bg-success">Ready</span>
@@ -2302,7 +2309,7 @@
                       <% }); %>
                     <% } else { %>
                       <tr>
-                        <td colspan="8" class="text-muted">Немає курсів для cleanup.</td>
+                        <td colspan="9" class="text-muted">Немає курсів для cleanup.</td>
                       </tr>
                     <% } %>
                   </tbody>
@@ -8990,4 +8997,3 @@
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
-
