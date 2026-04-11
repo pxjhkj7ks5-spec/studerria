@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.5.98",
+      "date": "2026-04-11",
+      "items": [
+        "fix(admin-legacy-course-delete-audit): exclude append-only `admin_change_audit` from legacy course cleanup so the force-delete flow no longer dies on the audit trail mutation trigger"
+      ]
+    },
+    {
       "version": "1.5.97",
       "date": "2026-04-11",
       "items": [

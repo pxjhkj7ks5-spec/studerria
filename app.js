@@ -57852,7 +57852,13 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
         GROUP BY table_name
         ORDER BY table_name
       `);
-      const scopedCleanupExclusions = new Set(['courses', 'semesters', 'subjects', 'users']);
+      const scopedCleanupExclusions = new Set([
+        'admin_change_audit',
+        'courses',
+        'semesters',
+        'subjects',
+        'users',
+      ]);
       for (const row of scopedCleanupTables) {
         const tableName = String(row.table_name || '').trim();
         if (!tableName || scopedCleanupExclusions.has(tableName)) {
