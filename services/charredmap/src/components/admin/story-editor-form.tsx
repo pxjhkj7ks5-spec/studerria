@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
+import { saveStoryAction, type ActionState } from "@/app/actions/admin";
 import { withBasePath } from "@/lib/base-path";
 import type { OccupationStatus, PublicationStatus } from "@/lib/constants";
-import { saveStoryAction } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/admin/submit-button";
 
 type CityOption = {
@@ -32,7 +32,7 @@ type StoryEditorFormProps = {
   story?: EditableStory | null;
 };
 
-const initialState = {};
+const initialState: ActionState = {};
 
 export function StoryEditorForm({
   adminPath,

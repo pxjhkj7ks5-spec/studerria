@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.02",
+      "date": "2026-04-13",
+      "items": [
+        "fix(charredmap-admin-action-state): type the admin login and story editor `useActionState` initial state as `ActionState` so the sidecar no longer fails Next.js TypeScript build on `state.error` access"
+      ]
+    },
+    {
       "version": "1.6.01",
       "date": "2026-04-13",
       "items": [

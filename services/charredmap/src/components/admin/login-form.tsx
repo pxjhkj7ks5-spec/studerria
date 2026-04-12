@@ -1,10 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
-import { loginAction } from "@/app/actions/admin";
+import { loginAction, type ActionState } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/admin/submit-button";
 
-const initialState = {};
+const initialState: ActionState = {};
 
 export function LoginForm() {
   const [state, formAction] = useActionState(loginAction, initialState);
