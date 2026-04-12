@@ -11,47 +11,81 @@ export default async function Home() {
     getPublishedStats(),
     getOccupationOverlay(),
   ]);
+  const overviewItems = [
+    {
+      label: "Опубліковано",
+      value: String(stories.length).padStart(2, "0"),
+      note: "Історії, які вже відкриваються просто з мапи.",
+    },
+    {
+      label: "Міста в архіві",
+      value: String(stats.cities).padStart(2, "0"),
+      note: "Точки пам'яті, прив'язані до редакційної бази.",
+    },
+    {
+      label: "Публічний доступ",
+      value: "Вільно",
+      note: "Читання відкрите, а модерація винесена в окремий префікс.",
+    },
+  ];
 
   return (
-    <main className="pb-16">
-      <section className="relative overflow-hidden border-b border-white/6">
-        <div className="mx-auto grid w-full max-w-[1600px] gap-10 px-4 py-8 md:px-6 md:py-10 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] xl:items-stretch">
-          <div className="flex flex-col justify-between gap-12">
-            <div className="hero-reveal space-y-6">
-              <p className="text-xs uppercase tracking-[0.34em] text-[--accent-orange]">
-                charredmap
-              </p>
-              <div className="space-y-5">
-                <h1 className="font-display max-w-3xl text-5xl leading-[0.95] text-white md:text-7xl xl:text-[5.3rem]">
-                  Карта пам&apos;яті міст, які пережили окупацію або живуть у ній досі.
+    <main className="relative pb-20">
+      <section className="relative isolate overflow-hidden border-b border-white/8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.16),_transparent_24%),radial-gradient(circle_at_85%_12%,_rgba(255,255,255,0.08),_transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_32%)]" />
+        <div className="mx-auto grid w-full max-w-[1720px] gap-10 px-4 py-6 md:px-6 md:py-8 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-end">
+          <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-between gap-10 py-4 md:min-h-[48rem] md:py-8">
+            <div className="space-y-8">
+              <div className="hero-reveal flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.34em] text-[--muted]">
+                <span className="text-[--accent-orange]">charredmap</span>
+                <span className="h-px w-10 bg-white/14" />
+                <span>Редакційний атлас пам&apos;яті</span>
+              </div>
+
+              <div className="hero-reveal space-y-6 [animation-delay:120ms]">
+                <h1 className="font-display max-w-4xl text-[clamp(3.8rem,9vw,8rem)] leading-[0.88] tracking-[-0.045em] text-white">
+                  Мапа міст, у яких пам&apos;ять досі говорить голосніше за тишу.
                 </h1>
-                <p className="max-w-2xl text-base leading-7 text-[#d3d6dc] md:text-lg">
-                  {siteDescription} Кожна мітка відкриває людську історію, а помаранчевий шар на темній мапі нагадує, що ця географія досі болить.
+                <p className="max-w-2xl text-base leading-7 text-[#d5d8de] md:text-lg">
+                  {siteDescription} Тут публікація починається не зі стрічки, а з географії болю:
+                  мітка, місто, людська історія і нічний простір, у якому все інше відступає.
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-3">
-              <div className="glass-panel hero-reveal rounded-[28px] p-5 [animation-delay:120ms]">
-                <p className="text-xs uppercase tracking-[0.22em] text-[--muted]">Опубліковано</p>
-                <p className="mt-3 font-display text-4xl text-white">{stories.length}</p>
+            <div className="grid gap-8 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
+              <div className="glass-panel hero-reveal rounded-[32px] p-5 md:p-6 [animation-delay:220ms]">
+                <p className="text-[11px] uppercase tracking-[0.3em] text-[--accent-orange]">
+                  Editorial note
+                </p>
+                <p className="mt-4 max-w-xl text-sm leading-7 text-[#f0d9c7] md:text-[15px]">
+                  Помаранчевий контур залишається редакційним статичним overlay для MVP. Він
+                  задає меморіальну рамку, а не імітує live-дані.
+                </p>
               </div>
-              <div className="glass-panel hero-reveal rounded-[28px] p-5 [animation-delay:180ms]">
-                <p className="text-xs uppercase tracking-[0.22em] text-[--muted]">Міста у БД</p>
-                <p className="mt-3 font-display text-4xl text-white">{stats.cities}</p>
-              </div>
-              <div className="glass-panel hero-reveal rounded-[28px] p-5 [animation-delay:240ms]">
-                <p className="text-xs uppercase tracking-[0.22em] text-[--muted]">Формат</p>
-                <p className="mt-3 font-display text-3xl text-white">Без реєстрації</p>
-              </div>
-            </div>
 
-            <div className="hero-reveal max-w-xl rounded-[28px] border border-[--accent-orange]/20 bg-[rgba(255,132,56,0.08)] p-5 text-sm leading-6 text-[#f5d7c2] [animation-delay:300ms]">
-              Помаранчевий контур є редакційним статичним overlay для MVP. Перед хостингом його треба замінити на перевірений newsroom GeoJSON.
+              <dl className="hero-reveal divide-y divide-white/10 border-y border-white/10 [animation-delay:280ms]">
+                {overviewItems.map((item) => (
+                  <div
+                    key={item.label}
+                    className="grid gap-2 py-4 md:grid-cols-[148px_minmax(0,1fr)] md:gap-6"
+                  >
+                    <dt className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">
+                      {item.label}
+                    </dt>
+                    <div className="space-y-1">
+                      <dd className="font-display text-3xl leading-none text-white md:text-4xl">
+                        {item.value}
+                      </dd>
+                      <p className="max-w-xl text-sm leading-6 text-[#d0d3da]">{item.note}</p>
+                    </div>
+                  </div>
+                ))}
+              </dl>
             </div>
           </div>
 
-          <div className="hero-reveal [animation-delay:180ms]">
+          <div className="relative z-10 hero-reveal xl:pb-8 [animation-delay:180ms]">
             <MapStoryExperience
               stories={stories}
               occupationOverlay={occupationOverlay}
@@ -60,22 +94,42 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-12 md:px-6 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1fr)]">
+      <section className="mx-auto grid w-full max-w-[1720px] gap-10 px-4 py-14 md:px-6 md:py-16 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
         <div className="space-y-4">
-          <p className="text-xs uppercase tracking-[0.3em] text-[--accent-orange]">
-            Про MVP
+          <p className="text-[11px] uppercase tracking-[0.32em] text-[--accent-orange]">
+            Принцип публічної частини
           </p>
-          <h2 className="font-display text-4xl text-white md:text-5xl">
-            Перший реліз зібраний навколо самої мапи, історії та редакторського контролю.
+          <h2 className="font-display max-w-3xl text-4xl leading-[0.94] text-white md:text-5xl xl:text-6xl">
+            Один екран тримає всю драматургію: мапа, індекс матеріалів і історія у фокусі.
           </h2>
         </div>
-        <div className="space-y-4 text-sm leading-7 text-[#d3d6dc] md:text-base">
-          <p>
-            У першій версії сайт не вимагає публічної авторизації. Вся редакторська логіка винесена в окрему закриту адмінку з паролем, де модератор створює місто, додає історію, фото і вирішує, залишати матеріал у draft чи показувати його на мапі.
-          </p>
-          <p>
-            На публічній стороні головним екраном є нічна векторна карта. Внизу не дублюємо dashboard-картки, а тримаємо один сильний жест: карту як меморіальний простір і історію як модальне читання.
-          </p>
+        <div className="grid gap-8 md:grid-cols-3">
+          <div className="border-t border-white/10 pt-4">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">01</p>
+            <h3 className="mt-4 font-display text-2xl text-white">Мапа як сцена</h3>
+            <p className="mt-3 text-sm leading-7 text-[#d0d3da]">
+              Публічна частина не розсипається на картки та дашборди. Головна площина лишається
+              темною картою з кількома точними редакційними жестами.
+            </p>
+          </div>
+
+          <div className="border-t border-white/10 pt-4">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">02</p>
+            <h3 className="mt-4 font-display text-2xl text-white">Історія як читання</h3>
+            <p className="mt-3 text-sm leading-7 text-[#d0d3da]">
+              Кожна мітка відкриває окремий меморіальний sheet, а не перенасичений detail-view.
+              Увага тримається на тексті, місці та даті публікації.
+            </p>
+          </div>
+
+          <div className="border-t border-white/10 pt-4">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">03</p>
+            <h3 className="mt-4 font-display text-2xl text-white">Окремий редактор</h3>
+            <p className="mt-3 text-sm leading-7 text-[#d0d3da]">
+              Адмінка ізольована окремим префіксом. Публічний шар залишається камерним і чистим,
+              без будь-якого адміністративного шуму на поверхні сайту.
+            </p>
+          </div>
         </div>
       </section>
     </main>

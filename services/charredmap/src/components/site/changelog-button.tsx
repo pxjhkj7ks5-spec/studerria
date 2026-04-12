@@ -42,17 +42,17 @@ export function ChangelogButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:border-[--accent-orange]/60 hover:bg-white/10"
+        className="rounded-full border border-white/10 bg-[rgba(255,255,255,0.04)] px-4 py-2.5 text-sm text-white transition hover:border-[--accent-orange]/60 hover:bg-white/[0.08]"
       >
         Changelog
       </button>
 
       {open ? (
-        <div className="story-fade-in fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-4 md:items-center">
-          <div className="glass-panel story-scrollbar max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-[30px] p-6 md:p-8">
+        <div className="story-fade-in fixed inset-0 z-50 flex items-end justify-center bg-[rgba(3,4,6,0.78)] p-4 backdrop-blur-sm md:items-center">
+          <div className="glass-panel story-scrollbar max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-[34px] p-6 md:p-8">
             <div className="flex items-start justify-between gap-6">
               <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.28em] text-[--accent-orange]">
+                <p className="text-[11px] uppercase tracking-[0.3em] text-[--accent-orange]">
                   Історія змін
                 </p>
                 <h2 className="font-display text-3xl text-white md:text-4xl">
@@ -71,18 +71,18 @@ export function ChangelogButton({
               </button>
             </div>
 
-            <div className="mt-8 space-y-4">
+            <div className="mt-8 space-y-3">
               {entries.length ? (
                 entries.map((entry) => (
                   <div
                     key={entry.hash}
-                    className="rounded-[24px] border border-white/8 bg-white/[0.035] p-4"
+                    className="border-l border-white/10 py-1 pl-5"
                   >
-                    <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.18em] text-[--muted]">
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-[--muted]">
                       <span>{entry.shortHash}</span>
                       <span>{formatDate(entry.date)}</span>
                     </div>
-                    <p className="mt-3 text-base text-white">{entry.message}</p>
+                    <p className="mt-2 text-base leading-7 text-white">{entry.message}</p>
                   </div>
                 ))
               ) : (
