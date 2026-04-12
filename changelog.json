@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.5.99",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-sidecar): vendor the standalone charredmap app into the Studerria repository and proxy it through the main Express app under `/charredmap` and `/charredmap/admin`, so the memorial map ships on the Studerria domain without sharing its own auth or runtime with the main portal",
+        "feat(charredmap-docker-local): add an isolated `charredmap` service to `docker/local` with a dedicated SQLite/uploads volume, sidecar healthcheck, and dedicated env variables so the map stays operationally separate from the Studerria Postgres app",
+        "fix(charredmap-secret-hardening): reject placeholder admin and session secrets in production for the charredmap sidecar, keep the main Studerria app starting even if that sidecar is unavailable, and document the required server env setup for secure HTTPS deployment"
+      ]
+    },
+    {
       "version": "1.5.98",
       "date": "2026-04-11",
       "items": [
