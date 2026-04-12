@@ -1,7 +1,37 @@
 {
-  "version": "0.1.04",
-  "generatedAt": "2026-04-12T22:19:32.767Z",
+  "version": "0.1.05",
+  "generatedAt": "2026-04-12T23:15:22.788Z",
   "entries": [
+    {
+      "hash": "0332c5b8a813f5b1ea01a071d940878a34484eb2",
+      "shortHash": "0332c5b",
+      "message": "feat(charredmap-visual): reshape public memorial surfaces",
+      "date": "2026-04-13T02:15:12+03:00"
+    },
+    {
+      "hash": "3c2d8c767b42125b21fd5c90f030de090a10c842",
+      "shortHash": "3c2d8c7",
+      "message": "fix(charredmap-admin-state): type action state in admin forms",
+      "date": "2026-04-13T01:57:30+03:00"
+    },
+    {
+      "hash": "7feb68868d3dae980d41fdfcf645bfab502648ec",
+      "shortHash": "7feb688",
+      "message": "fix(charredmap-font-build): use cyrillic-safe display font",
+      "date": "2026-04-13T01:54:34+03:00"
+    },
+    {
+      "hash": "72366dfcf3106c6b5a0e77fd6ef411e83b23908c",
+      "shortHash": "72366df",
+      "message": "fix(charredmap-docker-build): restore prisma schema during image build",
+      "date": "2026-04-13T01:47:40+03:00"
+    },
+    {
+      "hash": "03ce0372727f96b41599624c2437dd28cfab59ba",
+      "shortHash": "03ce037",
+      "message": "feat(charredmap-sidecar): proxy memorial map through studerria",
+      "date": "2026-04-13T01:30:56+03:00"
+    },
     {
       "hash": "8214dd3156158965f2e24cf395dc31ccad89721a",
       "shortHash": "8214dd3",

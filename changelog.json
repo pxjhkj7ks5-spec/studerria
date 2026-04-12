@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.03",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-visual): reshape the public `charredmap` shell into a stronger memorial-first composition with a full-bleed poster hero, quieter typography hierarchy, a more editorial map workspace, and a less dashboard-like story index beside the map",
+        "feat(charredmap-reading-surfaces): redesign the story sheet, markdown body styling, footer, and changelog modal to better match the macOS Tahoe / Liquid Glass direction while keeping the public side intentionally sparse and focused on reading"
+      ]
+    },
+    {
       "version": "1.6.02",
       "date": "2026-04-13",
       "items": [
