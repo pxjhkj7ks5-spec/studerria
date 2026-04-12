@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Manrope } from "next/font/google";
+import { Manrope, Onest } from "next/font/google";
 import { SiteFooter } from "@/components/site/site-footer";
 import { siteDescription, siteName } from "@/lib/constants";
 import "./globals.css";
 
-const displayFont = Bricolage_Grotesque({
+const displayFont = Onest({
   subsets: ["latin", "cyrillic"],
   variable: "--font-display",
 });

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.01",
+      "date": "2026-04-13",
+      "items": [
+        "fix(charredmap-font-build): replace the unsupported `Bricolage_Grotesque` display font with `Onest`, which supports Cyrillic in `next@16.2.2`, so the sidecar build no longer fails TypeScript during `next build`"
+      ]
+    },
+    {
       "version": "1.6.00",
       "date": "2026-04-13",
       "items": [
