@@ -3,6 +3,7 @@ const http = require('http');
 const helmet = require('helmet');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
+const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID, createHash } = require('crypto');
@@ -326,6 +327,8 @@ const wss = new WebSocketServer({ noServer: true });
 const SOCKET_CHANNEL_MESSAGES = 'messages';
 const SOCKET_CHANNEL_ADMIN = 'admin';
 const SOCKET_CHANNELS = new Set([SOCKET_CHANNEL_MESSAGES, SOCKET_CHANNEL_ADMIN]);
+const CHARREDMAP_BASE_PATH = '/charredmap';
+const charredmapProxyTarget = String(process.env.CHARREDMAP_PROXY_TARGET || '').trim();
 const DANGEROUS_UPLOAD_EXTENSIONS = new Set([
   '.html',
   '.htm',
@@ -337,6 +340,67 @@ const DANGEROUS_UPLOAD_EXTENSIONS = new Set([
   '.mjs',
   '.json',
 ]);
+
+const hasCharredmapProxy = /^https?:\/\//i.test(charredmapProxyTarget);
+
+function isCharredmapRequest(req) {
+  const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
+  return pathname === CHARREDMAP_BASE_PATH || pathname.startsWith(`${CHARREDMAP_BASE_PATH}/`);
+}
+
+function respondCharredmapUnavailable(res, statusCode = 503) {
+  if (!res || res.headersSent) return;
+  const body = statusCode === 404 ? 'Not found' : 'Charredmap is temporarily unavailable.';
+  if (typeof res.status === 'function') {
+    res.status(statusCode);
+  } else {
+    res.statusCode = statusCode;
+  }
+  if (typeof res.setHeader === 'function') {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  }
+  if (typeof res.type === 'function') {
+    res.type('text/plain; charset=utf-8');
+  }
+  if (typeof res.send === 'function') {
+    res.send(body);
+    return;
+  }
+  if (typeof res.end === 'function') {
+    res.end(body);
+  }
+}
+
+const charredmapProxy = hasCharredmapProxy
+  ? createProxyMiddleware({
+      target: charredmapProxyTarget,
+      changeOrigin: false,
+      xfwd: true,
+      ws: false,
+      proxyTimeout: 30000,
+      timeout: 30000,
+      on: {
+        error(err, req, res) {
+          console.error('Charredmap proxy error', err);
+          respondCharredmapUnavailable(res, 503);
+        },
+        proxyReq(proxyReq) {
+          proxyReq.setHeader('x-forwarded-prefix', CHARREDMAP_BASE_PATH);
+        },
+      },
+    })
+  : null;
+
+app.use((req, res, next) => {
+  if (!isCharredmapRequest(req)) {
+    return next();
+  }
+  if (!charredmapProxy) {
+    return respondCharredmapUnavailable(res, 404);
+  }
+  return charredmapProxy(req, res, next);
+});
 
 process.on('uncaughtException', (err) => {
   pushRuntimeErrorEvent('unhandled', 'uncaughtException', err && err.message ? err.message : err);

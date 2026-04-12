@@ -20,6 +20,44 @@ services:
       retries: 20
       start_period: 120s
 
+  charredmap:
+    build:
+      context: ../../services/charredmap
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_PATH: /charredmap
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${CHARREDMAP_NODE_ENV:-development}
+      HOSTNAME: 0.0.0.0
+      PORT: 8080
+      NEXT_PUBLIC_BASE_PATH: /charredmap
+      DATABASE_URL: file:/data/charredmap.db
+      UPLOAD_DIR: /data/uploads
+      ADMIN_PATH: ${CHARREDMAP_ADMIN_PATH:-admin}
+      ADMIN_PASSWORD: ${CHARREDMAP_ADMIN_PASSWORD:-change-me-charredmap-admin}
+      SESSION_SECRET: ${CHARREDMAP_SESSION_SECRET:-change-me-charredmap-session-secret-change-this}
+    volumes:
+      - charredmap_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8080/charredmap').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   app:
     build:
       context: ../..
@@ -41,6 +79,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-change-me-local-session-secret}
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      CHARREDMAP_PROXY_TARGET: http://charredmap:8080
     ports:
       - "${APP_PORT_FORWARD:-3000}:${APP_PORT:-3000}"
     volumes:
@@ -58,3 +97,4 @@ services:
 
 volumes:
   postgres_data:
+  charredmap_data:

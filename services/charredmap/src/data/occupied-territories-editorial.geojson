@@ -1,0 +1,85 @@
+{
+  "type": "FeatureCollection",
+  "name": "occupied-territories-editorial",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region": "Crimea",
+        "note": "Editorial placeholder overlay. Replace with a verified newsroom GeoJSON before deployment."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [32.18, 45.14],
+            [32.63, 44.75],
+            [33.45, 44.51],
+            [34.16, 44.46],
+            [35.19, 44.58],
+            [35.98, 44.86],
+            [36.44, 45.32],
+            [36.34, 45.94],
+            [35.77, 46.17],
+            [34.64, 46.21],
+            [33.5, 46.16],
+            [32.61, 45.95],
+            [32.18, 45.14]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "region": "South-east corridor",
+        "note": "Editorial placeholder overlay. Replace with a verified newsroom GeoJSON before deployment."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [34.64, 46.67],
+            [35.41, 46.3],
+            [36.43, 46.12],
+            [37.5, 46.24],
+            [38.42, 46.65],
+            [39.09, 47.33],
+            [39.86, 48.05],
+            [39.7, 48.66],
+            [39.03, 48.97],
+            [38.11, 48.93],
+            [37.11, 48.69],
+            [36.24, 48.2],
+            [35.44, 47.73],
+            [34.81, 47.14],
+            [34.64, 46.67]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "region": "East bank Kherson sector",
+        "note": "Editorial placeholder overlay. Replace with a verified newsroom GeoJSON before deployment."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [32.8, 46.63],
+            [33.62, 46.48],
+            [34.31, 46.55],
+            [34.84, 46.93],
+            [34.88, 47.34],
+            [34.42, 47.54],
+            [33.74, 47.43],
+            [33.01, 47.09],
+            [32.8, 46.63]
+          ]
+        ]
+      }
+    }
+  ]
+}

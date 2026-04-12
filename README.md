@@ -1,6 +1,11 @@
 # studerria
 Student portal (`Node.js + Express + EJS + Postgres`) with Docker Compose as the primary runtime.
 
+The repository now also vendors `charredmap` as a separate service proxied through Studerria at:
+
+- `/charredmap`
+- `/charredmap/admin`
+
 ## Primary runtime
 
 The current deployment path is Docker Compose from:

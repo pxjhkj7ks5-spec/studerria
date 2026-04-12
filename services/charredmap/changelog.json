@@ -1,0 +1,30 @@
+{
+  "version": "0.1.04",
+  "generatedAt": "2026-04-12T22:19:32.767Z",
+  "entries": [
+    {
+      "hash": "8214dd3156158965f2e24cf395dc31ccad89721a",
+      "shortHash": "8214dd3",
+      "message": "feat: deploy charredmap under studerria path",
+      "date": "2026-04-13T01:19:23+03:00"
+    },
+    {
+      "hash": "3e7a7302e12f793779c190384faf88da6083e56a",
+      "shortHash": "3e7a730",
+      "message": "feat: prepare Cloud Run container",
+      "date": "2026-04-13T00:38:01+03:00"
+    },
+    {
+      "hash": "831faaf15a8da3f5fce1afe9ed7d71c2de5fda43",
+      "shortHash": "831faaf",
+      "message": "fix: load occupation overlay at runtime",
+      "date": "2026-04-04T23:52:04+03:00"
+    },
+    {
+      "hash": "243f1c014002da843e1821af93492bc70e6de8fd",
+      "shortHash": "243f1c0",
+      "message": "feat: build charredmap mvp",
+      "date": "2026-04-04T23:47:38+03:00"
+    }
+  ]
+}

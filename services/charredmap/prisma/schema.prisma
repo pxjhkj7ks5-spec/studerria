@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum OccupationStatus {
+  occupied
+  deoccupied
+}
+
+enum PublicationStatus {
+  draft
+  published
+}
+
+model City {
+  id               String           @id @default(cuid())
+  name             String
+  slug             String           @unique
+  oblast           String
+  lat              Float
+  lng              Float
+  occupationStatus OccupationStatus
+  stories          Story[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model Story {
+  id                String            @id @default(cuid())
+  cityId            String
+  slug              String            @unique
+  title             String
+  body              String
+  coverImageUrl     String?
+  publicationStatus PublicationStatus @default(draft)
+  publishedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  city              City              @relation(fields: [cityId], references: [id], onDelete: Cascade)
+}
