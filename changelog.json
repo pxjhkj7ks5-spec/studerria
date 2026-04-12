@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.00",
+      "date": "2026-04-13",
+      "items": [
+        "fix(charredmap-docker-build): copy the Prisma schema into the sidecar dependency stage before `npm ci` and install OpenSSL in both build and runtime layers so the `charredmap` container now builds cleanly in `docker/local` instead of failing during `prisma generate`"
+      ]
+    },
+    {
       "version": "1.5.99",
       "date": "2026-04-13",
       "items": [
