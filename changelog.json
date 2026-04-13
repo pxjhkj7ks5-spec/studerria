@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.04",
+      "date": "2026-04-13",
+      "items": [
+        "fix(admin-legacy-course-delete-fk-blockers): clean every FK blocker before legacy course deletion so teacher and PLED cleanup no longer dies on hidden references, and use the real dependency counts when showing delete readiness in Admin"
+      ]
+    },
+    {
       "version": "1.6.03",
       "date": "2026-04-13",
       "items": [

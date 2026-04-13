@@ -40643,7 +40643,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
             other_blocking_rows: otherBlockingRows,
             other_blocking_preview: otherBlockingPreview,
           },
-          deletable: true,
+          deletable: Boolean(dependencyCounts.deletable),
         };
       })
     );
@@ -57850,6 +57850,30 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
       ? semesterRows.map((row) => Number(row.id)).filter((value) => Number.isInteger(value) && value > 0)
       : [];
     await withTransaction(async (client) => {
+      const cleanupBlockingReferences = async (rows = []) => {
+        const seen = new Set();
+        for (const row of Array.isArray(rows) ? rows : []) {
+          if (!row || row.primary) {
+            continue;
+          }
+          const tableName = String(row.table_name || '').trim();
+          const columnName = String(row.column_name || 'course_id').trim();
+          if (!tableName || !columnName) {
+            continue;
+          }
+          const key = `${tableName}.${columnName}`;
+          if (seen.has(key)) {
+            continue;
+          }
+          seen.add(key);
+          const columns = await getTableColumnSet(tableName);
+          if (!columns.has(columnName)) {
+            continue;
+          }
+          await txRun(client, `DELETE FROM ${tableName} WHERE ${columnName} = ?`, [courseId]);
+        }
+      };
+
       const deleteIfHasColumn = async (tableName, columnName = 'course_id', sql = null, params = []) => {
         const columns = await getTableColumnSet(tableName);
         if (!columns.has(columnName)) {
@@ -57949,6 +57973,7 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
       await txRun(client, 'DELETE FROM subjects WHERE course_id = ?', [courseId]);
       await txRun(client, 'DELETE FROM users WHERE course_id = ?', [courseId]);
       await txRun(client, 'DELETE FROM semesters WHERE course_id = ?', [courseId]);
+      await cleanupBlockingReferences(dependencyCounts.blocker_rows || []);
       await txRun(client, 'DELETE FROM courses WHERE id = ?', [courseId]);
     });
     logAction(db, req, 'course_delete', {
