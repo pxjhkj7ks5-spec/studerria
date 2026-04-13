@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.08",
+      "date": "2026-04-13",
+      "items": [
+        "fix(admin-legacy-course-hard-delete): remove the protected-state guard from legacy course cleanup, expose a force-delete action in Admin, and drop the FK-specific rollback message so the delete flow stays fully destructive"
+      ]
+    },
+    {
       "version": "1.6.05",
       "date": "2026-04-13",
       "items": [

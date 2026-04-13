@@ -57816,26 +57816,6 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
   const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
     tab: 'admin-legacy-courses',
   });
-  const resolveDependencyMessage = (counts = {}) => {
-    const otherBlockingRows = Array.isArray(counts.other_blocking_rows) ? counts.other_blocking_rows : [];
-    if (otherBlockingRows.length > 0) {
-      return `Legacy course cleanup still has linked rows: ${otherBlockingRows.slice(0, 3).map((row) => row.label).join(', ')}`;
-    }
-    const primaryParts = [];
-    if (Number(counts.users || 0) > 0) {
-      primaryParts.push(`${Number(counts.users || 0)} users`);
-    }
-    if (Number(counts.subjects || 0) > 0) {
-      primaryParts.push(`${Number(counts.subjects || 0)} subjects`);
-    }
-    if (Number(counts.semesters || 0) > 0) {
-      primaryParts.push(`${Number(counts.semesters || 0)} semesters`);
-    }
-    if (primaryParts.length > 0) {
-      return `Legacy course cleanup still has primary rows: ${primaryParts.join(', ')}`;
-    }
-    return 'Legacy course cleanup still has linked rows';
-  };
   if (Number.isNaN(courseId)) {
     return res.redirect(redirectWith('err', 'Invalid course'));
   }
@@ -57989,14 +57969,6 @@ app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, r
     return res.redirect(redirectWith('ok', 'Legacy course deleted'));
   } catch (err) {
     console.error('Legacy course delete failed', err);
-    if (err && err.code === '23503') {
-      try {
-        const counts = await academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId);
-        return res.redirect(redirectWith('err', resolveDependencyMessage(counts)));
-      } catch (_) {
-        return res.redirect(redirectWith('err', 'Legacy course cleanup still has linked rows'));
-      }
-    }
     return res.redirect(redirectWith('err', 'Database error'));
   }
 });

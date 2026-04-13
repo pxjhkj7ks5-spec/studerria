@@ -2271,8 +2271,7 @@
                     <% if (legacyCourseCleanupRowsData.length) { %>
                       <% legacyCourseCleanupRowsData.forEach(function(course) { %>
                         <% const dep = course.dependency_counts || { users: 0, subjects: 0, semesters: 0, other: 0, other_blocking_preview: '' }; %>
-                        <% const safeToDelete = Boolean(course.deletable); %>
-                        <tr class="<%= safeToDelete ? '' : 'table-warning-subtle' %>">
+                        <tr>
                           <td class="fw-semibold"><%= course.name %> <span class="text-muted">#<%= course.id %></span></td>
                           <td><%= course.campus_label || 'Kyiv' %></td>
                           <td><%= course.kind_label || (course.is_teacher_course ? 'Teacher course' : 'Legacy course') %></td>
@@ -2286,22 +2285,17 @@
                             <% } %>
                           </td>
                           <td>
-                            <% if (safeToDelete) { %>
-                              <span class="badge text-bg-success">Ready</span>
-                            <% } else { %>
-                              <span class="badge text-bg-warning">Protected</span>
-                            <% } %>
+                            <span class="badge text-bg-danger">Hard delete</span>
                           </td>
                           <td class="text-end">
                             <form method="POST" action="/admin/courses/delete/<%= course.id %>" class="d-inline">
                               <button
                                 class="btn btn-outline-danger btn-sm"
                                 type="submit"
-                                <%= safeToDelete ? '' : 'disabled' %>
-                                data-confirm="Delete legacy course <%= course.name %>? This cannot be undone."
+                                data-confirm="Force delete legacy course <%= course.name %> and every linked row? This cannot be undone."
                                 data-confirm-level="danger"
                               >
-                                Delete
+                                Force delete
                               </button>
                             </form>
                           </td>
