@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.05",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-desktop-map): refine the public memorial map for large desktop and Mac viewports with hover-driven marker previews, active marker states, a wider story rail, and a stronger focused-story overlay inside the map workspace",
+        "feat(charredmap-desktop-story): rebuild `/charredmap/stories/[slug]` into a dedicated wide reading page with a large hero surface, sticky metadata rail, and a centered long-form text column instead of a simple modal-like container"
+      ]
+    },
+    {
       "version": "1.6.04",
       "date": "2026-04-13",
       "items": [
