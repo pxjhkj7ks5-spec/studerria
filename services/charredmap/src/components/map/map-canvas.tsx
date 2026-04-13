@@ -16,6 +16,11 @@ type MapCanvasProps = {
   onPreviewStory?: (story: SerializedStory) => void;
 };
 
+const relaxedUkraineBounds = [
+  [ukraineBounds[0][0] - 4.8, ukraineBounds[0][1] - 3.4],
+  [ukraineBounds[1][0] + 6.4, ukraineBounds[1][1] + 4.2],
+] as const;
+
 function getOffsetPoint(story: SerializedStory, index: number, total: number) {
   if (total <= 1) {
     return [story.city.lng, story.city.lat] as [number, number];
@@ -89,12 +94,13 @@ export function MapCanvas({
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: mapStyleUrl,
-      center: [31.25, 48.8],
-      zoom: 5.1,
-      minZoom: 4.2,
+      center: [31.4, 48.7],
+      zoom: 4.65,
+      minZoom: 3.85,
       maxZoom: 11.5,
-      maxBounds: ukraineBounds as unknown as maplibregl.LngLatBoundsLike,
+      maxBounds: relaxedUkraineBounds as unknown as maplibregl.LngLatBoundsLike,
       attributionControl: false,
+      renderWorldCopies: false,
     });
     mapRef.current = map;
 
@@ -218,5 +224,5 @@ export function MapCanvas({
     };
   }, [occupationOverlay, previewStory, selectStory, stories]);
 
-  return <div ref={containerRef} className="h-full min-h-[520px] w-full xl:min-h-[48rem] 2xl:min-h-[52rem]" />;
+  return <div ref={containerRef} className="h-full min-h-[560px] w-full xl:min-h-[46rem] 2xl:min-h-[50rem]" />;
 }

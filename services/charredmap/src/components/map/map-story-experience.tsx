@@ -60,19 +60,18 @@ export function MapStoryExperience({
 
   return (
     <>
-      <div className="glass-panel relative overflow-hidden rounded-[36px]">
+      <div className="glass-panel relative overflow-hidden rounded-[36px] xl:rounded-[40px]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.16),_transparent_28%),radial-gradient(circle_at_86%_14%,_rgba(255,255,255,0.08),_transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_32%)]" />
-        <div className="pointer-events-none absolute inset-y-0 right-[380px] hidden w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent)] xl:block 2xl:right-[420px]" />
+        <div className="pointer-events-none absolute inset-y-0 right-[336px] hidden w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent)] xl:block 2xl:right-[360px]" />
 
-        <div className="relative border-b border-white/10 px-4 py-4 md:px-6 md:py-5">
+        <div className="relative border-b border-white/10 px-4 py-4 md:px-5 md:py-4 xl:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-2xl space-y-3">
+            <div className="max-w-[34rem] space-y-3">
               <p className="text-[11px] uppercase tracking-[0.3em] text-[--accent-orange]">
                 Редакційний шар
               </p>
-              <h2 className="font-display text-2xl leading-[1.02] text-white md:text-3xl">
-                Карта лишається головною сценою, а історія з&apos;являється лише тоді, коли
-                глядач сам відкриває мітку.
+              <h2 className="font-display text-2xl leading-[1.02] text-white md:text-[2rem]">
+                Карта лишається сценою, а історія входить у кадр тільки після вибору мітки.
               </h2>
               <p className="max-w-xl text-sm leading-6 text-[--muted]">
                 Помаранчевий контур є редакційним GeoJSON-overlay для MVP і не претендує на
@@ -91,11 +90,11 @@ export function MapStoryExperience({
           </div>
         </div>
 
-        <div className="relative grid min-h-[700px] grid-cols-1 xl:min-h-[48rem] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:min-h-[52rem] 2xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="relative min-h-[540px] border-b border-white/10 xl:min-h-[48rem] xl:border-b-0 2xl:min-h-[52rem]">
+        <div className="relative grid min-h-[700px] grid-cols-1 xl:min-h-[46rem] xl:grid-cols-[minmax(0,1fr)_336px] 2xl:min-h-[50rem] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="relative min-h-[560px] border-b border-white/10 xl:min-h-[46rem] xl:border-b-0 2xl:min-h-[50rem]">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.3))]" />
             {activeStory ? (
-              <div className="pointer-events-none absolute left-6 top-6 z-10 hidden max-w-[22rem] xl:block 2xl:max-w-[24rem]">
+              <div className="pointer-events-none absolute left-5 top-5 z-10 hidden max-w-[19rem] xl:block 2xl:max-w-[21rem]">
                 <div className="rounded-[28px] border border-white/10 bg-[rgba(7,9,12,0.68)] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-[--accent-orange]">
                     У фокусі
@@ -159,7 +158,7 @@ export function MapStoryExperience({
             />
           </div>
 
-          <aside className="relative bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(4,5,7,0.74))] p-4 backdrop-blur-2xl md:p-5 xl:max-h-[48rem] xl:overflow-y-auto 2xl:max-h-[52rem] story-scrollbar">
+          <aside className="relative bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(4,5,7,0.74))] p-4 backdrop-blur-2xl md:p-5 xl:max-h-[46rem] xl:overflow-y-auto 2xl:max-h-[50rem] story-scrollbar">
             <div className="flex items-end justify-between gap-4 border-b border-white/10 pb-4">
               <div className="space-y-2">
                 <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">

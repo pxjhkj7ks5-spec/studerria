@@ -33,8 +33,8 @@ export default async function Home() {
     <main className="relative pb-20">
       <section className="relative isolate overflow-hidden border-b border-white/8">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.16),_transparent_24%),radial-gradient(circle_at_85%_12%,_rgba(255,255,255,0.08),_transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_32%)]" />
-        <div className="mx-auto grid w-full max-w-[1720px] gap-10 px-4 py-6 md:px-6 md:py-8 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-end">
-          <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-between gap-10 py-4 md:min-h-[48rem] md:py-8">
+        <div className="mx-auto grid w-full max-w-[1860px] gap-8 px-4 py-6 md:px-6 md:py-8 xl:grid-cols-[minmax(320px,0.56fr)_minmax(0,1.44fr)] xl:items-stretch 2xl:gap-12">
+          <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-between gap-8 py-4 md:min-h-[44rem] md:py-8 xl:pr-4 2xl:pr-10">
             <div className="space-y-8">
               <div className="hero-reveal flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.34em] text-[--muted]">
                 <span className="text-[--accent-orange]">charredmap</span>
@@ -43,32 +43,22 @@ export default async function Home() {
               </div>
 
               <div className="hero-reveal space-y-6 [animation-delay:120ms]">
-                <h1 className="font-display max-w-4xl text-[clamp(3.8rem,9vw,8rem)] leading-[0.88] tracking-[-0.045em] text-white">
-                  Мапа міст, у яких пам&apos;ять досі говорить голосніше за тишу.
+                <h1 className="font-display max-w-[9ch] text-[clamp(3.1rem,6.4vw,6.4rem)] leading-[0.9] tracking-[-0.05em] text-white">
+                  Мапа міст, де пам&apos;ять досі говорить голосніше за тишу.
                 </h1>
-                <p className="max-w-2xl text-base leading-7 text-[#d5d8de] md:text-lg">
-                  {siteDescription} Тут публікація починається не зі стрічки, а з географії болю:
-                  мітка, місто, людська історія і нічний простір, у якому все інше відступає.
+                <p className="max-w-[32rem] text-[15px] leading-6 text-[#d5d8de] md:text-base md:leading-7">
+                  {siteDescription} Мітка, місто і людська історія збираються тут в один темний
+                  простір, де ніщо не відволікає від читання.
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-8 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
-              <div className="glass-panel hero-reveal rounded-[32px] p-5 md:p-6 [animation-delay:220ms]">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-[--accent-orange]">
-                  Editorial note
-                </p>
-                <p className="mt-4 max-w-xl text-sm leading-7 text-[#f0d9c7] md:text-[15px]">
-                  Помаранчевий контур залишається редакційним статичним overlay для MVP. Він
-                  задає меморіальну рамку, а не імітує live-дані.
-                </p>
-              </div>
-
-              <dl className="hero-reveal divide-y divide-white/10 border-y border-white/10 [animation-delay:280ms]">
+            <div className="hero-reveal max-w-[34rem] [animation-delay:260ms]">
+              <dl className="divide-y divide-white/10 border-y border-white/10">
                 {overviewItems.map((item) => (
                   <div
                     key={item.label}
-                    className="grid gap-2 py-4 md:grid-cols-[148px_minmax(0,1fr)] md:gap-6"
+                    className="grid gap-2 py-4 md:grid-cols-[132px_minmax(0,1fr)] md:gap-5"
                   >
                     <dt className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">
                       {item.label}
@@ -85,7 +75,7 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="relative z-10 hero-reveal xl:pb-8 [animation-delay:180ms]">
+          <div className="relative z-10 hero-reveal xl:flex xl:items-stretch [animation-delay:180ms]">
             <MapStoryExperience
               stories={stories}
               occupationOverlay={occupationOverlay}
