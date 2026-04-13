@@ -73,10 +73,6 @@ export function MapStoryExperience({
               <h2 className="font-display text-2xl leading-[1.02] text-white md:text-[2rem]">
                 Карта лишається сценою, а історія входить у кадр тільки після вибору мітки.
               </h2>
-              <p className="max-w-xl text-sm leading-6 text-[--muted]">
-                Помаранчевий контур є редакційним GeoJSON-overlay для MVP і не претендує на
-                оперативну точність у реальному часі.
-              </p>
             </div>
 
             <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.18em] text-[--muted]">
