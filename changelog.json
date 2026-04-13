@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.09",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-favicon): add a dedicated memorial favicon and Apple touch icon for `charredmap`, using the Ukraine silhouette mark so the sidecar now has a branded tab icon and Apple-compatible launcher artwork"
+      ]
+    },
+    {
       "version": "1.6.08",
       "date": "2026-04-13",
       "items": [
