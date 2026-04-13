@@ -1,7 +1,13 @@
 {
-  "version": "0.1.08",
-  "generatedAt": "2026-04-13T19:01:01.903Z",
+  "version": "0.1.09",
+  "generatedAt": "2026-04-13T19:07:08.690Z",
   "entries": [
+    {
+      "hash": "660faf4742ab3212faaa71903863da5e14fc3c6a",
+      "shortHash": "660faf4",
+      "message": "feat(charredmap-hero): remove laptop stats rail",
+      "date": "2026-04-13T22:07:01+03:00"
+    },
     {
       "hash": "d477501c7dd8b2797ef4a250fb77b53f68ec20ee",
       "shortHash": "d477501",

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.11",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-hero-cleanup): remove the stats rail from the public `charredmap` hero on laptop and desktop layouts, drop the unused published-stats fetch behind it, and let the left intro column stay visually cleaner and more centered around the opening copy"
+      ]
+    },
+    {
       "version": "1.6.10",
       "date": "2026-04-13",
       "items": [
