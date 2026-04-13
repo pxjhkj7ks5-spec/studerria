@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { PublicationStatus } from "@/lib/constants";
-import { prisma } from "@/lib/prisma";
+import { ensureCharredmapDatabase, prisma } from "@/lib/prisma";
 import { excerpt, slugify } from "@/lib/utils";
 
 type StoryWithCity = Prisma.StoryGetPayload<{
@@ -60,6 +60,8 @@ function isDatabaseNotReady(error: unknown) {
 }
 
 export async function getPublishedStories() {
+  await ensureCharredmapDatabase();
+
   try {
     const stories = await prisma.story.findMany({
       where: { publicationStatus: "published" },
@@ -78,6 +80,8 @@ export async function getPublishedStories() {
 }
 
 export async function getPublishedStoryBySlug(slug: string) {
+  await ensureCharredmapDatabase();
+
   try {
     const story = await prisma.story.findFirst({
       where: {
@@ -98,6 +102,8 @@ export async function getPublishedStoryBySlug(slug: string) {
 }
 
 export async function getAdminStories() {
+  await ensureCharredmapDatabase();
+
   try {
     const stories = await prisma.story.findMany({
       include: { city: true },
@@ -115,6 +121,8 @@ export async function getAdminStories() {
 }
 
 export async function getAdminStoryById(id: string) {
+  await ensureCharredmapDatabase();
+
   try {
     const story = await prisma.story.findUnique({
       where: { id },
@@ -132,6 +140,8 @@ export async function getAdminStoryById(id: string) {
 }
 
 export async function getAdminCities() {
+  await ensureCharredmapDatabase();
+
   try {
     return await prisma.city.findMany({
       orderBy: [{ name: "asc" }],
@@ -155,6 +165,8 @@ export async function getAdminCities() {
 }
 
 export async function getPublishedStats() {
+  await ensureCharredmapDatabase();
+
   try {
     const [stories, cities] = await Promise.all([
       prisma.story.count({ where: { publicationStatus: "published" } }),
@@ -190,6 +202,8 @@ async function createUniqueSlug(
   source: string,
   excludeId?: string,
 ) {
+  await ensureCharredmapDatabase();
+
   const baseSlug = slugify(source);
   let attempt = 0;
 
@@ -231,6 +245,8 @@ export async function upsertCityRecord(input: {
   lng: number;
   occupationStatus: "occupied" | "deoccupied";
 }) {
+  await ensureCharredmapDatabase();
+
   if (input.cityId) {
     return prisma.city.update({
       where: { id: input.cityId },
@@ -266,6 +282,8 @@ export async function upsertStoryRecord(input: {
   coverImageUrl?: string | null;
   publicationStatus: PublicationStatus;
 }) {
+  await ensureCharredmapDatabase();
+
   if (input.storyId) {
     const existing = await prisma.story.findUniqueOrThrow({
       where: { id: input.storyId },
