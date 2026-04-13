@@ -9,6 +9,6 @@ coverage
 test
 uploads
 .local
+services/charredmap
 docker/local/db/init/*.sql
 docker/local/db/init/*.sql.gz
-
