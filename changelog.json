@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.13",
+      "date": "2026-04-13",
+      "items": [
+        "chore(admin-legacy-cleanup-removal): remove the temporary legacy cleanup tab and hard-delete endpoint from Admin, drop the Academic Setup link into legacy pathways, and redirect `/admin/pathways?legacy=1` back to the main academic_v2 workspace"
+      ]
+    },
+    {
       "version": "1.6.12",
       "date": "2026-04-13",
       "items": [

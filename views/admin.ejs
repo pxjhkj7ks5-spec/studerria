@@ -1062,12 +1062,6 @@
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
             <% } %>
           </div>
-          <% if (!isLimitedView && role === 'admin') { %>
-            <div class="admin-sidebar-section">
-              <div class="admin-sidebar-title">Cleanup</div>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-legacy-courses">Legacy courses</button>
-            </div>
-          <% } %>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">People</div>
             <% if (sectionAllowed('admin-students')) { %>
@@ -1149,7 +1143,6 @@
       <% } %>
 
       <% const adminSectionOptionsList = typeof adminSectionOptions !== 'undefined' && Array.isArray(adminSectionOptions) ? adminSectionOptions : []; %>
-      <% const legacyCourseCleanupRowsData = typeof legacyCourseCleanupRows !== 'undefined' && Array.isArray(legacyCourseCleanupRows) ? legacyCourseCleanupRows : []; %>
       <% const dashboardStatsData = typeof dashboardStats !== 'undefined' && dashboardStats ? dashboardStats : null; %>
       <% const rbacRolesList = typeof rbacRoles !== 'undefined' && Array.isArray(rbacRoles) ? rbacRoles : []; %>
       <% const rbacPermissionOptionsList = typeof rbacPermissionOptions !== 'undefined' && Array.isArray(rbacPermissionOptions) ? rbacPermissionOptions : []; %>
@@ -1158,7 +1151,7 @@
       <% const userPrimaryRoleMapData = typeof userPrimaryRoleMap !== 'undefined' && userPrimaryRoleMap ? userPrimaryRoleMap : {}; %>
       <% const activeAdminTabRaw = typeof activeAdminTab === 'string' ? activeAdminTab.trim() : ''; %>
       <% const activeAdminTabNormalized = activeAdminTabRaw === 'admin-role-access' ? 'admin-role-studio' : activeAdminTabRaw; %>
-      <% const initialAdminTab = (/^[a-z0-9-]+$/i.test(activeAdminTabNormalized) && (((adminSectionOptionsList || []).some((section) => section && section.id === activeAdminTabNormalized)) || activeAdminTabNormalized === 'admin-deanery-monitoring' || activeAdminTabNormalized === 'admin-legacy-courses')) ? activeAdminTabNormalized : ''; %>
+      <% const initialAdminTab = (/^[a-z0-9-]+$/i.test(activeAdminTabNormalized) && (((adminSectionOptionsList || []).some((section) => section && section.id === activeAdminTabNormalized)) || activeAdminTabNormalized === 'admin-deanery-monitoring')) ? activeAdminTabNormalized : ''; %>
       <% const roleLabelMapData = Object.assign({
         admin: 'Адмін',
         teacher: 'Викладач',
@@ -2235,83 +2228,6 @@
         </div>
         <% } %>
 
-        <% } %>
-
-        <% if (!isLimitedView && role === 'admin') { %>
-        <div id="admin-legacy-courses" class="admin-panel" data-admin-title="Cleanup / Legacy courses">
-          <div class="card mb-4">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                <div>
-                  <h5 class="card-title mb-1">Legacy courses</h5>
-                  <div class="small text-muted">Тимчасовий cleanup-екран для видалення застарілих курсів після міграції.</div>
-                </div>
-                <div class="small text-muted">Показано <%= legacyCourseCleanupRowsData.length %> курсів</div>
-              </div>
-              <div class="alert alert-warning glass-inset border-0 mb-3">
-                Legacy cleanup deletes remove related legacy users, subjects, semesters, and linked data automatically.
-                Extra blockers now surface in `Other links` instead of collapsing into a generic database error. Teacher courses stay protected.
-              </div>
-              <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Курс</th>
-                      <th>Локація</th>
-                      <th>Тип</th>
-                      <th>Users</th>
-                      <th>Subjects</th>
-                      <th>Semesters</th>
-                      <th>Other links</th>
-                      <th>Статус</th>
-                      <th class="text-end">Дія</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% if (legacyCourseCleanupRowsData.length) { %>
-                      <% legacyCourseCleanupRowsData.forEach(function(course) { %>
-                        <% const dep = course.dependency_counts || { users: 0, subjects: 0, semesters: 0, other: 0, other_blocking_preview: '' }; %>
-                        <tr>
-                          <td class="fw-semibold"><%= course.name %> <span class="text-muted">#<%= course.id %></span></td>
-                          <td><%= course.campus_label || 'Kyiv' %></td>
-                          <td><%= course.kind_label || (course.is_teacher_course ? 'Teacher course' : 'Legacy course') %></td>
-                          <td><%= Number(dep.users || 0) %></td>
-                          <td><%= Number(dep.subjects || 0) %></td>
-                          <td><%= Number(dep.semesters || 0) %></td>
-                          <td>
-                            <div><%= Number(dep.other || 0) %></div>
-                            <% if (dep.other_blocking_preview) { %>
-                              <div class="small text-muted"><%= dep.other_blocking_preview %></div>
-                            <% } %>
-                          </td>
-                          <td>
-                            <span class="badge text-bg-danger">Hard delete</span>
-                          </td>
-                          <td class="text-end">
-                            <form method="POST" action="/admin/courses/delete/<%= course.id %>" class="d-inline">
-                              <button
-                                class="btn btn-outline-danger btn-sm"
-                                type="submit"
-                                data-confirm="Force delete legacy course <%= course.name %> and every linked row? This cannot be undone."
-                                data-confirm-level="danger"
-                              >
-                                Force delete
-                              </button>
-                            </form>
-                          </td>
-                        </tr>
-                      <% }); %>
-                    <% } else { %>
-                      <tr>
-                        <td colspan="9" class="text-muted">Немає курсів для cleanup.</td>
-                      </tr>
-                    <% } %>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
         <% } %>
 
         <% if (sectionAllowed('admin-homework')) { %>

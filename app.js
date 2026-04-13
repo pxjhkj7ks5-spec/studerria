@@ -40594,60 +40594,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         console.error('Database error (admin.supportRequests)', supportErr);
       }
     }
-    const legacyCourseCleanupRows = await Promise.all(
-      (allCourses || []).map(async (course) => {
-        const courseIdValue = Number(course && course.id ? course.id : 0);
-        let dependencyCounts = {
-          users: 0,
-          subjects: 0,
-          semesters: 0,
-          other_blocking_total: 0,
-          other_blocking_rows: [],
-          deletable: true,
-        };
-        try {
-          dependencyCounts = await academicSetupHelpers.getLegacyCourseDependencyCounts(
-            getAcademicSetupStore(),
-            courseIdValue
-          );
-        } catch (cleanupErr) {
-          console.error('Database error (admin.legacyCourseCleanup)', cleanupErr);
-        }
-        const usersCount = Number(dependencyCounts.users || 0);
-        const subjectsCount = Number(dependencyCounts.subjects || 0);
-        const semestersCount = Number(dependencyCounts.semesters || 0);
-        const otherBlockingTotal = Number(dependencyCounts.other_blocking_total || 0);
-        const otherBlockingRows = Array.isArray(dependencyCounts.other_blocking_rows)
-          ? dependencyCounts.other_blocking_rows
-          : [];
-        const otherBlockingPreview = otherBlockingRows
-          .slice(0, 3)
-          .map((row) => {
-            const count = Number(row && row.count || 0);
-            return count > 1 ? `${row.label} ${count}` : row.label;
-          })
-          .join(', ');
-        const campusKey = normalizeCourseCampus(course && course.location ? course.location : 'kyiv');
-        return {
-          ...course,
-          campus_key: campusKey,
-          campus_label: campusKey === 'munich' ? 'Munich' : 'Kyiv',
-          kind_label: course && (course.is_teacher_course === true || Number(course.is_teacher_course) === 1)
-            ? 'Teacher course'
-            : 'Legacy course',
-          dependency_counts: {
-            users: usersCount,
-            subjects: subjectsCount,
-            semesters: semestersCount,
-            other: otherBlockingTotal,
-            other_blocking_rows: otherBlockingRows,
-            other_blocking_preview: otherBlockingPreview,
-          },
-          deletable: Boolean(dependencyCounts.deletable),
-        };
-      })
-    );
-
     try {
         const projectionAlert = buildAcademicV2CourseProjectionAlert(req, courseSubjectScope.projectionIssues, 'course');
         res.render('admin', buildAdminTemplateLocals({
@@ -40673,7 +40619,6 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       activeAdminTab: typeof req.query.tab === 'string' ? req.query.tab : '',
                                       courses,
                                       allCourses,
-                                      legacyCourseCleanupRows,
                                       teacherRequests,
         semesters,
         semestersByCourse,
@@ -40862,9 +40807,9 @@ async function handleAcademicV2MutationRoute(req, res, {
   }
 }
 
-app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res, next) => {
+app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
   if (String(req.query.legacy || '').trim() === '1') {
-    return next();
+    return res.redirect(buildAdminPathwaysUrl(req.query));
   }
   const focus = parseAcademicV2Focus(req.query);
   const pageRole = normalizeRoleKey(
@@ -57806,169 +57751,6 @@ app.post('/admin/courses/normalize-legacy', requireCoursesSectionAccess, writeLi
       }
     }
     console.error('Legacy course normalization failed', err);
-    return res.redirect(redirectWith('err', 'Database error'));
-  }
-});
-
-app.post('/admin/courses/delete/:id', requireCoursesSectionAccess, async (req, res) => {
-  const { id } = req.params;
-  const courseId = Number(id);
-  const redirectWith = (kind, message) => buildAdminScopedNoticeUrl(req, kind, message, {
-    tab: 'admin-legacy-courses',
-  });
-  if (Number.isNaN(courseId)) {
-    return res.redirect(redirectWith('err', 'Invalid course'));
-  }
-  try {
-    const courseRow = await db.get('SELECT id, name FROM courses WHERE id = ? LIMIT 1', [courseId]);
-    if (!courseRow) {
-      return res.redirect(redirectWith('err', 'Course not found'));
-    }
-    const dependencyCounts = await academicSetupHelpers.getLegacyCourseDependencyCounts(getAcademicSetupStore(), courseId);
-    const semesterRows = await db.all('SELECT id FROM semesters WHERE course_id = ?', [courseId]);
-    const semesterIds = Array.isArray(semesterRows)
-      ? semesterRows.map((row) => Number(row.id)).filter((value) => Number.isInteger(value) && value > 0)
-      : [];
-    await withTransaction(async (client) => {
-      const cleanupBlockingReferences = async (rows = []) => {
-        const seen = new Set();
-        for (const row of Array.isArray(rows) ? rows : []) {
-          if (!row || row.primary) {
-            continue;
-          }
-          const tableName = String(row.table_name || '').trim();
-          const columnName = String(row.column_name || 'course_id').trim();
-          if (!tableName || !columnName) {
-            continue;
-          }
-          const key = `${tableName}.${columnName}`;
-          if (seen.has(key)) {
-            continue;
-          }
-          seen.add(key);
-          const columns = await getTableColumnSet(tableName);
-          if (!columns.has(columnName)) {
-            continue;
-          }
-          await txRun(client, `DELETE FROM ${tableName} WHERE ${columnName} = ?`, [courseId]);
-        }
-      };
-
-      const deleteIfHasColumn = async (tableName, columnName = 'course_id', sql = null, params = []) => {
-        const columns = await getTableColumnSet(tableName);
-        if (!columns.has(columnName)) {
-          return;
-        }
-        await txRun(client, sql || `DELETE FROM ${tableName} WHERE ${columnName} = ?`, params.length ? params : [courseId]);
-      };
-
-      const nullifyIfHasColumn = async (tableName, columnName, values) => {
-        if (!Array.isArray(values) || !values.length) return;
-        const columns = await getTableColumnSet(tableName);
-        if (!columns.has(columnName)) {
-          return;
-        }
-        await txRun(client, `UPDATE ${tableName} SET ${columnName} = NULL WHERE ${columnName} = ANY(?::int[])`, [values]);
-      };
-
-      await deleteIfHasColumn('subject_course_bindings');
-      await deleteIfHasColumn('study_context_course_bindings');
-      await deleteIfHasColumn('program_admission_courses');
-      await deleteIfHasColumn('rooms');
-      await deleteIfHasColumn('course_study_days');
-
-      await txRun(client, 'DELETE FROM subject_materials WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM messages WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM teamwork_tasks WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM homework WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM schedule_entries WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM activity_log WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM personal_reminders WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM course_week_time_modes WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM schedule_generator_items WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM schedule_generator_entries WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM subject_grading_settings WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM journal_columns WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM journal_grade_hash_audit WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM attendance_records WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM journal_grade_appeals WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM journal_subject_close_events WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM journal_grade_moderations WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-      await txRun(client, 'DELETE FROM competency_evaluations WHERE course_id = ? OR semester_id = ANY(?::int[])', [courseId, semesterIds]);
-
-      await nullifyIfHasColumn('subject_grading_settings', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('journal_columns', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('journal_grade_hash_audit', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('attendance_records', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('journal_grade_appeals', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('journal_subject_close_events', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('journal_grade_moderations', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('competency_evaluations', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('session_generator_drafts', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('rating_publication_snapshots', 'semester_id', semesterIds);
-      await nullifyIfHasColumn('study_context_semesters', 'legacy_semester_id', semesterIds);
-      await nullifyIfHasColumn('academic_v2_terms', 'legacy_semester_id', semesterIds);
-
-      const scopedCleanupTables = await txAll(client, `
-        SELECT
-          table_name,
-          BOOL_OR(column_name = 'course_id') AS has_course_id,
-          BOOL_OR(column_name = 'semester_id') AS has_semester_id
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND column_name IN ('course_id', 'semester_id')
-        GROUP BY table_name
-        ORDER BY table_name
-      `);
-      const scopedCleanupExclusions = new Set([
-        'admin_change_audit',
-        'courses',
-        'semesters',
-        'subjects',
-        'users',
-      ]);
-      for (const row of scopedCleanupTables) {
-        const tableName = String(row.table_name || '').trim();
-        if (!tableName || scopedCleanupExclusions.has(tableName)) {
-          continue;
-        }
-        const clauses = [];
-        const params = [];
-        if (row.has_course_id) {
-          clauses.push('course_id = ?');
-          params.push(courseId);
-        }
-        if (row.has_semester_id && semesterIds.length) {
-          clauses.push('semester_id = ANY(?::int[])');
-          params.push(semesterIds);
-        }
-        if (!clauses.length) {
-          continue;
-        }
-        await txRun(client, `DELETE FROM ${tableName} WHERE ${clauses.join(' OR ')}`, params);
-      }
-
-      await txRun(client, 'DELETE FROM history_log WHERE course_id = ?', [courseId]);
-      await txRun(client, 'DELETE FROM login_history WHERE course_id = ?', [courseId]);
-      await txRun(client, 'DELETE FROM subjects WHERE course_id = ?', [courseId]);
-      await txRun(client, 'DELETE FROM users WHERE course_id = ?', [courseId]);
-      await txRun(client, 'DELETE FROM semesters WHERE course_id = ?', [courseId]);
-      await cleanupBlockingReferences(dependencyCounts.blocker_rows || []);
-      await txRun(client, 'DELETE FROM courses WHERE id = ?', [courseId]);
-    });
-    logAction(db, req, 'course_delete', {
-      id: courseId,
-      forced_cleanup: true,
-      dependency_counts: dependencyCounts,
-    });
-    invalidateCoursesCache();
-    invalidateRegistrationPathwaysCache();
-    invalidateSubjectsCache(courseId);
-    invalidateSemestersCache(courseId);
-    invalidateStudyDaysCache(courseId);
-    return res.redirect(redirectWith('ok', 'Legacy course deleted'));
-  } catch (err) {
-    console.error('Legacy course delete failed', err);
     return res.redirect(redirectWith('err', 'Database error'));
   }
 });
