@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.10",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-laptop-hero): rebalance the public `charredmap` hero for laptop and Mac screens by tightening the opening copy, shortening the headline line-length, removing the separate editorial note card, and reducing the vertical sprawl before the map workspace",
+        "feat(charredmap-laptop-map): widen the main map stage by giving the side rail less width, moving the workspace higher in the first viewport, shrinking the focused-story overlay, and relaxing the map bounds + initial zoom so desktop users can pan more freely across both axes"
+      ]
+    },
+    {
       "version": "1.6.09",
       "date": "2026-04-13",
       "items": [

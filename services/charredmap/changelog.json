@@ -1,7 +1,13 @@
 {
-  "version": "0.1.07",
-  "generatedAt": "2026-04-13T18:56:01.852Z",
+  "version": "0.1.08",
+  "generatedAt": "2026-04-13T19:01:01.903Z",
   "entries": [
+    {
+      "hash": "d477501c7dd8b2797ef4a250fb77b53f68ec20ee",
+      "shortHash": "d477501",
+      "message": "feat(charredmap-laptop-layout): widen the map workspace",
+      "date": "2026-04-13T22:00:53+03:00"
+    },
     {
       "hash": "b3e7017e8467daabd5914b36c0107d56f36861b0",
       "shortHash": "b3e7017",
