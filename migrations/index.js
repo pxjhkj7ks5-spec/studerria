@@ -48,6 +48,7 @@ const academicV2SharedGroupSubjectLinks = require('./047_academic_v2_shared_grou
 const securityMulticourseRateLimits = require('./048_security_multicourse_rate_limits');
 const securityHardeningAdminControls = require('./049_security_hardening_admin_controls');
 const adminChangeAuditAppendOnlyFkCleanup = require('./050_admin_change_audit_append_only_fk_cleanup');
+const sessionPersistenceDefaults = require('./051_session_persistence_defaults');
 
 module.exports = [
   init,
@@ -100,4 +101,5 @@ module.exports = [
   securityMulticourseRateLimits,
   securityHardeningAdminControls,
   adminChangeAuditAppendOnlyFkCleanup,
+  sessionPersistenceDefaults,
 ];

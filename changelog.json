@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.15",
+      "date": "2026-04-13",
+      "items": [
+        "fix(session-persistence): extend the default authenticated session window to 14 days idle and 28 days absolute, raise the admin limits for long-lived cookies, and migrate existing installations off the old 60-minute idle timeout so users stay signed in for 2-4 weeks instead of being logged out after short inactivity"
+      ]
+    },
+    {
       "version": "1.6.14",
       "date": "2026-04-13",
       "items": [

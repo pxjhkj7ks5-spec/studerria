@@ -1386,14 +1386,14 @@
                         <input
                           type="number"
                           min="5"
-                          max="1440"
+                          max="129600"
                           class="form-control"
                           name="session_idle_timeout_minutes"
-                          value="<%= (settings && settings.session_idle_timeout_minutes) || 60 %>"
+                          value="<%= (settings && settings.session_idle_timeout_minutes) || 20160 %>"
                           data-settings-field
                           required
                         />
-                        <div class="small text-muted mt-1">Завершує сесію після бездіяльності. Захист від shared machine і stolen cookie.</div>
+                        <div class="small text-muted mt-1">Завершує сесію після бездіяльності. Дефолт тепер 14 днів, щоб браузер не викидав із логіну щодня.</div>
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label">Absolute timeout (hours)</label>
@@ -1403,11 +1403,11 @@
                           max="2160"
                           class="form-control"
                           name="session_absolute_timeout_hours"
-                          value="<%= (settings && settings.session_absolute_timeout_hours) || 336 %>"
+                          value="<%= (settings && settings.session_absolute_timeout_hours) || 672 %>"
                           data-settings-field
                           required
                         />
-                        <div class="small text-muted mt-1">Сесія не живе довше цього часу навіть при активності.</div>
+                        <div class="small text-muted mt-1">Сесія не живе довше цього часу навіть при активності. Дефолт тепер 28 днів.</div>
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label">Step-up re-auth window (minutes)</label>

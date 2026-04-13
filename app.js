@@ -553,7 +553,7 @@ const SECURITY_LOGS_RETENTION_MIN_DAYS = 30;
 const SECURITY_IP_RETENTION_MIN_DAYS = 30;
 const SECURITY_DEVICE_RETENTION_MIN_DAYS = 30;
 const SESSION_IDLE_TIMEOUT_MINUTES_MIN = 5;
-const SESSION_IDLE_TIMEOUT_MINUTES_MAX = 1440;
+const SESSION_IDLE_TIMEOUT_MINUTES_MAX = 24 * 60 * 90;
 const SESSION_ABSOLUTE_TIMEOUT_HOURS_MIN = 1;
 const SESSION_ABSOLUTE_TIMEOUT_HOURS_MAX = 24 * 90;
 const SECURITY_STEPUP_REAUTH_MINUTES_MIN = 5;
@@ -664,7 +664,7 @@ const SECURITY_RISK_THRESHOLDS_DEFAULTS = securityHelpers.buildRiskThresholds({
 }, securityHelpers.SECURITY_RISK_THRESHOLDS_DEFAULTS);
 
 const DEFAULT_SETTINGS = {
-  session_duration_days: 14,
+  session_duration_days: resolveSessionCompatibilityDays(SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours),
   session_idle_timeout_minutes: SESSION_SECURITY_DEFAULTS.idleTimeoutMinutes,
   session_absolute_timeout_hours: SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours,
   max_file_size_mb: 20,
