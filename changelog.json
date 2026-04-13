@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.17",
+      "date": "2026-04-13",
+      "items": [
+        "fix(session-persistence-startup): remove the circular `DEFAULT_SETTINGS` initialization path that crashed Node on boot after the session-persistence rollout, so the app can start cleanly and apply the longer 14-day idle / 28-day absolute session window"
+      ]
+    },
+    {
       "version": "1.6.16",
       "date": "2026-04-13",
       "items": [

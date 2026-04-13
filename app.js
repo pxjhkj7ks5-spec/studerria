@@ -664,7 +664,7 @@ const SECURITY_RISK_THRESHOLDS_DEFAULTS = securityHelpers.buildRiskThresholds({
 }, securityHelpers.SECURITY_RISK_THRESHOLDS_DEFAULTS);
 
 const DEFAULT_SETTINGS = {
-  session_duration_days: resolveSessionCompatibilityDays(SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours),
+  session_duration_days: Math.max(1, Math.ceil(SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours / 24)),
   session_idle_timeout_minutes: SESSION_SECURITY_DEFAULTS.idleTimeoutMinutes,
   session_absolute_timeout_hours: SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours,
   max_file_size_mb: 20,
