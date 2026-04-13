@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.12",
+      "date": "2026-04-13",
+      "items": [
+        "fix(admin-legacy-course-delete-audit-fk): drop the append-only `admin_change_audit` foreign keys to courses and users so hard-deleting a legacy course no longer fails when Postgres tries to null out immutable audit rows"
+      ]
+    },
+    {
       "version": "1.6.11",
       "date": "2026-04-13",
       "items": [
