@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.16",
+      "date": "2026-04-13",
+      "items": [
+        "perf(charredmap-deploy-cache): stop rewriting `services/charredmap/package.json` and `package-lock.json` on every patch bump so the Docker dependency layer keeps its cache between memorial-map releases, and exclude `services/charredmap` from the main Studerria app build context so charredmap-only edits no longer invalidate the app image"
+      ]
+    },
+    {
       "version": "1.6.15",
       "date": "2026-04-13",
       "items": [

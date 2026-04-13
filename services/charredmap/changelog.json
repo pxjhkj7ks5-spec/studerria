@@ -1,7 +1,19 @@
 {
-  "version": "0.1.10",
-  "generatedAt": "2026-04-13T19:23:20.246Z",
+  "version": "0.1.11",
+  "generatedAt": "2026-04-13T20:18:33.390Z",
   "entries": [
+    {
+      "hash": "599c38c9aadc8bbc1409548d9426e1a0a16f8f6c",
+      "shortHash": "599c38c",
+      "message": "perf(charredmap-deploy): preserve docker dependency cache",
+      "date": "2026-04-13T23:18:19+03:00"
+    },
+    {
+      "hash": "10d6350e7e264a0469b57f753acc437dbd56b7eb",
+      "shortHash": "10d6350",
+      "message": "fix extend session persistence window",
+      "date": "2026-04-13T23:09:46+03:00"
+    },
     {
       "hash": "c93b98bc8c5aaa93db8cc2302ab4a4123b446bd6",
       "shortHash": "c93b98b",
