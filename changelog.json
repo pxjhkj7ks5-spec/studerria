@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.18",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-city-search): add an admin city autocomplete flow for story creation/editing that searches a bundled Ukraine city catalog plus existing DB cities, suggests matches while typing names like Київ or Авдіївку, and auto-fills oblast + coordinates from the chosen entry",
+        "fix(charredmap-city-schema-bootstrap): auto-create the SQLite `City` and `Story` tables on first access inside the charredmap sidecar so the admin story form no longer crashes with `The table main.City does not exist in the current database` on fresh or incomplete databases"
+      ]
+    },
+    {
       "version": "1.6.17",
       "date": "2026-04-13",
       "items": [

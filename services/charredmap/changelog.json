@@ -1,7 +1,19 @@
 {
-  "version": "0.1.11",
-  "generatedAt": "2026-04-13T20:18:33.390Z",
+  "version": "0.1.12",
+  "generatedAt": "2026-04-13T20:39:23.537Z",
   "entries": [
+    {
+      "hash": "70c0527ba800f00c7c28f697afaf111e906b5bd0",
+      "shortHash": "70c0527",
+      "message": "feat(charredmap-city-search): add admin autocomplete and db bootstrap",
+      "date": "2026-04-13T23:39:13+03:00"
+    },
+    {
+      "hash": "e49c7c8864535d6d063b3e632859082f273141b9",
+      "shortHash": "e49c7c8",
+      "message": "fix session persistence startup crash",
+      "date": "2026-04-13T23:22:09+03:00"
+    },
     {
       "hash": "599c38c9aadc8bbc1409548d9426e1a0a16f8f6c",
       "shortHash": "599c38c",
