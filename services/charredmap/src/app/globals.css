@@ -121,6 +121,101 @@ button {
   filter: saturate(0.88) contrast(1.04);
 }
 
+.charredmap-marker {
+  position: relative;
+  display: flex;
+  height: 1.6rem;
+  width: 1.6rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.28);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.charredmap-marker:hover,
+.charredmap-marker:focus-visible,
+.charredmap-marker[data-selected="true"] {
+  transform: scale(1.18);
+  border-color: rgba(255, 179, 122, 0.78);
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.36);
+}
+
+.charredmap-marker__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.12);
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+.charredmap-marker__dot {
+  position: relative;
+  z-index: 1;
+  height: 0.8rem;
+  width: 0.8rem;
+  border-radius: 999px;
+}
+
+.charredmap-marker[data-occupation="occupied"] .charredmap-marker__dot {
+  background: var(--accent-orange);
+  box-shadow: 0 0 18px rgba(255, 132, 56, 0.8);
+}
+
+.charredmap-marker[data-occupation="deoccupied"] .charredmap-marker__dot {
+  background: white;
+  box-shadow: 0 0 0 2px rgba(218, 59, 59, 0.8);
+}
+
+.charredmap-map-popup .maplibregl-popup-content {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  background: rgba(8, 10, 12, 0.84);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(18px);
+  padding: 0;
+}
+
+.charredmap-map-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.charredmap-map-popup__body {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.charredmap-map-popup__eyebrow {
+  margin: 0;
+  color: var(--accent-orange);
+  font-size: 0.65rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.charredmap-map-popup__title {
+  margin: 0.55rem 0 0;
+  color: white;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.charredmap-map-popup__meta {
+  margin: 0.45rem 0 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .maplibregl-ctrl-top-right {
   top: 18px;
   right: 18px;
@@ -190,6 +285,34 @@ button {
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.78);
+    opacity: 0.72;
+  }
+
+  70% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (min-width: 1280px) {
+  .charredmap-marker {
+    height: 1.8rem;
+    width: 1.8rem;
+  }
+
+  .charredmap-marker__dot {
+    height: 0.92rem;
+    width: 0.92rem;
   }
 }
 

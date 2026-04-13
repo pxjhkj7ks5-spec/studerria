@@ -18,6 +18,22 @@ export function MapStoryExperience({
   occupationOverlay,
 }: MapStoryExperienceProps) {
   const [selectedStory, setSelectedStory] = useState<SerializedStory | null>(null);
+  const [activeStory, setActiveStory] = useState<SerializedStory | null>(stories[0] ?? null);
+
+  useEffect(() => {
+    if (!stories.length) {
+      setActiveStory(null);
+      return;
+    }
+
+    setActiveStory((current) => {
+      if (current && stories.some((entry) => entry.id === current.id)) {
+        return current;
+      }
+
+      return stories[0] ?? null;
+    });
+  }, [stories]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -46,7 +62,7 @@ export function MapStoryExperience({
     <>
       <div className="glass-panel relative overflow-hidden rounded-[36px]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.16),_transparent_28%),radial-gradient(circle_at_86%_14%,_rgba(255,255,255,0.08),_transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_32%)]" />
-        <div className="pointer-events-none absolute inset-y-0 right-[340px] hidden w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent)] xl:block" />
+        <div className="pointer-events-none absolute inset-y-0 right-[380px] hidden w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent)] xl:block 2xl:right-[420px]" />
 
         <div className="relative border-b border-white/10 px-4 py-4 md:px-6 md:py-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -69,15 +85,38 @@ export function MapStoryExperience({
                 {stories.length} матеріалів
               </span>
               <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2">
-                Натисніть на мітку
+                Курсор або натиск
               </span>
             </div>
           </div>
         </div>
 
-        <div className="relative grid min-h-[680px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="relative min-h-[500px] border-b border-white/10 xl:border-b-0">
+        <div className="relative grid min-h-[700px] grid-cols-1 xl:min-h-[48rem] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:min-h-[52rem] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="relative min-h-[540px] border-b border-white/10 xl:min-h-[48rem] xl:border-b-0 2xl:min-h-[52rem]">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.3))]" />
+            {activeStory ? (
+              <div className="pointer-events-none absolute left-6 top-6 z-10 hidden max-w-[22rem] xl:block 2xl:max-w-[24rem]">
+                <div className="rounded-[28px] border border-white/10 bg-[rgba(7,9,12,0.68)] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-[--accent-orange]">
+                    У фокусі
+                  </p>
+                  <h3 className="mt-3 font-display text-2xl leading-[1.02] text-white">
+                    {activeStory.title}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-white/78">
+                    {activeStory.excerpt}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.18em] text-[--muted]">
+                    <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">
+                      {activeStory.city.name}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">
+                      {activeStory.city.occupationStatus === "occupied" ? "Окуповане" : "Деокуповане"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-4 md:p-6">
               <div className="max-w-md rounded-[30px] border border-white/10 bg-[rgba(7,9,12,0.58)] p-4 backdrop-blur-2xl">
                 <p className="text-[11px] uppercase tracking-[0.28em] text-[--accent-orange]">
@@ -111,11 +150,16 @@ export function MapStoryExperience({
             <MapCanvas
               stories={stories}
               occupationOverlay={occupationOverlay}
-              onSelectStory={setSelectedStory}
+              activeStory={activeStory}
+              onPreviewStory={setActiveStory}
+              onSelectStory={(story) => {
+                setActiveStory(story);
+                setSelectedStory(story);
+              }}
             />
           </div>
 
-          <aside className="relative bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(4,5,7,0.74))] p-4 backdrop-blur-2xl md:p-5">
+          <aside className="relative bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(4,5,7,0.74))] p-4 backdrop-blur-2xl md:p-5 xl:max-h-[48rem] xl:overflow-y-auto 2xl:max-h-[52rem] story-scrollbar">
             <div className="flex items-end justify-between gap-4 border-b border-white/10 pb-4">
               <div className="space-y-2">
                 <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">
@@ -130,17 +174,34 @@ export function MapStoryExperience({
               </span>
             </div>
 
+            {activeStory ? (
+              <div className="mt-4 rounded-[28px] border border-white/10 bg-white/[0.04] p-4 xl:hidden">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[--accent-orange]">
+                  У фокусі
+                </p>
+                <p className="mt-3 font-display text-2xl leading-tight text-white">
+                  {activeStory.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-white/72">{activeStory.excerpt}</p>
+              </div>
+            ) : null}
+
             <div className="mt-4 space-y-1">
               {stories.length ? (
                 stories.map((story, index) => {
                   const meta = occupationMeta[story.city.occupationStatus];
-                  const active = selectedStory?.id === story.id;
+                  const active = activeStory?.id === story.id;
 
                   return (
                     <button
                       key={story.id}
                       type="button"
-                      onClick={() => setSelectedStory(story)}
+                      onMouseEnter={() => setActiveStory(story)}
+                      onFocus={() => setActiveStory(story)}
+                      onClick={() => {
+                        setActiveStory(story);
+                        setSelectedStory(story);
+                      }}
                       className={`group relative block w-full overflow-hidden border-l py-4 pl-5 pr-3 text-left transition ${
                         active
                           ? "border-[--accent-orange] bg-[linear-gradient(90deg,rgba(255,132,56,0.16),rgba(255,132,56,0.03)_48%,transparent)]"
