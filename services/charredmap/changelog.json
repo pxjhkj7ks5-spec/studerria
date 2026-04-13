@@ -1,7 +1,25 @@
 {
-  "version": "0.1.09",
-  "generatedAt": "2026-04-13T19:07:08.690Z",
+  "version": "0.1.10",
+  "generatedAt": "2026-04-13T19:23:20.246Z",
   "entries": [
+    {
+      "hash": "c93b98bc8c5aaa93db8cc2302ab4a4123b446bd6",
+      "shortHash": "c93b98b",
+      "message": "feat(charredmap-map-header): remove overlay note",
+      "date": "2026-04-13T22:23:12+03:00"
+    },
+    {
+      "hash": "dd354d1f2af81f5afb7381cd3077dd5b8aa2373a",
+      "shortHash": "dd354d1",
+      "message": "chore remove legacy cleanup entry points",
+      "date": "2026-04-13T22:22:21+03:00"
+    },
+    {
+      "hash": "e33d0f107586afbca659c53fb5b497ca797b6e32",
+      "shortHash": "e33d0f1",
+      "message": "fix admin audit append-only foreign keys",
+      "date": "2026-04-13T22:14:05+03:00"
+    },
     {
       "hash": "660faf4742ab3212faaa71903863da5e14fc3c6a",
       "shortHash": "660faf4",

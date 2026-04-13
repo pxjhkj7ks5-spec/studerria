@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.14",
+      "date": "2026-04-13",
+      "items": [
+        "feat(charredmap-map-header-cleanup): remove the explanatory GeoJSON-overlay note from the public map header so the workspace opens with a cleaner, tighter top bar above the map"
+      ]
+    },
+    {
       "version": "1.6.13",
       "date": "2026-04-13",
       "items": [
