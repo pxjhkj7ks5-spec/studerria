@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.23",
+      "date": "2026-04-14",
+      "items": [
+        "fix(charredmap-submit-cta): give the public `Надіслати на модерацію` button its own bright accent treatment so the primary submit action no longer visually disappears into the dark glass form background"
+      ]
+    },
+    {
       "version": "1.6.22",
       "date": "2026-04-14",
       "items": [

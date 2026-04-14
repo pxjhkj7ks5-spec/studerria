@@ -1,7 +1,13 @@
 {
-  "version": "0.1.13",
-  "generatedAt": "2026-04-14T15:59:40.878Z",
+  "version": "0.1.14",
+  "generatedAt": "2026-04-14T16:36:47.295Z",
   "entries": [
+    {
+      "hash": "bae91a24aacc1c510c52a65861bca09821e18972",
+      "shortHash": "bae91a2",
+      "message": "fix(charredmap-submit-cta): highlight public moderation button",
+      "date": "2026-04-14T19:36:42+03:00"
+    },
     {
       "hash": "5f8e861e3045be05e7bac8b367f3b8a969a89085",
       "shortHash": "5f8e861",
