@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useDeferredValue, useState } from "react";
+import { useActionState, useDeferredValue, useEffect, useState } from "react";
 import {
   submitStoryAction,
   type PublicSubmissionState,
@@ -17,12 +17,78 @@ import type { OccupationStatus } from "@/lib/constants";
 
 type PublicStoryFormProps = {
   cities: CityLookupCity[];
+  submitted?: boolean;
 };
 
 const initialState: PublicSubmissionState = {};
+const publicDraftStorageKey = "charredmap-public-submission-draft";
 
-export function PublicStoryForm({ cities }: PublicStoryFormProps) {
+type PublicStoryDraft = {
+  submitterName: string;
+  submitterContact: string;
+  title: string;
+  body: string;
+  selectedCityId: string;
+  selectedLookupKey: string | null;
+  cityName: string;
+  oblast: string;
+  lat: string;
+  lng: string;
+  occupationStatus: OccupationStatus;
+};
+
+function isOccupationStatus(value: string): value is OccupationStatus {
+  return value === "occupied" || value === "deoccupied";
+}
+
+function parseStoredDraft(value: string | null): PublicStoryDraft | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<PublicStoryDraft>;
+
+    if (
+      typeof parsed.submitterName !== "string" ||
+      typeof parsed.submitterContact !== "string" ||
+      typeof parsed.title !== "string" ||
+      typeof parsed.body !== "string" ||
+      typeof parsed.selectedCityId !== "string" ||
+      (parsed.selectedLookupKey !== null && typeof parsed.selectedLookupKey !== "string") ||
+      typeof parsed.cityName !== "string" ||
+      typeof parsed.oblast !== "string" ||
+      typeof parsed.lat !== "string" ||
+      typeof parsed.lng !== "string" ||
+      !isOccupationStatus(String(parsed.occupationStatus ?? ""))
+    ) {
+      return null;
+    }
+
+    return {
+      submitterName: parsed.submitterName,
+      submitterContact: parsed.submitterContact,
+      title: parsed.title,
+      body: parsed.body,
+      selectedCityId: parsed.selectedCityId,
+      selectedLookupKey: parsed.selectedLookupKey,
+      cityName: parsed.cityName,
+      oblast: parsed.oblast,
+      lat: parsed.lat,
+      lng: parsed.lng,
+      occupationStatus: parsed.occupationStatus,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function PublicStoryForm({ cities, submitted = false }: PublicStoryFormProps) {
   const [state, formAction] = useActionState(submitStoryAction, initialState);
+  const [submitterName, setSubmitterName] = useState("");
+  const [submitterContact, setSubmitterContact] = useState("");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [selectedCityId, setSelectedCityId] = useState("");
   const [selectedLookupKey, setSelectedLookupKey] = useState<string | null>(null);
   const [cityLookupOpen, setCityLookupOpen] = useState(false);
@@ -31,6 +97,7 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
   const [lat, setLat] = useState("49");
   const [lng, setLng] = useState("32");
   const [occupationStatus, setOccupationStatus] = useState<OccupationStatus>("deoccupied");
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const deferredCityName = useDeferredValue(cityName);
   const cityLookupOptions = buildCityLookupOptions(cities);
   const citySuggestions = getCitySuggestions(deferredCityName, cityLookupOptions);
@@ -60,6 +127,74 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
 
     setSelectedCityId("");
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (submitted) {
+      window.sessionStorage.removeItem(publicDraftStorageKey);
+      setDraftHydrated(true);
+      return;
+    }
+
+    const storedDraft = parseStoredDraft(
+      window.sessionStorage.getItem(publicDraftStorageKey),
+    );
+
+    if (storedDraft) {
+      setSubmitterName(storedDraft.submitterName);
+      setSubmitterContact(storedDraft.submitterContact);
+      setTitle(storedDraft.title);
+      setBody(storedDraft.body);
+      setSelectedCityId(storedDraft.selectedCityId);
+      setSelectedLookupKey(storedDraft.selectedLookupKey);
+      setCityName(storedDraft.cityName);
+      setOblast(storedDraft.oblast);
+      setLat(storedDraft.lat);
+      setLng(storedDraft.lng);
+      setOccupationStatus(storedDraft.occupationStatus);
+    }
+
+    setDraftHydrated(true);
+  }, [submitted]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !draftHydrated || submitted) {
+      return;
+    }
+
+    const draft: PublicStoryDraft = {
+      submitterName,
+      submitterContact,
+      title,
+      body,
+      selectedCityId,
+      selectedLookupKey,
+      cityName,
+      oblast,
+      lat,
+      lng,
+      occupationStatus,
+    };
+
+    window.sessionStorage.setItem(publicDraftStorageKey, JSON.stringify(draft));
+  }, [
+    body,
+    cityName,
+    draftHydrated,
+    lat,
+    lng,
+    oblast,
+    occupationStatus,
+    selectedCityId,
+    selectedLookupKey,
+    submitterContact,
+    submitterName,
+    submitted,
+    title,
+  ]);
 
   return (
     <form action={formAction} className="glass-panel rounded-[34px] p-5 md:p-7">
@@ -91,6 +226,8 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
               <span className="text-sm text-[--muted]">Ваше ім&apos;я</span>
               <input
                 name="submitterName"
+                value={submitterName}
+                onChange={(event) => setSubmitterName(event.target.value)}
                 required
                 maxLength={80}
                 placeholder="Ім'я або псевдонім"
@@ -101,6 +238,8 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
               <span className="text-sm text-[--muted]">Контакт</span>
               <input
                 name="submitterContact"
+                value={submitterContact}
+                onChange={(event) => setSubmitterContact(event.target.value)}
                 required
                 maxLength={160}
                 placeholder="email, Telegram або інший контакт"
@@ -113,6 +252,8 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
             <span className="text-sm text-[--muted]">Заголовок</span>
             <input
               name="title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
               required
               maxLength={140}
               placeholder="Короткий заголовок історії"
@@ -278,6 +419,8 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
             <span className="text-sm text-[--muted]">Текст історії</span>
             <textarea
               name="body"
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
               required
               rows={14}
               maxLength={20000}
@@ -303,6 +446,10 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
               Повернутись на мапу
             </Link>
           </div>
+
+          <p className="text-xs leading-5 text-[--muted]">
+            Чернетка цієї форми зберігається автоматично лише до завершення поточної сесії браузера.
+          </p>
         </section>
 
         <aside className="space-y-4">

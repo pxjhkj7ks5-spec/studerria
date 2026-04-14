@@ -40,7 +40,7 @@ export default async function SubmitPage({ searchParams }: SubmitPageProps) {
         </div>
       ) : null}
 
-      <PublicStoryForm cities={cities} />
+      <PublicStoryForm cities={cities} submitted={Boolean(submitted)} />
     </main>
   );
 }
