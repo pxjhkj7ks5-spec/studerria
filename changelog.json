@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.20",
+      "date": "2026-04-14",
+      "items": [
+        "fix(admin-import-export-panel): close the disabled legacy schedule-editor block before the `Import/Export` and `Generators` panels so both sections render again and the admin tab switcher can open them instead of falling back to Overview"
+      ]
+    },
+    {
       "version": "1.6.19",
       "date": "2026-04-14",
       "items": [

@@ -1997,10 +1997,11 @@
               <% } %>
             </div>
           </div>
-        </div>
+	        </div>
+	        <% } %>
 
-        <% if (sectionAllowed('admin-import-export')) { %>
-        <div id="admin-import-export" class="admin-panel" data-admin-title="Schedule / Import Export">
+	        <% if (sectionAllowed('admin-import-export')) { %>
+	        <div id="admin-import-export" class="admin-panel" data-admin-title="Schedule / Import Export">
           <div class="card mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -2225,13 +2226,11 @@
               <div class="small text-muted">Перед Publish рекомендуємо зберегти поточний CSV як backup.</div>
             </div>
           </div>
-        </div>
-        <% } %>
+	        </div>
+	        <% } %>
 
-        <% } %>
-
-        <% if (sectionAllowed('admin-homework')) { %>
-        <div id="admin-homework" class="admin-panel" data-admin-title="Academics / Homework">
+	        <% if (sectionAllowed('admin-homework')) { %>
+	        <div id="admin-homework" class="admin-panel" data-admin-title="Academics / Homework">
           <div class="card mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
