@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 type SubmitButtonProps = {
   children: React.ReactNode;
   variant?: "primary" | "secondary";
+  pendingLabel?: string;
 };
 
 export function SubmitButton({
   children,
   variant = "primary",
+  pendingLabel = "Збереження...",
 }: SubmitButtonProps) {
   const status = useFormStatus();
 
@@ -25,7 +27,7 @@ export function SubmitButton({
           : "border border-white/12 bg-white/[0.04] text-white hover:border-white/30 hover:bg-white/[0.08]",
       )}
     >
-      {status.pending ? "Збереження..." : children}
+      {status.pending ? pendingLabel : children}
     </button>
   );
 }

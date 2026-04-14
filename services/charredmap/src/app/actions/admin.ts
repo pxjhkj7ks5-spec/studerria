@@ -14,7 +14,7 @@ import {
 } from "@/lib/auth";
 import { withBasePath } from "@/lib/base-path";
 import { occupationStatuses, publicationStatuses } from "@/lib/constants";
-import { upsertCityRecord, upsertStoryRecord } from "@/lib/data";
+import { deleteStoryRecord, upsertCityRecord, upsertStoryRecord } from "@/lib/data";
 import { localStorageAdapter } from "@/lib/storage";
 
 export type ActionState = {
@@ -25,14 +25,26 @@ const storySchema = z.object({
   storyId: z.string().optional(),
   cityId: z.string().optional(),
   cityMode: z.enum(["existing", "new"]),
-  cityName: z.string().trim().min(2, "Вкажіть місто."),
-  oblast: z.string().trim().min(2, "Вкажіть область."),
+  cityName: z.string().trim().min(2, "Вкажіть місто.").max(80, "Назва міста задовга."),
+  oblast: z.string().trim().min(2, "Вкажіть область.").max(80, "Назва області задовга."),
   lat: z.coerce.number().min(43.5, "Широта поза межами України.").max(53.5),
   lng: z.coerce.number().min(20.5, "Довгота поза межами України.").max(40.8),
   occupationStatus: z.enum(occupationStatuses),
-  title: z.string().trim().min(4, "Занадто короткий заголовок."),
-  body: z.string().trim().min(40, "Додайте повніший текст історії."),
+  title: z
+    .string()
+    .trim()
+    .min(4, "Занадто короткий заголовок.")
+    .max(140, "Заголовок має вміщатися в 140 символів."),
+  body: z
+    .string()
+    .trim()
+    .min(40, "Додайте повніший текст історії.")
+    .max(20_000, "Текст занадто великий для одного матеріалу."),
   publicationStatus: z.enum(publicationStatuses),
+});
+
+const deleteStorySchema = z.object({
+  storyId: z.string().trim().min(1, "Не вдалося визначити історію."),
 });
 
 function secureCompare(left: string, right: string) {
@@ -57,12 +69,12 @@ export async function loginAction(
   }
 
   await createAdminSession();
-  redirect(getAdminStoriesRoute());
+  redirect(withBasePath(getAdminStoriesRoute()));
 }
 
 export async function logoutAction() {
   await clearAdminSession();
-  redirect(getAdminRoute());
+  redirect(withBasePath(getAdminRoute()));
 }
 
 export async function saveStoryAction(
@@ -100,6 +112,8 @@ export async function saveStoryAction(
   let coverImageUrl: string | null | undefined;
   const coverImage = formData.get("coverImage");
 
+  let story: Awaited<ReturnType<typeof upsertStoryRecord>>;
+
   try {
     if (coverImage instanceof File && coverImage.size > 0) {
       const storedUpload = await localStorageAdapter.saveCoverImage(
@@ -118,7 +132,7 @@ export async function saveStoryAction(
       occupationStatus: parsed.data.occupationStatus,
     });
 
-    const story = await upsertStoryRecord({
+    story = await upsertStoryRecord({
       storyId: parsed.data.storyId,
       cityId: city.id,
       title: parsed.data.title,
@@ -126,16 +140,6 @@ export async function saveStoryAction(
       coverImageUrl,
       publicationStatus: parsed.data.publicationStatus,
     });
-
-    const adminBasePath = withBasePath(getAdminRoute());
-    const adminStoriesPath = withBasePath(getAdminStoriesRoute());
-
-    revalidatePath(withBasePath("/"));
-    revalidatePath(adminBasePath);
-    revalidatePath(adminStoriesPath);
-    revalidatePath(withBasePath(`/stories/${story.slug}`));
-
-    redirect(`${getAdminStoriesRoute()}?saved=1`);
   } catch (error) {
     if (error instanceof Error) {
       return { error: error.message };
@@ -143,4 +147,35 @@ export async function saveStoryAction(
 
     return { error: "Не вдалося зберегти історію." };
   }
+
+  const adminBasePath = withBasePath(getAdminRoute());
+  const adminStoriesPath = withBasePath(getAdminStoriesRoute());
+
+  revalidatePath(withBasePath("/"));
+  revalidatePath(adminBasePath);
+  revalidatePath(adminStoriesPath);
+  revalidatePath(withBasePath(`/stories/${story.slug}`));
+
+  redirect(withBasePath(`${getAdminStoriesRoute()}?saved=1`));
+}
+
+export async function deleteStoryAction(formData: FormData) {
+  await requireAdminSession();
+
+  const parsed = deleteStorySchema.safeParse({
+    storyId: String(formData.get("storyId") ?? ""),
+  });
+
+  if (!parsed.success) {
+    redirect(withBasePath(`${getAdminStoriesRoute()}?deleted=0`));
+  }
+
+  const deletedStory = await deleteStoryRecord(parsed.data.storyId);
+
+  revalidatePath(withBasePath("/"));
+  revalidatePath(withBasePath(getAdminRoute()));
+  revalidatePath(withBasePath(getAdminStoriesRoute()));
+  revalidatePath(withBasePath(`/stories/${deletedStory.slug}`));
+
+  redirect(withBasePath(`${getAdminStoriesRoute()}?deleted=1`));
 }

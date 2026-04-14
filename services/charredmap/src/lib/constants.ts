@@ -11,7 +11,7 @@ export const ukraineBounds = [
 ] as const;
 
 export const occupationStatuses = ["occupied", "deoccupied"] as const;
-export const publicationStatuses = ["draft", "published"] as const;
+export const publicationStatuses = ["draft", "submitted", "published"] as const;
 
 export type OccupationStatus = (typeof occupationStatuses)[number];
 export type PublicationStatus = (typeof publicationStatuses)[number];
@@ -41,5 +41,6 @@ export const occupationMeta: Record<
 
 export const publicationMeta: Record<PublicationStatus, string> = {
   draft: "Чернетка",
+  submitted: "На модерації",
   published: "Опубліковано",
 };

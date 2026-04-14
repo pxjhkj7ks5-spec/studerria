@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { MapStoryExperience } from "@/components/map/map-story-experience";
 import { siteDescription } from "@/lib/constants";
 import { getPublishedStories } from "@/lib/data";
@@ -53,6 +54,16 @@ export default async function Home() {
           <h2 className="font-display max-w-3xl text-4xl leading-[0.94] text-white md:text-5xl xl:text-6xl">
             Один екран тримає всю драматургію: мапа, індекс матеріалів і історія у фокусі.
           </h2>
+          <p className="max-w-xl text-sm leading-7 text-white/70">
+            Публічна поверхня лишається стриманою, але вже має окремий канал для нових подань від
+            читачів без прямого доступу в редакторський шар.
+          </p>
+          <Link
+            href="/submit"
+            className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-sm text-white transition hover:border-[--accent-orange]/40 hover:bg-[rgba(255,132,56,0.08)]"
+          >
+            Надіслати історію на модерацію
+          </Link>
         </div>
         <div className="grid gap-8 md:grid-cols-3">
           <div className="border-t border-white/10 pt-4">
@@ -75,10 +86,10 @@ export default async function Home() {
 
           <div className="border-t border-white/10 pt-4">
             <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">03</p>
-            <h3 className="mt-4 font-display text-2xl text-white">Окремий редактор</h3>
+            <h3 className="mt-4 font-display text-2xl text-white">Публічне подання</h3>
             <p className="mt-3 text-sm leading-7 text-[#d0d3da]">
-              Адмінка ізольована окремим префіксом. Публічний шар залишається камерним і чистим,
-              без будь-якого адміністративного шуму на поверхні сайту.
+              Будь-хто може надіслати матеріал через окрему форму, але він потрапляє в чергу
+              модерації. Публічний шар лишається чистим і не змішується з адмінською логікою.
             </p>
           </div>
         </div>

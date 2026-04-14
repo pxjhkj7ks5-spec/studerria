@@ -32,6 +32,8 @@ const schemaStatements = [
     "title" TEXT NOT NULL,
     "body" TEXT NOT NULL,
     "coverImageUrl" TEXT,
+    "submitterName" TEXT,
+    "submitterContact" TEXT,
     "publicationStatus" TEXT NOT NULL DEFAULT 'draft',
     "publishedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -39,6 +41,17 @@ const schemaStatements = [
     FOREIGN KEY ("cityId") REFERENCES "City"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Story_slug_key" ON "Story"("slug")`,
+] as const;
+
+const storyAlterStatements = [
+  {
+    column: "submitterName",
+    statement: `ALTER TABLE "Story" ADD COLUMN "submitterName" TEXT`,
+  },
+  {
+    column: "submitterContact",
+    statement: `ALTER TABLE "Story" ADD COLUMN "submitterContact" TEXT`,
+  },
 ] as const;
 
 let databaseReadyPromise: Promise<void> | null = null;
@@ -51,6 +64,19 @@ export async function ensureCharredmapDatabase() {
   databaseReadyPromise = (async () => {
     for (const statement of schemaStatements) {
       await prisma.$executeRawUnsafe(statement);
+    }
+
+    const storyColumns = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+      `PRAGMA table_info("Story")`,
+    );
+    const storyColumnNames = new Set(storyColumns.map((column) => column.name));
+
+    for (const column of storyAlterStatements) {
+      if (storyColumnNames.has(column.column)) {
+        continue;
+      }
+
+      await prisma.$executeRawUnsafe(column.statement);
     }
   })().catch((error) => {
     databaseReadyPromise = null;

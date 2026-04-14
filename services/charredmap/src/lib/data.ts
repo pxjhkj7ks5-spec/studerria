@@ -31,6 +31,11 @@ export type SerializedStory = {
   };
 };
 
+export type AdminStory = SerializedStory & {
+  submitterName: string | null;
+  submitterContact: string | null;
+};
+
 function serializeStory(story: StoryWithCity): SerializedStory {
   return {
     id: story.id,
@@ -52,6 +57,14 @@ function serializeStory(story: StoryWithCity): SerializedStory {
       lng: story.city.lng,
       occupationStatus: story.city.occupationStatus,
     },
+  };
+}
+
+function serializeAdminStory(story: StoryWithCity): AdminStory {
+  return {
+    ...serializeStory(story),
+    submitterName: story.submitterName,
+    submitterContact: story.submitterContact,
   };
 }
 
@@ -110,7 +123,7 @@ export async function getAdminStories() {
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     });
 
-    return stories.map((story) => serializeStory(story));
+    return stories.map((story) => serializeAdminStory(story));
   } catch (error) {
     if (isDatabaseNotReady(error)) {
       return [];
@@ -129,7 +142,7 @@ export async function getAdminStoryById(id: string) {
       include: { city: true },
     });
 
-    return story ? serializeStory(story) : null;
+    return story ? serializeAdminStory(story) : null;
   } catch (error) {
     if (isDatabaseNotReady(error)) {
       return null;
@@ -274,6 +287,36 @@ export async function upsertCityRecord(input: {
   });
 }
 
+export async function resolveSubmissionCityRecord(input: {
+  cityId?: string;
+  cityName: string;
+  oblast: string;
+  lat: number;
+  lng: number;
+  occupationStatus: "occupied" | "deoccupied";
+}) {
+  await ensureCharredmapDatabase();
+
+  if (input.cityId) {
+    return prisma.city.findUniqueOrThrow({
+      where: { id: input.cityId },
+    });
+  }
+
+  const existingCity = await prisma.city.findFirst({
+    where: {
+      name: input.cityName,
+      oblast: input.oblast,
+    },
+  });
+
+  if (existingCity) {
+    return existingCity;
+  }
+
+  return upsertCityRecord(input);
+}
+
 export async function upsertStoryRecord(input: {
   storyId?: string;
   cityId: string;
@@ -281,6 +324,8 @@ export async function upsertStoryRecord(input: {
   body: string;
   coverImageUrl?: string | null;
   publicationStatus: PublicationStatus;
+  submitterName?: string | null;
+  submitterContact?: string | null;
 }) {
   await ensureCharredmapDatabase();
 
@@ -291,6 +336,8 @@ export async function upsertStoryRecord(input: {
         slug: true,
         publishedAt: true,
         coverImageUrl: true,
+        submitterName: true,
+        submitterContact: true,
       },
     });
 
@@ -302,6 +349,8 @@ export async function upsertStoryRecord(input: {
         cityId: input.cityId,
         coverImageUrl: input.coverImageUrl ?? existing.coverImageUrl,
         publicationStatus: input.publicationStatus,
+        submitterName: input.submitterName ?? existing.submitterName,
+        submitterContact: input.submitterContact ?? existing.submitterContact,
         publishedAt:
           input.publicationStatus === "published"
             ? existing.publishedAt ?? new Date()
@@ -321,8 +370,30 @@ export async function upsertStoryRecord(input: {
       cityId: input.cityId,
       coverImageUrl: input.coverImageUrl ?? null,
       publicationStatus: input.publicationStatus,
+      submitterName: input.submitterName ?? null,
+      submitterContact: input.submitterContact ?? null,
       publishedAt: input.publicationStatus === "published" ? new Date() : null,
     },
     include: { city: true },
   });
+}
+
+export async function deleteStoryRecord(storyId: string) {
+  await ensureCharredmapDatabase();
+
+  const existing = await prisma.story.findUniqueOrThrow({
+    where: { id: storyId },
+    select: {
+      id: true,
+      slug: true,
+      coverImageUrl: true,
+      publicationStatus: true,
+    },
+  });
+
+  await prisma.story.delete({
+    where: { id: storyId },
+  });
+
+  return existing;
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChangelogButton } from "@/components/site/changelog-button";
 import { getChangelog, getVersionInfo } from "@/lib/site-content";
 
@@ -19,12 +20,18 @@ export async function SiteFooter() {
             <span className="text-white/70">v{versionInfo.version}</span>
           </div>
           <p className="max-w-2xl leading-6">
-            Публічний шар лишається камерним: одна мапа, один індекс матеріалів і changelog у
-            футері без зайвого службового шуму.
+            Публічний шар лишається камерним: одна мапа, один індекс матеріалів, окрема форма
+            публічного подання і changelog у футері без службового шуму.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/submit"
+            className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white transition hover:border-[--accent-orange]/40 hover:bg-[rgba(255,132,56,0.08)]"
+          >
+            Надіслати історію
+          </Link>
           <ChangelogButton
             version={changelog.version}
             generatedAt={changelog.generatedAt}
