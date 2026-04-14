@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.21",
+      "date": "2026-04-14",
+      "items": [
+        "fix(admin-support-panel-leak): remove the stray wrapper close after `admin-messages` so the support thread UI stays inside its own `admin-support` panel instead of leaking below Overview and Import/Export",
+        "chore(admin-generators-tab-removal): drop the redundant `Генератори` tab from the admin sidebar and remove its placeholder panel while keeping the direct generator routes available from the overview actions"
+      ]
+    },
+    {
       "version": "1.6.20",
       "date": "2026-04-14",
       "items": [

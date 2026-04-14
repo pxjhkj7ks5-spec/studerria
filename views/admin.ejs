@@ -1049,9 +1049,6 @@
             <% if (sectionAllowed('admin-import-export')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
             <% } %>
-            <% if (sectionAllowed('admin-schedule-generator')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-schedule-generator">Генератори</button>
-            <% } %>
           </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Academics</div>
@@ -2207,27 +2204,6 @@
           </div>
         </div>
         <% } %>
-
-        <% if (sectionAllowed('admin-schedule-generator')) { %>
-        <div id="admin-schedule-generator" class="admin-panel" data-admin-title="Schedule / Generators">
-          <div class="card mb-4">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                <div>
-                  <h5 class="card-title mb-1">Генератори</h5>
-                  <div class="small text-muted">Генератор розкладу + генератор сесій (превʼю/планування).</div>
-                </div>
-                <div class="d-flex gap-2 flex-wrap">
-                  <a class="btn btn-outline-primary btn-sm" href="<%= buildScopedHref('/admin/schedule-generator') %>">Генератор розкладу</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/session-generator') %>">Генератор сесій</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/export/schedule.csv') %>">Export current schedule CSV</a>
-                </div>
-              </div>
-              <div class="small text-muted">Перед Publish рекомендуємо зберегти поточний CSV як backup.</div>
-            </div>
-          </div>
-	        </div>
-	        <% } %>
 
 	        <% if (sectionAllowed('admin-homework')) { %>
 	        <div id="admin-homework" class="admin-panel" data-admin-title="Academics / Homework">
@@ -3846,7 +3822,6 @@
           </div>
 
         </div>
-      </div>
       <% } %>
 
         <% if (sectionAllowed('admin-support') && supportSectionVisible) { %>
