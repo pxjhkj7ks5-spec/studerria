@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.24",
+      "date": "2026-04-14",
+      "items": [
+        "fix(charredmap-moderation-flow): stop double-prefixing the `charredmap` base path in server-action redirects after public submit / admin save / admin delete so the success flow no longer falls into a 404, and make the admin shell plus submitted-story editor clearly lead into the moderation queue instead of visually prioritizing the empty manual editor"
+      ]
+    },
+    {
       "version": "1.6.23",
       "date": "2026-04-14",
       "items": [
