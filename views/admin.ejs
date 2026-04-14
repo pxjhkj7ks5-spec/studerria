@@ -1046,6 +1046,9 @@
             <% if (sectionAllowed('admin-homework')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
             <% } %>
+            <% if (sectionAllowed('admin-teamwork')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-teamwork">Teamwork</button>
+            <% } %>
           </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">People</div>
@@ -1087,12 +1090,6 @@
             <% } %>
             <% if (sectionAllowed('admin-role-access')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-role-studio">Role Studio</button>
-            <% } %>
-          </div>
-          <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">Teamwork</div>
-            <% if (sectionAllowed('admin-teamwork')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-teamwork">Teamwork</button>
             <% } %>
           </div>
         </div>

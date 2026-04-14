@@ -364,7 +364,7 @@ body.theme-dark .select-locked {
   position: sticky;
   top: 88px;
   align-self: flex-start;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 96px);
   border-radius: var(--r-lg);
   padding: 18px 16px;
   backdrop-filter: blur(18px);

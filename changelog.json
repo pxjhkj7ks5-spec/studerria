@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.29",
+      "date": "2026-04-14",
+      "items": [
+        "refactor(admin-sidebar-teamwork): move `Teamwork` into the `Academics` group and make the sticky admin sidebar taller so more navigation items stay visible before scrolling"
+      ]
+    },
+    {
       "version": "1.6.28",
       "date": "2026-04-14",
       "items": [
