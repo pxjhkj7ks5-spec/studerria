@@ -293,7 +293,9 @@ export function PublicStoryForm({ cities }: PublicStoryFormProps) {
           ) : null}
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <SubmitButton pendingLabel="Надсилання...">Надіслати на модерацію</SubmitButton>
+            <SubmitButton variant="accent" pendingLabel="Надсилання...">
+              Надіслати на модерацію
+            </SubmitButton>
             <Link
               href="/"
               className="rounded-full border border-white/10 px-5 py-3 text-sm text-[--muted] transition hover:border-white/30 hover:text-white"
