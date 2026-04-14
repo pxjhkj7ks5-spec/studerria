@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.22",
+      "date": "2026-04-14",
+      "items": [
+        "feat(charredmap-public-submissions): add a public `/charredmap/submit` flow so anyone can send a city-linked story with contact details and city autocomplete, while keeping the public side safe by accepting text-only submissions that land in moderation instead of publishing directly",
+        "feat(charredmap-moderation-desk): extend the admin story workspace with a dedicated moderation queue for submitted stories, visible submitter details, a tri-state publication status (`draft` / `submitted` / `published`), and a destructive delete action for removing stories from both the admin list and the public map"
+      ]
+    },
+    {
       "version": "1.6.21",
       "date": "2026-04-14",
       "items": [
