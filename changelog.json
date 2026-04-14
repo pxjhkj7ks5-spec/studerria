@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.32",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(academic-setup-sidebar): remove the redundant `Status` chip cluster and `Source: academic_v2_*` note from the Academic Setup v2 sidebar so the workspace nav stays cleaner and more focused on actual actions"
+      ]
+    },
+    {
       "version": "1.6.31",
       "date": "2026-04-15",
       "items": [

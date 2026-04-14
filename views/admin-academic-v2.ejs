@@ -663,19 +663,6 @@
               <button type="button" class="academic-v2-mode-button" data-mode-button="structure">Structure</button>
               <button type="button" class="academic-v2-mode-button" data-mode-button="diagnostics">Diagnostics</button>
             </div>
-            <div class="academic-v2-sidebar-group">
-              <div class="academic-v2-sidebar-group-title">Status</div>
-              <div class="academic-v2-sidebar-chip-stack">
-                <span class="academic-v2-chip <%= selectedGroup ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= selectedGroup ? 'Scope ready' : 'Need course' %></span>
-                <span class="academic-v2-chip"><%= subjectCards.length %> subj</span>
-                <span class="academic-v2-chip"><%= termCards.length %> terms</span>
-                <span class="academic-v2-chip <%= workspaceReadiness.scheduleConflictCount ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= workspaceReadiness.scheduleConflictCount %> warnings</span>
-              </div>
-            </div>
-            <div class="academic-v2-sidebar-note" title="Запис іде тільки в academic_v2_* таблиці. Legacy-таблиці — лише проєкція для суміснісності.">
-              <span aria-hidden="true">ℹ</span>
-              <span>Source: <span class="academic-v2-code">academic_v2_*</span></span>
-            </div>
             <div class="academic-v2-sidebar-group academic-v2-sidebar-group--utility">
               <nav class="academic-v2-sidebar-nav">
                 <a class="academic-v2-nav-link" href="/admin"><span>Admin</span><span class="academic-v2-code">←</span></a>
