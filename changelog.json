@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.30",
+      "date": "2026-04-15",
+      "items": [
+        "fix(security-analytics-visit-resolution): resolve visit user/role from the persisted session when the raw visit row was captured before login, so recent visits and role breakdowns no longer collapse into `Guest` for authenticated sessions",
+        "fix(security-analytics-data-quality-fallback): return a partial compatibility payload instead of `Unavailable` when a runtime error interrupts diagnostics, and harden legacy boolean/text timestamp SQL in related security queries"
+      ]
+    },
+    {
       "version": "1.6.29",
       "date": "2026-04-14",
       "items": [

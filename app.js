@@ -11610,7 +11610,7 @@ const maybeCleanupVisitEvents = async () => {
         UPDATE users
         SET last_login_ip = NULL
         WHERE last_login_ip IS NOT NULL
-          AND last_login_at < NOW() - (?::int * INTERVAL '1 day')
+          AND NULLIF(TRIM(CAST(last_login_at AS TEXT)), '')::timestamptz < NOW() - (?::int * INTERVAL '1 day')
       `,
       [securityIpRetentionDays]
     );
@@ -11700,7 +11700,7 @@ const maybeCleanupVisitEvents = async () => {
         UPDATE users
         SET last_user_agent = NULL
         WHERE last_user_agent IS NOT NULL
-          AND last_login_at < NOW() - (?::int * INTERVAL '1 day')
+          AND NULLIF(TRIM(CAST(last_login_at AS TEXT)), '')::timestamptz < NOW() - (?::int * INTERVAL '1 day')
       `,
       [securityDeviceRetentionDays]
     );
@@ -12909,15 +12909,15 @@ function buildAdminScopedUserFilters(adminAcademicScope = {}, options = {}) {
       `
         LOWER(
           COALESCE(
-            NULLIF(TRIM(v2_program.track_key), ''),
-            NULLIF(TRIM(p.track_key), ''),
-            NULLIF(TRIM(u.study_track), ''),
-            CASE
-              WHEN COALESCE(group_course_meta.is_teacher_course, course_meta.is_teacher_course, 0) = 1 THEN 'teacher'
-              ELSE 'bachelor'
-            END
-          )
-        ) = ?
+                NULLIF(TRIM(v2_program.track_key), ''),
+                NULLIF(TRIM(p.track_key), ''),
+                NULLIF(TRIM(u.study_track), ''),
+                CASE
+                  WHEN LOWER(TRIM(COALESCE(CAST(group_course_meta.is_teacher_course AS TEXT), CAST(course_meta.is_teacher_course AS TEXT), ''))) IN ('1', 'true', 't', 'yes', 'on') THEN 'teacher'
+                  ELSE 'bachelor'
+                END
+              )
+            ) = ?
       `
     );
     userParams.push(String(scopeState.track || 'bachelor'));
@@ -21825,6 +21825,39 @@ const finalizeDataQualityDiagnosticsResult = (result, items = []) => {
     severity_checks: severityChecks,
   };
   return result;
+};
+
+const buildDataQualityPartialFallbackResult = ({
+  courseId = null,
+  semesterId = null,
+  err = null,
+  title = 'Data quality у режимі сумісності',
+  description = 'Повний набір перевірок тимчасово недоступний, показано деградований результат.',
+} = {}) => {
+  const normalizedCourseId = Number(courseId || 0);
+  const normalizedSemesterId = Number(semesterId || 0);
+  const examples = Array.from(new Set(
+    [
+      'Частина перевірок недоступна для поточного стану сервісу.',
+      String(err && err.message ? err.message : err || '').trim().slice(0, 180),
+    ].filter(Boolean)
+  ));
+  return finalizeDataQualityDiagnosticsResult({
+    generated_at: new Date().toISOString(),
+    course_id: Number.isInteger(normalizedCourseId) && normalizedCourseId > 0 ? normalizedCourseId : null,
+    semester_id: Number.isInteger(normalizedSemesterId) && normalizedSemesterId > 0 ? normalizedSemesterId : null,
+    available: true,
+    partial: true,
+    summary: buildEmptyDataQualitySummary(),
+    items: [],
+  }, [
+    buildDataQualityCompatibilityCheck({
+      key: 'runtime_partial_fallback',
+      title,
+      description,
+      examples,
+    }),
+  ]);
 };
 
 async function buildAdminDataQualityDiagnostics({
@@ -40021,7 +40054,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                   NULLIF(TRIM(p.track_key), ''),
                   NULLIF(TRIM(u.study_track), ''),
                   CASE
-                    WHEN COALESCE(group_course_meta.is_teacher_course, course_meta.is_teacher_course, 0) = 1 THEN 'teacher'
+                    WHEN LOWER(TRIM(COALESCE(CAST(group_course_meta.is_teacher_course AS TEXT), CAST(course_meta.is_teacher_course AS TEXT), ''))) IN ('1', 'true', 't', 'yes', 'on') THEN 'teacher'
                     ELSE 'bachelor'
                   END
                 )
@@ -40494,7 +40527,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
             LOWER(
               COALESCE(
                 NULLIF(TRIM(u.study_track), ''),
-                CASE WHEN COALESCE(course_meta.is_teacher_course, 0) = 1 THEN 'teacher' ELSE 'bachelor' END
+                CASE WHEN ${buildTruthyTextCondition('course_meta.is_teacher_course')} THEN 'teacher' ELSE 'bachelor' END
               )
             )
           ) AS track_key,
@@ -52162,9 +52195,13 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     const userId = Number(req?.session?.user?.id || 0);
     const roleKeys = getSessionRoleList(req);
     const activeSemester = await getActiveSemester(courseId);
-    const uniqueExpr = "COALESCE(v.user_id::text, NULLIF(v.session_id, ''), NULLIF(v.ip, ''), 'guest')";
+    const visitSessionJoinSql = `LEFT JOIN ${sessionTableName} visit_session_store ON visit_session_store.sid = v.session_id`;
+    const visitSessionUserIdExpr = "CASE WHEN (visit_session_store.sess::jsonb -> 'user' ->> 'id') ~ '^[0-9]+$' THEN (visit_session_store.sess::jsonb -> 'user' ->> 'id')::int ELSE NULL END";
+    const resolvedVisitUserIdExpr = `COALESCE(v.user_id, ${visitSessionUserIdExpr})`;
+    const resolvedVisitRoleExpr = `COALESCE(NULLIF(v.role_key, ''), NULLIF(visit_session_store.sess::jsonb ->> 'role', ''), 'guest')`;
+    const uniqueExpr = `COALESCE((${resolvedVisitUserIdExpr})::text, NULLIF(v.session_id, ''), NULLIF(v.ip, ''), 'guest')`;
     const excludeAdminClause = excludeAdmin
-      ? "AND COALESCE(NULLIF(v.role_key, ''), 'guest') <> 'admin'"
+      ? `AND ${resolvedVisitRoleExpr} <> 'admin'`
       : '';
     const scopedVisitWhereSql = isSystemScope
       ? 'v.created_at >= ?'
@@ -52176,12 +52213,13 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     const recentSqlBase = `
       SELECT
         v.created_at,
-        COALESCE(NULLIF(u.full_name, ''), 'Guest') AS user_name,
-        COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
+        COALESCE(NULLIF(visit_user.full_name, ''), 'Guest') AS user_name,
+        ${resolvedVisitRoleExpr} AS role_key,
         v.page_key,
         v.route_path
       FROM site_visit_events v
-      LEFT JOIN users u ON u.id = v.user_id
+      ${visitSessionJoinSql}
+      LEFT JOIN users visit_user ON visit_user.id = ${resolvedVisitUserIdExpr}
       WHERE v.created_at >= ?
         ${isSystemScope ? '' : 'AND (v.course_id = ? OR v.course_id IS NULL)'}
     `;
@@ -52203,9 +52241,10 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
           SELECT
             COUNT(*)::int AS total_visits,
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors,
-            COUNT(DISTINCT v.user_id)::int AS signed_users,
+            COUNT(DISTINCT ${resolvedVisitUserIdExpr})::int AS signed_users,
             COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
           FROM site_visit_events v
+          ${visitSessionJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
         `,
@@ -52218,6 +52257,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(*)::int AS visits,
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
           FROM site_visit_events v
+          ${visitSessionJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
@@ -52232,6 +52272,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(*)::int AS visits,
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
           FROM site_visit_events v
+          ${visitSessionJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY v.page_key
@@ -52243,12 +52284,13 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       db.all(
         `
           SELECT
-            COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
+            ${resolvedVisitRoleExpr} AS role_key,
             COUNT(*)::int AS visits
           FROM site_visit_events v
+          ${visitSessionJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
-          GROUP BY COALESCE(NULLIF(v.role_key, ''), 'guest')
+          GROUP BY ${resolvedVisitRoleExpr}
           ORDER BY visits DESC, role_key ASC
         `,
         scopedVisitParams
@@ -52326,9 +52368,10 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             SELECT
               COUNT(*)::int AS total_visits,
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors,
-              COUNT(DISTINCT v.user_id)::int AS signed_users,
+              COUNT(DISTINCT ${resolvedVisitUserIdExpr})::int AS signed_users,
               COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
             FROM site_visit_events v
+            ${visitSessionJoinSql}
             WHERE ${scopedVisitWhereSql}
           `,
           scopedVisitParams
@@ -52340,6 +52383,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(*)::int AS visits,
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
             FROM site_visit_events v
+            ${visitSessionJoinSql}
             WHERE ${scopedVisitWhereSql}
             GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
             ORDER BY day ASC
@@ -52353,6 +52397,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(*)::int AS visits,
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
             FROM site_visit_events v
+            ${visitSessionJoinSql}
             WHERE ${scopedVisitWhereSql}
             GROUP BY v.page_key
             ORDER BY visits DESC, v.page_key ASC
@@ -52363,11 +52408,12 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
         db.all(
           `
             SELECT
-              COALESCE(NULLIF(v.role_key, ''), 'guest') AS role_key,
+              ${resolvedVisitRoleExpr} AS role_key,
               COUNT(*)::int AS visits
             FROM site_visit_events v
+            ${visitSessionJoinSql}
             WHERE ${scopedVisitWhereSql}
-            GROUP BY COALESCE(NULLIF(v.role_key, ''), 'guest')
+            GROUP BY ${resolvedVisitRoleExpr}
             ORDER BY visits DESC, role_key ASC
           `,
           scopedVisitParams
@@ -52440,6 +52486,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
 });
 
 app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  const courseId = getAdminCourse(req);
   const unavailablePayload = {
     ok: true,
     generated_at: new Date().toISOString(),
@@ -52453,9 +52500,8 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
   } catch (err) {
     return res.json(unavailablePayload);
   }
+  let activeSemester = null;
   try {
-    const courseId = getAdminCourse(req);
-    let activeSemester = null;
     try {
       activeSemester = await getActiveSemester(courseId);
     } catch (err) {
@@ -52476,7 +52522,14 @@ app.get('/admin/data-quality.json', requireVisitAnalyticsSectionAccess, async (r
     if (!isDbSchemaCompatibilityError(err)) {
       console.error('Database error (admin.dataQuality)', err);
     }
-    return res.json(unavailablePayload);
+    return res.json({
+      ok: true,
+      ...buildDataQualityPartialFallbackResult({
+        courseId,
+        semesterId: activeSemester ? Number(activeSemester.id) : null,
+        err,
+      }),
+    });
   }
 });
 
@@ -53272,7 +53325,7 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
             LOWER(
               COALESCE(
                 NULLIF(TRIM(u.study_track), ''),
-                CASE WHEN COALESCE(course_meta.is_teacher_course, 0) = 1 THEN 'teacher' ELSE 'bachelor' END
+                CASE WHEN ${buildTruthyTextCondition('course_meta.is_teacher_course')} THEN 'teacher' ELSE 'bachelor' END
               )
             )
           ) AS track_key,
