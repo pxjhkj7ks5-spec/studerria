@@ -61,6 +61,23 @@ export function StoryEditorForm({
       ? cityLookupOptions.find((entry) => entry.key === selectedLookupKey) ?? null
       : null;
   const hasSubmitterInfo = Boolean(story?.submitterName || story?.submitterContact);
+  const isModerationStory =
+    story?.publicationStatus === "submitted" || hasSubmitterInfo;
+  const editorEyebrow = story
+    ? isModerationStory
+      ? "Модерація"
+      : "Редагування"
+    : "Нова історія";
+  const editorTitle = story
+    ? isModerationStory
+      ? "Перевірити публічне подання"
+      : "Оновити матеріал"
+    : "Додати матеріал на мапу";
+  const editorDescription = story
+    ? isModerationStory
+      ? "Тут редактор бачить автора, контакт, текст і місто, а далі вирішує: лишити в черзі, перевести в чернетку або публікувати."
+      : "Тут редактор коригує місто, текст, статус і вирішує, що піде в публічний шар."
+    : "Окремий ручний редактор для внутрішніх матеріалів без прив’язки до публічної черги.";
 
   const clearLinkedCity = () => {
     setSelectedCityId("");
@@ -99,15 +116,13 @@ export function StoryEditorForm({
         <div className="flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.28em] text-[--accent-orange]">
-              {story ? "Редагування" : "Нова історія"}
+              {editorEyebrow}
             </p>
             <h1 className="font-display text-3xl text-white md:text-4xl">
-              {story ? "Оновити матеріал" : "Додати матеріал на мапу"}
+              {editorTitle}
             </h1>
             <p className="max-w-2xl text-sm leading-6 text-white/72">
-              {story?.publicationStatus === "submitted"
-                ? "Матеріал зайшов із публічної форми й зараз стоїть у модераційній черзі."
-                : "Тут редактор коригує місто, текст, статус і вирішує, що піде в публічний шар."}
+              {editorDescription}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -65,7 +65,7 @@ export async function submitStoryAction(
   }
 
   if (parsed.data.website?.trim()) {
-    redirect(withBasePath("/submit?submitted=1"));
+    redirect("/submit?submitted=1");
   }
 
   if (parsed.data.cityMode === "existing" && !parsed.data.cityId) {
@@ -102,5 +102,5 @@ export async function submitStoryAction(
 
   revalidatePath(withBasePath(getAdminRoute()));
   revalidatePath(withBasePath(getAdminStoriesRoute()));
-  redirect(withBasePath("/submit?submitted=1"));
+  redirect("/submit?submitted=1");
 }

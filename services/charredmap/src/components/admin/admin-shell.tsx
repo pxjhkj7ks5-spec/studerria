@@ -29,13 +29,13 @@ export function AdminShell({ adminPath, children }: AdminShellProps) {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href={`/${adminPath}/stories`}
-              className="rounded-full border border-white/12 px-4 py-2 text-sm text-white transition hover:border-white/30"
+              className="rounded-full bg-[--paper] px-4 py-2 text-sm font-semibold text-black transition hover:bg-white"
             >
-              Усі історії
+              Черга модерації
             </Link>
             <Link
               href={`/${adminPath}/stories/new`}
-              className="rounded-full bg-[--paper] px-4 py-2 text-sm font-semibold text-black transition hover:bg-white"
+              className="rounded-full border border-white/12 px-4 py-2 text-sm text-white transition hover:border-white/30"
             >
               Нова історія
             </Link>

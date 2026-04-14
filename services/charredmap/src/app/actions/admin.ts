@@ -69,12 +69,12 @@ export async function loginAction(
   }
 
   await createAdminSession();
-  redirect(withBasePath(getAdminStoriesRoute()));
+  redirect(getAdminStoriesRoute());
 }
 
 export async function logoutAction() {
   await clearAdminSession();
-  redirect(withBasePath(getAdminRoute()));
+  redirect(getAdminRoute());
 }
 
 export async function saveStoryAction(
@@ -156,7 +156,7 @@ export async function saveStoryAction(
   revalidatePath(adminStoriesPath);
   revalidatePath(withBasePath(`/stories/${story.slug}`));
 
-  redirect(withBasePath(`${getAdminStoriesRoute()}?saved=1`));
+  redirect(`${getAdminStoriesRoute()}?saved=1`);
 }
 
 export async function deleteStoryAction(formData: FormData) {
@@ -167,7 +167,7 @@ export async function deleteStoryAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(withBasePath(`${getAdminStoriesRoute()}?deleted=0`));
+    redirect(`${getAdminStoriesRoute()}?deleted=0`);
   }
 
   const deletedStory = await deleteStoryRecord(parsed.data.storyId);
@@ -177,5 +177,5 @@ export async function deleteStoryAction(formData: FormData) {
   revalidatePath(withBasePath(getAdminStoriesRoute()));
   revalidatePath(withBasePath(`/stories/${deletedStory.slug}`));
 
-  redirect(withBasePath(`${getAdminStoriesRoute()}?deleted=1`));
+  redirect(`${getAdminStoriesRoute()}?deleted=1`);
 }
