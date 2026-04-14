@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.19",
+      "date": "2026-04-14",
+      "items": [
+        "fix(admin-tabs): remove the duplicate admin tab controller that was fighting with the newer fallback controller and forcing `Import/Export` plus `Generators` back to Overview instead of opening their own panels"
+      ]
+    },
+    {
       "version": "1.6.18",
       "date": "2026-04-13",
       "items": [
