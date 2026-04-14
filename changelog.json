@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.28",
+      "date": "2026-04-14",
+      "items": [
+        "refactor(admin-sidebar-order): reorder the admin sidebar around current day-to-day workflows by moving Academic Setup, Import/Export, people tools, and communications higher while pushing system utilities lower without changing any panel ids or routes"
+      ]
+    },
+    {
       "version": "1.6.27",
       "date": "2026-04-14",
       "items": [

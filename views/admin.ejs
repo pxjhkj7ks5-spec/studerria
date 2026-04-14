@@ -1036,24 +1036,12 @@
             <% } %>
           </div>
           <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">System</div>
-            <% if (sectionAllowed('admin-settings')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-settings">System Settings</button>
-            <% } %>
-            <% if (sectionAllowed('admin-role-access')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-role-studio">Role Studio</button>
-            <% } %>
-          </div>
-          <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">Schedule</div>
-            <% if (sectionAllowed('admin-import-export')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
-            <% } %>
-          </div>
-          <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Academics</div>
             <% if (canManagePathways) { %>
               <a class="admin-nav-link" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Academic Setup</a>
+            <% } %>
+            <% if (sectionAllowed('admin-import-export')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
             <% } %>
             <% if (sectionAllowed('admin-homework')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
@@ -1064,11 +1052,20 @@
             <% if (sectionAllowed('admin-students')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-students">Students</button>
             <% } %>
+            <% if (sectionAllowed('admin-teachers')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-teachers">Teacher Requests</button>
+            <% } %>
             <% if (sectionAllowed('admin-users')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-users">Users</button>
             <% } %>
-            <% if (sectionAllowed('admin-teachers')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-teachers">Teacher Requests</button>
+          </div>
+          <div class="admin-sidebar-section">
+            <div class="admin-sidebar-title">Communications</div>
+            <% if (sectionAllowed('admin-support') && supportSectionVisible) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-support"><%= t('admin.supportSectionNav') %></button>
+            <% } %>
+            <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-messages">Messages</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
@@ -1084,12 +1081,12 @@
             <% } %>
           </div>
           <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">Communications</div>
-            <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-messages">Messages</button>
+            <div class="admin-sidebar-title">System</div>
+            <% if (sectionAllowed('admin-settings')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-settings">System Settings</button>
             <% } %>
-            <% if (sectionAllowed('admin-support') && supportSectionVisible) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-support"><%= t('admin.supportSectionNav') %></button>
+            <% if (sectionAllowed('admin-role-access')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-role-studio">Role Studio</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
