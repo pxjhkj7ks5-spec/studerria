@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.27",
+      "date": "2026-04-14",
+      "items": [
+        "fix(charredmap-submit-draft-types): finish the stored-draft type guard for the public moderation form by narrowing `occupationStatus` from the raw session payload instead of string-coercing it, so the `charredmap` production build no longer fails TypeScript during `next build`"
+      ]
+    },
+    {
       "version": "1.6.26",
       "date": "2026-04-14",
       "items": [

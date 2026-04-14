@@ -1,7 +1,13 @@
 {
-  "version": "0.1.17",
-  "generatedAt": "2026-04-14T20:00:33.294Z",
+  "version": "0.1.18",
+  "generatedAt": "2026-04-14T20:04:34.920Z",
   "entries": [
+    {
+      "hash": "aa3917a359998c2e4fc5360afaa3737c3fbe62e1",
+      "shortHash": "aa3917a",
+      "message": "fix(charredmap-submit-draft): narrow stored occupation status",
+      "date": "2026-04-14T23:04:27+03:00"
+    },
     {
       "hash": "44d3e73799fe1f8c838cdaecef9dfac5e8ad06b9",
       "shortHash": "44d3e73",
