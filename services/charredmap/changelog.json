@@ -1,7 +1,13 @@
 {
-  "version": "0.1.15",
-  "generatedAt": "2026-04-14T16:40:09.436Z",
+  "version": "0.1.16",
+  "generatedAt": "2026-04-14T19:54:48.961Z",
   "entries": [
+    {
+      "hash": "f5f8bdcd027bb574fa7902b0876be78b38bf4d57",
+      "shortHash": "f5f8bdc",
+      "message": "fix(charredmap-submit-draft): preserve public form state in session",
+      "date": "2026-04-14T22:54:35+03:00"
+    },
     {
       "hash": "25182196b34fc5231f3d3c8f97b13a021ed4d9cc",
       "shortHash": "2518219",

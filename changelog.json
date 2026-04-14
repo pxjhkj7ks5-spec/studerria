@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.25",
+      "date": "2026-04-14",
+      "items": [
+        "fix(charredmap-submit-draft): keep the public moderation form fully controlled on client errors and auto-save its text fields plus city binding into session storage, so a failed submit no longer wipes the story and the draft survives reloads until the current browser session ends"
+      ]
+    },
+    {
       "version": "1.6.24",
       "date": "2026-04-14",
       "items": [
