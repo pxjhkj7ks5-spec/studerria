@@ -1,7 +1,13 @@
 {
-  "version": "0.1.16",
-  "generatedAt": "2026-04-14T19:54:48.961Z",
+  "version": "0.1.17",
+  "generatedAt": "2026-04-14T20:00:33.294Z",
   "entries": [
+    {
+      "hash": "44d3e73799fe1f8c838cdaecef9dfac5e8ad06b9",
+      "shortHash": "44d3e73",
+      "message": "fix(charredmap-submit-draft): satisfy stored draft type narrowing",
+      "date": "2026-04-14T23:00:28+03:00"
+    },
     {
       "hash": "f5f8bdcd027bb574fa7902b0876be78b38bf4d57",
       "shortHash": "f5f8bdc",

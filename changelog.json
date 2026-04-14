@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.26",
+      "date": "2026-04-14",
+      "items": [
+        "fix(charredmap-submit-draft-types): tighten the stored-draft type narrowing for the public moderation form so the `charredmap` production build stops failing on `occupationStatus` being possibly undefined when restoring session-only autosave data"
+      ]
+    },
+    {
       "version": "1.6.25",
       "date": "2026-04-14",
       "items": [
