@@ -707,11 +707,9 @@
                   </div>
                 </div>
                 <div class="academic-v2-workspace-tabs">
-                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="overview">Огляд</button>
                   <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="subjects">Предмети</button>
                   <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="terms">Терми</button>
                   <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="schedule">Розклад</button>
-                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="teachers">Викладачі</button>
                   <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="students">Студенти</button>
                 </div>
               </div>
@@ -1933,7 +1931,7 @@
                     <h3 class="h6 mb-1">Операційний перехід у курс</h3>
                     <!-- Workspace contains subjects, terms, schedule, students -->
                     <div class="academic-v2-actions">
-                      <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="overview">Відкрити workspace</button>
+                      <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="schedule">Відкрити workspace</button>
                     </div>
                   </div>
                 </div>
@@ -1943,56 +1941,6 @@
             </div>
 
             <div class="academic-v2-mode-panel" data-mode-panel="operate">
-              <section class="academic-v2-card" id="overview" data-workspace-panel="overview">
-                <div class="academic-v2-section-head">
-                  <div>
-                    <h2 class="academic-v2-section-title">Огляд</h2>
-                    <!-- Overview: readiness snapshot -->
-                  </div>
-                  <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip <%= workspaceReadiness.hasActiveTerm ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
-                      <%= workspaceReadiness.hasActiveTerm ? 'Є активний терм' : 'Активний терм відсутній' %>
-                    </span>
-                    <span class="academic-v2-chip"><%= subjectCards.length %> предметів</span>
-                    <span class="academic-v2-chip"><%= termCards.length %> термів</span>
-                    <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів</span>
-                  </div>
-                </div>
-                <% if (selectedGroup) { %>
-                  <div class="academic-v2-grid-3 academic-v2-grid-3--overview">
-                    <div class="academic-v2-subcard">
-                      <div class="academic-v2-subcard-topline">Готовність предметів</div>
-                      <div class="academic-v2-chip-row mt-1">
-                        <span class="academic-v2-chip"><%= workspaceReadiness.subjectBoundCount %> привʼязані до термів</span>
-                        <span class="academic-v2-chip"><%= workspaceReadiness.activityReadyCount %> з активностями</span>
-                        <span class="academic-v2-chip"><%= workspaceReadiness.teacherReadyCount %> з викладачами</span>
-                        <span class="academic-v2-chip academic-v2-chip--warm"><%= workspaceReadiness.missingTeacherCount %> без викладача</span>
-                      </div>
-                    </div>
-                    <div class="academic-v2-subcard">
-                      <div class="academic-v2-subcard-topline">Розклад і терми</div>
-                      <div class="academic-v2-chip-row mt-1">
-                        <span class="academic-v2-chip <%= activeTermCount ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= activeTermCount %> активних термів</span>
-                        <span class="academic-v2-chip"><%= archivedTermCount %> архівних</span>
-                        <span class="academic-v2-chip"><%= selectedWorkspaceTermId ? (selectedTermRecord ? selectedTermRecord.title : 'Поточний терм') : 'Усі терми' %></span>
-                        <span class="academic-v2-chip <%= workspaceReadiness.scheduleConflictCount ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= workspaceReadiness.scheduleConflictCount %> попереджень у розкладі</span>
-                      </div>
-                    </div>
-                    <div class="academic-v2-subcard">
-                      <div class="academic-v2-subcard-topline">Швидкі дії</div>
-                      <div class="academic-v2-actions mt-2">
-                        <button type="button" class="btn btn-outline-secondary" data-workspace-tab-target="subjects">Предмети</button>
-                        <button type="button" class="btn btn-outline-secondary" data-workspace-tab-target="terms">Терми</button>
-                        <button type="button" class="btn btn-outline-secondary" data-workspace-tab-target="schedule">Розклад</button>
-                        <button type="button" class="btn btn-outline-secondary" data-workspace-tab-target="students">Студенти</button>
-                      </div>
-                    </div>
-                  </div>
-                <% } else { %>
-                  <div class="academic-v2-empty">Оберіть курс у блоці контексту, щоб побачити готовність і перейти до операційних панелей.</div>
-                <% } %>
-              </section>
-
             <section class="academic-v2-card" id="subjects" data-workspace-panel="subjects">
               <div class="academic-v2-section-head">
                 <div>
@@ -2676,37 +2624,6 @@
               <% } %>
             </section>
 
-            <section class="academic-v2-card" id="teachers" data-workspace-panel="teachers">
-              <div class="academic-v2-section-head">
-                <div>
-                  <h2 class="academic-v2-section-title">Викладачі</h2>
-                  <!-- Teacher coverage for current course -->
-                </div>
-              </div>
-              <% if (teacherCoverageCards.length) { %>
-                <div class="academic-v2-grid-2 academic-v2-grid-2--teachers">
-                  <% teacherCoverageCards.forEach((teacher) => { %>
-                    <div class="academic-v2-subcard">
-                      <div class="academic-v2-course-subject-card-head">
-                        <div>
-                          <strong><%= teacher.teacher_name %></strong>
-                          <div class="academic-v2-muted"><%= teacher.subject_titles.length %> предметів · <%= teacher.entries.length %> слотів</div>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" data-workspace-tab-target="schedule">Розклад</button>
-                      </div>
-                      <div class="academic-v2-chip-row mt-1">
-                        <% teacher.subject_titles.forEach((title) => { %>
-                          <span class="academic-v2-chip"><%= title %></span>
-                        <% }); %>
-                      </div>
-                    </div>
-                  <% }); %>
-                </div>
-              <% } else { %>
-                <div class="academic-v2-empty">У поточному курсі ще немає призначених викладачів.</div>
-              <% } %>
-            </section>
-
             <section class="academic-v2-card" id="students" data-workspace-panel="students">
               <div class="academic-v2-section-head">
                 <div>
@@ -2807,7 +2724,7 @@
         const requestedSubjectId = Number(<%- JSON.stringify(numberOrZero(requestedSubjectId)) %> || 0);
         const requestedWorkspaceTab = <%- JSON.stringify(String(requestedWorkspaceTab || '').trim()) %>;
         const requestedStructureTab = <%- JSON.stringify(String(requestedStructureTab || '').trim()) %>;
-        const normalizedRequestedWorkspaceTab = ['overview', 'subjects', 'terms', 'schedule', 'teachers', 'students'].includes(requestedWorkspaceTab)
+        const normalizedRequestedWorkspaceTab = ['subjects', 'terms', 'schedule', 'students'].includes(requestedWorkspaceTab)
           ? requestedWorkspaceTab
           : '';
         const normalizedRequestedStructureTab = <%- JSON.stringify(
@@ -2985,7 +2902,7 @@
         };
 
         let activeMode = normalizeModeName(workspaceDefaultMode);
-        let activeWorkspaceTab = 'overview';
+        let activeWorkspaceTab = 'schedule';
         let activeStructureTab = <%- JSON.stringify(Boolean(selectedGroup)) %> ? 'courses' : 'programs';
         let activeDiagnosticsTab = 'projection';
         let activeScheduleView = 'advanced';
@@ -3375,7 +3292,7 @@
               : workspaceDefaultMode,
             workspaceTab: allowedTabs.has(String(rawState.workspaceTab || '').trim())
               ? String(rawState.workspaceTab || '').trim()
-              : 'overview',
+              : 'schedule',
             structureTab: allowedStructureTabs.has(String(rawState.structureTab || '').trim())
               ? String(rawState.structureTab || '').trim()
               : activeStructureTab,
@@ -3493,7 +3410,7 @@
         }
         if (requestedSubjectId && getSubjectCardById(requestedSubjectId)) {
           activeMode = 'operate';
-          activeWorkspaceTab = normalizedRequestedWorkspaceTab || 'subjects';
+          activeWorkspaceTab = normalizedRequestedWorkspaceTab || 'schedule';
           activeSubjectId = requestedSubjectId;
         }
 
@@ -4016,7 +3933,7 @@
         };
 
         const setWorkspaceTab = (tab) => {
-          activeWorkspaceTab = tab || 'overview';
+          activeWorkspaceTab = tab || 'schedule';
           workspacePanels.forEach((panel) => {
             panel.hidden = panel.getAttribute('data-workspace-panel') !== activeWorkspaceTab;
           });

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.35",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(academic-setup-operate-ui): make `Schedule` the default Operate workspace tab and remove the standalone `Overview` and `Teachers` tabs/panels so Operate stays focused on actionable course tools: subjects, terms, schedule, and students"
+      ]
+    },
+    {
       "version": "1.6.34",
       "date": "2026-04-15",
       "items": [
