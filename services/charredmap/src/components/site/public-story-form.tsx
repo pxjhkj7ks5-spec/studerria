@@ -37,7 +37,7 @@ type PublicStoryDraft = {
   occupationStatus: OccupationStatus;
 };
 
-function isOccupationStatus(value: string): value is OccupationStatus {
+function isOccupationStatus(value: unknown): value is OccupationStatus {
   return value === "occupied" || value === "deoccupied";
 }
 
@@ -61,7 +61,7 @@ function parseStoredDraft(value: string | null): PublicStoryDraft | null {
       typeof parsed.oblast !== "string" ||
       typeof parsed.lat !== "string" ||
       typeof parsed.lng !== "string" ||
-      !isOccupationStatus(String(occupationStatus ?? ""))
+      !isOccupationStatus(occupationStatus)
     ) {
       return null;
     }
