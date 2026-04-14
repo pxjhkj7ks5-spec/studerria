@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.34",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(academic-setup-bachelor-ui): hide the standalone `Stage Templates` tab and panel for bachelor programs while keeping the stage-template backend flow intact under the bachelor catalog and structure-apply logic"
+      ]
+    },
+    {
       "version": "1.6.33",
       "date": "2026-04-15",
       "items": [

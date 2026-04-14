@@ -730,7 +730,9 @@
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="programs">Programs</button>
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="cohorts">Cohorts</button>
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="courses">Courses</button>
-                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="stage-templates">Stage Templates</button>
+                  <% if (!isBachelorProgramSelected) { %>
+                    <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="stage-templates">Stage Templates</button>
+                  <% } %>
                   <% if (isBachelorProgramSelected) { %>
                     <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="bachelor-catalog">Bachelor Catalog</button>
                   <% } %>
@@ -1181,307 +1183,309 @@
               </div>
             </section>
 
-            <section class="academic-v2-card" id="stage-templates" data-structure-panel="stage-templates">
-              <div class="academic-v2-section-head">
-                <div>
-                  <h2 class="academic-v2-section-title">Stage templates</h2>
-                  <!-- Templates: stage-level term/subject definitions, applied on promotion -->
-                </div>
-                <% if (scopedStageSubjectsWithoutActivities.length) { %>
-                  <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip academic-v2-chip--warm"><%= scopedStageSubjectsWithoutActivities.length %> stage subjects missing activity</span>
+            <% if (!isBachelorProgramSelected) { %>
+              <section class="academic-v2-card" id="stage-templates" data-structure-panel="stage-templates">
+                <div class="academic-v2-section-head">
+                  <div>
+                    <h2 class="academic-v2-section-title">Stage templates</h2>
+                    <!-- Templates: stage-level term/subject definitions, applied on promotion -->
                   </div>
-                <% } %>
-              </div>
-              <div class="academic-v2-subcard mb-4">
-                <form method="get" action="/admin/pathways" class="academic-v2-focus-grid">
-                  <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
-                  <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
-                  <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
-                  <div class="academic-v2-field">
-                    <label for="templateProgramId">Program</label>
-                    <select id="templateProgramId" class="form-select" name="program_id">
-                      <% (programs || []).forEach((program) => { %>
-                        <option value="<%= program.id %>" <%= Number(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
-                      <% }); %>
-                    </select>
-                  </div>
-                  <div class="academic-v2-field">
-                    <label for="templateStageNumber">Template stage</label>
-                    <select id="templateStageNumber" class="form-select" name="template_stage">
-                      <% stageOptions.forEach((stageNumber) => { %>
-                        <option value="<%= stageNumber %>" <%= stageNumber === activeTemplateStage ? 'selected' : '' %>>Stage <%= stageNumber %></option>
-                      <% }); %>
-                    </select>
-                  </div>
-                  <div class="academic-v2-actions">
-                    <button type="submit" class="btn btn-outline-secondary">Load stage template</button>
-                  </div>
-                </form>
-                <div class="academic-v2-chip-row mt-1">
-                  <% (templateStageCards || []).forEach((card) => { %>
-                    <span class="academic-v2-chip <%= card.is_current ? 'academic-v2-chip--ok' : '' %>">Stage <%= card.stage_number %>: <%= card.term_count %> terms, <%= card.subject_count %> subjects</span>
-                  <% }); %>
-                </div>
-              </div>
-              <div class="academic-v2-stack">
-                <details class="academic-v2-subcard academic-v2-disclosure">
-                  <summary class="academic-v2-disclosure-summary">
-                    <strong>Terms</strong>
-                    <span class="academic-v2-chip"><%= (scopedStageTermTemplates || []).length %> templates</span>
-                  </summary>
-                  <div class="academic-v2-disclosure-body">
-                    <div class="academic-v2-grid-2">
-                      <form method="post" action="/admin/pathways/v2/stage-terms/save" class="academic-v2-subcard" data-editor-form="stage-term">
-                        <%- renderFocusFields() %>
-                        <input type="hidden" name="stage_term_template_id" value="" data-editor-input="stage-term.id" />
-                        <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
-                        <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
-                        <h3 class="h6 mb-1">Stage terms</h3>
-                        <div class="academic-v2-form-grid academic-v2-form-grid--compact">
-                          <div class="academic-v2-field">
-                            <label for="stageTermNumber">Term number</label>
-                            <select id="stageTermNumber" class="form-select" name="term_number" data-editor-input="stage-term.term_number">
-                              <% termOptions.forEach((term) => { %>
-                                <option value="<%= term.value %>"><%= term.label %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="stageTermTitle">Title</label>
-                            <input id="stageTermTitle" class="form-control" type="text" name="title" data-editor-input="stage-term.title" placeholder="Term 1" required />
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="stageTermStartDate">Start date</label>
-                            <input id="stageTermStartDate" class="form-control" type="date" name="start_date" data-editor-input="stage-term.start_date" />
-                          </div>
-                          <div class="academic-v2-field">
-                            <label>Weeks</label>
-                            <div class="academic-v2-muted">Fixed presets: T1 = 15, T2 = 15, T3 = 7.</div>
-                          </div>
-                        </div>
-                        <input type="hidden" name="is_active_default" value="0" />
-                        <div class="form-check mt-3">
-                          <input id="stageTermActiveDefault" class="form-check-input" type="checkbox" name="is_active_default" value="1" data-editor-input="stage-term.is_active_default" />
-                          <label class="form-check-label" for="stageTermActiveDefault">Default active term</label>
-                        </div>
-                        <div class="academic-v2-actions mt-2">
-                          <button type="submit" class="btn btn-primary">Зберегти stage term</button>
-                          <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-term">Скинути</button>
-                        </div>
-                      </form>
-                      <div class="academic-v2-subcard">
-                        <h3 class="h6 mb-1">Поточні stage term templates</h3>
-                        <% if ((scopedStageTermTemplates || []).length) { %>
-                          <div class="academic-v2-stack">
-                            <% (scopedStageTermTemplates || []).forEach((stageTerm) => { %>
-                              <div class="academic-v2-subcard">
-                                <div class="d-flex flex-wrap justify-content-between gap-2">
-                                  <div>
-                                    <strong><%= stageTerm.title %></strong>
-                                    <div class="academic-v2-muted">Term <%= stageTerm.term_number %> - <%= stageTerm.weeks_count %> weeks<%= stageTerm.start_date ? ` - ${stageTerm.start_date}` : '' %></div>
-                                  </div>
-                                  <div class="academic-v2-actions">
-                                    <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-term" data-editor-payload='<%- toAttr(stageTerm) %>'>Edit</button>
-                                  </div>
-                                </div>
-                              </div>
-                            <% }); %>
-                          </div>
-                        <% } else { %>
-                          <div class="academic-v2-empty">No stage terms yet.</div>
-                        <% } %>
-                      </div>
+                  <% if (scopedStageSubjectsWithoutActivities.length) { %>
+                    <div class="academic-v2-chip-row">
+                      <span class="academic-v2-chip academic-v2-chip--warm"><%= scopedStageSubjectsWithoutActivities.length %> stage subjects missing activity</span>
                     </div>
+                  <% } %>
+                </div>
+                <div class="academic-v2-subcard mb-4">
+                  <form method="get" action="/admin/pathways" class="academic-v2-focus-grid">
+                    <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+                    <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                    <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
+                    <div class="academic-v2-field">
+                      <label for="templateProgramId">Program</label>
+                      <select id="templateProgramId" class="form-select" name="program_id">
+                        <% (programs || []).forEach((program) => { %>
+                          <option value="<%= program.id %>" <%= Number(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="academic-v2-field">
+                      <label for="templateStageNumber">Template stage</label>
+                      <select id="templateStageNumber" class="form-select" name="template_stage">
+                        <% stageOptions.forEach((stageNumber) => { %>
+                          <option value="<%= stageNumber %>" <%= stageNumber === activeTemplateStage ? 'selected' : '' %>>Stage <%= stageNumber %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="academic-v2-actions">
+                      <button type="submit" class="btn btn-outline-secondary">Load stage template</button>
+                    </div>
+                  </form>
+                  <div class="academic-v2-chip-row mt-1">
+                    <% (templateStageCards || []).forEach((card) => { %>
+                      <span class="academic-v2-chip <%= card.is_current ? 'academic-v2-chip--ok' : '' %>">Stage <%= card.stage_number %>: <%= card.term_count %> terms, <%= card.subject_count %> subjects</span>
+                    <% }); %>
                   </div>
-                </details>
-                <details class="academic-v2-subcard academic-v2-disclosure" open>
-                  <summary class="academic-v2-disclosure-summary">
-                    <strong>Stage subjects</strong>
-                    <span class="academic-v2-chip"><%= scopedStageSubjectTemplatesList.length %> templates</span>
-                  </summary>
-                  <div class="academic-v2-disclosure-body">
-                    <div class="academic-v2-grid-2">
-                      <form method="post" action="/admin/pathways/v2/stage-subjects/save" class="academic-v2-subcard" data-editor-form="stage-subject">
-                        <%- renderFocusFields() %>
-                        <input type="hidden" name="stage_subject_template_id" value="" data-editor-input="stage-subject.id" />
-                        <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
-                        <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
-                        <h3 class="h6 mb-1">Stage subjects</h3>
-                        <div class="academic-v2-form-grid">
-                          <div class="academic-v2-field">
-                            <label for="stageSubjectTemplate">Subject template</label>
-                            <select id="stageSubjectTemplate" class="form-select" name="subject_template_id" data-editor-input="stage-subject.subject_template_id">
-                              <% (subjectTemplates || []).forEach((template) => { %>
-                                <option value="<%= template.id %>"><%= template.name %></option>
-                              <% }); %>
-                            </select>
+                </div>
+                <div class="academic-v2-stack">
+                  <details class="academic-v2-subcard academic-v2-disclosure">
+                    <summary class="academic-v2-disclosure-summary">
+                      <strong>Terms</strong>
+                      <span class="academic-v2-chip"><%= (scopedStageTermTemplates || []).length %> templates</span>
+                    </summary>
+                    <div class="academic-v2-disclosure-body">
+                      <div class="academic-v2-grid-2">
+                        <form method="post" action="/admin/pathways/v2/stage-terms/save" class="academic-v2-subcard" data-editor-form="stage-term">
+                          <%- renderFocusFields() %>
+                          <input type="hidden" name="stage_term_template_id" value="" data-editor-input="stage-term.id" />
+                          <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
+                          <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
+                          <h3 class="h6 mb-1">Stage terms</h3>
+                          <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                            <div class="academic-v2-field">
+                              <label for="stageTermNumber">Term number</label>
+                              <select id="stageTermNumber" class="form-select" name="term_number" data-editor-input="stage-term.term_number">
+                                <% termOptions.forEach((term) => { %>
+                                  <option value="<%= term.value %>"><%= term.label %></option>
+                                <% }); %>
+                              </select>
+                            </div>
+                            <div class="academic-v2-field">
+                              <label for="stageTermTitle">Title</label>
+                              <input id="stageTermTitle" class="form-control" type="text" name="title" data-editor-input="stage-term.title" placeholder="Term 1" required />
+                            </div>
+                            <div class="academic-v2-field">
+                              <label for="stageTermStartDate">Start date</label>
+                              <input id="stageTermStartDate" class="form-control" type="date" name="start_date" data-editor-input="stage-term.start_date" />
+                            </div>
+                            <div class="academic-v2-field">
+                              <label>Weeks</label>
+                              <div class="academic-v2-muted">Fixed presets: T1 = 15, T2 = 15, T3 = 7.</div>
+                            </div>
                           </div>
-                          <div class="academic-v2-field" style="grid-column: 1 / -1;">
-                            <label for="stageSubjectTitle">Live title override</label>
-                            <input id="stageSubjectTitle" class="form-control" type="text" name="title" data-editor-input="stage-subject.title" placeholder="Leave empty to use the template name" />
+                          <input type="hidden" name="is_active_default" value="0" />
+                          <div class="form-check mt-3">
+                            <input id="stageTermActiveDefault" class="form-check-input" type="checkbox" name="is_active_default" value="1" data-editor-input="stage-term.is_active_default" />
+                            <label class="form-check-label" for="stageTermActiveDefault">Default active term</label>
                           </div>
-                          <div class="academic-v2-field">
-                            <label for="stageSubjectGroups">Group count</label>
-                            <input id="stageSubjectGroups" class="form-control" type="number" name="group_count" data-editor-input="stage-subject.group_count" value="1" />
+                          <div class="academic-v2-actions mt-2">
+                            <button type="submit" class="btn btn-primary">Зберегти stage term</button>
+                            <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-term">Скинути</button>
                           </div>
-                          <div class="academic-v2-field">
-                            <label for="stageSubjectDefaultGroup">Default group</label>
-                            <input id="stageSubjectDefaultGroup" class="form-control" type="number" name="default_group" data-editor-input="stage-subject.default_group" value="1" />
-                          </div>
-                          <div class="academic-v2-field" style="grid-column: 1 / -1;">
-                            <span class="academic-v2-muted">Sorted alphabetically.</span>
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="stageSubjectTerms">Stage terms</label>
-                            <select id="stageSubjectTerms" class="form-select" name="stage_term_template_ids" multiple size="4" data-editor-input="stage-subject.stage_term_template_ids">
+                        </form>
+                        <div class="academic-v2-subcard">
+                          <h3 class="h6 mb-1">Поточні stage term templates</h3>
+                          <% if ((scopedStageTermTemplates || []).length) { %>
+                            <div class="academic-v2-stack">
                               <% (scopedStageTermTemplates || []).forEach((stageTerm) => { %>
-                                <option value="<%= stageTerm.id %>"><%= stageTerm.title %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field" style="grid-column: 1 / -1;">
-                            <label for="stageSubjectTeachers">Default teachers</label>
-                            <select id="stageSubjectTeachers" class="form-select" name="teacher_ids" multiple size="5" data-editor-input="stage-subject.teacher_ids">
-                              <% (teachers || []).forEach((teacher) => { %>
-                                <option value="<%= teacher.id %>"><%= teacher.full_name %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                        </div>
-                        <div class="academic-v2-checkboxes mt-3">
-                          <input type="hidden" name="is_visible" value="0" />
-                          <div class="form-check"><input id="stageSubjectVisible" class="form-check-input" type="checkbox" name="is_visible" value="1" data-editor-input="stage-subject.is_visible" checked /><label class="form-check-label" for="stageSubjectVisible">Visible</label></div>
-                          <input type="hidden" name="is_required" value="0" />
-                          <div class="form-check"><input id="stageSubjectRequired" class="form-check-input" type="checkbox" name="is_required" value="1" data-editor-input="stage-subject.is_required" checked /><label class="form-check-label" for="stageSubjectRequired">Required</label></div>
-                          <input type="hidden" name="is_general" value="0" />
-                          <div class="form-check"><input id="stageSubjectGeneral" class="form-check-input" type="checkbox" name="is_general" value="1" data-editor-input="stage-subject.is_general" checked /><label class="form-check-label" for="stageSubjectGeneral">General</label></div>
-                          <input type="hidden" name="show_in_teamwork" value="0" />
-                          <div class="form-check"><input id="stageSubjectTeamwork" class="form-check-input" type="checkbox" name="show_in_teamwork" value="1" data-editor-input="stage-subject.show_in_teamwork" checked /><label class="form-check-label" for="stageSubjectTeamwork">Show in teamwork</label></div>
-                        </div>
-                        <div class="academic-v2-actions mt-2">
-                          <button type="submit" class="btn btn-primary">Зберегти stage subject</button>
-                          <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject">Скинути</button>
-                        </div>
-                      </form>
-                      <div class="academic-v2-subcard">
-                        <h3 class="h6 mb-1">Поточні stage subject templates</h3>
-                        <% if (scopedStageSubjectTemplatesList.length) { %>
-                          <div class="academic-v2-stack">
-                            <% scopedStageSubjectTemplatesList.forEach((stageSubject) => { %>
-                              <div class="academic-v2-subcard">
-                                <div class="d-flex flex-wrap justify-content-between gap-2">
-                                  <div>
-                                    <strong><%= stageSubject.title %></strong>
-                                    <div class="academic-v2-muted"><%= stageSubject.subject_template_name %></div>
-                                    <div class="academic-v2-chip-row mt-2">
-                                      <span class="academic-v2-chip"><%= stageSubject.stage_term_titles.length ? stageSubject.stage_term_titles.join(', ') : 'All stage terms' %></span>
-                                      <span class="academic-v2-chip"><%= stageSubject.teacher_names.length ? stageSubject.teacher_names.join(', ') : 'No teacher defaults' %></span>
-                                      <% (stageSubject.activity_types || []).forEach((activityType) => { %>
-                                        <span class="academic-v2-chip"><%= activityType %></span>
-                                      <% }); %>
+                                <div class="academic-v2-subcard">
+                                  <div class="d-flex flex-wrap justify-content-between gap-2">
+                                    <div>
+                                      <strong><%= stageTerm.title %></strong>
+                                      <div class="academic-v2-muted">Term <%= stageTerm.term_number %> - <%= stageTerm.weeks_count %> weeks<%= stageTerm.start_date ? ` - ${stageTerm.start_date}` : '' %></div>
+                                    </div>
+                                    <div class="academic-v2-actions">
+                                      <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-term" data-editor-payload='<%- toAttr(stageTerm) %>'>Edit</button>
                                     </div>
                                   </div>
-                                  <div class="academic-v2-actions">
-                                    <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject" data-editor-payload='<%- toAttr(stageSubject) %>'>Edit</button>
-                                    <form method="post" action="/admin/pathways/v2/stage-subjects/<%= stageSubject.id %>/delete">
-                                      <%- renderFocusFields() %>
-                                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                    </form>
-                                  </div>
                                 </div>
-                              </div>
-                            <% }); %>
-                          </div>
-                        <% } else { %>
-                          <div class="academic-v2-empty">No stage subjects yet.</div>
-                        <% } %>
+                              <% }); %>
+                            </div>
+                          <% } else { %>
+                            <div class="academic-v2-empty">No stage terms yet.</div>
+                          <% } %>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </details>
-                <details class="academic-v2-subcard academic-v2-disclosure">
-                  <summary class="academic-v2-disclosure-summary">
-                    <strong>Activities</strong>
-                    <span class="academic-v2-chip"><%= scopedStageSubjectActivitiesList.length %> templates</span>
-                  </summary>
-                  <div class="academic-v2-disclosure-body">
-                    <div class="academic-v2-grid-2">
-                      <form method="post" action="/admin/pathways/v2/stage-subject-activities/save" class="academic-v2-subcard" data-editor-form="stage-subject-activity">
-                        <%- renderFocusFields() %>
-                        <input type="hidden" name="stage_subject_activity_id" value="" data-editor-input="stage-subject-activity.id" />
-                        <h3 class="h6 mb-1">Stage subject activities</h3>
-                        <div class="academic-v2-form-grid">
-                          <div class="academic-v2-field">
-                            <label for="stageSubjectActivityTemplate">Stage subject</label>
-                            <select id="stageSubjectActivityTemplate" class="form-select" name="stage_subject_template_id" data-editor-input="stage-subject-activity.stage_subject_template_id">
+                  </details>
+                  <details class="academic-v2-subcard academic-v2-disclosure" open>
+                    <summary class="academic-v2-disclosure-summary">
+                      <strong>Stage subjects</strong>
+                      <span class="academic-v2-chip"><%= scopedStageSubjectTemplatesList.length %> templates</span>
+                    </summary>
+                    <div class="academic-v2-disclosure-body">
+                      <div class="academic-v2-grid-2">
+                        <form method="post" action="/admin/pathways/v2/stage-subjects/save" class="academic-v2-subcard" data-editor-form="stage-subject">
+                          <%- renderFocusFields() %>
+                          <input type="hidden" name="stage_subject_template_id" value="" data-editor-input="stage-subject.id" />
+                          <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" data-preserve-reset="1" />
+                          <input type="hidden" name="stage_number" value="<%= activeTemplateStage || 1 %>" data-preserve-reset="1" />
+                          <h3 class="h6 mb-1">Stage subjects</h3>
+                          <div class="academic-v2-form-grid">
+                            <div class="academic-v2-field">
+                              <label for="stageSubjectTemplate">Subject template</label>
+                              <select id="stageSubjectTemplate" class="form-select" name="subject_template_id" data-editor-input="stage-subject.subject_template_id">
+                                <% (subjectTemplates || []).forEach((template) => { %>
+                                  <option value="<%= template.id %>"><%= template.name %></option>
+                                <% }); %>
+                              </select>
+                            </div>
+                            <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                              <label for="stageSubjectTitle">Live title override</label>
+                              <input id="stageSubjectTitle" class="form-control" type="text" name="title" data-editor-input="stage-subject.title" placeholder="Leave empty to use the template name" />
+                            </div>
+                            <div class="academic-v2-field">
+                              <label for="stageSubjectGroups">Group count</label>
+                              <input id="stageSubjectGroups" class="form-control" type="number" name="group_count" data-editor-input="stage-subject.group_count" value="1" />
+                            </div>
+                            <div class="academic-v2-field">
+                              <label for="stageSubjectDefaultGroup">Default group</label>
+                              <input id="stageSubjectDefaultGroup" class="form-control" type="number" name="default_group" data-editor-input="stage-subject.default_group" value="1" />
+                            </div>
+                            <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                              <span class="academic-v2-muted">Sorted alphabetically.</span>
+                            </div>
+                            <div class="academic-v2-field">
+                              <label for="stageSubjectTerms">Stage terms</label>
+                              <select id="stageSubjectTerms" class="form-select" name="stage_term_template_ids" multiple size="4" data-editor-input="stage-subject.stage_term_template_ids">
+                                <% (scopedStageTermTemplates || []).forEach((stageTerm) => { %>
+                                  <option value="<%= stageTerm.id %>"><%= stageTerm.title %></option>
+                                <% }); %>
+                              </select>
+                            </div>
+                            <div class="academic-v2-field" style="grid-column: 1 / -1;">
+                              <label for="stageSubjectTeachers">Default teachers</label>
+                              <select id="stageSubjectTeachers" class="form-select" name="teacher_ids" multiple size="5" data-editor-input="stage-subject.teacher_ids">
+                                <% (teachers || []).forEach((teacher) => { %>
+                                  <option value="<%= teacher.id %>"><%= teacher.full_name %></option>
+                                <% }); %>
+                              </select>
+                            </div>
+                          </div>
+                          <div class="academic-v2-checkboxes mt-3">
+                            <input type="hidden" name="is_visible" value="0" />
+                            <div class="form-check"><input id="stageSubjectVisible" class="form-check-input" type="checkbox" name="is_visible" value="1" data-editor-input="stage-subject.is_visible" checked /><label class="form-check-label" for="stageSubjectVisible">Visible</label></div>
+                            <input type="hidden" name="is_required" value="0" />
+                            <div class="form-check"><input id="stageSubjectRequired" class="form-check-input" type="checkbox" name="is_required" value="1" data-editor-input="stage-subject.is_required" checked /><label class="form-check-label" for="stageSubjectRequired">Required</label></div>
+                            <input type="hidden" name="is_general" value="0" />
+                            <div class="form-check"><input id="stageSubjectGeneral" class="form-check-input" type="checkbox" name="is_general" value="1" data-editor-input="stage-subject.is_general" checked /><label class="form-check-label" for="stageSubjectGeneral">General</label></div>
+                            <input type="hidden" name="show_in_teamwork" value="0" />
+                            <div class="form-check"><input id="stageSubjectTeamwork" class="form-check-input" type="checkbox" name="show_in_teamwork" value="1" data-editor-input="stage-subject.show_in_teamwork" checked /><label class="form-check-label" for="stageSubjectTeamwork">Show in teamwork</label></div>
+                          </div>
+                          <div class="academic-v2-actions mt-2">
+                            <button type="submit" class="btn btn-primary">Зберегти stage subject</button>
+                            <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject">Скинути</button>
+                          </div>
+                        </form>
+                        <div class="academic-v2-subcard">
+                          <h3 class="h6 mb-1">Поточні stage subject templates</h3>
+                          <% if (scopedStageSubjectTemplatesList.length) { %>
+                            <div class="academic-v2-stack">
                               <% scopedStageSubjectTemplatesList.forEach((stageSubject) => { %>
-                                <option value="<%= stageSubject.id %>"><%= stageSubject.title %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="stageSubjectActivityType">Activity type</label>
-                            <select id="stageSubjectActivityType" class="form-select" name="activity_type" data-editor-input="stage-subject-activity.activity_type">
-                              <% activityTypeOptions.forEach((activityType) => { %>
-                                <option value="<%= activityType.value %>"><%= activityType.label %></option>
-                              <% }); %>
-                            </select>
-                          </div>
-                          <div class="academic-v2-field">
-                            <label for="stageSubjectActivitySortOrder">Sort order</label>
-                            <input id="stageSubjectActivitySortOrder" class="form-control" type="number" name="sort_order" data-editor-input="stage-subject-activity.sort_order" value="0" />
-                          </div>
-                        </div>
-                        <div class="academic-v2-muted mt-3">Lecture shared. Seminar/practice/lab by subgroup.</div>
-                        <div class="academic-v2-actions mt-2">
-                          <button type="submit" class="btn btn-primary">Зберегти stage activity</button>
-                          <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject-activity">Скинути</button>
-                        </div>
-                        <div class="academic-v2-chip-row mt-1">
-                          <% activityPresetOptions.forEach((preset) => { %>
-                            <button
-                              type="submit"
-                              class="btn btn-sm btn-outline-secondary"
-                              formaction="/admin/pathways/v2/stage-subject-activities/preset"
-                              formmethod="post"
-                              name="preset_key"
-                              value="<%= preset.value %>"
-                            ><%= preset.label %></button>
-                          <% }); %>
-                        </div>
-                      </form>
-                      <div class="academic-v2-subcard">
-                        <h3 class="h6 mb-1">Поточні stage activity templates</h3>
-                        <% if (scopedStageSubjectActivitiesList.length) { %>
-                          <div class="academic-v2-stack">
-                            <% scopedStageSubjectActivitiesList.forEach((activity) => { %>
-                              <div class="academic-v2-subcard">
-                                <div class="d-flex flex-wrap justify-content-between gap-2">
-                                  <div>
-                                    <strong><%= activity.subject_title %></strong>
-                                    <div class="academic-v2-muted"><%= activity.activity_type %> · <%= Number(activity.sort_order || 0) %></div>
-                                  </div>
-                                  <div class="academic-v2-actions">
-                                    <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject-activity" data-editor-payload='<%- toAttr(activity) %>'>Edit</button>
-                                    <form method="post" action="/admin/pathways/v2/stage-subject-activities/<%= activity.id %>/delete">
-                                      <%- renderFocusFields() %>
-                                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                    </form>
+                                <div class="academic-v2-subcard">
+                                  <div class="d-flex flex-wrap justify-content-between gap-2">
+                                    <div>
+                                      <strong><%= stageSubject.title %></strong>
+                                      <div class="academic-v2-muted"><%= stageSubject.subject_template_name %></div>
+                                      <div class="academic-v2-chip-row mt-2">
+                                        <span class="academic-v2-chip"><%= stageSubject.stage_term_titles.length ? stageSubject.stage_term_titles.join(', ') : 'All stage terms' %></span>
+                                        <span class="academic-v2-chip"><%= stageSubject.teacher_names.length ? stageSubject.teacher_names.join(', ') : 'No teacher defaults' %></span>
+                                        <% (stageSubject.activity_types || []).forEach((activityType) => { %>
+                                          <span class="academic-v2-chip"><%= activityType %></span>
+                                        <% }); %>
+                                      </div>
+                                    </div>
+                                    <div class="academic-v2-actions">
+                                      <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject" data-editor-payload='<%- toAttr(stageSubject) %>'>Edit</button>
+                                      <form method="post" action="/admin/pathways/v2/stage-subjects/<%= stageSubject.id %>/delete">
+                                        <%- renderFocusFields() %>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                      </form>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            <% }); %>
-                          </div>
-                        <% } else { %>
-                          <div class="academic-v2-empty">No stage activities yet.</div>
-                        <% } %>
+                              <% }); %>
+                            </div>
+                          <% } else { %>
+                            <div class="academic-v2-empty">No stage subjects yet.</div>
+                          <% } %>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </details>
-              </div>
-            </section>
+                  </details>
+                  <details class="academic-v2-subcard academic-v2-disclosure">
+                    <summary class="academic-v2-disclosure-summary">
+                      <strong>Activities</strong>
+                      <span class="academic-v2-chip"><%= scopedStageSubjectActivitiesList.length %> templates</span>
+                    </summary>
+                    <div class="academic-v2-disclosure-body">
+                      <div class="academic-v2-grid-2">
+                        <form method="post" action="/admin/pathways/v2/stage-subject-activities/save" class="academic-v2-subcard" data-editor-form="stage-subject-activity">
+                          <%- renderFocusFields() %>
+                          <input type="hidden" name="stage_subject_activity_id" value="" data-editor-input="stage-subject-activity.id" />
+                          <h3 class="h6 mb-1">Stage subject activities</h3>
+                          <div class="academic-v2-form-grid">
+                            <div class="academic-v2-field">
+                              <label for="stageSubjectActivityTemplate">Stage subject</label>
+                              <select id="stageSubjectActivityTemplate" class="form-select" name="stage_subject_template_id" data-editor-input="stage-subject-activity.stage_subject_template_id">
+                                <% scopedStageSubjectTemplatesList.forEach((stageSubject) => { %>
+                                  <option value="<%= stageSubject.id %>"><%= stageSubject.title %></option>
+                                <% }); %>
+                              </select>
+                            </div>
+                            <div class="academic-v2-field">
+                              <label for="stageSubjectActivityType">Activity type</label>
+                              <select id="stageSubjectActivityType" class="form-select" name="activity_type" data-editor-input="stage-subject-activity.activity_type">
+                                <% activityTypeOptions.forEach((activityType) => { %>
+                                  <option value="<%= activityType.value %>"><%= activityType.label %></option>
+                                <% }); %>
+                              </select>
+                            </div>
+                            <div class="academic-v2-field">
+                              <label for="stageSubjectActivitySortOrder">Sort order</label>
+                              <input id="stageSubjectActivitySortOrder" class="form-control" type="number" name="sort_order" data-editor-input="stage-subject-activity.sort_order" value="0" />
+                            </div>
+                          </div>
+                          <div class="academic-v2-muted mt-3">Lecture shared. Seminar/practice/lab by subgroup.</div>
+                          <div class="academic-v2-actions mt-2">
+                            <button type="submit" class="btn btn-primary">Зберегти stage activity</button>
+                            <button type="button" class="btn btn-outline-secondary" data-editor-reset="stage-subject-activity">Скинути</button>
+                          </div>
+                          <div class="academic-v2-chip-row mt-1">
+                            <% activityPresetOptions.forEach((preset) => { %>
+                              <button
+                                type="submit"
+                                class="btn btn-sm btn-outline-secondary"
+                                formaction="/admin/pathways/v2/stage-subject-activities/preset"
+                                formmethod="post"
+                                name="preset_key"
+                                value="<%= preset.value %>"
+                              ><%= preset.label %></button>
+                            <% }); %>
+                          </div>
+                        </form>
+                        <div class="academic-v2-subcard">
+                          <h3 class="h6 mb-1">Поточні stage activity templates</h3>
+                          <% if (scopedStageSubjectActivitiesList.length) { %>
+                            <div class="academic-v2-stack">
+                              <% scopedStageSubjectActivitiesList.forEach((activity) => { %>
+                                <div class="academic-v2-subcard">
+                                  <div class="d-flex flex-wrap justify-content-between gap-2">
+                                    <div>
+                                      <strong><%= activity.subject_title %></strong>
+                                      <div class="academic-v2-muted"><%= activity.activity_type %> · <%= Number(activity.sort_order || 0) %></div>
+                                    </div>
+                                    <div class="academic-v2-actions">
+                                      <button type="button" class="btn btn-sm btn-primary" data-editor-target="stage-subject-activity" data-editor-payload='<%- toAttr(activity) %>'>Edit</button>
+                                      <form method="post" action="/admin/pathways/v2/stage-subject-activities/<%= activity.id %>/delete">
+                                        <%- renderFocusFields() %>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                      </form>
+                                    </div>
+                                  </div>
+                                </div>
+                              <% }); %>
+                            </div>
+                          <% } else { %>
+                            <div class="academic-v2-empty">No stage activities yet.</div>
+                          <% } %>
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </section>
+            <% } %>
 
             <% if (isBachelorProgramSelected) { %>
               <section class="academic-v2-card" id="bachelor-catalog-panel" data-structure-panel="bachelor-catalog">
@@ -2806,7 +2810,11 @@
         const normalizedRequestedWorkspaceTab = ['overview', 'subjects', 'terms', 'schedule', 'teachers', 'students'].includes(requestedWorkspaceTab)
           ? requestedWorkspaceTab
           : '';
-        const normalizedRequestedStructureTab = ['programs', 'cohorts', 'courses', 'stage-templates', 'bachelor-catalog'].includes(requestedStructureTab)
+        const normalizedRequestedStructureTab = <%- JSON.stringify(
+          isBachelorProgramSelected
+            ? ['programs', 'cohorts', 'courses', 'bachelor-catalog']
+            : ['programs', 'cohorts', 'courses', 'stage-templates']
+        ) %>.includes(requestedStructureTab)
           ? requestedStructureTab
           : '';
         const scheduleEntriesData = <%- JSON.stringify(scheduleEntriesForViews || []) %>;
