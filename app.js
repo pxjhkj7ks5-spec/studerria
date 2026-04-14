@@ -11309,6 +11309,36 @@ const buildVisitDayLabels = (days) => {
   return labels;
 };
 
+const buildVisitAnalyticsSqlParts = ({
+  visitAlias = 'v',
+  sessionAlias = 'visit_session_store',
+  userAlias = 'visit_user',
+} = {}) => {
+  const sessionJsonExpr = `${sessionAlias}.sess::jsonb`;
+  const storedRoleExpr = `NULLIF(${visitAlias}.role_key, '')`;
+  const normalizedStoredRoleExpr = `(CASE WHEN LOWER(COALESCE(${storedRoleExpr}, '')) IN ('guest', 'anonymous') THEN NULL ELSE ${storedRoleExpr} END)`;
+  const sessionJoinSql = `LEFT JOIN ${sessionTableName} ${sessionAlias} ON ${sessionAlias}.sid = ${visitAlias}.session_id`;
+  const sessionUserIdExpr = `CASE WHEN (${sessionJsonExpr} -> 'user' ->> 'id') ~ '^[0-9]+$' THEN (${sessionJsonExpr} -> 'user' ->> 'id')::int ELSE NULL END`;
+  const resolvedUserIdExpr = `COALESCE(${visitAlias}.user_id, ${sessionUserIdExpr})`;
+  const userJoinSql = `LEFT JOIN users ${userAlias} ON ${userAlias}.id = ${resolvedUserIdExpr}`;
+  const sessionRoleExpr = `NULLIF(${sessionJsonExpr} ->> 'role', '')`;
+  const userRoleExpr = `NULLIF(${userAlias}.role, '')`;
+  const resolvedRoleExpr = `COALESCE(${normalizedStoredRoleExpr}, ${sessionRoleExpr}, ${userRoleExpr}, ${storedRoleExpr}, 'guest')`;
+  const resolvedUserNameExpr = `COALESCE(NULLIF(${userAlias}.full_name, ''), CASE WHEN ${resolvedUserIdExpr} IS NOT NULL THEN ('User #' || (${resolvedUserIdExpr})::text) ELSE 'Guest' END)`;
+  const uniqueVisitorExpr = `COALESCE((${resolvedUserIdExpr})::text, NULLIF(${visitAlias}.session_id, ''), NULLIF(${visitAlias}.ip, ''), 'guest')`;
+  const courseScopeExpr = `COALESCE(${visitAlias}.course_id, ${userAlias}.course_id)`;
+  return {
+    sessionJoinSql,
+    sessionUserIdExpr,
+    resolvedUserIdExpr,
+    userJoinSql,
+    resolvedRoleExpr,
+    resolvedUserNameExpr,
+    uniqueVisitorExpr,
+    courseScopeExpr,
+  };
+};
+
 const resolveVisitPageKey = (pathname) => {
   const normalized = String(pathname || '').trim();
   if (!normalized) return null;
@@ -52195,33 +52225,36 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     const userId = Number(req?.session?.user?.id || 0);
     const roleKeys = getSessionRoleList(req);
     const activeSemester = await getActiveSemester(courseId);
-    const visitSessionJoinSql = `LEFT JOIN ${sessionTableName} visit_session_store ON visit_session_store.sid = v.session_id`;
-    const visitSessionUserIdExpr = "CASE WHEN (visit_session_store.sess::jsonb -> 'user' ->> 'id') ~ '^[0-9]+$' THEN (visit_session_store.sess::jsonb -> 'user' ->> 'id')::int ELSE NULL END";
-    const resolvedVisitUserIdExpr = `COALESCE(v.user_id, ${visitSessionUserIdExpr})`;
-    const resolvedVisitRoleExpr = `COALESCE(NULLIF(v.role_key, ''), NULLIF(visit_session_store.sess::jsonb ->> 'role', ''), 'guest')`;
-    const uniqueExpr = `COALESCE((${resolvedVisitUserIdExpr})::text, NULLIF(v.session_id, ''), NULLIF(v.ip, ''), 'guest')`;
+    const {
+      sessionJoinSql: visitSessionJoinSql,
+      resolvedUserIdExpr: resolvedVisitUserIdExpr,
+      userJoinSql: visitUserJoinSql,
+      resolvedRoleExpr: resolvedVisitRoleExpr,
+      resolvedUserNameExpr: resolvedVisitUserNameExpr,
+      uniqueVisitorExpr: uniqueExpr,
+      courseScopeExpr: resolvedVisitCourseScopeExpr,
+    } = buildVisitAnalyticsSqlParts();
     const excludeAdminClause = excludeAdmin
       ? `AND ${resolvedVisitRoleExpr} <> 'admin'`
       : '';
     const scopedVisitWhereSql = isSystemScope
       ? 'v.created_at >= ?'
-      : 'v.course_id = ? AND v.created_at >= ?';
+      : `${resolvedVisitCourseScopeExpr} = ? AND v.created_at >= ?`;
     const scopedVisitParams = isSystemScope ? [sinceIso] : [courseId, sinceIso];
-    const recentVisitParams = isSystemScope ? [sinceIso] : [sinceIso, courseId];
+    const recentVisitParams = scopedVisitParams;
     const now = new Date();
 
     const recentSqlBase = `
       SELECT
         v.created_at,
-        COALESCE(NULLIF(visit_user.full_name, ''), 'Guest') AS user_name,
+        ${resolvedVisitUserNameExpr} AS user_name,
         ${resolvedVisitRoleExpr} AS role_key,
         v.page_key,
         v.route_path
       FROM site_visit_events v
       ${visitSessionJoinSql}
-      LEFT JOIN users visit_user ON visit_user.id = ${resolvedVisitUserIdExpr}
-      WHERE v.created_at >= ?
-        ${isSystemScope ? '' : 'AND (v.course_id = ? OR v.course_id IS NULL)'}
+      ${visitUserJoinSql}
+      WHERE ${scopedVisitWhereSql}
     `;
     const recentFilteredSql = `
       ${recentSqlBase}
@@ -52245,6 +52278,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
           FROM site_visit_events v
           ${visitSessionJoinSql}
+          ${visitUserJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
         `,
@@ -52258,6 +52292,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
           FROM site_visit_events v
           ${visitSessionJoinSql}
+          ${visitUserJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
@@ -52273,6 +52308,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
           FROM site_visit_events v
           ${visitSessionJoinSql}
+          ${visitUserJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY v.page_key
@@ -52288,6 +52324,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
             COUNT(*)::int AS visits
           FROM site_visit_events v
           ${visitSessionJoinSql}
+          ${visitUserJoinSql}
           WHERE ${scopedVisitWhereSql}
             ${excludeAdminClause}
           GROUP BY ${resolvedVisitRoleExpr}
@@ -52372,6 +52409,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
             FROM site_visit_events v
             ${visitSessionJoinSql}
+            ${visitUserJoinSql}
             WHERE ${scopedVisitWhereSql}
           `,
           scopedVisitParams
@@ -52384,6 +52422,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
             FROM site_visit_events v
             ${visitSessionJoinSql}
+            ${visitUserJoinSql}
             WHERE ${scopedVisitWhereSql}
             GROUP BY (v.created_at AT TIME ZONE 'UTC')::date
             ORDER BY day ASC
@@ -52398,6 +52437,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(DISTINCT ${uniqueExpr})::int AS unique_visitors
             FROM site_visit_events v
             ${visitSessionJoinSql}
+            ${visitUserJoinSql}
             WHERE ${scopedVisitWhereSql}
             GROUP BY v.page_key
             ORDER BY visits DESC, v.page_key ASC
@@ -52412,6 +52452,7 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
               COUNT(*)::int AS visits
             FROM site_visit_events v
             ${visitSessionJoinSql}
+            ${visitUserJoinSql}
             WHERE ${scopedVisitWhereSql}
             GROUP BY ${resolvedVisitRoleExpr}
             ORDER BY visits DESC, role_key ASC
@@ -52482,6 +52523,199 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.visitAnalytics.fetch');
+  }
+});
+
+app.get('/admin/visit-log', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitLog.init');
+  }
+  const roleKeys = getSessionRoleList(req);
+  let courses = [];
+  let courseId = getStaffCourse(req);
+  let allowCourseSelect = false;
+  try {
+    courses = await getCoursesCached();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitLog.courses');
+  }
+  try {
+    const baseCourseId = Number(req.session.user.course_id || 1);
+    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+    if (!allowedCourses.length) {
+      return res.status(403).send('Forbidden (course access)');
+    }
+    courses = allowedCourses;
+    const requestedCourse = Number(req.query.course);
+    if (allowedCourseIds.has(requestedCourse)) {
+      courseId = requestedCourse;
+    } else if (!allowedCourseIds.has(courseId)) {
+      courseId = Number(allowedCourses[0].id || baseCourseId);
+    }
+    req.session.adminCourse = courseId;
+    allowCourseSelect = allowedCourses.length > 1;
+    const selectedCourse = (allowedCourses || []).find((course) => Number(course.id || 0) === Number(courseId || 0)) || null;
+    const days = parseVisitDays(req.query.days);
+    const excludeAdmin = parseVisitExcludeAdmin(req.query.exclude_admin);
+    const canUseSystemScope = hasSessionRole(req, 'admin');
+    const selectedScope = canUseSystemScope && String(req.query.scope || '').trim().toLowerCase() === 'system'
+      ? 'system'
+      : 'course';
+    const isSystemScope = selectedScope === 'system';
+    const labels = buildVisitDayLabels(days);
+    const sinceIso = labels.length
+      ? new Date(`${labels[0]}T00:00:00.000Z`).toISOString()
+      : new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
+    const {
+      sessionJoinSql: visitSessionJoinSql,
+      userJoinSql: visitUserJoinSql,
+      resolvedUserIdExpr: resolvedVisitUserIdExpr,
+      resolvedRoleExpr: resolvedVisitRoleExpr,
+      resolvedUserNameExpr: resolvedVisitUserNameExpr,
+      uniqueVisitorExpr,
+      courseScopeExpr,
+    } = buildVisitAnalyticsSqlParts();
+    const excludeAdminClause = excludeAdmin
+      ? `AND ${resolvedVisitRoleExpr} <> 'admin'`
+      : '';
+    const scopedVisitWhereSql = isSystemScope
+      ? 'v.created_at >= ?'
+      : `${courseScopeExpr} = ? AND v.created_at >= ?`;
+    const scopedVisitParams = isSystemScope ? [sinceIso] : [courseId, sinceIso];
+    const summaryRow = await db.get(
+      `
+        SELECT
+          COUNT(*)::int AS total_visits,
+          COUNT(DISTINCT ${uniqueVisitorExpr})::int AS unique_visitors,
+          COUNT(DISTINCT ${resolvedVisitUserIdExpr})::int AS signed_users,
+          COUNT(DISTINCT (v.created_at AT TIME ZONE 'UTC')::date)::int AS active_days
+        FROM site_visit_events v
+        ${visitSessionJoinSql}
+        ${visitUserJoinSql}
+        WHERE ${scopedVisitWhereSql}
+          ${excludeAdminClause}
+      `,
+      scopedVisitParams
+    );
+    const countRow = await db.get(
+      `
+        SELECT COUNT(*)::int AS total_rows
+        FROM site_visit_events v
+        ${visitSessionJoinSql}
+        ${visitUserJoinSql}
+        WHERE ${scopedVisitWhereSql}
+          ${excludeAdminClause}
+      `,
+      scopedVisitParams
+    );
+    const perPage = 100;
+    const requestedPage = Math.max(1, parsePositiveIntStrict(req.query.page, 1) || 1);
+    const totalRows = Number(countRow && countRow.total_rows || 0);
+    const totalPages = Math.max(1, Math.ceil(totalRows / perPage));
+    const currentPage = Math.min(requestedPage, totalPages);
+    const offset = (currentPage - 1) * perPage;
+    const [topUserRows, visitRows] = await Promise.all([
+      db.all(
+        `
+          SELECT
+            ${resolvedVisitUserIdExpr} AS actor_user_id,
+            ${resolvedVisitUserNameExpr} AS user_name,
+            ${resolvedVisitRoleExpr} AS role_key,
+            COUNT(*)::int AS visits,
+            COUNT(DISTINCT COALESCE(v.page_key, 'unknown'))::int AS pages,
+            MAX(v.created_at) AS last_seen_at
+          FROM site_visit_events v
+          ${visitSessionJoinSql}
+          ${visitUserJoinSql}
+          WHERE ${scopedVisitWhereSql}
+            ${excludeAdminClause}
+          GROUP BY ${resolvedVisitUserIdExpr}, ${resolvedVisitUserNameExpr}, ${resolvedVisitRoleExpr}
+          ORDER BY visits DESC, last_seen_at DESC, user_name ASC
+          LIMIT 20
+        `,
+        scopedVisitParams
+      ),
+      db.all(
+        `
+          SELECT
+            v.created_at,
+            ${resolvedVisitUserNameExpr} AS user_name,
+            ${resolvedVisitRoleExpr} AS role_key,
+            COALESCE(v.page_key, 'unknown') AS page_key,
+            COALESCE(v.route_path, '/') AS route_path,
+            COALESCE(NULLIF(v.ip, ''), '—') AS ip
+          FROM site_visit_events v
+          ${visitSessionJoinSql}
+          ${visitUserJoinSql}
+          WHERE ${scopedVisitWhereSql}
+            ${excludeAdminClause}
+          ORDER BY v.created_at DESC
+          LIMIT ? OFFSET ?
+        `,
+        [...scopedVisitParams, perPage, offset]
+      ),
+    ]);
+    const queryParams = new URLSearchParams();
+    if (!isSystemScope && courseId) queryParams.set('course', String(courseId));
+    if (canUseSystemScope && selectedScope === 'system') queryParams.set('scope', 'system');
+    queryParams.set('days', String(days));
+    queryParams.set('exclude_admin', excludeAdmin ? '1' : '0');
+    const baseQuery = queryParams.toString();
+    const pageBase = baseQuery ? `?${baseQuery}&page=` : '?page=';
+    return res.render('admin-visit-log', {
+      username: req.session.user.username,
+      role: normalizeRoleKey(req.session.role || 'student'),
+      adminHomeHref: getStaffPanelBase(req, courseId),
+      analyticsPanelHref: buildStaffPanelScopeUrl(
+        req,
+        getStoredAdminAcademicScope(req),
+        { courseId },
+        { tab: 'admin-visit-analytics' }
+      ),
+      courses,
+      selectedCourse,
+      selectedCourseId: courseId,
+      allowCourseSelect,
+      canUseSystemScope,
+      selectedScope,
+      filters: {
+        days,
+        exclude_admin: excludeAdmin,
+      },
+      summary: {
+        total_visits: Number(summaryRow && summaryRow.total_visits || 0),
+        unique_visitors: Number(summaryRow && summaryRow.unique_visitors || 0),
+        signed_users: Number(summaryRow && summaryRow.signed_users || 0),
+        active_days: Number(summaryRow && summaryRow.active_days || 0),
+      },
+      topUsers: (topUserRows || []).map((row) => ({
+        actor_user_id: row.actor_user_id ? Number(row.actor_user_id) : null,
+        user_name: String(row && row.user_name || 'Guest'),
+        role_key: String(row && row.role_key || 'guest'),
+        visits: Number(row && row.visits || 0),
+        pages: Number(row && row.pages || 0),
+        last_seen_at: row && row.last_seen_at ? row.last_seen_at : null,
+      })),
+      visits: (visitRows || []).map((row) => ({
+        created_at: row && row.created_at ? row.created_at : null,
+        user_name: String(row && row.user_name || 'Guest'),
+        role_key: String(row && row.role_key || 'guest'),
+        page_key: String(row && row.page_key || 'unknown'),
+        route_path: String(row && row.route_path || '/'),
+        ip: String(row && row.ip || '—'),
+      })),
+      pagination: {
+        page: currentPage,
+        totalPages,
+        totalRows,
+        perPage,
+        pageBase,
+      },
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitLog');
   }
 });
 

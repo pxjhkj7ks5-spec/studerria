@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
+    <title>Візити · журнал</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root {
+        --accent: #3b82f6;
+        --accent-dark: #2563eb;
+        --radius: 18px;
+        --glass-border-dark: rgba(255, 255, 255, 0.14);
+        --glass-border-light: rgba(15, 23, 42, 0.12);
+        --glass-bg-light: rgba(255, 255, 255, 0.72);
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", "Inter", Arial, sans-serif;
+        min-height: 100vh;
+      }
+      body.theme-light {
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(147, 197, 253, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 90% 20%, rgba(196, 181, 253, 0.22), transparent 60%),
+          linear-gradient(135deg, #e6eef8 0%, #e9f0fb 45%, #eef2ff 100%);
+        color: #0f172a;
+      }
+      body.theme-dark {
+        background: radial-gradient(1200px 800px at 15% 10%, rgba(59, 130, 246, 0.22), transparent 60%),
+          radial-gradient(1000px 700px at 80% 20%, rgba(14, 165, 233, 0.18), transparent 60%),
+          linear-gradient(160deg, #0b0f1a 0%, #141b30 100%);
+        color: #f8fafc;
+      }
+      .admin-nav {
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      body.theme-light .admin-nav {
+        background: rgba(255, 255, 255, 0.8);
+        border-bottom-color: rgba(15, 23, 42, 0.12);
+      }
+      body.theme-dark .admin-nav {
+        background: rgba(10, 10, 20, 0.6);
+      }
+      .card,
+      .visit-stat-tile {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        background-clip: padding-box;
+        border-radius: var(--radius);
+        backdrop-filter: blur(20px);
+        transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+      }
+      body.theme-dark .card,
+      body.theme-dark .visit-stat-tile {
+        background: rgba(18, 24, 40, 0.72);
+        color: #f8fafc;
+        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      }
+      body.theme-light .card,
+      body.theme-light .visit-stat-tile {
+        background: var(--glass-bg-light);
+        border-color: var(--glass-border-light);
+        box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+      }
+      body.theme-dark .text-muted {
+        color: rgba(226, 232, 240, 0.72) !important;
+      }
+      body.theme-dark .table {
+        color: #f8fafc;
+      }
+      body.theme-dark .table th,
+      body.theme-dark .table td {
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+      .visit-page-shell {
+        display: grid;
+        gap: 1rem;
+      }
+      .visit-page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .visit-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.85rem;
+      }
+      .visit-stat-tile {
+        padding: 1rem 1.1rem;
+        border: 1px solid transparent;
+      }
+      .visit-stat-label {
+        font-size: 0.88rem;
+        color: rgba(100, 116, 139, 0.95);
+      }
+      .visit-stat-value {
+        font-size: clamp(1.5rem, 2vw, 2rem);
+        font-weight: 700;
+        line-height: 1.1;
+        margin-top: 0.3rem;
+      }
+      body.theme-dark .visit-stat-label {
+        color: rgba(226, 232, 240, 0.72);
+      }
+      .visit-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid rgba(59, 130, 246, 0.16);
+        background: rgba(59, 130, 246, 0.08);
+        color: #1d4ed8;
+        font-size: 0.88rem;
+        font-weight: 600;
+      }
+      body.theme-dark .visit-chip {
+        background: rgba(59, 130, 246, 0.16);
+        border-color: rgba(96, 165, 250, 0.24);
+        color: #dbeafe;
+      }
+      .visit-stack {
+        display: grid;
+        gap: 1rem;
+      }
+      .visit-card-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .visit-table-note {
+        font-size: 0.88rem;
+      }
+      .pagination .page-link {
+        border-radius: 999px;
+        margin: 0 0.2rem;
+      }
+      @media (max-width: 992px) {
+        .visit-stat-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 575px) {
+        .visit-stat-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/admin.css" />
+    <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+  </head>
+  <body class="studerria-theme theme-light visit-log-page">
+    <%- include('partials/theme-bootstrap-body') %>
+    <%- include('partials/dynamic-bg') %>
+    <%
+      const numberFormatter = new Intl.NumberFormat('uk-UA');
+      const formatNumber = (value) => numberFormatter.format(Number(value || 0));
+      const roleLabelMap = {
+        admin: 'Адмін',
+        deanery: 'Деканат',
+        starosta: 'Староста',
+        teacher: 'Викладач',
+        student: 'Студент',
+        guest: 'Гість',
+        anonymous: 'Гість',
+      };
+      const pageLabelMap = {
+        login: 'Логін',
+        register: 'Реєстрація',
+        schedule: 'Розклад',
+        'my-day': 'Мій день',
+        teamwork: 'Teamwork',
+        profile: 'Профіль',
+        admin: 'Адмінка',
+        messages: 'Повідомлення',
+        homework: 'Домашка',
+        grades: 'Оцінки',
+      };
+      const formatRoleLabel = (value) => roleLabelMap[String(value || '').trim().toLowerCase()] || String(value || 'guest');
+      const formatPageLabel = (value) => pageLabelMap[String(value || '').trim().toLowerCase()] || String(value || 'unknown');
+      const formatDateTime = (value) => {
+        const parsed = value ? new Date(value) : null;
+        if (!parsed || Number.isNaN(parsed.getTime())) return '—';
+        return parsed.toLocaleString('uk-UA');
+      };
+      const currentPage = Number(pagination && pagination.page || 1);
+      const totalPages = Number(pagination && pagination.totalPages || 1);
+      const pageStart = Math.max(1, currentPage - 2);
+      const pageEnd = Math.min(totalPages, currentPage + 2);
+      const visiblePages = [];
+      for (let page = pageStart; page <= pageEnd; page += 1) visiblePages.push(page);
+      const scopeLabel = selectedScope === 'system'
+        ? 'Вся система'
+        : (selectedCourse && selectedCourse.name ? selectedCourse.name : 'Обраний курс');
+    %>
+
+    <nav class="navbar navbar-expand-lg admin-nav">
+      <div class="container">
+        <span class="navbar-brand">Візити</span>
+        <div class="d-flex align-items-center">
+          <span class="me-3 text-muted">
+            <%= role === 'admin' ? t('role.admin') : (role === 'deanery' ? t('role.deanery') : (role === 'starosta' ? t('role.starosta') : t('role.user'))) %>: <%= username %>
+          </span>
+          <button
+            class="theme-toggle theme-toggle-min me-2"
+            type="button"
+            id="themeToggle"
+            aria-label="Toggle theme"
+            data-light-label="☀️"
+            data-dark-label="🌙"
+          >
+            🌙
+          </button>
+          <a class="btn btn-outline-primary btn-sm me-2" href="<%= analyticsPanelHref || adminHomeHref || '/admin' %>">Security analytics</a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="<%= adminHomeHref || '/admin' %>">Назад в адмінку</a>
+          <form method="POST" action="/logout">
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <div class="visit-page-shell">
+        <div class="card">
+          <div class="card-body">
+            <div class="visit-page-header">
+              <div>
+                <h1 class="h3 mb-1">Журнал візитів</h1>
+                <div class="text-muted">Повний список подій за вибраний період з окремим рейтингом користувачів.</div>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <span class="visit-chip"><%= scopeLabel %></span>
+                <span class="visit-chip"><%= formatNumber(filters && filters.days || 14) %> днів</span>
+                <span class="visit-chip"><%= filters && filters.exclude_admin ? 'Без адмінів' : 'З адмінами' %></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Фільтри</h5>
+            <form method="GET" action="/admin/visit-log" class="row g-3 align-items-end">
+              <% if (canUseSystemScope) { %>
+                <div class="col-12 col-md-3 col-xl-2">
+                  <label class="form-label">Scope</label>
+                  <select class="form-select" name="scope">
+                    <option value="course" <%= selectedScope === 'course' ? 'selected' : '' %>>Курс</option>
+                    <option value="system" <%= selectedScope === 'system' ? 'selected' : '' %>>Вся система</option>
+                  </select>
+                </div>
+              <% } %>
+              <% if (allowCourseSelect && selectedScope !== 'system') { %>
+                <div class="col-12 col-md-4 col-xl-3">
+                  <label class="form-label">Курс</label>
+                  <select class="form-select" name="course">
+                    <% (courses || []).forEach(function(course) { %>
+                      <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+                    <% }); %>
+                  </select>
+                </div>
+              <% } else if (selectedScope !== 'system') { %>
+                <input type="hidden" name="course" value="<%= selectedCourseId %>" />
+              <% } %>
+              <div class="col-12 col-md-3 col-xl-2">
+                <label class="form-label">Період</label>
+                <select class="form-select" name="days">
+                  <% [7, 14, 30, 60, 90].forEach(function(option) { %>
+                    <option value="<%= option %>" <%= Number(filters && filters.days || 14) === option ? 'selected' : '' %>><%= option %> днів</option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="col-12 col-md-3 col-xl-3">
+                <input type="hidden" name="exclude_admin" value="0" />
+                <div class="form-check form-switch pt-4">
+                  <input class="form-check-input" type="checkbox" role="switch" id="visitExcludeAdmin" name="exclude_admin" value="1" <%= filters && filters.exclude_admin ? 'checked' : '' %> />
+                  <label class="form-check-label" for="visitExcludeAdmin">Без адмінів</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-2 col-xl-2 d-grid">
+                <button class="btn btn-primary" type="submit">Застосувати</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="visit-stat-grid">
+          <div class="visit-stat-tile">
+            <div class="visit-stat-label">Візити</div>
+            <div class="visit-stat-value"><%= formatNumber(summary && summary.total_visits) %></div>
+          </div>
+          <div class="visit-stat-tile">
+            <div class="visit-stat-label">Унікальні відвідувачі</div>
+            <div class="visit-stat-value"><%= formatNumber(summary && summary.unique_visitors) %></div>
+          </div>
+          <div class="visit-stat-tile">
+            <div class="visit-stat-label">Авторизовані користувачі</div>
+            <div class="visit-stat-value"><%= formatNumber(summary && summary.signed_users) %></div>
+          </div>
+          <div class="visit-stat-tile">
+            <div class="visit-stat-label">Активні дні</div>
+            <div class="visit-stat-value"><%= formatNumber(summary && summary.active_days) %></div>
+          </div>
+        </div>
+
+        <div class="visit-stack">
+          <div class="card">
+            <div class="card-body">
+              <div class="visit-card-title mb-3">
+                <div>
+                  <h5 class="card-title mb-1">Топ користувачі за візитами</h5>
+                  <div class="text-muted">Рейтинг за період із кількістю сторінок і останньою активністю.</div>
+                </div>
+                <div class="visit-table-note text-muted">Топ 20</div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Користувач</th>
+                      <th>Роль</th>
+                      <th>Візити</th>
+                      <th>Сторінки</th>
+                      <th>Останній візит</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% (topUsers || []).forEach(function(row, index) { %>
+                      <tr>
+                        <td><%= index + 1 %></td>
+                        <td><%= row.user_name %></td>
+                        <td><%= formatRoleLabel(row.role_key) %></td>
+                        <td><%= formatNumber(row.visits) %></td>
+                        <td><%= formatNumber(row.pages) %></td>
+                        <td><%= formatDateTime(row.last_seen_at) %></td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(topUsers || []).length) { %>
+                      <tr>
+                        <td colspan="6" class="text-muted">Немає візитів за вибраний період.</td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-body">
+              <div class="visit-card-title mb-3">
+                <div>
+                  <h5 class="card-title mb-1">Усі візити</h5>
+                  <div class="text-muted">Список подій у зворотному хронологічному порядку.</div>
+                </div>
+                <div class="visit-table-note text-muted">
+                  Сторінка <%= currentPage %> з <%= totalPages %> · <%= formatNumber(pagination && pagination.totalRows || 0) %> записів
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Час</th>
+                      <th>Користувач</th>
+                      <th>Роль</th>
+                      <th>Сторінка</th>
+                      <th>Шлях</th>
+                      <th>IP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% (visits || []).forEach(function(row) { %>
+                      <tr>
+                        <td><%= formatDateTime(row.created_at) %></td>
+                        <td><%= row.user_name %></td>
+                        <td><%= formatRoleLabel(row.role_key) %></td>
+                        <td><%= formatPageLabel(row.page_key) %></td>
+                        <td><code><%= row.route_path %></code></td>
+                        <td><code><%= row.ip %></code></td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(visits || []).length) { %>
+                      <tr>
+                        <td colspan="6" class="text-muted">Немає візитів за вибраний період.</td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <nav class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="text-muted">Показуємо по <%= formatNumber(pagination && pagination.perPage || 100) %> записів</div>
+          <ul class="pagination mb-0">
+            <li class="page-item <%= currentPage <= 1 ? 'disabled' : '' %>">
+              <a class="page-link" href="<%= (pagination && pagination.pageBase ? pagination.pageBase : '?page=') + Math.max(1, currentPage - 1) %>">Назад</a>
+            </li>
+            <% visiblePages.forEach(function(page) { %>
+              <li class="page-item <%= currentPage === page ? 'active' : '' %>">
+                <a class="page-link" href="<%= (pagination && pagination.pageBase ? pagination.pageBase : '?page=') + page %>"><%= page %></a>
+              </li>
+            <% }); %>
+            <li class="page-item <%= currentPage >= totalPages ? 'disabled' : '' %>">
+              <a class="page-link" href="<%= (pagination && pagination.pageBase ? pagination.pageBase : '?page=') + Math.min(totalPages, currentPage + 1) %>">Далі</a>
+            </li>
+          </ul>
+        </nav>
+
+        <%- include('partials/app-footer') %>
+      </div>
+    </main>
+
+    <%- include('partials/changelog-modal') %>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+      const themeToggle = document.getElementById('themeToggle');
+      const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
+      const labelLight = themeToggle.dataset.lightLabel || 'Light';
+      const labelDark = themeToggle.dataset.darkLabel || 'Dark';
+      document.body.classList.remove('theme-light', 'theme-dark');
+      document.body.classList.add(savedTheme);
+      themeToggle.textContent = savedTheme === 'theme-dark' ? labelLight : labelDark;
+      themeToggle.addEventListener('click', () => {
+        const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+        document.body.classList.remove('theme-light', 'theme-dark');
+        document.body.classList.add(next);
+        localStorage.setItem('ui-theme', next);
+        themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
+      });
+
+      document.querySelectorAll('select.form-select').forEach((select) => {
+        select.addEventListener('pointerdown', () => select.classList.add('select-open'));
+        select.addEventListener('keydown', (event) => {
+          if ([' ', 'Enter', 'ArrowDown'].includes(event.key)) {
+            select.classList.add('select-open');
+          }
+        });
+        select.addEventListener('change', () => select.classList.remove('select-open'));
+        select.addEventListener('blur', () => select.classList.remove('select-open'));
+      });
+    </script>
+  </body>
+</html>

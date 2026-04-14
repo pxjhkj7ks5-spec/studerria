@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.31",
+      "date": "2026-04-15",
+      "items": [
+        "feat(admin-visit-log): add a standalone `/admin/visit-log` page with period filters, optional system scope for admins, top users by visits, and a paginated full visit journal linked directly from the admin sidebar and Security analytics",
+        "fix(security-analytics-visit-resolution): resolve visit actors through persisted session + user joins so role labels, authenticated user names, and course-scoped visit counts stay accurate even when the raw event row was captured before login completed"
+      ]
+    },
+    {
       "version": "1.6.30",
       "date": "2026-04-15",
       "items": [
