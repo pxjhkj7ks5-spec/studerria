@@ -48,6 +48,7 @@ function parseStoredDraft(value: string | null): PublicStoryDraft | null {
 
   try {
     const parsed = JSON.parse(value) as Partial<PublicStoryDraft>;
+    const occupationStatus = parsed.occupationStatus;
 
     if (
       typeof parsed.submitterName !== "string" ||
@@ -60,7 +61,7 @@ function parseStoredDraft(value: string | null): PublicStoryDraft | null {
       typeof parsed.oblast !== "string" ||
       typeof parsed.lat !== "string" ||
       typeof parsed.lng !== "string" ||
-      !isOccupationStatus(String(parsed.occupationStatus ?? ""))
+      !isOccupationStatus(String(occupationStatus ?? ""))
     ) {
       return null;
     }
@@ -76,7 +77,7 @@ function parseStoredDraft(value: string | null): PublicStoryDraft | null {
       oblast: parsed.oblast,
       lat: parsed.lat,
       lng: parsed.lng,
-      occupationStatus: parsed.occupationStatus,
+      occupationStatus,
     };
   } catch {
     return null;
