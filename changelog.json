@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.33",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(academic-setup-structure-ui): hide the standalone `Subject Templates` tab and panel from Academic Setup v2 while keeping subject-template entities, routes, and internal links alive as a backend mechanism for stage templates, bachelor catalog sync, and live course subjects"
+      ]
+    },
+    {
       "version": "1.6.32",
       "date": "2026-04-15",
       "items": [

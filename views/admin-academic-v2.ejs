@@ -731,7 +731,6 @@
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="cohorts">Cohorts</button>
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="courses">Courses</button>
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="stage-templates">Stage Templates</button>
-                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="subject-templates">Subject Templates</button>
                   <% if (isBachelorProgramSelected) { %>
                     <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="bachelor-catalog">Bachelor Catalog</button>
                   <% } %>
@@ -1795,85 +1794,6 @@
               </section>
             <% } %>
 
-            <section class="academic-v2-card" id="subject-templates" data-structure-panel="subject-templates">
-              <div class="academic-v2-section-head">
-                <div>
-                  <h2 class="academic-v2-section-title">Subject templates</h2>
-                </div>
-                <div class="academic-v2-chip-row">
-                  <span class="academic-v2-chip"><%= subjectTemplates.length %> templates</span>
-                  <span class="academic-v2-chip"><%= subjectCards.length %> linked in selected course</span>
-                </div>
-              </div>
-              <div class="academic-v2-grid-2">
-                <form method="post" action="/admin/pathways/v2/templates/save" class="academic-v2-subcard" data-editor-form="template">
-                  <%- renderFocusFields() %>
-                  <input type="hidden" name="subject_template_id" value="" data-editor-input="template.id" />
-                  <div class="academic-v2-section-head academic-v2-section-head--tight">
-                    <div>
-                      <div class="academic-v2-subcard-topline">Catalog</div>
-                      <h3 class="h6 mb-1">Шаблон предмета</h3>
-                    </div>
-                  </div>
-                  <div class="academic-v2-form-grid academic-v2-form-grid--compact">
-                    <div class="academic-v2-field" style="grid-column: 1 / -1;">
-                      <label for="templateName">Назва шаблону</label>
-                      <input id="templateName" class="form-control" type="text" name="name" data-editor-input="template.name" placeholder="Філософія" required />
-                    </div>
-                  </div>
-                  <input type="hidden" name="is_active" value="0" />
-                  <div class="form-check mt-2">
-                    <input id="templateActive" class="form-check-input" type="checkbox" name="is_active" value="1" data-editor-input="template.is_active" checked />
-                    <label class="form-check-label" for="templateActive">Активний шаблон</label>
-                  </div>
-                  <div class="academic-v2-actions mt-2">
-                    <button type="submit" class="btn btn-primary">Зберегти шаблон</button>
-                    <button type="button" class="btn btn-outline-secondary" data-editor-reset="template">Скинути</button>
-                  </div>
-                </form>
-                <div class="academic-v2-subcard">
-                  <div class="academic-v2-table-wrap">
-                    <table class="table academic-v2-table">
-                      <thead>
-                        <tr>
-                          <th>Template</th>
-                          <th>Usage</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <% (subjectTemplates || []).forEach((template) => { %>
-                          <tr>
-                            <td>
-                              <div class="academic-v2-kv">
-                                <strong><%= template.name %></strong>
-                                <span class="academic-v2-muted"><%= template.is_active ? 'Active' : 'Inactive' %></span>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="academic-v2-chip-row">
-                                <span class="academic-v2-chip"><%= template.group_subject_count %> system</span>
-                                <span class="academic-v2-chip"><%= Number(currentSubjectTemplateLinks.get(Number(template.id || 0)) || 0) %> selected course</span>
-                              </div>
-                            </td>
-                            <td class="text-end">
-                              <div class="academic-v2-actions justify-content-end">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-editor-target="template" data-editor-payload='<%- toAttr(template) %>'>Edit</button>
-                                <form method="post" action="/admin/pathways/v2/templates/<%= template.id %>/delete">
-                                  <%- renderFocusFields() %>
-                                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                </form>
-                              </div>
-                            </td>
-                          </tr>
-                        <% }); %>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </section>
-
             <section class="academic-v2-card" id="groups" data-structure-panel="courses">
               <div class="academic-v2-section-head">
                 <div>
@@ -2886,7 +2806,7 @@
         const normalizedRequestedWorkspaceTab = ['overview', 'subjects', 'terms', 'schedule', 'teachers', 'students'].includes(requestedWorkspaceTab)
           ? requestedWorkspaceTab
           : '';
-        const normalizedRequestedStructureTab = ['programs', 'cohorts', 'courses', 'stage-templates', 'subject-templates', 'bachelor-catalog'].includes(requestedStructureTab)
+        const normalizedRequestedStructureTab = ['programs', 'cohorts', 'courses', 'stage-templates', 'bachelor-catalog'].includes(requestedStructureTab)
           ? requestedStructureTab
           : '';
         const scheduleEntriesData = <%- JSON.stringify(scheduleEntriesForViews || []) %>;
@@ -4172,9 +4092,6 @@
           }
           if (target === 'cohort') {
             setStructureTab('cohorts');
-          }
-          if (target === 'template') {
-            setStructureTab('subject-templates');
           }
           if (target === 'stage-term' || target === 'stage-subject' || target === 'stage-subject-activity') {
             setStructureTab('stage-templates');
