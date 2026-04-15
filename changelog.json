@@ -1,6 +1,20 @@
 {
   "items": [
     {
+      "version": "1.6.41",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(journal-insights-streamline): trim Journal Insights UI by removing compare/publish/subject-mix blocks, keep only summary + ranking + trends, and bind subject flow to runtime subject ids while preserving legacy-only publish/snapshot behavior through resolved storage subject binding"
+      ]
+    },
+    {
+      "version": "1.6.40",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(journal-insights-runtime-cleanup): bind Insights subject selection and return context to runtime subject ids (including non-positive runtime ids), keep publishing and snapshot lookup strictly on legacy-bound storage ids, and simplify the Insights UI to a lean read-only storage-status flow when legacy binding is missing"
+      ]
+    },
+    {
       "version": "1.6.39",
       "date": "2026-04-15",
       "items": [

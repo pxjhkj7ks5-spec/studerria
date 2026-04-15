@@ -31851,7 +31851,7 @@ async function buildJournalInsightsContext({
   const subjectsInCourse = (subjectOptions || []).filter(
     (item) => Number(item.course_id) === Number(selectedCourseId)
   );
-  const requestedSubjectId = parsePositiveIntStrict(payload.subject_id);
+  const requestedSubjectId = parseNonZeroIntStrict(payload.subject_id);
   let selectedSubject = requestedSubjectId
     ? ((subjectsInCourse || []).find((item) => Number(item.subject_id) === Number(requestedSubjectId)) || null)
     : null;
@@ -31896,6 +31896,7 @@ async function buildJournalInsightsContext({
     ? resolveJournalStorageSubjectId(selectedSubject)
     : null;
   const selectedJournalHasStorageBinding = Boolean(selectedJournalStorageSubjectId);
+  const selectedJournalSupportsLegacyMutations = Number(selectedJournalStorageSubjectId || 0) > 0;
 
   const period = normalizeJournalInsightsPeriod(payload.period, 'semester');
   const selectedSemester = selectedCourseId ? await getActiveSemester(selectedCourseId) : null;
@@ -31933,7 +31934,7 @@ async function buildJournalInsightsContext({
 
   let selectedGroupNumber = parsePositiveIntStrict(payload.group_number);
   let selectedStudentId = parsePositiveIntStrict(payload.student_id);
-  const returnSubjectId = parsePositiveIntStrict(payload.return_subject_id);
+  const returnSubjectId = parseNonZeroIntStrict(payload.return_subject_id);
   const returnAttendanceDateRaw = String(payload.return_attendance_date || '').trim();
   const returnAttendanceDate = isValidDateString(returnAttendanceDateRaw) ? returnAttendanceDateRaw : '';
   const returnAttendanceClassNumber = parsePositiveIntStrict(payload.return_attendance_class_number);
@@ -32568,6 +32569,8 @@ async function buildJournalInsightsContext({
     publishDisabledReason = 'Student scope is personal and cannot be published.';
   } else if (scopeType === 'all-courses') {
     publishDisabledReason = 'All-courses scope cannot be published as a single audience. Select a specific course or group.';
+  } else if ((scopeType === 'subject' || scopeType === 'group') && selectedSubject && !selectedJournalSupportsLegacyMutations) {
+    publishDisabledReason = 'Publishing for this subject is unavailable until legacy journal storage binding is created.';
   } else if (scopeType === 'course') {
     canPublishRating = true;
     publishTarget = {
@@ -32581,7 +32584,7 @@ async function buildJournalInsightsContext({
       kind: 'group',
       course_id: Number(selectedCourseId || 0),
       semester_id: selectedSemesterId || null,
-      subject_id: Number(selectedSubject.subject_id || 0),
+      subject_id: Number(selectedJournalStorageSubjectId || 0),
       group_number: Number(selectedGroupNumber || 0),
     };
   } else if (scopeType === 'subject' && selectedSubject && groupOptions.length === 1) {
@@ -32590,7 +32593,7 @@ async function buildJournalInsightsContext({
       kind: 'group',
       course_id: Number(selectedCourseId || 0),
       semester_id: selectedSemesterId || null,
-      subject_id: Number(selectedSubject.subject_id || 0),
+      subject_id: Number(selectedJournalStorageSubjectId || 0),
       group_number: Number(groupOptions[0]),
     };
   } else {
@@ -32604,8 +32607,8 @@ async function buildJournalInsightsContext({
     participantsCount,
     lang,
   });
-  const snapshotWorkloadKeys = selectedSubject
-    ? [`${Number(selectedSubject.subject_id || 0)}|${Number((publishTarget && publishTarget.group_number) || selectedGroupNumber || 0) || 'all'}`]
+  const snapshotWorkloadKeys = selectedJournalSupportsLegacyMutations
+    ? [`${Number(selectedJournalStorageSubjectId || 0)}|${Number((publishTarget && publishTarget.group_number) || selectedGroupNumber || 0) || 'all'}`]
     : [];
   let latestPublishedRating = null;
   try {
@@ -32623,7 +32626,7 @@ async function buildJournalInsightsContext({
       const matchedSnapshot = journalInsightHelpers.findRelevantRatingSnapshot(snapshotRows, {
         courseId: selectedCourseId,
         semesterId: selectedSemesterId,
-        subjectId: selectedSubject ? Number(selectedSubject.subject_id || 0) : null,
+        subjectId: selectedJournalSupportsLegacyMutations ? Number(selectedJournalStorageSubjectId || 0) : null,
         groupNumber: (publishTarget && publishTarget.group_number) || selectedGroupNumber || null,
         scopeType,
         targetKind: publishTarget ? publishTarget.kind : '',
@@ -32704,15 +32707,17 @@ async function buildJournalInsightsContext({
     publishDisabledReason,
     publishTarget,
     publishTargetSummary,
-      latestPublishedRating,
-      workflowLinks,
-      returnJournalContext: {
-        subjectId: returnSubjectId || Number(selectedSubject?.subject_id || 0) || null,
-        attendanceDate: returnAttendanceDate,
-        attendanceClassNumber: returnAttendanceClassNumber || null,
-        attendanceQuick: returnAttendanceQuick ? 1 : 0,
-      },
-      canManageAllSubjects: Boolean(journalScope.fullAccess),
+    latestPublishedRating,
+    workflowLinks,
+    returnJournalContext: {
+      subjectId: returnSubjectId || Number(selectedSubject?.subject_id || 0) || null,
+      attendanceDate: returnAttendanceDate,
+      attendanceClassNumber: returnAttendanceClassNumber || null,
+      attendanceQuick: returnAttendanceQuick ? 1 : 0,
+    },
+    selectedJournalHasStorageBinding,
+    selectedJournalSupportsLegacyMutations,
+    canManageAllSubjects: Boolean(journalScope.fullAccess),
   };
 }
 
@@ -32810,13 +32815,13 @@ app.post('/journal/insights/publish-rating', requireLogin, writeLimiter, async (
   } catch (err) {
     return res.redirect(buildJournalInsightsUrl({
       courseId: parsePositiveIntStrict(req.body.course_id, req.session?.user?.course_id),
-      subjectId: parsePositiveIntStrict(req.body.subject_id),
+      subjectId: parseNonZeroIntStrict(req.body.subject_id),
       scopeType: req.body.scope_type || 'subject',
       groupNumber: parsePositiveIntStrict(req.body.group_number),
       studentId: parsePositiveIntStrict(req.body.student_id),
       period: req.body.period || 'semester',
       compareMode: req.body.compare_mode || 'none',
-      returnSubjectId: parsePositiveIntStrict(req.body.return_subject_id),
+      returnSubjectId: parseNonZeroIntStrict(req.body.return_subject_id),
       returnAttendanceDate: String(req.body.return_attendance_date || '').trim(),
       returnAttendanceClassNumber: parsePositiveIntStrict(req.body.return_attendance_class_number),
       returnAttendanceQuick: parseBinaryFlag(req.body.return_attendance_quick, 0),
