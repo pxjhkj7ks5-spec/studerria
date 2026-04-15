@@ -50275,8 +50275,12 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
     const config = parsedConfig && typeof parsedConfig === 'object'
       ? { ...DEFAULT_GENERATOR_CONFIG, ...parsedConfig }
       : { ...DEFAULT_GENERATOR_CONFIG };
-    const requestedLocation = String((req.body && req.body.active_location) || '');
-    const activeLocation = requestedLocation.toLowerCase() === 'munich'
+    const requestedLocation = String(
+      (req.body && req.body.active_location)
+      || (req.query && req.query.location)
+      || ''
+    );
+    let activeLocation = requestedLocation.toLowerCase() === 'munich'
       ? 'munich'
       : requestedLocation
       ? 'kyiv'
@@ -50530,6 +50534,131 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       config,
     });
 
+    const activeLocationCourses = coursesByLocation[activeLocation] || [];
+    const requestedCourseId = parsePositiveIntStrict(
+      (req.query && (req.query.course_id || req.query.selected_course_id))
+      || null
+    );
+    const selectedGlobalCourse = requestedCourseId
+      ? ((activeLocationCourses || []).find((course) => Number(course.id) === Number(requestedCourseId)) || null)
+      : null;
+    const fallbackGlobalCourse = selectedGlobalCourse || (activeLocationCourses[0] || null);
+    const selectedGlobalCourseId = fallbackGlobalCourse ? Number(fallbackGlobalCourse.id) : null;
+    const selectedGlobalSemesters = selectedGlobalCourseId
+      ? (semestersByCourse[selectedGlobalCourseId] || [])
+      : [];
+    const requestedSemesterId = parsePositiveIntStrict(
+      (req.query && (req.query.semester_id || req.query.selected_semester_id))
+      || null
+    );
+    const configuredSemesterId = selectedGlobalCourseId
+      ? parsePositiveIntStrict(
+        getConfiguredCourseSemesterId(config, selectedGlobalCourseId, activeLocation)
+      )
+      : null;
+    const selectedSemesterFromLocationMap = selectedGlobalCourseId
+      ? parsePositiveIntStrict(
+        selectedSemestersByLocation
+          && selectedSemestersByLocation[activeLocation]
+          && selectedSemestersByLocation[activeLocation][selectedGlobalCourseId]
+      )
+      : null;
+    let selectedGlobalSemester = null;
+    if (selectedGlobalSemesters.length && requestedSemesterId) {
+      selectedGlobalSemester = selectedGlobalSemesters.find((semester) => Number(semester.id) === Number(requestedSemesterId)) || null;
+    }
+    if (!selectedGlobalSemester && selectedGlobalSemesters.length && configuredSemesterId) {
+      selectedGlobalSemester = selectedGlobalSemesters.find((semester) => Number(semester.id) === Number(configuredSemesterId)) || null;
+    }
+    if (!selectedGlobalSemester && selectedGlobalSemesters.length && selectedSemesterFromLocationMap) {
+      selectedGlobalSemester = selectedGlobalSemesters.find((semester) => Number(semester.id) === Number(selectedSemesterFromLocationMap)) || null;
+    }
+    if (!selectedGlobalSemester && selectedGlobalSemesters.length) {
+      selectedGlobalSemester = selectedGlobalSemesters[0];
+    }
+    const selectedGlobalSemesterId = selectedGlobalSemester ? Number(selectedGlobalSemester.id) : null;
+
+    let selectedGlobalSubjects = selectedGlobalCourseId
+      ? ((subjectsByCourse[selectedGlobalCourseId] || []).filter((subject) => Number(subject.visible || 1) !== 0))
+      : [];
+    if (selectedGlobalCourseId && selectedGlobalSemesterId) {
+      try {
+        const semesterSubjectRows = await db.all(
+          `
+            SELECT DISTINCT subject_id
+            FROM subject_grading_settings
+            WHERE course_id = ? AND semester_id = ?
+          `,
+          [selectedGlobalCourseId, selectedGlobalSemesterId]
+        );
+        const semesterSubjectIdSet = new Set((semesterSubjectRows || [])
+          .map((row) => Number(row.subject_id || 0))
+          .filter((value) => Number.isInteger(value) && value > 0));
+        if (semesterSubjectIdSet.size) {
+          selectedGlobalSubjects = selectedGlobalSubjects.filter((subject) => semesterSubjectIdSet.has(Number(subject.id || 0)));
+        }
+      } catch (_err) {
+        // Fallback to all visible subjects for the selected course.
+      }
+    }
+    selectedGlobalSubjects = [...selectedGlobalSubjects]
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
+    const selectedGlobalSubjectIds = selectedGlobalSubjects
+      .map((subject) => Number(subject.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0);
+    const selectedGlobalTeacherMap = selectedGlobalSubjectIds.length
+      ? await getSessionSubjectTeacherMap(selectedGlobalSubjectIds)
+      : new Map();
+    const selectedGlobalTeacherOptionsBySubject = {};
+    selectedGlobalSubjectIds.forEach((subjectId) => {
+      selectedGlobalTeacherOptionsBySubject[String(subjectId)] = resolveSessionTeachersForGroup(
+        selectedGlobalTeacherMap,
+        subjectId,
+        null
+      );
+    });
+    const selectedGlobalItems = (items || []).filter((item) => (
+      Number(item.course_id || 0) === Number(selectedGlobalCourseId || 0)
+      && (!selectedGlobalSemesterId || Number(item.semester_id || 0) === Number(selectedGlobalSemesterId))
+    ));
+    const selectedGlobalItemMap = new Map();
+    selectedGlobalItems.forEach((item) => {
+      const lessonType = String(item.lesson_type || '').trim().toLowerCase();
+      if (!(lessonType === 'lecture' || lessonType === 'seminar')) return;
+      if (!(item.group_number === null || typeof item.group_number === 'undefined')) return;
+      const key = `${Number(item.subject_id || 0)}|${lessonType}`;
+      if (!selectedGlobalItemMap.has(key)) {
+        selectedGlobalItemMap.set(key, item);
+      }
+    });
+    const selectedGlobalMatrixRows = [];
+    selectedGlobalSubjects.forEach((subject) => {
+      const subjectId = Number(subject.id || 0);
+      if (!Number.isInteger(subjectId) || subjectId < 1) return;
+      ['lecture', 'seminar'].forEach((lessonType) => {
+        const key = `${subjectId}|${lessonType}`;
+        const existingItem = selectedGlobalItemMap.get(key);
+        selectedGlobalMatrixRows.push({
+          subject_id: subjectId,
+          subject_name: String(subject.name || ''),
+          lesson_type: lessonType,
+          pairs_count: Number(existingItem && existingItem.pairs_count ? existingItem.pairs_count : 0) || 0,
+          teacher_id: existingItem && Number(existingItem.teacher_id || 0) > 0
+            ? Number(existingItem.teacher_id)
+            : null,
+          fixed_day: existingItem && existingItem.fixed_day ? String(existingItem.fixed_day) : '',
+          fixed_class_number: existingItem && Number(existingItem.fixed_class_number || 0) > 0
+            ? Number(existingItem.fixed_class_number)
+            : null,
+        });
+      });
+    });
+    const selectedGlobalExtraItemsCount = selectedGlobalItems.filter((item) => {
+      const lessonType = String(item.lesson_type || '').trim().toLowerCase();
+      if (!(lessonType === 'lecture' || lessonType === 'seminar')) return true;
+      return !(item.group_number === null || typeof item.group_number === 'undefined');
+    }).length;
+
     return res.render('admin-schedule-generator', {
       username: req.session.user.username,
       role: req.session.role,
@@ -50561,6 +50690,15 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       dayOptions: fullWeekDays,
       dayLabels: studyDayLabels,
       classOptions: [1, 2, 3, 4, 5, 6, 7],
+      selectedGlobalCourseId,
+      selectedGlobalSemesterId,
+      selectedGlobalCourse: fallbackGlobalCourse,
+      selectedGlobalSemester,
+      selectedGlobalSemesters,
+      selectedGlobalSubjects,
+      selectedGlobalMatrixRows,
+      selectedGlobalTeacherOptionsBySubject,
+      selectedGlobalExtraItemsCount,
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.render');
@@ -50965,6 +51103,188 @@ app.post('/admin/schedule-generator/items/add', requireScheduleGeneratorSectionA
   }
 });
 
+app.post('/admin/schedule-generator/items/bulk-sync', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.items.bulkSync.init');
+  }
+  const runId = Number(req.body.run_id);
+  const courseId = Number(req.body.course_id);
+  const semesterId = Number(req.body.semester_id);
+  const activeLocation = normalizeGeneratorLocation(req.body.active_location || 'kyiv');
+  if (
+    !Number.isFinite(runId) || runId <= 0
+    || !Number.isFinite(courseId) || courseId <= 0
+    || !Number.isFinite(semesterId) || semesterId <= 0
+  ) {
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid scope', runId || null));
+  }
+
+  const toArray = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value === undefined || value === null) return [];
+    return [value];
+  };
+  const subjectRows = toArray(req.body.row_subject_id);
+  const lessonTypeRows = toArray(req.body.row_lesson_type);
+  const pairsRows = toArray(req.body.row_pairs_count);
+  const teacherRows = toArray(req.body.row_teacher_id);
+  const fixedDayRows = toArray(req.body.row_fixed_day);
+  const fixedClassRows = toArray(req.body.row_fixed_class_number);
+  const rowCount = Math.max(
+    subjectRows.length,
+    lessonTypeRows.length,
+    pairsRows.length,
+    teacherRows.length,
+    fixedDayRows.length,
+    fixedClassRows.length
+  );
+
+  try {
+    const run = await db.get('SELECT config FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) {
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found', runId));
+    }
+    const semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    if (!semester) {
+      return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Semester not found', runId));
+    }
+    const subjectRowsForCourse = await getSubjectsCached(courseId, { visibleOnly: true });
+    const subjectMap = new Map(
+      (subjectRowsForCourse || [])
+        .filter((subject) => Number(subject.visible || 1) !== 0)
+        .map((subject) => [Number(subject.id || 0), subject])
+    );
+    const teacherMapBySubject = subjectMap.size
+      ? await getSessionSubjectTeacherMap(Array.from(subjectMap.keys()))
+      : new Map();
+    const resolveDefaultTeacherId = (subjectId) => {
+      let candidates = resolveSessionTeachersForGroup(teacherMapBySubject, subjectId, null);
+      if ((!Array.isArray(candidates) || !candidates.length) && teacherMapBySubject.has(Number(subjectId))) {
+        const subjectTeacherMap = teacherMapBySubject.get(Number(subjectId));
+        const flattened = new Map();
+        if (subjectTeacherMap && subjectTeacherMap.byGroup && typeof subjectTeacherMap.byGroup.forEach === 'function') {
+          subjectTeacherMap.byGroup.forEach((groupMap) => {
+            if (!groupMap || typeof groupMap.forEach !== 'function') return;
+            groupMap.forEach((teacherName, teacherIdRaw) => {
+              const teacherId = Number(teacherIdRaw || 0);
+              if (!Number.isFinite(teacherId) || teacherId < 1) return;
+              flattened.set(teacherId, String(teacherName || `ID ${teacherId}`));
+            });
+          });
+        }
+        candidates = Array.from(flattened.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
+      }
+      if (!Array.isArray(candidates) || !candidates.length) return null;
+      const defaultId = Number(candidates[0] && candidates[0].id ? candidates[0].id : 0);
+      return Number.isFinite(defaultId) && defaultId > 0 ? defaultId : null;
+    };
+
+    const normalizedRows = [];
+    for (let idx = 0; idx < rowCount; idx += 1) {
+      const subjectId = Number(subjectRows[idx]);
+      if (!Number.isFinite(subjectId) || subjectId < 1 || !subjectMap.has(subjectId)) continue;
+      const lessonTypeRaw = String(lessonTypeRows[idx] || '').trim().toLowerCase();
+      const lessonType = lessonTypeRaw === 'seminar' ? 'seminar' : lessonTypeRaw === 'lecture' ? 'lecture' : '';
+      if (!lessonType) continue;
+      const pairsCount = Number(pairsRows[idx]);
+      if (!Number.isFinite(pairsCount) || pairsCount <= 0) continue;
+      const fixedDay = normalizeWeekdayName(String(fixedDayRows[idx] || '').trim()) || null;
+      const fixedClassRaw = Number(fixedClassRows[idx]);
+      const fixedClass = Number.isFinite(fixedClassRaw) && fixedClassRaw > 0
+        ? Math.floor(fixedClassRaw)
+        : null;
+      if (fixedClass !== null && (fixedClass < 1 || fixedClass > 7)) {
+        return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid slot', runId, {
+          location: activeLocation,
+          course_id: courseId,
+          semester_id: semesterId,
+        }));
+      }
+      let teacherId = Number(teacherRows[idx]);
+      if (!Number.isFinite(teacherId) || teacherId < 1) {
+        teacherId = resolveDefaultTeacherId(subjectId);
+      }
+      normalizedRows.push({
+        subject_id: subjectId,
+        lesson_type: lessonType,
+        pairs_count: Math.max(1, Math.min(120, Math.floor(pairsCount))),
+        teacher_id: Number.isFinite(teacherId) && teacherId > 0 ? Math.floor(teacherId) : null,
+        fixed_day: fixedDay,
+        fixed_class_number: fixedClass,
+      });
+    }
+
+    const dedupedRows = Array.from(new Map(
+      normalizedRows.map((row) => [`${row.subject_id}|${row.lesson_type}`, row])
+    ).values());
+    const runConfig = parseGeneratorConfig(run.config);
+    const nextCourseSemestersByLocation = {
+      ...(runConfig.course_semesters_by_location || { kyiv: {}, munich: {} }),
+      [activeLocation]: {
+        ...((runConfig.course_semesters_by_location && runConfig.course_semesters_by_location[activeLocation]) || {}),
+        [String(courseId)]: semesterId,
+      },
+    };
+    const nextConfig = {
+      ...runConfig,
+      active_location: activeLocation,
+      course_semesters_by_location: nextCourseSemestersByLocation,
+    };
+
+    await withTransaction(async (client) => {
+      await txRun(
+        client,
+        'DELETE FROM schedule_generator_items WHERE run_id = ? AND course_id = ? AND semester_id = ?',
+        [runId, courseId, semesterId]
+      );
+      const insertSql = `
+        INSERT INTO schedule_generator_items
+          (run_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, pairs_count, weeks_set, fixed_day, fixed_class_number, mirror_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      for (const row of dedupedRows) {
+        await txRun(client, insertSql, [
+          runId,
+          courseId,
+          semesterId,
+          row.subject_id,
+          row.teacher_id,
+          row.lesson_type,
+          null,
+          row.pairs_count,
+          null,
+          row.fixed_day,
+          row.fixed_class_number,
+          null,
+        ]);
+      }
+      await txRun(
+        client,
+        'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
+        [serializeGeneratorConfig(nextConfig), runId]
+      );
+    });
+
+    return res.redirect(buildScheduleGeneratorNoticeUrl(
+      req,
+      'ok',
+      `Plan synced (${dedupedRows.length}).`,
+      runId,
+      {
+        location: activeLocation,
+        course_id: courseId,
+        semester_id: semesterId,
+      }
+    ));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.items.bulkSync');
+  }
+});
+
 app.post('/admin/schedule-generator/mirror-auto', requireScheduleGeneratorSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
@@ -51304,6 +51624,15 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
     if (activeLocation !== config.active_location) {
       config.active_location = activeLocation;
     }
+    const nextCourseSemestersByLocation = {
+      ...(config.course_semesters_by_location || { kyiv: {}, munich: {} }),
+    };
+    if (courseOnly && scopeSemesterId) {
+      nextCourseSemestersByLocation[activeLocation] = {
+        ...(nextCourseSemestersByLocation[activeLocation] || {}),
+        [String(courseOnly)]: scopeSemesterId,
+      };
+    }
     const locationCourses = await getCoursesByLocation(activeLocation);
     const locationCourseIds = new Set((locationCourses || []).map((c) => Number(c.id)));
     if (courseOnly && !locationCourseIds.has(courseOnly)) {
@@ -51318,10 +51647,13 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
       `,
       [runId]
     );
-    const items = (itemsAll || []).filter((item) =>
-      locationCourseIds.has(Number(item.course_id)) &&
-      (!courseOnly || Number(item.course_id) === courseOnly)
-    );
+    const items = (itemsAll || []).filter((item) => {
+      const matchesLocation = locationCourseIds.has(Number(item.course_id));
+      if (!matchesLocation) return false;
+      if (courseOnly && Number(item.course_id) !== courseOnly) return false;
+      if (courseOnly && scopeSemesterId && Number(item.semester_id || 0) !== Number(scopeSemesterId)) return false;
+      return true;
+    });
     if (!items.length) {
       return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'No items for location', runId));
     }
@@ -51345,8 +51677,14 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
     }
     for (const courseId of courseIds) {
       const configuredSemesterId = getConfiguredCourseSemesterId(config, courseId, activeLocation);
+      const scopedSemesterId = courseOnly && scopeSemesterId && Number(courseOnly) === Number(courseId)
+        ? Number(scopeSemesterId)
+        : null;
       let semester = null;
-      if (configuredSemesterId) {
+      if (scopedSemesterId) {
+        semester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [scopedSemesterId, courseId]);
+      }
+      if (!semester && configuredSemesterId) {
         semester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, courseId]);
       }
       if (!semester) {
@@ -51424,6 +51762,8 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
     const diffResult = await buildScheduleDiff(filteredEntries);
     const nextConfig = {
       ...config,
+      active_location: activeLocation,
+      course_semesters_by_location: nextCourseSemestersByLocation,
       last_stats: {
         generated_at: new Date().toISOString(),
         items: normalizedItems.length,
@@ -51495,6 +51835,11 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
     return res.redirect(buildScheduleGeneratorPreviewUrl(req, runId, {
       courseId: firstCourse,
       week: 1,
+      extraParams: {
+        location: activeLocation,
+        course_id: firstCourse,
+        semester_id: scopeSemesterId,
+      },
     }));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.run');
@@ -51509,6 +51854,16 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
   }
   const runId = Number(req.params.runId);
   const courseId = Number(req.query.course);
+  const requestedSemesterIdRaw = Number(req.query.semester_id);
+  const requestedSemesterId = Number.isFinite(requestedSemesterIdRaw) && requestedSemesterIdRaw > 0
+    ? requestedSemesterIdRaw
+    : null;
+  const requestedLocationRaw = String(req.query.location || '').trim().toLowerCase();
+  const requestedLocation = requestedLocationRaw === 'munich'
+    ? 'munich'
+    : requestedLocationRaw === 'kyiv'
+    ? 'kyiv'
+    : null;
   if (!Number.isFinite(runId) || runId <= 0) {
     return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Invalid run'));
   }
@@ -51516,7 +51871,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
     const config = parseGeneratorConfig(run.config);
-    const activeLocation = config.active_location === 'munich' ? 'munich' : 'kyiv';
+    const activeLocation = requestedLocation || (config.active_location === 'munich' ? 'munich' : 'kyiv');
     const coursesByLocation = {
       kyiv: await getCoursesByLocation('kyiv'),
       munich: await getCoursesByLocation('munich'),
@@ -51533,7 +51888,13 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
     const selectedLocation = normalizeGeneratorLocation(selectedCourse?.location || activeLocation);
     const configuredSemesterId = getConfiguredCourseSemesterId(config, selectedCourseId, selectedLocation);
     let activeSemester = null;
-    if (configuredSemesterId) {
+    if (requestedSemesterId) {
+      activeSemester = await db.get(
+        'SELECT * FROM semesters WHERE id = ? AND course_id = ?',
+        [requestedSemesterId, selectedCourseId]
+      );
+    }
+    if (!activeSemester && configuredSemesterId) {
       activeSemester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [configuredSemesterId, selectedCourseId]);
     }
     if (!activeSemester) {
@@ -51623,6 +51984,8 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
       run,
       courses: allCourses,
       selectedCourseId,
+      selectedLocation,
+      selectedSemesterId: activeSemester ? Number(activeSemester.id || 0) : null,
       scheduleByDay,
       daysOfWeek: activeDays,
       dayDates,
@@ -51664,10 +52027,17 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
   const buildPreviewRedirect = (message) => {
     const courseId = Number(req.body.course_id);
     const week = Number(req.body.week);
+    const semesterId = parsePositiveIntStrict(req.body.semester_id);
+    const locationRaw = String(req.body.location || '').trim().toLowerCase();
+    const location = locationRaw === 'munich' ? 'munich' : locationRaw === 'kyiv' ? 'kyiv' : null;
     return buildScheduleGeneratorPreviewUrl(req, runId, {
       courseId,
       week,
       err: message || '',
+      extraParams: {
+        location,
+        semester_id: semesterId,
+      },
     });
   };
   if (!Number.isFinite(runId) || runId <= 0) {
@@ -51777,10 +52147,15 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
     });
     const courseId = Number(req.body.course_id) || Number(entries[0].course_id);
     const week = Number(req.body.week) || 1;
+    const semesterId = parsePositiveIntStrict(req.body.semester_id);
+    const locationRaw = String(req.body.location || '').trim().toLowerCase();
+    const location = locationRaw === 'munich' ? 'munich' : locationRaw === 'kyiv' ? 'kyiv' : null;
     return res.redirect(buildScheduleGeneratorPreviewUrl(req, runId, {
       courseId,
       week,
       extraParams: {
+        location,
+        semester_id: semesterId,
         published: '1',
         op: operationId,
         added: String(diffResult.diff.added),

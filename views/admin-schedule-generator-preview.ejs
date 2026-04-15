@@ -39,7 +39,12 @@
           >
             🌙
           </button>
-          <a class="btn btn-outline-primary btn-sm me-2" href="/admin/schedule-generator?run=<%= run.id %>">Назад до генератора</a>
+          <a
+            class="btn btn-outline-primary btn-sm me-2"
+            href="/admin/schedule-generator?run=<%= run.id %><% if (selectedLocation) { %>&location=<%= encodeURIComponent(String(selectedLocation)) %><% } %><% if (selectedCourseId) { %>&course_id=<%= selectedCourseId %><% } %><% if (selectedSemesterId) { %>&semester_id=<%= selectedSemesterId %><% } %>"
+          >
+            Назад до генератора
+          </a>
           <form method="POST" action="/logout">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
           </form>
@@ -75,6 +80,8 @@
           <div class="panel-body">
             <form method="GET" action="/admin/schedule-generator/<%= run.id %>/preview" class="d-flex gap-2 align-items-center">
               <input type="hidden" name="week" value="<%= currentWeek %>" />
+              <input type="hidden" name="location" value="<%= selectedLocation || '' %>" />
+              <input type="hidden" name="semester_id" value="<%= selectedSemesterId || '' %>" />
               <select name="course" class="form-select w-auto" onchange="this.form.submit()">
                 <% (courses || []).forEach(function(course) { %>
                   <option value="<%= course.id %>" <%= Number(course.id) === Number(selectedCourseId) ? 'selected' : '' %>><%= course.name %></option>
@@ -115,6 +122,8 @@
             <input type="hidden" name="operation_id" value="<%= previewStats ? (previewStats.operation_id || '') : '' %>" />
             <input type="hidden" name="course_id" value="<%= selectedCourseId %>" />
             <input type="hidden" name="week" value="<%= currentWeek %>" />
+            <input type="hidden" name="location" value="<%= selectedLocation || '' %>" />
+            <input type="hidden" name="semester_id" value="<%= selectedSemesterId || '' %>" />
             <label class="form-check small">
               <input class="form-check-input" type="checkbox" name="confirm_overwrite" value="1" data-publish-confirm />
               Я розумію, що це перезапише <%= overwriteCount %> слотів

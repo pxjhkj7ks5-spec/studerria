@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.46",
+      "date": "2026-04-16",
+      "items": [
+        "refactor(schedule-generator-global-term-matrix): rebuild `/admin/schedule-generator` around a global location/course/semester scope with a compact lecture/seminar matrix (pairs + optional teacher + modal fixed day/slot), add bulk sync with automatic teacher fallback from subject assignments, remove the heavy in-page teacher limits block, make preview generation honor an explicitly selected non-active semester for the chosen course, and persist selected scope (location/course/semester) across preview/publish/back navigation"
+      ]
+    },
+    {
       "version": "1.6.45",
       "date": "2026-04-16",
       "items": [
