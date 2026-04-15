@@ -22942,9 +22942,31 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const deadlinesWindowEnd = formatLocalDate(addDays(now, 14));
   const deadlinesWindowStart = formatLocalDate(addDays(now, -7));
 
-  const studentGroups = useStudentAcademicScope
+  let studentGroups = useStudentAcademicScope
     ? Array.from(studentCompat.rows || [])
     : [];
+  if (useStudentAcademicScope && !studentGroups.length) {
+    const fallbackStudentId = parsePositiveIntStrict(user && user.id ? user.id : user);
+    if (fallbackStudentId) {
+      const fallbackRows = await academicSetupHelpers.listLegacyStudentGroupRows(getAcademicSetupStore(), {
+        studentId: fallbackStudentId,
+        courseId: courseId || null,
+        includeHidden: false,
+      }).catch(() => []);
+      if (Array.isArray(fallbackRows) && fallbackRows.length) {
+        studentGroups = fallbackRows.map((row) => {
+          const normalizedGroup = parsePositiveIntStrict(row.group_number);
+          return {
+            ...row,
+            selected_group: normalizedGroup,
+            default_group: normalizedGroup,
+            has_all_groups: row.group_number === null || typeof row.group_number === 'undefined',
+            owner_course_id: Number(row.owner_course_id || row.course_id || courseId || 0) || null,
+          };
+        });
+      }
+    }
+  }
 
   let workloadTargets = (studentGroups || []).map((row) => ({
     subject_id: Number(row.subject_id),
@@ -23051,10 +23073,10 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           const selectedGroup = parsePositiveIntStrict(target.selected_group);
           if (scopeKind === 'schedule') {
             if (selectedGroup) {
-              chunks.push(`(${alias}.subject_id = ? AND (LOWER(COALESCE(NULLIF(TRIM(CAST(${alias}.lesson_type AS TEXT)), ''), '')) = 'lecture' OR ${alias}.group_number = ?))`);
+              chunks.push(`(${alias}.subject_id = ? AND (${alias}.group_number = ? OR ${alias}.group_number IS NULL OR LOWER(COALESCE(NULLIF(TRIM(CAST(${alias}.lesson_type AS TEXT)), ''), '')) = 'lecture'))`);
               params.push(target.subject_id, selectedGroup);
             } else {
-              chunks.push(`(${alias}.subject_id = ? AND LOWER(COALESCE(NULLIF(TRIM(CAST(${alias}.lesson_type AS TEXT)), ''), '')) = 'lecture')`);
+              chunks.push(`(${alias}.subject_id = ? AND (${alias}.group_number IS NULL OR LOWER(COALESCE(NULLIF(TRIM(CAST(${alias}.lesson_type AS TEXT)), ''), '')) = 'lecture'))`);
               params.push(target.subject_id);
             }
           } else if (selectedGroup) {

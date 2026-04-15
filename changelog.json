@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.45",
+      "date": "2026-04-16",
+      "items": [
+        "fix(my-day-next-classes): restore nearest-class visibility by adding a student-group fallback when selected focus subjects are empty and by including shared schedule slots (`group_number IS NULL`) in My Day schedule scope filtering"
+      ]
+    },
+    {
       "version": "1.6.44",
       "date": "2026-04-16",
       "items": [

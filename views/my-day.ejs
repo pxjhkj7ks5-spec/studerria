@@ -67,9 +67,9 @@
         || supportThreads.length > 0;
       const hasInboxMessageMissionData = Boolean(inboxMessageSummary) || inboxMessageItems.length > 0;
       const hasTeacherQuickActions = isTeacherMyDayView && teacherQuickActions.length > 0;
-      const showAttendanceMission = Boolean(attendanceHealth) || isStudentLikeMyDayView;
+      const showAttendanceMission = Boolean(attendanceHealth);
       const showRatingMission = Boolean(latestRatingSnapshot) || !isStudentLikeMyDayView;
-      const showSupportMission = hasSupportMissionData;
+      const showSupportMission = Number(supportMissionSummary.open || 0) > 0;
       const showInboxMissionCard = Boolean(settings && settings.allow_messages && hasInboxMessageMissionData);
       const showMissionStrip = showAttendanceMission
         || showRatingMission
