@@ -1,6 +1,20 @@
 {
   "items": [
     {
+      "version": "1.6.38",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(teacher-hub-offering-scope): switch Teacher Hub to the live offering assignment shape (`teacher_offering_assignments`) as the primary source, normalize hub scope rows through one shared mapper, remove duplicated teacher-scope reloads between `/teacher` and My Day, and keep a compact legacy fallback only when offering data is unavailable"
+      ]
+    },
+    {
+      "version": "1.6.37",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(journal-runtime-subject-binding): allow the Journal page to resolve and open runtime subject ids (including negative academic_v2 runtime ids), remove redundant legacy-only subject-id guards in page flow, and keep runtime/unmapped contexts safely read-only by disabling legacy mutation workflows where storage is not legacy-bound"
+      ]
+    },
+    {
       "version": "1.6.36",
       "date": "2026-04-15",
       "items": [

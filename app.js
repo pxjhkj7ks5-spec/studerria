@@ -13064,6 +13064,14 @@ function parsePositiveIntStrict(rawValue, fallback = null) {
   return parsed;
 }
 
+function parseNonZeroIntStrict(rawValue, fallback = null) {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed === 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
 function normalizeBoolean(rawValue, fallback = false) {
   if (typeof rawValue === 'boolean') return rawValue;
   if (typeof rawValue === 'number') return rawValue === 1;
@@ -28153,7 +28161,7 @@ const getJournalRefererSearchParams = (req) => {
 
 const buildJournalRedirectPath = (params = {}) => {
   const query = new URLSearchParams();
-  const subjectId = parsePositiveIntStrict(params.subjectId);
+  const subjectId = parseNonZeroIntStrict(params.subjectId);
   if (subjectId) query.set('subject_id', String(subjectId));
   const attendanceDate = String(params.attendanceDate || '').trim();
   if (isValidDateString(attendanceDate)) query.set('attendance_date', attendanceDate);
@@ -30039,7 +30047,35 @@ async function trySyncJournalColumnsAfterHomeworkCreate({
 }
 
 async function getTeacherJournalSubjectAccess(userId, subjectId, courseId = null) {
+  const runtimeSubjectId = parseNonZeroIntStrict(subjectId);
   const normalizedCourseId = parsePositiveIntStrict(courseId) || null;
+  if (runtimeSubjectId && runtimeSubjectId < 0) {
+    const rows = await getTeacherAssignedSubjects(userId);
+    const subjectRows = (rows || []).filter((row) => {
+      const rowRuntimeSubjectId = buildJournalRuntimeSubjectId({
+        legacySubjectId: row.subject_id || row.legacy_subject_id,
+        groupSubjectId: row.group_subject_id,
+        subjectOfferingId: row.subject_offering_id,
+      });
+      if (Number(rowRuntimeSubjectId || 0) !== Number(runtimeSubjectId)) {
+        return false;
+      }
+      if (normalizedCourseId && Number(row.course_id || 0) !== Number(normalizedCourseId)) {
+        return false;
+      }
+      return true;
+    });
+    if (!subjectRows.length) {
+      return { hasRows: false, allowAll: false, groups: new Set() };
+    }
+    const groupCount = Math.max(
+      1,
+      subjectRows.reduce((maxValue, row) => Math.max(maxValue, Number(row.group_count || 1) || 1), 1)
+    );
+    return buildTeacherSubjectAccess(subjectRows, groupCount, {
+      courseId: normalizedCourseId,
+    });
+  }
   const rows = await teacherTemplateHelpers.listTeacherSubjectMirrorRows(
     getTeacherTemplateStore(),
     userId,
@@ -30075,6 +30111,26 @@ function buildJournalRuntimeSubjectId({
     return 0 - (1000000000 + normalizedSubjectOfferingId);
   }
   return null;
+}
+
+function resolveJournalStorageSubjectId(subjectOption = null) {
+  if (!subjectOption || typeof subjectOption !== 'object') {
+    return null;
+  }
+  const legacySubjectId = parsePositiveIntStrict(subjectOption.legacy_subject_id);
+  if (legacySubjectId) {
+    return legacySubjectId;
+  }
+  const runtimeSubjectId = parseNonZeroIntStrict(subjectOption.subject_id);
+  if (runtimeSubjectId) {
+    return runtimeSubjectId;
+  }
+  const derivedRuntimeSubjectId = buildJournalRuntimeSubjectId({
+    legacySubjectId: subjectOption.legacy_subject_id || subjectOption.subject_id,
+    groupSubjectId: subjectOption.group_subject_id,
+    subjectOfferingId: subjectOption.subject_offering_id,
+  });
+  return parseNonZeroIntStrict(derivedRuntimeSubjectId);
 }
 
 async function listJournalAcademicV2FallbackSubjects() {
@@ -30816,7 +30872,7 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
   const groups = groupFilterSet && groupFilterSet.size
     ? Array.from(groupFilterSet).filter((value) => Number.isInteger(value) && value > 0)
     : [];
-  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  const normalizedSubjectId = parseNonZeroIntStrict(subjectId);
   const normalizedCourseId = parsePositiveIntStrict(courseId);
   if (normalizedSubjectId && normalizedCourseId) {
     try {
@@ -30840,7 +30896,15 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
           { selectedOnly: true }
         ).catch(() => null);
         const subjectRows = Array.isArray(studentState && studentState.subjects) ? studentState.subjects : [];
-        const selectedSubject = subjectRows.find((row) => Number(row.subject_id || row.id) === Number(normalizedSubjectId)) || null;
+        const selectedSubject = subjectRows.find((row) => {
+          const rowSubjectId = resolveJournalStorageSubjectId({
+            subject_id: row.subject_id || row.id,
+            legacy_subject_id: row.legacy_subject_id,
+            group_subject_id: row.group_subject_id,
+            subject_offering_id: row.subject_offering_id,
+          });
+          return Number(rowSubjectId || 0) === Number(normalizedSubjectId);
+        }) || null;
         if (!selectedSubject) {
           continue;
         }
@@ -30884,6 +30948,10 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
 }
 
 async function getJournalStudentGroup(subjectId, studentId) {
+  const normalizedSubjectId = parseNonZeroIntStrict(subjectId);
+  if (!normalizedSubjectId) {
+    return { group_number: null };
+  }
   try {
     const studentState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
       getAcademicV2Store(),
@@ -30891,7 +30959,15 @@ async function getJournalStudentGroup(subjectId, studentId) {
       { selectedOnly: true }
     );
     const subjectRows = Array.isArray(studentState && studentState.subjects) ? studentState.subjects : [];
-    const selectedSubject = subjectRows.find((row) => Number(row.subject_id || row.id) === Number(subjectId)) || null;
+    const selectedSubject = subjectRows.find((row) => {
+      const rowSubjectId = resolveJournalStorageSubjectId({
+        subject_id: row.subject_id || row.id,
+        legacy_subject_id: row.legacy_subject_id,
+        group_subject_id: row.group_subject_id,
+        subject_offering_id: row.subject_offering_id,
+      });
+      return Number(rowSubjectId || 0) === Number(normalizedSubjectId);
+    }) || null;
     if (selectedSubject) {
       const selectedGroup = selectedSubject.has_all_groups
         ? null
@@ -30909,8 +30985,11 @@ async function getJournalStudentGroup(subjectId, studentId) {
       throw err;
     }
   }
+  if (normalizedSubjectId < 0) {
+    return { group_number: null };
+  }
   return academicSetupHelpers.getLegacyStudentSubjectGroup(getAcademicSetupStore(), {
-    subjectId,
+    subjectId: normalizedSubjectId,
     studentId,
     activeOnly: usersHasIsActive,
   });
@@ -31306,7 +31385,7 @@ async function buildJournalMatrix({
   groupFilterSet = null,
   studentFilterIds = [],
 }) {
-  const normalizedSubjectId = parsePositiveIntStrict(subjectId);
+  const normalizedSubjectId = parseNonZeroIntStrict(subjectId);
   if (!normalizedSubjectId) {
     return {
       gradingSettings: {
@@ -31319,8 +31398,16 @@ async function buildJournalMatrix({
       rows: [],
     };
   }
-  const gradingSettings = await ensureSubjectGradingSettings(subjectId, courseId, semesterId, actorUserId);
-  if (Number(gradingSettings?.is_closed || 0) !== 1) {
+  const supportsLegacyHomeworkSync = normalizedSubjectId > 0;
+  const gradingSettings = supportsLegacyHomeworkSync
+    ? await ensureSubjectGradingSettings(subjectId, courseId, semesterId, actorUserId)
+    : {
+        ...DEFAULT_SUBJECT_GRADING_SETTINGS,
+        is_closed: 0,
+        closed_by: null,
+        closed_at: null,
+      };
+  if (supportsLegacyHomeworkSync && Number(gradingSettings?.is_closed || 0) !== 1) {
     try {
       await syncJournalColumnsFromHomework(subjectId, courseId, semesterId, gradingSettings, actorUserId);
     } catch (err) {
@@ -32916,8 +33003,8 @@ app.get('/journal', requireLogin, async (req, res) => {
     const selectedCourseId = Number(selectedSubject.course_id || req.session.user.course_id || 1);
     const selectedSemester = await getActiveSemester(selectedCourseId);
     journalFallbackState.selectedSemester = selectedSemester || null;
-    const selectedLegacySubjectId = parsePositiveIntStrict(selectedSubject.legacy_subject_id || selectedSubject.subject_id);
-    if (!selectedLegacySubjectId) {
+    const storageSubjectId = resolveJournalStorageSubjectId(selectedSubject);
+    if (!storageSubjectId) {
       await renderViewToResponse(
         res,
         'journal',
@@ -32944,15 +33031,18 @@ app.get('/journal', requireLogin, async (req, res) => {
       );
       return;
     }
-    const subjectClosure = await getJournalSubjectClosureState(selectedLegacySubjectId);
-    const canEditJournal = teacherJournalMode && !subjectClosure.is_closed;
+    const supportsLegacyJournalMutations = Number(storageSubjectId) > 0;
+    const subjectClosure = await getJournalSubjectClosureState(storageSubjectId);
+    const canEditJournal = teacherJournalMode && supportsLegacyJournalMutations && !subjectClosure.is_closed;
     const canCloseSubject = Boolean(
       teacherJournalMode
+      && supportsLegacyJournalMutations
       && !subjectClosure.is_closed
       && (journalScope.fullAccess || selectedSubject.has_all_groups)
     );
     const canReopenSubject = Boolean(
       teacherJournalMode
+      && supportsLegacyJournalMutations
       && subjectClosure.is_closed
       && (journalScope.fullAccess || selectedSubject.has_all_groups)
     );
@@ -32968,7 +33058,7 @@ app.get('/journal', requireLogin, async (req, res) => {
     }
 
     const matrix = await buildJournalMatrix({
-      subjectId: Number(selectedSubject.subject_id),
+      subjectId: Number(storageSubjectId),
       courseId: selectedCourseId,
       semesterId: selectedSemester ? Number(selectedSemester.id) : null,
       actorUserId: Number(req.session.user.id),
@@ -32976,17 +33066,19 @@ app.get('/journal', requireLogin, async (req, res) => {
       studentFilterIds,
     });
     const attendanceContext = buildJournalEmptyAttendanceContext();
-    const journalWorkflowLinks = {
-      insightsHref: buildJournalInsightsUrl({
-        courseId: Number(selectedSubject.course_id || 0),
-        subjectId: Number(selectedSubject.subject_id || 0),
-        scopeType: 'subject',
-        period: 'semester',
-        returnSubjectId: Number(selectedSubject.subject_id || 0),
-      }),
-      closeExportHref: buildJournalCloseExportPathFromRequest(req, Number(selectedSubject.subject_id || 0), {
-      }),
-    };
+    const journalWorkflowLinks = supportsLegacyJournalMutations
+      ? {
+          insightsHref: buildJournalInsightsUrl({
+            courseId: Number(selectedSubject.course_id || 0),
+            subjectId: Number(selectedSubject.subject_id || 0),
+            scopeType: 'subject',
+            period: 'semester',
+            returnSubjectId: Number(selectedSubject.subject_id || 0),
+          }),
+          closeExportHref: buildJournalCloseExportPathFromRequest(req, Number(selectedSubject.subject_id || 0), {
+          }),
+        }
+      : {};
     const routeMessages = (res.locals && res.locals.messages && typeof res.locals.messages === 'object')
       ? res.locals.messages
       : {};
@@ -34123,7 +34215,8 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
     );
     const subjectClosure = await getJournalSubjectClosureState(Number(column.subject_id));
     const subjectIsClosed = subjectClosure.is_closed;
-    const canManageRetakes = teacherJournalMode && !subjectIsClosed && !isJournalColumnLocked(column);
+    const supportsLegacyJournalMutations = Number(column.subject_id || 0) > 0;
+    const canManageRetakes = teacherJournalMode && supportsLegacyJournalMutations && !subjectIsClosed && !isJournalColumnLocked(column);
     const appealRows = await db.all(
       `
         SELECT
@@ -34148,7 +34241,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       `,
       [columnId, studentId]
     );
-    const canManageAppeals = teacherJournalMode && !subjectIsClosed && !isJournalColumnLocked(column);
+    const canManageAppeals = teacherJournalMode && supportsLegacyJournalMutations && !subjectIsClosed && !isJournalColumnLocked(column);
     const moderationRow = await db.get(
       `
         SELECT
@@ -34175,6 +34268,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
     const columnNeedsModeration = isJournalModerationRequiredColumn(column);
     const canManageModeration = (
       teacherJournalMode
+      && supportsLegacyJournalMutations
       && !subjectIsClosed
       && !isJournalColumnLocked(column)
       && columnNeedsModeration
@@ -34221,11 +34315,13 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
     });
     const canAddCompetencySignal = (
       teacherJournalMode
+      && supportsLegacyJournalMutations
       && !subjectIsClosed
       && !isJournalColumnLocked(column)
     );
     const canCreateAppeals = (
       !teacherJournalMode
+      && supportsLegacyJournalMutations
       && !subjectIsClosed
       && Number(req.session.user.id) === studentId
       && Boolean(grade && Number.isFinite(Number(grade.score)))
@@ -34274,7 +34370,7 @@ app.get('/journal/cell.json', requireLogin, readLimiter, async (req, res) => {
       submission_status: submissionStatus,
       subject_is_closed: subjectIsClosed,
       subject_closed_at: subjectClosure.closed_at || null,
-      can_edit: teacherJournalMode && !subjectIsClosed && !isJournalColumnLocked(column),
+      can_edit: teacherJournalMode && supportsLegacyJournalMutations && !subjectIsClosed && !isJournalColumnLocked(column),
       can_manage_retakes: canManageRetakes,
       can_create_appeals: canCreateAppeals,
       can_manage_appeals: canManageAppeals,
