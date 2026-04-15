@@ -385,6 +385,8 @@
         const teacherPriorities = Array.isArray(teacherTopPriorities) ? teacherTopPriorities : [];
         const activitySummary = teacherActivitySummary || {};
         const ratingTopEntry = latestRatingSnapshot && latestRatingSnapshot.top_entry ? latestRatingSnapshot.top_entry : null;
+        const hasRecentTemplates = Array.isArray(recentTemplates) && recentTemplates.length > 0;
+        const hasTeacherAssets = Array.isArray(teacherAssets) && teacherAssets.length > 0;
       %>
 
       <section class="row g-3 mb-1">
@@ -509,7 +511,7 @@
                 <div class="stat-value"><%= Number(stats && stats.templates ? stats.templates : 0) %></div>
               </div>
               <div class="stat-card">
-                <div class="stat-label"><%= lang === 'en' ? 'Assets' : 'Assets' %></div>
+                <div class="stat-label"><%= lang === 'en' ? 'Assets' : 'Асети' %></div>
                 <div class="stat-value"><%= Number(stats && stats.assets ? stats.assets : 0) %></div>
               </div>
               <div class="stat-card">
@@ -610,6 +612,7 @@
             </div>
           </article>
         </div>
+        <% if (hasRecentTemplates) { %>
         <div class="col-12 col-xl-6">
           <article class="glass hub-panel h-100">
             <div class="hub-panel-head">
@@ -617,9 +620,8 @@
                 <h5 class="mb-1"><%= lang === 'en' ? 'Recent templates' : 'Останні шаблони' %></h5>
                 <p><%= lang === 'en' ? 'Reusable starts for upcoming homework and session tasks.' : 'База для швидкого створення домашок і сесійних задач.' %></p>
               </div>
-              <a class="btn btn-hub btn-sm" href="/teacher/workspace"><%= lang === 'en' ? 'Workspace' : 'Workspace' %></a>
+              <a class="btn btn-hub btn-sm" href="/teacher/workspace"><%= lang === 'en' ? 'Workspace' : 'Робоча зона' %></a>
             </div>
-            <% if ((recentTemplates || []).length) { %>
               <div class="hub-list">
                 <% recentTemplates.forEach(function(template) { %>
                   <div class="hub-list-item">
@@ -632,21 +634,19 @@
                   </div>
                 <% }) %>
               </div>
-            <% } else { %>
-              <div class="hub-list-item"><%= lang === 'en' ? 'No templates yet.' : 'Шаблони ще не створені.' %></div>
-            <% } %>
           </article>
         </div>
+        <% } %>
+        <% if (hasTeacherAssets) { %>
         <div class="col-12 col-xl-6">
           <article class="glass hub-panel h-100">
             <div class="hub-panel-head">
               <div>
-                <h5 class="mb-1"><%= lang === 'en' ? 'Asset library' : 'Бібліотека assets' %></h5>
+                <h5 class="mb-1"><%= lang === 'en' ? 'Asset library' : 'Бібліотека асетів' %></h5>
                 <p><%= lang === 'en' ? 'Reusable files linked to templates and homework.' : 'Файли, які можна повторно використовувати в шаблонах і домашках.' %></p>
               </div>
               <a class="btn btn-hub btn-sm" href="/teacher/workspace"><%= lang === 'en' ? 'Manage files' : 'Керувати' %></a>
             </div>
-            <% if ((teacherAssets || []).length) { %>
               <div class="hub-list">
                 <% teacherAssets.forEach(function(asset) { %>
                   <div class="hub-list-item">
@@ -659,11 +659,9 @@
                   </div>
                 <% }) %>
               </div>
-            <% } else { %>
-              <div class="hub-list-item"><%= lang === 'en' ? 'No assets uploaded yet.' : 'Файли ще не завантажені.' %></div>
-            <% } %>
           </article>
         </div>
+        <% } %>
       </section>
 
       <%- include('partials/app-footer') %>
@@ -714,4 +712,3 @@
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
-

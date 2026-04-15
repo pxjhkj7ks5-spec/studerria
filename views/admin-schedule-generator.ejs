@@ -60,14 +60,14 @@
         mirrorGroups: 'Fast group mirroring (A/B)',
         mirrorGroupsHint: 'Pair groups 1/2 with the same mirror key and alternate them by weeks.',
         saveSettings: 'Save settings',
-        scopeControls: 'Область генерації',
+        scopeControls: 'Generation scope',
         scopeHint: 'Applies to Preview/Publish. If empty, generate the whole semester.',
-        semesterOptional: 'Семестр (необовʼязково)',
+        semesterOptional: 'Semester (optional)',
         allSemesters: 'All semesters',
-        weekFrom: 'Тиждень від',
-        weekTo: 'Тиждень до',
-        groups: 'Групи',
-        days: 'Дні',
+        weekFrom: 'Week from',
+        weekTo: 'Week to',
+        groups: 'Groups',
+        days: 'Days',
         beforeRun: 'Before run',
         readyToGenerate: 'Everything is ready to generate.',
         critical: 'Critical',
@@ -81,12 +81,12 @@
         lastGeneration: 'Last generation',
         records: 'Records',
         conflicts: 'Conflicts',
-        diffPreview: 'Порівняння (Preview)',
-        overwriteSlots: 'Перезапис слотів',
-        manualOverwrite: 'Ручний перезапис',
+        diffPreview: 'Diff (Preview)',
+        overwriteSlots: 'Overwrite slots',
+        manualOverwrite: 'Manual overwrite',
         manualOverwriteTodo: 'TODO (needs is_manual)',
         updatedAt: 'Updated',
-        operation: 'Операція',
+        operation: 'Operation',
         course: 'Course',
         subject: 'Subject',
         location: 'Location',
@@ -143,9 +143,9 @@
         fixedDayShort: 'Fixed day',
         fixedSlotShort: 'Fixed slot',
         actions: 'Actions',
-        unlock: 'Розблокувати',
-        lock: 'Зафіксувати',
-        delete: 'Видалити',
+        unlock: 'Unlock',
+        lock: 'Lock',
+        delete: 'Delete',
         deleteRecordConfirm: 'Delete record?',
         addSubjectsToCreatePlan: 'Add subjects to create a plan.',
         mirrorAutoTitle: 'Mirror auto-pairs',
@@ -190,6 +190,8 @@
         moreRecords: (count) => `${count} more records.`,
         foundMerges: (count) => `Found ${count} merges`,
         pairsUnit: 'pairs',
+        advancedToggleShow: 'Show additional sections',
+        advancedToggleHide: 'Hide additional sections',
       }
     : {
         pageTitle: 'Генератор розкладу',
@@ -227,13 +229,13 @@
         seminarStart: 'На початку',
         seminarEven: 'Рівномірно',
         seminarEnd: 'В кінці',
-        maxPairsPerDay: 'Max пар/день',
+        maxPairsPerDay: 'Макс. пар/день',
         targetPairsPerDay: 'Ціль пар/день',
         evennessBalance: 'Баланс рівномірності',
         evennessHint: '0 — компактніше, 100 — максимально рівномірно.',
         avoidLateSlots: 'Уникати вечірніх слотів',
         lateSlotsHint: '0 — не враховувати, 100 — максимально уникати 5-7 пар.',
-        strictNoEvening: 'Strict no-evening (заборонити 6-7 пари)',
+        strictNoEvening: 'Строго без вечірніх (заборонити 6-7 пари)',
         strictNoEveningHint: 'Жорстка заборона вечірніх слотів. Якщо не вистачає місця — генератор покаже конфлікти.',
         specialWeeks: 'Особливі тижні (1-3,8)',
         specialWeeksMode: 'Режим особливих тижнів',
@@ -251,14 +253,14 @@
         mirrorGroups: 'Швидке дзеркало груп (A/B)',
         mirrorGroupsHint: 'Парно зʼєднуємо групи 1/2 з однаковим ключем дзеркала та чергуємо по тижнях.',
         saveSettings: 'Зберегти налаштування',
-        scopeControls: 'Scope controls',
+        scopeControls: 'Область генерації',
         scopeHint: 'Застосовується до Preview/Publish. Якщо порожньо — генеруємо весь семестр.',
-        semesterOptional: 'Semester (optional)',
+        semesterOptional: 'Семестр (необовʼязково)',
         allSemesters: 'Усі семестри',
-        weekFrom: 'Week from',
-        weekTo: 'Week to',
-        groups: 'Groups',
-        days: 'Days',
+        weekFrom: 'Тиждень від',
+        weekTo: 'Тиждень до',
+        groups: 'Групи',
+        days: 'Дні',
         beforeRun: 'Перед запуском',
         readyToGenerate: 'Все готово до генерації.',
         critical: 'Критично',
@@ -272,12 +274,12 @@
         lastGeneration: 'Остання генерація',
         records: 'Записів',
         conflicts: 'Конфліктів',
-        diffPreview: 'Diff (Preview)',
-        overwriteSlots: 'Overwrite slots',
-        manualOverwrite: 'Manual overwrite',
+        diffPreview: 'Порівняння (Preview)',
+        overwriteSlots: 'Перезапис слотів',
+        manualOverwrite: 'Ручний перезапис',
         manualOverwriteTodo: 'TODO (needs is_manual)',
         updatedAt: 'Оновлено',
-        operation: 'Operation',
+        operation: 'Операція',
         course: 'Курс',
         subject: 'Предмет',
         location: 'Локація',
@@ -334,9 +336,9 @@
         fixedDayShort: 'Фікс. день',
         fixedSlotShort: 'Фікс. слот',
         actions: 'Дії',
-        unlock: 'Unlock',
-        lock: 'Lock',
-        delete: 'Delete',
+        unlock: 'Розблокувати',
+        lock: 'Зафіксувати',
+        delete: 'Видалити',
         deleteRecordConfirm: 'Видалити запис?',
         addSubjectsToCreatePlan: 'Додайте предмети, щоб створити план.',
         mirrorAutoTitle: 'Авто-пари для дзеркала',
@@ -381,6 +383,8 @@
         moreRecords: (count) => `Ще ${count} записів.`,
         foundMerges: (count) => `Знайдено ${count} злиттів`,
         pairsUnit: 'пар',
+        advancedToggleShow: 'Показати додаткові секції',
+        advancedToggleHide: 'Сховати додаткові секції',
       };
   const scheduleGeneratorLessonTypeLabels = {
     lecture: scheduleGeneratorCopy.lecture,
@@ -580,6 +584,16 @@
               </form>
             <% } %>
           <% }); %>
+          <button
+            class="btn btn-outline-secondary"
+            type="button"
+            id="toggleGeneratorAdvancedSections"
+            data-show-label="<%= scheduleGeneratorCopy.advancedToggleShow %>"
+            data-hide-label="<%= scheduleGeneratorCopy.advancedToggleHide %>"
+            aria-expanded="false"
+          >
+            <%= scheduleGeneratorCopy.advancedToggleShow %>
+          </button>
         </div>
       </div>
 
@@ -919,7 +933,7 @@
             </div>
           </div>
 
-          <div class="card glass-panel mb-4">
+          <div class="card glass-panel mb-4 generator-optional-section">
             <div class="card-body">
               <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.mergePreviewTitle %></div>
               <div class="small text-muted mb-3">
@@ -942,7 +956,7 @@
             </div>
           </div>
 
-          <div class="card glass-panel mb-4">
+          <div class="card glass-panel mb-4 generator-optional-section">
             <div class="card-body">
               <div class="generator-section-title mb-2"><%= scheduleGeneratorCopy.lastGeneration %></div>
               <% if (lastStats) { %>
@@ -992,7 +1006,7 @@
             </div>
           </div>
 
-          <div class="card glass-panel mb-4">
+          <div class="card glass-panel mb-4 generator-optional-section">
             <div class="card-body">
               <div class="generator-section-title mb-1"><%= scheduleGeneratorCopy.loadMapTitle %></div>
               <div class="small text-muted mb-2"><%= scheduleGeneratorCopy.loadMapHint %></div>
@@ -1595,6 +1609,25 @@
       const scopeCard = document.getElementById('generatorScopeCard');
       const scopeFields = scopeCard ? Array.from(scopeCard.querySelectorAll('[data-scope-field]')) : [];
       const runForms = document.querySelectorAll('.generator-run-form');
+      const toggleAdvancedSectionsBtn = document.getElementById('toggleGeneratorAdvancedSections');
+      const advancedSections = Array.from(document.querySelectorAll('.generator-optional-section'));
+
+      const setAdvancedSections = (expanded) => {
+        document.body.classList.toggle('show-advanced', expanded);
+        if (!toggleAdvancedSectionsBtn) return;
+        toggleAdvancedSectionsBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        toggleAdvancedSectionsBtn.textContent = expanded
+          ? (toggleAdvancedSectionsBtn.dataset.hideLabel || '')
+          : (toggleAdvancedSectionsBtn.dataset.showLabel || '');
+      };
+
+      if (toggleAdvancedSectionsBtn && advancedSections.length) {
+        setAdvancedSections(false);
+        toggleAdvancedSectionsBtn.addEventListener('click', () => {
+          const expanded = toggleAdvancedSectionsBtn.getAttribute('aria-expanded') === 'true';
+          setAdvancedSections(!expanded);
+        });
+      }
 
       const evennessRange = document.getElementById('evennessBiasRange');
       const evennessValue = document.getElementById('evennessBiasValue');

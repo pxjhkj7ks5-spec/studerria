@@ -84,6 +84,26 @@ body.theme-light.schedule-generator-page .glass {
   gap: var(--s-4);
 }
 
+.schedule-generator-page .generator-optional-section {
+  display: none;
+}
+
+.schedule-generator-page.show-advanced .generator-optional-section {
+  display: block;
+  animation: generatorSectionFade 180ms ease;
+}
+
+@keyframes generatorSectionFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .generator-section-title {
   font-size: 0.85rem;
   letter-spacing: 0.12em;
