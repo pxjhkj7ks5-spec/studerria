@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.42",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(teacher-workspace-offering-first): simplify `/teacher/workspace` by using live offering assignments as the primary scope source, remove duplicate early loading of legacy teacher-subject rows, reuse normalized offering scope rows for subject selectors/homework scope, and keep legacy teacher-subject fallback only when offering assignments are unavailable"
+      ]
+    },
+    {
       "version": "1.6.41",
       "date": "2026-04-15",
       "items": [

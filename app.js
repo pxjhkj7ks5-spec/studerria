@@ -19422,8 +19422,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     }
   };
   try {
-    const [teacherSubjects, teacherAssignedOfferings, teacherOfferingCatalog, teacherOfferingSelections] = await Promise.all([
-      getTeacherAssignedSubjects(userId),
+    const [teacherAssignedOfferings, teacherOfferingCatalog, teacherOfferingSelections] = await Promise.all([
       getTeacherAssignedOfferings(userId),
       listTeacherOfferingCatalog({
         allowLegacyBootstrap: false,
@@ -19433,7 +19432,13 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       }),
       getTeacherOfferingSelections(userId),
     ]);
-    const teacherCourses = buildTeacherCourseList(teacherSubjects);
+    let teacherScopeRows = buildTeacherAssignedSubjectRowsFromOfferings(teacherAssignedOfferings);
+    if (!teacherScopeRows.length) {
+      teacherScopeRows = await getTeacherAssignedSubjects(userId);
+    }
+    const teacherCourses = buildTeacherCourseList(
+      (teacherAssignedOfferings || []).length ? teacherAssignedOfferings : teacherScopeRows
+    );
     const requestedCourseId = parsePositiveIntStrict(req.query.course);
     const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
     const requestedSemesterId = parsePositiveIntStrict(req.query.semester_id);
@@ -19595,8 +19600,14 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       ? scopedTeacherOfferings
       : workspaceCatalogOfferings;
     const workspaceScopedSubjectIds = Array.from(new Set(
-      (workspaceHomeworkScopeSource || [])
-        .map((offering) => Number(offering && offering.legacy_subject_id ? offering.legacy_subject_id : 0))
+      ((workspaceHomeworkScopeSource || []).length
+        ? workspaceHomeworkScopeSource
+        : (teacherScopeRows || []))
+        .map((offering) => Number(
+          offering && (offering.legacy_subject_id || offering.subject_id)
+            ? (offering.legacy_subject_id || offering.subject_id)
+            : 0
+        ))
         .filter((value) => Number.isInteger(value) && value > 0)
     ));
     const workspaceScopedOwnerCourseIds = workspaceScopedSubjectIds.length
@@ -19654,13 +19665,13 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     ]);
 
     const subjectMap = new Map();
-    teacherSubjects.forEach((subject) => {
+    teacherScopeRows.forEach((subject) => {
       const subjectId = Number(subject.subject_id);
       if (!Number.isFinite(subjectId) || subjectId < 1 || subjectMap.has(subjectId)) return;
       subjectMap.set(subjectId, {
         id: subjectId,
         name: String(subject.subject_name || '').trim(),
-        course_id: Number(subject.course_id),
+        course_id: Number(subject.owner_course_id || subject.course_id || 0) || null,
         course_name: String(subject.course_name || ''),
       });
     });
