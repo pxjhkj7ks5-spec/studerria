@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.44",
+      "date": "2026-04-16",
+      "items": [
+        "refactor(home-generators-compact-ui): streamline role-based home data and declutter schedule/session generator pages"
+      ]
+    },
+    {
       "version": "1.6.43",
       "date": "2026-04-16",
       "items": [
