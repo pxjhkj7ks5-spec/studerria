@@ -165,10 +165,54 @@
   const toAttr = (value) => JSON.stringify(value || {}).replace(/'/g, '&#39;');
   const campusLabelByKey = new Map(campusOptions.map((campus) => [campus.value, campus.label]));
   const allGroupsList = Array.isArray(groups) ? groups : [];
+  const allTermsList = Array.isArray(terms) ? terms : [];
   const allGroupSubjectsList = Array.isArray(groupSubjects) ? groupSubjects : [];
   const sharedGroupSubjectLinksList = Array.isArray(sharedGroupSubjectLinks) ? sharedGroupSubjectLinks : [];
   const scopedTermsList = Array.isArray(scopedTerms) ? scopedTerms : [];
   const scopedScheduleEntriesList = Array.isArray(scopedScheduleEntries) ? scopedScheduleEntries : [];
+  const selectedProgramForGlobalTerms = selectedProgram
+    || ((Array.isArray(programs) ? programs : []).find((program) => numberOrZero(program && program.id) === activeProgramId) || null)
+    || ((Array.isArray(programs) ? programs : [])[0] || null);
+  const selectedProgramGlobalTermsId = numberOrZero(selectedProgramForGlobalTerms && selectedProgramForGlobalTerms.id);
+  const selectedProgramGlobalTermsTrackKey = String(selectedProgramForGlobalTerms && selectedProgramForGlobalTerms.track_key || '').trim().toLowerCase();
+  const selectedProgramGlobalTermsName = String(selectedProgramForGlobalTerms && selectedProgramForGlobalTerms.name || '').trim();
+  const selectedProgramGlobalTermGroups = allGroupsList.filter((group) => (
+    numberOrZero(group && group.program_id) === selectedProgramGlobalTermsId
+    && Boolean(group && group.is_active)
+  ));
+  const activeTermNumberByGroupId = allTermsList.reduce((map, term) => {
+    const groupId = numberOrZero(term && term.group_id);
+    if (!groupId) {
+      return map;
+    }
+    const isActive = Boolean(term && term.is_active) && !Boolean(term && term.is_archived);
+    if (!isActive) {
+      return map;
+    }
+    if (!map.has(groupId)) {
+      map.set(groupId, numberOrZero(term && term.term_number));
+    }
+    return map;
+  }, new Map());
+  const selectedProgramGlobalTermSummary = termOptions.map((termOption) => {
+    const activeCount = selectedProgramGlobalTermGroups.reduce((count, group) => (
+      numberOrZero(activeTermNumberByGroupId.get(numberOrZero(group && group.id))) === Number(termOption.value)
+        ? count + 1
+        : count
+    ), 0);
+    return {
+      ...termOption,
+      active_count: activeCount,
+    };
+  });
+  const selectedProgramGroupsWithoutActiveTerm = selectedProgramGlobalTermGroups.filter((group) => (
+    numberOrZero(activeTermNumberByGroupId.get(numberOrZero(group && group.id))) < 1
+  ));
+  const dominantGlobalTermOption = selectedProgramGlobalTermSummary
+    .slice()
+    .sort((a, b) => Number(b.active_count || 0) - Number(a.active_count || 0) || Number(a.value || 0) - Number(b.value || 0))[0]
+    || termOptions[0];
+  const defaultGlobalTermNumber = numberOrZero(dominantGlobalTermOption && dominantGlobalTermOption.value) || 1;
   const selectedTermRecord = selectedTerm
     || scopedTermsList.find((term) => Number(term.id || 0) === Number(activeTermId || 0))
     || scopedTermsList.find((term) => term.is_active && !term.is_archived)
@@ -689,7 +733,6 @@
               </div>
               <div class="academic-v2-scope-strip-actions">
                 <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="subjects">Предмети</button>
-                <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="terms">Терми</button>
                 <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="schedule">Розклад</button>
               </div>
             </div>
@@ -708,7 +751,6 @@
                 </div>
                 <div class="academic-v2-workspace-tabs">
                   <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="subjects">Предмети</button>
-                  <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="terms">Терми</button>
                   <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="schedule">Розклад</button>
                   <button type="button" class="academic-v2-workspace-tab" data-workspace-tab-target="students">Студенти</button>
                 </div>
@@ -728,6 +770,7 @@
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="programs">Programs</button>
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="cohorts">Cohorts</button>
                   <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="courses">Courses</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="terms-global">Terms</button>
                   <% if (!isBachelorProgramSelected) { %>
                     <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="stage-templates">Stage Templates</button>
                   <% } %>
@@ -1178,6 +1221,117 @@
                     <% } %>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section class="academic-v2-card" id="terms-global" data-structure-panel="terms-global">
+              <div class="academic-v2-section-head">
+                <div>
+                  <h2 class="academic-v2-section-title">Глобальні терми</h2>
+                  <!-- Program-level active term switch for all live courses -->
+                </div>
+                <div class="academic-v2-chip-row">
+                  <span class="academic-v2-chip"><%= selectedProgramGlobalTermsName || 'Програму не вибрано' %></span>
+                  <span class="academic-v2-chip"><%= selectedProgramGlobalTermsTrackKey || 'track —' %></span>
+                  <span class="academic-v2-chip"><%= selectedProgramGlobalTermGroups.length %> активних курсів</span>
+                  <span class="academic-v2-chip <%= selectedProgramGroupsWithoutActiveTerm.length ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= selectedProgramGroupsWithoutActiveTerm.length %> без активного терму</span>
+                </div>
+              </div>
+
+              <div class="academic-v2-grid-2">
+                <form method="get" action="/admin/pathways" class="academic-v2-subcard">
+                  <input type="hidden" name="structure_tab" value="terms-global" />
+                  <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
+                  <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                  <input type="hidden" name="term_id" value="<%= activeTermId || '' %>" />
+                  <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
+                  <div class="academic-v2-subcard-topline">Scope</div>
+                  <div class="academic-v2-field">
+                    <label for="globalTermsProgram">Програма</label>
+                    <select id="globalTermsProgram" class="form-select" name="program_id">
+                      <% (programs || []).forEach((program) => { %>
+                        <option value="<%= program.id %>" <%= Number(program.id) === selectedProgramGlobalTermsId ? 'selected' : '' %>><%= program.name %> · <%= program.track_key %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="academic-v2-actions mt-2">
+                    <button type="submit" class="btn btn-outline-secondary">Відкрити програму</button>
+                  </div>
+                </form>
+
+                <form method="post" action="/admin/pathways/v2/terms/activate-program" class="academic-v2-subcard">
+                  <%- renderFocusFields() %>
+                  <input type="hidden" name="structure_tab" value="terms-global" />
+                  <div class="academic-v2-subcard-topline">Mass update</div>
+                  <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                    <div class="academic-v2-field">
+                      <label for="globalTermsProgramApply">Програма</label>
+                      <select
+                        id="globalTermsProgramApply"
+                        class="form-select"
+                        name="program_id"
+                        <%= !(programs || []).length ? 'disabled' : '' %>
+                      >
+                        <% (programs || []).forEach((program) => { %>
+                          <option value="<%= program.id %>" <%= Number(program.id) === selectedProgramGlobalTermsId ? 'selected' : '' %>><%= program.name %> · <%= program.track_key %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="academic-v2-field">
+                      <label for="globalTermsNumber">Активний терм для всіх курсів</label>
+                      <select id="globalTermsNumber" class="form-select" name="term_number" <%= !selectedProgramGlobalTermsId ? 'disabled' : '' %>>
+                        <% termOptions.forEach((term) => { %>
+                          <option value="<%= term.value %>" <%= Number(term.value) === defaultGlobalTermNumber ? 'selected' : '' %>><%= term.label %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="academic-v2-chip-row mt-2">
+                    <% selectedProgramGlobalTermSummary.forEach((term) => { %>
+                      <span class="academic-v2-chip"><%= term.label %>: <%= Number(term.active_count || 0) %></span>
+                    <% }); %>
+                  </div>
+                  <div class="academic-v2-actions mt-2">
+                    <button
+                      type="submit"
+                      class="btn btn-primary"
+                      <%= !selectedProgramGlobalTermsId || !selectedProgramGlobalTermGroups.length ? 'disabled' : '' %>
+                    >Застосувати до всіх курсів програми</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="academic-v2-subcard mt-3">
+                <h3 class="h6 mb-2">Поточний активний терм по курсах</h3>
+                <% if (selectedProgramGlobalTermGroups.length) { %>
+                  <div class="academic-v2-table-wrap">
+                    <table class="table academic-v2-table">
+                      <thead>
+                        <tr>
+                          <th>Курс</th>
+                          <th>Stage / Campus</th>
+                          <th>Активний терм</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% selectedProgramGlobalTermGroups.forEach((group) => { %>
+                          <% const currentTermNumber = numberOrZero(activeTermNumberByGroupId.get(numberOrZero(group.id))); %>
+                          <tr>
+                            <td><strong><%= group.label %></strong></td>
+                            <td><span class="academic-v2-muted">Stage <%= group.stage_number %> · <%= group.campus_key %></span></td>
+                            <td>
+                              <span class="academic-v2-chip <%= currentTermNumber ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>">
+                                <%= currentTermNumber ? `Term ${currentTermNumber}` : 'Не вибрано' %>
+                              </span>
+                            </td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% } else { %>
+                  <div class="academic-v2-empty">У вибраній програмі немає активних курсів для масового перемикання терму.</div>
+                <% } %>
               </div>
             </section>
 
@@ -1929,7 +2083,7 @@
                   </div>
                   <div class="academic-v2-subcard">
                     <h3 class="h6 mb-1">Операційний перехід у курс</h3>
-                    <!-- Workspace contains subjects, terms, schedule, students -->
+                    <!-- Workspace contains subjects, schedule, students -->
                     <div class="academic-v2-actions">
                       <button type="button" class="btn btn-outline-secondary" data-mode-button="operate" data-workspace-tab-target="schedule">Відкрити workspace</button>
                     </div>
@@ -2362,7 +2516,7 @@
               </div>
             </section>
 
-            <section class="academic-v2-card" id="terms" data-workspace-panel="terms">
+            <section class="academic-v2-card" id="terms" data-workspace-panel="terms" hidden>
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Терми</h2>
@@ -2724,13 +2878,13 @@
         const requestedSubjectId = Number(<%- JSON.stringify(numberOrZero(requestedSubjectId)) %> || 0);
         const requestedWorkspaceTab = <%- JSON.stringify(String(requestedWorkspaceTab || '').trim()) %>;
         const requestedStructureTab = <%- JSON.stringify(String(requestedStructureTab || '').trim()) %>;
-        const normalizedRequestedWorkspaceTab = ['subjects', 'terms', 'schedule', 'students'].includes(requestedWorkspaceTab)
+        const normalizedRequestedWorkspaceTab = ['subjects', 'schedule', 'students'].includes(requestedWorkspaceTab)
           ? requestedWorkspaceTab
           : '';
         const normalizedRequestedStructureTab = <%- JSON.stringify(
           isBachelorProgramSelected
-            ? ['programs', 'cohorts', 'courses', 'bachelor-catalog']
-            : ['programs', 'cohorts', 'courses', 'stage-templates']
+            ? ['programs', 'cohorts', 'courses', 'terms-global', 'bachelor-catalog']
+            : ['programs', 'cohorts', 'courses', 'terms-global', 'stage-templates']
         ) %>.includes(requestedStructureTab)
           ? requestedStructureTab
           : '';
@@ -3933,7 +4087,13 @@
         };
 
         const setWorkspaceTab = (tab) => {
-          activeWorkspaceTab = tab || 'schedule';
+          const requestedTab = String(tab || '').trim();
+          const allowedWorkspaceTabs = workspaceTabButtons
+            .map((button) => String(button.getAttribute('data-workspace-tab-target') || '').trim())
+            .filter(Boolean);
+          activeWorkspaceTab = allowedWorkspaceTabs.includes(requestedTab)
+            ? requestedTab
+            : (allowedWorkspaceTabs.includes('schedule') ? 'schedule' : (allowedWorkspaceTabs[0] || 'schedule'));
           workspacePanels.forEach((panel) => {
             panel.hidden = panel.getAttribute('data-workspace-panel') !== activeWorkspaceTab;
           });
@@ -4030,7 +4190,7 @@
             setWorkspaceTab('subjects');
           }
           if (target === 'term') {
-            setWorkspaceTab('terms');
+            setStructureTab('terms-global');
           }
           if (target === 'schedule') {
             selectedScheduleEntryPayload = payload;

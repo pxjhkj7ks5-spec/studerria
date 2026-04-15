@@ -41122,6 +41122,22 @@ app.post('/admin/pathways/v2/terms/save', requirePathwaysSectionAccess, writeLim
   })
 ));
 
+app.post('/admin/pathways/v2/terms/activate-program', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.activateProgramTerm(getAcademicV2Store(), req.body),
+    successMessage: 'Активний терм оновлено для всіх курсів вибраної програми',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      termId: null,
+    }),
+    extraParamsBuilder: () => ({
+      structure_tab: 'terms-global',
+    }),
+    logContext: 'admin.pathways.v2.term.activate-program',
+  })
+));
+
 app.post('/admin/pathways/v2/terms/:termId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.deleteTerm(getAcademicV2Store(), req.params.termId),

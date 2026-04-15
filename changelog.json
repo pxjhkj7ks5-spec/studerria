@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.36",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(academic-setup-terms-global): move term operations out of `Operate` UI into a new `Structure -> Terms` panel with a program-level bulk action that sets the selected active term across all active courses, while keeping term entities/projections in `academic_v2` and preserving compatibility flows"
+      ]
+    },
+    {
       "version": "1.6.35",
       "date": "2026-04-15",
       "items": [
