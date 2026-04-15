@@ -13192,7 +13192,7 @@ function buildJournalInsightsUrl(params = {}) {
   const query = new URLSearchParams();
   const courseId = parsePositiveIntStrict(params.courseId);
   if (courseId) query.set('course_id', String(courseId));
-  const subjectId = parsePositiveIntStrict(params.subjectId);
+  const subjectId = parseNonZeroIntStrict(params.subjectId);
   if (subjectId) query.set('subject_id', String(subjectId));
   const scopeType = String(params.scopeType || '').trim().toLowerCase();
   if (scopeType) query.set('scope_type', scopeType);
@@ -13204,7 +13204,7 @@ function buildJournalInsightsUrl(params = {}) {
   if (period) query.set('period', period);
   const compareMode = String(params.compareMode || '').trim().toLowerCase();
   if (compareMode) query.set('compare_mode', compareMode);
-  const returnSubjectId = parsePositiveIntStrict(params.returnSubjectId);
+  const returnSubjectId = parseNonZeroIntStrict(params.returnSubjectId);
   if (returnSubjectId) query.set('return_subject_id', String(returnSubjectId));
   const returnAttendanceDate = String(params.returnAttendanceDate || '').trim();
   if (isValidDateString(returnAttendanceDate)) query.set('return_attendance_date', returnAttendanceDate);
@@ -15062,6 +15062,63 @@ function normalizeTemplateTagsInput(rawValue) {
   return Array.from(unique).slice(0, 20);
 }
 
+function buildTeacherAssignedSubjectRowsFromOfferings(assignedOfferings = []) {
+  return (assignedOfferings || []).flatMap((offering) => {
+    const hasAllGroups = offering.has_all_groups === true;
+    const selectedGroupNumbers = hasAllGroups
+      ? []
+      : normalizeTeacherGroupNumberList(offering.group_numbers);
+    const scopedGroupNumbers = hasAllGroups || !selectedGroupNumbers.length
+      ? [null]
+      : selectedGroupNumbers;
+    const baseRow = {
+      subject_id: Number(offering.legacy_subject_id || 0) || null,
+      subject_offering_id: Number(offering.subject_offering_id || 0) || null,
+      subject_name: String(offering.name || ''),
+      group_count: Math.max(1, Number(offering.group_count || 1) || 1),
+      is_general: offering.is_general === true || Number(offering.is_general) === 1,
+      show_in_teamwork: offering.show_in_teamwork === true || Number(offering.show_in_teamwork) === 1,
+      is_shared: offering.is_shared === true || Number(offering.is_shared) === 1,
+      has_all_groups: hasAllGroups,
+      group_numbers: selectedGroupNumbers,
+    };
+    const contextRows = Array.isArray(offering.contexts) && offering.contexts.length
+      ? offering.contexts.map((context) => ({
+        course_id: Number(context.course_id || 0) || null,
+        owner_course_id: Number(context.course_id || 0) || null,
+        course_name: String(context.course_name || ''),
+        study_context_id: Number(context.id || 0) || null,
+        study_context_label: String(context.label || ''),
+        stage_number: Number(context.stage_number || 0) || null,
+        campus_key: String(context.campus_key || ''),
+        admission_year: Number(context.admission_year || 0) || null,
+        program_id: Number(context.program_id || 0) || null,
+        program_code: String(context.program_code || ''),
+        program_name: String(context.program_name || ''),
+        semester_titles: Array.isArray(context.semester_titles) ? context.semester_titles.slice() : [],
+      }))
+      : [{
+        course_id: null,
+        owner_course_id: null,
+        course_name: '',
+        study_context_id: null,
+        study_context_label: '',
+        stage_number: null,
+        campus_key: '',
+        admission_year: null,
+        program_id: null,
+        program_code: '',
+        program_name: '',
+        semester_titles: [],
+      }];
+    return contextRows.flatMap((contextRow) => scopedGroupNumbers.map((groupNumber) => ({
+      ...baseRow,
+      ...contextRow,
+      group_number: groupNumber,
+    })));
+  });
+}
+
 async function getTeacherAssignedSubjects(userId) {
   if (!Number.isFinite(Number(userId))) return [];
   const academicV2Rows = await academicV2RuntimeHelpers.listTeacherAssignedSubjectRows(
@@ -15073,61 +15130,9 @@ async function getTeacherAssignedSubjects(userId) {
     return academicV2Rows;
   }
   const assignedOfferings = await getTeacherAssignedOfferings(userId);
-  if (assignedOfferings.length) {
-    return assignedOfferings.flatMap((offering) => {
-      const hasAllGroups = offering.has_all_groups === true;
-      const selectedGroupNumbers = hasAllGroups
-        ? []
-        : normalizeTeacherGroupNumberList(offering.group_numbers);
-      const scopedGroupNumbers = hasAllGroups || !selectedGroupNumbers.length
-        ? [null]
-        : selectedGroupNumbers;
-      const baseRow = {
-        subject_id: Number(offering.legacy_subject_id || 0) || null,
-        subject_offering_id: Number(offering.subject_offering_id || 0) || null,
-        subject_name: String(offering.name || ''),
-        group_count: Math.max(1, Number(offering.group_count || 1) || 1),
-        is_general: offering.is_general === true || Number(offering.is_general) === 1,
-        show_in_teamwork: offering.show_in_teamwork === true || Number(offering.show_in_teamwork) === 1,
-        is_shared: offering.is_shared === true || Number(offering.is_shared) === 1,
-        has_all_groups: hasAllGroups,
-        group_numbers: selectedGroupNumbers,
-      };
-      const contextRows = Array.isArray(offering.contexts) && offering.contexts.length
-        ? offering.contexts.map((context) => ({
-          course_id: Number(context.course_id || 0) || null,
-          owner_course_id: Number(context.course_id || 0) || null,
-          course_name: String(context.course_name || ''),
-          study_context_id: Number(context.id || 0) || null,
-          study_context_label: String(context.label || ''),
-          stage_number: Number(context.stage_number || 0) || null,
-          campus_key: String(context.campus_key || ''),
-          admission_year: Number(context.admission_year || 0) || null,
-          program_id: Number(context.program_id || 0) || null,
-          program_code: String(context.program_code || ''),
-          program_name: String(context.program_name || ''),
-          semester_titles: Array.isArray(context.semester_titles) ? context.semester_titles.slice() : [],
-        }))
-        : [{
-          course_id: null,
-          owner_course_id: null,
-          course_name: '',
-          study_context_id: null,
-          study_context_label: '',
-          stage_number: null,
-          campus_key: '',
-          admission_year: null,
-          program_id: null,
-          program_code: '',
-          program_name: '',
-          semester_titles: [],
-        }];
-      return contextRows.flatMap((contextRow) => scopedGroupNumbers.map((groupNumber) => ({
-        ...baseRow,
-        ...contextRow,
-        group_number: groupNumber,
-      })));
-    });
+  const offeringRows = buildTeacherAssignedSubjectRowsFromOfferings(assignedOfferings);
+  if (offeringRows.length) {
+    return offeringRows;
   }
   return teacherTemplateHelpers.listTeacherAssignedSubjectRows(getTeacherTemplateStore(), userId);
 }
@@ -15997,14 +16002,21 @@ async function getTeacherHubSubjects(userId) {
 
 function buildTeacherCourseList(subjectRows = []) {
   const map = new Map();
-  (subjectRows || []).forEach((row) => {
-    const courseId = Number(row.course_id);
+  const registerCourse = (courseIdRaw, courseNameRaw) => {
+    const courseId = Number(courseIdRaw);
     if (!Number.isFinite(courseId) || courseId < 1 || map.has(courseId)) {
       return;
     }
     map.set(courseId, {
       id: courseId,
-      name: String(row.course_name || `Course ${courseId}`),
+      name: String(courseNameRaw || `Course ${courseId}`),
+    });
+  };
+  (subjectRows || []).forEach((row) => {
+    registerCourse(row && row.course_id, row && row.course_name);
+    const contexts = Array.isArray(row && row.contexts) ? row.contexts : [];
+    contexts.forEach((context) => {
+      registerCourse(context && context.course_id, context && context.course_name);
     });
   });
   return Array.from(map.values()).sort((a, b) => Number(a.id) - Number(b.id));
@@ -19062,8 +19074,8 @@ app.get('/teacher', requireLogin, async (req, res) => {
     }
   };
   try {
-    const [teacherSubjects, templatesCount, assetRows, createdHomeworkCount, recentHomeworkCount] = await Promise.all([
-      getTeacherHubSubjects(userId),
+    const [teacherAssignedOfferings, templatesCount, assetRows, createdHomeworkCount, recentHomeworkCount] = await Promise.all([
+      getTeacherAssignedOfferings(userId),
       getTeacherHubCount(
         'SELECT COUNT(*) AS count FROM teacher_homework_templates WHERE user_id = ?',
         [userId]
@@ -19084,23 +19096,68 @@ app.get('/teacher', requireLogin, async (req, res) => {
         [userId]
       ),
     ]);
-    const teacherCourses = buildTeacherCourseList(teacherSubjects);
-    const primaryTeacherSubject = Array.isArray(teacherSubjects) && teacherSubjects.length ? teacherSubjects[0] : null;
-    const uniqueSubjectIds = new Set(
-      (teacherSubjects || [])
-        .map((row) => Number(row.subject_id))
+    let teacherScopeRows = buildTeacherAssignedSubjectRowsFromOfferings(teacherAssignedOfferings);
+    if (!teacherScopeRows.length) {
+      teacherScopeRows = await getTeacherHubSubjects(userId);
+    }
+    const teacherCourses = buildTeacherCourseList(
+      (teacherAssignedOfferings || []).length ? teacherAssignedOfferings : teacherScopeRows
+    );
+    const uniqueLegacySubjectIds = new Set(
+      ((teacherAssignedOfferings || []).length
+        ? (teacherAssignedOfferings || []).map((offering) => Number(offering.legacy_subject_id || 0))
+        : (teacherScopeRows || []).map((row) => Number(row.subject_id || 0)))
         .filter((value) => Number.isInteger(value) && value > 0)
     );
+    const uniqueOfferingIds = new Set(
+      (teacherAssignedOfferings || [])
+        .map((offering) => Number(offering.id || offering.subject_offering_id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const primaryOffering = (teacherAssignedOfferings || []).find(
+      (offering) => Number.isInteger(Number(offering && offering.legacy_subject_id)) && Number(offering.legacy_subject_id) > 0
+    ) || ((teacherAssignedOfferings || [])[0] || null);
+    const primaryOfferingContexts = Array.isArray(primaryOffering && primaryOffering.contexts)
+      ? primaryOffering.contexts
+      : [];
+    const primaryOfferingContext = primaryOfferingContexts.find(
+      (context) => Number.isInteger(Number(context && context.course_id)) && Number(context.course_id) > 0
+    ) || (primaryOfferingContexts[0] || null);
+    const fallbackPrimarySubject = Array.isArray(teacherScopeRows) && teacherScopeRows.length
+      ? teacherScopeRows[0]
+      : null;
+    const primarySubjectId = parsePositiveIntStrict(
+      (primaryOffering && primaryOffering.legacy_subject_id)
+      || (fallbackPrimarySubject && fallbackPrimarySubject.subject_id)
+    );
+    const primaryCourseId = parsePositiveIntStrict(
+      (primaryOfferingContext && primaryOfferingContext.course_id)
+      || (fallbackPrimarySubject && fallbackPrimarySubject.course_id)
+    );
+    const primaryGroupNumber = parsePositiveIntStrict(
+      (primaryOffering && primaryOffering.group_number)
+      || (fallbackPrimarySubject && fallbackPrimarySubject.group_number)
+    );
     const roleKeys = normalizeRoleList(req.session.roles || []);
-    const teacherCockpit = await buildMyDayData(req.session.user, 'teacher', roleKeys, { request: req });
+    const teacherCockpit = await buildMyDayData(req.session.user, 'teacher', roleKeys, {
+      request: req,
+      teacherAssignedSubjectRows: teacherScopeRows,
+    });
     const recentTemplates = await getTeacherHomeworkTemplates(userId, { limit: 5 });
+    const insightsFallbackHref = primaryCourseId
+      ? buildJournalInsightsUrl({
+          courseId: primaryCourseId,
+          scopeType: 'course',
+          period: 'semester',
+        })
+      : '/journal/insights';
 
     return res.render('teacher-hub', {
       role: 'teacher',
       username,
       settings: settingsCache,
       stats: {
-        subjects: uniqueSubjectIds.size,
+        subjects: uniqueOfferingIds.size || uniqueLegacySubjectIds.size,
         courses: teacherCourses.length,
         templates: templatesCount,
         assets: (assetRows || []).length,
@@ -19117,18 +19174,19 @@ app.get('/teacher', requireLogin, async (req, res) => {
       teacherActivitySummary: teacherCockpit && teacherCockpit.activity_summary ? teacherCockpit.activity_summary : null,
       latestRatingSnapshot: teacherCockpit && teacherCockpit.latest_rating_snapshot ? teacherCockpit.latest_rating_snapshot : null,
       journalHubLinks: {
-        journalHref: primaryTeacherSubject
-          ? buildJournalRedirectPath({ subjectId: Number(primaryTeacherSubject.subject_id || 0) })
+        journalHref: primarySubjectId
+          ? buildJournalRedirectPath({ subjectId: primarySubjectId })
           : '/journal',
-        insightsHref: primaryTeacherSubject
+        insightsHref: primarySubjectId
           ? buildJournalInsightsUrl({
-              courseId: Number(primaryTeacherSubject.course_id || 0),
-              subjectId: Number(primaryTeacherSubject.subject_id || 0),
+              courseId: primaryCourseId || null,
+              subjectId: primarySubjectId,
               scopeType: 'subject',
+              groupNumber: primaryGroupNumber || null,
               period: 'semester',
-              returnSubjectId: Number(primaryTeacherSubject.subject_id || 0),
+              returnSubjectId: primarySubjectId,
             })
-          : '/journal/insights',
+          : insightsFallbackHref,
         scheduleHref: '/schedule',
       },
       error: decodeMessage(req.query.error),
@@ -22827,6 +22885,9 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   const isStaffRole = normalizedRoleList.some((roleKey) => ['teacher', 'admin', 'deanery'].includes(roleKey));
   const requestedCompetencySubjectId = Number(options && options.competencySubjectId ? options.competencySubjectId : 0);
   const request = options && options.request ? options.request : null;
+  const preloadedTeacherAssignedSubjectRows = Array.isArray(options && options.teacherAssignedSubjectRows)
+    ? options.teacherAssignedSubjectRows
+    : null;
   const useStudentAcademicScope = !isStaffRole || isAdminViewingStudentSelf(request);
   const studentCompat = useStudentAcademicScope
     ? await loadAcademicV2LegacyStudentRows(user, {
@@ -22880,7 +22941,9 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
   }));
 
   if (!workloadTargets.length && isStaffRole && !useStudentAcademicScope) {
-    const teacherTargets = (await getTeacherAssignedSubjects(user.id))
+    const teacherTargets = ((preloadedTeacherAssignedSubjectRows && preloadedTeacherAssignedSubjectRows.length)
+      ? preloadedTeacherAssignedSubjectRows
+      : await getTeacherAssignedSubjects(user.id))
       .filter((row) => !courseId || Number(row.course_id || 0) === Number(courseId || 0));
     workloadTargets = (teacherTargets || []).map((row) => ({
       subject_id: Number(row.subject_id),
@@ -31829,6 +31892,10 @@ async function buildJournalInsightsContext({
   if (!teacherJournalMode) {
     scopeType = 'student';
   }
+  const selectedJournalStorageSubjectId = selectedSubject
+    ? resolveJournalStorageSubjectId(selectedSubject)
+    : null;
+  const selectedJournalHasStorageBinding = Boolean(selectedJournalStorageSubjectId);
 
   const period = normalizeJournalInsightsPeriod(payload.period, 'semester');
   const selectedSemester = selectedCourseId ? await getActiveSemester(selectedCourseId) : null;
@@ -31901,6 +31968,10 @@ async function buildJournalInsightsContext({
     const studentsById = new Map();
     const subjectRowsBag = [];
     for (const subject of subjects) {
+      const matrixSubjectId = resolveJournalStorageSubjectId(subject);
+      if (!matrixSubjectId) {
+        continue;
+      }
       const restrictedGroups = (!journalScope.fullAccess && !subject.has_all_groups)
         ? new Set(
           (subject.group_numbers || [])
@@ -31912,7 +31983,7 @@ async function buildJournalInsightsContext({
         ? activeSemesterByCourseId.get(Number(subject.course_id || 0))
         : selectedSemester;
       const matrix = await buildJournalMatrix({
-        subjectId: Number(subject.subject_id),
+        subjectId: Number(matrixSubjectId),
         courseId: Number(subject.course_id),
         semesterId: matrixSemester && Number(matrixSemester.id) > 0 ? Number(matrixSemester.id) : null,
         actorUserId: Number(req.session.user.id),
@@ -31923,6 +31994,7 @@ async function buildJournalInsightsContext({
       subjectRowsBag.push({
         subject,
         rows,
+        matrixSubjectId: Number(matrixSubjectId),
       });
       rows.forEach((row) => {
         const groupNumber = Number(row?.student?.group_number || 0);
@@ -31938,7 +32010,7 @@ async function buildJournalInsightsContext({
         : String(subject.subject_name || '');
       courseSubjectSummaries.push({
         course_id: Number(subject.course_id || 0),
-        subject_id: Number(subject.subject_id),
+        subject_id: Number(matrixSubjectId),
         subject_name: subjectDisplayName,
         students_count: rows.length,
         average_final_score: scoreList.length ? roundToPrecision(scoreList.reduce((sum, value) => sum + value, 0) / scoreList.length, 2) : 0,
@@ -32002,12 +32074,12 @@ async function buildJournalInsightsContext({
           },
         }]
         : [];
-      courseSubjectSummaries = (subjectRowsBag || []).map(({ subject, rows }) => {
+      courseSubjectSummaries = (subjectRowsBag || []).map(({ subject, rows, matrixSubjectId }) => {
         const matchedRow = (rows || []).find((row) => Number(row?.student?.id || 0) === Number(selectedStudentId)) || null;
         const finalScore = matchedRow ? roundToPrecision(matchedRow.final_score, 2) : 0;
         return {
           course_id: Number(subject?.course_id || 0),
-          subject_id: Number(subject?.subject_id || 0),
+          subject_id: Number(matrixSubjectId || 0),
           subject_name: String(subject?.subject_name || ''),
           students_count: matchedRow ? 1 : 0,
           average_final_score: finalScore,
@@ -32025,6 +32097,9 @@ async function buildJournalInsightsContext({
       }));
     }
   } else if (selectedSubject) {
+    const matrixSubjectId = selectedJournalHasStorageBinding
+      ? Number(selectedJournalStorageSubjectId)
+      : null;
     const restrictedGroups = (!journalScope.fullAccess && !selectedSubject.has_all_groups)
       ? new Set(
         (selectedSubject.group_numbers || [])
@@ -32033,14 +32108,19 @@ async function buildJournalInsightsContext({
       )
       : null;
 
-    const matrix = await buildJournalMatrix({
-      subjectId: Number(selectedSubject.subject_id),
-      courseId: Number(selectedSubject.course_id),
-      semesterId: selectedSemesterId,
-      actorUserId: Number(req.session.user.id),
-      groupFilterSet: restrictedGroups,
-      studentFilterIds: !teacherJournalMode ? [Number(req.session.user.id)] : [],
-    });
+    const matrix = matrixSubjectId
+      ? await buildJournalMatrix({
+        subjectId: matrixSubjectId,
+        courseId: Number(selectedSubject.course_id),
+        semesterId: selectedSemesterId,
+        actorUserId: Number(req.session.user.id),
+        groupFilterSet: restrictedGroups,
+        studentFilterIds: !teacherJournalMode ? [Number(req.session.user.id)] : [],
+      })
+      : {
+        columns: [],
+        rows: [],
+      };
     const baseRows = Array.isArray(matrix.rows) ? matrix.rows : [];
     activeColumnsCount = Array.isArray(matrix.columns) ? matrix.columns.length : 0;
     baseRows.forEach((row) => {
@@ -32098,7 +32178,7 @@ async function buildJournalInsightsContext({
       .filter((value) => Number.isFinite(value));
     courseSubjectSummaries = [{
       course_id: Number(selectedSubject.course_id || 0),
-      subject_id: Number(selectedSubject.subject_id),
+      subject_id: Number(selectedJournalStorageSubjectId || 0),
       subject_name: String(selectedSubject.subject_name || ''),
       students_count: scopeRows.length,
       average_final_score: scopeScoreList.length ? roundToPrecision(scopeScoreList.reduce((sum, value) => sum + value, 0) / scopeScoreList.length, 2) : 0,
@@ -32241,8 +32321,9 @@ async function buildJournalInsightsContext({
         )
       );
     }
-    if (selectedSubject && Number(selectedSubject.subject_id) > 0) {
-      return [Number(selectedSubject.subject_id)];
+    const selectedTrendSubjectId = parsePositiveIntStrict(selectedJournalStorageSubjectId);
+    if (selectedTrendSubjectId) {
+      return [Number(selectedTrendSubjectId)];
     }
     return [];
   })();

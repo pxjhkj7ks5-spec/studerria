@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.39",
+      "date": "2026-04-15",
+      "items": [
+        "refactor(teacher-hub-offering-source): optimize Teacher Hub by using the live offering assignment shape as the primary data source, normalize offering scope rows through one helper shared with My Day preload, simplify journal/insights primary-link resolution from offering context, and keep a compact legacy fallback only when live offering data is missing"
+      ]
+    },
+    {
       "version": "1.6.38",
       "date": "2026-04-15",
       "items": [

@@ -374,7 +374,7 @@
         <div class="hub-actions">
           <a class="btn btn-hub" href="<%= teacherScheduleHref %>"><%= t('teacherHub.action.schedule') %></a>
           <a class="btn btn-hub" href="/teacher/workspace"><%= t('teacherHub.action.workspace') %></a>
-          <a class="btn btn-hub" href="/teacher/subjects"><%= lang === 'en' ? 'Discipline assignments' : 'Призначення дисциплін' %></a>
+          <a class="btn btn-hub" href="/teacher/subjects"><%= t('teacherHub.action.subjects') %></a>
           <a class="btn btn-hub" href="<%= teacherJournalHref %>"><%= t('teacherHub.action.journal') %></a>
         </div>
       </section>
@@ -532,8 +532,8 @@
                 <span class="quick-desc"><%= t('teacherHub.quick.manageTemplates.desc') %></span>
               </a>
               <a class="quick-card" href="/teacher/subjects">
-                <span class="quick-title"><%= lang === 'en' ? 'Discipline assignments' : 'Призначення дисциплін' %></span>
-                <span class="quick-desc"><%= lang === 'en' ? 'Open the teaching scope manager. Live offerings are the default; compatibility only appears when no offering data is available.' : 'Відкрийте менеджер викладацького контуру. Нові пропозиції дисциплін є основним шляхом; сумісний режим з’являється лише якщо даних пропозицій немає.' %></span>
+                <span class="quick-title"><%= t('teacherHub.quick.updateScope.title') %></span>
+                <span class="quick-desc"><%= t('teacherHub.quick.updateScope.desc') %></span>
               </a>
               <a class="quick-card" href="<%= teacherScheduleHref %>">
                 <span class="quick-title"><%= t('teacherHub.quick.openSchedule.title') %></span>
@@ -714,3 +714,4 @@
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
+
