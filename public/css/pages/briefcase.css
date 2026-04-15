@@ -1,0 +1,509 @@
+body.page-briefcase {
+  overflow-x: hidden;
+}
+
+body.page-briefcase > .page-container {
+  max-width: none;
+  width: 100%;
+  min-height: 100vh;
+  padding: 0;
+}
+
+body.page-briefcase .briefcase-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(24px, 4vw, 48px);
+}
+
+body.page-briefcase .briefcase-stage {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding-block: clamp(24px, 6vh, 72px) 24px;
+}
+
+body.page-briefcase .briefcase-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+body.page-briefcase .briefcase-scene__grid {
+  position: absolute;
+  inset: -1px;
+  opacity: 0.3;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at 50% 40%, black 0%, rgba(0, 0, 0, 0.72) 50%, transparent 100%);
+}
+
+body.theme-light.page-briefcase .briefcase-scene__grid {
+  opacity: 0.16;
+  background:
+    linear-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+}
+
+body.page-briefcase .briefcase-scene__glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(10px);
+  animation: briefcase-float 12s ease-in-out infinite;
+}
+
+body.page-briefcase .briefcase-scene__glow--a {
+  width: 34rem;
+  height: 34rem;
+  left: -8rem;
+  top: -10rem;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.32), transparent 68%);
+}
+
+body.page-briefcase .briefcase-scene__glow--b {
+  width: 42rem;
+  height: 42rem;
+  right: -12rem;
+  bottom: -14rem;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.14), transparent 70%);
+  animation-delay: -4s;
+}
+
+body.page-briefcase .briefcase-card {
+  position: relative;
+  width: min(1120px, 100%);
+  padding: clamp(24px, 3vw, 40px);
+  border-radius: 34px;
+  border: 1px solid rgba(248, 113, 113, 0.16);
+  background:
+    linear-gradient(180deg, rgba(12, 16, 28, 0.86), rgba(9, 12, 22, 0.94));
+  box-shadow:
+    0 32px 100px rgba(2, 6, 23, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: clip;
+}
+
+body.theme-light.page-briefcase .briefcase-card {
+  border-color: rgba(239, 68, 68, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(245, 248, 255, 0.92));
+  box-shadow:
+    0 30px 88px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+}
+
+body.page-briefcase .briefcase-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 68%);
+  pointer-events: none;
+}
+
+body.page-briefcase .briefcase-card__topline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+body.page-briefcase .briefcase-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.8fr);
+  gap: clamp(20px, 4vw, 48px);
+  align-items: center;
+}
+
+body.page-briefcase .briefcase-copy {
+  position: relative;
+  z-index: 1;
+}
+
+body.page-briefcase .briefcase-overline {
+  margin: 0 0 12px;
+  color: rgba(248, 113, 113, 0.92);
+  font-size: 0.8rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+body.page-briefcase .briefcase-title {
+  margin: 0;
+  font-size: clamp(3rem, 7vw, 6.2rem);
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+}
+
+body.page-briefcase .briefcase-lead {
+  max-width: 38rem;
+  margin: 18px 0 0;
+  font-size: clamp(1rem, 1.8vw, 1.16rem);
+  line-height: 1.7;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+body.theme-light.page-briefcase .briefcase-lead {
+  color: rgba(15, 23, 42, 0.76);
+}
+
+body.page-briefcase .briefcase-actions {
+  margin-top: 28px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+body.page-briefcase .briefcase-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: min(28rem, 100%);
+  min-height: 8rem;
+  padding: 1.25rem 2rem;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.45), transparent 28%),
+    linear-gradient(180deg, #ff5f5f 0%, #cf1515 45%, #8f0505 100%);
+  box-shadow:
+    0 20px 44px rgba(239, 68, 68, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  transform: translateZ(0);
+  overflow: hidden;
+  transition: transform 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+}
+
+body.page-briefcase .briefcase-button:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow:
+    0 26px 56px rgba(239, 68, 68, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+body.page-briefcase .briefcase-button:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+body.page-briefcase .briefcase-button__ring,
+body.page-briefcase .briefcase-button__core {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+body.page-briefcase .briefcase-button__ring {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  opacity: 0.72;
+}
+
+body.page-briefcase .briefcase-button__core {
+  inset: 18% 16%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.3), transparent 30%),
+    radial-gradient(circle at 50% 40%, rgba(255, 108, 108, 0.4), rgba(132, 15, 15, 0.42) 58%, rgba(37, 5, 5, 0.72) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -14px 28px rgba(0, 0, 0, 0.2);
+  opacity: 0.92;
+  transform: scale(0.98);
+}
+
+body.page-briefcase.is-arming .briefcase-button__core,
+body.page-briefcase.is-launching .briefcase-button__core {
+  transform: scale(1.04);
+}
+
+body.page-briefcase .briefcase-button__ring::before,
+body.page-briefcase .briefcase-button__ring::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 74, 74, 0.24);
+  transform: translate(-50%, -50%) scale(0.42);
+  opacity: 0;
+}
+
+body.page-briefcase .briefcase-button__label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding-inline: 1rem;
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.page-briefcase .briefcase-hint {
+  max-width: 28rem;
+  margin: 0;
+  color: rgba(226, 232, 240, 0.68);
+  font-size: 0.94rem;
+}
+
+body.theme-light.page-briefcase .briefcase-hint {
+  color: rgba(15, 23, 42, 0.66);
+}
+
+body.page-briefcase .briefcase-console {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(248, 113, 113, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.theme-light.page-briefcase .briefcase-console {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+body.page-briefcase .briefcase-console__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+body.page-briefcase .briefcase-console__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(248, 113, 113, 0.92);
+}
+
+body.page-briefcase .briefcase-console__pulse {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f5f;
+  box-shadow: 0 0 0 0 rgba(255, 95, 95, 0.5);
+  animation: briefcase-pulse 2.1s ease-in-out infinite;
+}
+
+body.page-briefcase .briefcase-console__state {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  letter-spacing: -0.04em;
+}
+
+body.page-briefcase .briefcase-console__copy {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.76);
+  line-height: 1.65;
+}
+
+body.theme-light.page-briefcase .briefcase-console__copy {
+  color: rgba(15, 23, 42, 0.72);
+}
+
+body.page-briefcase .briefcase-metrics {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+body.page-briefcase .briefcase-metric {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.theme-light.page-briefcase .briefcase-metric {
+  border-top-color: rgba(15, 23, 42, 0.08);
+}
+
+body.page-briefcase .briefcase-metric dt,
+body.page-briefcase .briefcase-metric dd {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+body.page-briefcase .briefcase-metric dt {
+  color: rgba(226, 232, 240, 0.58);
+}
+
+body.page-briefcase .briefcase-metric dd {
+  font-weight: 600;
+}
+
+body.theme-light.page-briefcase .briefcase-metric dt {
+  color: rgba(15, 23, 42, 0.52);
+}
+
+body.page-briefcase .briefcase-footer-meta {
+  width: min(1120px, 100%);
+}
+
+body.page-briefcase .app-footer {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+body.page-briefcase.is-arming .briefcase-button {
+  filter: saturate(1.1) brightness(1.04);
+}
+
+body.page-briefcase.is-arming .briefcase-button__ring::before,
+body.page-briefcase.is-arming .briefcase-button__ring::after,
+body.page-briefcase.is-launching .briefcase-button__ring::before,
+body.page-briefcase.is-launching .briefcase-button__ring::after {
+  opacity: 1;
+  animation: briefcase-wave 1.45s ease-out infinite;
+}
+
+body.page-briefcase.is-arming .briefcase-button__ring::after,
+body.page-briefcase.is-launching .briefcase-button__ring::after {
+  animation-delay: 0.28s;
+}
+
+body.page-briefcase.is-launching .briefcase-card {
+  animation: briefcase-shake 420ms ease-in-out 2;
+}
+
+body.page-briefcase.is-launching .briefcase-scene__glow--a {
+  animation: briefcase-float 12s ease-in-out infinite, briefcase-flare 1.2s ease-out 1;
+}
+
+body.page-briefcase.is-launching .briefcase-scene__glow--b {
+  animation: briefcase-float 12s ease-in-out infinite reverse, briefcase-flare 1.2s ease-out 1;
+}
+
+@keyframes briefcase-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, 16px, 0) scale(1.04);
+  }
+}
+
+@keyframes briefcase-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 95, 95, 0.46);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(255, 95, 95, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 95, 95, 0);
+  }
+}
+
+@keyframes briefcase-wave {
+  0% {
+    transform: translate(-50%, -50%) scale(0.42);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.34);
+    opacity: 0;
+  }
+}
+
+@keyframes briefcase-shake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  20% {
+    transform: translate3d(-2px, 1px, 0);
+  }
+  40% {
+    transform: translate3d(2px, -1px, 0);
+  }
+  60% {
+    transform: translate3d(-1px, -1px, 0);
+  }
+  80% {
+    transform: translate3d(1px, 1px, 0);
+  }
+}
+
+@keyframes briefcase-flare {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 0.88;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(1.02);
+  }
+}
+
+@media (max-width: 980px) {
+  body.page-briefcase .briefcase-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body.page-briefcase .briefcase-console {
+    max-width: 42rem;
+  }
+}
+
+@media (max-width: 640px) {
+  body.page-briefcase .briefcase-shell {
+    padding: 16px;
+  }
+
+  body.page-briefcase .briefcase-card {
+    border-radius: 28px;
+  }
+
+  body.page-briefcase .briefcase-title {
+    font-size: clamp(2.4rem, 14vw, 4rem);
+  }
+
+  body.page-briefcase .briefcase-button {
+    width: 100%;
+    min-height: 6.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-briefcase .briefcase-scene__glow,
+  body.page-briefcase .briefcase-console__pulse,
+  body.page-briefcase.is-arming .briefcase-button__ring::before,
+  body.page-briefcase.is-arming .briefcase-button__ring::after,
+  body.page-briefcase.is-launching .briefcase-button__ring::before,
+  body.page-briefcase.is-launching .briefcase-button__ring::after,
+  body.page-briefcase.is-launching .briefcase-card {
+    animation: none !important;
+  }
+
+  body.page-briefcase .briefcase-button,
+  body.page-briefcase .briefcase-card {
+    transition: none;
+  }
+}

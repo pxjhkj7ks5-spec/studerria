@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
+    <title>Studerria · Красная кнопка</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/pages/briefcase.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+  </head>
+  <body class="studerria-theme theme-dark page-briefcase" data-theme="dark">
+    <%- include('partials/theme-bootstrap-body') %>
+
+    <div class="briefcase-scene" aria-hidden="true">
+      <span class="briefcase-scene__glow briefcase-scene__glow--a"></span>
+      <span class="briefcase-scene__glow briefcase-scene__glow--b"></span>
+      <span class="briefcase-scene__grid"></span>
+    </div>
+
+    <main class="briefcase-shell">
+      <section class="briefcase-stage" aria-labelledby="briefcase-title">
+        <article class="briefcase-card glass-panel">
+          <div class="briefcase-card__topline">
+            <span class="status-chip status-chip--danger">Только по ссылке</span>
+            <span class="status-chip status-chip--neutral">Анимация без риска</span>
+          </div>
+
+          <div class="briefcase-layout">
+            <div class="briefcase-copy">
+              <p class="briefcase-overline">Ядерный чемоданчик</p>
+              <h1 class="briefcase-title" id="briefcase-title">Красная кнопка</h1>
+              <p class="briefcase-lead">
+                Простая красивая страничка с мягким Liquid Glass-фоном и одной большой кнопкой.
+                Нажатие запускает только визуальную сцену.
+              </p>
+
+              <div class="briefcase-actions">
+                <button
+                  type="button"
+                  class="briefcase-button"
+                  data-briefcase-button
+                  aria-describedby="briefcase-status briefcase-message"
+                  aria-pressed="false"
+                >
+                  <span class="briefcase-button__ring" aria-hidden="true"></span>
+                  <span class="briefcase-button__core" aria-hidden="true"></span>
+                  <span class="briefcase-button__label" data-briefcase-label>Нажать кнопку</span>
+                </button>
+                <p class="briefcase-hint">
+                  Страница не торчит в меню. Зайти можно только по прямой ссылке.
+                </p>
+              </div>
+            </div>
+
+            <aside class="briefcase-console glass" aria-label="Статус панели">
+              <div class="briefcase-console__header">
+                <span class="briefcase-console__badge">STATUS</span>
+                <span class="briefcase-console__pulse" aria-hidden="true"></span>
+              </div>
+              <strong class="briefcase-console__state" id="briefcase-status" data-briefcase-status>
+                Standby
+              </strong>
+              <p class="briefcase-console__copy" id="briefcase-message" data-briefcase-message>
+                Система ждёт одного нажатия.
+              </p>
+              <dl class="briefcase-metrics">
+                <div class="briefcase-metric">
+                  <dt>Access</dt>
+                  <dd>Secret link</dd>
+                </div>
+                <div class="briefcase-metric">
+                  <dt>Mode</dt>
+                  <dd>Liquid Glass</dd>
+                </div>
+                <div class="briefcase-metric">
+                  <dt>Action</dt>
+                  <dd>Button only</dd>
+                </div>
+              </dl>
+            </aside>
+          </div>
+        </article>
+      </section>
+
+      <%- include('partials/app-footer', { footerMetaClass: 'briefcase-footer-meta' }) %>
+    </main>
+
+    <%- include('partials/changelog-modal') %>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdsl3N7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="/js/design-system.js" defer></script>
+    <script src="/js/briefcase.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+  </body>
+</html>

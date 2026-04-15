@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.43",
+      "date": "2026-04-16",
+      "items": [
+        "feat(briefcase-secret-page): add a direct-link-only `/briefcase` landing page with a dramatic red nuclear-briefcase button, liquid-glass atmosphere, and a lightweight safe animation sequence"
+      ]
+    },
+    {
       "version": "1.6.42",
       "date": "2026-04-15",
       "items": [
