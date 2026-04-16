@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.48",
+      "date": "2026-04-16",
+      "items": [
+        "fix(schedule-generator-preview-theme): stop `/admin/schedule-generator/:runId/preview` from forcing a white theme by aligning preview theme persistence with `ui-theme`, syncing `data-theme` on `html/body`, and keeping dark as safe default when storage is missing"
+      ]
+    },
+    {
       "version": "1.6.47",
       "date": "2026-04-16",
       "items": [

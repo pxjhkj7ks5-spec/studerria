@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
-  <body class="studerria-theme theme-light schedule-generator-page schedule-preview-page">
+  <body class="studerria-theme theme-dark schedule-generator-page schedule-preview-page">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <nav class="navbar navbar-expand-lg admin-nav">
@@ -264,17 +264,48 @@
       });
       const themeToggle = document.getElementById('themeToggle');
       if (themeToggle) {
-        const applyTheme = (theme) => {
-          document.body.classList.toggle('theme-light', theme === 'light');
-          document.body.classList.toggle('theme-dark', theme === 'dark');
-          themeToggle.textContent = theme === 'light' ? themeToggle.dataset.darkLabel : themeToggle.dataset.lightLabel;
+        const persistTheme = (theme) => {
+          const normalized = theme === 'light' ? 'light' : 'dark';
+          try {
+            localStorage.setItem('ui-theme', normalized === 'dark' ? 'theme-dark' : 'theme-light');
+            localStorage.setItem('theme', normalized);
+          } catch (_error) {
+            // Ignore storage failures in private mode.
+          }
         };
-        const stored = localStorage.getItem('theme') || 'light';
-        applyTheme(stored);
+        const resolveTheme = () => {
+          const bootTheme = document.documentElement.getAttribute('data-theme');
+          if (bootTheme === 'light' || bootTheme === 'dark') {
+            return bootTheme;
+          }
+          try {
+            const uiTheme = localStorage.getItem('ui-theme');
+            if (uiTheme === 'theme-light' || uiTheme === 'light') return 'light';
+            if (uiTheme === 'theme-dark' || uiTheme === 'dark') return 'dark';
+            const legacyTheme = localStorage.getItem('theme');
+            if (legacyTheme === 'light' || legacyTheme === 'dark') return legacyTheme;
+          } catch (_error) {
+            // Ignore storage failures and fallback to dark theme.
+          }
+          return 'dark';
+        };
+        const applyTheme = (theme) => {
+          const normalized = theme === 'light' ? 'light' : 'dark';
+          document.body.classList.toggle('theme-light', normalized === 'light');
+          document.body.classList.toggle('theme-dark', normalized === 'dark');
+          document.body.setAttribute('data-theme', normalized);
+          document.documentElement.setAttribute('data-theme', normalized);
+          themeToggle.textContent = normalized === 'light'
+            ? themeToggle.dataset.darkLabel
+            : themeToggle.dataset.lightLabel;
+        };
+        const initialTheme = resolveTheme();
+        applyTheme(initialTheme);
+        persistTheme(initialTheme);
         themeToggle.addEventListener('click', () => {
           const next = document.body.classList.contains('theme-light') ? 'dark' : 'light';
-          localStorage.setItem('theme', next);
           applyTheme(next);
+          persistTheme(next);
         });
       }
 
