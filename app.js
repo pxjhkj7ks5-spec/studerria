@@ -47640,10 +47640,18 @@ const getSessionSubjectTeacherMap = async (subjectIds = []) => {
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value) && value > 0)));
   if (!safeIds.length) return new Map();
-  const rows = await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
-    subjectIds: safeIds,
-    includeHidden: true,
-  });
+  let rows = [];
+  try {
+    rows = await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
+      subjectIds: safeIds,
+      includeHidden: true,
+    });
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    rows = [];
+  }
   const result = new Map();
   (rows || []).forEach((row) => {
     const subjectId = Number(row.subject_id);
@@ -48110,87 +48118,98 @@ async function getSessionGeneratorCleanupPreview({
       subjectsCount: 0,
     };
   }
+  try {
+    const homeworkSemesterFilter = buildSessionGeneratorSemesterFilter('semester_id', normalizedSemesterId);
+    let homeworkSql = `
+      SELECT id, subject_id
+      FROM homework
+      WHERE course_id = ?
+        AND LOWER(TRIM(COALESCE(description, ''))) LIKE ?
+        AND ${buildTruthyTextCondition('is_teacher_homework')}
+        AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
+        ${homeworkSemesterFilter.clause}
+    `;
+    const homeworkParams = [normalizedCourseId, sessionHomeworkPrefixPattern, ...homeworkSemesterFilter.params];
+    if (normalizedTargetDates.length) {
+      homeworkSql += ' AND class_date = ANY(?)';
+      homeworkParams.push(normalizedTargetDates);
+    }
+    const homeworkRows = await db.all(homeworkSql, homeworkParams);
+    const homeworkIds = Array.from(new Set((homeworkRows || [])
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isFinite(id) && id > 0)));
+    const touchedSubjectIds = new Set((homeworkRows || [])
+      .map((row) => Number(row.subject_id))
+      .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
+    const columnIds = new Set();
 
-  const homeworkSemesterFilter = buildSessionGeneratorSemesterFilter('semester_id', normalizedSemesterId);
-  let homeworkSql = `
-    SELECT id, subject_id
-    FROM homework
-    WHERE course_id = ?
-      AND LOWER(TRIM(COALESCE(description, ''))) LIKE ?
-      AND ${buildTruthyTextCondition('is_teacher_homework')}
-      AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
-      ${homeworkSemesterFilter.clause}
-  `;
-  const homeworkParams = [normalizedCourseId, sessionHomeworkPrefixPattern, ...homeworkSemesterFilter.params];
-  if (normalizedTargetDates.length) {
-    homeworkSql += ' AND class_date = ANY(?)';
-    homeworkParams.push(normalizedTargetDates);
+    if (homeworkIds.length) {
+      const linkedColumnRows = await db.all(
+        `
+          SELECT id, subject_id
+          FROM journal_columns
+          WHERE source_homework_id = ANY(?)
+        `,
+        [homeworkIds]
+      );
+      (linkedColumnRows || []).forEach((row) => {
+        const columnId = Number(row.id || 0);
+        if (Number.isFinite(columnId) && columnId > 0) {
+          columnIds.add(columnId);
+        }
+        const subjectId = Number(row.subject_id || 0);
+        if (Number.isFinite(subjectId) && subjectId > 0) {
+          touchedSubjectIds.add(subjectId);
+        }
+      });
+    }
+
+    if (purgeResidualSessionColumns) {
+      const columnSemesterFilter = buildSessionGeneratorSemesterFilter('jc.semester_id', normalizedSemesterId);
+      const residualColumnRows = await db.all(
+        `
+          SELECT DISTINCT jc.id, jc.subject_id
+          FROM journal_columns jc
+          LEFT JOIN homework h ON h.id = jc.source_homework_id
+          WHERE jc.course_id = ?
+            AND COALESCE(jc.is_archived, 0) = 0
+            ${columnSemesterFilter.clause}
+            AND (
+              LOWER(TRIM(COALESCE(jc.title, ''))) LIKE ?
+              OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE ?
+            )
+        `,
+        [normalizedCourseId, ...columnSemesterFilter.params, sessionHomeworkPrefixPattern, sessionHomeworkPrefixPattern]
+      );
+      (residualColumnRows || []).forEach((row) => {
+        const columnId = Number(row.id || 0);
+        if (Number.isFinite(columnId) && columnId > 0) {
+          columnIds.add(columnId);
+        }
+        const subjectId = Number(row.subject_id || 0);
+        if (Number.isFinite(subjectId) && subjectId > 0) {
+          touchedSubjectIds.add(subjectId);
+        }
+      });
+    }
+
+    return {
+      targetDatesCount: normalizedTargetDates.length,
+      publishedEventsCount: homeworkIds.length,
+      journalColumnsCount: columnIds.size,
+      subjectsCount: touchedSubjectIds.size,
+    };
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    return {
+      targetDatesCount: normalizedTargetDates.length,
+      publishedEventsCount: 0,
+      journalColumnsCount: 0,
+      subjectsCount: 0,
+    };
   }
-  const homeworkRows = await db.all(homeworkSql, homeworkParams);
-  const homeworkIds = Array.from(new Set((homeworkRows || [])
-    .map((row) => Number(row.id))
-    .filter((id) => Number.isFinite(id) && id > 0)));
-  const touchedSubjectIds = new Set((homeworkRows || [])
-    .map((row) => Number(row.subject_id))
-    .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
-  const columnIds = new Set();
-
-  if (homeworkIds.length) {
-    const linkedColumnRows = await db.all(
-      `
-        SELECT id, subject_id
-        FROM journal_columns
-        WHERE source_homework_id = ANY(?)
-      `,
-      [homeworkIds]
-    );
-    (linkedColumnRows || []).forEach((row) => {
-      const columnId = Number(row.id || 0);
-      if (Number.isFinite(columnId) && columnId > 0) {
-        columnIds.add(columnId);
-      }
-      const subjectId = Number(row.subject_id || 0);
-      if (Number.isFinite(subjectId) && subjectId > 0) {
-        touchedSubjectIds.add(subjectId);
-      }
-    });
-  }
-
-  if (purgeResidualSessionColumns) {
-    const columnSemesterFilter = buildSessionGeneratorSemesterFilter('jc.semester_id', normalizedSemesterId);
-    const residualColumnRows = await db.all(
-      `
-        SELECT DISTINCT jc.id, jc.subject_id
-        FROM journal_columns jc
-        LEFT JOIN homework h ON h.id = jc.source_homework_id
-        WHERE jc.course_id = ?
-          AND COALESCE(jc.is_archived, 0) = 0
-          ${columnSemesterFilter.clause}
-          AND (
-            LOWER(TRIM(COALESCE(jc.title, ''))) LIKE ?
-            OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE ?
-          )
-      `,
-      [normalizedCourseId, ...columnSemesterFilter.params, sessionHomeworkPrefixPattern, sessionHomeworkPrefixPattern]
-    );
-    (residualColumnRows || []).forEach((row) => {
-      const columnId = Number(row.id || 0);
-      if (Number.isFinite(columnId) && columnId > 0) {
-        columnIds.add(columnId);
-      }
-      const subjectId = Number(row.subject_id || 0);
-      if (Number.isFinite(subjectId) && subjectId > 0) {
-        touchedSubjectIds.add(subjectId);
-      }
-    });
-  }
-
-  return {
-    targetDatesCount: normalizedTargetDates.length,
-    publishedEventsCount: homeworkIds.length,
-    journalColumnsCount: columnIds.size,
-    subjectsCount: touchedSubjectIds.size,
-  };
 }
 
 async function purgeSessionGeneratorHomework({
@@ -48206,123 +48225,134 @@ async function purgeSessionGeneratorHomework({
     .map((value) => toDateOnly(value))
     .filter((value) => isValidDateString(value))))
     .sort();
-  const homeworkSemesterFilter = buildSessionGeneratorSemesterFilter('semester_id', normalizedSemesterId);
-  let homeworkSql = `
-    SELECT id, subject_id
-    FROM homework
-    WHERE course_id = ?
-      AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія]%'
-      AND ${buildTruthyTextCondition('is_teacher_homework')}
-      AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
-      ${homeworkSemesterFilter.clause}
-  `;
-  const homeworkParams = [normalizedCourseId, ...homeworkSemesterFilter.params];
-  if (normalizedTargetDates.length) {
-    homeworkSql += ' AND class_date = ANY(?)';
-    homeworkParams.push(normalizedTargetDates);
-  }
-  const homeworkRows = await db.all(homeworkSql, homeworkParams);
-  const homeworkIds = Array.from(new Set((homeworkRows || [])
-    .map((row) => Number(row.id))
-    .filter((id) => Number.isFinite(id) && id > 0)));
-  const touchedSubjectIds = new Set((homeworkRows || [])
-    .map((row) => Number(row.subject_id))
-    .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
-  const deletedColumnIds = new Set();
-
-  if (homeworkIds.length) {
-    const linkedColumnRows = await db.all(
-      `
-        SELECT id, subject_id
-        FROM journal_columns
-        WHERE source_homework_id = ANY(?)
-      `,
-      [homeworkIds]
-    );
-    (linkedColumnRows || []).forEach((row) => {
-      const columnId = Number(row.id || 0);
-      if (Number.isFinite(columnId) && columnId > 0) {
-        deletedColumnIds.add(columnId);
-      }
-      const subjectId = Number(row.subject_id || 0);
-      if (Number.isFinite(subjectId) && subjectId > 0) {
-        touchedSubjectIds.add(subjectId);
-      }
-    });
-    await db.run(
-      'DELETE FROM journal_columns WHERE source_homework_id = ANY(?)',
-      [homeworkIds]
-    );
-    await db.run(
-      'DELETE FROM homework WHERE id = ANY(?)',
-      [homeworkIds]
-    );
-  }
-
-  if (purgeResidualSessionColumns) {
-    const columnSemesterFilter = buildSessionGeneratorSemesterFilter('jc.semester_id', normalizedSemesterId);
-    const residualColumnRows = await db.all(
-      `
-        SELECT DISTINCT jc.id, jc.subject_id
-        FROM journal_columns jc
-        LEFT JOIN homework h ON h.id = jc.source_homework_id
-        WHERE jc.course_id = ?
-          AND COALESCE(jc.is_archived, 0) = 0
-          ${columnSemesterFilter.clause}
-          AND (
-            LOWER(TRIM(COALESCE(jc.title, ''))) LIKE '[сесія]%'
-            OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[сесія]%'
-          )
-      `,
-      [normalizedCourseId, ...columnSemesterFilter.params]
-    );
-    const residualColumnIds = Array.from(new Set((residualColumnRows || [])
+  try {
+    const homeworkSemesterFilter = buildSessionGeneratorSemesterFilter('semester_id', normalizedSemesterId);
+    let homeworkSql = `
+      SELECT id, subject_id
+      FROM homework
+      WHERE course_id = ?
+        AND LOWER(TRIM(COALESCE(description, ''))) LIKE '[сесія]%'
+        AND ${buildTruthyTextCondition('is_teacher_homework')}
+        AND COALESCE(status, 'published') IN ('draft', 'scheduled', 'published')
+        ${homeworkSemesterFilter.clause}
+    `;
+    const homeworkParams = [normalizedCourseId, ...homeworkSemesterFilter.params];
+    if (normalizedTargetDates.length) {
+      homeworkSql += ' AND class_date = ANY(?)';
+      homeworkParams.push(normalizedTargetDates);
+    }
+    const homeworkRows = await db.all(homeworkSql, homeworkParams);
+    const homeworkIds = Array.from(new Set((homeworkRows || [])
       .map((row) => Number(row.id))
-      .filter((columnId) => Number.isFinite(columnId) && columnId > 0 && !deletedColumnIds.has(columnId))));
-    (residualColumnRows || []).forEach((row) => {
-      const subjectId = Number(row.subject_id || 0);
-      if (Number.isFinite(subjectId) && subjectId > 0) {
-        touchedSubjectIds.add(subjectId);
-      }
-    });
-    if (residualColumnIds.length) {
-      residualColumnIds.forEach((columnId) => deletedColumnIds.add(columnId));
+      .filter((id) => Number.isFinite(id) && id > 0)));
+    const touchedSubjectIds = new Set((homeworkRows || [])
+      .map((row) => Number(row.subject_id))
+      .filter((subjectId) => Number.isFinite(subjectId) && subjectId > 0));
+    const deletedColumnIds = new Set();
+
+    if (homeworkIds.length) {
+      const linkedColumnRows = await db.all(
+        `
+          SELECT id, subject_id
+          FROM journal_columns
+          WHERE source_homework_id = ANY(?)
+        `,
+        [homeworkIds]
+      );
+      (linkedColumnRows || []).forEach((row) => {
+        const columnId = Number(row.id || 0);
+        if (Number.isFinite(columnId) && columnId > 0) {
+          deletedColumnIds.add(columnId);
+        }
+        const subjectId = Number(row.subject_id || 0);
+        if (Number.isFinite(subjectId) && subjectId > 0) {
+          touchedSubjectIds.add(subjectId);
+        }
+      });
       await db.run(
-        'DELETE FROM journal_columns WHERE id = ANY(?)',
-        [residualColumnIds]
+        'DELETE FROM journal_columns WHERE source_homework_id = ANY(?)',
+        [homeworkIds]
+      );
+      await db.run(
+        'DELETE FROM homework WHERE id = ANY(?)',
+        [homeworkIds]
       );
     }
-  }
 
-  let syncedSubjects = 0;
-  for (const subjectId of touchedSubjectIds) {
-    try {
-      const gradingSettings = await ensureSubjectGradingSettings(
-        Number(subjectId),
-        normalizedCourseId,
-        normalizedSemesterId,
-        actorUserId || null
+    if (purgeResidualSessionColumns) {
+      const columnSemesterFilter = buildSessionGeneratorSemesterFilter('jc.semester_id', normalizedSemesterId);
+      const residualColumnRows = await db.all(
+        `
+          SELECT DISTINCT jc.id, jc.subject_id
+          FROM journal_columns jc
+          LEFT JOIN homework h ON h.id = jc.source_homework_id
+          WHERE jc.course_id = ?
+            AND COALESCE(jc.is_archived, 0) = 0
+            ${columnSemesterFilter.clause}
+            AND (
+              LOWER(TRIM(COALESCE(jc.title, ''))) LIKE '[сесія]%'
+              OR LOWER(TRIM(COALESCE(h.description, ''))) LIKE '[сесія]%'
+            )
+        `,
+        [normalizedCourseId, ...columnSemesterFilter.params]
       );
-      await syncJournalColumnsFromHomework(
-        Number(subjectId),
-        normalizedCourseId,
-        normalizedSemesterId,
-        gradingSettings,
-        actorUserId || null
-      );
-      syncedSubjects += 1;
-    } catch (err) {
-      if (!isDbSchemaCompatibilityError(err)) {
-        throw err;
+      const residualColumnIds = Array.from(new Set((residualColumnRows || [])
+        .map((row) => Number(row.id))
+        .filter((columnId) => Number.isFinite(columnId) && columnId > 0 && !deletedColumnIds.has(columnId))));
+      (residualColumnRows || []).forEach((row) => {
+        const subjectId = Number(row.subject_id || 0);
+        if (Number.isFinite(subjectId) && subjectId > 0) {
+          touchedSubjectIds.add(subjectId);
+        }
+      });
+      if (residualColumnIds.length) {
+        residualColumnIds.forEach((columnId) => deletedColumnIds.add(columnId));
+        await db.run(
+          'DELETE FROM journal_columns WHERE id = ANY(?)',
+          [residualColumnIds]
+        );
       }
     }
-  }
 
-  return {
-    deletedHomeworkCount: homeworkIds.length,
-    deletedJournalColumnsCount: deletedColumnIds.size,
-    syncedSubjects,
-  };
+    let syncedSubjects = 0;
+    for (const subjectId of touchedSubjectIds) {
+      try {
+        const gradingSettings = await ensureSubjectGradingSettings(
+          Number(subjectId),
+          normalizedCourseId,
+          normalizedSemesterId,
+          actorUserId || null
+        );
+        await syncJournalColumnsFromHomework(
+          Number(subjectId),
+          normalizedCourseId,
+          normalizedSemesterId,
+          gradingSettings,
+          actorUserId || null
+        );
+        syncedSubjects += 1;
+      } catch (err) {
+        if (!isDbSchemaCompatibilityError(err)) {
+          throw err;
+        }
+      }
+    }
+
+    return {
+      deletedHomeworkCount: homeworkIds.length,
+      deletedJournalColumnsCount: deletedColumnIds.size,
+      syncedSubjects,
+    };
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      throw err;
+    }
+    return {
+      deletedHomeworkCount: 0,
+      deletedJournalColumnsCount: 0,
+      syncedSubjects: 0,
+    };
+  }
 };
 
 const buildSessionConflictSlotMap = (report) => {

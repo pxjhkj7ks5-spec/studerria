@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "version": "1.6.50",
+      "date": "2026-04-16",
+      "items": [
+        "fix(session-generator-db-compat): prevent `/admin/session-generator` database crashes on legacy schemas by adding compatibility fallbacks for teacher-assignment map loading and session cleanup preview/purge queries",
+        "refactor(session-generator-ui-compact): streamline the session generator default view by moving secondary legend/timeline panels into Advanced mode while keeping core manual planning flow focused"
+      ]
+    },
+    {
       "version": "1.6.49",
       "date": "2026-04-16",
       "items": [
