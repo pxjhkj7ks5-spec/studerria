@@ -50841,8 +50841,17 @@ app.post('/admin/schedule-generator/config', requireScheduleGeneratorSectionAcce
     const activeLocation = String(req.body.active_location || existing.active_location || 'kyiv').toLowerCase() === 'munich'
       ? 'munich'
       : 'kyiv';
-    const courseSemesterInput = req.body.course_semesters || {};
-    const sanitizedCourseSemesters = {};
+    const selectedLocationRaw = String(req.body.location || activeLocation).toLowerCase();
+    const selectedLocation = selectedLocationRaw === 'munich' ? 'munich' : 'kyiv';
+    const selectedCourseId = parsePositiveIntStrict(req.body.course_id);
+    const selectedSemesterId = parsePositiveIntStrict(req.body.semester_id);
+    const courseSemesterInput = req.body.course_semesters && typeof req.body.course_semesters === 'object'
+      ? req.body.course_semesters
+      : {};
+    const existingCourseSemesters = {
+      ...((existing.course_semesters_by_location && existing.course_semesters_by_location[activeLocation]) || {}),
+    };
+    const sanitizedCourseSemesters = { ...existingCourseSemesters };
     const entries = Object.entries(courseSemesterInput);
     for (const [courseIdRaw, semesterIdRaw] of entries) {
       const courseId = Number(courseIdRaw);
@@ -50853,6 +50862,18 @@ app.post('/admin/schedule-generator/config', requireScheduleGeneratorSectionAcce
         sanitizedCourseSemesters[String(courseId)] = semesterId;
       }
     }
+    if (selectedCourseId && selectedSemesterId) {
+      const scopedSemesterRow = await db.get(
+        'SELECT id FROM semesters WHERE id = ? AND course_id = ?',
+        [selectedSemesterId, selectedCourseId]
+      );
+      if (scopedSemesterRow) {
+        sanitizedCourseSemesters[String(selectedCourseId)] = selectedSemesterId;
+      }
+    }
+    const specialWeeksMode = String(req.body.special_weeks_mode || existing.special_weeks_mode || 'block') === 'overlay'
+      ? 'overlay'
+      : 'block';
     const nextCourseSemestersByLocation = {
       ...(existing.course_semesters_by_location || { kyiv: {}, munich: {} }),
       [activeLocation]: sanitizedCourseSemesters,
@@ -50867,7 +50888,7 @@ app.post('/admin/schedule-generator/config', requireScheduleGeneratorSectionAcce
       evenness_bias: evennessBias,
       late_slot_weight: Number.isFinite(lateSlotWeight) ? lateSlotWeight : 0,
       blocked_weeks: String(req.body.blocked_weeks || ''),
-      special_weeks_mode: String(req.body.special_weeks_mode || existing.special_weeks_mode || 'block'),
+      special_weeks_mode: specialWeeksMode,
       prefer_compactness: String(req.body.prefer_compactness || '') === 'on',
       strict_no_evening: String(req.body.strict_no_evening || '') === 'on',
       mirror_groups: String(req.body.mirror_groups || '') === 'on',
@@ -50889,7 +50910,11 @@ app.post('/admin/schedule-generator/config', requireScheduleGeneratorSectionAcce
         [Number(semesterId), runId, Number(courseId)]
       );
     }
-    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Settings saved', runId));
+    return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'ok', 'Settings saved', runId, {
+      location: selectedLocation,
+      course_id: selectedCourseId,
+      semester_id: selectedSemesterId,
+    }));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.config.save');
   }

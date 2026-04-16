@@ -39,6 +39,28 @@
         runHint: 'Generation runs for the selected course + semester scope.',
         generatePreview: 'Generate preview',
         openPreview: 'Open preview',
+        settingsTitle: 'Generation Settings',
+        settingsHint: 'Use only the controls that directly affect generation quality.',
+        blockedWeeks: 'Special Study Weeks',
+        blockedWeeksPlaceholder: 'For example: 2,5,9-10',
+        specialWeeksMode: 'Special weeks behavior',
+        specialWeeksBlock: 'Do not generate on these weeks',
+        specialWeeksOverlay: 'Ignore list (normal generation)',
+        maxDailyPairs: 'Max pairs/day',
+        targetDailyPairs: 'Target pairs/day',
+        distribution: 'Lecture week distribution',
+        seminarDistribution: 'Seminar week distribution',
+        distStart: 'Start',
+        distEven: 'Even',
+        distEnd: 'End',
+        strictNoEvening: 'Strict: avoid 6-7 slots',
+        preferCompactness: 'Prefer compact day layout',
+        autoSubjectDays: 'Auto-balance subject weekdays',
+        subjectSingleDay: 'Keep one subject on one weekday',
+        lectureSeminarSameDay: 'Prefer lecture + seminar same day',
+        lectureBeforeSeminar: 'Lecture before seminar',
+        mirrorGroups: 'Enable mirror groups (A/B)',
+        saveSettings: 'Save settings',
         advancedTitle: 'Additional settings',
         fixedDay: 'Fixed day',
         fixedSlot: 'Fixed slot',
@@ -85,6 +107,28 @@
         runHint: 'Генерація запускається тільки по вибраному курсу + терму.',
         generatePreview: 'Згенерувати превʼю',
         openPreview: 'Відкрити превʼю',
+        settingsTitle: 'Налаштування генерації',
+        settingsHint: 'Лишили тільки параметри, що реально впливають на якість генерації.',
+        blockedWeeks: 'Спец-тижні навчання',
+        blockedWeeksPlaceholder: 'Наприклад: 2,5,9-10',
+        specialWeeksMode: 'Режим спец-тижнів',
+        specialWeeksBlock: 'Не генерувати на цих тижнях',
+        specialWeeksOverlay: 'Ігнорувати список (звичайна генерація)',
+        maxDailyPairs: 'Макс пар/день',
+        targetDailyPairs: 'Ціль пар/день',
+        distribution: 'Розподіл лекцій по тижнях',
+        seminarDistribution: 'Розподіл семінарів по тижнях',
+        distStart: 'Початок',
+        distEven: 'Рівномірно',
+        distEnd: 'Кінець',
+        strictNoEvening: 'Строго без 6-7 пар',
+        preferCompactness: 'Компактніше розклад по днях',
+        autoSubjectDays: 'Авто-баланс днів для предметів',
+        subjectSingleDay: 'Один предмет в один день тижня',
+        lectureSeminarSameDay: 'Лекція + семінар в один день',
+        lectureBeforeSeminar: 'Лекція перед семінаром',
+        mirrorGroups: 'Увімкнути дзеркальні групи (A/B)',
+        saveSettings: 'Зберегти налаштування',
         advancedTitle: 'Додаткові параметри',
         fixedDay: 'Фіксований день',
         fixedSlot: 'Фіксований слот',
@@ -113,6 +157,14 @@
     : {};
   const fallbackTeachers = Array.isArray(teachers) ? teachers : [];
   const extraItemsCount = Number(selectedGlobalExtraItemsCount || 0) || 0;
+  const generatorConfig = config && typeof config === 'object' ? config : {};
+  const configDistribution = String(generatorConfig.distribution || 'even').toLowerCase();
+  const configSeminarDistribution = String(generatorConfig.seminar_distribution || 'even').toLowerCase();
+  const configSpecialWeeksMode = String(generatorConfig.special_weeks_mode || 'block').toLowerCase() === 'overlay'
+    ? 'overlay'
+    : 'block';
+  const configMaxDailyPairs = Number(generatorConfig.max_daily_pairs || 7);
+  const configTargetDailyPairs = Number(generatorConfig.target_daily_pairs || 4);
 
   const formatLocationLabel = (value) => String(value || '').toLowerCase() === 'munich'
     ? schedulePageText.locationMunich
@@ -289,6 +341,97 @@
             <div class="card-body">
               <div class="generator-section-title mb-2"><%= schedulePageText.teacherSettingsMoved %></div>
               <a class="btn btn-outline-secondary btn-sm" href="/admin/pathways"><%= schedulePageText.openAcademicSetup %></a>
+            </div>
+          </div>
+
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2"><%= schedulePageText.settingsTitle %></div>
+              <div class="small text-muted mb-3"><%= schedulePageText.settingsHint %></div>
+              <form method="POST" action="/admin/schedule-generator/config" class="row g-3">
+                <input type="hidden" name="run_id" value="<%= run.id %>" />
+                <input type="hidden" name="active_location" value="<%= activeLocation %>" />
+                <input type="hidden" name="location" value="<%= activeLocation %>" />
+                <input type="hidden" name="course_id" value="<%= scopedCourseId || '' %>" />
+                <input type="hidden" name="semester_id" value="<%= scopedSemesterId || '' %>" />
+                <% if (scopedCourseId && scopedSemesterId) { %>
+                  <input type="hidden" name="course_semesters[<%= scopedCourseId %>]" value="<%= scopedSemesterId %>" />
+                <% } %>
+                <div class="col-12">
+                  <label class="form-label"><%= schedulePageText.blockedWeeks %></label>
+                  <input
+                    class="form-control"
+                    type="text"
+                    name="blocked_weeks"
+                    placeholder="<%= schedulePageText.blockedWeeksPlaceholder %>"
+                    value="<%= String(generatorConfig.blocked_weeks || '') %>"
+                  />
+                </div>
+                <div class="col-12">
+                  <label class="form-label"><%= schedulePageText.specialWeeksMode %></label>
+                  <select class="form-select" name="special_weeks_mode">
+                    <option value="block" <%= configSpecialWeeksMode === 'block' ? 'selected' : '' %>><%= schedulePageText.specialWeeksBlock %></option>
+                    <option value="overlay" <%= configSpecialWeeksMode === 'overlay' ? 'selected' : '' %>><%= schedulePageText.specialWeeksOverlay %></option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label"><%= schedulePageText.maxDailyPairs %></label>
+                  <input class="form-control" type="number" min="1" max="7" name="max_daily_pairs" value="<%= Number.isFinite(configMaxDailyPairs) ? configMaxDailyPairs : 7 %>" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label"><%= schedulePageText.targetDailyPairs %></label>
+                  <input class="form-control" type="number" min="1" max="7" name="target_daily_pairs" value="<%= Number.isFinite(configTargetDailyPairs) ? configTargetDailyPairs : 4 %>" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label"><%= schedulePageText.distribution %></label>
+                  <select class="form-select" name="distribution">
+                    <option value="start" <%= configDistribution === 'start' ? 'selected' : '' %>><%= schedulePageText.distStart %></option>
+                    <option value="even" <%= configDistribution === 'even' ? 'selected' : '' %>><%= schedulePageText.distEven %></option>
+                    <option value="end" <%= configDistribution === 'end' ? 'selected' : '' %>><%= schedulePageText.distEnd %></option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label"><%= schedulePageText.seminarDistribution %></label>
+                  <select class="form-select" name="seminar_distribution">
+                    <option value="start" <%= configSeminarDistribution === 'start' ? 'selected' : '' %>><%= schedulePageText.distStart %></option>
+                    <option value="even" <%= configSeminarDistribution === 'even' ? 'selected' : '' %>><%= schedulePageText.distEven %></option>
+                    <option value="end" <%= configSeminarDistribution === 'end' ? 'selected' : '' %>><%= schedulePageText.distEnd %></option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="strict_no_evening" id="cfgStrictNoEvening" <%= generatorConfig.strict_no_evening ? 'checked' : '' %> />
+                    <label class="form-check-label" for="cfgStrictNoEvening"><%= schedulePageText.strictNoEvening %></label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="prefer_compactness" id="cfgPreferCompactness" <%= generatorConfig.prefer_compactness ? 'checked' : '' %> />
+                    <label class="form-check-label" for="cfgPreferCompactness"><%= schedulePageText.preferCompactness %></label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="auto_subject_days" id="cfgAutoSubjectDays" <%= generatorConfig.auto_subject_days !== false ? 'checked' : '' %> />
+                    <label class="form-check-label" for="cfgAutoSubjectDays"><%= schedulePageText.autoSubjectDays %></label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="subject_single_day" id="cfgSubjectSingleDay" <%= generatorConfig.subject_single_day !== false ? 'checked' : '' %> />
+                    <label class="form-check-label" for="cfgSubjectSingleDay"><%= schedulePageText.subjectSingleDay %></label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="lecture_seminar_same_day" id="cfgLectureSeminarSameDay" <%= generatorConfig.lecture_seminar_same_day !== false ? 'checked' : '' %> />
+                    <label class="form-check-label" for="cfgLectureSeminarSameDay"><%= schedulePageText.lectureSeminarSameDay %></label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="lecture_before_seminar" id="cfgLectureBeforeSeminar" <%= generatorConfig.lecture_before_seminar !== false ? 'checked' : '' %> />
+                    <label class="form-check-label" for="cfgLectureBeforeSeminar"><%= schedulePageText.lectureBeforeSeminar %></label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="mirror_groups" id="cfgMirrorGroups" <%= generatorConfig.mirror_groups ? 'checked' : '' %> />
+                    <label class="form-check-label" for="cfgMirrorGroups"><%= schedulePageText.mirrorGroups %></label>
+                  </div>
+                </div>
+                <div class="col-12 d-grid">
+                  <button class="btn btn-outline-primary" type="submit"><%= schedulePageText.saveSettings %></button>
+                </div>
+              </form>
             </div>
           </div>
 

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.49",
+      "date": "2026-04-16",
+      "items": [
+        "feat(schedule-generator-settings-return): restore essential custom generation controls on `/admin/schedule-generator` (special blocked weeks + mode, daily load targets, week distribution, and key generation toggles), keep selected scope after settings save, and harden config save so semester mapping is merged/preserved instead of being wiped"
+      ]
+    },
+    {
       "version": "1.6.48",
       "date": "2026-04-16",
       "items": [
