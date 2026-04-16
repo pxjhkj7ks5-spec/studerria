@@ -1127,6 +1127,19 @@ body.theme-light .deadline-block {
   background: rgba(250, 204, 21, 0.14);
 }
 
+.deadline-block--teamwork {
+  background: rgba(59, 130, 246, 0.14);
+}
+
+body.theme-dark .deadline-block--teamwork {
+  background: rgba(30, 64, 175, 0.26);
+  border: 1px solid rgba(125, 211, 252, 0.34);
+}
+
+body.theme-light .deadline-block--teamwork {
+  background: rgba(147, 197, 253, 0.2);
+}
+
 .deadline-title {
   cursor: pointer;
   font-size: 0.8rem;
@@ -1137,6 +1150,14 @@ body.theme-light .deadline-block {
 
 body.theme-light .deadline-title {
   color: #92400e;
+}
+
+.deadline-title--teamwork {
+  color: #dbeafe;
+}
+
+body.theme-light .deadline-title--teamwork {
+  color: #1e40af;
 }
 
 .deadline-title::-webkit-details-marker {
@@ -1169,6 +1190,16 @@ body.theme-light .deadline-title {
   transition: background var(--motion-fast);
 }
 
+.deadline-item[data-custom-id],
+.deadline-item[data-teamwork-id] {
+  cursor: pointer;
+}
+
+.deadline-item--teamwork {
+  border-color: rgba(147, 197, 253, 0.45);
+  background: rgba(59, 130, 246, 0.18);
+}
+
 body.theme-dark .deadline-item .fw-semibold {
   color: #fff8db;
 }
@@ -1186,6 +1217,11 @@ body.theme-dark .deadline-item {
   border-color: rgba(252, 211, 77, 0.36);
 }
 
+body.theme-dark .deadline-item--teamwork {
+  background: rgba(37, 99, 235, 0.28);
+  border-color: rgba(125, 211, 252, 0.38);
+}
+
 .deadline-item + .deadline-item {
   margin-top: 6px;
 }
@@ -1194,8 +1230,16 @@ body.theme-dark .deadline-item {
   background: rgba(250, 204, 21, 0.24);
 }
 
+.deadline-item--teamwork:hover {
+  background: rgba(96, 165, 250, 0.24);
+}
+
 body.theme-dark .deadline-item:hover {
   background: rgba(252, 211, 77, 0.28);
+}
+
+body.theme-dark .deadline-item--teamwork:hover {
+  background: rgba(96, 165, 250, 0.32);
 }
 
 .deadline-meta {
@@ -1203,8 +1247,27 @@ body.theme-dark .deadline-item:hover {
   color: #fde68a;
 }
 
+.deadline-item--teamwork .deadline-meta {
+  color: #dbeafe;
+}
+
 body.theme-light .deadline-meta {
   color: #b45309;
+}
+
+body.theme-light .deadline-item--teamwork .deadline-meta {
+  color: #1d4ed8;
+}
+
+.deadline-subtitle {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  line-height: 1.28;
+  color: rgba(191, 219, 254, 0.95);
+}
+
+body.theme-light .deadline-subtitle {
+  color: #1e3a8a;
 }
 
 body.page-schedule .week-rail::before,

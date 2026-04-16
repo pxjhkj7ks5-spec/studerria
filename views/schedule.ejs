@@ -34,6 +34,13 @@
         teacherHomeworkBadge: 'Teacher HW',
         creditBadge: 'Credit',
         homeworkShort: 'HW',
+        teamworkDeadlinesTitle: 'Teamwork deadlines',
+        teamworkBadge: 'Teamwork',
+        teamworkTeamsLabel: 'Teams',
+        teamworkOpenAction: 'Open teamwork',
+        teamworkNoGroups: 'No teams created yet.',
+        teamworkAudiencePrefix: 'Audience',
+        teamworkAddedByPrefix: 'Created by',
         nowChip: 'Now',
         nextChip: 'Next',
         dayBalanceNone: 'Day balance: no classes yet',
@@ -147,6 +154,27 @@
           '02-14': '"Любов варта всього."',
         },
       };
+  if (!scheduleViewText.teamworkDeadlinesTitle) {
+    scheduleViewText.teamworkDeadlinesTitle = lang === 'en' ? 'Teamwork deadlines' : 'Дедлайни тімворку';
+  }
+  if (!scheduleViewText.teamworkBadge) {
+    scheduleViewText.teamworkBadge = lang === 'en' ? 'Teamwork' : 'Тімворк';
+  }
+  if (!scheduleViewText.teamworkTeamsLabel) {
+    scheduleViewText.teamworkTeamsLabel = lang === 'en' ? 'Teams' : 'Команди';
+  }
+  if (!scheduleViewText.teamworkOpenAction) {
+    scheduleViewText.teamworkOpenAction = lang === 'en' ? 'Open teamwork' : 'Відкрити teamwork';
+  }
+  if (!scheduleViewText.teamworkNoGroups) {
+    scheduleViewText.teamworkNoGroups = lang === 'en' ? 'No teams created yet.' : 'Команди ще не створені.';
+  }
+  if (!scheduleViewText.teamworkAudiencePrefix) {
+    scheduleViewText.teamworkAudiencePrefix = lang === 'en' ? 'Audience' : 'Аудиторія';
+  }
+  if (!scheduleViewText.teamworkAddedByPrefix) {
+    scheduleViewText.teamworkAddedByPrefix = lang === 'en' ? 'Created by' : 'Створив';
+  }
   const scheduleAttendanceCardMap = (scheduleAttendanceMarkers && typeof scheduleAttendanceMarkers === 'object')
     ? scheduleAttendanceMarkers
     : {};
@@ -2566,6 +2594,49 @@
                 </div>
               </details>
             <% } %>
+            <% const teamworkItems = dateKey && teamworkDeadlinesByDate ? teamworkDeadlinesByDate[dateKey] : null; %>
+            <% if (canUseCustomDeadlinesUi && teamworkItems && teamworkItems.length) { %>
+              <details class="deadline-block deadline-block--teamwork">
+                <summary class="deadline-title deadline-title--teamwork"><%= scheduleViewText.teamworkDeadlinesTitle %></summary>
+                <div class="deadline-content">
+                  <% teamworkItems.forEach(function(item) { %>
+                    <% const dueLabel = item.due_date ? new Date(item.due_date).toLocaleDateString(localeCode) : ''; %>
+                    <% const shortDesc = item.title ? (item.title.length > 90 ? item.title.slice(0, 90) + '…' : item.title) : ''; %>
+                    <div
+                      class="deadline-item deadline-item--teamwork"
+                      data-teamwork-id="<%= item.id %>"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="top"
+                      title="<%= shortDesc %>"
+                    >
+                      <div>
+                        <div class="fw-semibold"><%= item.subject_name %></div>
+                        <% if (item.title) { %>
+                          <div class="deadline-subtitle"><%= item.title %></div>
+                        <% } %>
+                        <% const teacherGroups = Array.isArray(item.group_numbers) ? item.group_numbers.filter((g) => Number.isFinite(Number(g)) && Number(g) > 0) : []; %>
+                        <% let groupNote = ''; %>
+                        <% if (role === 'teacher') { %>
+                          <% if (teacherGroups.length > 1) { %>
+                            <% groupNote = ` · ${t('schedule.group.plural')} ${teacherGroups.join(', ')}`; %>
+                          <% } else if (teacherGroups.length === 1) { %>
+                            <% groupNote = ` · ${t('schedule.group.single')} ${teacherGroups[0]}`; %>
+                          <% } %>
+                        <% } %>
+                        <div class="deadline-meta"><%= t('schedule.customDeadlines.duePrefix') %>: <%= dueLabel %><%= groupNote %></div>
+                        <% if (item.created_by) { %>
+                          <div class="deadline-meta"><%= scheduleViewText.teamworkAddedByPrefix %>: <%= item.created_by %></div>
+                        <% } %>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                          <span class="priority-chip priority-normal"><%= scheduleViewText.teamworkBadge %></span>
+                          <span class="priority-chip priority-normal"><%= scheduleViewText.teamworkTeamsLabel %>: <%= Math.max(Number(item.group_count || 0), (item.team_groups || []).length, 1) %></span>
+                        </div>
+                      </div>
+                    </div>
+                  <% }); %>
+                </div>
+              </details>
+            <% } %>
           </div>
         <% }); %>
         <% const activeDaySet = new Set(daysOfWeek || []); %>
@@ -2619,6 +2690,106 @@
                           <% if (Number(item.is_teacher_homework || 0) === 1) { %>
                             <span class="priority-chip priority-urgent"><%= t('schedule.homeworkMeta.teacherHomework') %></span>
                           <% } %>
+                        </div>
+                      </div>
+                    </div>
+                  <% }); %>
+                </div>
+              </details>
+              <% const weekendTeamworkItems = card.date && teamworkDeadlinesByDate ? teamworkDeadlinesByDate[card.date] : []; %>
+              <% if (weekendTeamworkItems && weekendTeamworkItems.length) { %>
+                <details class="deadline-block deadline-block--teamwork">
+                  <summary class="deadline-title deadline-title--teamwork"><%= scheduleViewText.teamworkDeadlinesTitle %></summary>
+                  <div class="deadline-content">
+                    <% weekendTeamworkItems.forEach(function(item) { %>
+                      <% const dueLabel = item.due_date ? new Date(item.due_date).toLocaleDateString(localeCode) : ''; %>
+                      <% const shortDesc = item.title ? (item.title.length > 90 ? item.title.slice(0, 90) + '…' : item.title) : ''; %>
+                      <div
+                        class="deadline-item deadline-item--teamwork"
+                        data-teamwork-id="<%= item.id %>"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="<%= shortDesc %>"
+                      >
+                        <div>
+                          <div class="fw-semibold"><%= item.subject_name %></div>
+                          <% if (item.title) { %>
+                            <div class="deadline-subtitle"><%= item.title %></div>
+                          <% } %>
+                          <% const teacherGroups = Array.isArray(item.group_numbers) ? item.group_numbers.filter((g) => Number.isFinite(Number(g)) && Number(g) > 0) : []; %>
+                          <% let groupNote = ''; %>
+                          <% if (role === 'teacher') { %>
+                            <% if (teacherGroups.length > 1) { %>
+                              <% groupNote = ` · ${t('schedule.group.plural')} ${teacherGroups.join(', ')}`; %>
+                            <% } else if (teacherGroups.length === 1) { %>
+                              <% groupNote = ` · ${t('schedule.group.single')} ${teacherGroups[0]}`; %>
+                            <% } %>
+                          <% } %>
+                          <div class="deadline-meta"><%= t('schedule.customDeadlines.duePrefix') %>: <%= dueLabel %><%= groupNote %></div>
+                          <% if (item.created_by) { %>
+                            <div class="deadline-meta"><%= scheduleViewText.teamworkAddedByPrefix %>: <%= item.created_by %></div>
+                          <% } %>
+                          <div class="d-flex flex-wrap gap-1 mt-1">
+                            <span class="priority-chip priority-normal"><%= scheduleViewText.teamworkBadge %></span>
+                            <span class="priority-chip priority-normal"><%= scheduleViewText.teamworkTeamsLabel %>: <%= Math.max(Number(item.group_count || 0), (item.team_groups || []).length, 1) %></span>
+                          </div>
+                        </div>
+                      </div>
+                    <% }); %>
+                  </div>
+                </details>
+              <% } %>
+            </div>
+          <% }); %>
+        <% } %>
+        <% const weekendCustomDateSet = new Set((weekendDeadlineCards || []).map((card) => card.date)); %>
+        <% if (canUseCustomDeadlinesUi && weekendTeamworkDeadlineCards && weekendTeamworkDeadlineCards.length) { %>
+          <% weekendTeamworkDeadlineCards.forEach(function(card) { %>
+            <% if (activeDaySet.has(card.day) || weekendCustomDateSet.has(card.date)) { return; } %>
+            <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
+            <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= card.date || '' %>">
+              <div class="day-header">
+                <div class="day-title">
+                  <span class="day-name dayTitle"><%= card.day %></span>
+                  <% if (dateLabel) { %>
+                    <span class="day-date dayDate"><%= dateLabel %></span>
+                  <% } %>
+                </div>
+              </div>
+              <details class="deadline-block deadline-block--teamwork" open>
+                <summary class="deadline-title deadline-title--teamwork"><%= scheduleViewText.teamworkDeadlinesTitle %></summary>
+                <div class="deadline-content">
+                  <% card.items.forEach(function(item) { %>
+                    <% const dueLabel = item.due_date ? new Date(item.due_date).toLocaleDateString(localeCode) : ''; %>
+                    <% const shortDesc = item.title ? (item.title.length > 90 ? item.title.slice(0, 90) + '…' : item.title) : ''; %>
+                    <div
+                      class="deadline-item deadline-item--teamwork"
+                      data-teamwork-id="<%= item.id %>"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="top"
+                      title="<%= shortDesc %>"
+                    >
+                      <div>
+                        <div class="fw-semibold"><%= item.subject_name %></div>
+                        <% if (item.title) { %>
+                          <div class="deadline-subtitle"><%= item.title %></div>
+                        <% } %>
+                        <% const teacherGroups = Array.isArray(item.group_numbers) ? item.group_numbers.filter((g) => Number.isFinite(Number(g)) && Number(g) > 0) : []; %>
+                        <% let groupNote = ''; %>
+                        <% if (role === 'teacher') { %>
+                          <% if (teacherGroups.length > 1) { %>
+                            <% groupNote = ` · ${t('schedule.group.plural')} ${teacherGroups.join(', ')}`; %>
+                          <% } else if (teacherGroups.length === 1) { %>
+                            <% groupNote = ` · ${t('schedule.group.single')} ${teacherGroups[0]}`; %>
+                          <% } %>
+                        <% } %>
+                        <div class="deadline-meta"><%= t('schedule.customDeadlines.duePrefix') %>: <%= dueLabel %><%= groupNote %></div>
+                        <% if (item.created_by) { %>
+                          <div class="deadline-meta"><%= scheduleViewText.teamworkAddedByPrefix %>: <%= item.created_by %></div>
+                        <% } %>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                          <span class="priority-chip priority-normal"><%= scheduleViewText.teamworkBadge %></span>
+                          <span class="priority-chip priority-normal"><%= scheduleViewText.teamworkTeamsLabel %>: <%= Math.max(Number(item.group_count || 0), (item.team_groups || []).length, 1) %></span>
                         </div>
                       </div>
                     </div>
@@ -3116,6 +3287,32 @@
         </div>
       </div>
     </div>
+
+    <div class="modal fade" id="teamworkDeadlineViewModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><%= scheduleViewText.teamworkDeadlinesTitle %></h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= t('changelog.close') %>"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-2">
+              <div class="fw-semibold" id="teamworkDeadlineSubject"></div>
+              <div class="text-muted" id="teamworkDeadlineDue"></div>
+            </div>
+            <div class="mb-3" id="teamworkDeadlineTitle"></div>
+            <div class="small text-muted mb-2" id="teamworkDeadlineAudience"></div>
+            <div class="small text-muted mb-3" id="teamworkDeadlineBy"></div>
+            <div class="mb-2 fw-semibold"><%= scheduleViewText.teamworkTeamsLabel %></div>
+            <ul class="list-group mb-3" id="teamworkDeadlineTeams"></ul>
+            <a class="btn btn-outline-primary" id="teamworkDeadlineOpenLink" href="/teamwork"><%= scheduleViewText.teamworkOpenAction %></a>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal"><%= t('schedule.homeworkModal.close') %></button>
+          </div>
+        </div>
+      </div>
+    </div>
     <% } %>
 
     <%- include('partials/mobile-menu-modal', { role, t, activePage: 'schedule' }) %>
@@ -3489,6 +3686,7 @@
       const homeworkData = <%- JSON.stringify(homework || []) %>;
       const teacherHomeworkTemplates = <%- JSON.stringify(typeof teacherHomeworkTemplates !== 'undefined' ? teacherHomeworkTemplates : []) %>;
       const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
+      const teamworkDeadlineItems = <%- JSON.stringify(teamworkDeadlineItems || []) %>;
       const listEl = document.getElementById('homeworkList');
       const homeworkSubmitForm = document.getElementById('homeworkSubmitForm');
       const homeworkSubmitMeta = document.getElementById('homeworkSubmitMeta');
@@ -4882,6 +5080,14 @@
       const customDeadlineDescription = document.getElementById('customDeadlineDescription');
       const customDeadlineLinks = document.getElementById('customDeadlineLinks');
       const customDeadlineReactions = document.getElementById('customDeadlineReactions');
+      const teamworkDeadlineModal = document.getElementById('teamworkDeadlineViewModal');
+      const teamworkDeadlineSubject = document.getElementById('teamworkDeadlineSubject');
+      const teamworkDeadlineDue = document.getElementById('teamworkDeadlineDue');
+      const teamworkDeadlineTitle = document.getElementById('teamworkDeadlineTitle');
+      const teamworkDeadlineAudience = document.getElementById('teamworkDeadlineAudience');
+      const teamworkDeadlineBy = document.getElementById('teamworkDeadlineBy');
+      const teamworkDeadlineTeams = document.getElementById('teamworkDeadlineTeams');
+      const teamworkDeadlineOpenLink = document.getElementById('teamworkDeadlineOpenLink');
 
       function renderCustomDeadline(item) {
         if (!item) return;
@@ -4937,6 +5143,83 @@
       const customMap = customDeadlineItems && customDeadlineItems.length
         ? new Map(customDeadlineItems.map((item) => [String(item.id), item]))
         : null;
+      const teamworkMap = teamworkDeadlineItems && teamworkDeadlineItems.length
+        ? new Map(teamworkDeadlineItems.map((item) => [String(item.id), item]))
+        : null;
+
+      function renderTeamworkDeadline(item) {
+        if (!item) return;
+        if (teamworkDeadlineSubject) {
+          teamworkDeadlineSubject.textContent = item.subject_name || '';
+        }
+        if (teamworkDeadlineDue) {
+          const dueLabel = item.due_date ? new Date(item.due_date).toLocaleDateString(scheduleLocale) : '';
+          teamworkDeadlineDue.textContent = dueLabel ? `${scheduleText.customDeadlinesDuePrefix}: ${dueLabel}` : '';
+        }
+        if (teamworkDeadlineTitle) {
+          teamworkDeadlineTitle.textContent = item.title || '';
+        }
+        if (teamworkDeadlineAudience) {
+          const lessonLabel = item.lesson_scope === 'seminar'
+            ? scheduleViewText.lessonTypeSeminar
+            : scheduleViewText.lessonTypeLecture;
+          const groups = Array.isArray(item.group_numbers)
+            ? item.group_numbers.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+            : [];
+          let groupLabel = '';
+          if (groups.length > 1) {
+            groupLabel = `${scheduleText.groupPlural} ${groups.join(', ')}`;
+          } else if (groups.length === 1) {
+            groupLabel = `${scheduleText.groupSingle} ${groups[0]}`;
+          }
+          teamworkDeadlineAudience.textContent = groupLabel
+            ? `${scheduleViewText.teamworkAudiencePrefix}: ${lessonLabel} · ${groupLabel}`
+            : `${scheduleViewText.teamworkAudiencePrefix}: ${lessonLabel}`;
+        }
+        if (teamworkDeadlineBy) {
+          teamworkDeadlineBy.textContent = item.created_by
+            ? `${scheduleViewText.teamworkAddedByPrefix}: ${item.created_by}`
+            : '';
+        }
+        if (teamworkDeadlineOpenLink) {
+          teamworkDeadlineOpenLink.href = item.teamwork_href || '/teamwork';
+        }
+        if (teamworkDeadlineTeams) {
+          teamworkDeadlineTeams.replaceChildren();
+          const teamGroups = Array.isArray(item.team_groups) ? item.team_groups : [];
+          if (!teamGroups.length) {
+            const empty = document.createElement('li');
+            empty.className = 'list-group-item text-muted';
+            empty.textContent = scheduleViewText.teamworkNoGroups;
+            teamworkDeadlineTeams.appendChild(empty);
+          } else {
+            teamGroups.forEach((groupItem) => {
+              const listItem = document.createElement('li');
+              listItem.className = 'list-group-item';
+              const groupName = String(groupItem && groupItem.name ? groupItem.name : '').trim() || scheduleViewText.teamworkBadge;
+              const membersCount = Math.max(0, Number(groupItem && groupItem.members_count || 0));
+              const maxMembersValue = Number(groupItem && groupItem.max_members || 0);
+              const maxMembers = Number.isInteger(maxMembersValue) && maxMembersValue > 0
+                ? maxMembersValue
+                : null;
+              const seminarGroup = Number(groupItem && groupItem.seminar_group_number || 0);
+              const metaParts = [`${membersCount}${maxMembers ? `/${maxMembers}` : ''}`];
+              if (seminarGroup > 0) {
+                metaParts.push(`${scheduleText.groupSingle} ${seminarGroup}`);
+              }
+              const nameEl = document.createElement('div');
+              nameEl.className = 'fw-semibold';
+              nameEl.textContent = groupName;
+              const metaEl = document.createElement('div');
+              metaEl.className = 'small text-muted';
+              metaEl.textContent = metaParts.join(' · ');
+              listItem.appendChild(nameEl);
+              listItem.appendChild(metaEl);
+              teamworkDeadlineTeams.appendChild(listItem);
+            });
+          }
+        }
+      }
 
       function bindCustomDeadlineCards(root = document) {
         if (!customMap) return;
@@ -4953,7 +5236,23 @@
         });
       }
 
+      function bindTeamworkDeadlineCards(root = document) {
+        if (!teamworkMap) return;
+        root.querySelectorAll('.deadline-item[data-teamwork-id]').forEach((el) => {
+          if (el.dataset.deadlineTeamworkBound === '1') return;
+          el.dataset.deadlineTeamworkBound = '1';
+          el.addEventListener('click', () => {
+            const item = teamworkMap.get(String(el.dataset.teamworkId));
+            if (!item || !teamworkDeadlineModal) return;
+            renderTeamworkDeadline(item);
+            const modal = new bootstrap.Modal(teamworkDeadlineModal);
+            modal.show();
+          });
+        });
+      }
+
       bindCustomDeadlineCards();
+      bindTeamworkDeadlineCards();
       localStorage.removeItem('schedule-focus-week');
       document.body.classList.remove('focus-week');
 
@@ -5500,6 +5799,7 @@
             weekGrid.innerHTML = nextGrid.innerHTML;
             applyLocalWeekTimes();
             bindCustomDeadlineCards(weekGrid);
+            bindTeamworkDeadlineCards(weekGrid);
             bindScheduleCardInteractions(weekGrid);
             updateSmartHighlights();
             applySubjectTones(weekGrid);

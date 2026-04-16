@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.53",
+      "date": "2026-04-16",
+      "items": [
+        "feat(teamwork-schedule-deadlines): add an optional `show in schedule` switch when teachers create teamwork tasks with a due date, persist visibility via `teamwork_tasks.show_in_schedule`, and render blue clickable teamwork deadline cards in `/schedule` (including weekend cards) with a dedicated details modal that shows audience, teams, and quick navigation to teamwork"
+      ]
+    },
+    {
       "version": "1.6.51",
       "date": "2026-04-16",
       "items": [

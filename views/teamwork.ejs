@@ -46,6 +46,8 @@
         taskNameLabel: 'Task name',
         taskNamePlaceholder: 'For example: Practice 1',
         dueDateOptional: 'Deadline (optional)',
+        showInSchedule: 'Show in schedule',
+        showInScheduleHint: 'Works only when a deadline is set. The task will appear in Schedule as a blue teamwork deadline card.',
         lessonTypeLabel: 'Lesson type',
         lessonScopeAria: 'Lesson scope',
         showForGroups: 'Show for groups',
@@ -106,6 +108,8 @@
         taskNameLabel: 'Назва завдання',
         taskNamePlaceholder: 'Наприклад: Практика 1',
         dueDateOptional: 'Дедлайн (опц.)',
+        showInSchedule: 'Показувати в розкладі',
+        showInScheduleHint: 'Працює лише з вказаним дедлайном. Завдання зʼявиться у розкладі як синя картка тімворку.',
         lessonTypeLabel: 'Тип заняття',
         lessonScopeAria: 'Тип заняття',
         showForGroups: 'Показ для груп',
@@ -1020,8 +1024,13 @@
                 </div>
                 <div class="mb-3">
                   <label class="form-label"><%= teamworkCopy.dueDateOptional %></label>
-                  <input class="form-control" type="date" name="due_date" />
+                  <input class="form-control" type="date" id="taskDueDateInput" name="due_date" />
                 </div>
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" role="switch" id="showInScheduleToggle" name="show_in_schedule" value="1" disabled />
+                  <label class="form-check-label" for="showInScheduleToggle"><%= teamworkCopy.showInSchedule %></label>
+                </div>
+                <div class="small text-muted mb-3" id="showInScheduleHint"><%= teamworkCopy.showInScheduleHint %></div>
 
                 <div class="glass p-3 mb-3 task-options-block">
                   <div class="lesson-scope-picker mb-3">
@@ -1288,6 +1297,30 @@
       }
 
       initLessonScopeControls();
+
+      function initScheduleVisibilityToggle() {
+        const dueDateInput = document.getElementById('taskDueDateInput');
+        const showInScheduleToggle = document.getElementById('showInScheduleToggle');
+        const showInScheduleHint = document.getElementById('showInScheduleHint');
+        if (!dueDateInput || !showInScheduleToggle) return;
+
+        const applyState = () => {
+          const hasDueDate = Boolean(String(dueDateInput.value || '').trim());
+          showInScheduleToggle.disabled = !hasDueDate;
+          if (!hasDueDate) {
+            showInScheduleToggle.checked = false;
+          }
+          if (showInScheduleHint) {
+            showInScheduleHint.classList.toggle('opacity-75', !hasDueDate);
+          }
+        };
+
+        dueDateInput.addEventListener('change', applyState);
+        dueDateInput.addEventListener('input', applyState);
+        applyState();
+      }
+
+      initScheduleVisibilityToggle();
 
       function initSubjectSwitchFeedback() {
         const subjectLinks = Array.from(document.querySelectorAll('.subject-nav-pill[href]'));

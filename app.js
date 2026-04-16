@@ -25517,11 +25517,19 @@ async function loadStudentLegacyScheduleCompatData({
   };
 
   const loadCustomDeadlines = async () => {
+    const teamworkDeadlineData = await loadTeamworkScheduleDeadlines({
+      enabled: canUseCustomDeadlinesUi,
+      homeworkTargets: normalizedTargets,
+      weekStartDate,
+      weekEndDate,
+      weekDates,
+    });
     if (!canUseCustomDeadlinesUi || !normalizedTargets.length || !weekStartDate || !weekEndDate) {
       return {
         customDeadlinesByDate: {},
         weekendDeadlineCards: [],
         customDeadlineItems: [],
+        ...teamworkDeadlineData,
       };
     }
 
@@ -25568,6 +25576,7 @@ async function loadStudentLegacyScheduleCompatData({
       customDeadlinesByDate,
       weekendDeadlineCards,
       customDeadlineItems,
+      ...teamworkDeadlineData,
     };
   };
 
@@ -25780,6 +25789,232 @@ async function loadStudentLegacyScheduleCompatData({
     homeworkTags,
     ...(await loadCustomDeadlines()),
   };
+}
+
+function buildTeamworkScheduleAudience(task, maxGroupCount = 1) {
+  const safeMaxGroupCount = Math.max(1, Number(maxGroupCount) || 1);
+  const allGroups = Array.from({ length: safeMaxGroupCount }, (_value, index) => index + 1);
+  const lessonScope = normalizeTeamworkLessonScope(task && task.lesson_scope);
+  if (lessonScope !== 'seminar') {
+    return {
+      lessonScope,
+      allowAll: true,
+      groups: allGroups,
+    };
+  }
+  const parsedGroups = parseTeamworkGroupNumbers(task && task.seminar_group_numbers, safeMaxGroupCount);
+  const groups = parsedGroups.all || !parsedGroups.groups.length ? allGroups : parsedGroups.groups;
+  return {
+    lessonScope,
+    allowAll: groups.length === allGroups.length,
+    groups,
+  };
+}
+
+async function loadTeamworkScheduleDeadlines({
+  enabled = false,
+  homeworkTargets = [],
+  weekStartDate = null,
+  weekEndDate = null,
+  weekDates = [],
+}) {
+  const emptyState = {
+    teamworkDeadlinesByDate: {},
+    weekendTeamworkDeadlineCards: [],
+    teamworkDeadlineItems: [],
+  };
+  if (!enabled || !Array.isArray(homeworkTargets) || !homeworkTargets.length || !weekStartDate || !weekEndDate) {
+    return emptyState;
+  }
+
+  const scopeMap = new Map();
+  (homeworkTargets || []).forEach((target) => {
+    const subjectId = parsePositiveIntStrict(target && target.subject_id);
+    const groupNumber = parsePositiveIntStrict(target && target.group_number);
+    const courseId = parsePositiveIntStrict(target && (target.course_id || target.owner_course_id));
+    const semesterId = parsePositiveIntStrict(target && target.semester_id, 0) || 0;
+    if (!subjectId || !groupNumber || !courseId) {
+      return;
+    }
+    const key = `${subjectId}|${courseId}|${semesterId}`;
+    if (!scopeMap.has(key)) {
+      scopeMap.set(key, new Set());
+    }
+    scopeMap.get(key).add(groupNumber);
+  });
+
+  const scopeRows = Array.from(scopeMap.keys()).map((key) => {
+    const [subjectIdRaw, courseIdRaw, semesterIdRaw] = key.split('|');
+    return {
+      subject_id: Number(subjectIdRaw),
+      course_id: Number(courseIdRaw),
+      semester_id: Number(semesterIdRaw),
+      groups: Array.from(scopeMap.get(key) || []).sort((a, b) => a - b),
+    };
+  });
+  if (!scopeRows.length) {
+    return emptyState;
+  }
+
+  try {
+    const conditions = scopeRows
+      .map(() => '(t.subject_id = ? AND t.course_id = ? AND COALESCE(t.semester_id, 0) = ?)')
+      .join(' OR ');
+    const params = [];
+    scopeRows.forEach((row) => {
+      params.push(row.subject_id, row.course_id, row.semester_id);
+    });
+    const rows = await db.all(
+      `
+        SELECT
+          t.id,
+          t.subject_id,
+          t.course_id,
+          t.semester_id,
+          t.title,
+          t.created_by,
+          t.created_at,
+          t.due_date,
+          t.group_count,
+          t.member_limits_enabled,
+          t.min_members,
+          t.max_members,
+          t.lesson_scope,
+          t.seminar_group_numbers,
+          s.name AS subject_name,
+          s.group_count AS subject_group_count,
+          COALESCE(u.full_name, '') AS created_by_name
+        FROM teamwork_tasks t
+        JOIN subjects s ON s.id = t.subject_id
+        LEFT JOIN users u ON u.id = t.created_by
+        WHERE (${conditions})
+          AND t.show_in_schedule = 1
+          AND t.due_date IS NOT NULL
+          AND t.due_date >= ?
+          AND t.due_date <= ?
+        ORDER BY t.due_date ASC, t.created_at DESC
+      `,
+      [...params, weekStartDate, weekEndDate]
+    );
+
+    const teamworkDeadlineItems = [];
+    (rows || []).forEach((row) => {
+      const key = `${Number(row.subject_id || 0)}|${Number(row.course_id || 0)}|${parsePositiveIntStrict(row.semester_id, 0) || 0}`;
+      const targetGroups = scopeMap.get(key);
+      if (!targetGroups || !targetGroups.size) return;
+
+      const audience = buildTeamworkScheduleAudience(row, Number(row.subject_group_count || row.group_count || 1));
+      const intersects = audience.allowAll
+        || audience.groups.some((groupNumber) => targetGroups.has(Number(groupNumber)));
+      if (!intersects) return;
+
+      teamworkDeadlineItems.push({
+        id: Number(row.id || 0),
+        subject_id: Number(row.subject_id || 0),
+        course_id: Number(row.course_id || 0),
+        semester_id: parsePositiveIntStrict(row.semester_id, 0) || 0,
+        subject_name: row.subject_name || '',
+        title: row.title || '',
+        description: row.title || '',
+        due_date: row.due_date || null,
+        created_by: row.created_by_name || '',
+        created_by_id: Number(row.created_by || 0) || null,
+        created_at: row.created_at || null,
+        group_count: Math.max(1, Number(row.group_count || 1) || 1),
+        member_limits_enabled: Number(row.member_limits_enabled || 0) === 1 || row.member_limits_enabled === true,
+        min_members: Number(row.min_members || 0) || null,
+        max_members: Number(row.max_members || 0) || null,
+        lesson_scope: audience.lessonScope,
+        group_numbers: audience.groups,
+        audience_all_groups: audience.allowAll,
+      });
+    });
+
+    if (!teamworkDeadlineItems.length) {
+      return emptyState;
+    }
+
+    const taskIds = teamworkDeadlineItems.map((item) => item.id).filter((value) => Number.isInteger(value) && value > 0);
+    const groupsByTaskId = {};
+    if (taskIds.length) {
+      const placeholders = taskIds.map(() => '?').join(',');
+      const groupRows = await db.all(
+        `
+          SELECT
+            g.task_id,
+            g.id,
+            g.name,
+            g.max_members,
+            g.seminar_group_number,
+            COUNT(m.user_id)::int AS members_count
+          FROM teamwork_groups g
+          LEFT JOIN teamwork_members m ON m.group_id = g.id
+          WHERE g.task_id IN (${placeholders})
+          GROUP BY g.task_id, g.id, g.name, g.max_members, g.seminar_group_number
+          ORDER BY g.task_id ASC, g.seminar_group_number NULLS FIRST, g.id ASC
+        `,
+        taskIds
+      );
+      (groupRows || []).forEach((row) => {
+        const taskId = Number(row.task_id || 0);
+        if (!groupsByTaskId[taskId]) {
+          groupsByTaskId[taskId] = [];
+        }
+        groupsByTaskId[taskId].push({
+          id: Number(row.id || 0),
+          name: row.name || '',
+          seminar_group_number: row.seminar_group_number === null || typeof row.seminar_group_number === 'undefined'
+            ? null
+            : Number(row.seminar_group_number),
+          members_count: Math.max(0, Number(row.members_count || 0)),
+          max_members: row.max_members === null || typeof row.max_members === 'undefined'
+            ? null
+            : Number(row.max_members),
+        });
+      });
+    }
+
+    teamworkDeadlineItems.forEach((item) => {
+      item.team_groups = groupsByTaskId[item.id] || [];
+      item.teamwork_href = item.subject_id
+        ? `/teamwork?subject_id=${encodeURIComponent(String(item.subject_id))}`
+        : '/teamwork';
+    });
+
+    const teamworkDeadlinesByDate = {};
+    teamworkDeadlineItems.forEach((item) => {
+      const key = item.due_date;
+      if (!key) return;
+      if (!teamworkDeadlinesByDate[key]) teamworkDeadlinesByDate[key] = [];
+      teamworkDeadlinesByDate[key].push(item);
+    });
+
+    const weekendTeamworkDeadlineCards = [];
+    ['Saturday', 'Sunday'].forEach((day) => {
+      const dayIndex = fullWeekDays.indexOf(day);
+      const dayDate = dayIndex >= 0 ? weekDates[dayIndex] : null;
+      if (!dayDate) return;
+      const dayItems = teamworkDeadlinesByDate[dayDate] || [];
+      if (dayItems.length) {
+        weekendTeamworkDeadlineCards.push({
+          day,
+          date: dayDate,
+          items: dayItems,
+        });
+      }
+    });
+
+    return {
+      teamworkDeadlinesByDate,
+      weekendTeamworkDeadlineCards,
+      teamworkDeadlineItems,
+    };
+  } catch (err) {
+    if (!isDbSchemaCompatibilityError(err)) {
+      console.error('Teamwork schedule deadlines load failed', err);
+    }
+    return emptyState;
+  }
 }
 
 app.get('/schedule', requireLogin, async (req, res) => {
@@ -26322,6 +26557,17 @@ app.get('/schedule', requireLogin, async (req, res) => {
           });
         }
       }
+      const {
+        teamworkDeadlinesByDate,
+        weekendTeamworkDeadlineCards,
+        teamworkDeadlineItems,
+      } = await loadTeamworkScheduleDeadlines({
+        enabled: canUseCustomDeadlinesUi,
+        homeworkTargets: teacherTargets,
+        weekStartDate,
+        weekEndDate,
+        weekDates,
+      });
 
       let customDeadlineSubjects = [];
       if (canUseCustomDeadlinesUi) {
@@ -26364,6 +26610,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
         customDeadlinesByDate,
         weekendDeadlineCards,
         customDeadlineItems,
+        teamworkDeadlinesByDate,
+        weekendTeamworkDeadlineCards,
+        teamworkDeadlineItems,
         customDeadlineSubjects,
         subgroupError: req.query.sg || null,
         role: 'teacher',
@@ -26545,6 +26794,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
         customDeadlinesByDate: compatData.customDeadlinesByDate,
         weekendDeadlineCards: compatData.weekendDeadlineCards,
         customDeadlineItems: compatData.customDeadlineItems,
+        teamworkDeadlinesByDate: compatData.teamworkDeadlinesByDate,
+        weekendTeamworkDeadlineCards: compatData.weekendTeamworkDeadlineCards,
+        teamworkDeadlineItems: compatData.teamworkDeadlineItems,
         customDeadlineSubjects,
         subgroupError: req.query.sg || null,
         role: req.session.role,
@@ -26969,103 +27221,116 @@ app.get('/schedule', requireLogin, async (req, res) => {
         : {};
 
       const loadCustomDeadlines = (homeworkTargets, cb) => {
-        if (!canUseCustomDeadlinesUi) {
-          return cb({}, [], []);
-        }
-        if (!homeworkTargets.length || !weekStartDate || !weekEndDate) {
-          return cb({}, [], []);
-        }
-        const conditions = homeworkTargets
-          .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
-          .join(' OR ');
-        const params = [];
-        homeworkTargets.forEach((sg) => {
-          params.push(sg.subject_id, sg.group_number, sg.owner_course_id || scheduleCourseId, sg.semester_id || 0);
-        });
-        const sql = `
-          SELECT h.*, subj.name AS subject_name
-          FROM homework h
-          JOIN subjects subj ON subj.id = h.subject_id
-          WHERE (${conditions})
-            AND COALESCE(h.status, 'published') = 'published'
-            AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
-            AND ${buildTruthyTextCondition('h.is_custom_deadline')}
-            AND h.custom_due_date IS NOT NULL
-            AND h.custom_due_date >= ?
-            AND h.custom_due_date <= ?
-          ORDER BY h.custom_due_date ASC, h.created_at DESC
-        `;
-        db.all(sql, [...params, nowIso, weekStartDate, weekEndDate], (err, rows) => {
-          if (err) {
-            return cb({}, [], []);
+        loadTeamworkScheduleDeadlines({
+          enabled: canUseCustomDeadlinesUi,
+          homeworkTargets,
+          weekStartDate,
+          weekEndDate,
+          weekDates,
+        }).then((teamworkDeadlineData) => {
+          if (!canUseCustomDeadlinesUi) {
+            return cb({}, [], [], teamworkDeadlineData);
           }
-          const rowsList = rows || [];
-          const ids = rowsList.map((row) => row.id);
-          const byDate = {};
-          rowsList.forEach((row) => {
-            const key = row.custom_due_date;
-            if (!byDate[key]) byDate[key] = [];
-            byDate[key].push(row);
+          if (!homeworkTargets.length || !weekStartDate || !weekEndDate) {
+            return cb({}, [], [], teamworkDeadlineData);
+          }
+          const conditions = homeworkTargets
+            .map(() => '(h.subject_id = ? AND h.group_number = ? AND h.course_id = ? AND COALESCE(h.semester_id, 0) = ?)')
+            .join(' OR ');
+          const params = [];
+          homeworkTargets.forEach((sg) => {
+            params.push(sg.subject_id, sg.group_number, sg.owner_course_id || scheduleCourseId, sg.semester_id || 0);
           });
-          const weekendCards = [];
-          ['Saturday', 'Sunday'].forEach((day) => {
-            const idx = fullWeekDays.indexOf(day);
-            const date = idx >= 0 ? weekDates[idx] : null;
-            if (!date) return;
-            const items = byDate[date] || [];
-            if (items.length) {
-              weekendCards.push({ day, date, items });
+          const sql = `
+            SELECT h.*, subj.name AS subject_name
+            FROM homework h
+            JOIN subjects subj ON subj.id = h.subject_id
+            WHERE (${conditions})
+              AND COALESCE(h.status, 'published') = 'published'
+              AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
+              AND ${buildTruthyTextCondition('h.is_custom_deadline')}
+              AND h.custom_due_date IS NOT NULL
+              AND h.custom_due_date >= ?
+              AND h.custom_due_date <= ?
+            ORDER BY h.custom_due_date ASC, h.created_at DESC
+          `;
+          db.all(sql, [...params, nowIso, weekStartDate, weekEndDate], (err, rows) => {
+            if (err) {
+              return cb({}, [], [], teamworkDeadlineData);
             }
-          });
-          if (!ids.length) {
-            return cb(byDate, weekendCards, rowsList);
-          }
-          const placeholders = ids.map(() => '?').join(',');
-          db.all(
-            `SELECT homework_id, emoji, COUNT(*) AS count
-             FROM homework_reactions
-             WHERE homework_id IN (${placeholders})
-             GROUP BY homework_id, emoji`,
-            ids,
-            (reactErr, reactRows) => {
-              const reactionMap = {};
-              if (!reactErr && reactRows) {
-                reactRows.forEach((row) => {
-                  if (!reactionMap[row.homework_id]) reactionMap[row.homework_id] = {};
-                  reactionMap[row.homework_id][row.emoji] = Number(row.count || 0);
-                });
+            const rowsList = rows || [];
+            const ids = rowsList.map((row) => row.id);
+            const byDate = {};
+            rowsList.forEach((row) => {
+              const key = row.custom_due_date;
+              if (!byDate[key]) byDate[key] = [];
+              byDate[key].push(row);
+            });
+            const weekendCards = [];
+            ['Saturday', 'Sunday'].forEach((day) => {
+              const idx = fullWeekDays.indexOf(day);
+              const date = idx >= 0 ? weekDates[idx] : null;
+              if (!date) return;
+              const items = byDate[date] || [];
+              if (items.length) {
+                weekendCards.push({ day, date, items });
               }
-              db.all(
-                `SELECT homework_id, emoji
-                 FROM homework_reactions
-                 WHERE homework_id IN (${placeholders}) AND user_id = ?`,
-                [...ids, userId],
-                (myErr, myRows) => {
-                  const reactedMap = {};
-                  if (!myErr && myRows) {
-                    myRows.forEach((row) => {
-                      if (!reactedMap[row.homework_id]) reactedMap[row.homework_id] = {};
-                      reactedMap[row.homework_id][row.emoji] = true;
-                    });
-                  }
-                  rowsList.forEach((row) => {
-                    row.reactions = reactionMap[row.id] || {};
-                    row.reacted = reactedMap[row.id] || {};
-                  });
-                  return cb(byDate, weekendCards, rowsList);
-                }
-              );
+            });
+            if (!ids.length) {
+              return cb(byDate, weekendCards, rowsList, teamworkDeadlineData);
             }
-          );
-        });
+            const placeholders = ids.map(() => '?').join(',');
+            db.all(
+              `SELECT homework_id, emoji, COUNT(*) AS count
+               FROM homework_reactions
+               WHERE homework_id IN (${placeholders})
+               GROUP BY homework_id, emoji`,
+              ids,
+              (reactErr, reactRows) => {
+                const reactionMap = {};
+                if (!reactErr && reactRows) {
+                  reactRows.forEach((row) => {
+                    if (!reactionMap[row.homework_id]) reactionMap[row.homework_id] = {};
+                    reactionMap[row.homework_id][row.emoji] = Number(row.count || 0);
+                  });
+                }
+                db.all(
+                  `SELECT homework_id, emoji
+                   FROM homework_reactions
+                   WHERE homework_id IN (${placeholders}) AND user_id = ?`,
+                  [...ids, userId],
+                  (myErr, myRows) => {
+                    const reactedMap = {};
+                    if (!myErr && myRows) {
+                      myRows.forEach((row) => {
+                        if (!reactedMap[row.homework_id]) reactedMap[row.homework_id] = {};
+                        reactedMap[row.homework_id][row.emoji] = true;
+                      });
+                    }
+                    rowsList.forEach((row) => {
+                      row.reactions = reactionMap[row.id] || {};
+                      row.reacted = reactedMap[row.id] || {};
+                    });
+                    return cb(byDate, weekendCards, rowsList, teamworkDeadlineData);
+                  }
+                );
+              }
+            );
+          });
+        }).catch(() => cb({}, [], [], {
+          teamworkDeadlinesByDate: {},
+          weekendTeamworkDeadlineCards: [],
+          teamworkDeadlineItems: [],
+        }));
       };
 
       const loadHomework = (homeworkTargets) => {
         if (!homeworkTargets.length) {
-          return loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
-            res.render('schedule', {
-            scheduleByDay,
-            daysOfWeek: activeDays,
+          return loadCustomDeadlines(
+            homeworkTargets,
+            (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems, teamworkDeadlineData) => res.render('schedule', {
+              scheduleByDay,
+              daysOfWeek: activeDays,
               dayDates,
               currentWeek: selectedWeek,
               totalWeeks,
@@ -27080,6 +27345,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
               customDeadlinesByDate,
               weekendDeadlineCards,
               customDeadlineItems,
+              teamworkDeadlinesByDate: teamworkDeadlineData.teamworkDeadlinesByDate,
+              weekendTeamworkDeadlineCards: teamworkDeadlineData.weekendTeamworkDeadlineCards,
+              teamworkDeadlineItems: teamworkDeadlineData.teamworkDeadlineItems,
               customDeadlineSubjects,
               subgroupError: req.query.sg || null,
               role: req.session.role,
@@ -27276,7 +27544,17 @@ app.get('/schedule', requireLogin, async (req, res) => {
               fallbackUseLocalTime: useLocalTime,
             });
             const homeworkIds = homework.map((h) => h.id);
-            const finalizeRender = (tagOptions = [], customDeadlinesByDate = {}, weekendDeadlineCards = [], customDeadlineItems = []) => {
+            const finalizeRender = (
+              tagOptions = [],
+              customDeadlinesByDate = {},
+              weekendDeadlineCards = [],
+              customDeadlineItems = [],
+              teamworkDeadlineData = {
+                teamworkDeadlinesByDate: {},
+                weekendTeamworkDeadlineCards: [],
+                teamworkDeadlineItems: [],
+              }
+            ) => {
               res.render('schedule', {
                 scheduleByDay,
                 daysOfWeek: activeDays,
@@ -27294,6 +27572,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 customDeadlinesByDate,
                 weekendDeadlineCards,
                 customDeadlineItems,
+                teamworkDeadlinesByDate: teamworkDeadlineData.teamworkDeadlinesByDate,
+                weekendTeamworkDeadlineCards: teamworkDeadlineData.weekendTeamworkDeadlineCards,
+                teamworkDeadlineItems: teamworkDeadlineData.teamworkDeadlineItems,
                 customDeadlineSubjects,
                 subgroupError: req.query.sg || null,
                 role: req.session.role,
@@ -27315,8 +27596,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
             };
 
             if (!homeworkIds.length) {
-              return loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
-                finalizeRender([], customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
+              return loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems, teamworkDeadlineData) =>
+                finalizeRender([], customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems, teamworkDeadlineData)
               );
             }
             const placeholders = homeworkIds.map(() => '?').join(',');
@@ -27382,8 +27663,16 @@ app.get('/schedule', requireLogin, async (req, res) => {
                               }
                             })
                             .finally(() => {
-                              loadCustomDeadlines(homeworkTargets, (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems) =>
-                                finalizeRender(tagOptions, customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems)
+                              loadCustomDeadlines(
+                                homeworkTargets,
+                                (customDeadlinesByDate, weekendDeadlineCards, customDeadlineItems, teamworkDeadlineData) =>
+                                  finalizeRender(
+                                    tagOptions,
+                                    customDeadlinesByDate,
+                                    weekendDeadlineCards,
+                                    customDeadlineItems,
+                                    teamworkDeadlineData
+                                  )
                               );
                             });
                         }
@@ -38527,6 +38816,7 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
     lesson_scope,
     seminar_group_numbers,
     group_lock_enabled,
+    show_in_schedule,
   } = req.body;
   const subjectId = Number(subject_id);
   const groupCount = Number(group_count);
@@ -38540,6 +38830,9 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
   const groupLockEnabled = String(group_lock_enabled || '').toLowerCase() === 'on'
     || String(group_lock_enabled || '').toLowerCase() === '1'
     || String(group_lock_enabled || '').toLowerCase() === 'true';
+  const showInScheduleRequested = String(show_in_schedule || '').toLowerCase() === 'on'
+    || String(show_in_schedule || '').toLowerCase() === '1'
+    || String(show_in_schedule || '').toLowerCase() === 'true';
   const minMembers = limitsEnabled ? Number(min_members) : null;
   const maxMembers = limitsEnabled ? Number(max_members) : null;
 
@@ -38550,6 +38843,7 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
     return res.redirect(`/teamwork?subject_id=${subjectId}&err=Invalid%20members%20range`);
   }
   const dueDate = due_date ? String(due_date).slice(0, 10) : null;
+  const showInSchedule = dueDate && showInScheduleRequested ? 1 : 0;
   if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
     return res.redirect('/teamwork?err=Invalid%20date');
   }
@@ -38682,8 +38976,8 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
       `INSERT INTO teamwork_tasks
         (subject_id, title, created_by, created_at, due_date, course_id, semester_id,
          random_distribution, group_count, member_limits_enabled, min_members, max_members,
-         group_lock_enabled, lesson_scope, seminar_group_numbers)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         group_lock_enabled, lesson_scope, seminar_group_numbers, show_in_schedule)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id`,
       [
         subjectId,
@@ -38701,6 +38995,7 @@ app.post('/teamwork/task/create', requireLogin, writeLimiter, async (req, res) =
         groupLockEnabled ? 1 : 0,
         lessonScope,
         lessonScope === 'seminar' ? seminarGroupNumbersValue : null,
+        showInSchedule,
       ]
     );
     if (!taskRow || !taskRow.id) {
