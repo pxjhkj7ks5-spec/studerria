@@ -50544,9 +50544,6 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       : null;
     const fallbackGlobalCourse = selectedGlobalCourse || (activeLocationCourses[0] || null);
     const selectedGlobalCourseId = fallbackGlobalCourse ? Number(fallbackGlobalCourse.id) : null;
-    const selectedGlobalSemesters = selectedGlobalCourseId
-      ? (semestersByCourse[selectedGlobalCourseId] || [])
-      : [];
     const requestedSemesterId = parsePositiveIntStrict(
       (req.query && (req.query.semester_id || req.query.selected_semester_id))
       || null
@@ -50563,6 +50560,72 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
           && selectedSemestersByLocation[activeLocation][selectedGlobalCourseId]
       )
       : null;
+    const selectedCourseItemSemesterIds = new Set(
+      (items || [])
+        .filter((item) => Number(item.course_id || 0) === Number(selectedGlobalCourseId || 0))
+        .map((item) => Number(item.semester_id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    let semesterIdsFromCatalog = new Set();
+    if (selectedGlobalCourseId) {
+      try {
+        const catalogSemesterRows = await db.all(
+          `
+            SELECT DISTINCT semester_id
+            FROM subject_grading_settings
+            WHERE course_id = ?
+          `,
+          [selectedGlobalCourseId]
+        );
+        semesterIdsFromCatalog = new Set((catalogSemesterRows || [])
+          .map((row) => Number(row.semester_id || 0))
+          .filter((value) => Number.isInteger(value) && value > 0));
+      } catch (_err) {
+        semesterIdsFromCatalog = new Set();
+      }
+    }
+    const explicitSemesterIds = new Set(
+      [requestedSemesterId, configuredSemesterId, selectedSemesterFromLocationMap]
+        .map((value) => Number(value || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const isArchivedSemester = (semester) => (
+      semester && (semester.is_archived === true || Number(semester.is_archived || 0) === 1)
+    );
+    const isActiveSemester = (semester) => (
+      semester && (semester.is_active === true || Number(semester.is_active || 0) === 1)
+    );
+    let selectedGlobalSemesters = selectedGlobalCourseId
+      ? (semestersByCourse[selectedGlobalCourseId] || [])
+      : [];
+    if (selectedGlobalSemesters.length) {
+      const filteredSemesters = selectedGlobalSemesters.filter((semester) => {
+        const semesterId = Number(semester && semester.id ? semester.id : 0);
+        if (!Number.isInteger(semesterId) || semesterId < 1) return false;
+        if (isArchivedSemester(semester)
+          && !selectedCourseItemSemesterIds.has(semesterId)
+          && !explicitSemesterIds.has(semesterId)) {
+          return false;
+        }
+        if (semesterIdsFromCatalog.size > 0) {
+          return semesterIdsFromCatalog.has(semesterId)
+            || selectedCourseItemSemesterIds.has(semesterId)
+            || explicitSemesterIds.has(semesterId)
+            || isActiveSemester(semester);
+        }
+        return !isArchivedSemester(semester)
+          || selectedCourseItemSemesterIds.has(semesterId)
+          || explicitSemesterIds.has(semesterId);
+      });
+      if (filteredSemesters.length) {
+        selectedGlobalSemesters = filteredSemesters;
+      } else {
+        const fallbackNonArchived = selectedGlobalSemesters.filter((semester) => !isArchivedSemester(semester));
+        if (fallbackNonArchived.length) {
+          selectedGlobalSemesters = fallbackNonArchived;
+        }
+      }
+    }
     let selectedGlobalSemester = null;
     if (selectedGlobalSemesters.length && requestedSemesterId) {
       selectedGlobalSemester = selectedGlobalSemesters.find((semester) => Number(semester.id) === Number(requestedSemesterId)) || null;

@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.47",
+      "date": "2026-04-16",
+      "items": [
+        "fix(schedule-generator-term-scope): trim semester dropdown noise in `/admin/schedule-generator` by showing only relevant terms (catalog-linked, active, explicitly selected/configured, or already used in generator rows) and hiding archived/irrelevant legacy terms by default"
+      ]
+    },
+    {
       "version": "1.6.46",
       "date": "2026-04-16",
       "items": [
