@@ -427,7 +427,6 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-settings', label: 'Налаштування' },
   { id: 'admin-role-access', label: 'Role Studio' },
   { id: 'admin-visit-analytics', label: 'Security analytics' },
-  { id: 'admin-students', label: 'Students' },
   { id: 'admin-schedule', label: 'Розклад' },
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
   { id: 'admin-schedule-generator', label: 'Генератори' },
@@ -446,7 +445,7 @@ const ADMIN_SECTION_OPTIONS = [
 
 const DEFAULT_ROLE_PERMISSIONS = {
   starosta: ['admin-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
-  deanery: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-students', 'admin-overview'],
+  deanery: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
   teacher: [],
   student: [],
 };

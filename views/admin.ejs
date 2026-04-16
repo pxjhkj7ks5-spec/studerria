@@ -2697,7 +2697,7 @@
 
         <% } %>
 
-        <% if (sectionAllowed('admin-students')) { %>
+        <% if (sectionAllowed('admin-students') && (adminSectionOptionsList || []).some((section) => section && section.id === 'admin-students')) { %>
         <div id="admin-students" class="admin-panel" data-admin-title="People / Students">
           <% const studentRows = (users || []).filter(function(u) {
             const roleKeys = Array.isArray(u.role_keys) && u.role_keys.length
