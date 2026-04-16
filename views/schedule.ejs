@@ -2412,7 +2412,10 @@
                     ? (homeworkMetaAll[baseKey] || homeworkMetaAll[generalFallbackKey])
                     : null; %>
                   <% const hwMeta = compatHomeworkEnabled ? (hwMetaGeneral || hwMetaGroup || hwMetaAnyGroup) : null; %>
-                  <% const sessionKindRaw = hwMeta && hwMeta.session_kind ? String(hwMeta.session_kind) : ''; %>
+                  <% const sessionKindRaw = cls && cls.session_overlay_kind
+                    ? String(cls.session_overlay_kind)
+                    : (hwMeta && hwMeta.session_kind ? String(hwMeta.session_kind) : '');
+                  %>
                   <% const sessionKind = ['exam', 'credit', 'consultation', 'mixed', 'session'].includes(sessionKindRaw) ? sessionKindRaw : ''; %>
                   <% const sessionChipText = sessionKind === 'exam'
                     ? scheduleViewText.sessionExam

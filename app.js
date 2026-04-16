@@ -25191,6 +25191,163 @@ function applySessionMetaFlags(target, sessionType) {
   target.session_kind = 'mixed';
 }
 
+const SCHEDULE_SESSION_KINDS = new Set(['exam', 'credit', 'consultation', 'session', 'mixed']);
+
+const normalizeScheduleSessionKind = (rawValue) => {
+  const normalized = String(rawValue || '').trim().toLowerCase();
+  return SCHEDULE_SESSION_KINDS.has(normalized) ? normalized : '';
+};
+
+const mergeScheduleSessionKinds = (leftValue, rightValue) => {
+  const left = normalizeScheduleSessionKind(leftValue);
+  const right = normalizeScheduleSessionKind(rightValue);
+  if (!left) return right;
+  if (!right) return left;
+  if (left === right) return left;
+  if (left === 'mixed' || right === 'mixed') return 'mixed';
+  if (left === 'session') return right;
+  if (right === 'session') return left;
+  return 'mixed';
+};
+
+function applySessionHomeworkToScheduleCards(
+  scheduleByDay = {},
+  homeworkRows = [],
+  {
+    fallbackCourseId = null,
+    fallbackUseLocalTime = false,
+  } = {}
+) {
+  if (!scheduleByDay || typeof scheduleByDay !== 'object') return;
+  const buildSlotKey = ({ dayName, classNumber, classDate, groupNumber }) => {
+    const normalizedGroupNumber = parsePositiveIntStrict(groupNumber);
+    return `${dayName}|${classNumber}|${isValidDateString(classDate) ? classDate : ''}|${normalizedGroupNumber || ''}`;
+  };
+
+  const dayKeys = Object.keys(scheduleByDay).filter((day) => Array.isArray(scheduleByDay[day]));
+  if (!dayKeys.length) return;
+  const normalizedDaySet = new Set(
+    dayKeys
+      .map((day) => normalizeWeekdayName(day) || String(day || ''))
+      .filter(Boolean)
+  );
+  const slotMap = new Map();
+  dayKeys.forEach((dayKey) => {
+    const dayRows = Array.isArray(scheduleByDay[dayKey]) ? scheduleByDay[dayKey] : [];
+    dayRows.forEach((row, rowIndex) => {
+      const rowDay = normalizeWeekdayName(row && row.day_of_week) || normalizeWeekdayName(dayKey) || String(dayKey || '');
+      const rowClassNumber = parsePositiveIntStrict(row && row.class_number);
+      const rowGroupNumber = parsePositiveIntStrict(row && row.group_number);
+      if (!rowDay || !rowClassNumber) return;
+      const rowDate = toDateOnly(row && row.class_date);
+      const strictSlotKey = buildSlotKey({
+        dayName: rowDay,
+        classNumber: rowClassNumber,
+        classDate: rowDate,
+        groupNumber: rowGroupNumber,
+      });
+      const looseSlotKey = buildSlotKey({
+        dayName: rowDay,
+        classNumber: rowClassNumber,
+        classDate: null,
+        groupNumber: rowGroupNumber,
+      });
+      if (!slotMap.has(strictSlotKey)) slotMap.set(strictSlotKey, { dayKey, rowIndex });
+      if (!slotMap.has(looseSlotKey)) slotMap.set(looseSlotKey, { dayKey, rowIndex });
+    });
+  });
+
+  (Array.isArray(homeworkRows) ? homeworkRows : []).forEach((homeworkItem) => {
+    const normalizedSessionType = normalizeScheduleSessionKind(
+      homeworkItem && (homeworkItem.session_type || detectSessionHomeworkType(homeworkItem.description))
+    );
+    if (!normalizedSessionType) return;
+    const classNumber = parsePositiveIntStrict(homeworkItem && homeworkItem.class_number);
+    if (!classNumber) return;
+    const classDate = toDateOnly(homeworkItem && homeworkItem.class_date);
+    if (!isValidDateString(classDate)) return;
+    const groupNumber = parsePositiveIntStrict(homeworkItem && homeworkItem.group_number);
+    if (!groupNumber) return;
+    const dayName = normalizeWeekdayName(homeworkItem && (homeworkItem.day_of_week || homeworkItem.day))
+      || normalizeWeekdayName(getDayNameFromDate(classDate));
+    if (!dayName || !normalizedDaySet.has(dayName)) return;
+
+    const strictSlotKey = buildSlotKey({
+      dayName,
+      classNumber,
+      classDate,
+      groupNumber,
+    });
+    const looseSlotKey = buildSlotKey({
+      dayName,
+      classNumber,
+      classDate: null,
+      groupNumber,
+    });
+    const existingSlot = slotMap.get(strictSlotKey) || slotMap.get(looseSlotKey) || null;
+    if (existingSlot) {
+      const targetRows = Array.isArray(scheduleByDay[existingSlot.dayKey]) ? scheduleByDay[existingSlot.dayKey] : [];
+      const targetRow = targetRows[existingSlot.rowIndex];
+      if (targetRow) {
+        targetRow.session_overlay_kind = mergeScheduleSessionKinds(targetRow.session_overlay_kind, normalizedSessionType);
+        targetRow.session_overlay_count = Number(targetRow.session_overlay_count || 0) + 1;
+      }
+      return;
+    }
+
+    const subjectId = parsePositiveIntStrict(homeworkItem && homeworkItem.subject_id);
+    const courseId = parsePositiveIntStrict(homeworkItem && homeworkItem.course_id)
+      || parsePositiveIntStrict(fallbackCourseId);
+    if (!subjectId || !courseId || !groupNumber) return;
+
+    const dayRows = Array.isArray(scheduleByDay[dayName]) ? scheduleByDay[dayName] : null;
+    if (!dayRows) return;
+    const subjectName = sanitizeCompactText(
+      homeworkItem && (homeworkItem.subject || homeworkItem.subject_name || ''),
+      180
+    );
+    const syntheticRow = {
+      id: null,
+      schedule_entry_id: null,
+      course_id: courseId,
+      owner_course_id: courseId,
+      semester_id: parsePositiveIntStrict(homeworkItem && homeworkItem.semester_id) || null,
+      subject_id: subjectId,
+      legacy_subject_id: subjectId,
+      subject_name: subjectName || 'Іспит',
+      day_of_week: dayName,
+      class_number: classNumber,
+      group_number: groupNumber,
+      selected_group: groupNumber,
+      group_numbers: [groupNumber],
+      group_label: `Група ${groupNumber}`,
+      lesson_type: 'exam',
+      class_date: classDate,
+      use_local_time: Boolean(fallbackUseLocalTime),
+      room_id: null,
+      room_label: String(homeworkItem && homeworkItem.room_label || ''),
+      compat_homework_enabled: true,
+      is_general: false,
+      session_overlay_kind: normalizedSessionType,
+      session_overlay_count: 1,
+      is_virtual_session_slot: true,
+    };
+    dayRows.push(syntheticRow);
+    slotMap.set(strictSlotKey, { dayKey: dayName, rowIndex: dayRows.length - 1 });
+    if (!slotMap.has(looseSlotKey)) slotMap.set(looseSlotKey, { dayKey: dayName, rowIndex: dayRows.length - 1 });
+  });
+
+  dayKeys.forEach((dayKey) => {
+    const dayRows = Array.isArray(scheduleByDay[dayKey]) ? scheduleByDay[dayKey] : [];
+    dayRows.sort((leftRow, rightRow) => (
+      Number(leftRow && leftRow.class_number || 0) - Number(rightRow && rightRow.class_number || 0)
+      || Number(leftRow && leftRow.group_number || 0) - Number(rightRow && rightRow.group_number || 0)
+      || Number(leftRow && leftRow.schedule_entry_id || 0) - Number(rightRow && rightRow.schedule_entry_id || 0)
+      || String(leftRow && leftRow.subject_name || '').localeCompare(String(rightRow && rightRow.subject_name || ''), 'uk')
+    ));
+  });
+}
+
 function buildStudentScheduleHomeworkTargets(subjects = [], scheduleRows = []) {
   const targetMap = new Map();
   const baseGroupsBySubject = new Map();
@@ -26185,6 +26342,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
           });
         });
       }
+      applySessionHomeworkToScheduleCards(scheduleByDay, homework, {
+        fallbackCourseId: selectedCourse ? selectedCourse.id : (courseIds[0] || null),
+        fallbackUseLocalTime: false,
+      });
 
       return res.render('schedule', {
         scheduleByDay,
@@ -26356,6 +26517,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
         studentId: userId,
         scheduleByDay,
         fallbackCourseId: legacyCourseId || parsePositiveIntStrict(courseId) || null,
+      });
+      applySessionHomeworkToScheduleCards(scheduleByDay, compatData.homework, {
+        fallbackCourseId: legacyCourseId || parsePositiveIntStrict(courseId) || null,
+        fallbackUseLocalTime: useLocalTime,
       });
       return res.render('schedule', {
         scheduleByDay,
@@ -27106,6 +27271,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
               }
             });
 
+            applySessionHomeworkToScheduleCards(scheduleByDay, homework, {
+              fallbackCourseId: scheduleCourseId,
+              fallbackUseLocalTime: useLocalTime,
+            });
             const homeworkIds = homework.map((h) => h.id);
             const finalizeRender = (tagOptions = [], customDeadlinesByDate = {}, weekendDeadlineCards = [], customDeadlineItems = []) => {
               res.render('schedule', {
