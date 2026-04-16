@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.54",
+      "date": "2026-04-16",
+      "items": [
+        "docs(faq-about-sync): refresh `/help` FAQ and `/about` copy to match current Studerria behavior, including schedule deadline visibility rules (custom vs teamwork with “Show in schedule”), teamwork blue deadline cards flow, and up-to-date module/role descriptions"
+      ]
+    },
+    {
       "version": "1.6.53",
       "date": "2026-04-16",
       "items": [
