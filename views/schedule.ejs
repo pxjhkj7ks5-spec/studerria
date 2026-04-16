@@ -481,7 +481,7 @@
         border-color: rgba(148, 163, 184, 0.18);
       }
       .schedule-attendance-quick-card {
-        margin: 0 0 1.1rem;
+        margin: 0;
         padding: 16px 18px;
         border-radius: 20px;
         border: 1px solid rgba(255, 255, 255, 0.12);
@@ -497,6 +497,18 @@
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 12px;
+      }
+      .schedule-attendance-modal-header {
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .schedule-attendance-modal-header .btn-close {
+        margin: 0;
+        padding: 0.35rem;
+      }
+      .schedule-attendance-modal-title-wrap {
+        min-width: 0;
+        flex: 1;
       }
       .schedule-attendance-quick-head h6 {
         margin: 0;
@@ -580,6 +592,9 @@
         margin-left: auto;
       }
       @media (max-width: 767px) {
+        .schedule-attendance-modal-header {
+          align-items: stretch;
+        }
         .schedule-attendance-quick-head,
         .schedule-modal-footer,
         .schedule-modal-footer-main {
@@ -2651,49 +2666,6 @@
               <li class="list-group-item text-muted"><%= t('schedule.homeworkModal.empty') %></li>
             </ul>
 
-            <section class="schedule-attendance-quick-card d-none" id="scheduleAttendanceQuickCard">
-              <div class="schedule-attendance-quick-head">
-                <div>
-                  <h6><%= t('schedule.attendance.title') %></h6>
-                  <div class="small text-muted" id="scheduleAttendanceMeta"><%= t('schedule.attendance.meta') %></div>
-                </div>
-                <span class="attendance-chip attendance-chip--pending" id="scheduleAttendanceProgressChip"><%= t('schedule.attendance.progressIdle') %></span>
-              </div>
-              <div class="schedule-attendance-feedback small text-muted" id="scheduleAttendanceFeedback"></div>
-              <form id="scheduleAttendanceForm" autocomplete="off">
-                <input type="hidden" name="subject_id" id="scheduleAttendanceSubjectId" />
-                <input type="hidden" name="course_id" id="scheduleAttendanceCourseId" />
-                <input type="hidden" name="attendance_date" id="scheduleAttendanceDate" />
-                <input type="hidden" name="attendance_class_number" id="scheduleAttendanceClassNumber" />
-                <input type="hidden" name="group_number" id="scheduleAttendanceGroupNumber" />
-                <input type="hidden" name="lesson_type" id="scheduleAttendanceLessonType" />
-                <input type="hidden" name="is_general" id="scheduleAttendanceIsGeneral" />
-                <input type="hidden" name="target_groups" id="scheduleAttendanceTargetGroups" />
-              </form>
-              <div class="small text-muted d-none" id="scheduleAttendanceEmptyState"><%= t('schedule.attendance.empty') %></div>
-              <div class="schedule-attendance-quick-shell d-none" id="scheduleAttendanceQuickShell">
-                <div class="schedule-attendance-quick-student">
-                  <div class="schedule-attendance-quick-label"><%= t('schedule.attendance.studentLabel') %></div>
-                  <div class="schedule-attendance-quick-name" id="scheduleAttendanceStudentName">-</div>
-                  <div class="schedule-attendance-quick-meta" id="scheduleAttendanceStudentMeta">-</div>
-                  <div class="schedule-attendance-quick-status">
-                    <span class="attendance-chip attendance-chip--pending" id="scheduleAttendanceStudentChip"><%= t('schedule.attendance.status.pendingShort') %></span>
-                    <span class="small text-muted" id="scheduleAttendanceStudentNote"><%= t('schedule.attendance.quickHint') %></span>
-                  </div>
-                </div>
-                <div class="schedule-attendance-quick-actions">
-                  <button type="button" class="btn btn-outline-success glass schedule-attendance-choice" data-attendance-choice="present"><%= t('schedule.attendance.status.present') %></button>
-                  <button type="button" class="btn btn-outline-danger glass schedule-attendance-choice" data-attendance-choice="absent"><%= t('schedule.attendance.status.absent') %></button>
-                  <button type="button" class="btn btn-outline-primary glass schedule-attendance-choice" data-attendance-choice="excused"><%= t('schedule.attendance.status.excused') %></button>
-                </div>
-                <div class="schedule-attendance-quick-nav">
-                  <button type="button" class="btn btn-outline-secondary btn-sm glass" id="scheduleAttendancePrevBtn"><%= t('schedule.attendance.backAction') %></button>
-                  <div class="schedule-attendance-quick-summary" id="scheduleAttendanceSummary"></div>
-                  <button type="button" class="btn btn-primary btn-sm glass" id="scheduleAttendanceSaveBtn"><%= t('schedule.attendance.saveAction') %></button>
-                </div>
-              </div>
-            </section>
-
             <div id="subgroupSection" class="mb-4 d-none">
               <h6><%= t('schedule.homeworkModal.subgroups') %></h6>
               <div id="subgroupList" class="list-group mb-3"></div>
@@ -2855,7 +2827,6 @@
                 class="btn btn-outline-primary glass d-none"
                 id="scheduleAttendanceToggleBtn"
                 data-open-label="<%= t('schedule.attendance.fillAction') %>"
-                data-close-label="<%= t('schedule.attendance.hideAction') %>"
               >
                 <%= t('schedule.attendance.fillAction') %>
               </button>
@@ -2870,6 +2841,60 @@
         </div>
       </div>
     </div>
+
+    <% if (canManageAttendance) { %>
+    <div class="modal fade" id="scheduleAttendanceQuickModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header schedule-attendance-modal-header">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= t('changelog.close') %>"></button>
+            <div class="schedule-attendance-modal-title-wrap">
+              <h5 class="modal-title"><%= t('schedule.attendance.title') %></h5>
+              <div class="small text-muted" id="scheduleAttendanceMeta"><%= t('schedule.attendance.meta') %></div>
+            </div>
+            <span class="attendance-chip attendance-chip--pending" id="scheduleAttendanceProgressChip"><%= t('schedule.attendance.progressIdle') %></span>
+          </div>
+          <div class="modal-body">
+            <section class="schedule-attendance-quick-card" id="scheduleAttendanceQuickCard">
+              <div class="schedule-attendance-feedback small text-muted" id="scheduleAttendanceFeedback"></div>
+              <form id="scheduleAttendanceForm" autocomplete="off">
+                <input type="hidden" name="subject_id" id="scheduleAttendanceSubjectId" />
+                <input type="hidden" name="course_id" id="scheduleAttendanceCourseId" />
+                <input type="hidden" name="attendance_date" id="scheduleAttendanceDate" />
+                <input type="hidden" name="attendance_class_number" id="scheduleAttendanceClassNumber" />
+                <input type="hidden" name="group_number" id="scheduleAttendanceGroupNumber" />
+                <input type="hidden" name="lesson_type" id="scheduleAttendanceLessonType" />
+                <input type="hidden" name="is_general" id="scheduleAttendanceIsGeneral" />
+                <input type="hidden" name="target_groups" id="scheduleAttendanceTargetGroups" />
+              </form>
+              <div class="small text-muted d-none" id="scheduleAttendanceEmptyState"><%= t('schedule.attendance.empty') %></div>
+              <div class="schedule-attendance-quick-shell d-none" id="scheduleAttendanceQuickShell">
+                <div class="schedule-attendance-quick-student">
+                  <div class="schedule-attendance-quick-label"><%= t('schedule.attendance.studentLabel') %></div>
+                  <div class="schedule-attendance-quick-name" id="scheduleAttendanceStudentName">-</div>
+                  <div class="schedule-attendance-quick-meta" id="scheduleAttendanceStudentMeta">-</div>
+                  <div class="schedule-attendance-quick-status">
+                    <span class="attendance-chip attendance-chip--pending" id="scheduleAttendanceStudentChip"><%= t('schedule.attendance.status.pendingShort') %></span>
+                    <span class="small text-muted" id="scheduleAttendanceStudentNote"><%= t('schedule.attendance.quickHint') %></span>
+                  </div>
+                </div>
+                <div class="schedule-attendance-quick-actions">
+                  <button type="button" class="btn btn-success schedule-attendance-choice" data-attendance-choice="present"><%= t('schedule.attendance.status.present') %></button>
+                  <button type="button" class="btn btn-danger schedule-attendance-choice" data-attendance-choice="absent"><%= t('schedule.attendance.status.absent') %></button>
+                  <button type="button" class="btn btn-primary schedule-attendance-choice" data-attendance-choice="excused"><%= t('schedule.attendance.status.excused') %></button>
+                </div>
+                <div class="schedule-attendance-quick-nav">
+                  <button type="button" class="btn btn-outline-secondary btn-sm glass" id="scheduleAttendancePrevBtn"><%= t('schedule.attendance.backAction') %></button>
+                  <div class="schedule-attendance-quick-summary" id="scheduleAttendanceSummary"></div>
+                  <button type="button" class="btn btn-primary btn-sm glass" id="scheduleAttendanceSaveBtn"><%= t('schedule.attendance.saveAction') %></button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <% } %>
 
     <div class="modal fade" id="homeworkSubmitModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -3493,7 +3518,8 @@
       const customTemplateTitleInput = document.getElementById('customTemplateTitleInput');
       const customHwDescription = document.getElementById('customHwDescription');
       const templateCache = new Map();
-      const attendancePanelEl = document.getElementById('scheduleAttendanceQuickCard');
+      const attendanceModalEl = document.getElementById('scheduleAttendanceQuickModal');
+      const attendanceModal = attendanceModalEl && window.bootstrap ? new window.bootstrap.Modal(attendanceModalEl) : null;
       const attendanceMetaEl = document.getElementById('scheduleAttendanceMeta');
       const attendanceToggleBtn = document.getElementById('scheduleAttendanceToggleBtn');
       const attendanceProgressChipEl = document.getElementById('scheduleAttendanceProgressChip');
@@ -3523,6 +3549,7 @@
       let currentAttendanceRows = [];
       let currentAttendanceIndex = 0;
       let attendanceContextLoaded = false;
+      let attendanceOpeningFromHomeworkModal = false;
 
       const attendanceStatusKeys = ['present', 'late', 'absent', 'excused'];
       const attendanceQuickStatusKeys = ['present', 'absent', 'excused'];
@@ -3563,16 +3590,10 @@
         chipEl.className = `attendance-chip attendance-chip--${tone}`;
         chipEl.textContent = getAttendanceStatusLabel(status, short);
       };
-      const setAttendanceEditorVisible = (visible, { scroll = false } = {}) => {
-        if (!attendancePanelEl || !attendanceToggleBtn) return;
-        attendancePanelEl.classList.toggle('d-none', !visible);
-        attendanceToggleBtn.textContent = visible
-          ? String(attendanceToggleBtn.dataset.closeLabel || scheduleText.attendanceSaveAction)
-          : String(attendanceToggleBtn.dataset.openLabel || scheduleText.attendanceSaveAction);
-        if (visible && scroll) {
-          attendancePanelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      };
+      const attendanceNameCollator = new Intl.Collator(scheduleLocale || undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
       const cloneAttendanceRows = (rows = []) => (Array.isArray(rows) ? rows : [])
         .map((row) => ({
           student_id: Number(row && row.student_id || 0),
@@ -3582,7 +3603,14 @@
           reason: String(row && row.reason || ''),
           marked_at: String(row && row.marked_at || ''),
         }))
-        .filter((row) => Number.isInteger(row.student_id) && row.student_id > 0);
+        .filter((row) => Number.isInteger(row.student_id) && row.student_id > 0)
+        .sort((a, b) => {
+          const byName = attendanceNameCollator.compare(
+            String(a && a.full_name || ''),
+            String(b && b.full_name || '')
+          );
+          return byName !== 0 ? byName : Number(a.student_id || 0) - Number(b.student_id || 0);
+        });
       const countMarkedAttendanceRows = () => currentAttendanceRows.reduce((count, row) => (
         normalizeAttendanceStatusKey(row && row.status) ? count + 1 : count
       ), 0);
@@ -3698,7 +3726,6 @@
         currentAttendanceRows = [];
         currentAttendanceIndex = 0;
         attendanceContextLoaded = false;
-        if (attendancePanelEl) attendancePanelEl.classList.add('d-none');
         if (attendanceMetaEl) attendanceMetaEl.textContent = scheduleText.attendanceMeta;
         if (attendanceToggleBtn) {
           attendanceToggleBtn.classList.toggle('d-none', !canManageAttendance);
@@ -4400,9 +4427,6 @@
         currentAttendanceRows = [];
         currentAttendanceIndex = 0;
         attendanceContextLoaded = false;
-        if (attendancePanelEl) {
-          attendancePanelEl.classList.add('d-none');
-        }
         if (attendanceMetaEl) {
           attendanceMetaEl.textContent = roomLabel
             ? `${scheduleText.attendanceMeta} · ${scheduleUiText.roomLabel}: ${roomLabel}`
@@ -4491,30 +4515,50 @@
         if (hwTemplateSourceField) {
           hwTemplateSourceField.value = '';
         }
-        resetAttendancePanel();
-        if (location.hash.startsWith('#class=')) {
-          history.replaceState(null, '', location.pathname + location.search);
+        if (!attendanceOpeningFromHomeworkModal) {
+          resetAttendancePanel();
+          if (location.hash.startsWith('#class=')) {
+            history.replaceState(null, '', location.pathname + location.search);
+          }
         }
       });
 
+      const openAttendanceFromScheduleModal = async () => {
+        if (!canManageAttendance || !attendanceModal) return;
+        attendanceModal.show();
+        if (attendanceContextLoaded) {
+          renderAttendanceQuickCard();
+          return;
+        }
+        try {
+          await loadAttendanceContext();
+        } catch (error) {
+          setAttendanceFeedback(String(error && error.message ? error.message : scheduleText.attendanceLoadError), 'error');
+        }
+      };
+
+      if (attendanceModalEl) {
+        attendanceModalEl.addEventListener('hidden.bs.modal', () => {
+          attendanceOpeningFromHomeworkModal = false;
+          resetAttendancePanel();
+          if (location.hash.startsWith('#class=')) {
+            history.replaceState(null, '', location.pathname + location.search);
+          }
+        });
+      }
+
       if (attendanceToggleBtn) {
         attendanceToggleBtn.addEventListener('click', async () => {
-          if (!canManageAttendance) return;
-          const shouldOpen = attendancePanelEl ? attendancePanelEl.classList.contains('d-none') : true;
-          if (!shouldOpen) {
-            setAttendanceEditorVisible(false);
+          if (!canManageAttendance || !attendanceModal) return;
+          attendanceOpeningFromHomeworkModal = true;
+          if (homeworkModal && homeworkModal.classList.contains('show') && window.bootstrap) {
+            homeworkModal.addEventListener('hidden.bs.modal', () => {
+              openAttendanceFromScheduleModal();
+            }, { once: true });
+            window.bootstrap.Modal.getOrCreateInstance(homeworkModal).hide();
             return;
           }
-          setAttendanceEditorVisible(true, { scroll: true });
-          if (attendanceContextLoaded) {
-            renderAttendanceQuickCard();
-            return;
-          }
-          try {
-            await loadAttendanceContext();
-          } catch (error) {
-            setAttendanceFeedback(String(error && error.message ? error.message : scheduleText.attendanceLoadError), 'error');
-          }
+          await openAttendanceFromScheduleModal();
         });
       }
       if (attendancePrevBtn) {

@@ -27925,9 +27925,9 @@ function resolveScheduleAttendanceGroupScope(
     };
   }
 
-  const scopedGroups = normalizedTargetGroups.length
-    ? normalizedTargetGroups
-    : (slotGroupNumber ? [slotGroupNumber] : []);
+  const scopedGroups = slotGroupNumber
+    ? [slotGroupNumber]
+    : (normalizedTargetGroups.length ? normalizedTargetGroups : []);
   if (!scopedGroups.length) {
     if (!selectedSubject.has_all_groups && allowedSubjectGroups.length) {
       return {
@@ -31044,11 +31044,13 @@ async function getJournalStudents(subjectId, courseId, groupFilterSet = null, us
     userIds: userFilterIds,
     activeOnly: usersHasIsActive,
   });
-  return (rows || []).map((row) => ({
-    id: Number(row.id),
-    full_name: row.full_name,
-    group_number: Number(row.group_number || 0),
-  }));
+  return (rows || [])
+    .map((row) => ({
+      id: Number(row.id),
+      full_name: row.full_name,
+      group_number: Number(row.group_number || 0),
+    }))
+    .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || ''), 'uk'));
 }
 
 async function getJournalStudentGroup(subjectId, studentId) {
@@ -31133,6 +31135,10 @@ async function buildJournalAttendanceContext({
       }))
       .filter((student) => Number.isFinite(student.id) && student.id > 0)
     : [];
+  safeStudents.sort((a, b) => {
+    const byName = String(a.full_name || '').localeCompare(String(b.full_name || ''), 'uk');
+    return byName !== 0 ? byName : Number(a.id || 0) - Number(b.id || 0);
+  });
   const studentIds = safeStudents.map((student) => student.id);
 
   const semesterFilter = buildExactSemesterCondition('ar', semesterId);

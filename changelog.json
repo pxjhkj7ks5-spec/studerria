@@ -1,6 +1,15 @@
 {
   "items": [
     {
+      "version": "1.6.51",
+      "date": "2026-04-16",
+      "items": [
+        "refactor(schedule-attendance-modal-flow): move quick attendance from the class homework modal into a dedicated minimal modal that opens after closing the homework modal, with a top-left close control and concise status workflow",
+        "fix(schedule-attendance-student-order): enforce stable alphabetical student order (server + client) for sequential quick attendance marking",
+        "fix(schedule-attendance-group-scope): prioritize the class card group for non-lecture attendance scope resolution so the modal shows students for the selected group/pair context instead of over-broad target group sets"
+      ]
+    },
+    {
       "version": "1.6.50",
       "date": "2026-04-16",
       "items": [
