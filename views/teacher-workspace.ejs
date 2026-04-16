@@ -26,6 +26,34 @@
     (total, key) => total + Number((workspaceTemplatePlanValue.counts || {})[key] || 0),
     0,
   );
+  const workspaceSelectedOfferingCount = workspaceCatalogOfferingList.reduce(
+    (total, offering) => (workspaceSelectionMap.has(Number(offering.id || 0)) ? total + 1 : total),
+    0,
+  );
+  const selectedWorkspaceCourse = workspaceCourseList.find((course) => Number(course.id || 0) === Number(selectedCourseId || 0)) || null;
+  const selectedWorkspaceContext = workspaceContextList.find((context) => Number(context.id || 0) === Number(selectedWorkspaceContextId || 0)) || null;
+  const selectedWorkspaceSemester = workspaceSemesterList.find((semester) => Number(semester.id || 0) === Number(selectedWorkspaceSemesterId || 0)) || null;
+  const workspaceScopeChips = [];
+  if (selectedWorkspaceCourse && selectedWorkspaceCourse.name) {
+    workspaceScopeChips.push({ label: 'Course', value: selectedWorkspaceCourse.name });
+  }
+  if (selectedWorkspaceContext && selectedWorkspaceContext.label) {
+    workspaceScopeChips.push({ label: 'Context', value: selectedWorkspaceContext.label });
+  }
+  if (selectedWorkspaceSemester && selectedWorkspaceSemester.title) {
+    workspaceScopeChips.push({ label: 'Semester', value: selectedWorkspaceSemester.title });
+  }
+  if (!workspaceScopeChips.length) {
+    workspaceScopeChips.push({ label: 'Scope', value: 'All visible offerings' });
+  }
+  const workspaceSummaryCards = [
+    { value: teacherOfferingList.length, label: 'Live offerings', note: 'active now in this scope' },
+    { value: workspaceSelectedOfferingCount, label: 'Enabled', note: 'selected in the live editor' },
+    { value: workspaceTemplateActionCount, label: 'Rule changes', note: 'pending recurring sync actions' },
+    { value: Array.isArray(templates) ? templates.length : 0, label: 'Templates', note: 'saved homework drafts' },
+    { value: Array.isArray(assets) ? assets.length : 0, label: 'Assets', note: 'reusable files in library' },
+    { value: Array.isArray(recentHomework) ? recentHomework.length : 0, label: 'Recent homework', note: 'latest teacher tasks in scope' },
+  ];
   const workspaceTemplateStatusBadgeMap = {
     create: 'success',
     update: 'warning text-dark',
@@ -106,11 +134,38 @@
       }
       .workspace-hero {
         padding: 24px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
+        gap: 18px;
+        align-items: start;
+      }
+      .workspace-hero-copy {
+        min-width: 0;
+      }
+      .workspace-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(125, 211, 252, 0.24);
+        background: rgba(56, 189, 248, 0.12);
+        color: rgba(226, 232, 240, 0.92);
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      body.theme-light .workspace-kicker {
+        background: rgba(255, 255, 255, 0.92);
+        border-color: rgba(15, 23, 42, 0.1);
+        color: rgba(15, 23, 42, 0.78);
       }
       .workspace-title {
-        margin: 0;
+        margin: 14px 0 0;
         font-size: clamp(1.7rem, 2.8vw, 2.25rem);
         font-weight: 700;
+        max-width: 760px;
       }
       .workspace-subtitle {
         margin: 10px 0 0;
@@ -125,6 +180,80 @@
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
+      }
+      .workspace-scope-pills {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .workspace-scope-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.22);
+        color: rgba(226, 232, 240, 0.9);
+        font-size: 0.8rem;
+      }
+      body.theme-light .workspace-scope-pill {
+        background: rgba(255, 255, 255, 0.88);
+        border-color: rgba(15, 23, 42, 0.1);
+        color: rgba(15, 23, 42, 0.72);
+      }
+      .workspace-scope-pill strong {
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: rgba(148, 163, 184, 0.9);
+      }
+      body.theme-light .workspace-scope-pill strong {
+        color: rgba(71, 85, 105, 0.82);
+      }
+      .workspace-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .workspace-summary-card {
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background:
+          radial-gradient(140% 120% at 0% 0%, rgba(56, 189, 248, 0.14), transparent 58%),
+          rgba(15, 23, 42, 0.24);
+      }
+      body.theme-light .workspace-summary-card {
+        border-color: rgba(15, 23, 42, 0.1);
+        background:
+          radial-gradient(140% 120% at 0% 0%, rgba(125, 211, 252, 0.24), transparent 58%),
+          rgba(255, 255, 255, 0.9);
+      }
+      .workspace-summary-value {
+        font-size: clamp(1.3rem, 2.8vw, 1.8rem);
+        font-weight: 700;
+        line-height: 1;
+      }
+      .workspace-summary-label {
+        margin-top: 8px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(226, 232, 240, 0.84);
+      }
+      body.theme-light .workspace-summary-label {
+        color: rgba(15, 23, 42, 0.72);
+      }
+      .workspace-summary-note {
+        margin-top: 4px;
+        font-size: 0.8rem;
+        color: rgba(203, 213, 225, 0.76);
+      }
+      body.theme-light .workspace-summary-note {
+        color: rgba(15, 23, 42, 0.58);
       }
       .btn-glass {
         border-radius: 999px;
@@ -152,6 +281,23 @@
       }
       .workspace-panel h5 {
         margin-bottom: 14px;
+      }
+      .workspace-panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .workspace-filter-note {
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.16);
+      }
+      body.theme-light .workspace-filter-note {
+        border-color: rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.82);
       }
       .form-control,
       .form-select {
@@ -668,11 +814,19 @@
         gap: 8px;
       }
       @media (max-width: 991.98px) {
+        .workspace-hero {
+          grid-template-columns: 1fr;
+        }
         .workspace-assignment-grid {
           grid-template-columns: 1fr;
         }
         .workspace-assignment-controls {
           justify-items: stretch;
+        }
+      }
+      @media (max-width: 575.98px) {
+        .workspace-summary-grid {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -700,27 +854,56 @@
       <% } %>
 
       <section class="glass workspace-hero mb-3">
-        <h1 class="workspace-title">Teacher workspace</h1>
-        <p class="workspace-subtitle">
-          Build reusable homework templates and apply them in one click from class cards in schedule modal.
-        </p>
-        <div class="hero-actions">
-          <a class="btn btn-glass" href="/teacher">Teacher hub</a>
-          <a class="btn btn-glass" href="/schedule">Schedule</a>
-          <a class="btn btn-glass" href="/teacher/subjects">My disciplines</a>
-          <a class="btn btn-glass" href="/journal">Journal</a>
+        <div class="workspace-hero-copy">
+          <span class="workspace-kicker">Teacher workspace</span>
+          <h1 class="workspace-title">Manage live offerings, recurring rules and homework materials</h1>
+          <p class="workspace-subtitle">
+            Use the current course, study context and semester to control what is active now, preview recurring rules for future cohorts, and keep reusable homework content ready for schedule actions.
+          </p>
+          <div class="workspace-scope-pills">
+            <% workspaceScopeChips.forEach(function(chip) { %>
+              <span class="workspace-scope-pill"><strong><%= chip.label %></strong><span><%= chip.value %></span></span>
+            <% }) %>
+          </div>
+          <div class="hero-actions">
+            <a class="btn btn-glass" href="/teacher">Teacher hub</a>
+            <a class="btn btn-glass" href="/schedule">Schedule</a>
+            <a class="btn btn-glass" href="/teacher/subjects">My disciplines</a>
+            <a class="btn btn-glass" href="/journal">Journal</a>
+          </div>
+        </div>
+        <div class="workspace-summary-grid">
+          <% workspaceSummaryCards.forEach(function(card) { %>
+            <article class="workspace-summary-card">
+              <div class="workspace-summary-value"><%= card.value %></div>
+              <div class="workspace-summary-label"><%= card.label %></div>
+              <div class="workspace-summary-note"><%= card.note %></div>
+            </article>
+          <% }) %>
         </div>
       </section>
 
       <section class="glass workspace-panel mb-3">
-        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+        <div class="workspace-panel-head mb-3">
           <div>
-            <h5 class="mb-1">Live teaching scope</h5>
-            <p class="hint mb-0">This list now reads from `teacher_offering_assignments` and shows contexts and semesters attached to each live offering.</p>
+            <h5 class="mb-1">Current teaching scope</h5>
+            <p class="hint mb-0">These are the live offerings already active for the selected course, context and semester.</p>
           </div>
-          <span class="badge bg-secondary"><%= teacherOfferingList.length %></span>
+          <div class="workspace-assignment-status">
+            <span class="badge bg-secondary"><%= teacherOfferingList.length %> active now</span>
+            <span class="badge bg-info-subtle text-info-emphasis"><%= workspaceCatalogOfferingList.length %> visible in scope</span>
+          </div>
         </div>
         <form method="GET" action="/teacher/workspace" class="row g-2 mb-3">
+          <div class="col-12 col-lg-4">
+            <label class="form-label" for="workspaceCourseId">Course</label>
+            <select class="form-select" id="workspaceCourseId" name="course">
+              <option value="">All visible courses</option>
+              <% workspaceCourseList.forEach(function(course) { %>
+                <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+              <% }) %>
+            </select>
+          </div>
           <div class="col-12 col-lg-4">
             <label class="form-label" for="workspaceContextId">Study context</label>
             <select class="form-select" id="workspaceContextId" name="study_context_id">
@@ -739,17 +922,10 @@
               <% }) %>
             </select>
           </div>
-          <div class="col-12 col-lg-4">
-            <label class="form-label" for="workspaceCourseId">Course scope</label>
-            <select class="form-select" id="workspaceCourseId" name="course">
-              <option value="">All visible courses</option>
-              <% workspaceCourseList.forEach(function(course) { %>
-                <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
-              <% }) %>
-            </select>
-          </div>
           <div class="col-12">
-            <p class="hint mb-0">Primary scope is `study_context_id + semester_id`. Course is derived from the current offering context and used only when older actions still need it.</p>
+            <div class="workspace-filter-note hint mb-0">
+              Course narrows the catalog first. Study context and semester define the working scope used in the live editor, recurring rule preview, templates and recent homework below.
+            </div>
           </div>
           <div class="col-12 d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit">Apply filters</button>
@@ -768,10 +944,10 @@
                   <div>
                     <h6 class="workspace-scope-title"><%= offering.name %></h6>
                     <div class="workspace-scope-meta">
-                      <%= Array.isArray(offering.course_labels) && offering.course_labels.length ? offering.course_labels.join(' • ') : 'Course not bound yet' %>
+                      <%= Array.isArray(offering.course_labels) && offering.course_labels.length ? offering.course_labels.join(' / ') : 'Course not bound yet' %>
                     </div>
                   </div>
-                  <span class="badge bg-<%= offering.template_id ? 'info' : 'secondary' %>"><%= offering.template_id ? 'template matched' : 'live override' %></span>
+                  <span class="badge bg-<%= offering.template_id ? 'info' : 'secondary' %>"><%= offering.template_id ? 'from recurring rule' : 'saved live setup' %></span>
                 </div>
                 <div class="workspace-scope-chip-row">
                   <span class="workspace-scope-chip">Groups: <%= offeringGroupScope %></span>
@@ -779,7 +955,7 @@
                   <% if (offering.is_shared) { %><span class="workspace-scope-chip">Shared</span><% } %>
                   <% if (offering.is_general) { %><span class="workspace-scope-chip">General</span><% } %>
                 </div>
-                <div class="workspace-scope-meta"><%= Array.isArray(offering.context_labels) ? offering.context_labels.join(' • ') : '' %></div>
+                <div class="workspace-scope-meta"><%= Array.isArray(offering.context_labels) ? offering.context_labels.join(' / ') : '' %></div>
                 <% if (Array.isArray(offering.semester_labels) && offering.semester_labels.length) { %>
                   <div class="workspace-scope-chip-row">
                     <% offering.semester_labels.forEach(function(label) { %>
@@ -790,23 +966,22 @@
               </article>
             <% }) %>
           </div>
+        <% } else if (workspaceCatalogOfferingList.length) { %>
+          <div class="alert alert-info mb-0">No live offerings are enabled for this scope yet. Use the editor below to activate the offerings you need for this cohort.</div>
         <% } else { %>
-          <div class="alert alert-info mb-0">No live offerings assigned yet. Use <a href="/teacher/subjects">discipline assignments</a> to choose offerings and groups.</div>
+          <div class="alert alert-info mb-0">No offerings match the current filter yet. Try another course, context or semester, or review <a href="/teacher/subjects">discipline assignments</a>.</div>
         <% } %>
       </section>
 
       <section class="glass workspace-panel mb-3">
-        <% const scopedSelectedCount = workspaceCatalogOfferingList.reduce((total, offering) => (
-          workspaceSelectionMap.has(Number(offering.id || 0)) ? total + 1 : total
-        ), 0); %>
         <div class="workspace-assignment-toolbar mb-3">
           <div>
-            <h5 class="mb-1">Edit live assignments</h5>
-            <p class="hint mb-0">This is the primary live editor for the visible scope. Save only live overrides, or also update recurring template rules for future cohorts.</p>
+            <h5 class="mb-1">Manage live offerings</h5>
+            <p class="hint mb-0">Enable offerings for the current scope, choose a group where needed, and optionally align recurring rules for future cohorts.</p>
           </div>
           <div class="workspace-assignment-status">
-            <span class="badge bg-secondary"><%= workspaceCatalogOfferingList.length %> visible</span>
-            <span class="badge bg-info-subtle text-info-emphasis" id="workspaceSelectedOfferingsCount"><%= scopedSelectedCount %> selected</span>
+            <span class="badge bg-secondary"><%= workspaceCatalogOfferingList.length %> in scope</span>
+            <span class="badge bg-info-subtle text-info-emphasis" id="workspaceSelectedOfferingsCount"><%= workspaceSelectedOfferingCount %> active</span>
           </div>
         </div>
         <% if (workspaceCatalogOfferingList.length) { %>
@@ -821,7 +996,7 @@
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="workspaceSyncTemplates" name="sync_templates" value="1" />
               <label class="form-check-label" for="workspaceSyncTemplates">
-                Also update recurring template rules for these visible offerings
+                Also align recurring rules for these visible offerings
               </label>
             </div>
 
@@ -837,11 +1012,11 @@
                         <div>
                           <h6 class="workspace-scope-title"><%= offering.name %></h6>
                           <div class="workspace-scope-meta">
-                            <%= Array.isArray(offering.course_labels) && offering.course_labels.length ? offering.course_labels.join(' • ') : 'Course not bound yet' %>
+                            <%= Array.isArray(offering.course_labels) && offering.course_labels.length ? offering.course_labels.join(' / ') : 'Course not bound yet' %>
                           </div>
                         </div>
                         <span class="badge bg-<%= assignedOffering && assignedOffering.template_id ? 'info' : (isSelected ? 'secondary' : 'light text-dark') %>">
-                          <%= assignedOffering && assignedOffering.template_id ? 'template matched' : (isSelected ? 'live override' : 'available') %>
+                          <%= assignedOffering && assignedOffering.template_id ? 'from recurring rule' : (isSelected ? 'saved live setup' : 'available in scope') %>
                         </span>
                       </div>
                       <div class="workspace-scope-chip-row">
@@ -850,7 +1025,7 @@
                         <% if (offering.is_general) { %><span class="workspace-scope-chip">General</span><% } %>
                         <% if (!offering.is_general) { %><span class="workspace-scope-chip">Groups: <%= Number(offering.group_count || 1) %></span><% } %>
                       </div>
-                      <div class="workspace-assignment-description mt-2"><%= Array.isArray(offering.context_labels) ? offering.context_labels.join(' • ') : '' %></div>
+                      <div class="workspace-assignment-description mt-2"><%= Array.isArray(offering.context_labels) ? offering.context_labels.join(' / ') : '' %></div>
                       <% if (Array.isArray(offering.semester_labels) && offering.semester_labels.length) { %>
                         <div class="workspace-scope-chip-row">
                           <% offering.semester_labels.forEach(function(label) { %>
@@ -872,7 +1047,7 @@
                           data-offering-toggle="<%= offering.id %>"
                           <%= isSelected ? 'checked' : '' %>
                         />
-                        <label class="form-check-label" for="assign_offering_<%= offering.id %>">Assigned</label>
+                        <label class="form-check-label" for="assign_offering_<%= offering.id %>">Active</label>
                       </div>
                       <% if (!offering.is_general) { %>
                         <div class="w-100">
@@ -897,24 +1072,24 @@
             </div>
 
             <div class="workspace-assignment-footer">
-              <p class="hint mb-0">Only offerings visible in the current filter scope will change. Everything outside this scope stays untouched.</p>
+              <p class="hint mb-0">Only offerings visible in the current filter will change. Everything outside this scope stays untouched.</p>
               <button class="btn btn-primary" type="submit">Save live assignments</button>
             </div>
           </form>
         <% } else { %>
-          <div class="alert alert-info mb-0">No live offerings in the current scope. Change the course, context, or semester filter first.</div>
+          <div class="alert alert-info mb-0">No offerings are available in this filter. Expand the scope or review discipline assignments first.</div>
         <% } %>
       </section>
 
       <section class="glass workspace-panel mb-3">
         <div class="template-preview-toolbar mb-3">
           <div>
-            <h5 class="mb-1">Recurring template preview</h5>
-            <p class="hint mb-0">This preview is built from the current saved live assignments in the visible scope. Save live assignments first if you changed the toggles above.</p>
+            <h5 class="mb-1">Recurring rules preview</h5>
+            <p class="hint mb-0">This shows how the current saved live assignments would affect recurring rules for future cohorts in the same scope.</p>
           </div>
           <div class="workspace-assignment-status">
-            <span class="badge bg-secondary"><%= Number(workspaceTemplatePlanValue.visible_count || 0) %> visible</span>
-            <span class="badge bg-info-subtle text-info-emphasis"><%= Number(workspaceTemplatePlanValue.selected_count || 0) %> selected</span>
+            <span class="badge bg-secondary"><%= Number(workspaceTemplatePlanValue.visible_count || 0) %> in scope</span>
+            <span class="badge bg-info-subtle text-info-emphasis"><%= Number(workspaceTemplatePlanValue.selected_count || 0) %> active</span>
           </div>
         </div>
         <% if (workspaceCatalogOfferingList.length) { %>
@@ -936,7 +1111,7 @@
                     <div>
                       <h6 class="workspace-scope-title mb-0"><%= Array.isArray(item.offering_names) && item.offering_names.length ? item.offering_names.join(' / ') : 'Recurring rule' %></h6>
                       <div class="template-preview-meta">
-                        <%= Array.isArray(item.context_labels) && item.context_labels.length ? item.context_labels.join(' • ') : 'No study context labels yet' %>
+                        <%= Array.isArray(item.context_labels) && item.context_labels.length ? item.context_labels.join(' / ') : 'No study context labels yet' %>
                       </div>
                     </div>
                     <span class="badge bg-<%= statusBadge %>"><%= statusLabel %></span>
@@ -948,12 +1123,6 @@
                       <% if (item.stage_number) { %><span class="workspace-scope-chip">Stage: <%= item.stage_number %></span><% } %>
                       <% if (item.campus_key) { %><span class="workspace-scope-chip">Campus: <%= item.campus_key %></span><% } %>
                       <% if (item.track_key) { %><span class="workspace-scope-chip">Track: <%= item.track_key %></span><% } %>
-                    </div>
-                    <div class="template-preview-meta">
-                      <span>Dedup key: <code><%= item.dedupe_key %></code></span>
-                      <% if (item.existing_template_id) { %>
-                        <span class="ms-2">Existing rule #<%= item.existing_template_id %></span>
-                      <% } %>
                     </div>
                   </div>
                 </article>
@@ -972,13 +1141,13 @@
             <% workspaceCatalogOfferingList.forEach(function(offering) { %>
               <input type="hidden" name="visible_offering_ids" value="<%= offering.id %>" />
             <% }) %>
-            <p class="hint mb-0">Sync touches only recurring template rules that match the visible offerings. It does not change live assignments by itself.</p>
+            <p class="hint mb-0">Sync updates recurring rules for the visible offerings only. It does not change live assignments by itself.</p>
             <button class="btn btn-outline-primary" type="submit" <%= workspaceTemplateActionCount > 0 ? '' : 'disabled' %>>
-              Sync recurring templates
+              Sync recurring rules
             </button>
           </form>
         <% } else { %>
-          <div class="alert alert-info mb-0">No live offerings in the current scope, so there are no recurring template rules to preview or sync.</div>
+          <div class="alert alert-info mb-0">No offerings are visible in this filter, so there are no recurring rules to preview or sync.</div>
         <% } %>
       </section>
 
@@ -988,7 +1157,7 @@
             <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
               <div>
                 <h5 class="mb-1">Asset library</h5>
-                <p class="hint mb-0">Upload reusable files once and link them to templates or homework.</p>
+                <p class="hint mb-0">Store reusable files once and attach them to templates or homework whenever this scope needs them.</p>
               </div>
               <span class="badge bg-secondary"><%= (assets || []).length %></span>
             </div>
@@ -1025,7 +1194,7 @@
                         <div class="fw-semibold"><%= asset.name || asset.original_name || 'Asset' %></div>
                         <div class="asset-library-meta small">
                           <% if (asset.mime_type) { %><%= asset.mime_type %><% } %>
-                          <% if (asset.original_name) { %> · <%= asset.original_name %><% } %>
+                          <% if (asset.original_name) { %> &middot; <%= asset.original_name %><% } %>
                         </div>
                       </div>
                       <form method="POST" action="/teacher/workspace/assets/<%= asset.id %>/delete">
@@ -1175,7 +1344,7 @@
               <button class="btn btn-primary mt-3" type="submit">Save template</button>
             </form>
             <p class="hint mt-3 mb-0">
-              Tip: after saving, open any class card in schedule and use "Apply template" in homework modal.
+              Tip: after saving, your template is ready in the homework flow from schedule for matching classes and groups.
             </p>
             <% if (!(teacherSubjects || []).length) { %>
               <div class="alert alert-warning mt-3 mb-0">
@@ -1223,8 +1392,8 @@
                     </div>
                     <div class="template-meta">
                       <% if (template.course_name) { %><span><%= template.course_name %></span><% } %>
-                      <% if (template.subject_name) { %><span> · <%= template.subject_name %></span><% } %>
-                      <% if (template.updated_at) { %><span> · <%= String(template.updated_at).slice(0, 10) %></span><% } %>
+                      <% if (template.subject_name) { %><span> &middot; <%= template.subject_name %></span><% } %>
+                      <% if (template.updated_at) { %><span> &middot; <%= String(template.updated_at).slice(0, 10) %></span><% } %>
                     </div>
                     <p class="template-description"><%= template.description %></p>
                     <div class="template-chips">
@@ -1293,8 +1462,8 @@
           <article class="glass workspace-panel">
             <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
               <div>
-                <h5 class="mb-1">Recent homework created from workspace</h5>
-                <p class="hint mb-0">Latest published teacher tasks so you can reuse or verify delivery context.</p>
+                <h5 class="mb-1">Recent homework in this scope</h5>
+                <p class="hint mb-0">Latest teacher tasks in the selected scope, so you can quickly verify due dates, groups and subject context.</p>
               </div>
               <a class="btn btn-outline-secondary btn-sm" href="/schedule">Open schedule</a>
             </div>
@@ -1305,8 +1474,8 @@
                     <div class="fw-semibold"><%= item.description %></div>
                     <div class="recent-homework-meta small mt-1">
                       <% if (item.subject_name) { %><%= item.subject_name %><% } %>
-                      <% if (item.group_number) { %> · Group <%= item.group_number %><% } %>
-                      <% if (item.custom_due_date || item.class_date) { %> · <%= String(item.custom_due_date || item.class_date).slice(0, 10) %><% } %>
+                      <% if (item.group_number) { %> &middot; Group <%= item.group_number %><% } %>
+                      <% if (item.custom_due_date || item.class_date) { %> &middot; <%= String(item.custom_due_date || item.class_date).slice(0, 10) %><% } %>
                     </div>
                   </div>
                 <% }) %>
@@ -2217,7 +2386,7 @@
           }
         });
         if (workspaceSelectedOfferingsCount) {
-          workspaceSelectedOfferingsCount.textContent = `${selectedCount} selected`;
+          workspaceSelectedOfferingsCount.textContent = `${selectedCount} active`;
         }
       }
       workspaceOfferingToggles.forEach((toggle) => {
