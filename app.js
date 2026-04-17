@@ -3,12 +3,14 @@ const http = require('http');
 const helmet = require('helmet');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
+const RedisStore = require('connect-redis').default;
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID, createHash } = require('crypto');
 const multer = require('multer');
 const { Pool } = require('pg');
+const { createClient } = require('redis');
 const { WebSocketServer } = require('ws');
 const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
@@ -1030,6 +1032,22 @@ const sessionHealthProbeIntervalSeconds = Number.isFinite(sessionHealthProbeInte
   ? Math.floor(sessionHealthProbeIntervalRaw)
   : 60;
 const sessionHealthProbeIntervalMs = sessionHealthProbeIntervalSeconds * 1000;
+const sessionStoreDriverRaw = String(process.env.SESSION_STORE_DRIVER || 'postgres').trim().toLowerCase();
+const sessionStoreDriver = sessionStoreDriverRaw === 'redis' ? 'redis' : 'postgres';
+if (sessionStoreDriver !== sessionStoreDriverRaw) {
+  console.warn(`Invalid SESSION_STORE_DRIVER "${sessionStoreDriverRaw}", fallback to "${sessionStoreDriver}".`);
+}
+const sessionRedisPrefixRaw = String(process.env.SESSION_REDIS_PREFIX || 'kma:sess:').trim();
+const sessionRedisPrefix = sessionRedisPrefixRaw || 'kma:sess:';
+const redisUrl = String(process.env.REDIS_URL || 'redis://redis:6379').trim() || 'redis://redis:6379';
+const redisConnectTimeoutRaw = Number(process.env.REDIS_CONNECT_TIMEOUT_MS || 5000);
+const redisConnectTimeoutMs = Number.isFinite(redisConnectTimeoutRaw) && redisConnectTimeoutRaw >= 1000
+  ? Math.floor(redisConnectTimeoutRaw)
+  : 5000;
+const redisSocketKeepAliveRaw = Number(process.env.REDIS_KEEPALIVE_MS || 30000);
+const redisSocketKeepAliveMs = Number.isFinite(redisSocketKeepAliveRaw) && redisSocketKeepAliveRaw >= 1000
+  ? Math.floor(redisSocketKeepAliveRaw)
+  : 30000;
 
 const normalizeSessionHealthError = (rawError) => {
   const normalized = String(rawError || '')
@@ -1041,7 +1059,7 @@ const normalizeSessionHealthError = (rawError) => {
 
 const sessionHealthState = {
   ok: true,
-  table: sessionTableName,
+  table: sessionStoreDriver === 'redis' ? 'redis' : sessionTableName,
   lastCheckedAt: null,
   lastOkAt: null,
   lastErrorAt: null,
@@ -1099,27 +1117,52 @@ const probeSessionStoreHealth = async (reason = 'interval') => {
   }
 };
 
-const sessionStore = new PgSession({
-  pool,
-  tableName: sessionTableName,
-  createTableIfMissing: true,
-  pruneSessionInterval: pruneIntervalSeconds,
-  ttl: Math.floor(resolveSessionAbsoluteTimeoutMs(DEFAULT_SETTINGS.session_absolute_timeout_hours) / 1000),
-  errorLog: (...args) => {
-    const nowIso = new Date().toISOString();
-    const message = normalizeSessionHealthError(args
-      .map((item) => (item && item.message ? item.message : String(item)))
-      .join(' | '));
-    sessionHealthState.ok = false;
-    sessionHealthState.lastCheckedAt = nowIso;
-    sessionHealthState.lastErrorAt = nowIso;
-    sessionHealthState.lastError = message;
-    sessionHealthState.failures += 1;
-    pushRuntimeErrorEvent('session', 'store_error', message);
-    console.error('SESSION_STORE_ERROR', ...args);
-    logSessionHealth('store_error', { error: message });
-  },
-});
+const buildSessionStoreErrorLogger = (...args) => {
+  const nowIso = new Date().toISOString();
+  const message = normalizeSessionHealthError(args
+    .map((item) => (item && item.message ? item.message : String(item)))
+    .join(' | '));
+  sessionHealthState.ok = false;
+  sessionHealthState.lastCheckedAt = nowIso;
+  sessionHealthState.lastErrorAt = nowIso;
+  sessionHealthState.lastError = message;
+  sessionHealthState.failures += 1;
+  pushRuntimeErrorEvent('session', 'store_error', message);
+  console.error('SESSION_STORE_ERROR', ...args);
+  logSessionHealth('store_error', { error: message });
+};
+
+let redisSessionClient = null;
+let sessionStore = null;
+if (sessionStoreDriver === 'redis') {
+  redisSessionClient = createClient({
+    url: redisUrl,
+    socket: {
+      connectTimeout: redisConnectTimeoutMs,
+      keepAlive: redisSocketKeepAliveMs,
+      reconnectStrategy: (attempt) => Math.min(attempt * 50, 1000),
+    },
+  });
+  redisSessionClient.on('error', (err) => {
+    buildSessionStoreErrorLogger(err);
+  });
+  sessionStore = new RedisStore({
+    client: redisSessionClient,
+    prefix: sessionRedisPrefix,
+    ttl: Math.floor(resolveSessionAbsoluteTimeoutMs(DEFAULT_SETTINGS.session_absolute_timeout_hours) / 1000),
+  });
+} else {
+  sessionStore = new PgSession({
+    pool,
+    tableName: sessionTableName,
+    createTableIfMissing: true,
+    pruneSessionInterval: pruneIntervalSeconds,
+    ttl: Math.floor(resolveSessionAbsoluteTimeoutMs(DEFAULT_SETTINGS.session_absolute_timeout_hours) / 1000),
+    errorLog: (...args) => {
+      buildSessionStoreErrorLogger(...args);
+    },
+  });
+}
 
 const sessionMiddleware = session({
   name: sessionCookieName,
@@ -61393,7 +61436,7 @@ const startSessionHealthProbes = () => {
 
   logSessionHealth('probe_scheduler_started', {
     interval_seconds: sessionHealthProbeIntervalSeconds,
-    table: sessionTableName,
+    table: sessionHealthState.table,
   });
   runProbe('startup');
   setInterval(() => {
@@ -61406,7 +61449,18 @@ const startServer = async () => {
     port: PORT,
     node: process.version,
     env: process.env.NODE_ENV || 'unknown',
+    session_store: sessionStoreDriver,
   });
+  if (sessionStoreDriver === 'redis' && redisSessionClient && !redisSessionClient.isOpen) {
+    try {
+      await redisSessionClient.connect();
+      console.log('Redis session store connected', { redis_url: redisUrl });
+    } catch (err) {
+      console.error('Failed to connect Redis session store before listen', err);
+      process.exitCode = 1;
+      return;
+    }
+  }
   try {
     await ensureDbReady();
   } catch (err) {

@@ -1,12 +1,15 @@
 # Local Docker Stack
 
-This stack runs the current KMA app with PostgreSQL through Docker Compose.
+This stack runs the current KMA app with PostgreSQL, Redis, and centralized logs through Docker Compose.
 
 ## What is included
 
 - `app`: the existing Node.js + Express application from this repository
 - `charredmap`: isolated Next.js memorial-map service mounted under `/charredmap`
 - `db`: PostgreSQL 18 with first-start initialization from `docker/local/db/init/*.sql`
+- `redis`: Redis 7 for Studerria session storage
+- `loki`: log storage backend
+- `promtail`: Docker log collector that forwards container logs to Loki
 
 The stack includes a compatibility init script that creates the `cloudsqlsuperuser` role before importing Cloud SQL dumps, so Google Cloud exports restore cleanly on plain PostgreSQL.
 
@@ -31,12 +34,21 @@ App URL:
 - [http://localhost:3000/charredmap](http://localhost:3000/charredmap)
 - [http://localhost:3000/charredmap/admin](http://localhost:3000/charredmap/admin)
 
+Observability:
+
+- Loki API: [http://localhost:3100](http://localhost:3100)
+
 Postgres host access:
 
 - host: `localhost`
 - port: `5433`
 - database: `student_portal`
 - user: `studerria`
+
+Redis host access:
+
+- host: `localhost`
+- port: `6379`
 
 ## Optional env overrides
 
@@ -62,7 +74,7 @@ docker compose logs --tail=100 app
 docker compose logs --tail=100 charredmap
 ```
 
-Do not run `docker compose down -v` for a routine update, because that recreates the database volume.
+Do not run `docker compose down -v` for a routine update, because that recreates database and cache volumes.
 
 ## Re-import the backup from scratch
 
@@ -77,6 +89,8 @@ docker compose up --build -d
 ## Notes
 
 - The app uses `NODE_ENV=development` in this stack so local cookies continue to work over plain `http://localhost`.
+- Studerria sessions are configured to use Redis by default in this stack (`SESSION_STORE_DRIVER=redis`).
+- Container logs are centralized into Loki through Promtail; query them from your preferred Grafana/Loki client.
 - The repository `uploads/` directory is mounted into the app container, so uploaded files stay visible in the workspace.
 - `charredmap` keeps its own SQLite database and uploads in a dedicated Docker volume, so it stays operationally isolated from the Studerria Postgres app.
 - If `charredmap` is unhealthy or stopped, the main Studerria app still starts; only `/charredmap` returns a temporary `503`.

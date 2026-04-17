@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.58",
+      "date": "2026-04-17",
+      "items": [
+        "feat(infra): add Redis-backed Studerria sessions, extend docker/local with redis+loki+promtail, and document/update env for centralized logs"
+      ]
+    },
+    {
       "version": "1.6.57",
       "date": "2026-04-16",
       "items": [

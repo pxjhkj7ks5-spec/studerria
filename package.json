@@ -9,6 +9,7 @@
     "test": "node --test",
     "start": "node app.js",
     "lint": "eslint .",
+    "changelog:update": "node scripts/update-changelog.mjs",
     "version:patch": "node scripts/version.js patch",
     "version:minor": "node scripts/version.js minor",
     "version:release": "node scripts/version.js release"
@@ -20,6 +21,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "connect-pg-simple": "^10.0.0",
+    "connect-redis": "^7.1.1",
     "ejs": "^4.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
@@ -27,6 +29,7 @@
     "http-proxy-middleware": "^3.0.5",
     "multer": "^2.0.2",
     "pg": "^8.17.2",
+    "redis": "^4.7.1",
     "ws": "^8.19.0"
   },
   "devDependencies": {
