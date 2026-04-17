@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.6.60",
+      "date": "2026-04-18",
+      "items": [
+        "tune(infra): reduce promtail docker discovery polling to 20s, document deploy-fast server flow, and add explicit production env profile hints for docker/local"
+      ]
+    },
+    {
       "version": "1.6.59",
       "date": "2026-04-18",
       "items": [

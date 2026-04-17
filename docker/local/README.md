@@ -76,6 +76,31 @@ docker compose logs --tail=100 charredmap
 
 Do not run `docker compose down -v` for a routine update, because that recreates database and cache volumes.
 
+### Deploy Fast (server routine)
+
+Use this path when there are no Dockerfile/dependency changes and you only need the latest code:
+
+```bash
+cd ~/studerria
+git pull --rebase
+cd docker/local
+docker compose up -d
+docker compose ps
+```
+
+Server `.env` baseline:
+
+```env
+NODE_ENV=production
+CHARREDMAP_NODE_ENV=production
+```
+
+If image build inputs changed (`Dockerfile`, `package.json`, `package-lock.json`, or build tooling), use:
+
+```bash
+docker compose up --build -d
+```
+
 ## Re-import the backup from scratch
 
 The PostgreSQL dump is imported only when the database volume is empty. To recreate the database and re-run the import:
