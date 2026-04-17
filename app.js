@@ -47688,7 +47688,7 @@ const resolveSessionGeneratorWindowDates = (options = {}) =>
   sessionGeneratorHelpers.resolveSessionGeneratorWindowDates({
     ...options,
     parseWeekSet,
-    buildDatesFromWeekNumbers,
+    buildDatesFromWeekNumbers: buildSessionDatesFromWeekNumbers,
     buildDayBuckets: buildSessionDayBuckets,
   });
 
