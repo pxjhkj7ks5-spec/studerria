@@ -15552,8 +15552,16 @@ async function listTeacherOfferingCatalog(options = {}) {
           COALESCE(legacy_subject.name, so.title, cat.name) AS subject_name,
           COALESCE(legacy_subject.group_count, 1) AS group_count,
           COALESCE(legacy_subject.default_group, 1) AS default_group,
-          COALESCE(legacy_subject.is_general, true) AS is_general,
-          COALESCE(legacy_subject.show_in_teamwork, true) AS show_in_teamwork,
+          CASE
+            WHEN legacy_subject.is_general IS NULL THEN true
+            WHEN LOWER(legacy_subject.is_general::text) IN ('1', 'true', 't', 'yes', 'y', 'on') THEN true
+            ELSE false
+          END AS is_general,
+          CASE
+            WHEN legacy_subject.show_in_teamwork IS NULL THEN true
+            WHEN LOWER(legacy_subject.show_in_teamwork::text) IN ('1', 'true', 't', 'yes', 'y', 'on') THEN true
+            ELSE false
+          END AS show_in_teamwork,
           sc.id AS study_context_id,
           sc.label AS study_context_label,
           sc.stage_number,
@@ -15862,8 +15870,16 @@ async function getTeacherAssignedOfferings(userId) {
           COALESCE(legacy_subject.name, so.title, cat.name) AS subject_name,
           COALESCE(legacy_subject.group_count, 1) AS group_count,
           COALESCE(legacy_subject.default_group, 1) AS default_group,
-          COALESCE(legacy_subject.is_general, true) AS is_general,
-          COALESCE(legacy_subject.show_in_teamwork, true) AS show_in_teamwork,
+          CASE
+            WHEN legacy_subject.is_general IS NULL THEN true
+            WHEN LOWER(legacy_subject.is_general::text) IN ('1', 'true', 't', 'yes', 'y', 'on') THEN true
+            ELSE false
+          END AS is_general,
+          CASE
+            WHEN legacy_subject.show_in_teamwork IS NULL THEN true
+            WHEN LOWER(legacy_subject.show_in_teamwork::text) IN ('1', 'true', 't', 'yes', 'y', 'on') THEN true
+            ELSE false
+          END AS show_in_teamwork,
           sc.id AS study_context_id,
           sc.label AS study_context_label,
           sc.stage_number,
