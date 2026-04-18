@@ -12123,6 +12123,21 @@ function buildAcademicV2TeacherProjectionAlert(req, rows = [], context = 'subjec
   if (!unmappedSubjects.length && !missingCourse && !missingSemester) {
     return null;
   }
+  const isUk = getPreferredLang(req) === 'uk';
+
+  // On the main schedule page we hide legacy-projection internals from teachers.
+  // Show an alert only for hard mapping gaps (subject is not mapped at all).
+  if (context === 'schedule' && !unmappedSubjects.length) {
+    return null;
+  }
+  if (context === 'schedule') {
+    return {
+      title: isUk ? 'Розклад частково синхронізується' : 'Schedule is still syncing',
+      body: isUk
+        ? 'Частина пар може тимчасово не відображатися. Спробуйте оновити сторінку трохи пізніше.'
+        : 'Some classes may be temporarily missing. Try refreshing the page in a few minutes.',
+    };
+  }
 
   const title = context === 'schedule'
     ? 'Schedule projection needs attention'

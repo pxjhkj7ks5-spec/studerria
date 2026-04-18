@@ -2254,26 +2254,6 @@
           </div>
         </div>
 
-        <% const hasCourseFilters = role === 'teacher' && teacherCourses && teacherCourses.length > 1; %>
-        <% if (hasCourseFilters) { %>
-        <div class="glass schedule-panel liquid-card mb-4">
-          <div class="panel-section">
-            <div class="panel-title"><%= scheduleViewText.filtersTitle %></div>
-            <div class="panel-body">
-              <form method="GET" action="/schedule" class="d-inline">
-                <input type="hidden" name="week" value="<%= currentWeek %>" />
-                <select class="form-select form-select-sm" name="course" onchange="this.form.submit()">
-                  <option value=""><%= scheduleViewText.allCourses %></option>
-                  <% teacherCourses.forEach(function(c) { %>
-                    <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.name %></option>
-                  <% }); %>
-                </select>
-              </form>
-            </div>
-          </div>
-        </div>
-        <% } %>
-
         <% if (subgroupError === 'exists') { %>
           <div class="alert alert-warning glass text-white border-0">
             <%= t('schedule.homeworkModal.subgroupAlreadyJoined') %>
