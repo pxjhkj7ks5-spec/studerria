@@ -19503,12 +19503,13 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     }
   };
   try {
+    const showWorkspaceAdvancedPanels = String(req.query.advanced || '').trim() === '1';
     const [teacherAssignedOfferings, teacherOfferingCatalog, teacherOfferingSelections] = await Promise.all([
       getTeacherAssignedOfferings(userId),
       listTeacherOfferingCatalog({
-        allowLegacyBootstrap: false,
+        allowLegacyBootstrap: true,
         allowPresetBootstrap: true,
-        requirePresetStageSubject: true,
+        requirePresetStageSubject: false,
         allowedTrackKeys: ['bachelor', 'master'],
       }),
       getTeacherOfferingSelections(userId),
@@ -19517,6 +19518,17 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     if (!teacherScopeRows.length) {
       teacherScopeRows = await getTeacherAssignedSubjects(userId);
     }
+    const teacherScopedSubjectIdSet = new Set(
+      (teacherScopeRows || [])
+        .map((row) => parsePositiveIntStrict(row && (row.subject_id || row.legacy_subject_id)))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+    const teacherWorkspaceOfferingCatalog = teacherScopedSubjectIdSet.size
+      ? (teacherOfferingCatalog || []).filter((offering) => {
+          const legacySubjectId = parsePositiveIntStrict(offering && offering.legacy_subject_id);
+          return legacySubjectId && teacherScopedSubjectIdSet.has(legacySubjectId);
+        })
+      : (teacherOfferingCatalog || []);
     const teacherCourses = buildTeacherCourseList(
       (teacherAssignedOfferings || []).length ? teacherAssignedOfferings : teacherScopeRows
     );
@@ -19524,7 +19536,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     const requestedStudyContextId = parsePositiveIntStrict(req.query.study_context_id);
     const requestedSemesterId = parsePositiveIntStrict(req.query.semester_id);
     const workspaceCourseOptions = Array.from(new Map(
-      (teacherOfferingCatalog || [])
+      (teacherWorkspaceOfferingCatalog || [])
         .flatMap((offering) => Array.isArray(offering.contexts) ? offering.contexts : [])
         .map((context) => [Number(context.course_id || 0), {
           id: Number(context.course_id || 0) || null,
@@ -19537,7 +19549,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       return String(a.name || '').localeCompare(String(b.name || ''), 'uk', { sensitivity: 'base' });
     });
     const allWorkspaceContextOptions = Array.from(new Map(
-      (teacherOfferingCatalog || [])
+      (teacherWorkspaceOfferingCatalog || [])
         .flatMap((offering) => Array.isArray(offering.contexts) ? offering.contexts : [])
         .map((context) => [Number(context.id || 0), {
           id: Number(context.id || 0) || null,
@@ -19637,14 +19649,20 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         return false;
       }
       const semesterMatch = !selectedWorkspaceSemesterId
-        || contexts.some((context) => (context.semester_ids || []).some((semesterId) => Number(semesterId || 0) === Number(selectedWorkspaceSemesterId || 0)));
+        || contexts.some((context) => {
+          const semesterIds = Array.isArray(context && context.semester_ids) ? context.semester_ids : [];
+          if (!semesterIds.length) {
+            return true;
+          }
+          return semesterIds.some((semesterId) => Number(semesterId || 0) === Number(selectedWorkspaceSemesterId || 0));
+        });
       if (!semesterMatch) {
         return false;
       }
       return true;
     };
     const scopedTeacherOfferings = (teacherAssignedOfferings || []).filter(matchesWorkspaceScope);
-    const workspaceCatalogOfferings = (teacherOfferingCatalog || []).filter(matchesWorkspaceScope);
+    const workspaceCatalogOfferings = (teacherWorkspaceOfferingCatalog || []).filter(matchesWorkspaceScope);
     const workspaceAssignedOfferingDetails = new Map(
       (teacherAssignedOfferings || [])
         .map((offering) => [Number(offering.id || 0), offering])
@@ -19717,58 +19735,63 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       ? workspaceScopedOwnerCourseIds
       : workspaceTemplateCourseIds;
     const canLoadRecentHomework = recentHomeworkCourseIds.length > 0 && workspaceScopedSubjectIds.length > 0;
-    const recentHomeworkPromise = canLoadRecentHomework
-      ? db.all(
-          `
-            SELECT
-              h.id,
-              h.description,
-              h.class_date,
-              h.custom_due_date,
-              h.subject_id,
-              h.group_number,
-              h.course_id,
-              h.semester_id,
-              s.name AS subject_name
-            FROM homework h
-            LEFT JOIN subjects s ON s.id = h.subject_id
-            WHERE h.created_by_id = ?
-              AND COALESCE(h.is_teacher_homework, 0) = 1
-              AND h.course_id = ANY(?::int[])
-              AND h.subject_id = ANY(?::int[])
-              ${selectedWorkspaceLegacySemesterIds.length
-                ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
-                : ''}
-            ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) DESC NULLS LAST, CAST(h.created_at AS TEXT) DESC
-            LIMIT 8
-          `,
-          selectedWorkspaceLegacySemesterIds.length
-            ? [
-                userId,
-                recentHomeworkCourseIds,
-                workspaceScopedSubjectIds,
-                selectedWorkspaceLegacySemesterIds,
-              ]
-            : [
-                userId,
-                recentHomeworkCourseIds,
-                workspaceScopedSubjectIds,
-              ]
-        ).catch((err) => {
-          if (isDbSchemaCompatibilityError(err)) {
-            return [];
-          }
-          throw err;
-        })
-      : Promise.resolve([]);
-    const [templates, assets, recentHomework] = await Promise.all([
-      getTeacherHomeworkTemplates(userId, {
-        courseIds: workspaceTemplateCourseIds,
-        limit: 300,
-      }),
-      listTeacherAssets(userId, { courseIds: workspaceTemplateCourseIds }),
-      recentHomeworkPromise,
-    ]);
+    let templates = [];
+    let assets = [];
+    let recentHomework = [];
+    if (showWorkspaceAdvancedPanels) {
+      const recentHomeworkPromise = canLoadRecentHomework
+        ? db.all(
+            `
+              SELECT
+                h.id,
+                h.description,
+                h.class_date,
+                h.custom_due_date,
+                h.subject_id,
+                h.group_number,
+                h.course_id,
+                h.semester_id,
+                s.name AS subject_name
+              FROM homework h
+              LEFT JOIN subjects s ON s.id = h.subject_id
+              WHERE h.created_by_id = ?
+                AND COALESCE(h.is_teacher_homework, 0) = 1
+                AND h.course_id = ANY(?::int[])
+                AND h.subject_id = ANY(?::int[])
+                ${selectedWorkspaceLegacySemesterIds.length
+                  ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
+                  : ''}
+              ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) DESC NULLS LAST, CAST(h.created_at AS TEXT) DESC
+              LIMIT 8
+            `,
+            selectedWorkspaceLegacySemesterIds.length
+              ? [
+                  userId,
+                  recentHomeworkCourseIds,
+                  workspaceScopedSubjectIds,
+                  selectedWorkspaceLegacySemesterIds,
+                ]
+              : [
+                  userId,
+                  recentHomeworkCourseIds,
+                  workspaceScopedSubjectIds,
+                ]
+          ).catch((err) => {
+            if (isDbSchemaCompatibilityError(err)) {
+              return [];
+            }
+            throw err;
+          })
+        : Promise.resolve([]);
+      [templates, assets, recentHomework] = await Promise.all([
+        getTeacherHomeworkTemplates(userId, {
+          courseIds: workspaceTemplateCourseIds,
+          limit: 300,
+        }),
+        listTeacherAssets(userId, { courseIds: workspaceTemplateCourseIds }),
+        recentHomeworkPromise,
+      ]);
+    }
 
     const subjectMap = new Map();
     teacherScopeRows.forEach((subject) => {
@@ -19812,6 +19835,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       templates,
       assets,
       recentHomework,
+      showWorkspaceAdvancedPanels,
       error: decodeMessage(req.query.error),
       success: decodeMessage(req.query.ok),
     });
@@ -19849,9 +19873,9 @@ app.post('/teacher/workspace/offering-templates/sync', requireLogin, async (req,
     }
     const [teacherOfferingCatalog, teacherOfferingSelections, teacherAssignedOfferings] = await Promise.all([
       listTeacherOfferingCatalog({
-        allowLegacyBootstrap: false,
+        allowLegacyBootstrap: true,
         allowPresetBootstrap: true,
-        requirePresetStageSubject: true,
+        requirePresetStageSubject: false,
         allowedTrackKeys: ['bachelor', 'master'],
       }),
       getTeacherOfferingSelections(userId),
@@ -19928,9 +19952,9 @@ app.post('/teacher/workspace/offerings', requireLogin, async (req, res) => {
   });
   try {
     const result = await saveTeacherWorkspaceOfferingAssignments(userId, req.body, {
-      allowLegacyBootstrap: false,
+      allowLegacyBootstrap: true,
       allowPresetBootstrap: true,
-      requirePresetStageSubject: true,
+      requirePresetStageSubject: false,
       allowedTrackKeys: ['bachelor', 'master'],
     });
     if (!result.ok) {

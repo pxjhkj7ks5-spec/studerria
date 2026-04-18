@@ -11,6 +11,7 @@
   const workspaceContextList = Array.isArray(workspaceContextOptions) ? workspaceContextOptions : [];
   const workspaceContextCatalogList = Array.isArray(workspaceContextCatalog) ? workspaceContextCatalog : workspaceContextList;
   const workspaceSemesterList = Array.isArray(workspaceSemesterOptions) ? workspaceSemesterOptions : [];
+  const showAdvancedPanels = showWorkspaceAdvancedPanels === true;
   const workspaceTemplatePlanValue = workspaceTemplatePlan && typeof workspaceTemplatePlan === 'object'
     ? workspaceTemplatePlan
     : {
@@ -50,10 +51,14 @@
   const workspaceSummaryCards = [
     { value: teacherOfferingList.length, label: 'Live offerings', note: 'active now in this scope' },
     { value: workspaceSelectedOfferingCount, label: 'Enabled', note: 'selected in the live editor' },
-    { value: workspaceTemplateActionCount, label: 'Rule changes', note: 'pending recurring sync actions' },
-    { value: Array.isArray(templates) ? templates.length : 0, label: 'Templates', note: 'saved homework drafts' },
-    { value: Array.isArray(assets) ? assets.length : 0, label: 'Assets', note: 'reusable files in library' },
-    { value: Array.isArray(recentHomework) ? recentHomework.length : 0, label: 'Recent homework', note: 'latest teacher tasks in scope' },
+    ...(showAdvancedPanels
+      ? [
+          { value: workspaceTemplateActionCount, label: 'Rule changes', note: 'pending recurring sync actions' },
+          { value: Array.isArray(templates) ? templates.length : 0, label: 'Templates', note: 'saved homework drafts' },
+          { value: Array.isArray(assets) ? assets.length : 0, label: 'Assets', note: 'reusable files in library' },
+          { value: Array.isArray(recentHomework) ? recentHomework.length : 0, label: 'Recent homework', note: 'latest teacher tasks in scope' },
+        ]
+      : []),
   ];
   const workspaceTemplateStatusBadgeMap = {
     create: 'success',
@@ -857,9 +862,15 @@
       <section class="glass workspace-hero mb-3">
         <div class="workspace-hero-copy">
           <span class="workspace-kicker">Teacher workspace</span>
-          <h1 class="workspace-title">Manage live offerings, recurring rules and homework materials</h1>
+          <h1 class="workspace-title">
+            <%= showAdvancedPanels
+              ? 'Manage live offerings, recurring rules and homework materials'
+              : 'Manage live offerings for your selected teaching scope' %>
+          </h1>
           <p class="workspace-subtitle">
-            Use the current course, study context and semester to control what is active now, preview recurring rules for future cohorts, and keep reusable homework content ready for schedule actions.
+            <%= showAdvancedPanels
+              ? 'Use the current course, study context and semester to control what is active now, preview recurring rules for future cohorts, and keep reusable homework content ready for schedule actions.'
+              : 'Use course, study context and semester filters to activate only the offerings you need right now.' %>
           </p>
           <div class="workspace-scope-pills">
             <% workspaceScopeChips.forEach(function(chip) { %>
@@ -896,6 +907,9 @@
           </div>
         </div>
         <form method="GET" action="/teacher/workspace" class="row g-2 mb-3">
+          <% if (showAdvancedPanels) { %>
+            <input type="hidden" name="advanced" value="1" />
+          <% } %>
           <div class="col-12 col-lg-4">
             <label class="form-label" for="workspaceCourseId">Course</label>
             <select class="form-select" id="workspaceCourseId" name="course">
@@ -929,13 +943,18 @@
           </div>
           <div class="col-12">
             <div class="workspace-filter-note hint mb-0">
-              Course narrows the catalog first. Study context and semester define the working scope used in the live editor, recurring rule preview, templates and recent homework below.
+              <%= showAdvancedPanels
+                ? 'Course narrows the catalog first. Study context and semester define the working scope used in the live editor, recurring rule preview, templates and recent homework below.'
+                : 'Course narrows the catalog first. Study context and semester define the working scope used in the live editor.' %>
             </div>
           </div>
           <div class="col-12 d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit">Apply filters</button>
             <a class="btn btn-outline-secondary" href="/teacher/workspace">Clear</a>
             <a class="btn btn-outline-info" href="/teacher/subjects">Open discipline assignments</a>
+            <% if (!showAdvancedPanels) { %>
+              <a class="btn btn-outline-light" href="/teacher/workspace?advanced=1">Open advanced tools</a>
+            <% } %>
           </div>
         </form>
         <% if (teacherOfferingList.length) { %>
@@ -982,7 +1001,11 @@
         <div class="workspace-assignment-toolbar mb-3">
           <div>
             <h5 class="mb-1">Manage live offerings</h5>
-            <p class="hint mb-0">Enable offerings for the current scope, choose a group where needed, and optionally align recurring rules for future cohorts.</p>
+            <p class="hint mb-0">
+              <%= showAdvancedPanels
+                ? 'Enable offerings for the current scope, choose a group where needed, and optionally align recurring rules for future cohorts.'
+                : 'Enable offerings for the current scope and choose a group where needed.' %>
+            </p>
           </div>
           <div class="workspace-assignment-status">
             <span class="badge bg-secondary"><%= workspaceCatalogOfferingList.length %> in scope</span>
@@ -998,12 +1021,14 @@
               <input type="hidden" name="visible_offering_ids" value="<%= offering.id %>" />
             <% }) %>
 
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="workspaceSyncTemplates" name="sync_templates" value="1" />
-              <label class="form-check-label" for="workspaceSyncTemplates">
-                Also align recurring rules for these visible offerings
-              </label>
-            </div>
+            <% if (showAdvancedPanels) { %>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="workspaceSyncTemplates" name="sync_templates" value="1" />
+                <label class="form-check-label" for="workspaceSyncTemplates">
+                  Also align recurring rules for these visible offerings
+                </label>
+              </div>
+            <% } %>
 
             <div class="workspace-assignment-list">
               <% workspaceCatalogOfferingList.forEach(function(offering) { %>
@@ -1086,7 +1111,7 @@
         <% } %>
       </section>
 
-      <section class="glass workspace-panel mb-3">
+      <section class="glass workspace-panel mb-3<%= showAdvancedPanels ? '' : ' d-none' %>">
         <div class="template-preview-toolbar mb-3">
           <div>
             <h5 class="mb-1">Recurring rules preview</h5>
@@ -1156,7 +1181,7 @@
         <% } %>
       </section>
 
-      <section class="row g-3">
+      <section class="row g-3<%= showAdvancedPanels ? '' : ' d-none' %>">
         <div class="col-12 col-xl-5">
           <article class="glass workspace-panel mb-3">
             <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
@@ -1462,7 +1487,7 @@
         </div>
       </section>
 
-      <section class="row g-3 mt-1">
+      <section class="row g-3 mt-1<%= showAdvancedPanels ? '' : ' d-none' %>">
         <div class="col-12">
           <article class="glass workspace-panel">
             <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
