@@ -9,6 +9,7 @@
     : new Map();
   const workspaceCourseList = Array.isArray(workspaceCourseOptions) ? workspaceCourseOptions : [];
   const workspaceContextList = Array.isArray(workspaceContextOptions) ? workspaceContextOptions : [];
+  const workspaceContextCatalogList = Array.isArray(workspaceContextCatalog) ? workspaceContextCatalog : workspaceContextList;
   const workspaceSemesterList = Array.isArray(workspaceSemesterOptions) ? workspaceSemesterOptions : [];
   const workspaceTemplatePlanValue = workspaceTemplatePlan && typeof workspaceTemplatePlan === 'object'
     ? workspaceTemplatePlan
@@ -909,7 +910,11 @@
             <select class="form-select" id="workspaceContextId" name="study_context_id">
               <option value="">All contexts</option>
               <% workspaceContextList.forEach(function(context) { %>
-                <option value="<%= context.id %>" <%= Number(selectedWorkspaceContextId) === Number(context.id) ? 'selected' : '' %>><%= context.label %></option>
+                <option
+                  value="<%= context.id %>"
+                  data-course-id="<%= context.course_id || '' %>"
+                  <%= Number(selectedWorkspaceContextId) === Number(context.id) ? 'selected' : '' %>
+                ><%= context.label %></option>
               <% }) %>
             </select>
           </div>
@@ -1825,6 +1830,136 @@
 
       const workspaceTemplates = <%- JSON.stringify(templates || []) %>;
       const selectedCourseContext = <%- JSON.stringify(selectedCourseId || null) %>;
+      const workspaceContextCatalog = <%- JSON.stringify(workspaceContextCatalogList || []) %>;
+
+      function parsePositiveInt(value) {
+        const normalized = Number(value || 0);
+        return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+      }
+
+      function initWorkspaceScopeFilters() {
+        const courseSelect = document.getElementById('workspaceCourseId');
+        const contextSelect = document.getElementById('workspaceContextId');
+        const semesterSelect = document.getElementById('workspaceSemesterId');
+        if (!courseSelect || !contextSelect || !semesterSelect) {
+          return;
+        }
+
+        const allContexts = (Array.isArray(workspaceContextCatalog) ? workspaceContextCatalog : [])
+          .map((context) => ({
+            id: parsePositiveInt(context && context.id),
+            label: String(context && context.label ? context.label : ''),
+            course_id: parsePositiveInt(context && context.course_id),
+            semester_ids: Array.isArray(context && context.semester_ids) ? context.semester_ids.slice() : [],
+            semester_numbers: Array.isArray(context && context.semester_numbers) ? context.semester_numbers.slice() : [],
+            semester_titles: Array.isArray(context && context.semester_titles) ? context.semester_titles.slice() : [],
+          }))
+          .filter((context) => context.id && context.course_id);
+
+        const listContextsByCourse = (courseId) => {
+          const filtered = courseId
+            ? allContexts.filter((context) => Number(context.course_id) === Number(courseId))
+            : allContexts.slice();
+          filtered.sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'uk', { sensitivity: 'base' }));
+          return filtered;
+        };
+
+        const buildSemestersFromContexts = (contexts) => {
+          const byId = new Map();
+          contexts.forEach((context) => {
+            const semesterIds = Array.isArray(context.semester_ids) ? context.semester_ids : [];
+            semesterIds.forEach((semesterIdRaw, index) => {
+              const semesterId = parsePositiveInt(semesterIdRaw);
+              if (!semesterId || byId.has(semesterId)) {
+                return;
+              }
+              const semesterNumber = Number((context.semester_numbers || [])[index] || 0) || null;
+              const fallbackTitle = semesterNumber ? `Semester ${semesterNumber}` : `Semester ${index + 1}`;
+              const semesterTitle = String((context.semester_titles || [])[index] || fallbackTitle);
+              byId.set(semesterId, {
+                id: semesterId,
+                title: semesterTitle,
+                semester_number: semesterNumber,
+              });
+            });
+          });
+          return Array.from(byId.values()).sort((a, b) => {
+            const byNumber = Number(a.semester_number || 0) - Number(b.semester_number || 0);
+            if (byNumber !== 0) return byNumber;
+            return String(a.title || '').localeCompare(String(b.title || ''), 'uk', { sensitivity: 'base' });
+          });
+        };
+
+        const renderContextOptions = (contexts, preferredContextId = null) => {
+          contextSelect.innerHTML = '';
+          const defaultOption = document.createElement('option');
+          defaultOption.value = '';
+          defaultOption.textContent = 'All contexts';
+          contextSelect.appendChild(defaultOption);
+
+          contexts.forEach((context) => {
+            const option = document.createElement('option');
+            option.value = String(context.id);
+            option.dataset.courseId = String(context.course_id || '');
+            option.textContent = String(context.label || `Context ${context.id}`);
+            contextSelect.appendChild(option);
+          });
+
+          const selectedContextId = preferredContextId && contexts.some((context) => Number(context.id) === Number(preferredContextId))
+            ? preferredContextId
+            : null;
+          contextSelect.value = selectedContextId ? String(selectedContextId) : '';
+          return selectedContextId;
+        };
+
+        const renderSemesterOptions = (contexts, selectedContextId = null, preferredSemesterId = null) => {
+          const semesterSource = selectedContextId
+            ? contexts.filter((context) => Number(context.id) === Number(selectedContextId))
+            : contexts;
+          const semesters = buildSemestersFromContexts(semesterSource);
+
+          semesterSelect.innerHTML = '';
+          const defaultOption = document.createElement('option');
+          defaultOption.value = '';
+          defaultOption.textContent = 'All semesters';
+          semesterSelect.appendChild(defaultOption);
+
+          semesters.forEach((semester) => {
+            const option = document.createElement('option');
+            option.value = String(semester.id);
+            option.textContent = String(semester.title || `Semester ${semester.id}`);
+            semesterSelect.appendChild(option);
+          });
+
+          const selectedSemesterId = preferredSemesterId && semesters.some((semester) => Number(semester.id) === Number(preferredSemesterId))
+            ? preferredSemesterId
+            : null;
+          semesterSelect.value = selectedSemesterId ? String(selectedSemesterId) : '';
+        };
+
+        const syncFromCourse = () => {
+          const selectedCourseId = parsePositiveInt(courseSelect.value);
+          const preferredContextId = parsePositiveInt(contextSelect.value);
+          const preferredSemesterId = parsePositiveInt(semesterSelect.value);
+          const contexts = listContextsByCourse(selectedCourseId);
+          const selectedContextId = renderContextOptions(contexts, preferredContextId);
+          renderSemesterOptions(contexts, selectedContextId, preferredSemesterId);
+        };
+
+        const syncFromContext = () => {
+          const selectedCourseId = parsePositiveInt(courseSelect.value);
+          const selectedContextId = parsePositiveInt(contextSelect.value);
+          const preferredSemesterId = parsePositiveInt(semesterSelect.value);
+          const contexts = listContextsByCourse(selectedCourseId);
+          renderSemesterOptions(contexts, selectedContextId, preferredSemesterId);
+        };
+
+        courseSelect.addEventListener('change', syncFromCourse);
+        contextSelect.addEventListener('change', syncFromContext);
+        syncFromCourse();
+      }
+
+      initWorkspaceScopeFilters();
 
       function bindCourseSubjectFilter(courseSelect, subjectSelect) {
         if (!courseSelect || !subjectSelect) {
@@ -2369,12 +2504,17 @@
 
       const workspaceSelectedOfferingsCount = document.getElementById('workspaceSelectedOfferingsCount');
       const workspaceOfferingToggles = Array.from(document.querySelectorAll('[data-offering-toggle]'));
+      const workspaceOfferingControls = workspaceOfferingToggles.map((toggle) => {
+        const offeringId = String(toggle.getAttribute('data-offering-toggle') || '');
+        return {
+          toggle,
+          card: offeringId ? document.querySelector(`[data-offering-card="${offeringId}"]`) : null,
+          groupSelect: offeringId ? document.querySelector(`[data-offering-group="${offeringId}"]`) : null,
+        };
+      });
       function syncWorkspaceOfferingEditor() {
         let selectedCount = 0;
-        workspaceOfferingToggles.forEach((toggle) => {
-          const offeringId = toggle.getAttribute('data-offering-toggle');
-          const card = document.querySelector(`[data-offering-card="${offeringId}"]`);
-          const groupSelect = document.querySelector(`[data-offering-group="${offeringId}"]`);
+        workspaceOfferingControls.forEach(({ toggle, card, groupSelect }) => {
           if (toggle.checked) {
             selectedCount += 1;
           }

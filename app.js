@@ -19541,25 +19541,40 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         }])
         .filter((entry) => Number.isInteger(entry[0]) && entry[0] > 0)
     ).values());
-    let selectedWorkspaceContext = allWorkspaceContextOptions.find((item) => Number(item.id || 0) === Number(requestedStudyContextId || 0)) || null;
-    let selectedWorkspaceContextId = selectedWorkspaceContext ? Number(selectedWorkspaceContext.id) : null;
-    const selectedWorkspaceCourse = !selectedWorkspaceContext && requestedCourseId
+    const requestedWorkspaceCourse = requestedCourseId
       ? (workspaceCourseOptions.find((course) => Number(course.id || 0) === Number(requestedCourseId || 0)) || null)
       : null;
-    const selectedTeacherCourse = !selectedWorkspaceContext && requestedCourseId
-      ? (teacherCourses.find((course) => Number(course.id) === Number(requestedCourseId || 0)) || null)
+    const requestedTeacherCourse = requestedCourseId
+      ? (teacherCourses.find((course) => Number(course.id || 0) === Number(requestedCourseId || 0)) || null)
       : null;
-    let selectedCourseId = selectedWorkspaceContext && selectedWorkspaceContext.course_id
-      ? Number(selectedWorkspaceContext.course_id || 0) || null
-      : (selectedWorkspaceCourse
-        ? Number(selectedWorkspaceCourse.id || 0)
-        : (selectedTeacherCourse
-          ? Number(selectedTeacherCourse.id || 0)
-          : null));
-
+    let selectedCourseId = requestedWorkspaceCourse
+      ? Number(requestedWorkspaceCourse.id || 0) || null
+      : (requestedTeacherCourse
+        ? Number(requestedTeacherCourse.id || 0) || null
+        : null);
+    let selectedWorkspaceContext = allWorkspaceContextOptions.find((item) => Number(item.id || 0) === Number(requestedStudyContextId || 0)) || null;
+    if (
+      selectedWorkspaceContext
+      && selectedCourseId
+      && Number(selectedWorkspaceContext.course_id || 0) !== Number(selectedCourseId || 0)
+    ) {
+      // Keep course as the primary selector; stale context values from another course are dropped.
+      selectedWorkspaceContext = null;
+    }
+    if (!selectedCourseId && selectedWorkspaceContext && Number(selectedWorkspaceContext.course_id || 0) > 0) {
+      selectedCourseId = Number(selectedWorkspaceContext.course_id || 0);
+    }
     const workspaceContextOptions = (selectedCourseId
       ? allWorkspaceContextOptions.filter((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0))
       : allWorkspaceContextOptions);
+    let selectedWorkspaceContextId = selectedWorkspaceContext ? Number(selectedWorkspaceContext.id || 0) || null : null;
+    if (
+      selectedWorkspaceContextId
+      && !workspaceContextOptions.some((context) => Number(context.id || 0) === Number(selectedWorkspaceContextId || 0))
+    ) {
+      selectedWorkspaceContext = null;
+      selectedWorkspaceContextId = null;
+    }
     if (!selectedWorkspaceContextId && workspaceContextOptions.length === 1) {
       selectedWorkspaceContext = workspaceContextOptions[0];
       selectedWorkspaceContextId = Number(selectedWorkspaceContext.id || 0) || null;
@@ -19568,9 +19583,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
 
     const semesterSourceContexts = selectedWorkspaceContext
       ? [selectedWorkspaceContext]
-      : (selectedCourseId
-        ? allWorkspaceContextOptions.filter((context) => Number(context.course_id || 0) === Number(selectedCourseId || 0))
-        : allWorkspaceContextOptions);
+      : workspaceContextOptions;
     const workspaceSemesterOptions = Array.from(new Map(
       (selectedWorkspaceContext
         ? (selectedWorkspaceContext.semester_ids || []).map((semesterId, index) => ({
@@ -19685,49 +19698,61 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
         ))
       : workspaceTemplateCourseIds;
 
+    const recentHomeworkCourseIds = workspaceScopedOwnerCourseIds.length
+      ? workspaceScopedOwnerCourseIds
+      : workspaceTemplateCourseIds;
+    const canLoadRecentHomework = recentHomeworkCourseIds.length > 0 && workspaceScopedSubjectIds.length > 0;
+    const recentHomeworkPromise = canLoadRecentHomework
+      ? db.all(
+          `
+            SELECT
+              h.id,
+              h.description,
+              h.class_date,
+              h.custom_due_date,
+              h.subject_id,
+              h.group_number,
+              h.course_id,
+              h.semester_id,
+              s.name AS subject_name
+            FROM homework h
+            LEFT JOIN subjects s ON s.id = h.subject_id
+            WHERE h.created_by_id = ?
+              AND COALESCE(h.is_teacher_homework, 0) = 1
+              AND h.course_id = ANY(?::int[])
+              AND h.subject_id = ANY(?::int[])
+              ${selectedWorkspaceLegacySemesterIds.length
+                ? 'AND (h.semester_id = ANY(?::int[]) OR h.semester_id IS NULL)'
+                : ''}
+            ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) DESC NULLS LAST, CAST(h.created_at AS TEXT) DESC
+            LIMIT 8
+          `,
+          selectedWorkspaceLegacySemesterIds.length
+            ? [
+                userId,
+                recentHomeworkCourseIds,
+                workspaceScopedSubjectIds,
+                selectedWorkspaceLegacySemesterIds,
+              ]
+            : [
+                userId,
+                recentHomeworkCourseIds,
+                workspaceScopedSubjectIds,
+              ]
+        ).catch((err) => {
+          if (isDbSchemaCompatibilityError(err)) {
+            return [];
+          }
+          throw err;
+        })
+      : Promise.resolve([]);
     const [templates, assets, recentHomework] = await Promise.all([
       getTeacherHomeworkTemplates(userId, {
         courseIds: workspaceTemplateCourseIds,
         limit: 300,
       }),
       listTeacherAssets(userId, { courseIds: workspaceTemplateCourseIds }),
-      db.all(
-        `
-          SELECT
-            h.id,
-            h.description,
-            h.class_date,
-            h.custom_due_date,
-            h.subject_id,
-            h.group_number,
-            h.course_id,
-            h.semester_id,
-            s.name AS subject_name
-          FROM homework h
-          LEFT JOIN subjects s ON s.id = h.subject_id
-          WHERE h.created_by_id = ?
-            AND COALESCE(h.is_teacher_homework, 0) = 1
-            AND h.course_id = ANY(?::int[])
-            AND h.subject_id = ANY(?::int[])
-            AND (
-              h.semester_id = ANY(?::int[])
-              OR h.semester_id IS NULL
-            )
-          ORDER BY COALESCE(NULLIF(TRIM(CAST(h.custom_due_date AS TEXT)), ''), NULLIF(TRIM(CAST(h.class_date AS TEXT)), '')) DESC NULLS LAST, CAST(h.created_at AS TEXT) DESC
-          LIMIT 8
-        `,
-        [
-          userId,
-          workspaceScopedOwnerCourseIds.length ? workspaceScopedOwnerCourseIds : workspaceTemplateCourseIds,
-          workspaceScopedSubjectIds,
-          selectedWorkspaceLegacySemesterIds.length ? selectedWorkspaceLegacySemesterIds : [null],
-        ]
-      ).catch((err) => {
-        if (isDbSchemaCompatibilityError(err)) {
-          return [];
-        }
-        throw err;
-      }),
+      recentHomeworkPromise,
     ]);
 
     const subjectMap = new Map();
@@ -19758,6 +19783,7 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
       workspaceCourseOptions,
       selectedCourseId,
       workspaceContextOptions,
+      workspaceContextCatalog: allWorkspaceContextOptions,
       selectedWorkspaceContextId,
       workspaceSemesterOptions,
       selectedWorkspaceSemesterId,
