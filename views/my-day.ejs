@@ -215,19 +215,19 @@
           if (kind === 'group') return 'Group update';
           if (kind === 'subject') return 'Subject update';
           if (kind === 'direct') return 'Direct update';
-          return 'Inbox update';
+          return 'Message update';
         }
         if (kind === 'broadcast') return 'Загальне оголошення';
         if (kind === 'group') return 'Оновлення групи';
         if (kind === 'subject') return 'Оновлення предмета';
         if (kind === 'direct') return 'Адресне повідомлення';
-        return 'Оновлення inbox';
+        return 'Оновлення повідомлень';
       };
       const getInboxMessageCardTitle = (item) => {
         if (item && item.message_title) return item.message_title;
         if (item && item.body_preview) return item.body_preview;
         if (item && item.body) return item.body;
-        return lang === 'en' ? 'Inbox update' : 'Оновлення inbox';
+        return lang === 'en' ? 'Message update' : 'Оновлення повідомлень';
       };
       const getInboxMessageCardBody = (item) => {
         if (item && item.message_title) {
@@ -328,6 +328,107 @@
         <div class="alert alert-danger cockpit-alert" role="alert"><%= errMessage %></div>
       <% } %>
 
+      <% if (isTeacherMyDayView) { %>
+      <section class="teacher-home-hero<%= showMissionStrip ? ' has-rail' : '' %>">
+        <section class="cockpit-card brief-card <%= briefToneClass %>">
+          <div class="brief-head">
+            <span class="brief-kicker"><%= t('myDay.briefKicker') %></span>
+            <span class="brief-meta"><%= t('myDay.briefWeek') %> <%= cockpit.week_number || '-' %></span>
+          </div>
+          <h1 class="brief-title"><%= brief.title || t('myDay.briefTitleFallback') %></h1>
+          <p class="brief-message"><%= brief.message || t('myDay.briefMessageFallback') %></p>
+          <div class="brief-actions">
+            <a class="btn btn-glass" href="<%= brief.action_href || '/schedule' %>"><%= brief.action_label || t('myDay.briefOpenSchedule') %></a>
+            <button type="button" class="btn btn-soft" id="briefWhyToggle"><%= t('myDay.briefWhy') %></button>
+          </div>
+          <div class="brief-reasons d-none" id="briefWhyPanel">
+            <% if (briefReasons.length) { %>
+              <% briefReasons.forEach((reason) => { %>
+                <div class="brief-reason-row"><%= reason %></div>
+              <% }) %>
+            <% } else { %>
+              <div class="brief-reason-row"><%= t('myDay.briefWhyEmpty') %></div>
+            <% } %>
+          </div>
+        </section>
+
+        <% if (showMissionStrip) { %>
+        <aside class="cockpit-card teacher-home-rail">
+          <div class="teacher-home-rail-head">
+            <div class="teacher-home-rail-kicker"><%= lang === 'en' ? 'Teacher overview' : 'Огляд викладача' %></div>
+            <h2 class="teacher-home-rail-title"><%= lang === 'en' ? 'Today at a glance' : 'Коротко про сьогодні' %></h2>
+            <p class="teacher-home-rail-note"><%= lang === 'en' ? 'Key signals and fast links for the current day.' : 'Ключові сигнали та потрібні переходи на сьогодні.' %></p>
+          </div>
+
+          <div class="teacher-home-status-list">
+            <% if (showRatingMission) { %>
+              <article class="teacher-home-status-row">
+                <div class="teacher-home-status-main">
+                  <div class="teacher-home-status-label"><%= lang === 'en' ? 'Rating' : 'Рейтинг' %></div>
+                  <div class="teacher-home-status-value"><%= latestRatingSnapshot ? (latestRatingSnapshot.scope_label || '—') : '—' %></div>
+                  <p class="teacher-home-status-note"><%= latestRatingSnapshot && latestRatingSnapshot.period_label ? latestRatingSnapshot.period_label : (lang === 'en' ? 'The latest rating is available in Journal Insights.' : 'Останній рейтинг уже доступний у Journal Insights.') %></p>
+                </div>
+                <div class="teacher-home-status-side">
+                  <span class="mission-card-badge mission-card-badge-<%= getRatingMissionTone(latestRatingSnapshot) %>"><%= getRatingMissionStatusLabel(latestRatingSnapshot) %></span>
+                  <a class="btn btn-inline-link btn-xs teacher-home-status-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open analytics' : 'Відкрити аналітику' %></a>
+                </div>
+              </article>
+            <% } %>
+            <% if (showInboxMissionCard) { %>
+              <article class="teacher-home-status-row">
+                <div class="teacher-home-status-main">
+                  <div class="teacher-home-status-label"><%= lang === 'en' ? 'Messages' : 'Повідомлення' %></div>
+                  <div class="teacher-home-status-value"><%= inboxMessageSummary ? (Number(inboxMessageSummary.fresh_unread || 0) || Number(inboxMessageSummary.fresh || 0) || 0) : 0 %></div>
+                  <p class="teacher-home-status-note"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.unread || 0) : 0 %> · <%= lang === 'en' ? 'General' : 'Загальні' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.broadcast || 0) : 0 %></p>
+                </div>
+                <div class="teacher-home-status-side">
+                  <span class="mission-card-badge mission-card-badge-<%= inboxMessageSummary ? getInboxMessageTone(inboxMessageSummary) : 'calm' %>"><%= inboxMessageSummary ? getInboxMessageStatusLabel(inboxMessageSummary) : (lang === 'en' ? 'Quiet' : 'Спокійно') %></span>
+                  <a class="btn btn-inline-link btn-xs teacher-home-status-link" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open messages' : 'Відкрити повідомлення' %></a>
+                </div>
+              </article>
+            <% } %>
+            <% if (showAttendanceMission) { %>
+              <article class="teacher-home-status-row">
+                <div class="teacher-home-status-main">
+                  <div class="teacher-home-status-label"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
+                  <div class="teacher-home-status-value"><%= attendanceHealth && attendanceHealth.reliability !== null && typeof attendanceHealth.reliability !== 'undefined' ? `${attendanceHealth.reliability}%` : '-' %></div>
+                  <p class="teacher-home-status-note"><%= attendanceHealth ? getAttendanceNote(attendanceHealth) : (lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.') %></p>
+                </div>
+                <div class="teacher-home-status-side">
+                  <span class="mission-card-badge mission-card-badge-<%= attendanceHealth ? (attendanceHealth.tone || 'calm') : 'calm' %>"><%= attendanceHealth ? getAttendanceStatusLabel(attendanceHealth) : (lang === 'en' ? 'No data' : 'Немає даних') %></span>
+                  <a class="btn btn-inline-link btn-xs teacher-home-status-link" href="/journal"><%= lang === 'en' ? 'Open journal' : 'Відкрити журнал' %></a>
+                </div>
+              </article>
+            <% } %>
+            <% if (showSupportMission) { %>
+              <article class="teacher-home-status-row">
+                <div class="teacher-home-status-main">
+                  <div class="teacher-home-status-label"><%= lang === 'en' ? 'Support' : 'Підтримка' %></div>
+                  <div class="teacher-home-status-value"><%= Number(supportMissionSummary.open || 0) %></div>
+                  <p class="teacher-home-status-note"><%= lang === 'en' ? 'Resolved' : 'Закрито' %>: <%= Number(supportMissionSummary.resolved || 0) %></p>
+                </div>
+                <div class="teacher-home-status-side">
+                  <span class="mission-card-badge mission-card-badge-<%= getSupportMissionTone(supportMissionSummary) %>"><%= getSupportMissionStatusLabel(supportMissionSummary) %></span>
+                  <a class="btn btn-inline-link btn-xs teacher-home-status-link" href="/help"><%= lang === 'en' ? 'Open support' : 'Відкрити підтримку' %></a>
+                </div>
+              </article>
+            <% } %>
+          </div>
+
+          <% if (hasTeacherQuickActions) { %>
+            <div class="teacher-home-actions">
+              <div class="teacher-home-actions-title"><%= lang === 'en' ? 'Quick actions' : 'Швидкі дії' %></div>
+              <div class="teacher-home-actions-grid">
+                <% teacherQuickActions.forEach((action) => { %>
+                  <a class="btn btn-inline-link teacher-home-action-pill" href="<%= action.href %>"><%= action.label %></a>
+                <% }) %>
+              </div>
+            </div>
+          <% } %>
+        </aside>
+        <% } %>
+      </section>
+      <% } else { %>
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
           <span class="brief-kicker"><%= t('myDay.briefKicker') %></span>
@@ -351,73 +452,6 @@
       </section>
 
       <% if (showMissionStrip) { %>
-      <% if (isTeacherMyDayView) { %>
-      <section class="mission-strip mission-strip-compact">
-        <article class="cockpit-card mission-compact-shell">
-          <div class="mission-compact-head">
-            <div>
-              <div class="mission-compact-kicker"><%= lang === 'en' ? 'Teacher overview' : 'Огляд викладача' %></div>
-              <h2 class="mission-compact-title"><%= lang === 'en' ? 'Today at a glance' : 'Коротко про сьогодні' %></h2>
-            </div>
-            <a class="btn btn-soft mission-compact-schedule-link" href="/schedule"><%= lang === 'en' ? 'Open schedule' : 'Відкрити розклад' %></a>
-          </div>
-          <div class="mission-compact-grid">
-            <% if (showRatingMission) { %>
-              <article class="mission-compact-item">
-                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Rating' : 'Рейтинг' %></div>
-                <div class="mission-compact-item-topline">
-                  <div class="mission-compact-item-value"><%= latestRatingSnapshot ? (latestRatingSnapshot.scope_label || '—') : '—' %></div>
-                  <span class="mission-card-badge mission-card-badge-<%= getRatingMissionTone(latestRatingSnapshot) %>"><%= getRatingMissionStatusLabel(latestRatingSnapshot) %></span>
-                </div>
-                <p class="mission-compact-item-note"><%= latestRatingSnapshot && latestRatingSnapshot.period_label ? latestRatingSnapshot.period_label : (lang === 'en' ? 'Latest snapshot is in Journal Insights.' : 'Останній snapshot доступний у Journal Insights.') %></p>
-                <a class="mission-compact-item-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open insights' : 'Відкрити insights' %></a>
-              </article>
-            <% } %>
-            <% if (showInboxMissionCard) { %>
-              <article class="mission-compact-item">
-                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Inbox' : 'Inbox' %></div>
-                <div class="mission-compact-item-topline">
-                  <div class="mission-compact-item-value"><%= inboxMessageSummary ? (Number(inboxMessageSummary.fresh_unread || 0) || Number(inboxMessageSummary.fresh || 0) || 0) : 0 %></div>
-                  <span class="mission-card-badge mission-card-badge-<%= inboxMessageSummary ? getInboxMessageTone(inboxMessageSummary) : 'calm' %>"><%= inboxMessageSummary ? getInboxMessageStatusLabel(inboxMessageSummary) : (lang === 'en' ? 'Quiet' : 'Спокійно') %></span>
-                </div>
-                <p class="mission-compact-item-note"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.unread || 0) : 0 %> · <%= lang === 'en' ? 'Total' : 'Загальні' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.broadcast || 0) : 0 %></p>
-                <a class="mission-compact-item-link" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open inbox' : 'Відкрити inbox' %></a>
-              </article>
-            <% } %>
-            <% if (showAttendanceMission) { %>
-              <article class="mission-compact-item">
-                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
-                <div class="mission-compact-item-topline">
-                  <div class="mission-compact-item-value"><%= attendanceHealth && attendanceHealth.reliability !== null && typeof attendanceHealth.reliability !== 'undefined' ? `${attendanceHealth.reliability}%` : '-' %></div>
-                  <span class="mission-card-badge mission-card-badge-<%= attendanceHealth ? (attendanceHealth.tone || 'calm') : 'calm' %>"><%= attendanceHealth ? getAttendanceStatusLabel(attendanceHealth) : (lang === 'en' ? 'No data' : 'Немає даних') %></span>
-                </div>
-                <p class="mission-compact-item-note"><%= attendanceHealth ? getAttendanceNote(attendanceHealth) : (lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.') %></p>
-                <a class="mission-compact-item-link" href="/journal"><%= lang === 'en' ? 'Open journal' : 'Відкрити журнал' %></a>
-              </article>
-            <% } %>
-            <% if (showSupportMission) { %>
-              <article class="mission-compact-item">
-                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Support' : 'Підтримка' %></div>
-                <div class="mission-compact-item-topline">
-                  <div class="mission-compact-item-value"><%= Number(supportMissionSummary.open || 0) %></div>
-                  <span class="mission-card-badge mission-card-badge-<%= getSupportMissionTone(supportMissionSummary) %>"><%= getSupportMissionStatusLabel(supportMissionSummary) %></span>
-                </div>
-                <p class="mission-compact-item-note"><%= lang === 'en' ? 'Resolved' : 'Закрито' %>: <%= Number(supportMissionSummary.resolved || 0) %></p>
-                <a class="mission-compact-item-link" href="/help"><%= lang === 'en' ? 'Open help' : 'Відкрити help' %></a>
-              </article>
-            <% } %>
-          </div>
-          <% if (hasTeacherQuickActions) { %>
-            <div class="mission-compact-actions-head"><%= lang === 'en' ? 'Quick actions' : 'Швидкі дії' %></div>
-            <div class="mission-compact-actions">
-              <% teacherQuickActions.forEach((action) => { %>
-                <a class="btn btn-inline-link mission-compact-action-pill" href="<%= action.href %>"><%= action.label %></a>
-              <% }) %>
-            </div>
-          <% } %>
-        </article>
-      </section>
-      <% } else { %>
       <section class="mission-strip">
         <% if (showAttendanceMission) { %>
         <article class="cockpit-card mission-card mission-card-attendance<%= attendanceHealth ? ` is-${attendanceHealth.tone}` : '' %>">
@@ -480,14 +514,14 @@
                   <%= latestRatingSnapshot.top_entry.score_label || latestRatingSnapshot.top_entry.final_score || '' %>
                 </p>
               <% } else { %>
-                <p class="mission-card-note"><%= lang === 'en' ? 'The latest published snapshot is ready in Journal Insights.' : 'Останній опублікований snapshot вже доступний у Journal Insights.' %></p>
+                <p class="mission-card-note"><%= lang === 'en' ? 'The latest published rating is ready in Journal Insights.' : 'Останній опублікований рейтинг уже доступний у Journal Insights.' %></p>
               <% } %>
             <% } else { %>
               <div class="mission-card-empty"><%= lang === 'en' ? 'No published rating yet.' : 'Опублікованого рейтингу ще немає.' %></div>
             <% } %>
           </div>
           <div class="mission-card-action">
-            <a class="btn btn-inline-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open insights' : 'Відкрити insights' %></a>
+            <a class="btn btn-inline-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open analytics' : 'Відкрити аналітику' %></a>
           </div>
         </article>
         <% } %>
@@ -518,13 +552,13 @@
             <% } %>
           </div>
           <div class="mission-card-action">
-            <a class="btn btn-inline-link" href="/help"><%= lang === 'en' ? 'Open help' : 'Відкрити help' %></a>
+            <a class="btn btn-inline-link" href="/help"><%= lang === 'en' ? 'Open support' : 'Відкрити підтримку' %></a>
           </div>
         </article>
         <% } %>
         <% if (showInboxMissionCard) { %>
           <article class="cockpit-card mission-card mission-card-announcements<%= inboxMessageSummary ? ` is-${getInboxMessageTone(inboxMessageSummary)}` : '' %>">
-            <div class="mission-card-kicker"><%= lang === 'en' ? 'Inbox updates' : 'Оновлення inbox' %></div>
+            <div class="mission-card-kicker"><%= lang === 'en' ? 'Message updates' : 'Оновлення повідомлень' %></div>
             <div class="mission-card-content">
               <div class="mission-card-topline">
                 <div class="mission-card-value"><%= inboxMessageSummary ? (Number(inboxMessageSummary.fresh_unread || 0) || Number(inboxMessageSummary.fresh || 0) || 0) : 0 %></div>
@@ -549,11 +583,11 @@
                   <p class="mission-card-note"><%= lang === 'en' ? 'Broadcast, group, subject, and direct updates appear here. Support stays separate in Help.' : 'Тут з’являються загальні, групові, предметні й адресні оновлення. Підтримка лишається окремо в Help.' %></p>
                 <% } %>
               <% } else { %>
-                <div class="mission-card-empty"><%= lang === 'en' ? 'No recent inbox updates right now.' : 'Наразі немає свіжих оновлень inbox.' %></div>
+                <div class="mission-card-empty"><%= lang === 'en' ? 'No recent message updates right now.' : 'Наразі немає свіжих оновлень повідомлень.' %></div>
               <% } %>
             </div>
             <div class="mission-card-action">
-              <a class="btn btn-inline-link" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open inbox' : 'Відкрити inbox' %></a>
+              <a class="btn btn-inline-link" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open messages' : 'Відкрити повідомлення' %></a>
             </div>
           </article>
         <% } %>
@@ -1051,7 +1085,7 @@
           <div class="inbox-list">
             <% if (!inboxItems.length) { %>
               <div class="empty-state compact">
-                <div class="empty-state-title"><%= lang === 'en' ? 'Inbox is clear' : 'Inbox порожній' %></div>
+                <div class="empty-state-title"><%= lang === 'en' ? 'Messages are clear' : 'Повідомлень немає' %></div>
                 <div class="empty-state-subtitle"><%= lang === 'en' ? 'No actionable updates right now.' : 'Наразі немає важливих оновлень.' %></div>
               </div>
             <% } else { %>

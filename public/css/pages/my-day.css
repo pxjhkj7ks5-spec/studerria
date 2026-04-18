@@ -744,6 +744,152 @@ body.theme-light .cockpit-card {
   overflow: hidden;
 }
 
+.teacher-home-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  align-items: stretch;
+}
+
+.teacher-home-hero.has-rail {
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+}
+
+.teacher-home-hero .brief-card {
+  margin-bottom: 0;
+  height: 100%;
+}
+
+.teacher-home-rail {
+  padding: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.88rem;
+  min-width: 0;
+}
+
+.teacher-home-rail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.teacher-home-rail-kicker,
+.teacher-home-actions-title {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-dark);
+}
+
+body.theme-light .teacher-home-rail-kicker,
+body.theme-light .teacher-home-actions-title {
+  color: var(--muted-light);
+}
+
+.teacher-home-rail-title {
+  margin: 0;
+  font-size: clamp(1rem, 0.95rem + 0.5vw, 1.22rem);
+  letter-spacing: -0.02em;
+}
+
+.teacher-home-rail-note,
+.teacher-home-status-note {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted-dark);
+}
+
+body.theme-light .teacher-home-rail-note,
+body.theme-light .teacher-home-status-note {
+  color: var(--muted-light);
+}
+
+.teacher-home-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.teacher-home-status-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(9, 16, 31, 0.34);
+  padding: 0.82rem 0.86rem;
+}
+
+body.theme-light .teacher-home-status-row {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.teacher-home-status-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+}
+
+.teacher-home-status-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-dark);
+}
+
+body.theme-light .teacher-home-status-label {
+  color: var(--muted-light);
+}
+
+.teacher-home-status-value {
+  font-size: clamp(1rem, 0.92rem + 0.36vw, 1.18rem);
+  font-weight: 720;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+}
+
+.teacher-home-status-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.42rem;
+  flex-shrink: 0;
+}
+
+.teacher-home-status-link {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.teacher-home-actions {
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  padding-top: 0.84rem;
+}
+
+body.theme-light .teacher-home-actions {
+  border-top-color: rgba(15, 23, 42, 0.12);
+}
+
+.teacher-home-actions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+  margin-top: 0.5rem;
+}
+
+.teacher-home-action-pill {
+  min-height: 2.3rem;
+  padding: 0.42rem 0.84rem;
+}
+
 .brief-card::before {
   content: "";
   position: absolute;
@@ -2088,6 +2234,10 @@ body.theme-light .changelog-liquid-modal .modal-footer {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .teacher-home-hero.has-rail {
+    grid-template-columns: 1fr;
+  }
+
   .dual-focus-grid {
     grid-template-columns: 1fr;
   }
@@ -2154,6 +2304,26 @@ body.theme-light .changelog-liquid-modal .modal-footer {
 @media (max-width: 768px) {
   .mission-strip {
     grid-template-columns: 1fr;
+  }
+
+  .teacher-home-hero {
+    margin-bottom: 1rem;
+  }
+
+  .teacher-home-rail {
+    padding: 0.92rem;
+  }
+
+  .teacher-home-status-row {
+    flex-direction: column;
+  }
+
+  .teacher-home-status-side {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   .mission-compact-head {
