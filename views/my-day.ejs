@@ -351,6 +351,73 @@
       </section>
 
       <% if (showMissionStrip) { %>
+      <% if (isTeacherMyDayView) { %>
+      <section class="mission-strip mission-strip-compact">
+        <article class="cockpit-card mission-compact-shell">
+          <div class="mission-compact-head">
+            <div>
+              <div class="mission-compact-kicker"><%= lang === 'en' ? 'Teacher overview' : 'Огляд викладача' %></div>
+              <h2 class="mission-compact-title"><%= lang === 'en' ? 'Today at a glance' : 'Коротко про сьогодні' %></h2>
+            </div>
+            <a class="btn btn-soft mission-compact-schedule-link" href="/schedule"><%= lang === 'en' ? 'Open schedule' : 'Відкрити розклад' %></a>
+          </div>
+          <div class="mission-compact-grid">
+            <% if (showRatingMission) { %>
+              <article class="mission-compact-item">
+                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Rating' : 'Рейтинг' %></div>
+                <div class="mission-compact-item-topline">
+                  <div class="mission-compact-item-value"><%= latestRatingSnapshot ? (latestRatingSnapshot.scope_label || '—') : '—' %></div>
+                  <span class="mission-card-badge mission-card-badge-<%= getRatingMissionTone(latestRatingSnapshot) %>"><%= getRatingMissionStatusLabel(latestRatingSnapshot) %></span>
+                </div>
+                <p class="mission-compact-item-note"><%= latestRatingSnapshot && latestRatingSnapshot.period_label ? latestRatingSnapshot.period_label : (lang === 'en' ? 'Latest snapshot is in Journal Insights.' : 'Останній snapshot доступний у Journal Insights.') %></p>
+                <a class="mission-compact-item-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open insights' : 'Відкрити insights' %></a>
+              </article>
+            <% } %>
+            <% if (showInboxMissionCard) { %>
+              <article class="mission-compact-item">
+                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Inbox' : 'Inbox' %></div>
+                <div class="mission-compact-item-topline">
+                  <div class="mission-compact-item-value"><%= inboxMessageSummary ? (Number(inboxMessageSummary.fresh_unread || 0) || Number(inboxMessageSummary.fresh || 0) || 0) : 0 %></div>
+                  <span class="mission-card-badge mission-card-badge-<%= inboxMessageSummary ? getInboxMessageTone(inboxMessageSummary) : 'calm' %>"><%= inboxMessageSummary ? getInboxMessageStatusLabel(inboxMessageSummary) : (lang === 'en' ? 'Quiet' : 'Спокійно') %></span>
+                </div>
+                <p class="mission-compact-item-note"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.unread || 0) : 0 %> · <%= lang === 'en' ? 'Total' : 'Загальні' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.broadcast || 0) : 0 %></p>
+                <a class="mission-compact-item-link" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open inbox' : 'Відкрити inbox' %></a>
+              </article>
+            <% } %>
+            <% if (showAttendanceMission) { %>
+              <article class="mission-compact-item">
+                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
+                <div class="mission-compact-item-topline">
+                  <div class="mission-compact-item-value"><%= attendanceHealth && attendanceHealth.reliability !== null && typeof attendanceHealth.reliability !== 'undefined' ? `${attendanceHealth.reliability}%` : '-' %></div>
+                  <span class="mission-card-badge mission-card-badge-<%= attendanceHealth ? (attendanceHealth.tone || 'calm') : 'calm' %>"><%= attendanceHealth ? getAttendanceStatusLabel(attendanceHealth) : (lang === 'en' ? 'No data' : 'Немає даних') %></span>
+                </div>
+                <p class="mission-compact-item-note"><%= attendanceHealth ? getAttendanceNote(attendanceHealth) : (lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.') %></p>
+                <a class="mission-compact-item-link" href="/journal"><%= lang === 'en' ? 'Open journal' : 'Відкрити журнал' %></a>
+              </article>
+            <% } %>
+            <% if (showSupportMission) { %>
+              <article class="mission-compact-item">
+                <div class="mission-compact-item-kicker"><%= lang === 'en' ? 'Support' : 'Підтримка' %></div>
+                <div class="mission-compact-item-topline">
+                  <div class="mission-compact-item-value"><%= Number(supportMissionSummary.open || 0) %></div>
+                  <span class="mission-card-badge mission-card-badge-<%= getSupportMissionTone(supportMissionSummary) %>"><%= getSupportMissionStatusLabel(supportMissionSummary) %></span>
+                </div>
+                <p class="mission-compact-item-note"><%= lang === 'en' ? 'Resolved' : 'Закрито' %>: <%= Number(supportMissionSummary.resolved || 0) %></p>
+                <a class="mission-compact-item-link" href="/help"><%= lang === 'en' ? 'Open help' : 'Відкрити help' %></a>
+              </article>
+            <% } %>
+          </div>
+          <% if (hasTeacherQuickActions) { %>
+            <div class="mission-compact-actions-head"><%= lang === 'en' ? 'Quick actions' : 'Швидкі дії' %></div>
+            <div class="mission-compact-actions">
+              <% teacherQuickActions.forEach((action) => { %>
+                <a class="btn btn-inline-link mission-compact-action-pill" href="<%= action.href %>"><%= action.label %></a>
+              <% }) %>
+            </div>
+          <% } %>
+        </article>
+      </section>
+      <% } else { %>
       <section class="mission-strip">
         <% if (showAttendanceMission) { %>
         <article class="cockpit-card mission-card mission-card-attendance<%= attendanceHealth ? ` is-${attendanceHealth.tone}` : '' %>">
@@ -501,6 +568,7 @@
           </article>
         <% } %>
       </section>
+      <% } %>
       <% } %>
 
       <section class="cockpit-grid">
