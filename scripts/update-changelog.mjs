@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+﻿import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -75,3 +75,4 @@ const nextChangelog = {
 
 writeFileSync(changelogPath, `${JSON.stringify(nextChangelog, null, 2)}\n`);
 console.log(`Changelog updated for version ${currentVersion}`);
+
