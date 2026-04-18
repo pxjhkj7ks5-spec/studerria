@@ -19503,6 +19503,78 @@ app.get('/teacher/workspace', requireLogin, async (req, res) => {
     }
   };
   try {
+    const workspaceTemplateOnlyMode = true;
+    if (workspaceTemplateOnlyMode) {
+      const teacherScopeRows = await getTeacherAssignedSubjects(userId).catch((err) => {
+        if (isDbSchemaCompatibilityError(err)) {
+          return [];
+        }
+        throw err;
+      });
+      const teacherCourses = buildTeacherCourseList(teacherScopeRows);
+      const templateCourseIds = Array.from(new Set(
+        (teacherCourses || [])
+          .map((course) => Number(course && course.id ? course.id : 0))
+          .filter((value) => Number.isInteger(value) && value > 0)
+      ));
+      const subjectMap = new Map();
+      (teacherScopeRows || []).forEach((subject) => {
+        const subjectId = Number(subject && subject.subject_id ? subject.subject_id : 0);
+        if (!Number.isFinite(subjectId) || subjectId < 1 || subjectMap.has(subjectId)) return;
+        subjectMap.set(subjectId, {
+          id: subjectId,
+          name: String(subject && subject.subject_name ? subject.subject_name : '').trim(),
+          course_id: Number(subject && (subject.owner_course_id || subject.course_id) ? (subject.owner_course_id || subject.course_id) : 0) || null,
+          course_name: String(subject && subject.course_name ? subject.course_name : ''),
+        });
+      });
+      const teacherSubjects = Array.from(subjectMap.values()).sort((a, b) => {
+        const byCourse = Number(a.course_id) - Number(b.course_id);
+        if (byCourse !== 0) return byCourse;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'uk', { sensitivity: 'base' });
+      });
+      const [templates, assets] = await Promise.all([
+        getTeacherHomeworkTemplates(userId, {
+          courseIds: templateCourseIds,
+          limit: 300,
+        }),
+        listTeacherAssets(userId, { courseIds: templateCourseIds }),
+      ]);
+
+      return res.render('teacher-workspace', {
+        role: 'teacher',
+        username,
+        settings: settingsCache,
+        teacherCourses,
+        workspaceCourseOptions: [],
+        selectedCourseId: null,
+        workspaceContextOptions: [],
+        workspaceContextCatalog: [],
+        selectedWorkspaceContextId: null,
+        workspaceSemesterOptions: [],
+        selectedWorkspaceSemesterId: null,
+        teacherOfferings: [],
+        workspaceCatalogOfferings: [],
+        workspaceOfferingSelections: new Map(),
+        workspaceAssignedOfferingDetails: new Map(),
+        workspaceTemplatePlan: {
+          visible_count: 0,
+          selected_count: 0,
+          counts: { create: 0, update: 0, deactivate: 0, keep: 0, idle: 0 },
+          items: [],
+        },
+        teacherSubjects,
+        teacherSubjectsAll: teacherSubjects,
+        templates,
+        assets,
+        recentHomework: [],
+        showWorkspaceAdvancedPanels: false,
+        showWorkspaceTemplateOnly: true,
+        error: decodeMessage(req.query.error),
+        success: decodeMessage(req.query.ok),
+      });
+    }
+
     const showWorkspaceAdvancedPanels = String(req.query.advanced || '').trim() === '1';
     const [teacherAssignedOfferings, teacherOfferingCatalog, teacherOfferingSelections] = await Promise.all([
       getTeacherAssignedOfferings(userId),
