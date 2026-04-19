@@ -16,8 +16,8 @@ export default async function Home() {
     <main className="relative pb-20">
       <section className="relative isolate overflow-hidden border-b border-white/8">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.16),_transparent_24%),radial-gradient(circle_at_85%_12%,_rgba(255,255,255,0.08),_transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_32%)]" />
-        <div className="mx-auto grid w-full max-w-[1860px] gap-8 px-4 py-6 md:px-6 md:py-8 xl:grid-cols-[minmax(320px,0.56fr)_minmax(0,1.44fr)] xl:items-stretch 2xl:gap-12">
-          <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-center gap-8 py-4 md:min-h-[44rem] md:py-8 xl:pr-4 2xl:pr-10">
+        <div className="mx-auto grid w-full max-w-[1720px] gap-8 px-4 py-6 md:px-6 md:py-8 xl:grid-cols-[minmax(300px,0.42fr)_minmax(0,1.58fr)] xl:items-stretch 2xl:gap-10 2xl:px-8">
+          <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-center gap-8 py-4 md:min-h-[44rem] md:py-8 xl:pr-2 2xl:pr-4">
             <div className="space-y-8">
               <div className="hero-reveal flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.34em] text-[--muted]">
                 <span className="text-[--accent-orange]">charredmap</span>
@@ -37,7 +37,7 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="relative z-10 hero-reveal xl:flex xl:items-stretch [animation-delay:180ms]">
+          <div className="relative z-10 hero-reveal w-full xl:flex xl:items-stretch [animation-delay:180ms]">
             <MapStoryExperience
               stories={stories}
               occupationOverlay={occupationOverlay}

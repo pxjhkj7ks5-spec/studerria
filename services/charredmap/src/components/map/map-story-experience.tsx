@@ -60,9 +60,9 @@ export function MapStoryExperience({
 
   return (
     <>
-      <div className="glass-panel relative overflow-hidden rounded-[36px] xl:rounded-[40px]">
+      <div className="glass-panel relative w-full overflow-hidden rounded-[36px] xl:rounded-[40px]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.16),_transparent_28%),radial-gradient(circle_at_86%_14%,_rgba(255,255,255,0.08),_transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_32%)]" />
-        <div className="pointer-events-none absolute inset-y-0 right-[336px] hidden w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent)] xl:block 2xl:right-[360px]" />
+        <div className="pointer-events-none absolute inset-y-0 right-[304px] hidden w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent)] xl:block 2xl:right-[328px]" />
 
         <div className="relative border-b border-white/10 px-4 py-4 md:px-5 md:py-4 xl:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -86,7 +86,7 @@ export function MapStoryExperience({
           </div>
         </div>
 
-        <div className="relative grid min-h-[700px] grid-cols-1 xl:min-h-[46rem] xl:grid-cols-[minmax(0,1fr)_336px] 2xl:min-h-[50rem] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="relative grid min-h-[700px] grid-cols-1 xl:min-h-[46rem] xl:grid-cols-[minmax(0,1.18fr)_304px] 2xl:min-h-[50rem] 2xl:grid-cols-[minmax(0,1.28fr)_328px]">
           <div className="relative min-h-[560px] border-b border-white/10 xl:min-h-[46rem] xl:border-b-0 2xl:min-h-[50rem]">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.3))]" />
             {activeStory ? (
