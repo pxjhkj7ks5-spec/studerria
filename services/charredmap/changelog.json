@@ -1,7 +1,13 @@
 {
-  "version": "0.1.19",
-  "generatedAt": "2026-04-19T17:33:32.712Z",
+  "version": "0.1.20",
+  "generatedAt": "2026-04-19T17:45:20.421Z",
   "entries": [
+    {
+      "hash": "2d9064107fc9952723f283cfe170fb7eec7de5cb",
+      "shortHash": "2d90641",
+      "message": "fix(charredmap-admin): streamline moderation publishing",
+      "date": "2026-04-19T20:44:44+03:00"
+    },
     {
       "hash": "aa3917a359998c2e4fc5360afaa3737c3fbe62e1",
       "shortHash": "aa3917a",
