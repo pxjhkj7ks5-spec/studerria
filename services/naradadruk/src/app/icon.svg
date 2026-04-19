@@ -1,0 +1,20 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="64" fill="#0B1016" />
+  <rect x="16" y="16" width="224" height="224" rx="48" fill="url(#surface)" stroke="rgba(255,255,255,0.12)" />
+  <path d="M64 182V74H92L156 152V74H192V182H165L100 103V182H64Z" fill="url(#letter)" />
+  <circle cx="186" cy="76" r="18" fill="url(#accent)" />
+  <defs>
+    <linearGradient id="surface" x1="36" y1="28" x2="220" y2="228" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A2737" />
+      <stop offset="1" stop-color="#0F1824" />
+    </linearGradient>
+    <linearGradient id="letter" x1="64" y1="70" x2="197" y2="189" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3F7FF" />
+      <stop offset="1" stop-color="#BDD4EE" />
+    </linearGradient>
+    <linearGradient id="accent" x1="172" y1="58" x2="200" y2="94" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB56F" />
+      <stop offset="1" stop-color="#FF8F35" />
+    </linearGradient>
+  </defs>
+</svg>

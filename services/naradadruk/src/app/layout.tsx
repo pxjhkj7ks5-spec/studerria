@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { Manrope, Outfit } from "next/font/google";
 import { SiteFooter } from "@/components/site/site-footer";
-import { siteDescription, siteName } from "@/lib/constants";
+import {
+  siteBaseUrl,
+  siteDescription,
+  siteName,
+  sitePath,
+  siteShareDescription,
+  siteShareTitle,
+} from "@/lib/constants";
 import "./globals.css";
 
 const displayFont = Outfit({
@@ -17,6 +24,29 @@ const bodyFont = Manrope({
 export const metadata: Metadata = {
   title: siteName,
   description: siteDescription,
+  metadataBase: new URL(siteBaseUrl),
+  applicationName: siteName,
+  alternates: {
+    canonical: sitePath,
+  },
+  openGraph: {
+    type: "website",
+    locale: "uk_UA",
+    url: sitePath,
+    siteName,
+    title: siteShareTitle,
+    description: siteShareDescription,
+  },
+  twitter: {
+    card: "summary",
+    title: siteShareTitle,
+    description: siteShareDescription,
+  },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
