@@ -27,7 +27,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   return (
     <main className="mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6 md:py-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="reveal-up delay-1 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-[--accent]">Каталог</p>
           <h1 className="mt-3 font-display text-5xl tracking-[-0.06em] text-white">Готові рішення та практичні деталі.</h1>
@@ -42,7 +42,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.34fr_0.66fr]">
-        <aside className="glass-panel h-fit rounded-[2rem] p-5">
+        <aside className="glass-panel reveal-up delay-2 h-fit rounded-[2rem] p-5">
           <form action={withBasePath("/catalog")} className="grid gap-4">
             <div className="field-shell">
               <span>Пошук по каталогу</span>
@@ -71,12 +71,12 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             </div>
           </form>
 
-          <div className="mt-6 grid gap-3 border-t border-white/10 pt-6">
+          <div className="stagger-list mt-6 grid gap-3 border-t border-white/10 pt-6">
             {categories.map((category) => (
               <a
                 key={category.id}
                 href={withBasePath(`/category/${category.slug}`)}
-                className="rounded-[1.25rem] border border-white/10 px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.04]"
+                className="interactive-card rounded-[1.25rem] border border-white/10 px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.04]"
               >
                 <div className="flex items-center justify-between gap-4">
                   <span className="font-medium text-white">{category.name}</span>
@@ -90,13 +90,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
         <section className="self-start">
           {products.length > 0 ? (
-            <div className="grid gap-5 xl:grid-cols-2">
+            <div className="stagger-grid grid gap-5 xl:grid-cols-2">
               {products.map((product) => (
                 <ProductCard key={product.id} product={product} telegramUrl={settings.telegramUrl} />
               ))}
             </div>
           ) : (
-            <div className="glass-panel rounded-[2rem] p-8">
+            <div className="glass-panel reveal-up delay-3 rounded-[2rem] p-8">
               <h2 className="font-display text-3xl tracking-[-0.05em] text-white">За цим запитом поки немає товарів.</h2>
               <p className="mt-3 max-w-[44ch] text-sm leading-7 text-[--muted]">
                 Спробуйте змінити фільтр або напишіть у Telegram, якщо потрібна індивідуальна деталь чи кастомний виріб.

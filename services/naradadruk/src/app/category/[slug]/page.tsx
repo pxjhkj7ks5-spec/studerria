@@ -26,12 +26,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   return (
     <main className="mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6 md:py-10">
-      <a className="text-sm text-[--muted] transition hover:text-white" href={withBasePath("/catalog")}>
+      <a className="reveal-up delay-1 text-sm text-[--muted] transition hover:text-white" href={withBasePath("/catalog")}>
         Повернутися до каталогу
       </a>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[0.34fr_0.66fr]">
-        <aside className="glass-panel h-fit rounded-[2rem] p-5">
+        <aside className="glass-panel reveal-up delay-2 h-fit rounded-[2rem] p-5">
           <p className="text-xs uppercase tracking-[0.32em] text-[--accent]">Категорія</p>
           <h1 className="mt-3 font-display text-5xl tracking-[-0.06em] text-white">{category.name}</h1>
           <p className="mt-4 text-sm leading-7 text-[--muted]">{category.description}</p>
@@ -45,12 +45,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
             </a>
           </div>
 
-          <div className="mt-8 grid gap-3 border-t border-white/10 pt-6">
+          <div className="stagger-list mt-8 grid gap-3 border-t border-white/10 pt-6">
             {categories.map((item) => (
               <a
                 key={item.id}
                 href={withBasePath(`/category/${item.slug}`)}
-                className={`rounded-[1.25rem] border px-4 py-3 transition ${
+                className={`interactive-card rounded-[1.25rem] border px-4 py-3 transition ${
                   item.slug === category.slug
                     ? "border-[rgba(255,156,74,0.45)] bg-[rgba(255,156,74,0.08)]"
                     : "border-white/10 bg-white/[0.03] hover:border-white/20"
@@ -65,8 +65,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           </div>
         </aside>
 
-        <section>
-          <div className="grid gap-5 xl:grid-cols-2">
+        <section className="self-start">
+          <div className="stagger-grid grid gap-5 xl:grid-cols-2">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} telegramUrl={settings.telegramUrl} />
             ))}

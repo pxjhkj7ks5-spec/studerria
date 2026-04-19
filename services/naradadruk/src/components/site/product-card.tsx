@@ -16,7 +16,7 @@ type ProductCardProps = {
 
 export function ProductCard({ product, telegramUrl }: ProductCardProps) {
   return (
-    <article className="group grid gap-4 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.06] md:p-5">
+    <article className="interactive-card group grid gap-4 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 transition duration-300 hover:border-white/20 hover:bg-white/[0.06] md:p-5">
       <a className="block overflow-hidden rounded-[1.5rem] bg-[--surface-strong]" href={withBasePath(`/product/${product.slug}`)}>
         {product.coverImage ? (
           <Image

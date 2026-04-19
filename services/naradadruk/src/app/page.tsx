@@ -17,7 +17,7 @@ export default async function HomePage() {
       <section className="surface-grid hero-stage">
         <div className="mx-auto grid min-h-[100dvh] w-full max-w-[1400px] gap-10 px-4 pb-12 pt-6 md:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-14 lg:pb-16 lg:pt-8">
           <div className="flex min-h-[24rem] flex-col justify-between gap-10">
-            <div className="flex items-center justify-between gap-4">
+            <div className="reveal-up delay-1 flex items-center justify-between gap-4">
               <a href={withBasePath("/")} className="font-display text-2xl tracking-[-0.05em] text-white">
                 Narada Druk
               </a>
@@ -31,7 +31,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="hero-reveal max-w-3xl">
+            <div className="hero-reveal delay-2 max-w-3xl">
               <p className="text-xs uppercase tracking-[0.35em] text-[--accent]">3D друк та практичні аксесуари</p>
               <h1 className="mt-5 font-display text-5xl tracking-[-0.07em] text-white md:text-7xl">
                 {settings.heroTitle}
@@ -50,15 +50,15 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-              <div className="glass-panel rounded-[2rem] p-5">
+            <div className="reveal-up delay-3 grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
+              <div className="glass-panel interactive-card rounded-[2rem] p-5">
                 <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">{settings.supportTitle}</p>
                 <p className="mt-4 max-w-[44ch] text-sm leading-7 text-[--muted]">{settings.supportBody}</p>
               </div>
 
-              <div className="grid gap-3">
+              <div className="stagger-list grid gap-3">
                 {supportFacts.slice(0, 3).map((fact) => (
-                  <div key={fact} className="glass-panel rounded-[1.5rem] px-4 py-3 text-sm text-[--muted]">
+                  <div key={fact} className="glass-panel interactive-card rounded-[1.5rem] px-4 py-3 text-sm text-[--muted]">
                     {fact}
                   </div>
                 ))}
@@ -66,8 +66,8 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:pb-10">
-            <div className="glass-panel grid gap-6 rounded-[2.25rem] p-5 md:grid-cols-[0.84fr_1.16fr] md:p-6">
+          <div className="reveal-up delay-3 grid gap-4 lg:pb-10">
+            <div className="glass-panel interactive-card grid gap-6 rounded-[2.25rem] p-5 md:grid-cols-[0.84fr_1.16fr] md:p-6">
               <div className="flex flex-col justify-between gap-6">
                 <div>
                   <p className="text-xs uppercase tracking-[0.28em] text-[--muted]">Асортимент</p>
@@ -76,22 +76,22 @@ export default async function HomePage() {
                   </h2>
                 </div>
 
-                <div className="grid gap-3 text-sm text-[--muted]">
-                  <div className="rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3">
+                <div className="stagger-list grid gap-3 text-sm text-[--muted]">
+                  <div className="interactive-card rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3">
                     {settings.materialsNote}
                   </div>
-                  <div className="rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3">
+                  <div className="interactive-card rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3">
                     {settings.leadTimeNote}
                   </div>
                 </div>
               </div>
 
-              <div className="grid gap-3">
+              <div className="stagger-list grid gap-3">
                 {categories.slice(0, 4).map((category) => (
                   <a
                     key={category.id}
                     href={withBasePath(`/category/${category.slug}`)}
-                    className="rounded-[1.4rem] border border-white/10 bg-white/[0.04] px-4 py-4 transition hover:-translate-y-[1px] hover:border-white/20"
+                    className="interactive-card rounded-[1.4rem] border border-white/10 bg-white/[0.04] px-4 py-4 transition hover:border-white/20"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <span className="font-display text-2xl tracking-[-0.04em] text-white">{category.name}</span>
@@ -109,14 +109,14 @@ export default async function HomePage() {
       </section>
 
       <section className="mx-auto mt-4 w-full max-w-[1400px] px-4 pb-10 md:px-6">
-        <div className="grid gap-4 border-y border-white/10 py-8 md:grid-cols-4">
+        <div className="stagger-grid grid gap-4 border-y border-white/10 py-8 md:grid-cols-4">
           {[
             settings.deliveryNote,
             settings.paymentNote,
             settings.materialsNote,
             settings.contactNote,
           ].map((item) => (
-            <div key={item} className="text-sm leading-7 text-[--muted]">
+            <div key={item} className="interactive-card rounded-[1.5rem] border border-white/8 bg-white/[0.02] p-4 text-sm leading-7 text-[--muted]">
               {item}
             </div>
           ))}
@@ -124,7 +124,7 @@ export default async function HomePage() {
       </section>
 
       <section className="mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="reveal-up delay-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-[--accent]">Featured</p>
             <h2 className="mt-3 font-display text-4xl tracking-[-0.05em] text-white">Готові позиції, які вже можна брати за основу.</h2>
@@ -135,13 +135,13 @@ export default async function HomePage() {
         </div>
 
         {featuredProducts.length > 0 ? (
-          <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="stagger-grid mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
             {featuredProducts.map((product) => (
               <ProductCard key={product.id} product={product} telegramUrl={settings.telegramUrl} />
             ))}
           </div>
         ) : (
-          <div className="glass-panel mt-8 rounded-[2rem] p-8">
+          <div className="glass-panel reveal-up delay-2 mt-8 rounded-[2rem] p-8">
             <h3 className="font-display text-3xl tracking-[-0.05em] text-white">Каталог готовий до наповнення.</h3>
             <p className="mt-3 max-w-[48ch] text-sm leading-7 text-[--muted]">
               Додайте перші товари через адмінку, а поки що клієнтів можна вести напряму в Telegram для індивідуальних замовлень.
