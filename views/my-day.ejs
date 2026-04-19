@@ -428,6 +428,103 @@
         </aside>
         <% } %>
       </section>
+      <% } else if (isStudentLikeMyDayView) { %>
+      <section class="student-home-hero<%= showMissionStrip ? ' has-summary' : '' %>">
+        <section class="cockpit-card brief-card <%= briefToneClass %>">
+          <div class="brief-head">
+            <span class="brief-kicker"><%= t('myDay.briefKicker') %></span>
+            <span class="brief-meta"><%= t('myDay.briefWeek') %> <%= cockpit.week_number || '-' %></span>
+          </div>
+          <h1 class="brief-title"><%= brief.title || t('myDay.briefTitleFallback') %></h1>
+          <p class="brief-message"><%= brief.message || t('myDay.briefMessageFallback') %></p>
+          <div class="brief-actions">
+            <a class="btn btn-glass" href="<%= brief.action_href || '/schedule' %>"><%= brief.action_label || t('myDay.briefOpenSchedule') %></a>
+            <button type="button" class="btn btn-soft" id="briefWhyToggle"><%= t('myDay.briefWhy') %></button>
+          </div>
+          <div class="brief-reasons d-none" id="briefWhyPanel">
+            <% if (briefReasons.length) { %>
+              <% briefReasons.forEach((reason) => { %>
+                <div class="brief-reason-row"><%= reason %></div>
+              <% }) %>
+            <% } else { %>
+              <div class="brief-reason-row"><%= t('myDay.briefWhyEmpty') %></div>
+            <% } %>
+          </div>
+        </section>
+
+        <% if (showMissionStrip) { %>
+        <aside class="cockpit-card student-home-summary">
+          <div class="student-home-summary-head">
+            <div class="student-home-summary-kicker"><%= lang === 'en' ? 'Today' : 'На сьогодні' %></div>
+            <h2 class="student-home-summary-title"><%= lang === 'en' ? 'What needs attention' : 'Що варто тримати в полі зору' %></h2>
+            <p class="student-home-summary-note"><%= lang === 'en' ? 'Quick updates, signals, and actions without leaving the homepage.' : 'Короткі оновлення, сигнали і потрібні переходи без зайвих блоків.' %></p>
+          </div>
+
+          <div class="student-home-summary-list">
+            <% if (showInboxMissionCard) { %>
+              <article class="student-home-summary-row is-primary">
+                <div class="student-home-summary-main">
+                  <div class="student-home-summary-label"><%= lang === 'en' ? 'Messages' : 'Повідомлення' %></div>
+                  <div class="student-home-summary-value"><%= inboxMessageSummary ? (Number(inboxMessageSummary.fresh_unread || 0) || Number(inboxMessageSummary.fresh || 0) || 0) : 0 %></div>
+                  <% if (inboxMessageItems[0]) { %>
+                    <p class="student-home-summary-note"><strong><%= getInboxMessageKindLabel(inboxMessageItems[0]) %></strong>: <%= getInboxMessageCardTitle(inboxMessageItems[0]) %></p>
+                    <div class="student-home-summary-meta"><%= getInboxMessageMeta(inboxMessageItems[0]) %></div>
+                  <% } else { %>
+                    <p class="student-home-summary-note"><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.unread || 0) : 0 %> · <%= lang === 'en' ? 'General' : 'Загальні' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.broadcast || 0) : 0 %></p>
+                  <% } %>
+                </div>
+                <div class="student-home-summary-side">
+                  <span class="mission-card-badge mission-card-badge-<%= inboxMessageSummary ? getInboxMessageTone(inboxMessageSummary) : 'calm' %>"><%= inboxMessageSummary ? getInboxMessageStatusLabel(inboxMessageSummary) : (lang === 'en' ? 'Quiet' : 'Спокійно') %></span>
+                  <a class="btn btn-inline-link btn-xs student-home-summary-link" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open messages' : 'Відкрити повідомлення' %></a>
+                </div>
+              </article>
+            <% } %>
+
+            <% if (showAttendanceMission) { %>
+              <article class="student-home-summary-row">
+                <div class="student-home-summary-main">
+                  <div class="student-home-summary-label"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
+                  <div class="student-home-summary-value"><%= attendanceHealth && attendanceHealth.reliability !== null && typeof attendanceHealth.reliability !== 'undefined' ? `${attendanceHealth.reliability}%` : '-' %></div>
+                  <p class="student-home-summary-note"><%= attendanceHealth ? getAttendanceNote(attendanceHealth) : (lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.') %></p>
+                </div>
+                <div class="student-home-summary-side">
+                  <span class="mission-card-badge mission-card-badge-<%= attendanceHealth ? (attendanceHealth.tone || 'calm') : 'calm' %>"><%= attendanceHealth ? getAttendanceStatusLabel(attendanceHealth) : (lang === 'en' ? 'No data' : 'Немає даних') %></span>
+                  <a class="btn btn-inline-link btn-xs student-home-summary-link" href="/journal"><%= lang === 'en' ? 'Open journal' : 'Відкрити журнал' %></a>
+                </div>
+              </article>
+            <% } %>
+
+            <% if (showRatingMission) { %>
+              <article class="student-home-summary-row">
+                <div class="student-home-summary-main">
+                  <div class="student-home-summary-label"><%= lang === 'en' ? 'Rating' : 'Рейтинг' %></div>
+                  <div class="student-home-summary-value"><%= latestRatingSnapshot ? (latestRatingSnapshot.scope_label || '—') : '—' %></div>
+                  <p class="student-home-summary-note"><%= latestRatingSnapshot && latestRatingSnapshot.period_label ? latestRatingSnapshot.period_label : (lang === 'en' ? 'The latest published rating is ready in Journal Insights.' : 'Останній опублікований рейтинг уже доступний у Journal Insights.') %></p>
+                </div>
+                <div class="student-home-summary-side">
+                  <span class="mission-card-badge mission-card-badge-<%= getRatingMissionTone(latestRatingSnapshot) %>"><%= getRatingMissionStatusLabel(latestRatingSnapshot) %></span>
+                  <a class="btn btn-inline-link btn-xs student-home-summary-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open analytics' : 'Відкрити аналітику' %></a>
+                </div>
+              </article>
+            <% } %>
+
+            <% if (showSupportMission) { %>
+              <article class="student-home-summary-row">
+                <div class="student-home-summary-main">
+                  <div class="student-home-summary-label"><%= lang === 'en' ? 'Support' : 'Підтримка' %></div>
+                  <div class="student-home-summary-value"><%= Number(supportMissionSummary.open || 0) %></div>
+                  <p class="student-home-summary-note"><%= lang === 'en' ? 'Open threads' : 'Активні звернення' %>: <%= Number(supportMissionSummary.open || 0) %> · <%= lang === 'en' ? 'Resolved' : 'Закрито' %>: <%= Number(supportMissionSummary.resolved || 0) %></p>
+                </div>
+                <div class="student-home-summary-side">
+                  <span class="mission-card-badge mission-card-badge-<%= getSupportMissionTone(supportMissionSummary) %>"><%= getSupportMissionStatusLabel(supportMissionSummary) %></span>
+                  <a class="btn btn-inline-link btn-xs student-home-summary-link" href="/help"><%= lang === 'en' ? 'Open support' : 'Відкрити підтримку' %></a>
+                </div>
+              </article>
+            <% } %>
+          </div>
+        </aside>
+        <% } %>
+      </section>
       <% } else { %>
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
@@ -605,7 +702,7 @@
       <% } %>
       <% } %>
 
-      <section class="cockpit-grid">
+      <section class="cockpit-grid<%= isStudentLikeMyDayView ? ' student-cockpit-grid' : '' %>">
         <% if (isStudentLikeMyDayView) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card" id="deadlinesClassesBlock">
             <div class="section-head">
