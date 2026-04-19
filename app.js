@@ -330,7 +330,9 @@ const SOCKET_CHANNEL_MESSAGES = 'messages';
 const SOCKET_CHANNEL_ADMIN = 'admin';
 const SOCKET_CHANNELS = new Set([SOCKET_CHANNEL_MESSAGES, SOCKET_CHANNEL_ADMIN]);
 const CHARREDMAP_BASE_PATH = '/charredmap';
+const NARADADRUK_BASE_PATH = '/naradadruk';
 const charredmapProxyTarget = String(process.env.CHARREDMAP_PROXY_TARGET || '').trim();
+const naradadrukProxyTarget = String(process.env.NARADADRUK_PROXY_TARGET || '').trim();
 const DANGEROUS_UPLOAD_EXTENSIONS = new Set([
   '.html',
   '.htm',
@@ -344,15 +346,45 @@ const DANGEROUS_UPLOAD_EXTENSIONS = new Set([
 ]);
 
 const hasCharredmapProxy = /^https?:\/\//i.test(charredmapProxyTarget);
+const hasNaradadrukProxy = /^https?:\/\//i.test(naradadrukProxyTarget);
 
 function isCharredmapRequest(req) {
   const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
   return pathname === CHARREDMAP_BASE_PATH || pathname.startsWith(`${CHARREDMAP_BASE_PATH}/`);
 }
 
+function isNaradadrukRequest(req) {
+  const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
+  return pathname === NARADADRUK_BASE_PATH || pathname.startsWith(`${NARADADRUK_BASE_PATH}/`);
+}
+
 function respondCharredmapUnavailable(res, statusCode = 503) {
   if (!res || res.headersSent) return;
   const body = statusCode === 404 ? 'Not found' : 'Charredmap is temporarily unavailable.';
+  if (typeof res.status === 'function') {
+    res.status(statusCode);
+  } else {
+    res.statusCode = statusCode;
+  }
+  if (typeof res.setHeader === 'function') {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  }
+  if (typeof res.type === 'function') {
+    res.type('text/plain; charset=utf-8');
+  }
+  if (typeof res.send === 'function') {
+    res.send(body);
+    return;
+  }
+  if (typeof res.end === 'function') {
+    res.end(body);
+  }
+}
+
+function respondNaradadrukUnavailable(res, statusCode = 503) {
+  if (!res || res.headersSent) return;
+  const body = statusCode === 404 ? 'Not found' : 'Narada Druk is temporarily unavailable.';
   if (typeof res.status === 'function') {
     res.status(statusCode);
   } else {
@@ -394,6 +426,26 @@ const charredmapProxy = hasCharredmapProxy
     })
   : null;
 
+const naradadrukProxy = hasNaradadrukProxy
+  ? createProxyMiddleware({
+      target: naradadrukProxyTarget,
+      changeOrigin: false,
+      xfwd: true,
+      ws: false,
+      proxyTimeout: 30000,
+      timeout: 30000,
+      on: {
+        error(err, req, res) {
+          console.error('Narada Druk proxy error', err);
+          respondNaradadrukUnavailable(res, 503);
+        },
+        proxyReq(proxyReq) {
+          proxyReq.setHeader('x-forwarded-prefix', NARADADRUK_BASE_PATH);
+        },
+      },
+    })
+  : null;
+
 app.use((req, res, next) => {
   if (!isCharredmapRequest(req)) {
     return next();
@@ -402,6 +454,16 @@ app.use((req, res, next) => {
     return respondCharredmapUnavailable(res, 404);
   }
   return charredmapProxy(req, res, next);
+});
+
+app.use((req, res, next) => {
+  if (!isNaradadrukRequest(req)) {
+    return next();
+  }
+  if (!naradadrukProxy) {
+    return respondNaradadrukUnavailable(res, 404);
+  }
+  return naradadrukProxy(req, res, next);
 });
 
 process.on('uncaughtException', (err) => {

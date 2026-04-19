@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductStatus {
+  draft
+  published
+}
+
+model SiteSetting {
+  id             Int      @id
+  heroTitle      String
+  heroSubtitle   String
+  supportTitle   String
+  supportBody    String
+  materialsNote  String
+  leadTimeNote   String
+  deliveryNote   String
+  paymentNote    String
+  telegramUrl    String
+  contactNote    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique
+  description String    @default("")
+  sortOrder   Int       @default(0)
+  isVisible   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id               Int            @id @default(autoincrement())
+  title            String
+  slug             String         @unique
+  categoryId       Int
+  shortDescription String         @default("")
+  fullDescription  String         @default("")
+  status           ProductStatus  @default(draft)
+  isFeatured       Boolean        @default(false)
+  basePrice        Int?
+  priceFrom        Boolean        @default(false)
+  leadTime         String         @default("")
+  materialNote     String         @default("")
+  deliveryNote     String         @default("")
+  paymentNote      String         @default("")
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  category         Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants         ProductVariant[]
+  images           ProductImage[]
+}
+
+model ProductVariant {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  label       String
+  price       Int
+  description String   @default("")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  fileName  String
+  urlPath   String
+  alt       String   @default("")
+  sortOrder Int      @default(0)
+  isCover   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}

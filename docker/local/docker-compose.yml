@@ -101,6 +101,45 @@ services:
       retries: 20
       start_period: 30s
 
+  naradadruk:
+    build:
+      context: ../../services/naradadruk
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_PATH: /naradadruk
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NARADADRUK_NODE_ENV:-development}
+      HOSTNAME: 0.0.0.0
+      PORT: 8080
+      NEXT_PUBLIC_BASE_PATH: /naradadruk
+      DATABASE_URL: file:/data/naradadruk.db
+      UPLOAD_DIR: /data/uploads
+      ADMIN_PATH: ${NARADADRUK_ADMIN_PATH:-admin}
+      ADMIN_PASSWORD: ${NARADADRUK_ADMIN_PASSWORD:-change-me-naradadruk-admin}
+      SESSION_SECRET: ${NARADADRUK_SESSION_SECRET:-change-me-naradadruk-session-secret-change-this}
+      TELEGRAM_CHANNEL_URL: ${NARADADRUK_TELEGRAM_CHANNEL_URL:-https://web.telegram.org/k/#@naradaprint}
+    volumes:
+      - naradadruk_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8080/naradadruk').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   app:
     build:
       context: ../..
@@ -130,6 +169,7 @@ services:
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
       CHARREDMAP_PROXY_TARGET: http://charredmap:8080
+      NARADADRUK_PROXY_TARGET: http://naradadruk:8080
     ports:
       - "${APP_PORT_FORWARD:-3000}:${APP_PORT:-3000}"
     volumes:
@@ -149,5 +189,6 @@ volumes:
   postgres_data:
   redis_data:
   charredmap_data:
+  naradadruk_data:
   loki_data:
   promtail_positions:
