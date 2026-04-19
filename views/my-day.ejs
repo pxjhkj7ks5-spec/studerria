@@ -451,57 +451,6 @@
         </div>
       </section>
 
-      <% if (showMissionStrip && (showInboxMissionCard || showAttendanceMission || showRatingMission)) { %>
-      <section class="student-home-strip">
-        <% if (showInboxMissionCard) { %>
-          <article class="cockpit-card student-strip-card student-strip-card-primary">
-            <div class="student-strip-head">
-              <div class="student-strip-kicker"><%= lang === 'en' ? 'Messages' : 'Повідомлення' %></div>
-              <span class="mission-card-badge mission-card-badge-<%= inboxMessageSummary ? getInboxMessageTone(inboxMessageSummary) : 'calm' %>"><%= inboxMessageSummary ? getInboxMessageStatusLabel(inboxMessageSummary) : (lang === 'en' ? 'Quiet' : 'Спокійно') %></span>
-            </div>
-            <div class="student-strip-value"><%= inboxMessageSummary ? (Number(inboxMessageSummary.fresh_unread || 0) || Number(inboxMessageSummary.fresh || 0) || 0) : 0 %></div>
-            <p class="student-strip-note">
-              <% if (inboxMessageItems[0]) { %>
-                <strong><%= getInboxMessageKindLabel(inboxMessageItems[0]) %></strong>: <%= getInboxMessageCardTitle(inboxMessageItems[0]) %>
-              <% } else { %>
-                <%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.unread || 0) : 0 %> · <%= lang === 'en' ? 'General' : 'Загальні' %>: <%= inboxMessageSummary ? Number(inboxMessageSummary.broadcast || 0) : 0 %>
-              <% } %>
-            </p>
-            <div class="student-strip-actions">
-              <a class="btn btn-inline-link btn-xs" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open messages' : 'Відкрити повідомлення' %></a>
-            </div>
-          </article>
-        <% } %>
-
-        <% if (showAttendanceMission) { %>
-          <article class="cockpit-card student-strip-card">
-            <div class="student-strip-head">
-              <div class="student-strip-kicker"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
-              <span class="mission-card-badge mission-card-badge-<%= attendanceHealth ? (attendanceHealth.tone || 'calm') : 'calm' %>"><%= attendanceHealth ? getAttendanceStatusLabel(attendanceHealth) : (lang === 'en' ? 'No data' : 'Немає даних') %></span>
-            </div>
-            <div class="student-strip-value"><%= attendanceHealth && attendanceHealth.reliability !== null && typeof attendanceHealth.reliability !== 'undefined' ? `${attendanceHealth.reliability}%` : '-' %></div>
-            <p class="student-strip-note"><%= attendanceHealth ? getAttendanceNote(attendanceHealth) : (lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.') %></p>
-            <div class="student-strip-actions">
-              <a class="btn btn-inline-link btn-xs" href="/journal"><%= lang === 'en' ? 'Open journal' : 'Відкрити журнал' %></a>
-            </div>
-          </article>
-        <% } %>
-
-        <% if (showRatingMission) { %>
-          <article class="cockpit-card student-strip-card">
-            <div class="student-strip-head">
-              <div class="student-strip-kicker"><%= lang === 'en' ? 'Rating' : 'Рейтинг' %></div>
-              <span class="mission-card-badge mission-card-badge-<%= getRatingMissionTone(latestRatingSnapshot) %>"><%= getRatingMissionStatusLabel(latestRatingSnapshot) %></span>
-            </div>
-            <div class="student-strip-value"><%= latestRatingSnapshot ? (latestRatingSnapshot.scope_label || '—') : '—' %></div>
-            <p class="student-strip-note"><%= latestRatingSnapshot && latestRatingSnapshot.period_label ? latestRatingSnapshot.period_label : (lang === 'en' ? 'The latest published rating is ready in Journal Insights.' : 'Останній опублікований рейтинг уже доступний у Journal Insights.') %></p>
-            <div class="student-strip-actions">
-              <a class="btn btn-inline-link btn-xs" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open analytics' : 'Відкрити аналітику' %></a>
-            </div>
-          </article>
-        <% } %>
-      </section>
-      <% } %>
       <% } else { %>
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
