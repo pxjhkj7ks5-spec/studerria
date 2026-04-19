@@ -88,7 +88,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           </div>
         </aside>
 
-        <section>
+        <section className="self-start">
           {products.length > 0 ? (
             <div className="grid gap-5 xl:grid-cols-2">
               {products.map((product) => (
