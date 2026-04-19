@@ -378,6 +378,34 @@ export async function upsertStoryRecord(input: {
   });
 }
 
+export async function updateStoryPublicationStatus(input: {
+  storyId: string;
+  publicationStatus: PublicationStatus;
+}) {
+  await ensureCharredmapDatabase();
+
+  const existing = await prisma.story.findUniqueOrThrow({
+    where: { id: input.storyId },
+    select: {
+      id: true,
+      slug: true,
+      publishedAt: true,
+    },
+  });
+
+  return prisma.story.update({
+    where: { id: existing.id },
+    data: {
+      publicationStatus: input.publicationStatus,
+      publishedAt:
+        input.publicationStatus === "published"
+          ? existing.publishedAt ?? new Date()
+          : null,
+    },
+    include: { city: true },
+  });
+}
+
 export async function deleteStoryRecord(storyId: string) {
   await ensureCharredmapDatabase();
 

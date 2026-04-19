@@ -14,7 +14,12 @@ import {
 } from "@/lib/auth";
 import { withBasePath } from "@/lib/base-path";
 import { occupationStatuses, publicationStatuses } from "@/lib/constants";
-import { deleteStoryRecord, upsertCityRecord, upsertStoryRecord } from "@/lib/data";
+import {
+  deleteStoryRecord,
+  updateStoryPublicationStatus,
+  upsertCityRecord,
+  upsertStoryRecord,
+} from "@/lib/data";
 import { localStorageAdapter } from "@/lib/storage";
 
 export type ActionState = {
@@ -45,6 +50,11 @@ const storySchema = z.object({
 
 const deleteStorySchema = z.object({
   storyId: z.string().trim().min(1, "Не вдалося визначити історію."),
+});
+
+const storyStatusSchema = z.object({
+  storyId: z.string().trim().min(1),
+  publicationStatus: z.enum(publicationStatuses),
 });
 
 function secureCompare(left: string, right: string) {
@@ -178,4 +188,26 @@ export async function deleteStoryAction(formData: FormData) {
   revalidatePath(withBasePath(`/stories/${deletedStory.slug}`));
 
   redirect(`${getAdminStoriesRoute()}?deleted=1`);
+}
+
+export async function setStoryPublicationStatusAction(formData: FormData) {
+  await requireAdminSession();
+
+  const parsed = storyStatusSchema.safeParse({
+    storyId: String(formData.get("storyId") ?? ""),
+    publicationStatus: String(formData.get("publicationStatus") ?? ""),
+  });
+
+  if (!parsed.success) {
+    redirect(`${getAdminStoriesRoute()}?saved=0`);
+  }
+
+  const story = await updateStoryPublicationStatus(parsed.data);
+
+  revalidatePath(withBasePath("/"));
+  revalidatePath(withBasePath(getAdminRoute()));
+  revalidatePath(withBasePath(getAdminStoriesRoute()));
+  revalidatePath(withBasePath(`/stories/${story.slug}`));
+
+  redirect(`${getAdminStoriesRoute()}?saved=1`);
 }
