@@ -8571,7 +8571,7 @@
               ? assigned
                   .map(
                     (s) =>
-                      `<span class="study-day-chip">${s.name}<button type="button" data-subject-id="${s.id}" data-weekday="${day.weekday}" class="study-day-remove">×</button></span>`
+                      `<span class="study-day-chip">${escapeHtml(s.name)}<button type="button" data-subject-id="${s.id}" data-weekday="${day.weekday}" class="study-day-remove">×</button></span>`
                   )
                   .join('')
               : '<span class="text-muted">Немає предметів</span>';

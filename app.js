@@ -1369,6 +1369,66 @@ app.use((req, res, next) => {
   next();
 });
 
+const CSRF_MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+function resolveRequestHostForCsrf(req) {
+  const hostHeader = String(req && req.headers && req.headers.host ? req.headers.host : '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  return hostHeader;
+}
+
+function matchesRequestHost(rawUrl, expectedHost) {
+  if (!rawUrl || !expectedHost) return false;
+  try {
+    const parsed = new URL(String(rawUrl).trim());
+    return String(parsed.host || '').toLowerCase() === expectedHost;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function hasTrustedCsrfSource(req) {
+  const expectedHost = resolveRequestHostForCsrf(req);
+  if (!expectedHost) return false;
+
+  const originHeader = String(req && req.headers && req.headers.origin ? req.headers.origin : '').trim();
+  if (originHeader) {
+    return matchesRequestHost(originHeader, expectedHost);
+  }
+
+  const refererHeader = String(req && req.headers && req.headers.referer ? req.headers.referer : '').trim();
+  if (refererHeader) {
+    return matchesRequestHost(refererHeader, expectedHost);
+  }
+
+  const fetchSite = String(req && req.headers && req.headers['sec-fetch-site'] ? req.headers['sec-fetch-site'] : '')
+    .trim()
+    .toLowerCase();
+  return fetchSite === 'same-origin' || fetchSite === 'same-site' || fetchSite === 'none';
+}
+
+app.use((req, res, next) => {
+  const method = String(req && req.method ? req.method : '').toUpperCase();
+  if (!CSRF_MUTATING_METHODS.has(method)) {
+    return next();
+  }
+  if (!req.session || !req.session.user) {
+    return next();
+  }
+  if (req.path === '/_bootstrap') {
+    return next();
+  }
+  if (hasTrustedCsrfSource(req)) {
+    return next();
+  }
+  if (req.accepts('json') || req.path.startsWith('/api') || req.path.startsWith('/admin/api')) {
+    return res.status(403).json({ error: 'csrf_blocked' });
+  }
+  return res.status(403).send('Forbidden (csrf)');
+});
+
 function normalizeSocketChannel(rawValue) {
   const normalized = String(rawValue || '').trim().toLowerCase();
   if (!SOCKET_CHANNELS.has(normalized)) return '';
@@ -7487,7 +7547,7 @@ function normalizeSubjectDraftName(value, maxLength = 140) {
   return sanitizeCompactText(
     String(value || '').replace(/\s+/g, ' ').trim(),
     maxLength
-  );
+  ).replace(/[<>]/g, '').trim();
 }
 
 async function getSubjectBindingCourseIds(subjectId) {

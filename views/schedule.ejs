@@ -3362,8 +3362,8 @@
       crossorigin="anonymous"
     ></script>
     <script>
-      const scheduleLocale = <%- JSON.stringify(localeCode) %>;
-      const scheduleViewText = <%- JSON.stringify(scheduleViewText) %>;
+      const scheduleLocale = <%- JSON.stringify(localeCode).replace(/</g, '\\u003c') %>;
+      const scheduleViewText = <%- JSON.stringify(scheduleViewText).replace(/</g, '\\u003c') %>;
       const scheduleText = <%- JSON.stringify({
         validationCheckField: t('schedule.validation.checkField'),
         fileNotSelected: t('schedule.file.notSelected'),
@@ -3447,11 +3447,11 @@
         messagesNoFiltered: lang === 'en' ? 'No updates match the current filters.' : 'Під поточні фільтри оновлень немає.',
         messagesPublishedRating: lang === 'en' ? 'Published rating' : 'Опублікований рейтинг',
         messagesTopPrefix: lang === 'en' ? 'Top' : 'Топ',
-      }) %>;
+      }).replace(/</g, '\\u003c') %>;
       const scheduleUiText = <%- JSON.stringify({
         roomLabel: lang === 'en' ? 'Room' : 'Кабінет',
         assetsLabel: lang === 'en' ? 'Files' : 'Файли',
-      }) %>;
+      }).replace(/</g, '\\u003c') %>;
       function wireSelectOpenState(root = document) {
         root.querySelectorAll('select.form-select').forEach((select) => {
           select.addEventListener('pointerdown', () => {
@@ -3624,7 +3624,7 @@
         syncCustomDeadlineGroups();
       }
 
-      const currentUserId = <%- JSON.stringify(userId || null) %>;
+      const currentUserId = <%- JSON.stringify(userId || null).replace(/</g, '\\u003c') %>;
       const welcomeModalEl = document.getElementById('welcomeModal');
       if (welcomeModalEl) {
         const welcomeModal = bootstrap.Modal.getOrCreateInstance(welcomeModalEl, { backdrop: true });
@@ -3658,15 +3658,15 @@
         }
       }
 
-      const isTeacherView = <%- JSON.stringify(role === 'teacher') %>;
-      const canManageAttendance = <%- JSON.stringify(Boolean(canManageAttendance)) %>;
-      const canSubmitHomework = <%- JSON.stringify(role === 'student' || role === 'starosta') %>;
-      const allowCrossGroupHomeworkFallback = <%- JSON.stringify(role === 'admin' || viewAs === 'student') %>;
+      const isTeacherView = <%- JSON.stringify(role === 'teacher').replace(/</g, '\\u003c') %>;
+      const canManageAttendance = <%- JSON.stringify(Boolean(canManageAttendance)).replace(/</g, '\\u003c') %>;
+      const canSubmitHomework = <%- JSON.stringify(role === 'student' || role === 'starosta').replace(/</g, '\\u003c') %>;
+      const allowCrossGroupHomeworkFallback = <%- JSON.stringify(role === 'admin' || viewAs === 'student').replace(/</g, '\\u003c') %>;
       const homeworkModal = document.getElementById('homeworkModal');
-      const homeworkData = <%- JSON.stringify(homework || []) %>;
-      const teacherHomeworkTemplates = <%- JSON.stringify(typeof teacherHomeworkTemplates !== 'undefined' ? teacherHomeworkTemplates : []) %>;
-      const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []) %>;
-      const teamworkDeadlineItems = <%- JSON.stringify(teamworkDeadlineItems || []) %>;
+      const homeworkData = <%- JSON.stringify(homework || []).replace(/</g, '\\u003c') %>;
+      const teacherHomeworkTemplates = <%- JSON.stringify(typeof teacherHomeworkTemplates !== 'undefined' ? teacherHomeworkTemplates : []).replace(/</g, '\\u003c') %>;
+      const customDeadlineItems = <%- JSON.stringify(customDeadlineItems || []).replace(/</g, '\\u003c') %>;
+      const teamworkDeadlineItems = <%- JSON.stringify(teamworkDeadlineItems || []).replace(/</g, '\\u003c') %>;
       const listEl = document.getElementById('homeworkList');
       const homeworkSubmitForm = document.getElementById('homeworkSubmitForm');
       const homeworkSubmitMeta = document.getElementById('homeworkSubmitMeta');
@@ -3681,7 +3681,7 @@
       const subgroupList = document.getElementById('subgroupList');
       const subgroupHomeworkId = document.getElementById('subgroupHomeworkId');
       const joinSubgroupId = document.getElementById('joinSubgroupId');
-      const currentUser = <%- JSON.stringify(username) %>;
+      const currentUser = <%- JSON.stringify(username).replace(/</g, '\\u003c') %>;
       const hwControlToggle = document.getElementById('hwControl');
       const hwTemplateSelect = document.getElementById('hwTemplateSelect');
       const hwTemplateApplyBtn = document.getElementById('hwTemplateApply');
@@ -4801,14 +4801,14 @@
       const densityChipEvening = document.getElementById('densityChipEvening');
       const densityChipPeak = document.getElementById('densityChipPeak');
       const totalWeeks = <%= totalWeeks || 15 %>;
-      const semesterStartDate = <%- JSON.stringify(semester && semester.start_date ? semester.start_date : null) %>;
+      const semesterStartDate = <%- JSON.stringify(semester && semester.start_date ? semester.start_date : null).replace(/</g, '\\u003c') %>;
       const kyivWeekFormatter = new Intl.DateTimeFormat(scheduleLocale, {
         day: 'numeric',
         month: 'short',
         timeZone: 'Europe/Kyiv',
       });
       let currentWeek = <%= currentWeek %>;
-      const weekLabelText = <%- JSON.stringify(t('schedule.week')) %>;
+      const weekLabelText = <%- JSON.stringify(t('schedule.week')).replace(/</g, '\\u003c') %>;
       function setDrawerOpen(open) {
         if (!scheduleDrawer) return;
         document.body.classList.toggle('schedule-drawer-open', open);
