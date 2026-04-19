@@ -1,7 +1,13 @@
 {
-  "version": "0.1.20",
-  "generatedAt": "2026-04-19T17:45:20.421Z",
+  "version": "0.1.21",
+  "generatedAt": "2026-04-19T17:54:42.796Z",
   "entries": [
+    {
+      "hash": "47a3b6bf042256a58fbdb8dc584421742e7fa0c2",
+      "shortHash": "47a3b6b",
+      "message": "feat(charredmap-admin): add occupation territory editor",
+      "date": "2026-04-19T20:53:57+03:00"
+    },
     {
       "hash": "2d9064107fc9952723f283cfe170fb7eec7de5cb",
       "shortHash": "2d90641",
