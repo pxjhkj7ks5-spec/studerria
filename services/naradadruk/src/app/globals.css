@@ -161,6 +161,32 @@ img {
   transition: border-color 180ms ease, background-color 180ms ease;
 }
 
+.field-shell select {
+  color-scheme: dark;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 3rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.88) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.05rem) calc(50% - 0.12rem),
+    calc(100% - 0.72rem) calc(50% - 0.12rem);
+  background-size: 0.42rem 0.42rem, 0.42rem 0.42rem;
+  background-repeat: no-repeat;
+}
+
+.field-shell select option,
+.field-shell select optgroup {
+  background: #151b24;
+  color: #ffffff;
+}
+
+.field-shell select::-ms-expand {
+  display: none;
+}
+
 .field-shell textarea {
   min-height: 7rem;
   resize: vertical;
