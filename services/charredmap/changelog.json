@@ -1,7 +1,13 @@
 {
-  "version": "0.1.21",
-  "generatedAt": "2026-04-19T17:54:42.796Z",
+  "version": "0.1.22",
+  "generatedAt": "2026-04-19T18:02:00.000Z",
   "entries": [
+    {
+      "hash": "36d0d7fcb8a47c22105d7ef2c12a8008581f6bff",
+      "shortHash": "36d0d7f",
+      "message": "fix(charredmap-hero): remove story rail and rebalance layout",
+      "date": "2026-04-19T21:01:07+03:00"
+    },
     {
       "hash": "47a3b6bf042256a58fbdb8dc584421742e7fa0c2",
       "shortHash": "47a3b6b",
