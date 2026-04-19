@@ -105,6 +105,17 @@ img {
   pointer-events: none;
 }
 
+.hero-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 24% 58%, rgba(255, 156, 74, 0.16), transparent 26%),
+    radial-gradient(circle at 73% 54%, rgba(92, 151, 214, 0.16), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 26%);
+  pointer-events: none;
+}
+
 .product-placeholder {
   display: grid;
   place-items: end start;

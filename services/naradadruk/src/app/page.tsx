@@ -14,7 +14,7 @@ export default async function HomePage() {
 
   return (
     <main>
-      <section className="surface-grid">
+      <section className="surface-grid hero-stage">
         <div className="mx-auto grid min-h-[100dvh] w-full max-w-[1400px] gap-10 px-4 pb-12 pt-6 md:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-14 lg:pb-16 lg:pt-8">
           <div className="flex min-h-[24rem] flex-col justify-between gap-10">
             <div className="flex items-center justify-between gap-4">

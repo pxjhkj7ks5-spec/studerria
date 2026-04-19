@@ -28,8 +28,8 @@ export default function RootLayout({
     <html lang="uk">
       <body className={`${displayFont.variable} ${bodyFont.variable}`}>
         <div className="relative min-h-screen overflow-x-hidden bg-[--ink] text-white">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,135,61,0.18),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(41,76,120,0.22),_transparent_28%),linear-gradient(180deg,_rgba(255,255,255,0.05),_transparent_24%)]" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[38rem] bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.07),_transparent_60%)] opacity-70" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_28%,_rgba(255,135,61,0.16),_transparent_30%),radial-gradient(circle_at_82%_26%,_rgba(41,76,120,0.2),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.04),_transparent_22%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-[10rem] h-[42rem] bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.08),_transparent_60%)] opacity-70" />
           <div className="relative flex min-h-screen flex-col">
             <div className="flex-1">{children}</div>
             <SiteFooter />
