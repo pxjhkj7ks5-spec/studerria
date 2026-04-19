@@ -74,6 +74,10 @@ export function getAdminStoriesRoute(adminPath = getAdminPath()) {
   return `${getAdminRoute(adminPath)}/stories`;
 }
 
+export function getAdminTerritoriesRoute(adminPath = getAdminPath()) {
+  return `${getAdminRoute(adminPath)}/territories`;
+}
+
 function getAdminCookiePath(adminPath = getAdminPath()) {
   return withBasePath(getAdminRoute(adminPath));
 }

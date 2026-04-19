@@ -10,6 +10,7 @@ import {
   getAdminPassword,
   getAdminRoute,
   getAdminStoriesRoute,
+  getAdminTerritoriesRoute,
   requireAdminSession,
 } from "@/lib/auth";
 import { withBasePath } from "@/lib/base-path";
@@ -20,6 +21,7 @@ import {
   upsertCityRecord,
   upsertStoryRecord,
 } from "@/lib/data";
+import { saveOccupationOverlay } from "@/lib/occupation-overlay";
 import { localStorageAdapter } from "@/lib/storage";
 
 export type ActionState = {
@@ -55,6 +57,10 @@ const deleteStorySchema = z.object({
 const storyStatusSchema = z.object({
   storyId: z.string().trim().min(1),
   publicationStatus: z.enum(publicationStatuses),
+});
+
+const occupationOverlaySchema = z.object({
+  overlayGeoJson: z.string().min(1),
 });
 
 function secureCompare(left: string, right: string) {
@@ -210,4 +216,30 @@ export async function setStoryPublicationStatusAction(formData: FormData) {
   revalidatePath(withBasePath(`/stories/${story.slug}`));
 
   redirect(`${getAdminStoriesRoute()}?saved=1`);
+}
+
+export async function saveOccupationOverlayAction(formData: FormData) {
+  await requireAdminSession();
+
+  const parsed = occupationOverlaySchema.safeParse({
+    overlayGeoJson: String(formData.get("overlayGeoJson") ?? ""),
+  });
+
+  if (!parsed.success) {
+    redirect(`${getAdminTerritoriesRoute()}?saved=0`);
+  }
+
+  try {
+    const overlay = JSON.parse(parsed.data.overlayGeoJson);
+    await saveOccupationOverlay(overlay);
+  } catch {
+    redirect(`${getAdminTerritoriesRoute()}?saved=0`);
+  }
+
+  revalidatePath(withBasePath("/"));
+  revalidatePath(withBasePath(getAdminRoute()));
+  revalidatePath(withBasePath(getAdminStoriesRoute()));
+  revalidatePath(withBasePath(getAdminTerritoriesRoute()));
+
+  redirect(`${getAdminTerritoriesRoute()}?saved=1`);
 }

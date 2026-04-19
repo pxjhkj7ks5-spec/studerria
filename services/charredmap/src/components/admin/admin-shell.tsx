@@ -27,6 +27,12 @@ export function AdminShell({ adminPath, children }: AdminShellProps) {
               Історії
             </Link>
             <Link
+              href={`/${adminPath}/territories`}
+              className="rounded-full border border-white/12 px-4 py-2 text-sm text-white transition hover:border-white/30"
+            >
+              Території
+            </Link>
+            <Link
               href={`/${adminPath}/stories/new`}
               className="rounded-full border border-white/12 px-4 py-2 text-sm text-white transition hover:border-white/30"
             >
