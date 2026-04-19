@@ -15,9 +15,9 @@ export default async function HomePage() {
   return (
     <main>
       <section className="surface-grid hero-stage">
-        <div className="mx-auto grid min-h-[100dvh] w-full max-w-[1400px] gap-10 px-4 pb-12 pt-6 md:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-14 lg:pb-16 lg:pt-8">
-          <div className="flex min-h-[24rem] flex-col justify-between gap-10">
-            <div className="reveal-up delay-1 flex items-center justify-between gap-4">
+        <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] w-full max-w-[1400px] content-center gap-8 px-4 pb-10 pt-4 md:px-6 md:pb-12 md:pt-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] lg:items-center lg:gap-10 lg:pb-14 lg:pt-6 xl:gap-14">
+          <div className="flex min-h-0 flex-col gap-6 md:gap-8 lg:py-8">
+            <div className="reveal-up delay-1 flex items-center justify-between gap-4 lg:pb-2">
               <a href={withBasePath("/")} className="font-display text-2xl tracking-[-0.05em] text-white">
                 Narada Druk
               </a>
@@ -31,12 +31,12 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="hero-reveal delay-2 max-w-3xl">
+            <div className="hero-reveal delay-2 max-w-[44rem]">
               <p className="text-xs uppercase tracking-[0.35em] text-[--accent]">3D друк та практичні аксесуари</p>
-              <h1 className="mt-5 font-display text-5xl tracking-[-0.07em] text-white md:text-7xl">
+              <h1 className="mt-4 font-display text-[clamp(3.35rem,7.4vw,6.15rem)] leading-[0.92] tracking-[-0.075em] text-white">
                 {settings.heroTitle}
               </h1>
-              <p className="mt-6 max-w-[56ch] text-base leading-8 text-[--muted] md:text-lg">
+              <p className="mt-5 max-w-[48ch] text-base leading-8 text-[--muted] md:text-lg">
                 {settings.heroSubtitle}
               </p>
 
@@ -50,15 +50,15 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="reveal-up delay-3 grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-              <div className="glass-panel interactive-card rounded-[2rem] p-5">
+            <div className="reveal-up delay-3 grid gap-3 md:grid-cols-[1.08fr_0.92fr] lg:mt-auto">
+              <div className="glass-panel hero-support-panel interactive-card rounded-[2rem] p-5">
                 <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">{settings.supportTitle}</p>
                 <p className="mt-4 max-w-[44ch] text-sm leading-7 text-[--muted]">{settings.supportBody}</p>
               </div>
 
               <div className="stagger-list grid gap-3">
                 {supportFacts.slice(0, 3).map((fact) => (
-                  <div key={fact} className="glass-panel interactive-card rounded-[1.5rem] px-4 py-3 text-sm text-[--muted]">
+                  <div key={fact} className="glass-panel hero-fact-card interactive-card rounded-[1.45rem] px-4 py-3.5 text-sm text-[--muted]">
                     {fact}
                   </div>
                 ))}
@@ -66,8 +66,8 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="reveal-up delay-3 grid gap-4 lg:pb-10">
-            <div className="glass-panel interactive-card grid gap-6 rounded-[2.25rem] p-5 md:grid-cols-[0.84fr_1.16fr] md:p-6">
+          <div className="reveal-up delay-3 grid gap-4 lg:max-w-[31rem] lg:justify-self-end">
+            <div className="glass-panel interactive-card grid gap-5 rounded-[2.25rem] p-5 md:grid-cols-[0.8fr_1.2fr] md:p-6">
               <div className="flex flex-col justify-between gap-6">
                 <div>
                   <p className="text-xs uppercase tracking-[0.28em] text-[--muted]">Асортимент</p>
@@ -77,10 +77,10 @@ export default async function HomePage() {
                 </div>
 
                 <div className="stagger-list grid gap-3 text-sm text-[--muted]">
-                  <div className="interactive-card rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3">
+                  <div className="category-summary-card interactive-card rounded-[1.25rem] px-4 py-3">
                     {settings.materialsNote}
                   </div>
-                  <div className="interactive-card rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3">
+                  <div className="category-summary-card interactive-card rounded-[1.25rem] px-4 py-3">
                     {settings.leadTimeNote}
                   </div>
                 </div>
@@ -91,7 +91,7 @@ export default async function HomePage() {
                   <a
                     key={category.id}
                     href={withBasePath(`/category/${category.slug}`)}
-                    className="interactive-card rounded-[1.4rem] border border-white/10 bg-white/[0.04] px-4 py-4 transition hover:border-white/20"
+                    className="category-tile interactive-card rounded-[1.4rem] px-4 py-4 transition"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <span className="font-display text-2xl tracking-[-0.04em] text-white">{category.name}</span>
