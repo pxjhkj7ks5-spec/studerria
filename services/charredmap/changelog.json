@@ -1,12 +1,54 @@
 {
-  "version": "0.1.22",
-  "generatedAt": "2026-04-19T18:02:00.000Z",
+  "version": "0.1.23",
+  "generatedAt": "2026-04-20T21:17:51.439Z",
   "entries": [
+    {
+      "hash": "b9ec0c94bb2b3fb2e16896d78735a2b7eabb5502",
+      "shortHash": "b9ec0c9",
+      "message": "Локальні покращення стабільності та зручності використання.",
+      "date": "2026-04-21T00:17:46+03:00"
+    },
+    {
+      "hash": "4931a340fee76d1e8d2202bf91cf82c0ff806fde",
+      "shortHash": "4931a34",
+      "message": "fix(naradadruk): remove shimmer stripe artifact",
+      "date": "2026-04-20T23:55:31+03:00"
+    },
+    {
+      "hash": "e412ca621ffb4bc795dc8787e1a0b75deb6c2496",
+      "shortHash": "e412ca6",
+      "message": "feat(naradadruk): enhance storefront motion polish",
+      "date": "2026-04-20T23:52:55+03:00"
+    },
+    {
+      "hash": "215a412adf9ca9b8ee2a838b50cb8204ba589bbb",
+      "shortHash": "215a412",
+      "message": "fix schedule generator term list and scope auto-refresh",
+      "date": "2026-04-20T23:51:08+03:00"
+    },
+    {
+      "hash": "5c6d12a8e3b137fdacbc8afb92a6667ce1280203",
+      "shortHash": "5c6d12a",
+      "message": "fix schedule generator term scope auto-apply",
+      "date": "2026-04-20T23:41:02+03:00"
+    },
+    {
+      "hash": "718d89f181806fa7736ff9ba51008a558f7e0c74",
+      "shortHash": "718d89f",
+      "message": "chore(release): bump versions for hero cleanup",
+      "date": "2026-04-19T21:01:53+03:00"
+    },
     {
       "hash": "36d0d7fcb8a47c22105d7ef2c12a8008581f6bff",
       "shortHash": "36d0d7f",
       "message": "fix(charredmap-hero): remove story rail and rebalance layout",
       "date": "2026-04-19T21:01:07+03:00"
+    },
+    {
+      "hash": "9bb44f6f7920ef3be04f25fde77613bb3ef1a749",
+      "shortHash": "9bb44f6",
+      "message": "chore(release): bump versions for territory editor",
+      "date": "2026-04-19T20:55:03+03:00"
     },
     {
       "hash": "47a3b6bf042256a58fbdb8dc584421742e7fa0c2",
@@ -15,10 +57,364 @@
       "date": "2026-04-19T20:53:57+03:00"
     },
     {
+      "hash": "27414f3d456943e661bb033354c004c976aa6df4",
+      "shortHash": "27414f3",
+      "message": "chore(release): bump versions for charredmap admin fix",
+      "date": "2026-04-19T20:46:08+03:00"
+    },
+    {
       "hash": "2d9064107fc9952723f283cfe170fb7eec7de5cb",
       "shortHash": "2d90641",
       "message": "fix(charredmap-admin): streamline moderation publishing",
       "date": "2026-04-19T20:44:44+03:00"
+    },
+    {
+      "hash": "08e8b37cf528e67dd95d538cf69bb695ce1aa6e7",
+      "shortHash": "08e8b37",
+      "message": "chore(release): update 1.6.82",
+      "date": "2026-04-19T20:43:18+03:00"
+    },
+    {
+      "hash": "70cad4d0e8181c41d0573e989eff8898208531e9",
+      "shortHash": "70cad4d",
+      "message": "fix(naradadruk): tighten hero spacing and glass depth",
+      "date": "2026-04-19T20:41:13+03:00"
+    },
+    {
+      "hash": "26f051321a50783775c17382a0aae930cdb6654a",
+      "shortHash": "26f0513",
+      "message": "fix(charredmap-hero): rebalance gutters and widen map",
+      "date": "2026-04-19T20:34:47+03:00"
+    },
+    {
+      "hash": "a21c4a9ce33248d0e3d6d1113a49b6060cbf8e16",
+      "shortHash": "a21c4a9",
+      "message": "feat(naradadruk): add motion to storefront",
+      "date": "2026-04-19T16:16:44+03:00"
+    },
+    {
+      "hash": "ecdbf5bd89132fcbd3e86c6f8be04a9ed945d13c",
+      "shortHash": "ecdbf5b",
+      "message": "feat(naradadruk): improve share metadata and favicon",
+      "date": "2026-04-19T15:56:14+03:00"
+    },
+    {
+      "hash": "89881b256fe8ddca78cd707669e58bad378c5813",
+      "shortHash": "89881b2",
+      "message": "fix(naradadruk): tighten empty catalog layout",
+      "date": "2026-04-19T15:51:39+03:00"
+    },
+    {
+      "hash": "9e55cd5ee74511d3814678d04b515cd14cbd84d9",
+      "shortHash": "9e55cd5",
+      "message": "fix(naradadruk): lower hero background",
+      "date": "2026-04-19T15:49:04+03:00"
+    },
+    {
+      "hash": "ba865def083befe16837a85a0f5b4ec2ecde8008",
+      "shortHash": "ba865de",
+      "message": "fix(naradadruk): polish catalog select",
+      "date": "2026-04-19T15:45:17+03:00"
+    },
+    {
+      "hash": "f39f9c8f9134c5f126cf74f80d658e2e11565a4f",
+      "shortHash": "f39f9c8",
+      "message": "Remove student home message block",
+      "date": "2026-04-19T15:43:12+03:00"
+    },
+    {
+      "hash": "d9e6d64ec1dd0e7224db757c02adcbbf86f7d814",
+      "shortHash": "d9e6d64",
+      "message": "feat(naradadruk): add catalog mvp service",
+      "date": "2026-04-19T15:27:21+03:00"
+    },
+    {
+      "hash": "3405c2a400a58efe502db6bc0a467916fda35e16",
+      "shortHash": "3405c2a",
+      "message": "Refine student home presentation",
+      "date": "2026-04-19T15:22:13+03:00"
+    },
+    {
+      "hash": "4ff1b04ba524800dce098790214fde4bf96ba079",
+      "shortHash": "4ff1b04",
+      "message": "Harden XSS/CSRF and update vulnerable dependencies",
+      "date": "2026-04-19T13:12:38+03:00"
+    },
+    {
+      "hash": "264e4e76f926d29cc09356deb55873257b60bd64",
+      "shortHash": "264e4e7",
+      "message": "Normalize student home layout",
+      "date": "2026-04-19T13:03:29+03:00"
+    },
+    {
+      "hash": "2ce7f7e0e8d62698dc33030c91bee79c3fc48b60",
+      "shortHash": "2ce7f7e",
+      "message": "Refine teacher home layout",
+      "date": "2026-04-18T23:38:50+03:00"
+    },
+    {
+      "hash": "dfcadb8c96c492594b293c104d9d81a05b8d8736",
+      "shortHash": "dfcadb8",
+      "message": "Simplify and localize teacher workspace templates",
+      "date": "2026-04-18T23:32:30+03:00"
+    },
+    {
+      "hash": "d2ebd6c5c307cd23fb25decc0ac21b151d78be9c",
+      "shortHash": "d2ebd6c",
+      "message": "Fix teacher workspace scope and simplify UI",
+      "date": "2026-04-18T23:18:02+03:00"
+    },
+    {
+      "hash": "8b29af0a2ae70151744d49ac1d8bfee764008248",
+      "shortHash": "8b29af0",
+      "message": "Simplify teacher home mission section",
+      "date": "2026-04-18T23:11:54+03:00"
+    },
+    {
+      "hash": "39b55e22e1b0d1b52663f53fce35965eb6b24f80",
+      "shortHash": "39b55e2",
+      "message": "fix(schedule): hide teacher filters and soften projection alert",
+      "date": "2026-04-18T23:06:46+03:00"
+    },
+    {
+      "hash": "31b24d324393d1bcd8690f8fc306cb6fcdb2cadf",
+      "shortHash": "31b24d3",
+      "message": "refactor(teacher-workspace): normalize scope filters and sync logic",
+      "date": "2026-04-18T23:04:44+03:00"
+    },
+    {
+      "hash": "4931c2563b99686ea4b1d15d1f37d7b92ec1490f",
+      "shortHash": "4931c25",
+      "message": "chore(changelog): simplify release notes and bump to 1.6.65",
+      "date": "2026-04-18T22:57:50+03:00"
+    },
+    {
+      "hash": "908db1dd4bfc3c6b8ce96be961c1fef5900d3f99",
+      "shortHash": "908db1d",
+      "message": "docs: update changelog script to read version.json from kma",
+      "date": "2026-04-18T21:38:03+03:00"
+    },
+    {
+      "hash": "645d8cd5174f7e59f561832386d3dcea054ad9e0",
+      "shortHash": "645d8cd",
+      "message": "chore: add release note that there are no updates yet for 1.6.65",
+      "date": "2026-04-18T21:33:37+03:00"
+    },
+    {
+      "hash": "453fe1e238b47698f45110c414c53bd3cd4633c1",
+      "shortHash": "453fe1e",
+      "message": "refactor: simplify session generator planning workspace UI",
+      "date": "2026-04-18T00:35:07+03:00"
+    },
+    {
+      "hash": "939a7d7debc6a55027a5fe0d6458b16549d82842",
+      "shortHash": "939a7d7",
+      "message": "fix: restore session generator window date builder reference",
+      "date": "2026-04-18T00:25:20+03:00"
+    },
+    {
+      "hash": "60b7085890fe1d70a2888f6fa64e5c565a8c7f52",
+      "shortHash": "60b7085",
+      "message": "fix(postgres-compat): normalize legacy boolean flags in teacher offerings",
+      "date": "2026-04-18T00:21:02+03:00"
+    },
+    {
+      "hash": "c3010cd7cb15d4c9d51f3910d1b473c431fccec2",
+      "shortHash": "c3010cd",
+      "message": "chore(rules): update release workflow guidance",
+      "date": "2026-04-18T00:15:04+03:00"
+    },
+    {
+      "hash": "eae842bc3d1fa75a01e0e7f01a1238efc84b94eb",
+      "shortHash": "eae842b",
+      "message": "tune(infra): add deploy-fast docs and lighter promtail polling",
+      "date": "2026-04-18T00:11:11+03:00"
+    },
+    {
+      "hash": "d3c86e098a790a71ca7ba33a8ad08f2b10d5d0a9",
+      "shortHash": "d3c86e0",
+      "message": "chore: remove claude artifacts",
+      "date": "2026-04-18T00:04:32+03:00"
+    },
+    {
+      "hash": "5b1b9ea179cc608353e2a62444c4af143df5c7fc",
+      "shortHash": "5b1b9ea",
+      "message": "feat(infra): add redis sessions and local log stack",
+      "date": "2026-04-18T00:03:58+03:00"
+    },
+    {
+      "hash": "474727797fcbb4ba758af9306a235fd06fe1651f",
+      "shortHash": "4747277",
+      "message": "refactor(teacher-workspace): polish workspace overview",
+      "date": "2026-04-16T20:10:35+03:00"
+    },
+    {
+      "hash": "2a1a63e77e2cdc4f94256283fdbc5a9d6326ba3a",
+      "shortHash": "2a1a63e",
+      "message": "refactor(admin): remove students tab from admin sections",
+      "date": "2026-04-16T19:53:41+03:00"
+    },
+    {
+      "hash": "3311a745bb5bbff1f4d3753138277160fe2ebb70",
+      "shortHash": "3311a74",
+      "message": "chore(changelog): switch to generalized release-note format",
+      "date": "2026-04-16T19:50:19+03:00"
+    },
+    {
+      "hash": "7d5f27fecdb0dd02d7ca0e4e01f4fe7a9d9dac83",
+      "shortHash": "7d5f27f",
+      "message": "docs(faq-about): sync copy with current site behavior",
+      "date": "2026-04-16T19:46:07+03:00"
+    },
+    {
+      "hash": "5537a078ad12f00186b12d7ce39086bafa5a72cd",
+      "shortHash": "5537a07",
+      "message": "feat(teamwork): show optional teamwork deadlines in schedule",
+      "date": "2026-04-16T19:42:28+03:00"
+    },
+    {
+      "hash": "1a4eb954e21976c2ec37d3221dc1070425652577",
+      "shortHash": "1a4eb95",
+      "message": "Fix exam schedule overlay and hide Students admin tab",
+      "date": "2026-04-16T19:14:09+03:00"
+    },
+    {
+      "hash": "de40464c1e25a0650c598a0ec81b1a156a58e644",
+      "shortHash": "de40464",
+      "message": "refactor attendance quick modal flow and scope ordering",
+      "date": "2026-04-16T19:02:51+03:00"
+    },
+    {
+      "hash": "b40ae06790e0ed55aa9e29cbfe2c7068cbe73c80",
+      "shortHash": "b40ae06",
+      "message": "fix session generator db compatibility and compact ui",
+      "date": "2026-04-16T18:52:53+03:00"
+    },
+    {
+      "hash": "8e7d4e8262fb4aeaff2ac9d2a238573e1cd71bfb",
+      "shortHash": "8e7d4e8",
+      "message": "feat restore essential schedule generator custom settings",
+      "date": "2026-04-16T18:47:58+03:00"
+    },
+    {
+      "hash": "351a3609f1f7e6eac658175a2c0db3b2594ff2ee",
+      "shortHash": "351a360",
+      "message": "fix schedule generator preview theme persistence",
+      "date": "2026-04-16T18:43:27+03:00"
+    },
+    {
+      "hash": "088e1a93fbffd648230462f3d73edc53df15bb88",
+      "shortHash": "088e1a9",
+      "message": "fix schedule generator semester dropdown filtering",
+      "date": "2026-04-16T18:41:29+03:00"
+    },
+    {
+      "hash": "4d147853f645d10fb3d42cad045141c10bb66f8b",
+      "shortHash": "4d14785",
+      "message": "refactor schedule generator global term matrix scope",
+      "date": "2026-04-16T01:18:19+03:00"
+    },
+    {
+      "hash": "6e5e55b71188f7a86bc247aa091db722e45012cd",
+      "shortHash": "6e5e55b",
+      "message": "fix my-day nearest classes visibility",
+      "date": "2026-04-16T00:51:30+03:00"
+    },
+    {
+      "hash": "9a1cd0a4583aef66c445b5c84a57390d45a94921",
+      "shortHash": "9a1cd0a",
+      "message": "chore(changelog): add 1.6.44 release notes from latest update",
+      "date": "2026-04-16T00:45:19+03:00"
+    },
+    {
+      "hash": "e3f3024efcf19f62867fa14a682b6f1679538d17",
+      "shortHash": "e3f3024",
+      "message": "refactor(home-generators-compact-ui): streamline role-based home data and declutter schedule/session generator pages",
+      "date": "2026-04-16T00:44:50+03:00"
+    },
+    {
+      "hash": "2b246c2521bd2aba2f4b0ce026a7d183b70eff20",
+      "shortHash": "2b246c2",
+      "message": "feat: add secret briefcase landing page",
+      "date": "2026-04-16T00:30:09+03:00"
+    },
+    {
+      "hash": "580dae8961e65ca7ba49b8831cfb58719c88659c",
+      "shortHash": "580dae8",
+      "message": "refactor teacher workspace to offering-first scope",
+      "date": "2026-04-15T23:35:56+03:00"
+    },
+    {
+      "hash": "99914dfb649834969e67558bbdb059c61e54651b",
+      "shortHash": "99914df",
+      "message": "refactor journal insights runtime storage cleanup",
+      "date": "2026-04-15T22:40:48+03:00"
+    },
+    {
+      "hash": "08d8445a65732fa92161333da39dc5c8b6685f16",
+      "shortHash": "08d8445",
+      "message": "refactor teacher hub for offering data type and trim legacy paths",
+      "date": "2026-04-15T22:37:14+03:00"
+    },
+    {
+      "hash": "6a83ba9a463c490c41e6917e77339c8f8404cffd",
+      "shortHash": "6a83ba9",
+      "message": "refactor teacher hub offering scope and simplify my day preload",
+      "date": "2026-04-15T22:33:27+03:00"
+    },
+    {
+      "hash": "3cc514bc4e6cff3cfe1a0babd6436b5d4f3169ae",
+      "shortHash": "3cc514b",
+      "message": "refactor(academic-setup): move terms to structure and add global term switch",
+      "date": "2026-04-15T12:42:33+03:00"
+    },
+    {
+      "hash": "1441711f12fac8e2ce7226fa024b3de9fd6aea1c",
+      "shortHash": "1441711",
+      "message": "refactor streamline academic setup operate tabs",
+      "date": "2026-04-15T01:01:38+03:00"
+    },
+    {
+      "hash": "ce2a26b70ec65710db904c02b506b28074483e7b",
+      "shortHash": "ce2a26b",
+      "message": "refactor hide bachelor stage templates ui",
+      "date": "2026-04-15T00:52:35+03:00"
+    },
+    {
+      "hash": "aae5742a3d0f15ec914c41b4dd5b7bc2b1538026",
+      "shortHash": "aae5742",
+      "message": "refactor hide subject templates ui",
+      "date": "2026-04-15T00:38:43+03:00"
+    },
+    {
+      "hash": "44d41c5a2dc35c57e372055a2b38e7c3007f18bf",
+      "shortHash": "44d41c5",
+      "message": "refactor remove academic setup sidebar status",
+      "date": "2026-04-15T00:23:32+03:00"
+    },
+    {
+      "hash": "6c5a2de3c9c36ee04415fb5bcc983357770023c0",
+      "shortHash": "6c5a2de",
+      "message": "feat add admin visit log page",
+      "date": "2026-04-15T00:21:40+03:00"
+    },
+    {
+      "hash": "3ee5419ac4b4daf79e2b891f2de1cdd5a20201ad",
+      "shortHash": "3ee5419",
+      "message": "fix security analytics visit identity",
+      "date": "2026-04-15T00:08:17+03:00"
+    },
+    {
+      "hash": "4ed3e41307580b5f5a691f5551a52db69715205b",
+      "shortHash": "4ed3e41",
+      "message": "refactor admin sidebar teamwork layout",
+      "date": "2026-04-14T23:59:33+03:00"
+    },
+    {
+      "hash": "abc871e673fe4098fd2dfc3026d2b5a0bb967685",
+      "shortHash": "abc871e",
+      "message": "refactor admin sidebar order",
+      "date": "2026-04-14T23:48:29+03:00"
     },
     {
       "hash": "aa3917a359998c2e4fc5360afaa3737c3fbe62e1",
