@@ -25,7 +25,7 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 body {
@@ -58,8 +58,8 @@ img {
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 -1px 0 rgba(255, 255, 255, 0.04),
     var(--panel-shadow);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .accent-pill,
@@ -119,7 +119,7 @@ img {
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 88%);
   opacity: 0.72;
   pointer-events: none;
-  animation: grid-drift 22s ease-in-out infinite;
+  animation: none;
 }
 
 .hero-stage::after {
@@ -131,7 +131,7 @@ img {
     radial-gradient(circle at 78% 42%, rgba(92, 151, 214, 0.18), transparent 25%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 24%);
   pointer-events: none;
-  animation: glow-drift 18s ease-in-out infinite;
+  animation: none;
 }
 
 .hero-support-panel {
@@ -150,7 +150,7 @@ img {
   background: radial-gradient(circle, rgba(255, 170, 106, 0.2) 0%, rgba(255, 170, 106, 0) 72%);
   opacity: 0.72;
   pointer-events: none;
-  animation: orb-breathe 8.5s ease-in-out infinite;
+  animation: none;
 }
 
 .hero-fact-card,
@@ -372,9 +372,7 @@ img {
 .interactive-card:hover {
   border-color: var(--line-strong);
   background-color: rgba(255, 255, 255, 0.05);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    var(--panel-shadow-hover);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .product-card-shell {
@@ -385,9 +383,7 @@ img {
 }
 
 .product-card-shell:hover {
-  box-shadow:
-    0 24px 52px rgba(3, 7, 14, 0.34),
-    0 10px 24px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .product-media {
@@ -420,8 +416,8 @@ img {
 }
 
 .group:hover .product-media img {
-  transform: scale(1.02);
-  filter: saturate(1.04) contrast(1.02);
+  transform: none;
+  filter: none;
 }
 
 .product-title-link {
@@ -508,11 +504,11 @@ img {
 }
 
 .ambient-layer--warm {
-  animation: ambient-drift-warm 20s ease-in-out infinite alternate;
+  animation: none;
 }
 
 .ambient-layer--halo {
-  animation: ambient-drift-halo 16s ease-in-out infinite alternate;
+  animation: none;
 }
 
 @keyframes orb-breathe {
