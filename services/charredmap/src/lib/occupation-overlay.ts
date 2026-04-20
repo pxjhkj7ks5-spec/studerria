@@ -9,6 +9,16 @@ export {
 } from "@/lib/occupation-overlay-shared";
 
 function getOverlayFilePath() {
+  const explicitPath = process.env.OCCUPATION_OVERLAY_FILE?.trim();
+  if (explicitPath) {
+    return path.resolve(explicitPath);
+  }
+
+  const uploadDir = process.env.UPLOAD_DIR?.trim();
+  if (uploadDir && path.isAbsolute(uploadDir)) {
+    return path.join(path.dirname(uploadDir), "occupied-territories-editorial.geojson");
+  }
+
   return path.join(process.cwd(), "src/data/occupied-territories-editorial.geojson");
 }
 

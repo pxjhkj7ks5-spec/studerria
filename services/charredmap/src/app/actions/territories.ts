@@ -30,7 +30,8 @@ export async function saveOccupationOverlayAction(formData: FormData) {
   try {
     const overlay = JSON.parse(parsed.data.overlayGeoJson);
     await saveOccupationOverlay(overlay);
-  } catch {
+  } catch (error) {
+    console.error("saveOccupationOverlayAction failed:", error);
     redirect(`${getAdminTerritoriesRoute()}?saved=0`);
   }
 

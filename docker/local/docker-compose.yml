@@ -78,6 +78,7 @@ services:
       NEXT_PUBLIC_BASE_PATH: /charredmap
       DATABASE_URL: file:/data/charredmap.db
       UPLOAD_DIR: /data/uploads
+      OCCUPATION_OVERLAY_FILE: ${CHARREDMAP_OVERLAY_FILE:-/data/occupied-territories-editorial.geojson}
       ADMIN_PATH: ${CHARREDMAP_ADMIN_PATH:-admin}
       ADMIN_PASSWORD: ${CHARREDMAP_ADMIN_PASSWORD:-change-me-charredmap-admin}
       SESSION_SECRET: ${CHARREDMAP_SESSION_SECRET:-change-me-charredmap-session-secret-change-this}
