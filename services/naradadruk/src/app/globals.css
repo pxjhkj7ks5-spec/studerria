@@ -331,9 +331,14 @@ img {
 
 @keyframes shimmer-sweep {
   0% {
+    opacity: 0;
     transform: translate3d(-160%, 0, 0) rotate(14deg);
   }
+  24% {
+    opacity: 1;
+  }
   100% {
+    opacity: 0;
     transform: translate3d(180%, 0, 0) rotate(14deg);
   }
 }
@@ -401,7 +406,6 @@ img {
 }
 
 .interactive-card:hover::after {
-  opacity: 1;
   animation: shimmer-sweep 980ms var(--ease-fluid) 1;
 }
 
