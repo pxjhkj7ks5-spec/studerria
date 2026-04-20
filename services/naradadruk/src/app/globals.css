@@ -25,7 +25,7 @@
 }
 
 html {
-  scroll-behavior: auto;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -58,8 +58,9 @@ img {
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 -1px 0 rgba(255, 255, 255, 0.04),
     var(--panel-shadow);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  contain: paint;
 }
 
 .accent-pill,
@@ -119,7 +120,9 @@ img {
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 88%);
   opacity: 0.72;
   pointer-events: none;
-  animation: none;
+  animation: grid-drift 22s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
 .hero-stage::after {
@@ -131,7 +134,9 @@ img {
     radial-gradient(circle at 78% 42%, rgba(92, 151, 214, 0.18), transparent 25%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 24%);
   pointer-events: none;
-  animation: none;
+  animation: glow-drift 18s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
 .hero-support-panel {
@@ -150,7 +155,9 @@ img {
   background: radial-gradient(circle, rgba(255, 170, 106, 0.2) 0%, rgba(255, 170, 106, 0) 72%);
   opacity: 0.72;
   pointer-events: none;
-  animation: none;
+  animation: orb-breathe 8.5s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
 .hero-fact-card,
@@ -365,25 +372,19 @@ img {
   isolation: isolate;
   transition:
     border-color 220ms ease,
-    background-color 220ms ease,
-    box-shadow 260ms ease;
+    background-color 220ms ease;
+  contain: paint;
 }
 
 .interactive-card:hover {
   border-color: var(--line-strong);
   background-color: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .product-card-shell {
   transition:
     border-color 220ms ease,
-    background-color 220ms ease,
-    box-shadow 280ms ease;
-}
-
-.product-card-shell:hover {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    background-color 220ms ease;
 }
 
 .product-media {
@@ -411,13 +412,13 @@ img {
 
 .product-media img {
   transition:
-    transform 560ms var(--ease-fluid),
-    filter 360ms ease;
+    transform 360ms var(--ease-fluid);
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .group:hover .product-media img {
-  transform: none;
-  filter: none;
+  transform: translateZ(0) scale(1.01);
 }
 
 .product-title-link {
@@ -504,11 +505,15 @@ img {
 }
 
 .ambient-layer--warm {
-  animation: none;
+  animation: ambient-drift-warm 20s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
 .ambient-layer--halo {
-  animation: none;
+  animation: ambient-drift-halo 16s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
 @keyframes orb-breathe {
