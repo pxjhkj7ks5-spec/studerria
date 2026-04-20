@@ -4,13 +4,13 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FeatureCollection, Position } from "geojson";
 import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { saveOccupationOverlayAction } from "@/app/actions/admin";
+import { saveOccupationOverlayAction } from "@/app/actions/territories";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { mapStyleUrl, ukraineBounds } from "@/lib/constants";
 import {
   normalizeOccupationOverlay,
   type OccupationOverlayFeature,
-} from "@/lib/occupation-overlay";
+} from "@/lib/occupation-overlay-shared";
 
 type OccupationOverlayEditorProps = {
   overlay: FeatureCollection;

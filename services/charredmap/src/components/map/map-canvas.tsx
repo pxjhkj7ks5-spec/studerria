@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { FeatureCollection } from "geojson";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -13,8 +13,17 @@ type MapCanvasProps = {
   occupationOverlay: FeatureCollection;
   activeStory?: SerializedStory | null;
   onSelectStory: (story: SerializedStory) => void;
-  onPreviewStory?: (story: SerializedStory) => void;
 };
+
+type MarkerRecord = {
+  marker: maplibregl.Marker;
+  element: HTMLButtonElement;
+  storyId: string;
+};
+
+const OVERLAY_SOURCE_ID = "occupation-overlay";
+const OVERLAY_FILL_LAYER_ID = "occupation-fill";
+const OVERLAY_LINE_LAYER_ID = "occupation-line";
 
 const relaxedUkraineBounds = [
   [ukraineBounds[0][0] - 4.8, ukraineBounds[0][1] - 3.4],
@@ -41,7 +50,8 @@ function buildPopupContent(story: SerializedStory) {
 
   const eyebrow = document.createElement("p");
   eyebrow.className = "charredmap-map-popup__eyebrow";
-  eyebrow.textContent = story.city.occupationStatus === "occupied" ? "Окуповане місто" : "Деокуповане місто";
+  eyebrow.textContent =
+    story.city.occupationStatus === "occupied" ? "Окуповане місто" : "Деокуповане місто";
 
   const title = document.createElement("p");
   title.className = "charredmap-map-popup__title";
@@ -58,38 +68,203 @@ function buildPopupContent(story: SerializedStory) {
   return wrapper;
 }
 
+function syncActiveMarkerState(markerElements: Map<string, HTMLButtonElement>, activeId: string | null) {
+  for (const [storyId, element] of markerElements) {
+    element.dataset.selected = storyId === activeId ? "true" : "false";
+  }
+}
+
+function clearMarkers(markers: MarkerRecord[]) {
+  markers.forEach(({ marker }) => marker.remove());
+  markers.length = 0;
+}
+
+function ensureOverlayLayers(map: maplibregl.Map, occupationOverlay: FeatureCollection) {
+  const overlaySource = map.getSource(OVERLAY_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+
+  if (overlaySource) {
+    overlaySource.setData(occupationOverlay);
+  } else {
+    map.addSource(OVERLAY_SOURCE_ID, {
+      type: "geojson",
+      data: occupationOverlay,
+    });
+  }
+
+  if (!map.getLayer(OVERLAY_FILL_LAYER_ID)) {
+    map.addLayer({
+      id: OVERLAY_FILL_LAYER_ID,
+      type: "fill",
+      source: OVERLAY_SOURCE_ID,
+      paint: {
+        "fill-color": "#ff8438",
+        "fill-opacity": 0.22,
+      },
+    });
+  }
+
+  if (!map.getLayer(OVERLAY_LINE_LAYER_ID)) {
+    map.addLayer({
+      id: OVERLAY_LINE_LAYER_ID,
+      type: "line",
+      source: OVERLAY_SOURCE_ID,
+      paint: {
+        "line-color": "#ffb178",
+        "line-width": 1.25,
+        "line-opacity": 0.85,
+      },
+    });
+  }
+}
+
+function mountMarkers(
+  map: maplibregl.Map,
+  stories: SerializedStory[],
+  popup: maplibregl.Popup,
+  canHover: boolean,
+  markers: MarkerRecord[],
+  markerElements: Map<string, HTMLButtonElement>,
+  onSelectStory: (story: SerializedStory) => void,
+) {
+  clearMarkers(markers);
+  markerElements.clear();
+
+  const storiesByCity = new Map<string, SerializedStory[]>();
+
+  for (const story of stories) {
+    const existing = storiesByCity.get(story.city.id) ?? [];
+    existing.push(story);
+    storiesByCity.set(story.city.id, existing);
+  }
+
+  for (const [, cityStories] of storiesByCity) {
+    cityStories.forEach((story, index) => {
+      const markerElement = document.createElement("button");
+      markerElement.type = "button";
+      markerElement.className = "charredmap-marker";
+      markerElement.dataset.occupation = story.city.occupationStatus;
+      markerElement.dataset.selected = "false";
+      markerElement.setAttribute("aria-label", `${story.title}. ${story.city.name}, ${story.city.oblast}.`);
+
+      const innerDot = document.createElement("span");
+      innerDot.className = "charredmap-marker__dot";
+
+      const pulse = document.createElement("span");
+      pulse.className = "charredmap-marker__pulse";
+
+      markerElement.appendChild(pulse);
+      markerElement.appendChild(innerDot);
+
+      const coordinates = getOffsetPoint(story, index, cityStories.length);
+      const showPopup = () => {
+        if (!canHover) {
+          return;
+        }
+
+        popup
+          .setLngLat(coordinates)
+          .setDOMContent(buildPopupContent(story))
+          .addTo(map);
+      };
+
+      const hidePopup = () => {
+        popup.remove();
+      };
+
+      markerElement.addEventListener("mouseenter", showPopup);
+      markerElement.addEventListener("focus", showPopup);
+      markerElement.addEventListener("mouseleave", hidePopup);
+      markerElement.addEventListener("blur", hidePopup);
+      markerElement.addEventListener("click", () => {
+        hidePopup();
+        onSelectStory(story);
+      });
+
+      const marker = new maplibregl.Marker({
+        element: markerElement,
+        anchor: "center",
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      markers.push({
+        marker,
+        element: markerElement,
+        storyId: story.id,
+      });
+      markerElements.set(story.id, markerElement);
+    });
+  }
+}
+
 export function MapCanvas({
   stories,
   occupationOverlay,
   activeStory = null,
   onSelectStory,
-  onPreviewStory,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markerElementsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
   const popupRef = useRef<maplibregl.Popup | null>(null);
-  const activeStoryRef = useRef<SerializedStory | null>(activeStory);
-  const selectStory = useEffectEvent(onSelectStory);
-  const previewStory = useEffectEvent((story: SerializedStory) => {
-    onPreviewStory?.(story);
-  });
+  const mapLoadedRef = useRef(false);
+  const markersRef = useRef<MarkerRecord[]>([]);
+  const markerElementsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  function syncActiveMarkerState(activeId: string | null) {
-    for (const [storyId, element] of markerElementsRef.current) {
-      element.dataset.selected = storyId === activeId ? "true" : "false";
-    }
-  }
+  const activeStoryRef = useRef<SerializedStory | null>(activeStory);
+  const latestStoriesRef = useRef(stories);
+  const latestOverlayRef = useRef(occupationOverlay);
+  const latestOnSelectStoryRef = useRef(onSelectStory);
+
+  useEffect(() => {
+    latestOnSelectStoryRef.current = onSelectStory;
+  }, [onSelectStory]);
 
   useEffect(() => {
     activeStoryRef.current = activeStory;
-    syncActiveMarkerState(activeStory?.id ?? null);
+    syncActiveMarkerState(markerElementsRef.current, activeStory?.id ?? null);
   }, [activeStory]);
 
   useEffect(() => {
-    if (!containerRef.current) {
+    latestStoriesRef.current = stories;
+
+    const map = mapRef.current;
+    const popup = popupRef.current;
+
+    if (!map || !popup || !mapLoadedRef.current) {
       return;
     }
+
+    const canHover = window.matchMedia("(hover: hover)").matches;
+    mountMarkers(
+      map,
+      stories,
+      popup,
+      canHover,
+      markersRef.current,
+      markerElementsRef.current,
+      (story) => latestOnSelectStoryRef.current(story),
+    );
+    syncActiveMarkerState(markerElementsRef.current, activeStoryRef.current?.id ?? null);
+  }, [stories]);
+
+  useEffect(() => {
+    latestOverlayRef.current = occupationOverlay;
+
+    const map = mapRef.current;
+    if (!map || !mapLoadedRef.current) {
+      return;
+    }
+
+    ensureOverlayLayers(map, occupationOverlay);
+  }, [occupationOverlay]);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) {
+      return;
+    }
+
+    const markers = markersRef.current;
+    const markerElements = markerElementsRef.current;
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -108,121 +283,46 @@ export function MapCanvas({
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
 
-    map.on("load", () => {
-      map.addSource("occupation-overlay", {
-        type: "geojson",
-        data: occupationOverlay,
-      });
-
-      map.addLayer({
-        id: "occupation-fill",
-        type: "fill",
-        source: "occupation-overlay",
-        paint: {
-          "fill-color": "#ff8438",
-          "fill-opacity": 0.22,
-        },
-      });
-
-      map.addLayer({
-        id: "occupation-line",
-        type: "line",
-        source: "occupation-overlay",
-        paint: {
-          "line-color": "#ffb178",
-          "line-width": 1.25,
-          "line-opacity": 0.85,
-        },
-      });
-
-      const canHover = window.matchMedia("(hover: hover)").matches;
-      const popup = new maplibregl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        closeOnMove: false,
-        focusAfterOpen: false,
-        offset: 18,
-        className: "charredmap-map-popup",
-        maxWidth: "280px",
-      });
-      popupRef.current = popup;
-
-      const storiesByCity = new Map<string, SerializedStory[]>();
-      const markerElements = new Map<string, HTMLButtonElement>();
-
-      for (const story of stories) {
-        const existing = storiesByCity.get(story.city.id) ?? [];
-        existing.push(story);
-        storiesByCity.set(story.city.id, existing);
-      }
-
-      for (const [, cityStories] of storiesByCity) {
-        cityStories.forEach((story, index) => {
-          const markerElement = document.createElement("button");
-          markerElement.type = "button";
-          markerElement.className = "charredmap-marker";
-          markerElement.dataset.occupation = story.city.occupationStatus;
-          markerElement.dataset.selected = "false";
-          markerElement.setAttribute(
-            "aria-label",
-            `${story.title}. ${story.city.name}, ${story.city.oblast}.`,
-          );
-
-          const innerDot = document.createElement("span");
-          innerDot.className = "charredmap-marker__dot";
-
-          const pulse = document.createElement("span");
-          pulse.className = "charredmap-marker__pulse";
-
-          markerElement.appendChild(pulse);
-          markerElement.appendChild(innerDot);
-
-          const coordinates = getOffsetPoint(story, index, cityStories.length);
-          const openPreview = () => {
-            previewStory(story);
-
-            if (!canHover) {
-              return;
-            }
-
-            popup
-              .setLngLat(coordinates)
-              .setDOMContent(buildPopupContent(story))
-              .addTo(map);
-          };
-
-          markerElement.addEventListener("mouseenter", openPreview);
-          markerElement.addEventListener("focus", openPreview);
-          markerElement.addEventListener("mouseleave", () => popup.remove());
-          markerElement.addEventListener("blur", () => popup.remove());
-          markerElement.addEventListener("click", () => {
-            previewStory(story);
-            selectStory(story);
-          });
-
-          new maplibregl.Marker({
-            element: markerElement,
-            anchor: "center",
-          })
-            .setLngLat(coordinates)
-            .addTo(map);
-
-          markerElements.set(story.id, markerElement);
-        });
-      }
-
-      markerElementsRef.current = markerElements;
-      syncActiveMarkerState(activeStoryRef.current?.id ?? null);
+    const canHover = window.matchMedia("(hover: hover)").matches;
+    const popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      closeOnMove: false,
+      focusAfterOpen: false,
+      offset: 18,
+      className: "charredmap-map-popup",
+      maxWidth: "280px",
     });
+    popupRef.current = popup;
+
+    const handleLoad = () => {
+      mapLoadedRef.current = true;
+      ensureOverlayLayers(map, latestOverlayRef.current);
+      mountMarkers(
+        map,
+        latestStoriesRef.current,
+        popup,
+        canHover,
+        markers,
+        markerElements,
+        (story) => latestOnSelectStoryRef.current(story),
+      );
+      syncActiveMarkerState(markerElements, activeStoryRef.current?.id ?? null);
+    };
+
+    map.on("load", handleLoad);
 
     return () => {
-      popupRef.current?.remove();
+      map.off("load", handleLoad);
+      mapLoadedRef.current = false;
+      popup.remove();
       popupRef.current = null;
-      markerElementsRef.current.clear();
-      mapRef.current = null;
+      clearMarkers(markers);
+      markerElements.clear();
       map.remove();
+      mapRef.current = null;
     };
-  }, [occupationOverlay, previewStory, selectStory, stories]);
+  }, []);
 
   return <div ref={containerRef} className="h-full min-h-[560px] w-full xl:min-h-[46rem] 2xl:min-h-[50rem]" />;
 }

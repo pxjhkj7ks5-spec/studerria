@@ -15,7 +15,7 @@ export function StorySheet({ story, onClose, compact = false }: StorySheetProps)
   const occupation = occupationMeta[story.city.occupationStatus];
 
   return (
-    <article className="relative flex h-full flex-col overflow-hidden rounded-[32px] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(5,6,8,0.92))] text-white">
+    <article className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(5,6,8,0.92))] text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.18),_transparent_26%),radial-gradient(circle_at_82%_12%,_rgba(255,255,255,0.08),_transparent_18%)]" />
 
       <div className="relative overflow-hidden border-b border-white/10">
@@ -48,6 +48,7 @@ export function StorySheet({ story, onClose, compact = false }: StorySheetProps)
             <button
               type="button"
               onClick={onClose}
+              aria-label="Закрити історію"
               className="rounded-full border border-white/12 bg-black/30 px-3 py-1 text-xs text-[--muted] transition hover:border-white/30 hover:text-white"
             >
               Закрити
@@ -81,7 +82,7 @@ export function StorySheet({ story, onClose, compact = false }: StorySheetProps)
         </div>
       </div>
 
-      <div className={`relative story-scrollbar flex-1 overflow-y-auto ${compact ? "p-5 md:p-6" : "p-6 md:p-8"}`}>
+      <div className={`relative story-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain ${compact ? "p-5 md:p-6" : "p-6 md:p-8"}`}>
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
           <div className="min-w-0 space-y-6">
             <StoryBody body={story.body} />
