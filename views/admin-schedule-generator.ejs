@@ -295,18 +295,18 @@
           <div class="card glass-panel mb-4">
             <div class="card-body">
               <div class="generator-section-title mb-2"><%= schedulePageText.scopeHint %></div>
-              <form method="GET" action="/admin/schedule-generator" class="row g-3">
+              <form method="GET" action="/admin/schedule-generator" class="row g-3" id="scheduleGeneratorScopeForm">
                 <input type="hidden" name="run" value="<%= run.id %>" />
                 <div class="col-12">
                   <label class="form-label"><%= schedulePageText.location %></label>
-                  <select class="form-select" name="location">
+                  <select class="form-select" name="location" id="scopeLocationSelect">
                     <option value="kyiv" <%= activeLocation === 'kyiv' ? 'selected' : '' %>><%= schedulePageText.locationKyiv %></option>
                     <option value="munich" <%= activeLocation === 'munich' ? 'selected' : '' %>><%= schedulePageText.locationMunich %></option>
                   </select>
                 </div>
                 <div class="col-12">
                   <label class="form-label"><%= schedulePageText.course %></label>
-                  <select class="form-select" name="course_id" <%= activeLocationCourses.length ? '' : 'disabled' %>>
+                  <select class="form-select" name="course_id" id="scopeCourseSelect" <%= activeLocationCourses.length ? '' : 'disabled' %>>
                     <% if (!activeLocationCourses.length) { %>
                       <option value=""><%= schedulePageText.noCourses %></option>
                     <% } else { %>
@@ -318,7 +318,7 @@
                 </div>
                 <div class="col-12">
                   <label class="form-label"><%= schedulePageText.semester %></label>
-                  <select class="form-select" name="semester_id" <%= scopedSemesters.length ? '' : 'disabled' %>>
+                  <select class="form-select" name="semester_id" id="scopeSemesterSelect" <%= scopedSemesters.length ? '' : 'disabled' %>>
                     <% if (!scopedSemesters.length) { %>
                       <option value=""><%= schedulePageText.noSemesters %></option>
                     <% } else { %>
@@ -329,9 +329,6 @@
                       <% }); %>
                     <% } %>
                   </select>
-                </div>
-                <div class="col-12 d-grid">
-                  <button class="btn btn-primary" type="submit"><%= schedulePageText.applyScope %></button>
                 </div>
               </form>
             </div>
@@ -627,6 +624,27 @@
       const advancedSlotSelect = document.getElementById('matrixAdvancedSlotSelect');
       const advancedSaveBtn = document.getElementById('matrixAdvancedSaveBtn');
       let activeRowId = null;
+      const scopeForm = document.getElementById('scheduleGeneratorScopeForm');
+      const scopeSelects = [
+        document.getElementById('scopeLocationSelect'),
+        document.getElementById('scopeCourseSelect'),
+        document.getElementById('scopeSemesterSelect'),
+      ].filter(Boolean);
+
+      if (scopeForm && scopeSelects.length) {
+        const submitScopeForm = () => {
+          if (scopeForm.dataset.submitting === '1') return;
+          scopeForm.dataset.submitting = '1';
+          if (typeof scopeForm.requestSubmit === 'function') {
+            scopeForm.requestSubmit();
+            return;
+          }
+          scopeForm.submit();
+        };
+        scopeSelects.forEach((select) => {
+          select.addEventListener('change', submitScopeForm);
+        });
+      }
 
       const getAdvancedLabel = (dayValue, slotValue) => {
         const day = String(dayValue || '').trim();

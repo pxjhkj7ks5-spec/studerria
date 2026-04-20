@@ -51425,7 +51425,8 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
           return false;
         }
         if (semesterIdsFromCatalog.size > 0) {
-          return semesterIdsFromCatalog.has(semesterId)
+          return !isArchivedSemester(semester)
+            || semesterIdsFromCatalog.has(semesterId)
             || selectedCourseItemSemesterIds.has(semesterId)
             || explicitSemesterIds.has(semesterId)
             || isActiveSemester(semester);
