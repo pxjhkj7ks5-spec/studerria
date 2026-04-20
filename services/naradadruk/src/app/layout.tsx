@@ -42,11 +42,6 @@ export const metadata: Metadata = {
     title: siteShareTitle,
     description: siteShareDescription,
   },
-  icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
-  },
 };
 
 export default function RootLayout({
