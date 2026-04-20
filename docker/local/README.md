@@ -68,10 +68,12 @@ For a normal application update, keep the existing PostgreSQL volume and run:
 cd ~/studerria
 git pull --rebase
 cd docker/local
-docker compose up --build -d
+docker compose pull naradadruk
+docker compose up -d
 docker compose ps
 docker compose logs --tail=100 app
 docker compose logs --tail=100 charredmap
+docker compose logs --tail=100 naradadruk
 ```
 
 Do not run `docker compose down -v` for a routine update, because that recreates database and cache volumes.
@@ -84,6 +86,7 @@ Use this path when there are no Dockerfile/dependency changes and you only need 
 cd ~/studerria
 git pull --rebase
 cd docker/local
+docker compose pull naradadruk
 docker compose up -d
 docker compose ps
 ```
@@ -98,7 +101,13 @@ CHARREDMAP_NODE_ENV=production
 If image build inputs changed (`Dockerfile`, `package.json`, `package-lock.json`, or build tooling), use:
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d naradadruk
+```
+
+If GHCR package access is private, authenticate once on the server before pulls:
+
+```bash
+echo "$GITHUB_TOKEN_WITH_READ_PACKAGES" | docker login ghcr.io -u "$GITHUB_USERNAME" --password-stdin
 ```
 
 ## Re-import the backup from scratch

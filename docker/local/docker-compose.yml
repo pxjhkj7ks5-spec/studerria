@@ -103,6 +103,7 @@ services:
       start_period: 30s
 
   naradadruk:
+    image: ${NARADADRUK_IMAGE:-ghcr.io/pxjhkj7ks5-spec/studerria-naradadruk:latest}
     build:
       context: ../../services/naradadruk
       dockerfile: Dockerfile
