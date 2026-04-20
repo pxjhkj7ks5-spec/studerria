@@ -8495,7 +8495,14 @@ async function getCoursesByLocation(location) {
   return (courses || []).filter((course) => {
     const isTeacher = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
     const courseLocation = String(course.location || 'kyiv').toLowerCase();
-    return !isTeacher && courseLocation === target;
+    const normalizedName = String(course.name || '').trim().toLowerCase();
+    const isGeneratorPlaceholderCourse = normalizedName === 'основний курс'
+      || normalizedName === 'base course'
+      || normalizedName === 'main course'
+      || normalizedName.startsWith('основний курс ')
+      || normalizedName.startsWith('base course ')
+      || normalizedName.startsWith('main course ');
+    return !isTeacher && !isGeneratorPlaceholderCourse && courseLocation === target;
   });
 }
 
@@ -51377,71 +51384,16 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
           && selectedSemestersByLocation[activeLocation][selectedGlobalCourseId]
       )
       : null;
-    const selectedCourseItemSemesterIds = new Set(
-      (items || [])
-        .filter((item) => Number(item.course_id || 0) === Number(selectedGlobalCourseId || 0))
-        .map((item) => Number(item.semester_id || 0))
-        .filter((value) => Number.isInteger(value) && value > 0)
-    );
-    let semesterIdsFromCatalog = new Set();
-    if (selectedGlobalCourseId) {
-      try {
-        const catalogSemesterRows = await db.all(
-          `
-            SELECT DISTINCT semester_id
-            FROM subject_grading_settings
-            WHERE course_id = ?
-          `,
-          [selectedGlobalCourseId]
-        );
-        semesterIdsFromCatalog = new Set((catalogSemesterRows || [])
-          .map((row) => Number(row.semester_id || 0))
-          .filter((value) => Number.isInteger(value) && value > 0));
-      } catch (_err) {
-        semesterIdsFromCatalog = new Set();
-      }
-    }
-    const explicitSemesterIds = new Set(
-      [requestedSemesterId, configuredSemesterId, selectedSemesterFromLocationMap]
-        .map((value) => Number(value || 0))
-        .filter((value) => Number.isInteger(value) && value > 0)
-    );
-    const isArchivedSemester = (semester) => (
-      semester && (semester.is_archived === true || Number(semester.is_archived || 0) === 1)
-    );
-    const isActiveSemester = (semester) => (
-      semester && (semester.is_active === true || Number(semester.is_active || 0) === 1)
-    );
     let selectedGlobalSemesters = selectedGlobalCourseId
       ? (semestersByCourse[selectedGlobalCourseId] || [])
       : [];
     if (selectedGlobalSemesters.length) {
       const filteredSemesters = selectedGlobalSemesters.filter((semester) => {
         const semesterId = Number(semester && semester.id ? semester.id : 0);
-        if (!Number.isInteger(semesterId) || semesterId < 1) return false;
-        if (isArchivedSemester(semester)
-          && !selectedCourseItemSemesterIds.has(semesterId)
-          && !explicitSemesterIds.has(semesterId)) {
-          return false;
-        }
-        if (semesterIdsFromCatalog.size > 0) {
-          return !isArchivedSemester(semester)
-            || semesterIdsFromCatalog.has(semesterId)
-            || selectedCourseItemSemesterIds.has(semesterId)
-            || explicitSemesterIds.has(semesterId)
-            || isActiveSemester(semester);
-        }
-        return !isArchivedSemester(semester)
-          || selectedCourseItemSemesterIds.has(semesterId)
-          || explicitSemesterIds.has(semesterId);
+        return Number.isInteger(semesterId) && semesterId > 0;
       });
       if (filteredSemesters.length) {
         selectedGlobalSemesters = filteredSemesters;
-      } else {
-        const fallbackNonArchived = selectedGlobalSemesters.filter((semester) => !isArchivedSemester(semester));
-        if (fallbackNonArchived.length) {
-          selectedGlobalSemesters = fallbackNonArchived;
-        }
       }
     }
     let selectedGlobalSemester = null;

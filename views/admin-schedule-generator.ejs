@@ -619,7 +619,12 @@
       }
 
       const advancedModalElement = document.getElementById('matrixAdvancedModal');
-      const advancedModal = advancedModalElement ? new bootstrap.Modal(advancedModalElement) : null;
+      const bootstrapModalCtor = window.bootstrap && typeof window.bootstrap.Modal === 'function'
+        ? window.bootstrap.Modal
+        : null;
+      const advancedModal = advancedModalElement && bootstrapModalCtor
+        ? new bootstrapModalCtor(advancedModalElement)
+        : null;
       const advancedDaySelect = document.getElementById('matrixAdvancedDaySelect');
       const advancedSlotSelect = document.getElementById('matrixAdvancedSlotSelect');
       const advancedSaveBtn = document.getElementById('matrixAdvancedSaveBtn');
