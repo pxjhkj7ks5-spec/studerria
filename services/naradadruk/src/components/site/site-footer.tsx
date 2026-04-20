@@ -2,7 +2,7 @@ import { withBasePath } from "@/lib/base-path";
 
 export function SiteFooter() {
   return (
-    <footer className="relative z-10 mt-16 border-t border-white/10">
+    <footer className="reveal-up delay-2 relative z-10 mt-16 border-t border-white/10">
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-4 py-8 text-sm text-[--muted] md:flex-row md:items-center md:justify-between md:px-6">
         <div>
           <div className="font-display text-base text-white">Narada Druk</div>
@@ -12,14 +12,14 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <a className="transition hover:text-white" href={withBasePath("/")}>
+          <a className="footer-link transition hover:text-white" href={withBasePath("/")}>
             Головна
           </a>
-          <a className="transition hover:text-white" href={withBasePath("/catalog")}>
+          <a className="footer-link transition hover:text-white" href={withBasePath("/catalog")}>
             Каталог
           </a>
           <a
-            className="transition hover:text-white"
+            className="footer-link transition hover:text-white"
             href="https://web.telegram.org/k/#@naradaprint"
             target="_blank"
             rel="noreferrer"
