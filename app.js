@@ -7929,6 +7929,69 @@ async function buildSubjectOptionStorageScope(subjectOptions = [], options = {})
   };
 }
 
+async function listAcademicV2LegacySubjectIdsForCourseSemester(courseId, semesterId) {
+  const normalizedCourseId = Number(courseId || 0);
+  const normalizedSemesterId = Number(semesterId || 0);
+  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return { term_ids: [], subject_ids: [] };
+  }
+  if (!Number.isInteger(normalizedSemesterId) || normalizedSemesterId < 1) {
+    return { term_ids: [], subject_ids: [] };
+  }
+
+  try {
+    const termRows = await db.all(
+      `
+        SELECT DISTINCT t.id
+        FROM academic_v2_groups g
+        JOIN academic_v2_cohorts c ON c.id = g.cohort_id
+        JOIN academic_v2_programs p ON p.id = c.program_id
+        JOIN academic_v2_terms t ON t.group_id = g.id
+        WHERE g.legacy_course_id = ?
+          AND t.legacy_semester_id = ?
+          AND COALESCE(g.is_active, TRUE) = TRUE
+          AND COALESCE(c.is_active, TRUE) = TRUE
+          AND COALESCE(p.is_active, TRUE) = TRUE
+      `,
+      [normalizedCourseId, normalizedSemesterId]
+    );
+    const termIds = Array.from(new Set(
+      (termRows || [])
+        .map((row) => Number(row.id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    if (!termIds.length) {
+      return { term_ids: [], subject_ids: [] };
+    }
+
+    const subjectRows = await db.all(
+      `
+        SELECT DISTINCT gs.legacy_subject_id AS subject_id
+        FROM academic_v2_group_subject_terms gst
+        JOIN academic_v2_group_subjects gs ON gs.id = gst.group_subject_id
+        WHERE gst.term_id = ANY(?::int[])
+          AND COALESCE(gs.is_visible, TRUE) = TRUE
+          AND COALESCE(gs.legacy_subject_id, 0) > 0
+      `,
+      [termIds]
+    );
+    const subjectIds = Array.from(new Set(
+      (subjectRows || [])
+        .map((row) => Number(row.subject_id || 0))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ));
+    return {
+      term_ids: termIds,
+      subject_ids: subjectIds,
+    };
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return { term_ids: [], subject_ids: [] };
+    }
+    throw err;
+  }
+}
+
 async function buildCourseDashboardStats(courseId, semesterId = null, options = {}) {
   const safeCourseId = Number(courseId || 0);
   const safeSemesterId = Number(semesterId || 0);
@@ -51415,23 +51478,42 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       ? ((subjectsByCourse[selectedGlobalCourseId] || []).filter((subject) => Number(subject.visible || 1) !== 0))
       : [];
     if (selectedGlobalCourseId && selectedGlobalSemesterId) {
-      try {
-        const semesterSubjectRows = await db.all(
-          `
-            SELECT DISTINCT subject_id
-            FROM subject_grading_settings
-            WHERE course_id = ? AND semester_id = ?
-          `,
-          [selectedGlobalCourseId, selectedGlobalSemesterId]
-        );
-        const semesterSubjectIdSet = new Set((semesterSubjectRows || [])
-          .map((row) => Number(row.subject_id || 0))
+      let scopedSubjectIdSet = null;
+      const academicV2ScopedSubjects = await listAcademicV2LegacySubjectIdsForCourseSemester(
+        selectedGlobalCourseId,
+        selectedGlobalSemesterId
+      );
+      if (Array.isArray(academicV2ScopedSubjects.term_ids) && academicV2ScopedSubjects.term_ids.length) {
+        scopedSubjectIdSet = new Set((academicV2ScopedSubjects.subject_ids || [])
+          .map((value) => Number(value || 0))
           .filter((value) => Number.isInteger(value) && value > 0));
-        if (semesterSubjectIdSet.size) {
-          selectedGlobalSubjects = selectedGlobalSubjects.filter((subject) => semesterSubjectIdSet.has(Number(subject.id || 0)));
+      }
+
+      if (!scopedSubjectIdSet) {
+        try {
+          const semesterSubjectRows = await db.all(
+            `
+              SELECT DISTINCT subject_id
+              FROM subject_grading_settings
+              WHERE course_id = ? AND semester_id = ?
+            `,
+            [selectedGlobalCourseId, selectedGlobalSemesterId]
+          );
+          const semesterSubjectIds = (semesterSubjectRows || [])
+            .map((row) => Number(row.subject_id || 0))
+            .filter((value) => Number.isInteger(value) && value > 0);
+          if (semesterSubjectIds.length) {
+            scopedSubjectIdSet = new Set(semesterSubjectIds);
+          }
+        } catch (_err) {
+          // Fallback to all visible subjects for the selected course.
         }
-      } catch (_err) {
-        // Fallback to all visible subjects for the selected course.
+      }
+
+      if (scopedSubjectIdSet) {
+        selectedGlobalSubjects = selectedGlobalSubjects.filter((subject) => (
+          scopedSubjectIdSet.has(Number(subject.id || 0))
+        ));
       }
     }
     selectedGlobalSubjects = [...selectedGlobalSubjects]
