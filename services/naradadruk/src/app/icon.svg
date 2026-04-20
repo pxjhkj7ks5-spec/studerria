@@ -1,20 +1,76 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="256" height="256" rx="64" fill="#0B1016" />
-  <rect x="16" y="16" width="224" height="224" rx="48" fill="url(#surface)" stroke="rgba(255,255,255,0.12)" />
-  <path d="M64 182V74H92L156 152V74H192V182H165L100 103V182H64Z" fill="url(#letter)" />
-  <circle cx="186" cy="76" r="18" fill="url(#accent)" />
+  <rect width="256" height="256" rx="64" fill="url(#bg)" />
+  <rect x="16" y="16" width="224" height="224" rx="48" fill="url(#glass)" stroke="url(#glassStroke)" stroke-width="2" />
+
+  <g opacity="0.3">
+    <path d="M60 48V208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M96 48V208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M132 48V208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M168 48V208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M204 48V208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M48 68H208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M48 104H208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M48 140H208" stroke="url(#grid)" stroke-width="1.25" />
+    <path d="M48 176H208" stroke="url(#grid)" stroke-width="1.25" />
+  </g>
+
+  <rect x="44" y="44" width="168" height="168" rx="40" fill="url(#panel)" stroke="url(#panelStroke)" stroke-width="2" />
+
+  <path d="M72 176V80H92L148 145V80H176V176H157L100 109V176H72Z" fill="url(#letter)" />
+
+  <g filter="url(#headGlow)">
+    <rect x="156" y="58" width="42" height="20" rx="10" fill="url(#head)" />
+    <path d="M177 78L186 94H168L177 78Z" fill="url(#head)" />
+  </g>
+
+  <path d="M115 188H176" stroke="url(#lineA)" stroke-width="6" stroke-linecap="round" />
+  <path d="M111 201H180" stroke="url(#lineB)" stroke-width="6" stroke-linecap="round" />
+
   <defs>
-    <linearGradient id="surface" x1="36" y1="28" x2="220" y2="228" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1A2737" />
-      <stop offset="1" stop-color="#0F1824" />
+    <linearGradient id="bg" x1="16" y1="8" x2="236" y2="248" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A1220" />
+      <stop offset="1" stop-color="#080C14" />
     </linearGradient>
-    <linearGradient id="letter" x1="64" y1="70" x2="197" y2="189" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F3F7FF" />
-      <stop offset="1" stop-color="#BDD4EE" />
+    <linearGradient id="glass" x1="36" y1="22" x2="226" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2B3A52" stop-opacity="0.58" />
+      <stop offset="1" stop-color="#1A2538" stop-opacity="0.4" />
     </linearGradient>
-    <linearGradient id="accent" x1="172" y1="58" x2="200" y2="94" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFB56F" />
-      <stop offset="1" stop-color="#FF8F35" />
+    <linearGradient id="glassStroke" x1="20" y1="20" x2="228" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B8D8FF" stop-opacity="0.32" />
+      <stop offset="1" stop-color="#8CA7CF" stop-opacity="0.18" />
     </linearGradient>
+    <linearGradient id="grid" x1="48" y1="48" x2="208" y2="208" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8DB5EA" stop-opacity="0.18" />
+      <stop offset="1" stop-color="#8DB5EA" stop-opacity="0.04" />
+    </linearGradient>
+    <linearGradient id="panel" x1="52" y1="52" x2="206" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3D4D65" stop-opacity="0.52" />
+      <stop offset="1" stop-color="#1B273A" stop-opacity="0.38" />
+    </linearGradient>
+    <linearGradient id="panelStroke" x1="48" y1="44" x2="210" y2="214" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E4F0FF" stop-opacity="0.22" />
+      <stop offset="1" stop-color="#A7C3EC" stop-opacity="0.12" />
+    </linearGradient>
+    <linearGradient id="letter" x1="72" y1="76" x2="179" y2="178" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6FAFF" />
+      <stop offset="1" stop-color="#C7DCF8" />
+    </linearGradient>
+    <linearGradient id="head" x1="161" y1="58" x2="194" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFC582" />
+      <stop offset="1" stop-color="#FF9343" />
+    </linearGradient>
+    <linearGradient id="lineA" x1="114" y1="188" x2="176" y2="188" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFBC75" />
+      <stop offset="1" stop-color="#FFA052" />
+    </linearGradient>
+    <linearGradient id="lineB" x1="110" y1="201" x2="180" y2="201" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB062" />
+      <stop offset="1" stop-color="#FF8D3E" />
+    </linearGradient>
+    <filter id="headGlow" x="148" y="52" width="58" height="50" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="1.5" result="effect1_foregroundBlur" />
+    </filter>
   </defs>
 </svg>
