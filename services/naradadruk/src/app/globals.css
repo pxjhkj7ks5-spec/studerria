@@ -329,20 +329,6 @@ img {
   }
 }
 
-@keyframes shimmer-sweep {
-  0% {
-    opacity: 0;
-    transform: translate3d(-160%, 0, 0) rotate(14deg);
-  }
-  24% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(180%, 0, 0) rotate(14deg);
-  }
-}
-
 .hero-reveal,
 .reveal-up {
   opacity: 0;
@@ -386,16 +372,6 @@ img {
   will-change: transform;
 }
 
-.interactive-card::after {
-  content: "";
-  position: absolute;
-  inset: -32%;
-  width: 36%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
-  opacity: 0;
-  pointer-events: none;
-}
-
 .interactive-card:hover {
   transform: translateY(-3px);
   border-color: var(--line-strong);
@@ -403,10 +379,6 @@ img {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     var(--panel-shadow-hover);
-}
-
-.interactive-card:hover::after {
-  animation: shimmer-sweep 980ms var(--ease-fluid) 1;
 }
 
 .product-card-shell {
@@ -602,7 +574,6 @@ img {
   .float-soft,
   .product-media::after,
   .interactive-card,
-  .interactive-card::after,
   .stagger-grid > *,
   .stagger-list > *,
   .ambient-layer {
