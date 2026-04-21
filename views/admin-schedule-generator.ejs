@@ -31,6 +31,7 @@
         additionalEmpty: 'Not set',
         additionalEdit: 'Day/slot',
         syncRows: 'Sync Rows',
+        autoSyncHint: 'Changes are saved automatically.',
         noRows: 'No subjects found for this semester.',
         extraItemsHint: (count) => `Hidden legacy rows in this scope: ${count}. They remain untouched until next sync for this scope.`,
         teacherSettingsMoved: 'Teacher day constraints are moved out of this page.',
@@ -99,6 +100,7 @@
         additionalEmpty: 'Не задано',
         additionalEdit: 'День/слот',
         syncRows: 'Синхронізувати таблицю',
+        autoSyncHint: 'Зміни зберігаються автоматично.',
         noRows: 'Для цього семестру предметів не знайдено.',
         extraItemsHint: (count) => `У цьому scope є приховані legacy-записи: ${count}. Вони зникнуть після синхронізації цього scope.`,
         teacherSettingsMoved: 'Налаштування робочих днів викладачів винесено зі сторінки генератора.',
@@ -478,6 +480,7 @@
                 <input type="hidden" name="active_location" value="<%= activeLocation %>" />
                 <input type="hidden" name="course_id" value="<%= scopedCourseId || '' %>" />
                 <input type="hidden" name="semester_id" value="<%= scopedSemesterId || '' %>" />
+                <input type="hidden" name="sync_mode" value="auto" />
 
                 <% if (!matrixRows.length) { %>
                   <div class="generator-empty"><%= schedulePageText.noRows %></div>
@@ -545,9 +548,7 @@
                       </tbody>
                     </table>
                   </div>
-                  <div class="d-grid d-md-flex justify-content-md-end mt-3">
-                    <button class="btn btn-primary" type="submit" <%= scopedCourseId && scopedSemesterId ? '' : 'disabled' %>><%= schedulePageText.syncRows %></button>
-                  </div>
+                  <div class="text-muted small text-end mt-3"><%= schedulePageText.autoSyncHint %></div>
                 <% } %>
               </form>
             </div>
@@ -628,7 +629,10 @@
       const advancedDaySelect = document.getElementById('matrixAdvancedDaySelect');
       const advancedSlotSelect = document.getElementById('matrixAdvancedSlotSelect');
       const advancedSaveBtn = document.getElementById('matrixAdvancedSaveBtn');
+      const bulkSyncForm = document.getElementById('bulkScheduleSyncForm');
       let activeRowId = null;
+      let bulkSyncDebounceId = null;
+      let queueBulkSyncSubmit = () => {};
       const scopeForm = document.getElementById('scheduleGeneratorScopeForm');
       const scopeSelects = [
         document.getElementById('scopeLocationSelect'),
@@ -649,6 +653,56 @@
         scopeSelects.forEach((select) => {
           select.addEventListener('change', submitScopeForm);
         });
+      }
+
+      if (bulkSyncForm) {
+        const resolveBulkSyncScopeKey = () => {
+          const runId = String((bulkSyncForm.querySelector('input[name="run_id"]') || {}).value || '').trim();
+          const courseId = String((bulkSyncForm.querySelector('input[name="course_id"]') || {}).value || '').trim();
+          const semesterId = String((bulkSyncForm.querySelector('input[name="semester_id"]') || {}).value || '').trim();
+          return `schedule-generator:auto-sync:${runId}:${courseId}:${semesterId}`;
+        };
+        const submitBulkSyncForm = () => {
+          if (bulkSyncForm.dataset.submitting === '1') return;
+          bulkSyncForm.dataset.submitting = '1';
+          if (typeof bulkSyncForm.requestSubmit === 'function') {
+            bulkSyncForm.requestSubmit();
+            return;
+          }
+          bulkSyncForm.submit();
+        };
+        queueBulkSyncSubmit = () => {
+          if (bulkSyncForm.dataset.submitting === '1') return;
+          if (bulkSyncDebounceId) {
+            window.clearTimeout(bulkSyncDebounceId);
+          }
+          bulkSyncDebounceId = window.setTimeout(() => {
+            bulkSyncDebounceId = null;
+            submitBulkSyncForm();
+          }, 250);
+        };
+
+        bulkSyncForm.addEventListener('change', (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (target.matches('input[name="row_pairs_count"], select[name="row_teacher_id"]')) {
+            queueBulkSyncSubmit();
+          }
+        });
+
+        const hasLegacyExtraRows = <%= extraItemsCount > 0 ? 'true' : 'false' %>;
+        if (hasLegacyExtraRows) {
+          const scopeKey = resolveBulkSyncScopeKey();
+          const alreadySynced = scopeKey && window.sessionStorage
+            ? window.sessionStorage.getItem(scopeKey) === '1'
+            : false;
+          if (!alreadySynced) {
+            if (scopeKey && window.sessionStorage) {
+              window.sessionStorage.setItem(scopeKey, '1');
+            }
+            submitBulkSyncForm();
+          }
+        }
       }
 
       const getAdvancedLabel = (dayValue, slotValue) => {
@@ -686,6 +740,7 @@
           dayInput.value = advancedDaySelect ? advancedDaySelect.value : '';
           slotInput.value = advancedSlotSelect ? advancedSlotSelect.value : '';
           label.textContent = getAdvancedLabel(dayInput.value, slotInput.value);
+          queueBulkSyncSubmit();
           if (advancedModal) advancedModal.hide();
         });
       }

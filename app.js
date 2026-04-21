@@ -52140,6 +52140,8 @@ app.post('/admin/schedule-generator/items/bulk-sync', requireScheduleGeneratorSe
   const courseId = Number(req.body.course_id);
   const semesterId = Number(req.body.semester_id);
   const activeLocation = normalizeGeneratorLocation(req.body.active_location || 'kyiv');
+  const syncMode = String(req.body.sync_mode || '').trim().toLowerCase();
+  const silentSync = syncMode === 'auto';
   if (
     !Number.isFinite(runId) || runId <= 0
     || !Number.isFinite(courseId) || courseId <= 0
@@ -52296,6 +52298,13 @@ app.post('/admin/schedule-generator/items/bulk-sync', requireScheduleGeneratorSe
       );
     });
 
+    if (silentSync) {
+      return res.redirect(buildScheduleGeneratorUrl(req, runId, {
+        location: activeLocation,
+        course_id: courseId,
+        semester_id: semesterId,
+      }));
+    }
     return res.redirect(buildScheduleGeneratorNoticeUrl(
       req,
       'ok',
