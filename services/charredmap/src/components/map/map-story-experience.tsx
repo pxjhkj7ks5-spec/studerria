@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { FeatureCollection } from "geojson";
 import type { SerializedStory } from "@/lib/data";
 import { MapCanvas } from "@/components/map/map-canvas";
@@ -17,6 +18,7 @@ export function MapStoryExperience({
 }: MapStoryExperienceProps) {
   const [selectedStory, setSelectedStory] = useState<SerializedStory | null>(null);
   const closeStory = () => setSelectedStory(null);
+  const canUsePortal = typeof document !== "undefined";
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -84,21 +86,25 @@ export function MapStoryExperience({
         </div>
       </div>
 
-      {selectedStory ? (
-        <div
-          className="story-fade-in fixed inset-0 z-50 flex items-end justify-center bg-[rgba(3,4,6,0.76)] p-4 backdrop-blur-sm md:items-center"
-          onClick={closeStory}
-          role="presentation"
-        >
+      {canUsePortal && selectedStory
+        ? createPortal(
           <div
-            className="glass-panel h-[90vh] max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-[34px]"
-            onClick={(event) => event.stopPropagation()}
+            className="story-fade-in fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(3,4,6,0.76)] p-3 backdrop-blur-sm sm:p-4 md:p-6"
+            onClick={closeStory}
             role="presentation"
           >
-            <StorySheet story={selectedStory} onClose={closeStory} compact />
+            <div
+              className="glass-panel h-auto max-h-[92dvh] w-full max-w-[min(1100px,96vw)] overflow-hidden rounded-[30px] sm:rounded-[34px]"
+              onClick={(event) => event.stopPropagation()}
+              role="presentation"
+            >
+              <StorySheet story={selectedStory} onClose={closeStory} compact />
+            </div>
           </div>
-        </div>
-      ) : null}
+          ,
+          document.body,
+        )
+        : null}
     </>
   );
 }

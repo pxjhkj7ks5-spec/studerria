@@ -82,6 +82,25 @@ button {
   cursor: pointer;
 }
 
+.charredmap-action-primary {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(245, 242, 236, 0.9);
+  color: #141414;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.charredmap-action-primary:hover,
+.charredmap-action-primary:focus-visible {
+  background: rgba(245, 242, 236, 0.82);
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+}
+
 ::selection {
   background: rgba(255, 132, 56, 0.38);
   color: var(--paper);

@@ -13,6 +13,8 @@ type StorySheetProps = {
 
 export function StorySheet({ story, onClose, compact = false }: StorySheetProps) {
   const occupation = occupationMeta[story.city.occupationStatus];
+  const heroHeightClass = compact ? "h-52 sm:h-60 md:h-[17.5rem]" : "h-64 md:h-[21rem]";
+  const heroPaddingClass = compact ? "p-5 md:p-6" : "p-5 md:p-8";
 
   return (
     <article className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(5,6,8,0.92))] text-white">
@@ -23,10 +25,10 @@ export function StorySheet({ story, onClose, compact = false }: StorySheetProps)
           <img
             src={withBasePath(story.coverImageUrl)}
             alt={story.title}
-            className="h-64 w-full object-cover md:h-[21rem]"
+            className={`${heroHeightClass} w-full object-cover`}
           />
         ) : (
-          <div className="flex h-64 items-end bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.55),_transparent_34%),linear-gradient(145deg,#101113,#050505)] p-6 md:h-[21rem]">
+          <div className={`flex ${heroHeightClass} items-end bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.55),_transparent_34%),linear-gradient(145deg,#101113,#050505)] p-6`}>
             <div className="max-w-lg space-y-3">
               <p className="text-xs uppercase tracking-[0.3em] text-[--accent-orange]">
                 {occupation.label}
@@ -56,7 +58,7 @@ export function StorySheet({ story, onClose, compact = false }: StorySheetProps)
           ) : null}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 p-5 md:p-8">
+        <div className={`absolute inset-x-0 bottom-0 ${heroPaddingClass}`}>
           <div className="max-w-3xl space-y-4">
             <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.22em] text-[#e8ddd4]/78">
               <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 backdrop-blur-xl">
@@ -136,7 +138,7 @@ export function StorySheet({ story, onClose, compact = false }: StorySheetProps)
             <div className="flex flex-col gap-3 pt-2">
               <Link
                 href={`/stories/${story.slug}`}
-                className="rounded-full bg-[--paper] px-4 py-2.5 text-center text-sm font-semibold text-black transition hover:bg-white"
+                className="charredmap-action-primary rounded-full px-4 py-2.5 text-center text-sm font-semibold"
               >
                 Окрема сторінка
               </Link>

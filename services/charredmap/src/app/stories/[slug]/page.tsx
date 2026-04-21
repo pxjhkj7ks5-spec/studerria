@@ -126,7 +126,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
                 <div className="mt-5 flex flex-col gap-3">
                   <a
                     href="#story-body"
-                    className="rounded-full bg-[--paper] px-4 py-2.5 text-center text-sm font-semibold text-black transition hover:bg-white"
+                    className="charredmap-action-primary rounded-full px-4 py-2.5 text-center text-sm font-semibold"
                   >
                     Перейти до тексту
                   </a>
