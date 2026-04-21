@@ -19,10 +19,10 @@ export default async function Home() {
         <div className="mx-auto grid w-full max-w-[1720px] gap-8 px-4 py-6 md:px-6 md:py-8 xl:gap-10 xl:grid-cols-[minmax(380px,0.64fr)_minmax(0,1.36fr)] xl:items-stretch 2xl:gap-12 2xl:grid-cols-[minmax(420px,0.72fr)_minmax(0,1.28fr)] 2xl:px-8">
           <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-center gap-8 py-4 md:min-h-[44rem] md:py-8 xl:pr-4 2xl:pr-6">
             <div className="space-y-8">
-              <div className="hero-reveal flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.34em] text-[--muted]">
+              <div className="hero-reveal flex items-center gap-3 whitespace-nowrap text-[10px] uppercase tracking-[0.3em] text-[--muted] sm:text-[11px]">
                 <span className="text-[--accent-orange]">charredmap</span>
                 <span className="h-px w-10 bg-white/14" />
-                <span>Редакційний атлас пам&apos;яті</span>
+                <span>Атлас пам&apos;яті</span>
               </div>
 
               <div className="hero-reveal space-y-6 [animation-delay:120ms]">
