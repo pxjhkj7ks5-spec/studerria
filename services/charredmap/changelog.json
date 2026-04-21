@@ -1,7 +1,121 @@
 {
-  "version": "0.1.24",
-  "generatedAt": "2026-04-20T21:36:04.844Z",
+  "version": "0.1.25",
+  "generatedAt": "2026-04-21T16:36:27.935Z",
   "entries": [
+    {
+      "hash": "bc45d49a0e5527f88a67b7279b8927fe57ac2235",
+      "shortHash": "bc45d49",
+      "message": "Мінорні оновлення сайту для покращення роботи.",
+      "date": "2026-04-21T19:36:21+03:00"
+    },
+    {
+      "hash": "f057ffd45e24acd7d086ab02c2c5947de8e27d8d",
+      "shortHash": "f057ffd",
+      "message": "fix changelog corrupted text entry",
+      "date": "2026-04-21T19:35:39+03:00"
+    },
+    {
+      "hash": "d0c60a52eeb816867461d5430490e05857874eb4",
+      "shortHash": "d0c60a5",
+      "message": "Remove decorative empty-state blobs in teamwork and journal",
+      "date": "2026-04-21T19:28:19+03:00"
+    },
+    {
+      "hash": "aa56160e1b466e64c0bea42fe85f67d36ecfb0c5",
+      "shortHash": "aa56160",
+      "message": "fix(naradadruk): stabilize trackpad scroll and refine hero",
+      "date": "2026-04-21T19:26:37+03:00"
+    },
+    {
+      "hash": "653c6d524375f186247e1434997ab8a872cef4eb",
+      "shortHash": "653c6d5",
+      "message": "feat academic setup global term start dates",
+      "date": "2026-04-21T19:18:48+03:00"
+    },
+    {
+      "hash": "b5ff5eacb2e9a405c722a7cbb0433ee6e99ab315",
+      "shortHash": "b5ff5ea",
+      "message": "refine schedule preview page to match schedule design",
+      "date": "2026-04-21T19:11:28+03:00"
+    },
+    {
+      "hash": "f98cf031473ea067f49b07294d630d797f3c82c2",
+      "shortHash": "f98cf03",
+      "message": "Add classic animations across key Studerria pages",
+      "date": "2026-04-21T19:02:51+03:00"
+    },
+    {
+      "hash": "803a65ec6d9cdc119edfef68d0a3f7f53651f45d",
+      "shortHash": "803a65e",
+      "message": "fix(naradadruk): reduce homepage scroll jank without removing motion",
+      "date": "2026-04-21T19:00:09+03:00"
+    },
+    {
+      "hash": "b5e6485929f04fd9e2200f54de44b43250b6ec49",
+      "shortHash": "b5e6485",
+      "message": "fix schedule generator preview run redirect",
+      "date": "2026-04-21T18:52:59+03:00"
+    },
+    {
+      "hash": "8bc8e4a40a33f784a2ea05581700d2fde32de187",
+      "shortHash": "8bc8e4a",
+      "message": "feat generator matrix auto-sync without manual button",
+      "date": "2026-04-21T18:46:40+03:00"
+    },
+    {
+      "hash": "963cba3ad6c2f8116f8be08e972512e76e409d5c",
+      "shortHash": "963cba3",
+      "message": "fix generator term selector canonical term ordering",
+      "date": "2026-04-21T18:41:52+03:00"
+    },
+    {
+      "hash": "e84e34502a090ed47fc292dded973c6fa45206ca",
+      "shortHash": "e84e345",
+      "message": "fix(naradadruk): keep animations while smoothing homepage scroll",
+      "date": "2026-04-21T01:12:20+03:00"
+    },
+    {
+      "hash": "b0133c7b459571cdc3d7b5077e8a2e8f9bfeb62b",
+      "shortHash": "b0133c7",
+      "message": "fix(naradadruk): reduce homepage scroll jank with css-only simplification",
+      "date": "2026-04-21T01:06:32+03:00"
+    },
+    {
+      "hash": "84cfac822f0fab368a9197e7b871f81b1dc851e3",
+      "shortHash": "84cfac8",
+      "message": "ci(naradadruk): publish GHCR image for faster server updates",
+      "date": "2026-04-21T01:04:24+03:00"
+    },
+    {
+      "hash": "1dde9e4e97df6914afc35003978f5d16d195cad1",
+      "shortHash": "1dde9e4",
+      "message": "fix(naradadruk): reduce hover jank on homepage scroll",
+      "date": "2026-04-21T00:58:50+03:00"
+    },
+    {
+      "hash": "32d2724999577517c95cfabc900c1f0d40237080",
+      "shortHash": "32d2724",
+      "message": "fix(naradadruk): restore favicon and speed up container startup",
+      "date": "2026-04-21T00:51:46+03:00"
+    },
+    {
+      "hash": "5c46a9d5589c0c0a81bf5d3a8a03c4c76a2f0f4a",
+      "shortHash": "5c46a9d",
+      "message": "feat(naradadruk): refresh favicon design",
+      "date": "2026-04-21T00:44:42+03:00"
+    },
+    {
+      "hash": "8e64840f9146b5aaba9dba2601ad28b566099b05",
+      "shortHash": "8e64840",
+      "message": "fix generator matrix subjects by bachelor catalog term",
+      "date": "2026-04-21T00:42:28+03:00"
+    },
+    {
+      "hash": "60a6f21807033d1ca8e36fa6358efb66955112d3",
+      "shortHash": "60a6f21",
+      "message": "fix(naradadruk): remove hover stripe artifact on cards",
+      "date": "2026-04-21T00:39:01+03:00"
+    },
     {
       "hash": "8b9f3f8214b0f1cedcc67591e7ba054d7506d0c8",
       "shortHash": "8b9f3f8",
