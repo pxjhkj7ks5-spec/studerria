@@ -817,7 +817,7 @@
 
       <% if (selectedSubjectId) { %>
         <% if (!tasks.length) { %>
-          <div class="glass p-4 text-center text-muted"><%= teamworkCopy.noTasks %></div>
+          <div class="glass p-4 text-center text-muted teamwork-empty-state"><%= teamworkCopy.noTasks %></div>
         <% } %>
 
         <section class="materials-feed">
@@ -1323,7 +1323,7 @@
       initScheduleVisibilityToggle();
 
       function initSubjectSwitchFeedback() {
-        const subjectLinks = Array.from(document.querySelectorAll('.subject-nav-pill[href]'));
+        const subjectLinks = Array.from(document.querySelectorAll('.subject-nav-pill'));
         if (!subjectLinks.length) return;
 
         const markPending = (link) => {

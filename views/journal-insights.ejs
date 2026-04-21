@@ -257,11 +257,29 @@
       .summary-card {
         position: relative;
         overflow: hidden;
+        --card-delay: 0ms;
         border-radius: 14px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: rgba(15, 23, 42, 0.28);
         padding: 12px;
+        transform: translateY(8px) scale(0.985);
+        opacity: 0;
+        animation: insights-card-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        animation-delay: var(--card-delay);
       }
+      .summary-grid .summary-card:nth-child(2) { --card-delay: 40ms; }
+      .summary-grid .summary-card:nth-child(3) { --card-delay: 80ms; }
+      .summary-grid .summary-card:nth-child(4) { --card-delay: 120ms; }
+      .summary-grid .summary-card:nth-child(5) { --card-delay: 160ms; }
+      .summary-grid .summary-card:nth-child(6) { --card-delay: 200ms; }
+      .summary-grid .summary-card:nth-child(7) { --card-delay: 240ms; }
+      .summary-grid .summary-card:nth-child(8) { --card-delay: 280ms; }
+      .summary-grid .summary-card:nth-child(9) { --card-delay: 320ms; }
+      .summary-grid .summary-card:nth-child(10) { --card-delay: 360ms; }
+      .summary-grid .summary-card:nth-child(11) { --card-delay: 400ms; }
+      .summary-grid .summary-card:nth-child(12) { --card-delay: 440ms; }
+      .summary-grid .summary-card:nth-child(13) { --card-delay: 480ms; }
+      .summary-grid .summary-card:nth-child(14) { --card-delay: 520ms; }
       .summary-card::before {
         content: '';
         position: absolute;
@@ -372,7 +390,20 @@
         width: var(--w, 0%);
         border-radius: 999px;
         background: linear-gradient(90deg, #38bdf8 0%, #818cf8 100%);
+        transform-origin: left center;
+        transform: scaleX(0);
+        animation: insights-trend-fill 680ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        animation-delay: 120ms;
       }
+      .trend-row:nth-child(2) .trend-bar { animation-delay: 170ms; }
+      .trend-row:nth-child(3) .trend-bar { animation-delay: 220ms; }
+      .trend-row:nth-child(4) .trend-bar { animation-delay: 270ms; }
+      .trend-row:nth-child(5) .trend-bar { animation-delay: 320ms; }
+      .trend-row:nth-child(6) .trend-bar { animation-delay: 370ms; }
+      .trend-row:nth-child(7) .trend-bar { animation-delay: 420ms; }
+      .trend-row:nth-child(8) .trend-bar { animation-delay: 470ms; }
+      .trend-row:nth-child(9) .trend-bar { animation-delay: 520ms; }
+      .trend-row:nth-child(10) .trend-bar { animation-delay: 570ms; }
       .trend-value {
         font-weight: 600;
         font-size: 0.82rem;
@@ -468,6 +499,37 @@
       }
       body.theme-light .insights-table tbody tr.ranking-row-top td {
         background: rgba(56, 189, 248, 0.08);
+      }
+      @keyframes insights-card-rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px) scale(0.985);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes insights-trend-fill {
+        from {
+          transform: scaleX(0);
+        }
+        to {
+          transform: scaleX(1);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .summary-card,
+        .trend-bar {
+          animation: none;
+        }
+        .summary-card {
+          opacity: 1;
+          transform: none;
+        }
+        .trend-bar {
+          transform: none;
+        }
       }
       @media (max-width: 991px) {
         .hero-grid {
