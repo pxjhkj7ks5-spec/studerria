@@ -52696,21 +52696,6 @@ app.post('/admin/schedule-generator/run', requireScheduleGeneratorSectionAccess,
 
     const courseContexts = new Map();
     const courseIds = Array.from(new Set(items.map((item) => String(item.course_id))));
-    const blockedCourseIds = [];
-    for (const courseId of courseIds) {
-      const courseScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: false }).catch(() => null);
-      if (courseScope && courseScope.source === 'academic_v2') {
-        blockedCourseIds.push(Number(courseId));
-      }
-    }
-    if (blockedCourseIds.length) {
-      return res.redirect(buildScheduleGeneratorNoticeUrl(
-        req,
-        'err',
-        'Academic v2 courses use the Academic Setup v2 schedule editor.',
-        runId
-      ));
-    }
     for (const courseId of courseIds) {
       const configuredSemesterId = getConfiguredCourseSemesterId(config, courseId, activeLocation);
       const scopedSemesterId = courseOnly && scopeSemesterId && Number(courseOnly) === Number(courseId)
