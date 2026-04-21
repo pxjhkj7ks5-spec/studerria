@@ -7992,6 +7992,56 @@ async function listAcademicV2LegacySubjectIdsForCourseSemester(courseId, semeste
   }
 }
 
+function parseAcademicTermNumberFromSemesterTitle(title) {
+  const rawTitle = String(title || '').trim();
+  if (!rawTitle) return null;
+  const match = rawTitle.match(/(?:term|терм|семестр)\s*([1-9][0-9]*)/i);
+  if (!match) return null;
+  const numeric = Number(match[1] || 0);
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+}
+
+async function listAcademicV2LegacyTermNumbersBySemesterId(courseId) {
+  const normalizedCourseId = Number(courseId || 0);
+  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return new Map();
+  }
+  try {
+    const rows = await db.all(
+      `
+        SELECT DISTINCT ON (t.legacy_semester_id)
+          t.legacy_semester_id AS semester_id,
+          t.term_number
+        FROM academic_v2_groups g
+        JOIN academic_v2_cohorts c ON c.id = g.cohort_id
+        JOIN academic_v2_programs p ON p.id = c.program_id
+        JOIN academic_v2_terms t ON t.group_id = g.id
+        WHERE g.legacy_course_id = ?
+          AND COALESCE(t.legacy_semester_id, 0) > 0
+          AND COALESCE(t.term_number, 0) IN (1, 2, 3)
+          AND COALESCE(g.is_active, TRUE) = TRUE
+          AND COALESCE(c.is_active, TRUE) = TRUE
+          AND COALESCE(p.is_active, TRUE) = TRUE
+        ORDER BY t.legacy_semester_id, t.term_number ASC, t.id ASC
+      `,
+      [normalizedCourseId]
+    );
+    return new Map(
+      (rows || [])
+        .map((row) => [Number(row.semester_id || 0), Number(row.term_number || 0)])
+        .filter(([semesterId, termNumber]) => (
+          Number.isInteger(semesterId) && semesterId > 0
+          && Number.isInteger(termNumber) && termNumber >= 1 && termNumber <= 3
+        ))
+    );
+  } catch (err) {
+    if (isDbSchemaCompatibilityError(err)) {
+      return new Map();
+    }
+    throw err;
+  }
+}
+
 async function buildCourseDashboardStats(courseId, semesterId = null, options = {}) {
   const safeCourseId = Number(courseId || 0);
   const safeSemesterId = Number(semesterId || 0);
@@ -51447,16 +51497,53 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
           && selectedSemestersByLocation[activeLocation][selectedGlobalCourseId]
       )
       : null;
+    const academicV2TermNumberBySemesterId = selectedGlobalCourseId
+      ? await listAcademicV2LegacyTermNumbersBySemesterId(selectedGlobalCourseId)
+      : new Map();
     let selectedGlobalSemesters = selectedGlobalCourseId
       ? (semestersByCourse[selectedGlobalCourseId] || [])
       : [];
     if (selectedGlobalSemesters.length) {
-      const filteredSemesters = selectedGlobalSemesters.filter((semester) => {
-        const semesterId = Number(semester && semester.id ? semester.id : 0);
-        return Number.isInteger(semesterId) && semesterId > 0;
-      });
-      if (filteredSemesters.length) {
-        selectedGlobalSemesters = filteredSemesters;
+      const normalizedSemesters = selectedGlobalSemesters
+        .map((semester) => {
+          const semesterId = Number(semester && semester.id ? semester.id : 0);
+          if (!Number.isInteger(semesterId) || semesterId < 1) return null;
+          const mappedTermNumber = Number(academicV2TermNumberBySemesterId.get(semesterId) || 0) || null;
+          const titleTermNumber = parseAcademicTermNumberFromSemesterTitle(semester.title);
+          const resolvedTermNumber = mappedTermNumber || titleTermNumber || null;
+          const displayTitle = Number.isInteger(resolvedTermNumber) && resolvedTermNumber > 0
+            ? `Term ${resolvedTermNumber}`
+            : String(semester.title || `Semester ${semesterId}`);
+          return {
+            ...semester,
+            term_number: resolvedTermNumber,
+            display_title: displayTitle,
+          };
+        })
+        .filter(Boolean);
+
+      const canonicalSemesters = normalizedSemesters
+        .filter((semester) => Number.isInteger(Number(semester.term_number || 0)) && Number(semester.term_number || 0) >= 1 && Number(semester.term_number || 0) <= 3);
+      if (canonicalSemesters.length) {
+        const byTermNumber = new Map();
+        canonicalSemesters.forEach((semester) => {
+          const termNumber = Number(semester.term_number || 0);
+          const existing = byTermNumber.get(termNumber);
+          if (!existing) {
+            byTermNumber.set(termNumber, semester);
+            return;
+          }
+          const currentMapped = academicV2TermNumberBySemesterId.has(Number(semester.id || 0));
+          const existingMapped = academicV2TermNumberBySemesterId.has(Number(existing.id || 0));
+          if (currentMapped && !existingMapped) {
+            byTermNumber.set(termNumber, semester);
+          }
+        });
+        selectedGlobalSemesters = Array.from(byTermNumber.entries())
+          .sort((left, right) => Number(left[0] || 0) - Number(right[0] || 0))
+          .map(([, semester]) => semester);
+      } else if (normalizedSemesters.length) {
+        selectedGlobalSemesters = normalizedSemesters;
       }
     }
     let selectedGlobalSemester = null;

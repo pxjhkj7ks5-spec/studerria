@@ -324,7 +324,7 @@
                     <% } else { %>
                       <% scopedSemesters.forEach(function(semester) { %>
                         <option value="<%= semester.id %>" <%= Number(semester.id) === Number(scopedSemesterId || 0) ? 'selected' : '' %>>
-                          <%= semester.title || ('Semester ' + semester.id) %> · <%= semester.weeks_count || '—' %>
+                          <%= semester.display_title || semester.title || ('Semester ' + semester.id) %> · <%= semester.weeks_count || '—' %>
                         </option>
                       <% }); %>
                     <% } %>
