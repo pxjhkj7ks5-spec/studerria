@@ -13,12 +13,12 @@ export default async function HomePage() {
   ]);
 
   return (
-    <main>
+    <main className="pb-6">
       <section className="surface-grid hero-stage">
-        <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] w-full max-w-[1400px] content-center gap-8 px-4 pb-10 pt-4 md:px-6 md:pb-12 md:pt-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] lg:items-center lg:gap-10 lg:pb-14 lg:pt-6 xl:gap-14">
+        <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] w-full max-w-[1400px] content-center gap-10 px-4 pb-10 pt-5 md:px-6 md:pb-12 md:pt-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] lg:items-center lg:gap-12 lg:pb-14 lg:pt-8 xl:gap-16">
           <div className="flex min-h-0 flex-col gap-6 md:gap-8 lg:py-8">
             <div className="reveal-up delay-1 flex items-center justify-between gap-4 lg:pb-2">
-              <a href={withBasePath("/")} className="font-display text-2xl tracking-[-0.05em] text-white">
+              <a href={withBasePath("/")} className="font-display text-[1.95rem] tracking-[-0.055em] text-white">
                 Narada Druk
               </a>
               <div className="hidden items-center gap-3 md:flex">
@@ -31,16 +31,16 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="hero-reveal delay-2 max-w-[44rem]">
+            <div className="hero-reveal delay-2 max-w-[45rem]">
               <p className="text-xs uppercase tracking-[0.35em] text-[--accent]">3D друк та практичні аксесуари</p>
-              <h1 className="mt-4 font-display text-[clamp(3.35rem,7.4vw,6.15rem)] leading-[0.92] tracking-[-0.075em] text-white">
+              <h1 className="mt-4 max-w-[10.5ch] font-display text-[clamp(3.1rem,7vw,5.75rem)] leading-[0.9] tracking-[-0.078em] text-white">
                 {settings.heroTitle}
               </h1>
-              <p className="mt-5 max-w-[48ch] text-base leading-8 text-[--muted] md:text-lg">
+              <p className="mt-6 max-w-[48ch] text-base leading-8 text-[--muted] md:text-lg">
                 {settings.heroSubtitle}
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-9 flex flex-wrap gap-3">
                 <a className="accent-pill" href={withBasePath("/catalog")}>
                   Дивитися каталог
                 </a>
@@ -66,8 +66,8 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="reveal-up delay-3 grid gap-4 lg:max-w-[31rem] lg:justify-self-end">
-            <div className="glass-panel interactive-card grid gap-5 rounded-[2.25rem] p-5 md:grid-cols-[0.8fr_1.2fr] md:p-6">
+          <div className="reveal-up delay-3 grid gap-4 lg:max-w-[32rem] lg:justify-self-end">
+            <div className="glass-panel interactive-card grid gap-5 rounded-[2.5rem] p-5 md:grid-cols-[0.8fr_1.2fr] md:p-7">
               <div className="flex flex-col justify-between gap-6">
                 <div>
                   <p className="text-xs uppercase tracking-[0.28em] text-[--muted]">Асортимент</p>
@@ -108,7 +108,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="deferred-section mx-auto mt-4 w-full max-w-[1400px] px-4 pb-10 md:px-6">
+      <section className="mx-auto mt-4 w-full max-w-[1400px] px-4 pb-10 md:px-6">
         <div className="stagger-grid grid gap-4 border-y border-white/10 py-8 md:grid-cols-4">
           {[
             settings.deliveryNote,
@@ -123,7 +123,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="deferred-section mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6">
+      <section className="mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6">
         <div className="reveal-up delay-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-[--accent]">Featured</p>
