@@ -51,14 +51,14 @@ export default async function HomePage() {
             </div>
 
             <div className="reveal-up delay-3 grid gap-3 md:grid-cols-[1.08fr_0.92fr] lg:mt-auto">
-              <div className="glass-panel hero-support-panel interactive-card rounded-[2rem] p-5">
+              <div className="glass-panel hero-support-panel panel-shell rounded-[2rem] p-5">
                 <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">{settings.supportTitle}</p>
                 <p className="mt-4 max-w-[44ch] text-sm leading-7 text-[--muted]">{settings.supportBody}</p>
               </div>
 
               <div className="stagger-list grid gap-3">
                 {supportFacts.slice(0, 3).map((fact) => (
-                  <div key={fact} className="glass-panel hero-fact-card interactive-card rounded-[1.45rem] px-4 py-3.5 text-sm text-[--muted]">
+                  <div key={fact} className="glass-panel hero-fact-card panel-shell rounded-[1.45rem] px-4 py-3.5 text-sm text-[--muted]">
                     {fact}
                   </div>
                 ))}
@@ -67,7 +67,7 @@ export default async function HomePage() {
           </div>
 
           <div className="reveal-up delay-3 grid gap-4 lg:max-w-[32rem] lg:justify-self-end">
-            <div className="glass-panel interactive-card grid gap-5 rounded-[2.5rem] p-5 md:grid-cols-[0.8fr_1.2fr] md:p-7">
+            <div className="glass-panel panel-shell grid gap-5 rounded-[2.35rem] p-5 md:grid-cols-[0.82fr_1.18fr] md:p-6">
               <div className="flex flex-col justify-between gap-6">
                 <div>
                   <p className="text-xs uppercase tracking-[0.28em] text-[--muted]">Асортимент</p>
@@ -77,10 +77,10 @@ export default async function HomePage() {
                 </div>
 
                 <div className="stagger-list grid gap-3 text-sm text-[--muted]">
-                  <div className="category-summary-card interactive-card rounded-[1.25rem] px-4 py-3">
+                  <div className="category-summary-card panel-shell rounded-[1.25rem] px-4 py-3">
                     {settings.materialsNote}
                   </div>
-                  <div className="category-summary-card interactive-card rounded-[1.25rem] px-4 py-3">
+                  <div className="category-summary-card panel-shell rounded-[1.25rem] px-4 py-3">
                     {settings.leadTimeNote}
                   </div>
                 </div>
@@ -116,7 +116,7 @@ export default async function HomePage() {
             settings.materialsNote,
             settings.contactNote,
           ].map((item) => (
-            <div key={item} className="interactive-card rounded-[1.5rem] border border-white/8 bg-white/[0.02] p-4 text-sm leading-7 text-[--muted]">
+            <div key={item} className="panel-shell rounded-[1.5rem] border border-white/8 bg-white/[0.02] p-4 text-sm leading-7 text-[--muted]">
               {item}
             </div>
           ))}

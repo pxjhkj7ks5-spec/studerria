@@ -25,7 +25,8 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
+  overflow-anchor: none;
 }
 
 body {
@@ -33,6 +34,7 @@ body {
   font-family: var(--font-body), sans-serif;
   background: var(--ink);
   color: white;
+  overflow-anchor: none;
 }
 
 a {
@@ -62,6 +64,12 @@ img {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   contain: paint;
+}
+
+.panel-shell {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .accent-pill,
@@ -524,6 +532,83 @@ img {
   animation: ambient-drift-halo 16s ease-in-out infinite alternate;
   will-change: transform, opacity;
   transform: translateZ(0);
+}
+
+html.nd-scrolling .surface-grid::before,
+html.nd-scrolling .hero-stage::after,
+html.nd-scrolling .hero-support-panel::before,
+html.nd-scrolling .ambient-layer--warm,
+html.nd-scrolling .ambient-layer--halo,
+html.nd-scrolling .float-soft {
+  animation-play-state: paused;
+}
+
+html.nd-scrolling .interactive-card,
+html.nd-scrolling .category-tile,
+html.nd-scrolling .product-card-shell,
+html.nd-scrolling .product-media::after,
+html.nd-scrolling .product-media img,
+html.nd-scrolling .product-title-link,
+html.nd-scrolling .accent-pill,
+html.nd-scrolling .ghost-pill,
+html.nd-scrolling .footer-link::after {
+  transition: none !important;
+}
+
+html.nd-scrolling .category-tile,
+html.nd-scrolling .product-card-shell,
+html.nd-scrolling .product-title-link,
+html.nd-scrolling .accent-pill,
+html.nd-scrolling .ghost-pill,
+html.nd-scrolling .footer-link {
+  pointer-events: none;
+}
+
+html.nd-scrolling .interactive-card:hover,
+html.nd-scrolling .category-tile:hover,
+html.nd-scrolling .product-card-shell:hover,
+html.nd-scrolling .accent-pill:hover,
+html.nd-scrolling .ghost-pill:hover,
+html.nd-scrolling .footer-link:hover::after,
+html.nd-scrolling .footer-link:focus-visible::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+html.nd-scrolling .interactive-card:hover,
+html.nd-scrolling .category-tile:hover {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: transparent !important;
+}
+
+html.nd-scrolling .product-card-shell:hover {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+html.nd-scrolling .accent-pill:hover {
+  background: var(--accent) !important;
+  color: var(--ink) !important;
+}
+
+html.nd-scrolling .ghost-pill:hover {
+  border-color: var(--line) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)) !important;
+}
+
+html.nd-scrolling .product-media::after {
+  opacity: 0 !important;
+  transform: translate3d(-32%, 0, 0) !important;
+}
+
+html.nd-scrolling .group:hover .product-media img,
+html.nd-scrolling .group:hover .product-title-link {
+  transform: translateZ(0) !important;
+  filter: none !important;
+  color: white !important;
+  text-shadow: none !important;
 }
 
 @keyframes orb-breathe {

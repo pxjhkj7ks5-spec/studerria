@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Outfit } from "next/font/google";
+import { ScrollPerformanceGuard } from "@/components/site/scroll-performance-guard";
 import { SiteFooter } from "@/components/site/site-footer";
 import {
   siteBaseUrl,
@@ -52,6 +53,7 @@ export default function RootLayout({
   return (
     <html lang="uk">
       <body className={`${displayFont.variable} ${bodyFont.variable}`}>
+        <ScrollPerformanceGuard />
         <div className="relative min-h-screen overflow-x-hidden bg-[--ink] text-white">
           <div className="ambient-layer ambient-layer--warm pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_28%,_rgba(255,135,61,0.16),_transparent_30%),radial-gradient(circle_at_82%_26%,_rgba(41,76,120,0.2),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.04),_transparent_22%)]" />
           <div className="ambient-layer ambient-layer--halo pointer-events-none absolute inset-x-0 top-[10rem] h-[42rem] bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.08),_transparent_60%)] opacity-70" />
