@@ -180,6 +180,23 @@
     numberOrZero(group && group.program_id) === selectedProgramGlobalTermsId
     && Boolean(group && group.is_active)
   ));
+  const selectedProgramGlobalTermGroupIds = new Set(
+    selectedProgramGlobalTermGroups
+      .map((group) => numberOrZero(group && group.id))
+      .filter((value) => value > 0)
+  );
+  const termStartDateByGroupId = allTermsList.reduce((map, term) => {
+    const groupId = numberOrZero(term && term.group_id);
+    const termNumber = numberOrZero(term && term.term_number);
+    if (!groupId || !selectedProgramGlobalTermGroupIds.has(groupId) || termNumber < 1 || termNumber > 3) {
+      return map;
+    }
+    if (!map.has(groupId)) {
+      map.set(groupId, new Map());
+    }
+    map.get(groupId).set(termNumber, String(term && term.start_date || '').trim());
+    return map;
+  }, new Map());
   const activeTermNumberByGroupId = allTermsList.reduce((map, term) => {
     const groupId = numberOrZero(term && term.group_id);
     if (!groupId) {
@@ -205,6 +222,31 @@
       active_count: activeCount,
     };
   });
+  const selectedProgramGlobalTermStartDateSummary = termOptions.map((termOption) => {
+    const dateCounters = new Map();
+    selectedProgramGlobalTermGroups.forEach((group) => {
+      const groupId = numberOrZero(group && group.id);
+      const groupDates = termStartDateByGroupId.get(groupId) || new Map();
+      const startDate = String(groupDates.get(Number(termOption.value)) || '').trim();
+      if (!startDate) {
+        return;
+      }
+      dateCounters.set(startDate, Number(dateCounters.get(startDate) || 0) + 1);
+    });
+    const rankedDates = Array.from(dateCounters.entries())
+      .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || String(left[0] || '').localeCompare(String(right[0] || '')));
+    const dominantDate = rankedDates.length ? String(rankedDates[0][0] || '') : '';
+    const dominantCount = rankedDates.length ? Number(rankedDates[0][1] || 0) : 0;
+    return {
+      ...termOption,
+      dominant_start_date: dominantDate,
+      dominant_count: dominantCount,
+      unique_dates_count: dateCounters.size,
+    };
+  });
+  const selectedProgramGlobalTermStartDateByNumber = new Map(
+    selectedProgramGlobalTermStartDateSummary.map((item) => [Number(item.value), String(item.dominant_start_date || '')])
+  );
   const selectedProgramGroupsWithoutActiveTerm = selectedProgramGlobalTermGroups.filter((group) => (
     numberOrZero(activeTermNumberByGroupId.get(numberOrZero(group && group.id))) < 1
   ));
@@ -1299,6 +1341,58 @@
                     >Застосувати до всіх курсів програми</button>
                   </div>
                 </form>
+
+                <form method="post" action="/admin/pathways/v2/terms/start-dates-program" class="academic-v2-subcard">
+                  <%- renderFocusFields() %>
+                  <input type="hidden" name="structure_tab" value="terms-global" />
+                  <div class="academic-v2-subcard-topline">Глобальні дати старту термів</div>
+                  <div class="academic-v2-form-grid academic-v2-form-grid--compact">
+                    <div class="academic-v2-field">
+                      <label for="globalTermsProgramDates">Програма</label>
+                      <select
+                        id="globalTermsProgramDates"
+                        class="form-select"
+                        name="program_id"
+                        <%= !(programs || []).length ? 'disabled' : '' %>
+                      >
+                        <% (programs || []).forEach((program) => { %>
+                          <option value="<%= program.id %>" <%= Number(program.id) === selectedProgramGlobalTermsId ? 'selected' : '' %>><%= program.name %> · <%= program.track_key %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <% termOptions.forEach((termOption) => { %>
+                      <div class="academic-v2-field">
+                        <label for="globalTermDate<%= termOption.value %>"><%= termOption.label %> · дата старту</label>
+                        <input
+                          id="globalTermDate<%= termOption.value %>"
+                          class="form-control"
+                          type="date"
+                          name="term_<%= termOption.value %>_start_date"
+                          value="<%= selectedProgramGlobalTermStartDateByNumber.get(Number(termOption.value)) || '' %>"
+                          <%= !selectedProgramGlobalTermsId ? 'disabled' : '' %>
+                        />
+                      </div>
+                    <% }); %>
+                  </div>
+                  <div class="academic-v2-chip-row mt-2">
+                    <% selectedProgramGlobalTermStartDateSummary.forEach((termSummary) => { %>
+                      <span class="academic-v2-chip <%= Number(termSummary.unique_dates_count || 0) > 1 ? 'academic-v2-chip--warm' : '' %>">
+                        <%= termSummary.label %>: <%= termSummary.dominant_start_date || 'дата не задана' %>
+                        <% if (Number(termSummary.dominant_count || 0) > 0) { %>
+                          · <%= Number(termSummary.dominant_count || 0) %>/<%= selectedProgramGlobalTermGroups.length %>
+                        <% } %>
+                      </span>
+                    <% }); %>
+                  </div>
+                  <div class="small academic-v2-muted mt-2">Порожнє поле не змінює дату терму. Заповни лише ті терми, які треба оновити.</div>
+                  <div class="academic-v2-actions mt-2">
+                    <button
+                      type="submit"
+                      class="btn btn-outline-secondary"
+                      <%= !selectedProgramGlobalTermsId ? 'disabled' : '' %>
+                    >Оновити дати термів для програми</button>
+                  </div>
+                </form>
               </div>
 
               <div class="academic-v2-subcard mt-3">
@@ -1311,11 +1405,14 @@
                           <th>Курс</th>
                           <th>Stage / Campus</th>
                           <th>Активний терм</th>
+                          <th>Дата старту активного терму</th>
                         </tr>
                       </thead>
                       <tbody>
                         <% selectedProgramGlobalTermGroups.forEach((group) => { %>
                           <% const currentTermNumber = numberOrZero(activeTermNumberByGroupId.get(numberOrZero(group.id))); %>
+                          <% const groupTermDateMap = termStartDateByGroupId.get(numberOrZero(group.id)) || new Map(); %>
+                          <% const currentTermStartDate = currentTermNumber ? String(groupTermDateMap.get(currentTermNumber) || '').trim() : ''; %>
                           <tr>
                             <td><strong><%= group.label %></strong></td>
                             <td><span class="academic-v2-muted">Stage <%= group.stage_number %> · <%= group.campus_key %></span></td>
@@ -1324,6 +1421,7 @@
                                 <%= currentTermNumber ? `Term ${currentTermNumber}` : 'Не вибрано' %>
                               </span>
                             </td>
+                            <td><span class="academic-v2-muted"><%= currentTermStartDate || 'дата не задана' %></span></td>
                           </tr>
                         <% }); %>
                       </tbody>

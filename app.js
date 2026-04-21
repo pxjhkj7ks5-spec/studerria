@@ -12411,6 +12411,7 @@ function getAcademicV2RouteMessages(req) {
     groupSaved: 'Групу збережено',
     groupProjectionRebuilt: 'Сумісну legacy-проекцію перебудовано',
     termSaved: 'Терм збережено',
+    programTermStartDatesUpdated: 'Дати старту термів оновлено для всіх курсів вибраної програми',
     termDeleted: 'Терм видалено',
     templateSaved: 'Шаблон предмета збережено',
     groupSubjectSaved: 'Предмет групи збережено',
@@ -12428,6 +12429,8 @@ function getAcademicV2RouteMessages(req) {
     GROUP_LABEL_REQUIRED: 'Назва групи обов’язкова',
     GROUP_REQUIRED: 'Спочатку виберіть групу',
     TERM_NOT_FOUND: 'Терм не знайдено',
+    TERM_START_DATE_REQUIRED: 'Вкажіть хоча б одну дату старту для термів',
+    TERM_START_DATE_INVALID: 'Некоректний формат дати терму. Використайте YYYY-MM-DD',
     TERM_NUMBER_ALREADY_EXISTS: 'У курсі вже існує терм із цим номером',
     CANONICAL_TERM_DELETE_BLOCKED: 'Фіксовані терми T1, T2 і T3 не можна видаляти',
     TEMPLATE_NAME_REQUIRED: 'Назва шаблону предмета обов’язкова',
@@ -12470,6 +12473,7 @@ function getAcademicV2RouteMessages(req) {
     groupSaved: 'Group saved',
     groupProjectionRebuilt: 'Legacy compatibility projection rebuilt',
     termSaved: 'Term saved',
+    programTermStartDatesUpdated: 'Term start dates were updated for all courses in the selected program',
     termDeleted: 'Term deleted',
     templateSaved: 'Subject template saved',
     groupSubjectSaved: 'Group subject saved',
@@ -12487,6 +12491,8 @@ function getAcademicV2RouteMessages(req) {
     GROUP_LABEL_REQUIRED: 'Group label is required',
     GROUP_REQUIRED: 'Select a group first',
     TERM_NOT_FOUND: 'Term not found',
+    TERM_START_DATE_REQUIRED: 'Provide at least one term start date',
+    TERM_START_DATE_INVALID: 'Invalid term date format. Use YYYY-MM-DD',
     TERM_NUMBER_ALREADY_EXISTS: 'That course already has a term with this number',
     CANONICAL_TERM_DELETE_BLOCKED: 'Fixed terms T1, T2, and T3 cannot be deleted',
     TEMPLATE_NAME_REQUIRED: 'Subject template name is required',
@@ -42265,6 +42271,22 @@ app.post('/admin/pathways/v2/terms/activate-program', requirePathwaysSectionAcce
       structure_tab: 'terms-global',
     }),
     logContext: 'admin.pathways.v2.term.activate-program',
+  })
+));
+
+app.post('/admin/pathways/v2/terms/start-dates-program', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.setProgramTermStartDates(getAcademicV2Store(), req.body),
+    successMessageKey: 'programTermStartDatesUpdated',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.row && result.row.program_id) || focus.programId,
+      termId: null,
+    }),
+    extraParamsBuilder: () => ({
+      structure_tab: 'terms-global',
+    }),
+    logContext: 'admin.pathways.v2.term.start-dates-program',
   })
 ));
 
