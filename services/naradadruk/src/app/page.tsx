@@ -108,7 +108,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto mt-4 w-full max-w-[1400px] px-4 pb-10 md:px-6">
+      <section className="deferred-section mx-auto mt-4 w-full max-w-[1400px] px-4 pb-10 md:px-6">
         <div className="stagger-grid grid gap-4 border-y border-white/10 py-8 md:grid-cols-4">
           {[
             settings.deliveryNote,
@@ -123,7 +123,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6">
+      <section className="deferred-section mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6">
         <div className="reveal-up delay-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-[--accent]">Featured</p>

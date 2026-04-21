@@ -58,8 +58,8 @@ img {
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 -1px 0 rgba(255, 255, 255, 0.04),
     var(--panel-shadow);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   contain: paint;
 }
 
@@ -107,6 +107,7 @@ img {
 
 .surface-grid {
   position: relative;
+  contain: paint;
 }
 
 .surface-grid::before {
@@ -115,9 +116,9 @@ img {
   inset: 0;
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 82%);
   background-size: 48px 48px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 88%);
   opacity: 0.72;
   pointer-events: none;
   animation: grid-drift 22s ease-in-out infinite;
@@ -137,6 +138,11 @@ img {
   animation: glow-drift 18s ease-in-out infinite;
   will-change: transform, opacity;
   transform: translateZ(0);
+}
+
+.deferred-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 720px;
 }
 
 .hero-support-panel {
@@ -379,12 +385,18 @@ img {
 .interactive-card:hover {
   border-color: var(--line-strong);
   background-color: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .product-card-shell {
   transition:
     border-color 220ms ease,
-    background-color 220ms ease;
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.product-card-shell:hover {
+  box-shadow: 0 16px 32px rgba(3, 7, 14, 0.18);
 }
 
 .product-media {
@@ -418,7 +430,7 @@ img {
 }
 
 .group:hover .product-media img {
-  transform: translateZ(0) scale(1.01);
+  transform: translateZ(0) scale(1.014);
 }
 
 .product-title-link {
