@@ -359,12 +359,54 @@ body.theme-dark.schedule-preview-page .navbar-brand {
   color: rgba(248, 250, 252, 0.92);
 }
 
-body.theme-light.schedule-preview-page .day-card .card-header {
-  color: #0f172a !important;
+.schedule-preview-page .schedule-preview-panel {
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 
-body.theme-light.schedule-preview-page .day-card .card-header .muted {
-  color: rgba(15, 23, 42, 0.65) !important;
+.schedule-preview-page .schedule-preview-panel .panel-section {
+  gap: 8px;
+}
+
+.schedule-preview-page .schedule-preview-course-form {
+  width: min(460px, 100%);
+}
+
+.schedule-preview-page .schedule-preview-course-form .form-select {
+  min-width: 260px;
+}
+
+.schedule-preview-page .schedule-preview-diff {
+  gap: 8px;
+}
+
+.schedule-preview-page .schedule-preview-publish-form {
+  display: grid;
+  gap: 10px;
+  max-width: 960px;
+}
+
+.schedule-preview-page .schedule-preview-publish-form .form-check {
+  margin: 0;
+}
+
+.schedule-preview-page .schedule-preview-publish-form .btn-primary {
+  min-width: 220px;
+}
+
+.schedule-preview-page .schedule-card.schedule-card--readonly {
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .schedule-preview-page .schedule-card.schedule-card--readonly:hover {
+    transform: none;
+    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+  }
+}
+
+body.theme-light.schedule-preview-page .schedule-card.schedule-card--readonly:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
 .schedule-preview-page .week-slider {

@@ -15,13 +15,13 @@
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/admin.css" />
-    <link rel="stylesheet" href="/css/pages/admin-schedule-generator.css" />
     <link rel="stylesheet" href="/css/pages/schedule.css" />
-      <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/pages/admin-schedule-generator.css" />
+    <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
-  <body class="studerria-theme theme-dark schedule-generator-page schedule-preview-page">
+  <body class="studerria-theme theme-dark page-schedule schedule-generator-page schedule-preview-page">
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <nav class="navbar navbar-expand-lg admin-nav">
@@ -52,7 +52,8 @@
       </div>
     </nav>
 
-    <main class="container py-4 schedule-content">
+    <main class="container pt-2 pb-4 schedule-content">
+      <% const localeCode = lang === 'en' ? 'en-US' : 'uk-UA'; %>
       <% if (messages && messages.error) { %>
         <div class="alert alert-danger"><%= messages.error %></div>
       <% } %>
@@ -74,11 +75,25 @@
           </div>
         </div>
       <% } %>
-      <div class="glass schedule-panel mb-4">
+      <% const previewStats = lastStats && lastStats.diff ? lastStats : null; %>
+      <% const previewDiff = previewStats ? previewStats.diff : null; %>
+      <% const overwriteCount = previewDiff ? Number(previewDiff.overwrite || 0) : 0; %>
+
+      <div class="glass week-hero liquid-card mb-4">
+        <div>
+          <h1 class="hero-title weekHeadline mb-1">Превʼю розкладу</h1>
+          <div class="hero-sub">Перевір розклад у форматі звичайної сторінки перед публікацією.</div>
+        </div>
+        <div class="hero-actions">
+          <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %> / <%= totalWeeks %></span>
+        </div>
+      </div>
+
+      <div class="glass schedule-panel liquid-card single-panel mb-4 schedule-preview-panel">
         <div class="panel-section">
           <div class="panel-title">Курс</div>
           <div class="panel-body">
-            <form method="GET" action="/admin/schedule-generator/<%= run.id %>/preview" class="d-flex gap-2 align-items-center">
+            <form method="GET" action="/admin/schedule-generator/<%= run.id %>/preview" class="d-flex gap-2 align-items-center schedule-preview-course-form">
               <input type="hidden" name="week" value="<%= currentWeek %>" />
               <input type="hidden" name="location" value="<%= selectedLocation || '' %>" />
               <input type="hidden" name="semester_id" value="<%= selectedSemesterId || '' %>" />
@@ -90,23 +105,13 @@
             </form>
           </div>
         </div>
-        <div class="panel-section">
-          <div class="panel-title">Тиждень</div>
-          <div class="panel-body">
-            <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %> / <%= totalWeeks %></span>
-          </div>
-        </div>
-        <% const previewStats = lastStats && lastStats.diff ? lastStats : null; %>
-        <% const previewDiff = previewStats ? previewStats.diff : null; %>
-        <% const overwriteCount = previewDiff ? Number(previewDiff.overwrite || 0) : 0; %>
         <div class="panel-section panel-sync">
           <div class="panel-title">Публікація</div>
           <% if (previewDiff) { %>
-            <div class="small text-muted">
-              Diff: +<%= previewDiff.added %> · ~<%= previewDiff.updated %> · −<%= previewDiff.removed %>
+            <div class="panel-body schedule-preview-diff">
+              <span class="sync-pill"><span class="chip">Diff</span> +<%= previewDiff.added %> · ~<%= previewDiff.updated %> · −<%= previewDiff.removed %></span>
+              <span class="sync-pill"><span class="chip">Перезапис</span> <%= overwriteCount %> слотів</span>
             </div>
-            <div class="small text-muted">Overwrite slots: <%= overwriteCount %></div>
-            <div class="small text-muted">Manual overwrite: TODO (needs `is_manual`).</div>
             <div class="small text-muted">Operation: <%= previewStats.operation_id || '—' %></div>
           <% } else { %>
             <div class="small text-muted">Немає даних превʼю. Спочатку згенеруйте розклад.</div>
@@ -114,7 +119,7 @@
           <form
             method="POST"
             action="/admin/schedule-generator/<%= run.id %>/publish"
-            class="d-flex flex-column gap-2 mt-2"
+            class="schedule-preview-publish-form mt-2"
             id="publishForm"
             data-has-preview="<%= previewDiff ? '1' : '0' %>"
             data-requires-typed="<%= publishRequiresTyped ? '1' : '0' %>"
@@ -128,60 +133,64 @@
               <input class="form-check-input" type="checkbox" name="confirm_overwrite" value="1" data-publish-confirm />
               Я розумію, що це перезапише <%= overwriteCount %> слотів
             </label>
-            <div class="small text-muted">Type PUBLISH to continue</div>
-            <input class="form-control form-control-sm" name="confirm_phrase" data-publish-phrase autocomplete="off" />
+            <label class="small text-muted" for="publishConfirmPhrase">Type PUBLISH to continue</label>
+            <input class="form-control" id="publishConfirmPhrase" name="confirm_phrase" data-publish-phrase autocomplete="off" />
             <label class="form-check small">
               <input class="form-check-input" type="checkbox" name="replace" value="1" checked />
               Замінити існуючий розклад для семестрів у превʼю
             </label>
-            <button class="btn btn-primary btn-sm" type="submit" id="publishBtn" <%= previewDiff ? '' : 'disabled' %>>Опублікувати</button>
+            <button class="btn btn-primary" type="submit" id="publishBtn" <%= previewDiff ? '' : 'disabled' %>>Опублікувати</button>
             <div class="small text-muted">Перед публікацією створимо backup CSV.</div>
           </form>
         </div>
       </div>
 
-      <div id="scheduleWeekGrid" class="row g-3">
+      <div id="scheduleWeekGrid">
         <% (daysOfWeek || []).forEach(function(day) { %>
           <% const list = scheduleByDay[day] || []; %>
-          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString('uk-UA') : ''; %>
-          <div class="col-12">
-            <div class="card glass day-card">
-              <div class="card-header fw-semibold text-white d-flex justify-content-between align-items-center">
-                <span><%= day %></span>
+          <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
+          <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
+            <div class="day-header">
+              <div class="day-title">
+                <span class="day-name dayTitle"><%= day %></span>
                 <% if (dateLabel) { %>
-                  <span class="small muted"><%= dateLabel %></span>
+                  <span class="day-date dayDate"><%= dateLabel %></span>
                 <% } %>
               </div>
-              <div class="card-body">
-                <% if (!list.length) { %>
-                  <div class="text-muted">Немає пар</div>
-                <% } else { %>
-                  <div class="list-group list-group-flush">
-                    <% list.forEach(function(cls) { %>
-                      <% const slot = bellSchedule[cls.class_number] || null; %>
-                      <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : `Пара ${cls.class_number}`; %>
-                      <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : cls.lesson_type; %>
-                      <div class="list-group-item schedule-card <%= cls.is_mirror ? 'is-mirror' : '' %>">
-                        <div class="d-flex justify-content-between align-items-center">
-                          <div>
-                            <div class="fw-semibold">
-                              <%= cls.subject_name %>
-                              <% if (typeLabel) { %>
-                                <span class="badge text-bg-secondary ms-2"><%= typeLabel %></span>
-                              <% } %>
-                              <% if (cls.is_mirror) { %>
-                                <span class="badge mirror-chip ms-2" title="Дзеркало<%= cls.mirror_key ? ': ' + cls.mirror_key : '' %>">A/B</span>
-                              <% } %>
-                            </div>
-                            <div class="small muted"><%= cls.group_label %> · <%= cls.teacher_name || 'Без викладача' %></div>
-                          </div>
-                          <div class="muted small"><%= timeLabel %></div>
-      </div>
-    </div>
-                    <% }); %>
+            </div>
+            <div class="list-group list-group-flush">
+              <% if (!list.length) { %>
+                <div class="list-group-item empty-state">Немає пар</div>
+              <% } else { %>
+                <% list.forEach(function(cls) { %>
+                  <% const slot = bellSchedule[cls.class_number] || null; %>
+                  <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : `Пара ${cls.class_number}`; %>
+                  <% const typeLabel = cls.lesson_type === 'lecture' ? 'Лекція' : cls.lesson_type === 'seminar' ? 'Семінар' : cls.lesson_type === 'lab' ? 'Лаб' : cls.lesson_type === 'practice' ? 'Практика' : (cls.lesson_type || ''); %>
+                  <div
+                    class="list-group-item schedule-card schedule-card--readonly liquid-card <%= cls.is_mirror ? 'is-mirror' : '' %>"
+                    role="article"
+                    aria-disabled="true"
+                  >
+                    <div class="schedule-card-inner">
+                      <div class="schedule-main">
+                        <div class="schedule-title-row">
+                          <div class="schedule-title classSubject"><%= cls.subject_name %></div>
+                          <% if (typeLabel) { %>
+                            <span class="lesson-pill"><%= typeLabel %></span>
+                          <% } %>
+                          <% if (cls.is_mirror) { %>
+                            <span class="mirror-chip" title="Дзеркало<%= cls.mirror_key ? ': ' + cls.mirror_key : '' %>">A/B</span>
+                          <% } %>
+                        </div>
+                        <div class="schedule-meta classMeta"><%= cls.group_label %> · <%= cls.teacher_name || 'Без викладача' %></div>
+                      </div>
+                      <div class="schedule-aside">
+                        <div class="schedule-time classTime"><%= timeLabel %></div>
+                      </div>
+                    </div>
                   </div>
-                <% } %>
-              </div>
+                <% }); %>
+              <% } %>
             </div>
           </div>
         <% }); %>
