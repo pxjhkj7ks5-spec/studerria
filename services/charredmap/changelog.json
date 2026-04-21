@@ -1,7 +1,25 @@
 {
-  "version": "0.1.25",
-  "generatedAt": "2026-04-21T16:36:27.935Z",
+  "version": "0.1.26",
+  "generatedAt": "2026-04-21T16:43:55.400Z",
   "entries": [
+    {
+      "hash": "a6d7795b3bd9e842169c3393f07353127fe769e1",
+      "shortHash": "a6d7795",
+      "message": "Локальні покращення стабільності та зручності використання.",
+      "date": "2026-04-21T19:43:48+03:00"
+    },
+    {
+      "hash": "a57253e3f939fe199d0ea5cfdcc79e96c5c43d36",
+      "shortHash": "a57253e",
+      "message": "Bust favicon cache with app version",
+      "date": "2026-04-21T19:42:38+03:00"
+    },
+    {
+      "hash": "1732098fdf8d7eb04f426c19d624919ce590bcf1",
+      "shortHash": "1732098",
+      "message": "feat brand studerria favicon",
+      "date": "2026-04-21T19:38:19+03:00"
+    },
     {
       "hash": "bc45d49a0e5527f88a67b7279b8927fe57ac2235",
       "shortHash": "bc45d49",
