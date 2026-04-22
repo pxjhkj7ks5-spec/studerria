@@ -47620,6 +47620,300 @@ app.post('/admin/schedule-windows', requireScheduleSectionAccess, async (req, re
   }
 });
 
+const SEMESTER_SUMMARY_LESSON_TYPE_LABELS = Object.freeze({
+  lecture: 'Лекція',
+  seminar: 'Семінар',
+  practice: 'Практика',
+  lab: 'Лабораторна',
+});
+
+const formatSemesterSummaryNumericRanges = (values = []) => {
+  const safeValues = Array.from(new Set((values || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)))
+    .sort((a, b) => a - b);
+  if (!safeValues.length) return '';
+  const ranges = [];
+  let rangeStart = safeValues[0];
+  let rangeEnd = safeValues[0];
+  for (let index = 1; index < safeValues.length; index += 1) {
+    const current = safeValues[index];
+    if (current === rangeEnd + 1) {
+      rangeEnd = current;
+      continue;
+    }
+    ranges.push(rangeStart === rangeEnd ? String(rangeStart) : `${rangeStart}-${rangeEnd}`);
+    rangeStart = current;
+    rangeEnd = current;
+  }
+  ranges.push(rangeStart === rangeEnd ? String(rangeStart) : `${rangeStart}-${rangeEnd}`);
+  return ranges.join(', ');
+};
+
+const formatSemesterSummaryWeekLabel = (weekNumbers = []) =>
+  formatSemesterSummaryNumericRanges(weekNumbers) || '—';
+
+const formatSemesterSummaryGroupLabel = (groupNumbers = []) => {
+  const safeGroups = Array.from(new Set((groupNumbers || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)))
+    .sort((a, b) => a - b);
+  if (!safeGroups.length) return '';
+  const rendered = formatSemesterSummaryNumericRanges(safeGroups);
+  return safeGroups.length === 1 ? `група ${rendered}` : `групи ${rendered}`;
+};
+
+const buildSemesterSummaryTable = async ({ courseId, semester }) => {
+  const normalizedCourseId = Number(courseId || 0);
+  const semesterId = Number(semester && semester.id || 0);
+  if (!Number.isInteger(normalizedCourseId) || normalizedCourseId < 1) {
+    return {
+      dayBuckets: [],
+      activeSubjects: [],
+      unscheduledActiveSubjects: [],
+      stats: {
+        active_subjects_total: 0,
+        scheduled_subjects_total: 0,
+        table_rows_total: 0,
+      },
+    };
+  }
+  if (!Number.isInteger(semesterId) || semesterId < 1) {
+    return {
+      dayBuckets: [],
+      activeSubjects: [],
+      unscheduledActiveSubjects: [],
+      stats: {
+        active_subjects_total: 0,
+        scheduled_subjects_total: 0,
+        table_rows_total: 0,
+      },
+    };
+  }
+
+  const scopedSubjects = await listAcademicV2LegacySubjectIdsForCourseSemester(normalizedCourseId, semesterId);
+  let activeSubjectIds = Array.from(new Set((scopedSubjects && scopedSubjects.subject_ids ? scopedSubjects.subject_ids : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)));
+
+  let activeSubjects = activeSubjectIds.length
+    ? await db.all(
+        `
+          SELECT id, name
+          FROM subjects
+          WHERE id = ANY(?::int[])
+            AND COALESCE(LOWER(TRIM(CAST(visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')
+          ORDER BY name ASC
+        `,
+        [activeSubjectIds]
+      )
+    : [];
+
+  const scheduleParams = [normalizedCourseId, semesterId];
+  let scheduleSql = `
+    SELECT
+      se.id,
+      se.subject_id,
+      se.group_number,
+      se.day_of_week,
+      se.class_number,
+      se.week_number,
+      COALESCE(se.lesson_type, '') AS lesson_type,
+      se.room_id,
+      s.name AS subject_name,
+      r.label AS room_name,
+      r.code AS room_code,
+      r.building AS room_building
+    FROM schedule_entries se
+    JOIN subjects s ON s.id = se.subject_id
+    LEFT JOIN rooms r ON r.id = se.room_id
+    WHERE se.course_id = ?
+      AND se.semester_id = ?
+      AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')
+  `;
+  if (activeSubjectIds.length) {
+    scheduleSql += ' AND se.subject_id = ANY(?::int[])';
+    scheduleParams.push(activeSubjectIds);
+  }
+  scheduleSql += `
+    ORDER BY se.day_of_week ASC,
+             se.class_number ASC,
+             COALESCE(se.week_number, 0) ASC,
+             s.name ASC,
+             COALESCE(se.group_number, 0) ASC,
+             se.id ASC
+  `;
+  const scheduleRows = await db.all(scheduleSql, scheduleParams);
+
+  if (!activeSubjects.length) {
+    const fallbackSubjectMap = new Map();
+    (scheduleRows || []).forEach((row) => {
+      const subjectId = Number(row && row.subject_id || 0);
+      if (!Number.isInteger(subjectId) || subjectId < 1) return;
+      if (!fallbackSubjectMap.has(subjectId)) {
+        fallbackSubjectMap.set(subjectId, {
+          id: subjectId,
+          name: String(row && row.subject_name || `Предмет ${subjectId}`),
+        });
+      }
+    });
+    activeSubjects = Array.from(fallbackSubjectMap.values())
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
+    activeSubjectIds = activeSubjects
+      .map((subject) => Number(subject.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  }
+
+  const teacherSubjectIds = Array.from(new Set([
+    ...activeSubjectIds,
+    ...(scheduleRows || [])
+      .map((row) => Number(row && row.subject_id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0),
+  ]));
+  const teacherMapBySubject = teacherSubjectIds.length
+    ? await getSessionSubjectTeacherMap(teacherSubjectIds)
+    : new Map();
+
+  const summaryBuckets = new Map();
+  (scheduleRows || []).forEach((row) => {
+    const dayName = normalizeWeekdayName(row && row.day_of_week) || String(row && row.day_of_week || '').trim();
+    const classNumber = Number(row && row.class_number || 0);
+    const subjectId = Number(row && row.subject_id || 0);
+    if (!dayName || !Number.isInteger(classNumber) || classNumber < 1 || !Number.isInteger(subjectId) || subjectId < 1) {
+      return;
+    }
+
+    const lessonType = String(row && row.lesson_type || '').trim().toLowerCase();
+    const groupNumber = Number(row && row.group_number || 0);
+    const resolvedTeachers = resolveSessionTeachersForGroup(
+      teacherMapBySubject,
+      subjectId,
+      Number.isInteger(groupNumber) && groupNumber > 0 ? groupNumber : null
+    );
+    const teacherNames = resolvedTeachers
+      .map((teacher) => String(teacher && teacher.name || '').trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'uk'));
+    const roomLabel = row && row.room_id
+      ? roomHelpers.buildRoomLabel({
+          label: row.room_name,
+          code: row.room_code,
+          building: row.room_building,
+        })
+      : '';
+    const bucketKey = [
+      dayName,
+      classNumber,
+      subjectId,
+      lessonType || 'lesson',
+      teacherNames.join('|') || 'no-teacher',
+      roomLabel || 'no-room',
+    ].join('::');
+
+    if (!summaryBuckets.has(bucketKey)) {
+      summaryBuckets.set(bucketKey, {
+        subject_id: subjectId,
+        subject_name: String(row && row.subject_name || `Предмет ${subjectId}`),
+        lesson_type: lessonType,
+        day_name: dayName,
+        class_number: classNumber,
+        week_numbers: new Set(),
+        group_numbers: new Set(),
+        teacher_names: new Set(teacherNames),
+        room_labels: new Set(roomLabel ? [roomLabel] : []),
+      });
+    }
+
+    const bucket = summaryBuckets.get(bucketKey);
+    const weekNumber = Number(row && row.week_number || 0);
+    if (Number.isInteger(weekNumber) && weekNumber > 0) {
+      bucket.week_numbers.add(weekNumber);
+    }
+    if (Number.isInteger(groupNumber) && groupNumber > 0) {
+      bucket.group_numbers.add(groupNumber);
+    }
+    teacherNames.forEach((teacherName) => {
+      if (teacherName) bucket.teacher_names.add(teacherName);
+    });
+    if (roomLabel) {
+      bucket.room_labels.add(roomLabel);
+    }
+  });
+
+  const renderedRows = Array.from(summaryBuckets.values())
+    .map((bucket) => {
+      const lessonTypeLabel = SEMESTER_SUMMARY_LESSON_TYPE_LABELS[bucket.lesson_type]
+        || (bucket.lesson_type
+          ? `${bucket.lesson_type.charAt(0).toUpperCase()}${bucket.lesson_type.slice(1)}`
+          : 'Заняття');
+      const groupLabel = bucket.lesson_type === 'lecture'
+        ? ''
+        : formatSemesterSummaryGroupLabel(Array.from(bucket.group_numbers));
+      const slot = bellSchedule[bucket.class_number] || null;
+      const teacherLabel = Array.from(bucket.teacher_names)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'uk'))
+        .join(', ') || '—';
+      const roomLabel = Array.from(bucket.room_labels)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'uk'))
+        .join(', ') || '—';
+      const metaParts = [lessonTypeLabel];
+      if (groupLabel) metaParts.push(groupLabel);
+      return {
+        subject_id: bucket.subject_id,
+        subject_name: bucket.subject_name,
+        subject_meta: metaParts.join(' • '),
+        day_name: bucket.day_name,
+        class_number: bucket.class_number,
+        time_label: slot ? `${slot.start}-${slot.end}` : `#${bucket.class_number}`,
+        teacher_label: teacherLabel,
+        weeks_label: formatSemesterSummaryWeekLabel(Array.from(bucket.week_numbers)),
+        room_label: roomLabel,
+      };
+    })
+    .sort((a, b) => {
+      const dayOrder = (fullWeekDays || daysOfWeek || []).indexOf(a.day_name) - (fullWeekDays || daysOfWeek || []).indexOf(b.day_name);
+      if (dayOrder !== 0) return dayOrder;
+      if (a.class_number !== b.class_number) return a.class_number - b.class_number;
+      return String(a.subject_name || '').localeCompare(String(b.subject_name || ''), 'uk');
+    });
+
+  const scheduledSubjectIds = new Set(renderedRows.map((row) => Number(row.subject_id || 0)).filter((value) => Number.isInteger(value) && value > 0));
+  const dayOrder = Array.isArray(fullWeekDays) && fullWeekDays.length ? fullWeekDays : [...daysOfWeek];
+  const dayBuckets = dayOrder
+    .map((dayName) => {
+      const rows = renderedRows.filter((row) => row.day_name === dayName);
+      return {
+        day_name: dayName,
+        day_short: String(getStudyDayShortLabel(dayName) || dayName).toUpperCase(),
+        rows,
+      };
+    })
+    .filter((bucket) => bucket.rows.length);
+
+  const unscheduledActiveSubjects = (activeSubjects || [])
+    .filter((subject) => !scheduledSubjectIds.has(Number(subject && subject.id || 0)))
+    .sort((a, b) => String(a && a.name || '').localeCompare(String(b && b.name || ''), 'uk'));
+
+  return {
+    dayBuckets,
+    activeSubjects: (activeSubjects || [])
+      .map((subject) => ({
+        id: Number(subject && subject.id || 0),
+        name: String(subject && subject.name || ''),
+      }))
+      .filter((subject) => Number.isInteger(subject.id) && subject.id > 0 && subject.name)
+      .sort((a, b) => a.name.localeCompare(b.name, 'uk')),
+    unscheduledActiveSubjects,
+    stats: {
+      active_subjects_total: activeSubjects.length,
+      scheduled_subjects_total: scheduledSubjectIds.size,
+      table_rows_total: renderedRows.length,
+    },
+  };
+};
+
 app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
@@ -47654,6 +47948,7 @@ app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res
   let activeSemester = null;
   try {
     const semesterList = await getSemestersCached(courseId);
+    const selectedCourse = (courses || []).find((course) => Number(course.id) === Number(courseId)) || null;
     const requestedSemesterId = Number(req.query.semester_id);
     if (Number.isFinite(requestedSemesterId) && requestedSemesterId > 0) {
       activeSemester = semesterList.find((sem) => Number(sem.id) === requestedSemesterId) || null;
@@ -47661,31 +47956,39 @@ app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res
     if (!activeSemester) {
       activeSemester = await getActiveSemester(courseId);
     }
-    const summaryRows = activeSemester
-      ? await db.all(
-          `
-            SELECT s.name AS subject_name,
-                   COALESCE(se.lesson_type, '') AS lesson_type,
-                   COUNT(*) AS total
-            FROM schedule_entries se
-            JOIN subjects s ON s.id = se.subject_id
-            WHERE se.course_id = ? AND se.semester_id = ?
-            GROUP BY s.name, COALESCE(se.lesson_type, '')
-            ORDER BY s.name, COALESCE(se.lesson_type, '')
-          `,
-          [courseId, activeSemester.id]
-        )
-      : [];
+    const semesterSummaryTable = activeSemester
+      ? await buildSemesterSummaryTable({
+          courseId,
+          semester: activeSemester,
+        })
+      : {
+          dayBuckets: [],
+          activeSubjects: [],
+          unscheduledActiveSubjects: [],
+          stats: {
+            active_subjects_total: 0,
+            scheduled_subjects_total: 0,
+            table_rows_total: 0,
+          },
+        };
     return res.render('admin-schedule-summary', {
       username: req.session.user.username,
       role: normalizeRoleKey(req.session.role || 'student'),
       adminHomeHref: getStaffPanelBase(req, courseId),
       courses,
+      selectedCourse,
       semesters: semesterList,
       activeSemester,
       selectedCourseId: courseId,
       allowCourseSelect,
-      semesterSummary: summaryRows || [],
+      semesterSummaryDays: semesterSummaryTable.dayBuckets || [],
+      semesterSummarySubjects: semesterSummaryTable.activeSubjects || [],
+      semesterSummaryUnscheduledSubjects: semesterSummaryTable.unscheduledActiveSubjects || [],
+      semesterSummaryStats: semesterSummaryTable.stats || {
+        active_subjects_total: 0,
+        scheduled_subjects_total: 0,
+        table_rows_total: 0,
+      },
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleSummary');
