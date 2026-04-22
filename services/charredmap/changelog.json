@@ -1,11 +1,23 @@
 {
-  "version": "0.1.29",
-  "generatedAt": "2026-04-22T07:25:50.984Z",
+  "version": "0.1.30",
+  "generatedAt": "2026-04-22T07:30:06.578Z",
   "entries": [
+    {
+      "hash": "38865e7272f66d886df859dd9d457a8d155a0387",
+      "shortHash": "38865e7",
+      "message": "Локальні покращення стабільності та зручності використання.",
+      "date": "2026-04-22T10:29:57+03:00"
+    },
+    {
+      "hash": "effb40fa187006dc4bb22b03b25038ee3c2ededd",
+      "shortHash": "effb40f",
+      "message": "chore(release): bump charredmap to 0.1.29",
+      "date": "2026-04-22T10:26:19+03:00"
+    },
     {
       "hash": "03fdee0d38819a3be2c5b932625712cd80035534",
       "shortHash": "03fdee0",
-      "message": "Поточні доопрацювання для кращого щоденного досвіду.",
+      "message": "feat(charredmap-footer): add instagram link",
       "date": "2026-04-22T10:25:41+03:00"
     },
     {
