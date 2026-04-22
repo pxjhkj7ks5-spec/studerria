@@ -1,7 +1,25 @@
 {
-  "version": "0.1.26",
-  "generatedAt": "2026-04-21T16:43:55.400Z",
+  "version": "0.1.27",
+  "generatedAt": "2026-04-22T06:58:44.849Z",
   "entries": [
+    {
+      "hash": "bffd530ba18158a10b558d978df1dc1c06159934",
+      "shortHash": "bffd530",
+      "message": "Мінорні оновлення сайту для покращення роботи.",
+      "date": "2026-04-22T09:58:34+03:00"
+    },
+    {
+      "hash": "613384343b27c76934f1f0cd920c2d9d20b9e439",
+      "shortHash": "6133843",
+      "message": "Fix naradadruk scroll jank",
+      "date": "2026-04-21T19:49:09+03:00"
+    },
+    {
+      "hash": "10a24cb9e26bcf915e113c633ed2a2c5937de1fb",
+      "shortHash": "10a24cb",
+      "message": "docs: add monorepo parallel work guidance",
+      "date": "2026-04-21T19:44:29+03:00"
+    },
     {
       "hash": "a6d7795b3bd9e842169c3393f07353127fe769e1",
       "shortHash": "a6d7795",
