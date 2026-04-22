@@ -17,8 +17,12 @@ export function MapStoryExperience({
   occupationOverlay,
 }: MapStoryExperienceProps) {
   const [selectedStory, setSelectedStory] = useState<SerializedStory | null>(null);
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
   const closeStory = () => setSelectedStory(null);
-  const canUsePortal = typeof document !== "undefined";
+
+  useEffect(() => {
+    setPortalNode(document.body);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -86,23 +90,28 @@ export function MapStoryExperience({
         </div>
       </div>
 
-      {canUsePortal && selectedStory
+      {portalNode && selectedStory
         ? createPortal(
-          <div
-            className="story-fade-in fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(3,4,6,0.76)] p-3 backdrop-blur-sm sm:p-4 md:p-6"
-            onClick={closeStory}
-            role="presentation"
-          >
+          <>
             <div
-              className="glass-panel h-auto max-h-[92dvh] w-full max-w-[min(1100px,96vw)] overflow-hidden rounded-[30px] sm:rounded-[34px]"
-              onClick={(event) => event.stopPropagation()}
+              className="story-fade-in fixed inset-0 z-[80] bg-[rgba(3,4,6,0.76)] backdrop-blur-sm"
+              onClick={closeStory}
               role="presentation"
-            >
-              <StorySheet story={selectedStory} onClose={closeStory} compact />
+            />
+            <div className="story-fade-in pointer-events-none fixed inset-0 z-[81] p-3 sm:p-4 md:p-6">
+              <div className="fixed left-1/2 top-1/2 h-auto max-h-[min(92dvh,960px)] w-[min(1100px,calc(100vw-1.5rem))] max-w-[1100px] -translate-x-1/2 -translate-y-1/2 sm:w-[min(1100px,calc(100vw-2rem))] md:w-[min(1100px,calc(100vw-3rem))]">
+                <div
+                  className="pointer-events-auto glass-panel h-full max-h-[inherit] overflow-hidden rounded-[30px] shadow-[0_36px_120px_rgba(0,0,0,0.5)] sm:rounded-[34px]"
+                  onClick={(event) => event.stopPropagation()}
+                  role="presentation"
+                >
+                  <StorySheet story={selectedStory} onClose={closeStory} compact />
+                </div>
+              </div>
             </div>
-          </div>
+          </>
           ,
-          document.body,
+          portalNode,
         )
         : null}
     </>
