@@ -54,6 +54,18 @@
 
     <main class="container pt-2 pb-4 schedule-content">
       <% const localeCode = lang === 'en' ? 'en-US' : 'uk-UA'; %>
+      <% const previewWeekCarouselText = lang === 'en'
+        ? {
+            kicker: 'Week navigator',
+            aria: 'Week carousel',
+            fallback: 'Semester flow',
+          }
+        : {
+            kicker: 'Навігація тижнями',
+            aria: 'Карусель тижнів',
+            fallback: 'Ритм семестру',
+          };
+      %>
       <% if (messages && messages.error) { %>
         <div class="alert alert-danger"><%= messages.error %></div>
       <% } %>
@@ -213,17 +225,19 @@
       </div>
     </div>
 
-    <div class="week-slider" id="weekSlider">
-      <button class="week-nav-btn" type="button" id="weekPrev" aria-label="Previous week">‹</button>
-      <% for (let w = 1; w <= (totalWeeks || 15); w++) { %>
-        <button
-          type="button"
-          class="week-dot <%= w === currentWeek ? 'active' : '' %>"
-          data-week="<%= w %>"
-          aria-label="<%= t('schedule.week') %> <%= w %>"
-        ></button>
-      <% } %>
-      <button class="week-nav-btn" type="button" id="weekNext" aria-label="Next week">›</button>
+    <div class="week-rail week-pager" id="weekPager">
+      <div class="week-pager-shell">
+        <div class="week-pill" id="weekPill" aria-label="<%= t('schedule.week') %> <%= currentWeek %>">
+          <div class="week-pill-head week-pill-head--compact">
+            <span class="week-pill-kicker"><%= previewWeekCarouselText.kicker %></span>
+            <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+          </div>
+          <span class="week-pill-progress" aria-hidden="true">
+            <span class="week-pill-progress-fill" id="weekPillProgress"></span>
+          </span>
+          <div class="week-carousel" id="weekCarousel" aria-label="<%= previewWeekCarouselText.aria %>"></div>
+        </div>
+      </div>
     </div>
 
     <%- include('partials/app-footer') %>
@@ -344,46 +358,164 @@
         updatePublishState();
       }
 
-      const weekSlider = document.getElementById('weekSlider');
-      const weekPrev = document.getElementById('weekPrev');
-      const weekNext = document.getElementById('weekNext');
+      const weekPager = document.getElementById('weekPager');
+      const weekPill = document.getElementById('weekPill');
+      const weekPillCount = document.getElementById('weekPillCount');
+      const weekPillProgress = document.getElementById('weekPillProgress');
+      const weekCarousel = document.getElementById('weekCarousel');
       const totalWeeks = <%= totalWeeks || 15 %>;
       let currentWeek = <%= currentWeek %>;
+      const semesterStartDate = <%- JSON.stringify(semester && semester.start_date ? semester.start_date : null).replace(/</g, '\\u003c') %>;
+      const previewLocale = <%- JSON.stringify(localeCode).replace(/</g, '\\u003c') %>;
+      const weekLabelText = <%- JSON.stringify(t('schedule.week')).replace(/</g, '\\u003c') %>;
+      const weekRangeFallbackText = <%- JSON.stringify(previewWeekCarouselText.fallback).replace(/</g, '\\u003c') %>;
+      const kyivWeekFormatter = new Intl.DateTimeFormat(previewLocale, {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'Europe/Kyiv',
+      });
 
-      function updateMobileWeekDots() {
-        if (!weekSlider) return;
-        const dots = weekSlider.querySelectorAll('.week-dot');
-        if (window.innerWidth > 768) {
-          dots.forEach((dot) => dot.classList.remove('hidden-mobile'));
-          return;
+      let isWeekSwitching = false;
+      let weekDebounceUntil = 0;
+      const weekDebounceMs = 240;
+
+      function clampWeek(value) {
+        const parsed = Number(value);
+        if (Number.isNaN(parsed)) return 1;
+        return Math.max(1, Math.min(totalWeeks, parsed));
+      }
+
+      function parseDateUtc(dateStr) {
+        if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+        const [y, m, d] = dateStr.split('-').map((n) => Number(n));
+        if (!y || !m || !d) return null;
+        return Date.UTC(y, m - 1, d);
+      }
+
+      function getWeekRange(week) {
+        const startUtc = parseDateUtc(semesterStartDate);
+        if (startUtc === null) return null;
+        const safeWeek = clampWeek(week);
+        const start = new Date(startUtc + ((safeWeek - 1) * 7 * 86400000));
+        const end = new Date(startUtc + (((safeWeek - 1) * 7) + 6) * 86400000);
+        return { start, end };
+      }
+
+      function formatWeekRange(week) {
+        const range = getWeekRange(week);
+        if (!range) return weekRangeFallbackText;
+        try {
+          if (typeof kyivWeekFormatter.formatRange === 'function') {
+            return kyivWeekFormatter.formatRange(range.start, range.end);
+          }
+        } catch (_error) {
         }
-        dots.forEach((dot) => {
-          const week = Number(dot.dataset.week);
-          const visible = week === currentWeek || week === currentWeek - 1 || week === currentWeek + 1;
-          dot.classList.toggle('hidden-mobile', !visible);
+        return `${kyivWeekFormatter.format(range.start)} - ${kyivWeekFormatter.format(range.end)}`;
+      }
+
+      function getWeekCarouselOffsets() {
+        return window.innerWidth <= 560 ? [-1, 0, 1] : [-2, -1, 0, 1, 2];
+      }
+
+      function renderWeekCarousel(activeWeek) {
+        if (!weekCarousel) return;
+        weekCarousel.textContent = '';
+        const fragment = document.createDocumentFragment();
+        const offsets = getWeekCarouselOffsets();
+        weekCarousel.style.setProperty('--week-carousel-columns', String(offsets.length));
+        weekCarousel.dataset.compact = offsets.length <= 3 ? 'true' : 'false';
+        weekCarousel.dataset.viewport = window.innerWidth <= 560 ? 'mobile' : 'desktop';
+        let activeChip = null;
+
+        offsets.forEach((offset) => {
+          const week = activeWeek + offset;
+          const distance = Math.abs(offset);
+          if (week < 1 || week > totalWeeks) {
+            const ghost = document.createElement('span');
+            ghost.className = 'week-carousel-card week-carousel-card--ghost';
+            ghost.dataset.distance = String(distance);
+            ghost.dataset.offset = String(offset);
+            ghost.setAttribute('aria-hidden', 'true');
+            fragment.appendChild(ghost);
+            return;
+          }
+
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'week-carousel-card';
+          chip.dataset.week = String(week);
+          chip.dataset.distance = String(distance);
+          chip.dataset.offset = String(offset);
+          chip.setAttribute('aria-label', `${weekLabelText} ${week}`);
+          if (week === activeWeek) {
+            chip.classList.add('is-active');
+            chip.setAttribute('aria-current', 'page');
+            activeChip = chip;
+          }
+          chip.innerHTML = `
+            <span class="week-carousel-card__shine" aria-hidden="true"></span>
+            <span class="week-carousel-card__label">${weekLabelText}</span>
+            <span class="week-carousel-card__number">${String(week).padStart(2, '0')}</span>
+            <span class="week-carousel-card__range">${formatWeekRange(week)}</span>
+          `;
+          chip.addEventListener('click', () => goToWeek(week));
+          fragment.appendChild(chip);
         });
+
+        weekCarousel.appendChild(fragment);
+        if (weekCarousel.dataset.viewport === 'mobile' && activeChip && typeof activeChip.scrollIntoView === 'function') {
+          window.requestAnimationFrame(() => {
+            activeChip.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'auto' });
+          });
+        }
       }
 
       function updateSchedule(week) {
-        const safe = Math.max(1, Math.min(totalWeeks, week));
+        const safe = clampWeek(week);
         const params = new URLSearchParams(window.location.search);
         params.set('week', safe);
         window.location.search = params.toString();
       }
 
-      function animateWeekChange(nextWeek) {
-        const safe = Math.max(1, Math.min(totalWeeks, nextWeek));
-        const active = weekSlider ? weekSlider.querySelector('.week-dot.active') : null;
-        const target = weekSlider
-          ? weekSlider.querySelector(`.week-dot[data-week="${safe}"]`)
-          : null;
-        if (active && target && active !== target) {
-          active.classList.remove('active');
-          target.classList.add('active');
-        }
+      function syncWeekPager(week) {
+        const safe = clampWeek(week);
+        const displayWeek = String(safe).padStart(2, '0');
         currentWeek = safe;
-        updateMobileWeekDots();
-        setTimeout(() => updateSchedule(safe), 200);
+        if (weekPillCount) {
+          weekPillCount.textContent = `${displayWeek} / ${String(totalWeeks).padStart(2, '0')}`;
+        }
+        if (weekPillProgress) {
+          const ratio = totalWeeks > 0 ? safe / totalWeeks : 1;
+          weekPillProgress.style.transform = `scaleX(${ratio})`;
+        }
+        if (weekPill) weekPill.setAttribute('aria-label', `${weekLabelText} ${safe}`);
+        renderWeekCarousel(safe);
+      }
+
+      function goToWeek(targetWeek) {
+        const safeWeek = clampWeek(targetWeek);
+        if (safeWeek === currentWeek || isWeekSwitching) return;
+
+        const now = Date.now();
+        if (now < weekDebounceUntil) return;
+        weekDebounceUntil = now + weekDebounceMs;
+        isWeekSwitching = true;
+        if (weekPager) {
+          weekPager.dataset.direction = safeWeek > currentWeek ? 'forward' : 'backward';
+        }
+
+        syncWeekPager(safeWeek);
+        setTimeout(() => {
+          isWeekSwitching = false;
+          if (weekPager) {
+            delete weekPager.dataset.direction;
+          }
+        }, 260);
+        requestAnimationFrame(() => updateSchedule(safeWeek));
+      }
+
+      function animateWeekChange(nextWeek) {
+        goToWeek(nextWeek);
       }
 
       const isTypingTarget = (el) => {
@@ -392,32 +524,23 @@
         return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
       };
 
-      if (weekSlider) {
-        weekSlider.addEventListener('click', (event) => {
-          const btn = event.target.closest('.week-dot');
-          if (!btn) return;
-          const week = Number(btn.dataset.week);
-          if (!Number.isNaN(week)) animateWeekChange(week);
-        });
-        if (weekPrev) {
-          weekPrev.addEventListener('click', () => animateWeekChange(currentWeek - 1));
-        }
-        if (weekNext) {
-          weekNext.addEventListener('click', () => animateWeekChange(currentWeek + 1));
-        }
-
+      if (weekPager) {
         let startX = 0;
-        weekSlider.addEventListener('touchstart', (event) => {
+        let startY = 0;
+        weekPager.addEventListener('touchstart', (event) => {
           startX = event.touches[0].clientX;
+          startY = event.touches[0].clientY;
         }, { passive: true });
-        weekSlider.addEventListener('touchend', (event) => {
+        weekPager.addEventListener('touchend', (event) => {
           const endX = event.changedTouches[0].clientX;
-          const delta = endX - startX;
-          if (Math.abs(delta) < 40) return;
-          if (delta < 0) animateWeekChange(currentWeek + 1);
-          if (delta > 0) animateWeekChange(currentWeek - 1);
-        });
-        updateMobileWeekDots();
+          const endY = event.changedTouches[0].clientY;
+          const deltaX = endX - startX;
+          const deltaY = endY - startY;
+          if (Math.abs(deltaX) < 42 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+          if (deltaX < 0) animateWeekChange(currentWeek + 1);
+          if (deltaX > 0) animateWeekChange(currentWeek - 1);
+        }, { passive: true });
+        syncWeekPager(currentWeek);
       }
 
       document.addEventListener('keydown', (event) => {
@@ -430,6 +553,11 @@
           event.preventDefault();
           animateWeekChange(currentWeek + 1);
         }
+      });
+
+      window.addEventListener('resize', () => {
+        if (!weekPager) return;
+        syncWeekPager(currentWeek);
       });
     </script>
       <script src="/js/design-system.js" defer></script>
