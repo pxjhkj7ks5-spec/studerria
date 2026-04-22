@@ -1,7 +1,13 @@
 {
-  "version": "0.1.27",
-  "generatedAt": "2026-04-22T06:58:44.849Z",
+  "version": "0.1.28",
+  "generatedAt": "2026-04-22T07:04:38.626Z",
   "entries": [
+    {
+      "hash": "e70ac0be4f14512f48af562f36ea74283ce61c75",
+      "shortHash": "e70ac0b",
+      "message": "Локальні покращення стабільності та зручності використання.",
+      "date": "2026-04-22T10:04:27+03:00"
+    },
     {
       "hash": "bffd530ba18158a10b558d978df1dc1c06159934",
       "shortHash": "bffd530",
