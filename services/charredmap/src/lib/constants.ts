@@ -1,6 +1,6 @@
 export const siteName = "charredmap";
 export const siteDescription =
-  "Інтерактивна мапа історій людей з деокупованих та окупованих міст України.";
+  "Мапа історій людей з окупованих і деокупованих міст України.";
 export const mapStyleUrl = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 export const adminSessionTtlSeconds = 60 * 60 * 24 * 7;
 export const maxUploadSizeBytes = 8 * 1024 * 1024;
@@ -27,13 +27,13 @@ export const occupationMeta: Record<
 > = {
   occupied: {
     label: "Окуповане місто",
-    badge: "Помаранчевий сигнал",
+    badge: "Під окупацією",
     markerClassName: "bg-[--accent-orange] shadow-[0_0_28px_rgba(255,132,56,0.55)]",
     markerLabel: "Окуповане",
   },
   deoccupied: {
     label: "Деокуповане місто",
-    badge: "Червоний акцент",
+    badge: "Після окупації",
     markerClassName: "bg-[--paper] ring-2 ring-[rgba(218,59,59,0.8)] shadow-[0_0_26px_rgba(218,59,59,0.35)]",
     markerLabel: "Деокуповане",
   },

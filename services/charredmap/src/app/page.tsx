@@ -30,8 +30,8 @@ export default async function Home() {
                   Мапа міст, де пам&apos;ять досі говорить голосніше за тишу.
                 </h1>
                 <p className="max-w-[32rem] text-[15px] leading-6 text-[#d5d8de] md:text-base md:leading-7">
-                  {siteDescription} Мітка, місто і людська історія збираються тут в один темний
-                  простір, де ніщо не відволікає від читання.
+                  {siteDescription} Відкрийте мітку на мапі, щоб прочитати історію міста і людей,
+                  які його пережили.
                 </p>
               </div>
             </div>
@@ -51,14 +51,14 @@ export default async function Home() {
       <section className="mx-auto grid w-full max-w-[1720px] gap-10 px-4 py-14 md:px-6 md:py-16 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
         <div className="space-y-4">
           <p className="text-[11px] uppercase tracking-[0.32em] text-[--accent-orange]">
-            Принцип публічної частини
+            Як це працює
           </p>
           <h2 className="font-display max-w-3xl text-4xl leading-[0.94] text-white md:text-5xl xl:text-6xl">
-            Один екран тримає всю драматургію: мапа, індекс матеріалів і історія у фокусі.
+            На головній все просто: мапа, історії і форма для нових матеріалів.
           </h2>
           <p className="max-w-xl text-sm leading-7 text-white/70">
-            Публічна поверхня лишається стриманою, але вже має окремий канал для нових подань від
-            читачів без прямого доступу в редакторський шар.
+            Тут немає зайвих розділів чи складної навігації. Є мапа, опубліковані історії та
+            окрема форма, через яку можна надіслати свій матеріал.
           </p>
           <Link
             href="/submit"
@@ -70,28 +70,28 @@ export default async function Home() {
         <div className="grid gap-8 md:grid-cols-3">
           <div className="border-t border-white/10 pt-4">
             <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">01</p>
-            <h3 className="mt-4 font-display text-2xl text-white">Мапа як сцена</h3>
+            <h3 className="mt-4 font-display text-2xl text-white">Мапа міст</h3>
             <p className="mt-3 text-sm leading-7 text-[#d0d3da]">
-              Публічна частина не розсипається на картки та дашборди. Головна площина лишається
-              темною картою з кількома точними редакційними жестами.
+              На мапі позначені міста, для яких уже є опубліковані історії. Вибираєте мітку і
+              одразу переходите до читання.
             </p>
           </div>
 
           <div className="border-t border-white/10 pt-4">
             <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">02</p>
-            <h3 className="mt-4 font-display text-2xl text-white">Історія як читання</h3>
+            <h3 className="mt-4 font-display text-2xl text-white">Історії людей</h3>
             <p className="mt-3 text-sm leading-7 text-[#d0d3da]">
-              Кожна мітка відкриває окремий меморіальний sheet, а не перенасичений detail-view.
-              Увага тримається на тексті, місці та даті публікації.
+              Кожна історія відкривається окремо: з фото, текстом, містом і датою публікації.
+              Ніщо зайве не відволікає від самого матеріалу.
             </p>
           </div>
 
           <div className="border-t border-white/10 pt-4">
             <p className="text-[11px] uppercase tracking-[0.28em] text-[--muted]">03</p>
-            <h3 className="mt-4 font-display text-2xl text-white">Публічне подання</h3>
+            <h3 className="mt-4 font-display text-2xl text-white">Надіслати матеріал</h3>
             <p className="mt-3 text-sm leading-7 text-[#d0d3da]">
-              Будь-хто може надіслати матеріал через окрему форму, але він потрапляє в чергу
-              модерації. Публічний шар лишається чистим і не змішується з адмінською логікою.
+              Через форму можна надіслати власну історію. Після перевірки вона з&apos;явиться на
+              мапі.
             </p>
           </div>
         </div>

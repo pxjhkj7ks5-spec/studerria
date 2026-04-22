@@ -13,15 +13,15 @@ export async function SiteFooter() {
           <div className="flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.3em]">
             <span className="text-[--accent-orange]">charredmap</span>
             <span className="h-px w-8 bg-white/12" />
-            <span>Нічна редакційна мапа історій з міст України</span>
+            <span>Історії міст України</span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-display text-xl text-white">charredmap</span>
             <span className="text-white/70">v{versionInfo.version}</span>
           </div>
           <p className="max-w-2xl leading-6">
-            Публічний шар лишається камерним: одна мапа, один індекс матеріалів, окрема форма
-            публічного подання і changelog у футері без службового шуму.
+            Тут зібрані опубліковані історії, а через окрему форму можна надіслати новий
+            матеріал.
           </p>
         </div>
 

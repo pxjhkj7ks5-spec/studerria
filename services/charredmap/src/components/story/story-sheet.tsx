@@ -127,11 +127,10 @@ export function StorySheet({ story, onClose, compact = false }: StorySheetProps)
 
             <div className="space-y-3">
               <p className="text-[11px] uppercase tracking-[0.28em] text-[--accent-orange]">
-                Перегляд
+                Окрема сторінка
               </p>
               <p className="leading-6">
-                Мітка прив&apos;язана до міста {story.city.name}. Окрема сторінка зберігає той самий
-                матеріал, що відкривається з мапи.
+                Цю історію можна відкрити окремо і поділитися посиланням на неї.
               </p>
             </div>
 

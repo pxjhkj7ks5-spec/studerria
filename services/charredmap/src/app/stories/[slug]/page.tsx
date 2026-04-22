@@ -120,8 +120,8 @@ export default async function StoryPage({ params }: StoryPageProps) {
                   Читання
                 </p>
                 <p className="mt-4 text-sm leading-7 text-white/74">
-                  На desktop ця сторінка працює як окрема reading-surface: широкий hero зверху,
-                  далі сконцентрований текстовий блок без модального відчуття.
+                  Тут можна спокійно прочитати історію повністю. Якщо потрібно, нижче є швидкий
+                  перехід одразу до тексту.
                 </p>
                 <div className="mt-5 flex flex-col gap-3">
                   <a

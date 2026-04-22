@@ -56,10 +56,10 @@ export function MapStoryExperience({
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-[34rem] space-y-3">
               <p className="text-[11px] uppercase tracking-[0.3em] text-[--accent-orange]">
-                Редакційний шар
+                Мапа історій
               </p>
               <h2 className="font-display text-2xl leading-[1.02] text-white md:text-[2rem]">
-                Карта лишається сценою, а історія входить у кадр тільки після вибору мітки.
+                Натисніть на мітку, щоб відкрити історію.
               </h2>
             </div>
 
@@ -67,7 +67,7 @@ export function MapStoryExperience({
               <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2">
                 {stories.length} матеріалів
               </span>
-              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2">Натиск для читання</span>
+              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2">Натисніть на мітку</span>
             </div>
           </div>
         </div>
