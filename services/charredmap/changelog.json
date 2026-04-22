@@ -1,11 +1,23 @@
 {
-  "version": "0.1.30",
-  "generatedAt": "2026-04-22T07:30:06.578Z",
+  "version": "0.1.31",
+  "generatedAt": "2026-04-22T07:34:15.800Z",
   "entries": [
+    {
+      "hash": "32f9ef50d22838764c6d3f61433468d6d40f0d88",
+      "shortHash": "32f9ef5",
+      "message": "Поточні доопрацювання для кращого щоденного досвіду.",
+      "date": "2026-04-22T10:34:04+03:00"
+    },
+    {
+      "hash": "875628b6e5d97d17060570ee23a75c533d3b9975",
+      "shortHash": "875628b",
+      "message": "chore(release): bump charredmap to 0.1.30",
+      "date": "2026-04-22T10:30:39+03:00"
+    },
     {
       "hash": "38865e7272f66d886df859dd9d457a8d155a0387",
       "shortHash": "38865e7",
-      "message": "Локальні покращення стабільності та зручності використання.",
+      "message": "fix(charredmap-modal): restore story scroll",
       "date": "2026-04-22T10:29:57+03:00"
     },
     {
