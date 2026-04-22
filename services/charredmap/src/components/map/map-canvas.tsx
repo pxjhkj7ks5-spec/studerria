@@ -279,7 +279,15 @@ export function MapCanvas({
     });
     mapRef.current = map;
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
+    map.addControl(
+      new maplibregl.NavigationControl({
+        showCompass: true,
+        showZoom: true,
+        visualizePitch: false,
+      }),
+      "top-right",
+    );
+    map.addControl(new maplibregl.FullscreenControl(), "top-right");
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
 
