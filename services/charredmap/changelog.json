@@ -1,11 +1,23 @@
 {
-  "version": "0.1.31",
-  "generatedAt": "2026-04-22T07:34:15.800Z",
+  "version": "0.1.32",
+  "generatedAt": "2026-04-22T07:41:24.104Z",
   "entries": [
+    {
+      "hash": "c9ec1653a0eaadbf0d83b8fea673dbaa410f33d4",
+      "shortHash": "c9ec165",
+      "message": "Поточні доопрацювання для кращого щоденного досвіду.",
+      "date": "2026-04-22T10:41:14+03:00"
+    },
+    {
+      "hash": "2fcce7ef52e51043e9fb2d4fde873ed088fd3573",
+      "shortHash": "2fcce7e",
+      "message": "chore(release): bump charredmap to 0.1.31",
+      "date": "2026-04-22T10:34:49+03:00"
+    },
     {
       "hash": "32f9ef50d22838764c6d3f61433468d6d40f0d88",
       "shortHash": "32f9ef5",
-      "message": "Поточні доопрацювання для кращого щоденного досвіду.",
+      "message": "fix(charredmap-hero): raise desktop intro block",
       "date": "2026-04-22T10:34:04+03:00"
     },
     {
