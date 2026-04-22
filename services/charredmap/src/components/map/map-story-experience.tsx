@@ -98,15 +98,13 @@ export function MapStoryExperience({
               onClick={closeStory}
               role="presentation"
             />
-            <div className="story-fade-in pointer-events-none fixed inset-0 z-[81] p-3 sm:p-4 md:p-6">
-              <div className="fixed left-1/2 top-1/2 h-auto max-h-[min(92dvh,960px)] w-[min(1100px,calc(100vw-1.5rem))] max-w-[1100px] -translate-x-1/2 -translate-y-1/2 sm:w-[min(1100px,calc(100vw-2rem))] md:w-[min(1100px,calc(100vw-3rem))]">
-                <div
-                  className="pointer-events-auto glass-panel h-full max-h-[inherit] overflow-hidden rounded-[30px] shadow-[0_36px_120px_rgba(0,0,0,0.5)] sm:rounded-[34px]"
-                  onClick={(event) => event.stopPropagation()}
-                  role="presentation"
-                >
-                  <StorySheet story={selectedStory} onClose={closeStory} compact />
-                </div>
+            <div className="story-fade-in pointer-events-none fixed inset-0 z-[81] grid place-items-center p-3 sm:p-4 md:p-6">
+              <div
+                className="pointer-events-auto glass-panel flex h-[min(92dvh,960px)] min-h-0 w-full max-w-[1100px] overflow-hidden rounded-[30px] shadow-[0_36px_120px_rgba(0,0,0,0.5)] sm:rounded-[34px]"
+                onClick={(event) => event.stopPropagation()}
+                role="presentation"
+              >
+                <StorySheet story={selectedStory} onClose={closeStory} compact />
               </div>
             </div>
           </>
