@@ -17,7 +17,7 @@ export default async function Home() {
       <section className="relative isolate overflow-hidden border-b border-white/8">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,56,0.16),_transparent_24%),radial-gradient(circle_at_85%_12%,_rgba(255,255,255,0.08),_transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_32%)]" />
         <div className="mx-auto grid w-full max-w-[1720px] gap-8 px-4 py-6 md:px-6 md:py-8 xl:gap-10 xl:grid-cols-[minmax(380px,0.64fr)_minmax(0,1.36fr)] xl:items-stretch 2xl:gap-12 2xl:grid-cols-[minmax(420px,0.72fr)_minmax(0,1.28fr)] 2xl:px-8">
-          <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-center gap-8 py-4 md:min-h-[44rem] md:py-8 xl:pr-4 2xl:pr-6">
+          <div className="relative z-10 flex min-h-[calc(100svh-7rem)] flex-col justify-center gap-8 py-4 md:min-h-[44rem] md:py-8 xl:justify-start xl:pt-14 xl:pr-4 xl:pb-8 2xl:pt-18 2xl:pr-6">
             <div className="space-y-8">
               <div className="hero-reveal flex items-center gap-3 whitespace-nowrap text-[10px] uppercase tracking-[0.3em] text-[--muted] sm:text-[11px]">
                 <span className="text-[--accent-orange]">charredmap</span>
