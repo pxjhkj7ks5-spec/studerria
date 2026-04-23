@@ -15,12 +15,16 @@
 
     <div class="vision-shell">
       <header class="vision-header">
-        <a href="/" class="vision-logo" aria-label="Studerria home">Studerria</a>
+        <a href="/" class="vision-logo" aria-label="Studerria home">
+          <img src="/favicon-dark.png" alt="" class="vision-logo-mark vision-logo-mark--dark" />
+          <img src="/favicon-light.png" alt="" class="vision-logo-mark vision-logo-mark--light" />
+          <span>STUDERRIA</span>
+        </a>
         <nav class="vision-nav" aria-label="Design system sections">
-          <a href="#schedule">Schedule</a>
-          <a href="#admin">Admin</a>
-          <a href="#profile">Profile</a>
-          <a href="#primitives">Primitives</a>
+          <a href="#schedule">Розклад</a>
+          <a href="#admin">Адмінка</a>
+          <a href="#login">Логін</a>
+          <a href="#profile">Профіль</a>
         </nav>
         <div class="vision-header-actions">
           <button
@@ -38,28 +42,18 @@
       </header>
 
       <main class="vision-main">
-        <section class="hero-section" id="schedule">
-          <div class="hero-copy">
-            <p class="hero-kicker">Studerria visual system</p>
-            <h1>Calm product surfaces for daily study work.</h1>
-            <p>
-              One restrained interface language for schedule, admin, profile, login and future dashboard
-              screens: deep indigo in dark mode, soft lavender daylight in light mode, and liquid-glass
-              only where it improves hierarchy.
-            </p>
-            <div class="hero-actions">
-              <a href="/schedule" class="btn-primary">Schedule</a>
-              <a href="#primitives" class="btn-secondary">View primitives</a>
-            </div>
-          </div>
-
-          <article class="vision-showcase" aria-label="Schedule reference">
+        <section class="vision-reference-grid" aria-label="Studerria product surfaces">
+          <article class="vision-product-panel vision-product-panel--schedule" id="schedule" aria-label="Schedule reference">
             <header class="vision-showcase-head">
               <div>
-                <p class="st-kicker">Schedule surface</p>
+                <p class="st-kicker">Навчання</p>
                 <h2 class="st-title">Тиждень 14</h2>
               </div>
-              <span class="st-badge">Сьогодні</span>
+              <div class="vision-control-cluster">
+                <span class="st-badge">Сьогодні</span>
+                <span class="vision-icon-pill" aria-hidden="true">‹</span>
+                <span class="vision-icon-pill" aria-hidden="true">›</span>
+              </div>
             </header>
 
             <div class="vision-days" aria-label="Week cards">
@@ -69,6 +63,7 @@
               <div class="vision-day"><strong>Чт</strong><span>17 квіт · 5 пар</span></div>
               <div class="vision-day"><strong>Пт</strong><span>18 квіт · 4 пари</span></div>
               <div class="vision-day"><strong>Сб</strong><span>19 квіт · —</span></div>
+              <div class="vision-day"><strong>Нд</strong><span>20 квіт · —</span></div>
             </div>
 
             <div class="vision-lessons">
@@ -98,59 +93,102 @@
               </article>
             </div>
           </article>
-        </section>
 
-        <section class="vision-system" id="admin">
-          <aside class="threads-panel" aria-label="Admin navigation reference">
-            <div class="panel-head">
-              <p class="st-kicker">Navigation</p>
-              <h2>Адмін-панель</h2>
-              <p>Compact sidebars, calm active states, readable labels and no decorative overload.</p>
-            </div>
-            <div class="threads-list">
-              <article class="thread-card"><h3>Overview</h3><p>Primary status and key actions.</p></article>
-              <article class="thread-card"><h3>Academic Setup</h3><p>Program, term and schedule structure.</p></article>
-              <article class="thread-card"><h3>Messages</h3><p>Communication tools stay visually secondary.</p></article>
-            </div>
-          </aside>
-
-          <section class="conversation-panel" id="profile" aria-label="Profile and controls reference">
-            <header class="conversation-head">
-              <div class="avatar" aria-hidden="true">MA</div>
+          <article class="vision-product-panel vision-product-panel--admin" id="admin" aria-label="Admin reference">
+            <header class="vision-showcase-head">
               <div>
-                <p class="st-kicker">Profile surface</p>
-                <h2>Редагування профілю</h2>
-                <p>Centered card language shared by login and profile forms.</p>
+                <p class="st-kicker">Control center</p>
+                <h2 class="st-title">Адмін-панель</h2>
               </div>
+              <span class="vision-status-pill">Session OK</span>
             </header>
 
-            <div class="conversation-stream" role="list">
-              <article class="message" role="listitem">
-                <h3>Primary card</h3>
-                <p>Liquid-glass is strongest on focused surfaces like login and profile.</p>
-              </article>
-              <article class="message" role="listitem">
-                <h3>Data cards</h3>
-                <p>Schedule and admin content stays more solid for readability.</p>
-              </article>
-              <article class="message" role="listitem">
-                <h3>Light mode</h3>
-                <p>The same geometry and accents, translated into soft daylight materials.</p>
-              </article>
+            <div class="vision-admin-layout">
+              <aside class="vision-admin-sidebar" aria-label="Admin sidebar preview">
+                <span class="vision-select">ППБД 25 Київ</span>
+                <a class="is-active" href="#admin">Overview</a>
+                <a href="#admin">Academic Setup</a>
+                <a href="#admin">Import/Export</a>
+                <a href="#admin">Homework</a>
+                <a href="#admin">Messages</a>
+              </aside>
+              <div class="vision-admin-content">
+                <div class="vision-metrics">
+                  <div><span>Users</span><strong>30</strong></div>
+                  <div><span>Subjects</span><strong>8</strong></div>
+                  <div><span>Homework</span><strong>0</strong></div>
+                </div>
+                <div class="vision-tools">
+                  <span>Генератор розкладу</span>
+                  <span>Генератор сесій</span>
+                  <span>Import/Export</span>
+                </div>
+                <div class="vision-nearest">
+                  <h3>Найближчі пари</h3>
+                  <p>Сьогодні, 10:00 - 11:20 · Правознавство · ауд. 201</p>
+                  <p>Сьогодні, 11:40 - 13:00 · Політологія · ауд. 305</p>
+                </div>
+              </div>
             </div>
+          </article>
 
-            <form class="conversation-compose" action="#" method="post" onsubmit="return false;">
-              <label for="visionConversationInput" class="sr-only">Reference input</label>
-              <input id="visionConversationInput" type="text" value="Марченко Андрій" aria-label="Reference input" />
-              <button type="submit">Save</button>
-            </form>
+          <article class="vision-product-panel vision-product-panel--login" id="login" aria-label="Login reference">
+            <div class="vision-auth-card">
+              <img src="/favicon-dark.png" alt="" class="vision-auth-logo vision-auth-logo--dark" />
+              <img src="/favicon-light.png" alt="" class="vision-auth-logo vision-auth-logo--light" />
+              <p class="vision-auth-wordmark">STUDERRIA</p>
+              <h2>Ласкаво просимо</h2>
+              <label>
+                <span>Email або імʼя користувача</span>
+                <input type="text" value="" aria-label="Email або імʼя користувача" />
+              </label>
+              <label>
+                <span>Пароль</span>
+                <input type="password" value="studerria" aria-label="Пароль" />
+              </label>
+              <button type="button">Увійти</button>
+            </div>
+          </article>
+        </section>
 
-            <footer>
-              <span>Deep indigo</span>
-              <span>Restrained purple</span>
-              <strong>Production UI</strong>
-            </footer>
-          </section>
+        <section class="vision-brand-lab" aria-label="Logo and profile usage">
+          <article class="vision-brand-card">
+            <p class="st-kicker">Logo usage</p>
+            <div class="vision-logo-pair">
+              <img src="/favicon-dark.png" alt="" />
+              <div>
+                <strong>Variant 1</strong>
+                <span>Навігація, бейджі, favicon, компактні UI-елементи.</span>
+              </div>
+            </div>
+            <div class="vision-logo-pair">
+              <img src="/favicon-light.png" alt="" />
+              <div>
+                <strong>Variant 2</strong>
+                <span>Логін, hero, заставки і виразні бренд-поверхні.</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="vision-profile-card" id="profile">
+            <header>
+              <div class="avatar" aria-hidden="true">MA</div>
+              <div>
+                <p class="st-kicker">Profile</p>
+                <h2>Редагування профілю</h2>
+              </div>
+            </header>
+            <div class="vision-profile-stats">
+              <span><strong>1</strong>Додано ДЗ</span>
+              <span><strong>0</strong>Командні</span>
+              <span><strong>0</strong>Бали</span>
+            </div>
+            <label>
+              <span>ПІБ</span>
+              <input type="text" value="Марченко Андрій" aria-label="ПІБ" />
+            </label>
+            <button type="button">Зберегти</button>
+          </article>
         </section>
 
         <section class="vision-primitives" id="primitives" aria-label="Reusable primitives">
