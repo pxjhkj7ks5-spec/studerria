@@ -44,6 +44,11 @@ export default async function HomePage() {
                   Перейти в Telegram
                 </a>
               </div>
+
+              <div className="hero-caption">
+                <span className="hero-caption-line" />
+                <p className="hero-caption-text">Серійні вироби, кастомні деталі, прямий контакт без зайвого процесу.</p>
+              </div>
             </div>
 
             <aside className="hero-rail">
@@ -115,12 +120,27 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="empty-showcase mt-8">
-            <h3 className="font-display text-[clamp(2rem,3.4vw,3rem)] leading-[0.98] tracking-[-0.05em] text-white">
-              Каталог готовий до наповнення.
-            </h3>
-            <p className="mt-4 max-w-[42rem] text-base leading-8 text-[--muted]">
-              Додайте перші товари через адмінку, а поки що клієнтів можна вести напряму в Telegram для індивідуальних замовлень.
-            </p>
+            <div>
+              <p className="empty-showcase-kicker">Наступний крок</p>
+              <h3 className="font-display text-[clamp(2rem,3.4vw,3rem)] leading-[0.98] tracking-[-0.05em] text-white">
+                Каталог готовий до першого наповнення.
+              </h3>
+            </div>
+
+            <div className="empty-showcase-copy">
+              <p className="text-base leading-8 text-[--muted]">
+                Додайте перші товари через адмінку, а поки що клієнтів можна вести напряму в Telegram для індивідуальних замовлень.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a className="accent-pill" href={settings.telegramUrl} target="_blank" rel="noreferrer">
+                  Написати в Telegram
+                </a>
+                <a className="ghost-pill" href={withBasePath("/catalog")}>
+                  Відкрити каталог
+                </a>
+              </div>
+            </div>
           </div>
         )}
       </section>
