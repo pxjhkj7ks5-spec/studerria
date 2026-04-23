@@ -97,7 +97,8 @@
   const scopedCourseId = Number(selectedGlobalCourseId || (selectedGlobalCourse && selectedGlobalCourse.id) || 0) || null;
   const scopedSemesterId = Number(selectedGlobalSemesterId || (selectedGlobalSemester && selectedGlobalSemester.id) || 0) || null;
   const scopedSemesters = Array.isArray(selectedGlobalSemesters) ? selectedGlobalSemesters : [];
-  const matrixRows = Array.isArray(manualMatrixRows) ? manualMatrixRows : [];
+  const matrixRows = (Array.isArray(manualMatrixRows) ? manualMatrixRows : [])
+    .filter((row) => Number(row && row.target_pairs || 0) > 0);
   const semesterWeeksCount = Number(selectedGlobalSemesterWeeksCount || 0) || 0;
   const summary = manualSummary && typeof manualSummary === 'object'
     ? manualSummary

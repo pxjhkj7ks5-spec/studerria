@@ -8724,6 +8724,41 @@ async function listScheduleGeneratorScopedVisibleSubjects(courseId, semesterId) 
     .sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'uk'));
 }
 
+async function listScheduleGeneratorManualActiveRowKeySet(runId, courseId, semesterId, options = {}) {
+  const normalizedRunId = parsePositiveIntStrict(runId);
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  if (!normalizedRunId || !normalizedCourseId || !normalizedSemesterId) {
+    return new Set();
+  }
+  const allowedSubjectIds = Array.isArray(options.allowedSubjectIds)
+    ? new Set(options.allowedSubjectIds
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0))
+    : null;
+  const rows = await db.all(
+    `
+      SELECT subject_id, lesson_type, pairs_count
+      FROM schedule_generator_items
+      WHERE run_id = ?
+        AND course_id = ?
+        AND semester_id = ?
+        AND group_number IS NULL
+    `,
+    [normalizedRunId, normalizedCourseId, normalizedSemesterId]
+  );
+  const rowKeySet = new Set();
+  (rows || []).forEach((row) => {
+    const subjectId = parsePositiveIntStrict(row && row.subject_id);
+    if (!subjectId) return;
+    if (allowedSubjectIds && !allowedSubjectIds.has(subjectId)) return;
+    const pairsCount = Math.max(0, Number(row && row.pairs_count || 0) || 0);
+    if (pairsCount < 1) return;
+    rowKeySet.add(buildScheduleGeneratorManualRowKey(subjectId, row && row.lesson_type));
+  });
+  return rowKeySet;
+}
+
 const getConfiguredCourseSemesterId = (config, courseId, location) => {
   const loc = normalizeGeneratorLocation(location || config?.active_location);
   const byLocation = config && config.course_semesters_by_location
@@ -52134,19 +52169,19 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       courseId: selectedGlobalCourseId,
       semesterId: selectedGlobalSemesterId,
     });
-    const manualScopeSlots = getScheduleGeneratorManualScopeSlotsFromConfig(config, manualScopeKey, {
+    const manualScopeSlotsRaw = getScheduleGeneratorManualScopeSlotsFromConfig(config, manualScopeKey, {
       allowedSubjectIds: selectedGlobalSubjectIds,
       maxSlots: SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT,
     });
     const manualSlotsByRowKey = new Map();
-    (manualScopeSlots || []).forEach((slot) => {
+    (manualScopeSlotsRaw || []).forEach((slot) => {
       const rowKey = buildScheduleGeneratorManualRowKey(slot.subject_id, slot.lesson_type);
       if (!manualSlotsByRowKey.has(rowKey)) {
         manualSlotsByRowKey.set(rowKey, []);
       }
       manualSlotsByRowKey.get(rowKey).push(slot);
     });
-    const manualMatrixRows = (selectedGlobalMatrixRows || []).map((row) => {
+    const manualMatrixRowsAll = (selectedGlobalMatrixRows || []).map((row) => {
       const rowKey = buildScheduleGeneratorManualRowKey(row.subject_id, row.lesson_type);
       const rowSlots = manualSlotsByRowKey.get(rowKey) || [];
       const targetPairs = Math.max(0, Number(row.pairs_count || 0) || 0);
@@ -52166,6 +52201,16 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
         remaining_pairs: remainingPairs,
         slots: rowSlots,
       };
+    });
+    const manualMatrixRows = manualMatrixRowsAll.filter((row) => Number(row.target_pairs || 0) > 0);
+    const manualVisibleRowKeySet = new Set(
+      (manualMatrixRows || [])
+        .map((row) => String(row && row.row_key || '').trim())
+        .filter(Boolean)
+    );
+    const manualScopeSlots = (manualScopeSlotsRaw || []).filter((slot) => {
+      const rowKey = buildScheduleGeneratorManualRowKey(slot && slot.subject_id, slot && slot.lesson_type);
+      return manualVisibleRowKeySet.has(rowKey);
     });
     const manualSummary = manualMatrixRows.reduce((acc, row) => {
       acc.rows_total += 1;
@@ -52908,9 +52953,16 @@ app.post('/admin/schedule-generator/manual-slots/save', requireScheduleGenerator
       courseId,
       semesterId,
     });
-    const manualScopeSlots = parseScheduleGeneratorManualSlots(req.body.slots_json, {
+    const manualScopeSlotsRaw = parseScheduleGeneratorManualSlots(req.body.slots_json, {
       allowedSubjectIds: scopedSubjectIds,
       maxSlots: SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT,
+    });
+    const manualActiveRowKeySet = await listScheduleGeneratorManualActiveRowKeySet(runId, courseId, semesterId, {
+      allowedSubjectIds: scopedSubjectIds,
+    });
+    const manualScopeSlots = (manualScopeSlotsRaw || []).filter((slot) => {
+      const rowKey = buildScheduleGeneratorManualRowKey(slot && slot.subject_id, slot && slot.lesson_type);
+      return manualActiveRowKeySet.has(rowKey);
     });
     const runConfig = parseGeneratorConfig(run.config);
     const manualScopeBag = runConfig && runConfig.manual_scope_slots && typeof runConfig.manual_scope_slots === 'object'
@@ -53008,7 +53060,14 @@ app.post('/admin/schedule-generator/manual-run', requireScheduleGeneratorSection
       allowedSubjectIds: scopedSubjectIds,
       maxSlots: SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT,
     });
-    const manualScopeSlots = bodySlots.length ? bodySlots : configSlots;
+    const scopedManualScopeSlots = bodySlots.length ? bodySlots : configSlots;
+    const manualActiveRowKeySet = await listScheduleGeneratorManualActiveRowKeySet(runId, courseId, semesterId, {
+      allowedSubjectIds: scopedSubjectIds,
+    });
+    const manualScopeSlots = (scopedManualScopeSlots || []).filter((slot) => {
+      const rowKey = buildScheduleGeneratorManualRowKey(slot && slot.subject_id, slot && slot.lesson_type);
+      return manualActiveRowKeySet.has(rowKey);
+    });
     if (!manualScopeSlots.length) {
       return redirectManualNotice('err', 'Manual slot plan is empty');
     }
