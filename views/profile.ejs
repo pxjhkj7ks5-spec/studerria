@@ -498,6 +498,7 @@
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <%- include('partials/studerria-system-head') %>
     <style>
       /* Lock the profile card shadow so global hover elevation rules cannot override it. */
       body.page-profile.studerria-theme .studerria-profile-card,

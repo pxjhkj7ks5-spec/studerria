@@ -1,23 +1,26 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="<%= lang || 'uk' %>">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
     <title>Studerria Vision</title>
     <link rel="stylesheet" href="/css/vision-bg.css" />
+    <%- include('partials/studerria-system-head') %>
   </head>
-  <body class="theme-light page-vision" data-theme="light">
+  <body class="studerria-theme theme-dark page-vision" data-theme="dark">
+    <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/vision-bg') %>
 
     <div class="vision-shell">
       <header class="vision-header">
         <a href="/" class="vision-logo" aria-label="Studerria home">Studerria</a>
-        <nav class="vision-nav" aria-label="Primary navigation">
-          <a href="#hero">Огляд</a>
-          <a href="#threads">Threads</a>
-          <a href="#conversation">Conversation</a>
-          <a href="#contacts">Контакти</a>
+        <nav class="vision-nav" aria-label="Design system sections">
+          <a href="#schedule">Schedule</a>
+          <a href="#admin">Admin</a>
+          <a href="#profile">Profile</a>
+          <a href="#primitives">Primitives</a>
         </nav>
         <div class="vision-header-actions">
           <button
@@ -28,110 +31,133 @@
             data-dark-label="Темна"
             aria-label="Toggle theme"
           >
-            Темна
+            Світла
           </button>
-          <a class="signup-btn" href="/register">Sign up</a>
+          <a class="signup-btn" href="/login">Open app</a>
         </div>
       </header>
 
       <main class="vision-main">
-        <section class="hero-section" id="hero">
+        <section class="hero-section" id="schedule">
           <div class="hero-copy">
-            <p class="hero-kicker">Studerria interface lab</p>
-            <h1>Открий нову еру кодування</h1>
+            <p class="hero-kicker">Studerria visual system</p>
+            <h1>Calm product surfaces for daily study work.</h1>
             <p>
-              Платформа для розкладу, курсів і щоденної комунікації, де викладачі та студенти працюють в
-              одній зрозумілій системі з фокусом на швидкість і прозорість процесів.
+              One restrained interface language for schedule, admin, profile, login and future dashboard
+              screens: deep indigo in dark mode, soft lavender daylight in light mode, and liquid-glass
+              only where it improves hierarchy.
             </p>
             <div class="hero-actions">
-              <a href="/login" class="btn-primary">Почати</a>
-              <a href="#threads" class="btn-secondary">Вивчити більше</a>
+              <a href="/schedule" class="btn-primary">Schedule</a>
+              <a href="#primitives" class="btn-secondary">View primitives</a>
             </div>
           </div>
 
-          <article class="code-diff-card" aria-label="Code diff preview">
-            <header>
-              <div class="diff-badge">GPT</div>
+          <article class="vision-showcase" aria-label="Schedule reference">
+            <header class="vision-showcase-head">
               <div>
-                <strong>Code diff</strong>
-                <p>Автоматизація змін у навчальних сценаріях</p>
+                <p class="st-kicker">Schedule surface</p>
+                <h2 class="st-title">Тиждень 14</h2>
               </div>
+              <span class="st-badge">Сьогодні</span>
             </header>
-            <div class="diff-columns">
-              <div class="diff-column before" aria-label="Before snippet">
-                <h3>Before</h3>
-                <pre><code><span>- export const semester = [];</span>
-<span>- const route = "manual-sync";</span>
-<span>- function assignHomework() {}</span>
-<span>- // no template reuse</span></code></pre>
-              </div>
-              <div class="diff-column after" aria-label="After snippet">
-                <h3>After</h3>
-                <pre><code><span>+ export const semester = buildSemesterPlan();</span>
-<span>+ const route = "template-sync";</span>
-<span>+ assignHomework({ reuseTemplate: true });</span>
-<span>+ pushJournalColumns();</span></code></pre>
-              </div>
+
+            <div class="vision-days" aria-label="Week cards">
+              <div class="vision-day is-active"><strong>Пн</strong><span>14 квіт · 4 пари</span></div>
+              <div class="vision-day"><strong>Вт</strong><span>15 квіт · 4 пари</span></div>
+              <div class="vision-day"><strong>Ср</strong><span>16 квіт · 3 пари</span></div>
+              <div class="vision-day"><strong>Чт</strong><span>17 квіт · 5 пар</span></div>
+              <div class="vision-day"><strong>Пт</strong><span>18 квіт · 4 пари</span></div>
+              <div class="vision-day"><strong>Сб</strong><span>19 квіт · —</span></div>
+            </div>
+
+            <div class="vision-lessons">
+              <article class="vision-lesson">
+                <div class="vision-lesson-number">1</div>
+                <div>
+                  <h3>Правознавство</h3>
+                  <p>10:00 - 11:20 · група 1 · ауд. 201</p>
+                </div>
+                <span class="st-badge">Лекція</span>
+              </article>
+              <article class="vision-lesson">
+                <div class="vision-lesson-number">2</div>
+                <div>
+                  <h3>Політологія</h3>
+                  <p>11:40 - 13:00 · група 2 · ауд. 305</p>
+                </div>
+                <span class="st-badge">Семінар</span>
+              </article>
+              <article class="vision-lesson">
+                <div class="vision-lesson-number">3</div>
+                <div>
+                  <h3>Іноземна мова</h3>
+                  <p>15:10 - 16:30 · група 3 · ауд. 409</p>
+                </div>
+                <span class="st-badge">Практика</span>
+              </article>
             </div>
           </article>
         </section>
 
-        <section class="workspace-section" id="threads">
-          <aside class="threads-panel" aria-label="Threads list">
+        <section class="vision-system" id="admin">
+          <aside class="threads-panel" aria-label="Admin navigation reference">
             <div class="panel-head">
-              <h2>Threads</h2>
-              <p>Модулі, які можна замінювати без зміни візуального каркасу.</p>
+              <p class="st-kicker">Navigation</p>
+              <h2>Адмін-панель</h2>
+              <p>Compact sidebars, calm active states, readable labels and no decorative overload.</p>
             </div>
             <div class="threads-list">
-              <%- include('partials/vision/thread-schedule') %>
-              <%- include('partials/vision/thread-profile') %>
-              <%- include('partials/vision/thread-settings') %>
+              <article class="thread-card"><h3>Overview</h3><p>Primary status and key actions.</p></article>
+              <article class="thread-card"><h3>Academic Setup</h3><p>Program, term and schedule structure.</p></article>
+              <article class="thread-card"><h3>Messages</h3><p>Communication tools stay visually secondary.</p></article>
             </div>
           </aside>
 
-          <section class="conversation-panel" id="conversation" aria-label="Conversation preview">
+          <section class="conversation-panel" id="profile" aria-label="Profile and controls reference">
             <header class="conversation-head">
-              <div class="avatar" aria-hidden="true">S</div>
+              <div class="avatar" aria-hidden="true">MA</div>
               <div>
-                <h2>Conversation</h2>
-                <p>Панель швидкої взаємодії для запитів по курсах і контактах</p>
+                <p class="st-kicker">Profile surface</p>
+                <h2>Редагування профілю</h2>
+                <p>Centered card language shared by login and profile forms.</p>
               </div>
             </header>
 
-            <div class="conversation-stream" role="log" aria-live="polite">
-              <article class="message from-user">
-                <h3>Куратор</h3>
-                <p>Склади короткий огляд розкладу на наступний тиждень і покажи конфлікти аудиторій.</p>
+            <div class="conversation-stream" role="list">
+              <article class="message" role="listitem">
+                <h3>Primary card</h3>
+                <p>Liquid-glass is strongest on focused surfaces like login and profile.</p>
               </article>
-              <article class="message from-assistant">
-                <h3>Studerria Assistant</h3>
-                <p>
-                  Знайшов 3 перетини в магістратурі. Можу застосувати шаблон перестановки та зберегти
-                  зміни в чернетку до затвердження.
-                </p>
+              <article class="message" role="listitem">
+                <h3>Data cards</h3>
+                <p>Schedule and admin content stays more solid for readability.</p>
               </article>
-              <article class="message from-user">
-                <h3>Деканат</h3>
-                <p>Після узгодження опублікуй рейтинг відвідуваності по групах і додай контакти кураторів.</p>
+              <article class="message" role="listitem">
+                <h3>Light mode</h3>
+                <p>The same geometry and accents, translated into soft daylight materials.</p>
               </article>
             </div>
 
             <form class="conversation-compose" action="#" method="post" onsubmit="return false;">
-              <label for="visionConversationInput" class="sr-only">Message</label>
-              <input
-                id="visionConversationInput"
-                type="text"
-                placeholder="Напишіть запит про розклад, курси або контактні дані..."
-              />
-              <button type="submit">Надіслати</button>
+              <label for="visionConversationInput" class="sr-only">Reference input</label>
+              <input id="visionConversationInput" type="text" value="Марченко Андрій" aria-label="Reference input" />
+              <button type="submit">Save</button>
             </form>
 
-            <footer id="contacts">
-              <span>+380 44 000 00 00</span>
-              <span>support@studerria.edu</span>
-              <strong>Powered by OpenAI</strong>
+            <footer>
+              <span>Deep indigo</span>
+              <span>Restrained purple</span>
+              <strong>Production UI</strong>
             </footer>
           </section>
+        </section>
+
+        <section class="vision-primitives" id="primitives" aria-label="Reusable primitives">
+          <article class="vision-primitive"><strong>Page Background</strong><span>Dark indigo and soft daylight gradients with one restrained wave layer.</span></article>
+          <article class="vision-primitive"><strong>Liquid Surface</strong><span>Used on nav, login, profile and selected elevated panels.</span></article>
+          <article class="vision-primitive"><strong>Data Surface</strong><span>More opaque cards for schedule rows, metrics, tables and lists.</span></article>
+          <article class="vision-primitive"><strong>Controls</strong><span>Rounded inputs, ghost buttons, gradient CTA and visible focus rings.</span></article>
         </section>
       </main>
     </div>
