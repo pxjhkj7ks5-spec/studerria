@@ -1,0 +1,696 @@
+<%
+  const manualPageText = lang === 'en'
+    ? {
+        pageTitle: 'Schedule Generator · Manual Alt',
+        backToAdmin: 'Back to admin',
+        backToAuto: 'Auto generator',
+        sessionGenerator: 'Session Generator',
+        heroTitle: 'Manual Alt Schedule Generator',
+        heroLead: 'Set a slot once and apply it to all semester weeks. Monitor coverage directly by subject row.',
+        scopeHint: 'Scope is global for this page and updates immediately.',
+        location: 'Campus',
+        locationKyiv: 'Kyiv',
+        locationMunich: 'Munich',
+        course: 'Course',
+        semester: 'Semester',
+        noCourses: 'No courses for this campus.',
+        noSemesters: 'No semesters for this course.',
+        matrixTitle: 'Manual Semester Matrix',
+        matrixLead: 'Each saved slot expands to every week of the selected semester.',
+        subject: 'Subject',
+        type: 'Type',
+        lecture: 'Lecture',
+        seminar: 'Seminar',
+        targetPairs: 'Target pairs',
+        targetSlots: 'Target slots',
+        assignedSlots: 'Assigned slots',
+        coveredPairs: 'Covered pairs',
+        remainingPairs: 'Remaining',
+        slotTemplates: 'Slot templates',
+        addSlot: 'Add slot',
+        day: 'Day',
+        slot: 'Slot',
+        clearPlan: 'Clear plan',
+        runPreview: 'Generate preview',
+        autosave: 'Autosave',
+        saving: 'Saving…',
+        saved: 'Saved',
+        saveError: 'Save failed',
+        emptySlotList: 'No slots',
+        noRows: 'No rows in this scope.',
+        summaryWeeks: 'Weeks',
+        summaryTargetPairs: 'Target pairs',
+        summaryCoveredPairs: 'Covered pairs',
+        summaryRemainingPairs: 'Remaining pairs',
+        summaryTargetSlots: 'Target slots',
+        summaryAssignedSlots: 'Assigned slots',
+        summaryClosedRows: 'Closed rows',
+      }
+    : {
+        pageTitle: 'Генератор розкладу · Manual Alt',
+        backToAdmin: 'Назад в адмінку',
+        backToAuto: 'Авто генератор',
+        sessionGenerator: 'Генератор сесій',
+        heroTitle: 'Ручний альтернативний генератор',
+        heroLead: 'Постав слот один раз і застосуй на всі тижні семестру. Контроль покриття по кожному рядку матриці.',
+        scopeHint: 'Scope для сторінки глобальний і оновлюється одразу.',
+        location: 'Кампус',
+        locationKyiv: 'Київ',
+        locationMunich: 'Мюнхен',
+        course: 'Курс',
+        semester: 'Терм',
+        noCourses: 'Немає курсів для цього кампусу.',
+        noSemesters: 'Для курсу немає семестрів.',
+        matrixTitle: 'Ручна матриця семестру',
+        matrixLead: 'Кожен збережений слот автоматично дублюється на всі тижні вибраного семестру.',
+        subject: 'Предмет',
+        type: 'Тип',
+        lecture: 'Лекція',
+        seminar: 'Семінар',
+        targetPairs: 'Потрібно пар',
+        targetSlots: 'Потрібно слотів',
+        assignedSlots: 'Задано слотів',
+        coveredPairs: 'Покрито пар',
+        remainingPairs: 'Залишок',
+        slotTemplates: 'Шаблони слотів',
+        addSlot: 'Додати слот',
+        day: 'День',
+        slot: 'Слот',
+        clearPlan: 'Очистити план',
+        runPreview: 'Згенерувати превʼю',
+        autosave: 'Автозбереження',
+        saving: 'Зберігаю…',
+        saved: 'Збережено',
+        saveError: 'Помилка збереження',
+        emptySlotList: 'Слоти не задані',
+        noRows: 'У цьому scope немає рядків.',
+        summaryWeeks: 'Тижнів',
+        summaryTargetPairs: 'Потрібно пар',
+        summaryCoveredPairs: 'Покрито пар',
+        summaryRemainingPairs: 'Залишок пар',
+        summaryTargetSlots: 'Потрібно слотів',
+        summaryAssignedSlots: 'Задано слотів',
+        summaryClosedRows: 'Закрито рядків',
+      };
+
+  const activeLocationCourses = (coursesByLocation && coursesByLocation[activeLocation]) || [];
+  const scopedCourseId = Number(selectedGlobalCourseId || (selectedGlobalCourse && selectedGlobalCourse.id) || 0) || null;
+  const scopedSemesterId = Number(selectedGlobalSemesterId || (selectedGlobalSemester && selectedGlobalSemester.id) || 0) || null;
+  const scopedSemesters = Array.isArray(selectedGlobalSemesters) ? selectedGlobalSemesters : [];
+  const matrixRows = Array.isArray(manualMatrixRows) ? manualMatrixRows : [];
+  const semesterWeeksCount = Number(selectedGlobalSemesterWeeksCount || 0) || 0;
+  const summary = manualSummary && typeof manualSummary === 'object'
+    ? manualSummary
+    : {
+        rows_total: 0,
+        target_pairs_total: 0,
+        covered_pairs_total: 0,
+        remaining_pairs_total: 0,
+        required_slots_total: 0,
+        assigned_slots_total: 0,
+        closed_rows_total: 0,
+      };
+  const safeDayOptions = Array.isArray(dayOptions) && dayOptions.length
+    ? dayOptions
+    : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const safeDayLabels = Array.isArray(dayLabels) && dayLabels.length
+    ? dayLabels
+    : ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+  const safeClassOptions = Array.isArray(classOptions) && classOptions.length
+    ? classOptions
+    : [1, 2, 3, 4, 5, 6, 7];
+
+  const buildGeneratorHref = (mode) => {
+    const params = new URLSearchParams();
+    if (run && run.id) params.set('run', String(run.id));
+    if (activeLocation) params.set('location', String(activeLocation));
+    if (scopedCourseId) params.set('course_id', String(scopedCourseId));
+    if (scopedSemesterId) params.set('semester_id', String(scopedSemesterId));
+    if (mode === 'manual') params.set('mode', 'manual');
+    const query = params.toString();
+    return `/admin/schedule-generator${query ? `?${query}` : ''}`;
+  };
+%>
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
+    <title><%= manualPageText.pageTitle %></title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/pages/admin.css" />
+    <link rel="stylesheet" href="/css/pages/admin-schedule-generator.css" />
+    <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <style>
+      .manual-shell .manual-slot-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .2rem .55rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,.2);
+        background: rgba(255,255,255,.06);
+        font-size: .75rem;
+      }
+      .manual-shell .manual-slot-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .4rem;
+        margin-top: .45rem;
+      }
+      .manual-shell .manual-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: .7rem;
+      }
+      .manual-shell .manual-summary-cell {
+        border: 1px solid rgba(255,255,255,.15);
+        border-radius: .75rem;
+        padding: .6rem .7rem;
+        background: rgba(255,255,255,.04);
+      }
+      .manual-shell .manual-summary-cell .label {
+        display: block;
+        font-size: .72rem;
+        opacity: .72;
+      }
+      .manual-shell .manual-summary-cell .value {
+        display: block;
+        font-weight: 600;
+        font-size: 1rem;
+        margin-top: .15rem;
+      }
+      .manual-shell .manual-type-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: .2rem .5rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,.2);
+        font-size: .72rem;
+        text-transform: uppercase;
+      }
+      .manual-shell .manual-type-badge.is-lecture { background: rgba(83, 162, 255, .14); }
+      .manual-shell .manual-type-badge.is-seminar { background: rgba(100, 224, 170, .14); }
+      .manual-shell .manual-remaining.ok { color: #34d399; }
+      .manual-shell .manual-remaining.warn { color: #f59e0b; }
+    </style>
+  </head>
+  <body class="studerria-theme theme-dark schedule-generator-page manual-shell">
+    <%- include('partials/theme-bootstrap-body') %>
+    <%- include('partials/dynamic-bg') %>
+
+    <nav class="navbar navbar-expand-lg admin-nav">
+      <div class="container">
+        <span class="navbar-brand"><%= manualPageText.pageTitle %></span>
+        <div class="d-flex align-items-center">
+          <span class="me-3 text-muted"><%= t('role.admin') %>: <%= username %></span>
+          <button
+            class="theme-toggle theme-toggle-min me-2"
+            type="button"
+            id="themeToggle"
+            aria-label="<%= t('theme.toggle') %>"
+            data-light-label="☀️"
+            data-dark-label="🌙"
+          >
+            🌙
+          </button>
+          <a class="btn btn-outline-primary btn-sm me-2" href="/admin"><%= manualPageText.backToAdmin %></a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="<%= buildGeneratorHref('auto') %>"><%= manualPageText.backToAuto %></a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="/admin/session-generator"><%= manualPageText.sessionGenerator %></a>
+          <form method="POST" action="/logout">
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <% if (messages && messages.error) { %>
+        <div class="alert alert-danger"><%= messages.error %></div>
+      <% } %>
+      <% if (messages && messages.success) { %>
+        <div class="alert alert-success"><%= messages.success %></div>
+      <% } %>
+
+      <div class="generator-hero glass mb-4">
+        <h1 class="h3 mb-2"><%= manualPageText.heroTitle %></h1>
+        <div class="text-muted"><%= manualPageText.heroLead %></div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-xl-4">
+          <div class="card glass-panel mb-4">
+            <div class="card-body">
+              <div class="generator-section-title mb-2"><%= manualPageText.scopeHint %></div>
+              <form method="GET" action="/admin/schedule-generator" class="row g-3" id="manualScopeForm">
+                <input type="hidden" name="run" value="<%= run.id %>" />
+                <input type="hidden" name="mode" value="manual" />
+                <div class="col-12">
+                  <label class="form-label"><%= manualPageText.location %></label>
+                  <select class="form-select" name="location" id="manualScopeLocation">
+                    <option value="kyiv" <%= activeLocation === 'kyiv' ? 'selected' : '' %>><%= manualPageText.locationKyiv %></option>
+                    <option value="munich" <%= activeLocation === 'munich' ? 'selected' : '' %>><%= manualPageText.locationMunich %></option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label"><%= manualPageText.course %></label>
+                  <select class="form-select" name="course_id" id="manualScopeCourse" <%= activeLocationCourses.length ? '' : 'disabled' %>>
+                    <% if (!activeLocationCourses.length) { %>
+                      <option value=""><%= manualPageText.noCourses %></option>
+                    <% } else { %>
+                      <% activeLocationCourses.forEach(function(course) { %>
+                        <option value="<%= course.id %>" <%= Number(course.id) === Number(scopedCourseId || 0) ? 'selected' : '' %>><%= course.name %></option>
+                      <% }); %>
+                    <% } %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label"><%= manualPageText.semester %></label>
+                  <select class="form-select" name="semester_id" id="manualScopeSemester" <%= scopedSemesters.length ? '' : 'disabled' %>>
+                    <% if (!scopedSemesters.length) { %>
+                      <option value=""><%= manualPageText.noSemesters %></option>
+                    <% } else { %>
+                      <% scopedSemesters.forEach(function(semester) { %>
+                        <option value="<%= semester.id %>" <%= Number(semester.id) === Number(scopedSemesterId || 0) ? 'selected' : '' %>>
+                          <%= semester.display_title || semester.title || ('Semester ' + semester.id) %> · <%= semester.weeks_count || '—' %>
+                        </option>
+                      <% }); %>
+                    <% } %>
+                  </select>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card glass-panel">
+            <div class="card-body">
+              <div class="manual-summary-grid">
+                <div class="manual-summary-cell"><span class="label"><%= manualPageText.summaryWeeks %></span><span class="value" id="sumWeeks"><%= semesterWeeksCount %></span></div>
+                <div class="manual-summary-cell"><span class="label"><%= manualPageText.summaryTargetPairs %></span><span class="value" id="sumTargetPairs"><%= Number(summary.target_pairs_total || 0) %></span></div>
+                <div class="manual-summary-cell"><span class="label"><%= manualPageText.summaryCoveredPairs %></span><span class="value" id="sumCoveredPairs"><%= Number(summary.covered_pairs_total || 0) %></span></div>
+                <div class="manual-summary-cell"><span class="label"><%= manualPageText.summaryRemainingPairs %></span><span class="value" id="sumRemainingPairs"><%= Number(summary.remaining_pairs_total || 0) %></span></div>
+                <div class="manual-summary-cell"><span class="label"><%= manualPageText.summaryTargetSlots %></span><span class="value" id="sumTargetSlots"><%= Number(summary.required_slots_total || 0) %></span></div>
+                <div class="manual-summary-cell"><span class="label"><%= manualPageText.summaryAssignedSlots %></span><span class="value" id="sumAssignedSlots"><%= Number(summary.assigned_slots_total || 0) %></span></div>
+                <div class="manual-summary-cell"><span class="label"><%= manualPageText.summaryClosedRows %></span><span class="value" id="sumClosedRows"><%= Number(summary.closed_rows_total || 0) %>/<%= Number(summary.rows_total || 0) %></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-8">
+          <div class="card glass-panel mb-3">
+            <div class="card-body d-flex flex-wrap align-items-center gap-2">
+              <form method="POST" action="/admin/schedule-generator/manual-run" id="manualRunForm" class="d-flex flex-wrap align-items-center gap-2">
+                <input type="hidden" name="run_id" value="<%= run.id %>" />
+                <input type="hidden" name="active_location" value="<%= activeLocation %>" />
+                <input type="hidden" name="course_id" value="<%= scopedCourseId || '' %>" />
+                <input type="hidden" name="semester_id" value="<%= scopedSemesterId || '' %>" />
+                <input type="hidden" name="slots_json" id="runManualSlotsPayload" value="" />
+                <button class="btn btn-primary" id="manualRunBtn" type="submit" <%= scopedCourseId && scopedSemesterId ? '' : 'disabled' %>><%= manualPageText.runPreview %></button>
+              </form>
+              <button class="btn btn-outline-secondary" type="button" id="manualClearBtn"><%= manualPageText.clearPlan %></button>
+              <span class="small text-muted"><%= manualPageText.autosave %>:</span>
+              <span class="small text-muted" id="manualSaveStatus"><%= manualPageText.saved %></span>
+            </div>
+          </div>
+
+          <div class="card glass-panel">
+            <div class="card-body">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <div class="generator-section-title"><%= manualPageText.matrixTitle %></div>
+                <div class="small text-muted">
+                  <%= scopedCourseId ? (selectedGlobalCourse && selectedGlobalCourse.name) : '—' %>
+                  <% if (scopedSemesterId) { %>
+                    · <%= selectedGlobalSemester && (selectedGlobalSemester.title || ('Semester ' + selectedGlobalSemester.id)) %>
+                  <% } %>
+                </div>
+              </div>
+              <div class="small text-muted mb-3"><%= manualPageText.matrixLead %></div>
+
+              <% if (!matrixRows.length) { %>
+                <div class="generator-empty"><%= manualPageText.noRows %></div>
+              <% } else { %>
+                <div class="table-responsive">
+                  <table class="table align-middle">
+                    <thead>
+                      <tr>
+                        <th><%= manualPageText.subject %></th>
+                        <th><%= manualPageText.type %></th>
+                        <th><%= manualPageText.targetPairs %></th>
+                        <th><%= manualPageText.targetSlots %></th>
+                        <th><%= manualPageText.assignedSlots %></th>
+                        <th><%= manualPageText.coveredPairs %></th>
+                        <th><%= manualPageText.remainingPairs %></th>
+                        <th><%= manualPageText.slotTemplates %></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% matrixRows.forEach(function(row, index) { %>
+                        <tr
+                          data-row-index="<%= index %>"
+                          data-row-key="<%= row.row_key %>"
+                          data-target-pairs="<%= Number(row.target_pairs || 0) %>"
+                        >
+                          <td class="fw-semibold"><%= row.subject_name %></td>
+                          <td>
+                            <span class="manual-type-badge <%= row.lesson_type === 'seminar' ? 'is-seminar' : 'is-lecture' %>">
+                              <%= row.lesson_type === 'seminar' ? manualPageText.seminar : manualPageText.lecture %>
+                            </span>
+                          </td>
+                          <td><span id="row-target-pairs-<%= index %>"><%= Number(row.target_pairs || 0) %></span></td>
+                          <td><span id="row-target-slots-<%= index %>"><%= Number(row.required_slots || 0) %></span></td>
+                          <td><span id="row-assigned-slots-<%= index %>"><%= Number(row.assigned_slots || 0) %></span></td>
+                          <td><span id="row-covered-pairs-<%= index %>"><%= Number(row.covered_pairs || 0) %></span></td>
+                          <td><span class="manual-remaining <%= Number(row.remaining_pairs || 0) <= 0 ? 'ok' : 'warn' %>" id="row-remaining-pairs-<%= index %>"><%= Number(row.remaining_pairs || 0) %></span></td>
+                          <td>
+                            <div class="d-flex gap-2">
+                              <select class="form-select form-select-sm" id="row-day-<%= index %>" style="max-width: 130px;">
+                                <option value=""><%= manualPageText.day %></option>
+                                <% safeDayOptions.forEach(function(day, dayIndex) { %>
+                                  <option value="<%= day %>"><%= safeDayLabels[dayIndex] || day %></option>
+                                <% }); %>
+                              </select>
+                              <select class="form-select form-select-sm" id="row-slot-<%= index %>" style="max-width: 110px;">
+                                <option value=""><%= manualPageText.slot %></option>
+                                <% safeClassOptions.forEach(function(slotValue) { %>
+                                  <option value="<%= slotValue %>">#<%= slotValue %></option>
+                                <% }); %>
+                              </select>
+                              <button class="btn btn-outline-primary btn-sm" type="button" data-add-slot data-row-index="<%= index %>"><%= manualPageText.addSlot %></button>
+                            </div>
+                            <div class="manual-slot-list" id="row-slot-list-<%= index %>" data-empty-text="<%= manualPageText.emptySlotList %>"></div>
+                          </td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <%- include('partials/app-footer') %>
+    <%- include('partials/changelog-modal') %>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        const applyTheme = (theme) => {
+          document.body.classList.toggle('theme-light', theme === 'light');
+          document.body.classList.toggle('theme-dark', theme === 'dark');
+          document.body.setAttribute('data-theme', theme);
+          document.documentElement.setAttribute('data-theme', theme);
+          themeToggle.textContent = theme === 'light'
+            ? (themeToggle.dataset.darkLabel || '☀️')
+            : (themeToggle.dataset.lightLabel || '🌙');
+        };
+        const storedTheme = localStorage.getItem('ui-theme');
+        const normalizedTheme = storedTheme === 'theme-light' || storedTheme === 'light' ? 'light' : 'dark';
+        localStorage.setItem('ui-theme', normalizedTheme === 'dark' ? 'theme-dark' : 'theme-light');
+        applyTheme(normalizedTheme);
+        themeToggle.addEventListener('click', () => {
+          const next = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
+          localStorage.setItem('ui-theme', next === 'dark' ? 'theme-dark' : 'theme-light');
+          applyTheme(next);
+        });
+      }
+
+      const scopeForm = document.getElementById('manualScopeForm');
+      ['manualScopeLocation', 'manualScopeCourse', 'manualScopeSemester']
+        .map((id) => document.getElementById(id))
+        .filter(Boolean)
+        .forEach((node) => node.addEventListener('change', () => {
+          if (!scopeForm || scopeForm.dataset.submitting === '1') return;
+          scopeForm.dataset.submitting = '1';
+          if (typeof scopeForm.requestSubmit === 'function') {
+            scopeForm.requestSubmit();
+            return;
+          }
+          scopeForm.submit();
+        }));
+
+      const rowsMeta = <%- JSON.stringify((matrixRows || []).map((row) => ({
+        row_key: String(row.row_key || ''),
+        subject_id: Number(row.subject_id || 0),
+        lesson_type: String(row.lesson_type || 'lecture'),
+        target_pairs: Number(row.target_pairs || 0),
+      }))) %>;
+      const dayOrder = <%- JSON.stringify(safeDayOptions || []) %>;
+      const weeksCount = Number(<%- JSON.stringify(semesterWeeksCount) %> || 0);
+      const saveStatus = document.getElementById('manualSaveStatus');
+      const saveTextSaving = <%- JSON.stringify(manualPageText.saving) %>;
+      const saveTextSaved = <%- JSON.stringify(manualPageText.saved) %>;
+      const saveTextError = <%- JSON.stringify(manualPageText.saveError) %>;
+      const saveFormPayloadTarget = document.getElementById('runManualSlotsPayload');
+      const manualRunForm = document.getElementById('manualRunForm');
+      const manualRunBtn = document.getElementById('manualRunBtn');
+      const manualClearBtn = document.getElementById('manualClearBtn');
+      const initialSlots = <%- JSON.stringify(manualScopeSlots || []) %>;
+      let manualSlots = Array.isArray(initialSlots) ? [...initialSlots] : [];
+      const rowMetaMap = new Map((rowsMeta || []).map((row) => [String(row.row_key || ''), row]));
+      const payloadBase = {
+        run_id: <%- JSON.stringify(Number(run && run.id || 0) || 0) %>,
+        active_location: <%- JSON.stringify(String(activeLocation || 'kyiv')) %>,
+        course_id: <%- JSON.stringify(Number(scopedCourseId || 0) || 0) %>,
+        semester_id: <%- JSON.stringify(Number(scopedSemesterId || 0) || 0) %>,
+      };
+      let saveTimer = null;
+      let saveToken = 0;
+
+      const normalizeDay = (value) => {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        const found = dayOrder.find((day) => String(day || '').toLowerCase() === raw.toLowerCase());
+        return found || '';
+      };
+      const normalizeLessonType = (value) => {
+        const raw = String(value || '').trim().toLowerCase();
+        if (raw === 'seminar' || raw.includes('сем')) return 'seminar';
+        return 'lecture';
+      };
+      const buildRowKey = (subjectId, lessonType) => `${Number(subjectId || 0)}|${normalizeLessonType(lessonType)}`;
+      const buildSlotKey = (slot) => `${Number(slot.subject_id || 0)}|${normalizeLessonType(slot.lesson_type)}|${normalizeDay(slot.day_of_week)}|${Number(slot.class_number || 0)}`;
+
+      const sortSlots = (left, right) => {
+        const keyLeft = buildRowKey(left.subject_id, left.lesson_type);
+        const keyRight = buildRowKey(right.subject_id, right.lesson_type);
+        if (keyLeft !== keyRight) return keyLeft.localeCompare(keyRight);
+        const dayLeft = dayOrder.indexOf(normalizeDay(left.day_of_week));
+        const dayRight = dayOrder.indexOf(normalizeDay(right.day_of_week));
+        if (dayLeft !== dayRight) return dayLeft - dayRight;
+        return Number(left.class_number || 0) - Number(right.class_number || 0);
+      };
+
+      const sanitizeSlots = (rows) => {
+        const seen = new Set();
+        const normalized = [];
+        (Array.isArray(rows) ? rows : []).forEach((slot) => {
+          const subjectId = Number(slot && slot.subject_id || 0);
+          const lessonType = normalizeLessonType(slot && slot.lesson_type);
+          const rowKey = buildRowKey(subjectId, lessonType);
+          if (!rowMetaMap.has(rowKey)) return;
+          const dayName = normalizeDay(slot && slot.day_of_week);
+          const classNumber = Number(slot && slot.class_number || 0);
+          if (!dayName || !Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) return;
+          const nextSlot = {
+            subject_id: subjectId,
+            lesson_type: lessonType,
+            day_of_week: dayName,
+            class_number: Math.floor(classNumber),
+          };
+          const slotKey = buildSlotKey(nextSlot);
+          if (seen.has(slotKey)) return;
+          seen.add(slotKey);
+          normalized.push(nextSlot);
+        });
+        return normalized.sort(sortSlots);
+      };
+
+      const updatePayloadInputs = () => {
+        const payload = JSON.stringify(manualSlots);
+        if (saveFormPayloadTarget) {
+          saveFormPayloadTarget.value = payload;
+        }
+      };
+
+      const updateSummary = () => {
+        let targetPairs = 0;
+        let coveredPairs = 0;
+        let targetSlots = 0;
+        let assignedSlots = 0;
+        let closedRows = 0;
+        rowsMeta.forEach((row) => {
+          const rowKey = String(row.row_key || '');
+          const rowTarget = Math.max(0, Number(row.target_pairs || 0));
+          const rowSlots = manualSlots.filter((slot) => buildRowKey(slot.subject_id, slot.lesson_type) === rowKey);
+          const rowCovered = rowSlots.length * weeksCount;
+          const rowTargetSlots = weeksCount > 0 ? Math.ceil(rowTarget / weeksCount) : 0;
+          targetPairs += rowTarget;
+          coveredPairs += rowCovered;
+          targetSlots += rowTargetSlots;
+          assignedSlots += rowSlots.length;
+          if (rowTarget > 0 && rowCovered >= rowTarget) closedRows += 1;
+        });
+        const remainingPairs = targetPairs - coveredPairs;
+        const setText = (id, value) => {
+          const node = document.getElementById(id);
+          if (node) node.textContent = String(value);
+        };
+        setText('sumTargetPairs', targetPairs);
+        setText('sumCoveredPairs', coveredPairs);
+        setText('sumRemainingPairs', remainingPairs);
+        setText('sumTargetSlots', targetSlots);
+        setText('sumAssignedSlots', assignedSlots);
+        const closedNode = document.getElementById('sumClosedRows');
+        if (closedNode) closedNode.textContent = `${closedRows}/${rowsMeta.length}`;
+      };
+
+      const renderRows = () => {
+        document.querySelectorAll('tr[data-row-index]').forEach((rowNode) => {
+          const rowIndex = Number(rowNode.dataset.rowIndex || 0);
+          const rowKey = String(rowNode.dataset.rowKey || '');
+          const rowTargetPairs = Math.max(0, Number(rowNode.dataset.targetPairs || 0));
+          const rowSlots = manualSlots.filter((slot) => buildRowKey(slot.subject_id, slot.lesson_type) === rowKey);
+          const targetSlots = weeksCount > 0 ? Math.ceil(rowTargetPairs / weeksCount) : 0;
+          const coveredPairs = rowSlots.length * weeksCount;
+          const remainingPairs = rowTargetPairs - coveredPairs;
+          const setNodeText = (suffix, value) => {
+            const node = document.getElementById(`row-${suffix}-${rowIndex}`);
+            if (node) node.textContent = String(value);
+          };
+          setNodeText('target-slots', targetSlots);
+          setNodeText('assigned-slots', rowSlots.length);
+          setNodeText('covered-pairs', coveredPairs);
+          const remainingNode = document.getElementById(`row-remaining-pairs-${rowIndex}`);
+          if (remainingNode) {
+            remainingNode.textContent = String(remainingPairs);
+            remainingNode.classList.toggle('ok', remainingPairs <= 0);
+            remainingNode.classList.toggle('warn', remainingPairs > 0);
+          }
+          const listNode = document.getElementById(`row-slot-list-${rowIndex}`);
+          if (!listNode) return;
+          if (!rowSlots.length) {
+            listNode.innerHTML = `<span class="small text-muted">${listNode.dataset.emptyText || ''}</span>`;
+            return;
+          }
+          listNode.innerHTML = rowSlots
+            .map((slot) => {
+              const slotKey = buildSlotKey(slot);
+              return `<span class="manual-slot-chip">${slot.day_of_week} #${slot.class_number}<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none manual-slot-remove" data-slot-key="${slotKey}" aria-label="remove">×</button></span>`;
+            })
+            .join('');
+        });
+      };
+
+      const renderAll = () => {
+        manualSlots = sanitizeSlots(manualSlots);
+        updatePayloadInputs();
+        renderRows();
+        updateSummary();
+      };
+
+      const queueSave = () => {
+        if (!payloadBase.run_id || !payloadBase.course_id || !payloadBase.semester_id) return;
+        if (saveTimer) window.clearTimeout(saveTimer);
+        if (saveStatus) saveStatus.textContent = saveTextSaving;
+        saveTimer = window.setTimeout(async () => {
+          saveToken += 1;
+          const currentToken = saveToken;
+          const body = new URLSearchParams({
+            run_id: String(payloadBase.run_id),
+            active_location: String(payloadBase.active_location || 'kyiv'),
+            course_id: String(payloadBase.course_id),
+            semester_id: String(payloadBase.semester_id),
+            slots_json: JSON.stringify(manualSlots),
+          });
+          try {
+            const response = await fetch('/admin/schedule-generator/manual-slots/save', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+              },
+              body: body.toString(),
+              credentials: 'same-origin',
+            });
+            const payload = await response.json().catch(() => ({ ok: false }));
+            if (currentToken !== saveToken) return;
+            if (!response.ok || !payload.ok) {
+              if (saveStatus) saveStatus.textContent = saveTextError;
+              return;
+            }
+            if (saveStatus) saveStatus.textContent = saveTextSaved;
+          } catch (_err) {
+            if (currentToken !== saveToken) return;
+            if (saveStatus) saveStatus.textContent = saveTextError;
+          }
+        }, 280);
+      };
+
+      document.querySelectorAll('[data-add-slot]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const rowIndex = Number(button.dataset.rowIndex || 0);
+          const rowNode = document.querySelector(`tr[data-row-index="${rowIndex}"]`);
+          if (!rowNode) return;
+          const rowKey = String(rowNode.dataset.rowKey || '');
+          const rowMeta = rowMetaMap.get(rowKey);
+          if (!rowMeta) return;
+          const daySelect = document.getElementById(`row-day-${rowIndex}`);
+          const slotSelect = document.getElementById(`row-slot-${rowIndex}`);
+          const dayName = normalizeDay(daySelect && daySelect.value);
+          const classNumber = Number(slotSelect && slotSelect.value || 0);
+          if (!dayName || !Number.isFinite(classNumber) || classNumber < 1 || classNumber > 7) return;
+          manualSlots.push({
+            subject_id: Number(rowMeta.subject_id || 0),
+            lesson_type: normalizeLessonType(rowMeta.lesson_type),
+            day_of_week: dayName,
+            class_number: Math.floor(classNumber),
+          });
+          renderAll();
+          queueSave();
+        });
+      });
+
+      document.addEventListener('click', (event) => {
+        const node = event.target;
+        if (!(node instanceof HTMLElement) || !node.classList.contains('manual-slot-remove')) return;
+        const slotKey = String(node.dataset.slotKey || '');
+        if (!slotKey) return;
+        manualSlots = manualSlots.filter((slot) => buildSlotKey(slot) !== slotKey);
+        renderAll();
+        queueSave();
+      });
+
+      if (manualClearBtn) {
+        manualClearBtn.addEventListener('click', () => {
+          manualSlots = [];
+          renderAll();
+          queueSave();
+        });
+      }
+
+      if (manualRunForm && manualRunBtn) {
+        manualRunForm.addEventListener('submit', () => {
+          updatePayloadInputs();
+          manualRunBtn.disabled = true;
+        });
+      }
+
+      renderAll();
+    </script>
+  </body>
+</html>

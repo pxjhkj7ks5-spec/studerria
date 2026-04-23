@@ -40,6 +40,7 @@
         runHint: 'Generation runs for the selected course + semester scope.',
         generatePreview: 'Generate preview',
         openPreview: 'Open preview',
+        openManual: 'Manual Alt',
         settingsTitle: 'Generation Settings',
         settingsHint: 'Use only the controls that directly affect generation quality.',
         blockedWeeks: 'Special Study Weeks',
@@ -109,6 +110,7 @@
         runHint: 'Генерація запускається тільки по вибраному курсу + терму.',
         generatePreview: 'Згенерувати превʼю',
         openPreview: 'Відкрити превʼю',
+        openManual: 'Manual Alt',
         settingsTitle: 'Налаштування генерації',
         settingsHint: 'Лишили тільки параметри, що реально впливають на якість генерації.',
         blockedWeeks: 'Спец-тижні навчання',
@@ -179,6 +181,17 @@
     if (dayText && slotNumber) return `${dayText} · #${slotNumber}`;
     if (dayText) return dayText;
     return `#${slotNumber}`;
+  };
+
+  const buildGeneratorHref = (mode) => {
+    const params = new URLSearchParams();
+    if (run && run.id) params.set('run', String(run.id));
+    if (activeLocation) params.set('location', String(activeLocation));
+    if (scopedCourseId) params.set('course_id', String(scopedCourseId));
+    if (scopedSemesterId) params.set('semester_id', String(scopedSemesterId));
+    if (String(mode || '').toLowerCase() === 'manual') params.set('mode', 'manual');
+    const query = params.toString();
+    return `/admin/schedule-generator${query ? `?${query}` : ''}`;
   };
 %>
 <!doctype html>
@@ -259,6 +272,7 @@
           </button>
           <a class="btn btn-outline-primary btn-sm me-2" href="/admin"><%= schedulePageText.backToAdmin %></a>
           <a class="btn btn-outline-secondary btn-sm me-2" href="/admin/session-generator"><%= schedulePageText.sessionGenerator %></a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="<%= buildGeneratorHref('manual') %>"><%= schedulePageText.openManual %></a>
           <form method="POST" action="/admin/schedule-generator/new" class="me-2">
             <button class="btn btn-outline-secondary btn-sm" type="submit">New run</button>
           </form>

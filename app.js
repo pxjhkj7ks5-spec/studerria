@@ -8589,6 +8589,141 @@ const normalizeWeekdayName = (value) => {
 const normalizeGeneratorLocation = (value) =>
   String(value || '').toLowerCase() === 'munich' ? 'munich' : 'kyiv';
 
+const SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT = 600;
+
+const normalizeScheduleGeneratorLessonType = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return 'lecture';
+  if (raw === 'seminar' || raw.includes('сем')) return 'seminar';
+  if (raw === 'lecture' || raw.includes('лек')) return 'lecture';
+  return 'lecture';
+};
+
+const buildScheduleGeneratorManualRowKey = (subjectId, lessonType) => {
+  const normalizedSubjectId = parsePositiveIntStrict(subjectId) || 0;
+  const normalizedLessonType = normalizeScheduleGeneratorLessonType(lessonType);
+  return `${normalizedSubjectId}|${normalizedLessonType}`;
+};
+
+const buildScheduleGeneratorManualScopeKey = ({ location, courseId, semesterId }) => {
+  const normalizedLocation = normalizeGeneratorLocation(location || 'kyiv');
+  const normalizedCourseId = parsePositiveIntStrict(courseId) || 0;
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId) || 0;
+  return `${normalizedLocation}:${normalizedCourseId}:${normalizedSemesterId}`;
+};
+
+const parseScheduleGeneratorManualSlots = (rawInput, options = {}) => {
+  const maxSlots = Math.max(1, Math.min(2000, Number(options.maxSlots || SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT)));
+  const allowedSubjectIds = Array.isArray(options.allowedSubjectIds)
+    ? new Set(options.allowedSubjectIds
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0))
+    : null;
+  let input = rawInput;
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return [];
+    try {
+      input = JSON.parse(trimmed);
+    } catch (_err) {
+      return [];
+    }
+  }
+  if (!Array.isArray(input)) {
+    return [];
+  }
+  const rows = [];
+  const seen = new Set();
+  for (const item of input) {
+    const subjectId = parsePositiveIntStrict(item && item.subject_id);
+    if (!subjectId) continue;
+    if (allowedSubjectIds && !allowedSubjectIds.has(subjectId)) continue;
+    const lessonType = normalizeScheduleGeneratorLessonType(item && item.lesson_type);
+    const dayName = normalizeWeekdayName(item && item.day_of_week);
+    const classNumberRaw = Number(item && item.class_number);
+    const classNumber = Number.isFinite(classNumberRaw) && classNumberRaw > 0
+      ? Math.floor(classNumberRaw)
+      : 0;
+    if (!dayName || classNumber < 1 || classNumber > 7) continue;
+    const dedupeKey = `${subjectId}|${lessonType}|${dayName}|${classNumber}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    rows.push({
+      subject_id: subjectId,
+      lesson_type: lessonType,
+      day_of_week: dayName,
+      class_number: classNumber,
+    });
+    if (rows.length >= maxSlots) break;
+  }
+  return rows.sort((left, right) => {
+    const bySubject = Number(left.subject_id || 0) - Number(right.subject_id || 0);
+    if (bySubject !== 0) return bySubject;
+    const byType = String(left.lesson_type || '').localeCompare(String(right.lesson_type || ''));
+    if (byType !== 0) return byType;
+    const dayIndexLeft = fullWeekDays.indexOf(normalizeWeekdayName(left.day_of_week) || '');
+    const dayIndexRight = fullWeekDays.indexOf(normalizeWeekdayName(right.day_of_week) || '');
+    if (dayIndexLeft !== dayIndexRight) return dayIndexLeft - dayIndexRight;
+    return Number(left.class_number || 0) - Number(right.class_number || 0);
+  });
+};
+
+const getScheduleGeneratorManualScopeSlotsFromConfig = (config, scopeKey, options = {}) => {
+  if (!scopeKey) return [];
+  const manualScopeSlots = config && config.manual_scope_slots && typeof config.manual_scope_slots === 'object'
+    ? config.manual_scope_slots
+    : {};
+  return parseScheduleGeneratorManualSlots(manualScopeSlots[scopeKey], options);
+};
+
+async function listScheduleGeneratorScopedVisibleSubjects(courseId, semesterId) {
+  const normalizedCourseId = parsePositiveIntStrict(courseId);
+  const normalizedSemesterId = parsePositiveIntStrict(semesterId);
+  if (!normalizedCourseId) return [];
+  let scopedSubjects = await getSubjectsCached(normalizedCourseId, { visibleOnly: true });
+  if (normalizedSemesterId) {
+    let scopedSubjectIdSet = null;
+    const academicV2ScopedSubjects = await listAcademicV2LegacySubjectIdsForCourseSemester(
+      normalizedCourseId,
+      normalizedSemesterId
+    );
+    if (Array.isArray(academicV2ScopedSubjects.term_ids) && academicV2ScopedSubjects.term_ids.length) {
+      scopedSubjectIdSet = new Set((academicV2ScopedSubjects.subject_ids || [])
+        .map((value) => Number(value || 0))
+        .filter((value) => Number.isInteger(value) && value > 0));
+    }
+
+    if (!scopedSubjectIdSet) {
+      try {
+        const semesterSubjectRows = await db.all(
+          `
+            SELECT DISTINCT subject_id
+            FROM subject_grading_settings
+            WHERE course_id = ? AND semester_id = ?
+          `,
+          [normalizedCourseId, normalizedSemesterId]
+        );
+        const semesterSubjectIds = (semesterSubjectRows || [])
+          .map((row) => Number(row.subject_id || 0))
+          .filter((value) => Number.isInteger(value) && value > 0);
+        if (semesterSubjectIds.length) {
+          scopedSubjectIdSet = new Set(semesterSubjectIds);
+        }
+      } catch (_err) {
+        // Fall back to all visible course subjects if scoped source is unavailable.
+      }
+    }
+
+    if (scopedSubjectIdSet) {
+      scopedSubjects = (scopedSubjects || []).filter((subject) => (
+        scopedSubjectIdSet.has(Number(subject.id || 0))
+      ));
+    }
+  }
+  return [...(scopedSubjects || [])]
+    .sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'uk'));
+}
+
 const getConfiguredCourseSemesterId = (config, courseId, location) => {
   const loc = normalizeGeneratorLocation(location || config?.active_location);
   const byLocation = config && config.course_semesters_by_location
@@ -51531,6 +51666,8 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
     if (activeLocation !== config.active_location) {
       config.active_location = activeLocation;
     }
+    const requestedGeneratorModeRaw = String((req.query && req.query.mode) || '').trim().toLowerCase();
+    const generatorViewMode = requestedGeneratorModeRaw === 'manual' ? 'manual' : 'auto';
     const coursesByLocation = {
       kyiv: await getCoursesByLocation('kyiv'),
       munich: await getCoursesByLocation('munich'),
@@ -51874,50 +52011,9 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
     }
     const selectedGlobalSemesterId = selectedGlobalSemester ? Number(selectedGlobalSemester.id) : null;
 
-    let selectedGlobalSubjects = selectedGlobalCourseId
-      ? ((subjectsByCourse[selectedGlobalCourseId] || []).filter((subject) => Number(subject.visible || 1) !== 0))
+    const selectedGlobalSubjects = selectedGlobalCourseId
+      ? await listScheduleGeneratorScopedVisibleSubjects(selectedGlobalCourseId, selectedGlobalSemesterId)
       : [];
-    if (selectedGlobalCourseId && selectedGlobalSemesterId) {
-      let scopedSubjectIdSet = null;
-      const academicV2ScopedSubjects = await listAcademicV2LegacySubjectIdsForCourseSemester(
-        selectedGlobalCourseId,
-        selectedGlobalSemesterId
-      );
-      if (Array.isArray(academicV2ScopedSubjects.term_ids) && academicV2ScopedSubjects.term_ids.length) {
-        scopedSubjectIdSet = new Set((academicV2ScopedSubjects.subject_ids || [])
-          .map((value) => Number(value || 0))
-          .filter((value) => Number.isInteger(value) && value > 0));
-      }
-
-      if (!scopedSubjectIdSet) {
-        try {
-          const semesterSubjectRows = await db.all(
-            `
-              SELECT DISTINCT subject_id
-              FROM subject_grading_settings
-              WHERE course_id = ? AND semester_id = ?
-            `,
-            [selectedGlobalCourseId, selectedGlobalSemesterId]
-          );
-          const semesterSubjectIds = (semesterSubjectRows || [])
-            .map((row) => Number(row.subject_id || 0))
-            .filter((value) => Number.isInteger(value) && value > 0);
-          if (semesterSubjectIds.length) {
-            scopedSubjectIdSet = new Set(semesterSubjectIds);
-          }
-        } catch (_err) {
-          // Fallback to all visible subjects for the selected course.
-        }
-      }
-
-      if (scopedSubjectIdSet) {
-        selectedGlobalSubjects = selectedGlobalSubjects.filter((subject) => (
-          scopedSubjectIdSet.has(Number(subject.id || 0))
-        ));
-      }
-    }
-    selectedGlobalSubjects = [...selectedGlobalSubjects]
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
     const selectedGlobalSubjectIds = selectedGlobalSubjects
       .map((subject) => Number(subject.id || 0))
       .filter((value) => Number.isInteger(value) && value > 0);
@@ -51974,6 +52070,94 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       return !(item.group_number === null || typeof item.group_number === 'undefined');
     }).length;
 
+    const selectedGlobalSemesterWeeksCount = Number(selectedGlobalSemester && selectedGlobalSemester.weeks_count || 0) || 0;
+    const manualScopeKey = buildScheduleGeneratorManualScopeKey({
+      location: activeLocation,
+      courseId: selectedGlobalCourseId,
+      semesterId: selectedGlobalSemesterId,
+    });
+    const manualScopeSlots = getScheduleGeneratorManualScopeSlotsFromConfig(config, manualScopeKey, {
+      allowedSubjectIds: selectedGlobalSubjectIds,
+      maxSlots: SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT,
+    });
+    const manualSlotsByRowKey = new Map();
+    (manualScopeSlots || []).forEach((slot) => {
+      const rowKey = buildScheduleGeneratorManualRowKey(slot.subject_id, slot.lesson_type);
+      if (!manualSlotsByRowKey.has(rowKey)) {
+        manualSlotsByRowKey.set(rowKey, []);
+      }
+      manualSlotsByRowKey.get(rowKey).push(slot);
+    });
+    const manualMatrixRows = (selectedGlobalMatrixRows || []).map((row) => {
+      const rowKey = buildScheduleGeneratorManualRowKey(row.subject_id, row.lesson_type);
+      const rowSlots = manualSlotsByRowKey.get(rowKey) || [];
+      const targetPairs = Math.max(0, Number(row.pairs_count || 0) || 0);
+      const requiredSlots = selectedGlobalSemesterWeeksCount > 0
+        ? Math.ceil(targetPairs / selectedGlobalSemesterWeeksCount)
+        : 0;
+      const assignedSlots = rowSlots.length;
+      const coveredPairs = assignedSlots * selectedGlobalSemesterWeeksCount;
+      const remainingPairs = targetPairs - coveredPairs;
+      return {
+        ...row,
+        row_key: rowKey,
+        target_pairs: targetPairs,
+        required_slots: requiredSlots,
+        assigned_slots: assignedSlots,
+        covered_pairs: coveredPairs,
+        remaining_pairs: remainingPairs,
+        slots: rowSlots,
+      };
+    });
+    const manualSummary = manualMatrixRows.reduce((acc, row) => {
+      acc.rows_total += 1;
+      acc.target_pairs_total += Number(row.target_pairs || 0);
+      acc.covered_pairs_total += Number(row.covered_pairs || 0);
+      acc.required_slots_total += Number(row.required_slots || 0);
+      acc.assigned_slots_total += Number(row.assigned_slots || 0);
+      if (Number(row.target_pairs || 0) > 0 && Number(row.remaining_pairs || 0) <= 0) {
+        acc.closed_rows_total += 1;
+      }
+      return acc;
+    }, {
+      rows_total: 0,
+      target_pairs_total: 0,
+      covered_pairs_total: 0,
+      required_slots_total: 0,
+      assigned_slots_total: 0,
+      closed_rows_total: 0,
+    });
+    manualSummary.remaining_pairs_total = manualSummary.target_pairs_total - manualSummary.covered_pairs_total;
+
+    if (generatorViewMode === 'manual') {
+      return res.render('admin-schedule-generator-manual', {
+        username: req.session.user.username,
+        role: req.session.role,
+        run,
+        config,
+        activeLocation,
+        coursesByLocation,
+        selectedGlobalCourseId,
+        selectedGlobalSemesterId,
+        selectedGlobalCourse: fallbackGlobalCourse,
+        selectedGlobalSemester,
+        selectedGlobalSemesters,
+        selectedGlobalSemesterWeeksCount,
+        selectedGlobalSubjects,
+        selectedGlobalMatrixRows,
+        selectedGlobalTeacherOptionsBySubject,
+        selectedGlobalExtraItemsCount,
+        manualScopeKey,
+        manualScopeSlots,
+        manualMatrixRows,
+        manualSummary,
+        dayOptions: fullWeekDays,
+        dayLabels: studyDayLabels,
+        classOptions: [1, 2, 3, 4, 5, 6, 7],
+        generatorViewMode,
+      });
+    }
+
     return res.render('admin-schedule-generator', {
       username: req.session.user.username,
       role: req.session.role,
@@ -52014,6 +52198,7 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       selectedGlobalMatrixRows,
       selectedGlobalTeacherOptionsBySubject,
       selectedGlobalExtraItemsCount,
+      generatorViewMode,
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.render');
@@ -52631,6 +52816,430 @@ app.post('/admin/schedule-generator/items/bulk-sync', requireScheduleGeneratorSe
     ));
   } catch (err) {
     return handleDbError(res, err, 'admin.scheduleGenerator.items.bulkSync');
+  }
+});
+
+app.post('/admin/schedule-generator/manual-slots/save', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'db_init_failed' });
+  }
+  try {
+    const runId = parsePositiveIntStrict(req.body.run_id);
+    const courseId = parsePositiveIntStrict(req.body.course_id);
+    const semesterId = parsePositiveIntStrict(req.body.semester_id);
+    const activeLocation = normalizeGeneratorLocation(req.body.active_location || req.body.location || 'kyiv');
+    if (!runId || !courseId || !semesterId) {
+      return res.status(400).json({ ok: false, error: 'invalid_scope' });
+    }
+    const run = await db.get('SELECT config FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) {
+      return res.status(404).json({ ok: false, error: 'run_not_found' });
+    }
+    const semester = await db.get('SELECT id FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    if (!semester) {
+      return res.status(400).json({ ok: false, error: 'semester_not_found' });
+    }
+    const scopedSubjects = await listScheduleGeneratorScopedVisibleSubjects(courseId, semesterId);
+    const scopedSubjectIds = (scopedSubjects || [])
+      .map((subject) => parsePositiveIntStrict(subject && subject.id))
+      .filter((value) => Number.isInteger(value) && value > 0);
+    const scopeKey = buildScheduleGeneratorManualScopeKey({
+      location: activeLocation,
+      courseId,
+      semesterId,
+    });
+    const manualScopeSlots = parseScheduleGeneratorManualSlots(req.body.slots_json, {
+      allowedSubjectIds: scopedSubjectIds,
+      maxSlots: SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT,
+    });
+    const runConfig = parseGeneratorConfig(run.config);
+    const manualScopeBag = runConfig && runConfig.manual_scope_slots && typeof runConfig.manual_scope_slots === 'object'
+      ? { ...runConfig.manual_scope_slots }
+      : {};
+    if (manualScopeSlots.length) {
+      manualScopeBag[scopeKey] = manualScopeSlots;
+    } else if (Object.prototype.hasOwnProperty.call(manualScopeBag, scopeKey)) {
+      delete manualScopeBag[scopeKey];
+    }
+    const nextCourseSemestersByLocation = {
+      ...(runConfig.course_semesters_by_location || { kyiv: {}, munich: {} }),
+      [activeLocation]: {
+        ...((runConfig.course_semesters_by_location && runConfig.course_semesters_by_location[activeLocation]) || {}),
+        [String(courseId)]: semesterId,
+      },
+    };
+    const nextConfig = {
+      ...runConfig,
+      active_location: activeLocation,
+      course_semesters_by_location: nextCourseSemestersByLocation,
+      manual_scope_slots: manualScopeBag,
+    };
+    await db.run(
+      'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
+      [serializeGeneratorConfig(nextConfig), runId]
+    );
+    return res.json({
+      ok: true,
+      run_id: runId,
+      scope_key: scopeKey,
+      slots_total: manualScopeSlots.length,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'save_failed' });
+  }
+});
+
+app.post('/admin/schedule-generator/manual-run', requireScheduleGeneratorSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.manualRun.init');
+  }
+  const runId = parsePositiveIntStrict(req.body.run_id);
+  const courseId = parsePositiveIntStrict(req.body.course_id);
+  const semesterId = parsePositiveIntStrict(req.body.semester_id);
+  const activeLocation = normalizeGeneratorLocation(req.body.active_location || req.body.location || 'kyiv');
+  const redirectManualNotice = (kind, message) => res.redirect(
+    buildScheduleGeneratorNoticeUrl(req, kind, message, runId, {
+      location: activeLocation,
+      course_id: courseId,
+      semester_id: semesterId,
+      mode: 'manual',
+    })
+  );
+  if (!runId || !courseId || !semesterId) {
+    return redirectManualNotice('err', 'Invalid scope');
+  }
+  try {
+    const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
+    if (!run) {
+      return redirectManualNotice('err', 'Run not found');
+    }
+    const semester = await db.get('SELECT * FROM semesters WHERE id = ? AND course_id = ?', [semesterId, courseId]);
+    if (!semester) {
+      return redirectManualNotice('err', 'Semester not found');
+    }
+    const weeksCount = Number(semester.weeks_count || 0);
+    if (!Number.isInteger(weeksCount) || weeksCount < 1) {
+      return redirectManualNotice('err', 'Semester weeks are not configured');
+    }
+
+    const scopedSubjects = await listScheduleGeneratorScopedVisibleSubjects(courseId, semesterId);
+    const scopedSubjectMap = new Map(
+      (scopedSubjects || [])
+        .map((subject) => [parsePositiveIntStrict(subject && subject.id), subject])
+        .filter(([subjectId]) => Number.isInteger(subjectId) && subjectId > 0)
+    );
+    if (!scopedSubjectMap.size) {
+      return redirectManualNotice('err', 'No subjects in selected scope');
+    }
+    const scopedSubjectIds = Array.from(scopedSubjectMap.keys());
+    const scopeKey = buildScheduleGeneratorManualScopeKey({
+      location: activeLocation,
+      courseId,
+      semesterId,
+    });
+    const runConfig = parseGeneratorConfig(run.config);
+    const bodySlots = parseScheduleGeneratorManualSlots(req.body.slots_json, {
+      allowedSubjectIds: scopedSubjectIds,
+      maxSlots: SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT,
+    });
+    const configSlots = getScheduleGeneratorManualScopeSlotsFromConfig(runConfig, scopeKey, {
+      allowedSubjectIds: scopedSubjectIds,
+      maxSlots: SCHEDULE_GENERATOR_MANUAL_SLOTS_LIMIT,
+    });
+    const manualScopeSlots = bodySlots.length ? bodySlots : configSlots;
+    if (!manualScopeSlots.length) {
+      return redirectManualNotice('err', 'Manual slot plan is empty');
+    }
+
+    const matrixItemsRaw = await db.all(
+      `
+        SELECT
+          sgi.id,
+          sgi.subject_id,
+          sgi.teacher_id,
+          sgi.lesson_type,
+          sgi.group_number,
+          sgi.pairs_count,
+          s.name AS subject_name,
+          s.group_count,
+          s.is_general
+        FROM schedule_generator_items sgi
+        JOIN subjects s ON s.id = sgi.subject_id
+        WHERE sgi.run_id = ?
+          AND sgi.course_id = ?
+          AND sgi.semester_id = ?
+          AND sgi.group_number IS NULL
+      `,
+      [runId, courseId, semesterId]
+    );
+    const matrixItemMap = new Map();
+    (matrixItemsRaw || []).forEach((item) => {
+      const subjectId = parsePositiveIntStrict(item && item.subject_id);
+      if (!subjectId || !scopedSubjectMap.has(subjectId)) return;
+      const lessonType = normalizeScheduleGeneratorLessonType(item && item.lesson_type);
+      const rowKey = buildScheduleGeneratorManualRowKey(subjectId, lessonType);
+      if (!matrixItemMap.has(rowKey)) {
+        matrixItemMap.set(rowKey, {
+          ...item,
+          subject_id: subjectId,
+          lesson_type: lessonType,
+          pairs_count: Math.max(0, Number(item && item.pairs_count || 0) || 0),
+          group_count: Math.max(1, Number(item && item.group_count || 1) || 1),
+        });
+      }
+    });
+
+    const teacherMapBySubject = scopedSubjectIds.length
+      ? await getSessionSubjectTeacherMap(scopedSubjectIds)
+      : new Map();
+    const defaultTeacherBySubject = new Map();
+    scopedSubjectIds.forEach((subjectId) => {
+      const candidates = resolveSessionTeachersForGroup(teacherMapBySubject, subjectId, null);
+      const teacherId = Number(candidates && candidates[0] && candidates[0].id ? candidates[0].id : 0);
+      if (Number.isFinite(teacherId) && teacherId > 0) {
+        defaultTeacherBySubject.set(subjectId, teacherId);
+      }
+    });
+
+    const manualMatrixMap = new Map();
+    scopedSubjectMap.forEach((subject, subjectId) => {
+      ['lecture', 'seminar'].forEach((lessonType) => {
+        const rowKey = buildScheduleGeneratorManualRowKey(subjectId, lessonType);
+        const item = matrixItemMap.get(rowKey);
+        const teacherIdRaw = Number(item && item.teacher_id || 0);
+        const teacherId = Number.isFinite(teacherIdRaw) && teacherIdRaw > 0
+          ? teacherIdRaw
+          : (defaultTeacherBySubject.get(subjectId) || null);
+        manualMatrixMap.set(rowKey, {
+          row_key: rowKey,
+          item_id: parsePositiveIntStrict(item && item.id) || null,
+          subject_id: subjectId,
+          subject_name: String(subject && subject.name || ''),
+          lesson_type: lessonType,
+          pairs_count: Math.max(0, Number(item && item.pairs_count || 0) || 0),
+          teacher_id: teacherId,
+          group_number: parsePositiveIntStrict(item && item.group_number) || null,
+          group_count: Math.max(1, Number(subject && subject.group_count || 1) || 1),
+          is_general: subject && (subject.is_general === true || Number(subject.is_general) === 1),
+        });
+      });
+    });
+
+    const slotCountByRow = new Map();
+    (manualScopeSlots || []).forEach((slot) => {
+      const rowKey = buildScheduleGeneratorManualRowKey(slot.subject_id, slot.lesson_type);
+      slotCountByRow.set(rowKey, (slotCountByRow.get(rowKey) || 0) + 1);
+    });
+
+    const entries = [];
+    const groupSlotMap = new Map();
+    const teacherSlotMap = new Map();
+    const slotCollisionSamples = [];
+    const teacherCollisionSamples = [];
+    const pushSlotCollision = (payload) => {
+      if (slotCollisionSamples.length >= 8) return;
+      slotCollisionSamples.push(payload);
+    };
+    const pushTeacherCollision = (payload) => {
+      if (teacherCollisionSamples.length >= 8) return;
+      teacherCollisionSamples.push(payload);
+    };
+
+    for (const slot of manualScopeSlots) {
+      const rowKey = buildScheduleGeneratorManualRowKey(slot.subject_id, slot.lesson_type);
+      const row = manualMatrixMap.get(rowKey);
+      if (!row) continue;
+      const groupList = row.group_number
+        ? [Number(row.group_number)]
+        : Array.from({ length: Math.max(1, Number(row.group_count || 1)) }, (_value, index) => index + 1);
+      const teacherId = parsePositiveIntStrict(row.teacher_id) || null;
+      for (let week = 1; week <= weeksCount; week += 1) {
+        for (const groupNumber of groupList) {
+          const groupSlotKey = `${week}|${slot.day_of_week}|${slot.class_number}|${groupNumber}`;
+          const existingGroupSlot = groupSlotMap.get(groupSlotKey);
+          if (existingGroupSlot && existingGroupSlot.row_key !== rowKey) {
+            pushSlotCollision({
+              week_number: week,
+              day_of_week: slot.day_of_week,
+              class_number: slot.class_number,
+              group_number: groupNumber,
+              current_subject: row.subject_name,
+              existing_subject: existingGroupSlot.subject_name,
+            });
+            continue;
+          }
+          groupSlotMap.set(groupSlotKey, {
+            row_key: rowKey,
+            subject_name: row.subject_name,
+          });
+
+          if (teacherId) {
+            const teacherSlotKey = `${teacherId}|${week}|${slot.day_of_week}|${slot.class_number}`;
+            const existingTeacherSlot = teacherSlotMap.get(teacherSlotKey);
+            if (existingTeacherSlot && existingTeacherSlot.row_key !== rowKey) {
+              pushTeacherCollision({
+                week_number: week,
+                day_of_week: slot.day_of_week,
+                class_number: slot.class_number,
+                current_subject: row.subject_name,
+                existing_subject: existingTeacherSlot.subject_name,
+              });
+              continue;
+            }
+            teacherSlotMap.set(teacherSlotKey, {
+              row_key: rowKey,
+              subject_name: row.subject_name,
+            });
+          }
+
+          entries.push({
+            item_id: row.item_id || null,
+            course_id: courseId,
+            semester_id: semesterId,
+            subject_id: row.subject_id,
+            teacher_id: teacherId,
+            lesson_type: row.lesson_type,
+            group_number: groupNumber,
+            day_of_week: slot.day_of_week,
+            class_number: slot.class_number,
+            week_number: week,
+            is_mirror: false,
+            mirror_key: null,
+          });
+        }
+      }
+    }
+
+    if (slotCollisionSamples.length) {
+      const sample = slotCollisionSamples[0];
+      return redirectManualNotice(
+        'err',
+        `Slot conflict: week ${sample.week_number}, ${sample.day_of_week} #${sample.class_number}, group ${sample.group_number}`
+      );
+    }
+    if (teacherCollisionSamples.length) {
+      const sample = teacherCollisionSamples[0];
+      return redirectManualNotice(
+        'err',
+        `Teacher conflict: week ${sample.week_number}, ${sample.day_of_week} #${sample.class_number}`
+      );
+    }
+    if (!entries.length) {
+      return redirectManualNotice('err', 'No entries produced from manual plan');
+    }
+
+    const totalTargetPairs = Array.from(manualMatrixMap.values())
+      .reduce((sum, row) => sum + Math.max(0, Number(row.pairs_count || 0)), 0);
+    const totalCoveredPairs = Array.from(manualMatrixMap.values())
+      .reduce((sum, row) => sum + ((slotCountByRow.get(row.row_key) || 0) * weeksCount), 0);
+    const totalRemainingPairs = totalTargetPairs - totalCoveredPairs;
+    const manualCoverageConflicts = Array.from(manualMatrixMap.values())
+      .filter((row) => Number(row.pairs_count || 0) > 0)
+      .map((row) => {
+        const covered = (slotCountByRow.get(row.row_key) || 0) * weeksCount;
+        const target = Math.max(0, Number(row.pairs_count || 0));
+        if (covered >= target) return null;
+        return {
+          item_id: row.item_id || null,
+          subject: row.subject_name,
+          reason: 'partial_schedule',
+          scheduled: covered,
+          target,
+        };
+      })
+      .filter(Boolean);
+
+    const operationId = randomUUID();
+    const diffResult = await buildScheduleDiff(entries);
+    const manualScopeBag = runConfig && runConfig.manual_scope_slots && typeof runConfig.manual_scope_slots === 'object'
+      ? { ...runConfig.manual_scope_slots }
+      : {};
+    manualScopeBag[scopeKey] = manualScopeSlots;
+    const nextCourseSemestersByLocation = {
+      ...(runConfig.course_semesters_by_location || { kyiv: {}, munich: {} }),
+      [activeLocation]: {
+        ...((runConfig.course_semesters_by_location && runConfig.course_semesters_by_location[activeLocation]) || {}),
+        [String(courseId)]: semesterId,
+      },
+    };
+    const nextConfig = {
+      ...runConfig,
+      active_location: activeLocation,
+      course_semesters_by_location: nextCourseSemestersByLocation,
+      manual_scope_slots: manualScopeBag,
+      last_stats: {
+        generated_at: new Date().toISOString(),
+        items: manualMatrixMap.size,
+        entries: entries.length,
+        conflicts: manualCoverageConflicts.length,
+        diff: diffResult.diff,
+        operation_id: operationId,
+        scope: {
+          type: 'manual_all_weeks',
+          location: activeLocation,
+          course_id: courseId,
+          semester_id: semesterId,
+        },
+      },
+      last_conflicts: manualCoverageConflicts,
+    };
+
+    await withTransaction(async (client) => {
+      await txRun(
+        client,
+        'DELETE FROM schedule_generator_entries WHERE run_id = ? AND course_id = ?',
+        [runId, courseId]
+      );
+      const insertSql = `
+        INSERT INTO schedule_generator_entries
+          (run_id, item_id, course_id, semester_id, subject_id, teacher_id, lesson_type, group_number, day_of_week, class_number, week_number, is_mirror, mirror_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      for (const entry of entries) {
+        await txRun(client, insertSql, [
+          runId,
+          entry.item_id,
+          entry.course_id,
+          entry.semester_id,
+          entry.subject_id,
+          entry.teacher_id,
+          entry.lesson_type,
+          entry.group_number,
+          entry.day_of_week,
+          entry.class_number,
+          entry.week_number,
+          false,
+          null,
+        ]);
+      }
+      await txRun(
+        client,
+        'UPDATE schedule_generator_runs SET config = ?, updated_at = NOW() WHERE id = ?',
+        [serializeGeneratorConfig(nextConfig), runId]
+      );
+    });
+
+    const coverageSuffix = totalRemainingPairs > 0
+      ? ` Coverage: ${totalCoveredPairs}/${totalTargetPairs}`
+      : ` Coverage complete: ${totalCoveredPairs}/${totalTargetPairs}`;
+    const okMessage = `Manual preview generated.${coverageSuffix}`;
+    return res.redirect(buildScheduleGeneratorPreviewUrl(req, runId, {
+      courseId,
+      week: 1,
+      ok: okMessage,
+      extraParams: {
+        location: activeLocation,
+        course_id: courseId,
+        semester_id: semesterId,
+        mode: 'manual',
+      },
+    }));
+  } catch (err) {
+    return handleDbError(res, err, 'admin.scheduleGenerator.manualRun');
   }
 });
 
