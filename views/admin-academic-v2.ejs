@@ -1792,7 +1792,7 @@
                       </div>
                       <div class="academic-v2-chip-row mt-1">
                         <span class="academic-v2-chip">Default preset: L + S</span>
-                        <span class="academic-v2-chip">Flags start as required + general</span>
+                        <span class="academic-v2-chip">За замовчуванням: обовʼязковий + загальний предмет</span>
                       </div>
                       <div class="academic-v2-actions mt-2">
                         <button type="submit" class="btn btn-primary" <%= !selectedBachelorCatalogSource ? 'disabled' : '' %>>Sync source → program</button>
@@ -1972,7 +1972,7 @@
                               <td>
                                 <div class="academic-v2-chip-row">
                                   <span class="academic-v2-chip <%= row.current_is_required ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= row.current_is_required ? 'Required' : 'Optional' %></span>
-                                  <span class="academic-v2-chip <%= row.current_is_general ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= row.current_is_general ? 'General' : 'Not general' %></span>
+                                  <span class="academic-v2-chip <%= row.current_is_general ? 'academic-v2-chip--ok' : 'academic-v2-chip--warm' %>"><%= row.current_is_general ? 'Загальний предмет' : 'Незагальний предмет' %></span>
                                 </div>
                               </td>
                               <td>
@@ -2029,9 +2029,10 @@
                                     <label class="academic-v2-chip">
                                       <input type="hidden" name="is_general" value="0" />
                                       <input type="checkbox" name="is_general" value="1" <%= row.current_is_general ? 'checked' : '' %> />
-                                      General
+                                      Загальний предмет
                                     </label>
                                   </div>
+                                  <div class="academic-v2-muted">Якщо вимкнено, семінари цього предмета можуть проводитись одночасно в кількох семінарських групах.</div>
                                   <div class="academic-v2-actions">
                                     <button type="submit" class="btn btn-sm btn-primary">Save row</button>
                                   </div>

@@ -51701,6 +51701,15 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       const raw = String(lessonType || '').toLowerCase();
       return raw.includes('seminar') || raw.includes('сем');
     };
+    const isGeneralSubject = (item) => {
+      if (!item) return true;
+      if (item.is_general === true || Number(item.is_general) === 1) return true;
+      if (item.is_general === false || Number(item.is_general) === 0) return false;
+      const normalized = String(item.is_general ?? '').trim().toLowerCase();
+      if (['1', 'true', 't', 'yes', 'y', 'on'].includes(normalized)) return true;
+      if (['0', 'false', 'f', 'no', 'n', 'off'].includes(normalized)) return false;
+      return true;
+    };
     const autoMirrorCandidatesByLocation = { kyiv: [], munich: [] };
     const autoMirrorExclusionsByLocation = { kyiv: [], munich: [] };
     Object.entries(itemsByLocation).forEach(([location, list]) => {
@@ -51709,7 +51718,7 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       const sameSubjectOnly = new Set();
       (list || []).forEach((item) => {
         const groupNum = Number(item.group_number);
-        const generalFlag = item.is_general === true || Number(item.is_general) === 1;
+        const generalFlag = isGeneralSubject(item);
         const baseEligible = isSeminarType(item.lesson_type)
           && (groupNum === 1 || groupNum === 2)
           && !item.mirror_key
@@ -51761,7 +51770,7 @@ app.get('/admin/schedule-generator', requireScheduleGeneratorSectionAccess, asyn
       (list || []).forEach((item) => {
         const reasons = [];
         const groupNum = Number(item.group_number);
-        const generalFlag = item.is_general === true || Number(item.is_general) === 1;
+        const generalFlag = isGeneralSubject(item);
         if (!isSeminarType(item.lesson_type)) reasons.push('Не семінар');
         if (!(groupNum === 1 || groupNum === 2)) reasons.push('Не група 1/2');
         if (item.mirror_key) reasons.push('Вже має ключ дзеркала');
