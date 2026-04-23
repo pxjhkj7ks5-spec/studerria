@@ -1,30 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7DD3FC" />
-      <stop offset="0.5" stop-color="#818CF8" />
-      <stop offset="1" stop-color="#3B82F6" />
+    <linearGradient id="bg" x1="19" y1="18" x2="110" y2="111" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2F3370" />
+      <stop offset="1" stop-color="#161A47" />
     </linearGradient>
-    <radialGradient id="shine" cx="0" cy="0" r="1" gradientTransform="translate(20 16) rotate(38) scale(26 24)" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9" />
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0" />
-    </radialGradient>
-    <linearGradient id="mark" x1="16" y1="17" x2="45" y2="47" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFFFFF" />
-      <stop offset="1" stop-color="#E2E8F0" />
+    <linearGradient id="logo-a" x1="36" y1="40" x2="87" y2="85" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8066FF" />
+      <stop offset="0.5" stop-color="#6A7DFF" />
+      <stop offset="1" stop-color="#9E7CFF" />
     </linearGradient>
+    <linearGradient id="logo-b" x1="63" y1="30" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B05CFF" />
+      <stop offset="0.55" stop-color="#FF8ACE" />
+      <stop offset="1" stop-color="#F278D1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0C1033" flood-opacity="0.42" />
+    </filter>
   </defs>
 
-  <rect width="64" height="64" rx="16" fill="url(#bg)" />
-  <circle cx="20" cy="16" r="22" fill="url(#shine)" />
-  <rect x="4.5" y="4.5" width="55" height="55" rx="13.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.26" />
-
-  <path
-    d="M45 20C41.7 16.9 36.4 15 30.9 15C24.2 15 19.5 18.5 19.5 23.3C19.5 29.7 25.4 31.2 30.4 32.4C35.5 33.5 40.6 34.7 40.6 40.1C40.6 45.4 35.9 49 29.2 49C23.7 49 18.5 46.9 15 43.2"
-    fill="none"
-    stroke="url(#mark)"
-    stroke-width="6"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
+  <rect x="12" y="12" width="104" height="104" rx="28" fill="url(#bg)" />
+  <rect x="12.75" y="12.75" width="102.5" height="102.5" rx="27.25" fill="none" stroke="#0B1039" stroke-opacity="0.9" stroke-width="1.5" />
+  <g filter="url(#shadow)">
+    <path
+      d="M32 53.5C32 48.3 34.8 43.5 39.3 41.1L64.5 27.5C69 25.1 74.5 25.2 78.8 27.8C82.1 29.8 84.2 33.4 84.4 37.2C84.6 41 82.9 44.7 79.8 46.9L60.3 60.8C58.4 62.1 56 62.3 53.9 61.3L40.3 54.9C36.4 53 32 55.8 32 53.5Z"
+      fill="url(#logo-a)"
+    />
+    <path
+      d="M95.7 42.1C95.7 47.3 92.9 52.1 88.4 54.5L63.2 68.1C58.7 70.5 53.2 70.4 48.9 67.8C45.6 65.8 43.5 62.2 43.3 58.4C43.1 54.6 44.8 50.9 47.9 48.7L67.4 34.8C69.3 33.5 71.7 33.3 73.8 34.3L87.4 40.7C91.3 42.6 95.7 39.8 95.7 42.1Z"
+      fill="url(#logo-b)"
+      opacity="0.98"
+    />
+    <path
+      d="M53.8 37.4C58.4 34.7 64.2 34.8 68.6 37.7C71.9 39.9 73.7 43.4 73.5 47.2C73.3 50.9 71.1 54.4 67.7 56.5L58.4 62.4C56.1 63.8 54.7 66.3 54.7 69C54.7 73.6 59.6 76.6 63.8 74.5L74.4 69.1C78.6 67 83.6 67.3 87.4 70C90.8 72.4 92.8 76.3 92.6 80.5C92.4 84.7 90.1 88.4 86.3 90.6L81.5 93.4"
+      fill="none"
+      stroke="#1A1747"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="10"
+    />
+    <path
+      d="M74.2 90.6C69.6 93.3 63.8 93.2 59.4 90.3C56.1 88.1 54.3 84.6 54.5 80.8C54.7 77.1 56.9 73.6 60.3 71.5L69.6 65.6C71.9 64.2 73.3 61.7 73.3 59C73.3 54.4 68.4 51.4 64.2 53.5L53.6 58.9C49.4 61 44.4 60.7 40.6 58C37.2 55.6 35.2 51.7 35.4 47.5C35.6 43.3 37.9 39.6 41.7 37.4L46.5 34.6"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="10"
+    />
+    <path
+      d="M28 98C32.6 102.9 39 106 45.8 106H82.2C92.1 106 100 98.1 100 88.2V39.8"
+      fill="none"
+      stroke="#A58FFF"
+      stroke-linecap="round"
+      stroke-opacity="0.14"
+      stroke-width="1.5"
+    />
+  </g>
 </svg>

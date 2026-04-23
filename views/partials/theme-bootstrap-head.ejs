@@ -2,20 +2,92 @@
   (function bootstrapStuderriaTheme() {
     var root = document.documentElement;
     var defaultTheme = '<%= (defaultTheme || "dark") === "light" ? "light" : "dark" %>';
+    var assetVersion = '<%= encodeURIComponent(String(appVersion || "0.0.0")) %>';
     var theme = defaultTheme;
+    var bodyObserver = null;
+
+    function resolveTheme(rawTheme) {
+      return rawTheme === 'theme-light' || rawTheme === 'light' ? 'light' : 'dark';
+    }
+
+    function ensureFaviconLink() {
+      var link = document.querySelector('link[data-studerria-favicon]');
+      if (!link) {
+        link = document.querySelector('link[rel="icon"]') || document.createElement('link');
+        link.setAttribute('rel', 'icon');
+        link.setAttribute('data-studerria-favicon', 'true');
+        if (!link.parentNode) {
+          document.head.appendChild(link);
+        }
+      }
+      link.setAttribute('type', 'image/png');
+      return link;
+    }
+
+    function applyFavicon(rawTheme) {
+      var resolvedTheme = resolveTheme(rawTheme);
+      var href = '/favicon-' + resolvedTheme + '.png?v=' + assetVersion;
+      var link = ensureFaviconLink();
+      if (link.getAttribute('href') !== href) {
+        link.setAttribute('href', href);
+      }
+      window.__studerriaThemeFaviconHref = href;
+      return resolvedTheme;
+    }
+
+    function resolveThemeFromDom() {
+      if (root.getAttribute('data-theme') === 'light') {
+        return 'light';
+      }
+      if (document.body) {
+        if (document.body.getAttribute('data-theme') === 'light' || document.body.classList.contains('theme-light')) {
+          return 'light';
+        }
+      }
+      return 'dark';
+    }
+
+    function syncThemeAssets() {
+      return applyFavicon(resolveThemeFromDom());
+    }
+
+    function observeBodyTheme() {
+      if (!window.MutationObserver || !document.body || bodyObserver) {
+        return;
+      }
+      bodyObserver = new MutationObserver(syncThemeAssets);
+      bodyObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme']
+      });
+      syncThemeAssets();
+    }
+
     try {
       var stored = localStorage.getItem('ui-theme');
-      if (stored === 'theme-light' || stored === 'light') {
-        theme = 'light';
-      } else if (stored === 'theme-dark' || stored === 'dark') {
-        theme = 'dark';
-      }
+      theme = resolveTheme(stored || defaultTheme);
       localStorage.setItem('ui-theme', theme === 'dark' ? 'theme-dark' : 'theme-light');
     } catch (_error) {
       theme = defaultTheme;
     }
     root.setAttribute('data-theme', theme);
     window.__studerriaThemeBoot = theme;
+    window.__studerriaApplyThemeFavicon = applyFavicon;
+    applyFavicon(theme);
+
+    if (window.MutationObserver) {
+      var rootObserver = new MutationObserver(syncThemeAssets);
+      rootObserver.observe(root, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme']
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', observeBodyTheme, { once: true });
+    } else {
+      observeBodyTheme();
+    }
   })();
 </script>
 <link rel="stylesheet" href="/css/navbar-enhanced.css" />
