@@ -8737,19 +8737,23 @@ const getConfiguredCourseSemesterId = (config, courseId, location) => {
   return fallback[courseId] || fallback[String(courseId)] || null;
 };
 
+const isGeneratorPlaceholderCourseName = (value) => {
+  const normalizedName = String(value || '').trim().toLowerCase();
+  return normalizedName === 'основний курс'
+    || normalizedName === 'base course'
+    || normalizedName === 'main course'
+    || normalizedName.startsWith('основний курс ')
+    || normalizedName.startsWith('base course ')
+    || normalizedName.startsWith('main course ');
+};
+
 async function getCoursesByLocation(location) {
   const target = String(location || 'kyiv').toLowerCase();
   const courses = await getCoursesCached();
   return (courses || []).filter((course) => {
     const isTeacher = course.is_teacher_course === true || Number(course.is_teacher_course) === 1;
     const courseLocation = String(course.location || 'kyiv').toLowerCase();
-    const normalizedName = String(course.name || '').trim().toLowerCase();
-    const isGeneratorPlaceholderCourse = normalizedName === 'основний курс'
-      || normalizedName === 'base course'
-      || normalizedName === 'main course'
-      || normalizedName.startsWith('основний курс ')
-      || normalizedName.startsWith('base course ')
-      || normalizedName.startsWith('main course ');
+    const isGeneratorPlaceholderCourse = isGeneratorPlaceholderCourseName(course.name);
     return !isTeacher && !isGeneratorPlaceholderCourse && courseLocation === target;
   });
 }
@@ -48045,30 +48049,84 @@ app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res
   }
   {
     const baseCourseId = Number(req.session.user.course_id || 1);
-    const { allowedCourseIds, allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
+    const { allowedCourses } = await buildStaffCourseAccess(baseCourseId, courses, roleKeys);
     if (!allowedCourses.length) {
       return res.status(403).send('Forbidden (course access)');
     }
-    courses = allowedCourses;
+    const filteredAllowedCourses = (allowedCourses || []).filter((course) => !isGeneratorPlaceholderCourseName(course && course.name));
+    courses = filteredAllowedCourses.length ? filteredAllowedCourses : allowedCourses;
+    const effectiveAllowedCourseIds = new Set((courses || [])
+      .map((course) => Number(course && course.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0));
     const requestedCourse = Number(req.query.course_id || req.query.course);
-    if (allowedCourseIds.has(requestedCourse)) {
+    if (effectiveAllowedCourseIds.has(requestedCourse)) {
       courseId = requestedCourse;
-    } else if (!allowedCourseIds.has(courseId)) {
-      courseId = Number(allowedCourses[0].id);
+    } else if (!effectiveAllowedCourseIds.has(courseId)) {
+      courseId = Number((courses[0] || {}).id || 0);
     }
     req.session.adminCourse = courseId;
-    allowCourseSelect = allowedCourses.length > 1;
+    allowCourseSelect = courses.length > 1;
   }
   let activeSemester = null;
   try {
-    const semesterList = await getSemestersCached(courseId);
+    const rawSemesterList = await getSemestersCached(courseId);
+    const academicV2TermNumberBySemesterId = await listAcademicV2LegacyTermNumbersBySemesterId(courseId);
+    let semesterList = Array.isArray(rawSemesterList) ? [...rawSemesterList] : [];
+    if (semesterList.length) {
+      const normalizedSemesters = semesterList
+        .map((semester) => {
+          const semesterId = Number(semester && semester.id ? semester.id : 0);
+          if (!Number.isInteger(semesterId) || semesterId < 1) return null;
+          const mappedTermNumber = Number(academicV2TermNumberBySemesterId.get(semesterId) || 0) || null;
+          const titleTermNumber = parseAcademicTermNumberFromSemesterTitle(semester.title);
+          const resolvedTermNumber = mappedTermNumber || titleTermNumber || null;
+          const displayTitle = Number.isInteger(resolvedTermNumber) && resolvedTermNumber > 0
+            ? `Term ${resolvedTermNumber}`
+            : String(semester.title || `Semester ${semesterId}`);
+          return {
+            ...semester,
+            term_number: resolvedTermNumber,
+            display_title: displayTitle,
+          };
+        })
+        .filter(Boolean);
+      const canonicalSemesters = normalizedSemesters
+        .filter((semester) => Number.isInteger(Number(semester.term_number || 0)) && Number(semester.term_number || 0) >= 1 && Number(semester.term_number || 0) <= 3);
+      if (canonicalSemesters.length) {
+        const byTermNumber = new Map();
+        canonicalSemesters.forEach((semester) => {
+          const termNumber = Number(semester.term_number || 0);
+          const existing = byTermNumber.get(termNumber);
+          if (!existing) {
+            byTermNumber.set(termNumber, semester);
+            return;
+          }
+          const currentMapped = academicV2TermNumberBySemesterId.has(Number(semester.id || 0));
+          const existingMapped = academicV2TermNumberBySemesterId.has(Number(existing.id || 0));
+          if (currentMapped && !existingMapped) {
+            byTermNumber.set(termNumber, semester);
+          }
+        });
+        semesterList = Array.from(byTermNumber.entries())
+          .sort((left, right) => Number(left[0] || 0) - Number(right[0] || 0))
+          .map(([, semester]) => semester);
+      } else {
+        semesterList = normalizedSemesters.sort((left, right) => Number(left.id || 0) - Number(right.id || 0));
+      }
+    }
     const selectedCourse = (courses || []).find((course) => Number(course.id) === Number(courseId)) || null;
     const requestedSemesterId = Number(req.query.semester_id);
     if (Number.isFinite(requestedSemesterId) && requestedSemesterId > 0) {
       activeSemester = semesterList.find((sem) => Number(sem.id) === requestedSemesterId) || null;
     }
     if (!activeSemester) {
-      activeSemester = await getActiveSemester(courseId);
+      const fallbackActiveSemester = await getActiveSemester(courseId);
+      if (fallbackActiveSemester) {
+        activeSemester = semesterList.find((sem) => Number(sem.id) === Number(fallbackActiveSemester.id)) || null;
+      }
+    }
+    if (!activeSemester && semesterList.length) {
+      activeSemester = semesterList[0];
     }
     const semesterSummaryTable = activeSemester
       ? await buildSemesterSummaryTable({

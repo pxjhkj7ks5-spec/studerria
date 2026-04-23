@@ -499,7 +499,7 @@
             </div>
             <div class="metric-tile">
               <span class="metric-label">Семестр</span>
-              <span class="metric-value"><%= activeSemester ? activeSemester.title : 'Не вибрано' %></span>
+              <span class="metric-value"><%= activeSemester ? (activeSemester.display_title || activeSemester.title) : 'Не вибрано' %></span>
             </div>
             <div class="metric-tile">
               <span class="metric-label">Активні предмети</span>
@@ -540,7 +540,7 @@
                 <select id="summarySemesterSelect" name="semester_id" class="form-select">
                   <% (semesters || []).forEach(function(semester) { %>
                     <option value="<%= semester.id %>" <%= activeSemester && Number(semester.id) === Number(activeSemester.id) ? 'selected' : '' %>>
-                      <%= semester.title %> · <%= semester.weeks_count %> тижнів
+                      <%= semester.display_title || semester.title %> · <%= semester.weeks_count %> тижнів
                     </option>
                   <% }); %>
                 </select>
