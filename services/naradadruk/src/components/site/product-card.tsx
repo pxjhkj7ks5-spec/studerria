@@ -16,7 +16,7 @@ type ProductCardProps = {
 
 export function ProductCard({ product, telegramUrl }: ProductCardProps) {
   return (
-    <article className="interactive-card product-card-shell group grid gap-4 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 transition duration-300 hover:border-white/20 hover:bg-white/[0.06] md:p-5">
+    <article className="interactive-card product-card-shell group grid gap-4 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 md:p-5">
       <a className="product-media block overflow-hidden rounded-[1.5rem] bg-[--surface-strong]" href={withBasePath(`/product/${product.slug}`)}>
         {product.coverImage ? (
           <Image
@@ -52,7 +52,7 @@ export function ProductCard({ product, telegramUrl }: ProductCardProps) {
 
         <div className="flex items-end justify-between gap-3">
           <p className="text-lg font-semibold text-white">{product.priceLabel}</p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <a className="ghost-pill" href={withBasePath(`/product/${product.slug}`)}>
               Деталі
             </a>

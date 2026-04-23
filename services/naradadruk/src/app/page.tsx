@@ -13,32 +13,28 @@ export default async function HomePage() {
   ]);
 
   return (
-    <main className="pb-6">
-      <section className="surface-grid hero-stage">
-        <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] w-full max-w-[1400px] content-center gap-10 px-4 pb-10 pt-5 md:px-6 md:pb-12 md:pt-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] lg:items-center lg:gap-12 lg:pb-14 lg:pt-8 xl:gap-16">
-          <div className="flex min-h-0 flex-col gap-6 md:gap-8 lg:py-8">
-            <div className="reveal-up delay-1 flex items-center justify-between gap-4 lg:pb-2">
-              <a href={withBasePath("/")} className="font-display text-[1.95rem] tracking-[-0.055em] text-white">
-                Narada Druk
+    <main className="pb-12">
+      <section className="surface-grid hero-stage border-b border-white/8">
+        <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-5 md:px-6 md:pb-16 md:pt-6">
+          <div className="flex items-center justify-between gap-4">
+            <a href={withBasePath("/")} className="font-display text-[1.95rem] tracking-[-0.055em] text-white">
+              Narada Druk
+            </a>
+            <div className="hidden items-center gap-3 md:flex">
+              <a className="ghost-pill" href={withBasePath("/catalog")}>
+                Каталог
               </a>
-              <div className="hidden items-center gap-3 md:flex">
-                <a className="ghost-pill" href={withBasePath("/catalog")}>
-                  Каталог
-                </a>
-                <a className="accent-pill" href={settings.telegramUrl} target="_blank" rel="noreferrer">
-                  Замовити
-                </a>
-              </div>
+              <a className="accent-pill" href={settings.telegramUrl} target="_blank" rel="noreferrer">
+                Замовити
+              </a>
             </div>
+          </div>
 
-            <div className="hero-reveal delay-2 max-w-[45rem]">
-              <p className="text-xs uppercase tracking-[0.35em] text-[--accent]">3D друк та практичні аксесуари</p>
-              <h1 className="mt-4 max-w-[10.5ch] font-display text-[clamp(3.1rem,7vw,5.75rem)] leading-[0.9] tracking-[-0.078em] text-white">
-                {settings.heroTitle}
-              </h1>
-              <p className="mt-6 max-w-[48ch] text-base leading-8 text-[--muted] md:text-lg">
-                {settings.heroSubtitle}
-              </p>
+          <div className="hero-grid mt-12 lg:mt-16">
+            <div className="hero-copy">
+              <p className="hero-kicker">3D друк та практичні аксесуари</p>
+              <h1 className="hero-title">{settings.heroTitle}</h1>
+              <p className="hero-body">{settings.heroSubtitle}</p>
 
               <div className="mt-9 flex flex-wrap gap-3">
                 <a className="accent-pill" href={withBasePath("/catalog")}>
@@ -50,84 +46,61 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="reveal-up delay-3 grid gap-3 md:grid-cols-[1.08fr_0.92fr] lg:mt-auto">
-              <div className="glass-panel hero-support-panel panel-shell rounded-[2rem] p-5">
-                <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">{settings.supportTitle}</p>
-                <p className="mt-4 max-w-[44ch] text-sm leading-7 text-[--muted]">{settings.supportBody}</p>
-              </div>
-
-              <div className="stagger-list grid gap-3">
-                {supportFacts.slice(0, 3).map((fact) => (
-                  <div key={fact} className="glass-panel hero-fact-card panel-shell rounded-[1.45rem] px-4 py-3.5 text-sm text-[--muted]">
-                    {fact}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="reveal-up delay-3 grid gap-4 lg:max-w-[32rem] lg:justify-self-end">
-            <div className="glass-panel panel-shell grid gap-5 rounded-[2.35rem] p-5 md:grid-cols-[0.82fr_1.18fr] md:p-6">
-              <div className="flex flex-col justify-between gap-6">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.28em] text-[--muted]">Асортимент</p>
-                  <h2 className="mt-4 font-display text-3xl tracking-[-0.05em] text-white">
-                    Каталог для готових позицій і кастомних задач.
-                  </h2>
-                </div>
-
-                <div className="stagger-list grid gap-3 text-sm text-[--muted]">
-                  <div className="category-summary-card panel-shell rounded-[1.25rem] px-4 py-3">
-                    {settings.materialsNote}
-                  </div>
-                  <div className="category-summary-card panel-shell rounded-[1.25rem] px-4 py-3">
-                    {settings.leadTimeNote}
-                  </div>
-                </div>
-              </div>
-
-              <div className="stagger-list grid gap-3">
+            <aside className="hero-rail">
+              <p className="hero-rail-label">Асортимент</p>
+              <div className="hero-category-list">
                 {categories.slice(0, 4).map((category) => (
-                  <a
-                    key={category.id}
-                    href={withBasePath(`/category/${category.slug}`)}
-                    className="category-tile interactive-card rounded-[1.4rem] px-4 py-4 transition"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="font-display text-2xl tracking-[-0.04em] text-white">{category.name}</span>
-                      <span className="text-xs uppercase tracking-[0.25em] text-[--muted]">
-                        {category.publishedCount} позицій
-                      </span>
+                  <a key={category.id} href={withBasePath(`/category/${category.slug}`)} className="hero-category-link">
+                    <div className="hero-category-head">
+                      <span className="hero-category-name">{category.name}</span>
+                      <span className="hero-category-count">{category.publishedCount} позицій</span>
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-[--muted]">{category.description}</p>
+                    <p className="hero-category-text">{category.description}</p>
                   </a>
                 ))}
               </div>
+            </aside>
+          </div>
+
+          <div className="hero-band mt-10 lg:mt-12">
+            <div className="hero-band-copy">
+              <p className="hero-band-label">{settings.supportTitle}</p>
+              <p className="hero-band-text">{settings.supportBody}</p>
+            </div>
+
+            <div className="hero-facts-grid">
+              {supportFacts.slice(0, 3).map((fact) => (
+                <p key={fact} className="hero-fact-item">
+                  {fact}
+                </p>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto mt-4 w-full max-w-[1400px] px-4 pb-10 md:px-6">
-        <div className="stagger-grid grid gap-4 border-y border-white/10 py-8 md:grid-cols-4">
+      <section className="mx-auto mt-4 w-full max-w-[1400px] px-4 md:px-6">
+        <div className="info-strip py-8 md:grid-cols-4">
           {[
             settings.deliveryNote,
             settings.paymentNote,
             settings.materialsNote,
             settings.contactNote,
           ].map((item) => (
-            <div key={item} className="panel-shell rounded-[1.5rem] border border-white/8 bg-white/[0.02] p-4 text-sm leading-7 text-[--muted]">
+            <div key={item} className="info-strip-item">
               {item}
             </div>
           ))}
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6">
-        <div className="reveal-up delay-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
+      <section className="mx-auto w-full max-w-[1400px] px-4 py-10 md:px-6 md:py-12">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-[44rem]">
             <p className="text-xs uppercase tracking-[0.32em] text-[--accent]">Featured</p>
-            <h2 className="mt-3 font-display text-4xl tracking-[-0.05em] text-white">Готові позиції, які вже можна брати за основу.</h2>
+            <h2 className="mt-3 font-display text-[clamp(2.2rem,4vw,3.7rem)] leading-[0.95] tracking-[-0.06em] text-white">
+              Готові позиції, які вже можна брати за основу.
+            </h2>
           </div>
           <a className="ghost-pill" href={withBasePath("/catalog")}>
             Увесь каталог
@@ -135,15 +108,17 @@ export default async function HomePage() {
         </div>
 
         {featuredProducts.length > 0 ? (
-          <div className="stagger-grid mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
             {featuredProducts.map((product) => (
               <ProductCard key={product.id} product={product} telegramUrl={settings.telegramUrl} />
             ))}
           </div>
         ) : (
-          <div className="glass-panel reveal-up delay-2 mt-8 rounded-[2rem] p-8">
-            <h3 className="font-display text-3xl tracking-[-0.05em] text-white">Каталог готовий до наповнення.</h3>
-            <p className="mt-3 max-w-[48ch] text-sm leading-7 text-[--muted]">
+          <div className="empty-showcase mt-8">
+            <h3 className="font-display text-[clamp(2rem,3.4vw,3rem)] leading-[0.98] tracking-[-0.05em] text-white">
+              Каталог готовий до наповнення.
+            </h3>
+            <p className="mt-4 max-w-[42rem] text-base leading-8 text-[--muted]">
               Додайте перші товари через адмінку, а поки що клієнтів можна вести напряму в Telegram для індивідуальних замовлень.
             </p>
           </div>
