@@ -515,21 +515,29 @@
 
       <section class="summary-card mb-3">
         <div class="card-body p-4">
-          <form class="summary-form" method="GET" action="/admin/schedule-summary">
+          <form id="semesterSummaryScopeForm" class="summary-form" method="GET" action="/admin/schedule-summary">
             <div class="row g-3 align-items-end">
               <div class="col-12 col-md-5">
                 <label class="form-label mb-2"><%= t('admin.course') %></label>
-                <select name="course" class="form-select" <%= allowCourseSelect ? 'onchange="this.form.submit()"' : 'disabled' %>>
+                <select
+                  id="summaryCourseSelect"
+                  name="course_id"
+                  class="form-select"
+                  <%= allowCourseSelect ? '' : 'disabled' %>
+                >
                   <% (courses || []).forEach(function(course) { %>
                     <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>>
                       <%= course.name %>
                     </option>
                   <% }); %>
                 </select>
+                <% if (!allowCourseSelect) { %>
+                  <input type="hidden" name="course_id" value="<%= Number(selectedCourseId || 0) %>" />
+                <% } %>
               </div>
               <div class="col-12 col-md-5">
                 <label class="form-label mb-2">Семестр</label>
-                <select name="semester_id" class="form-select" onchange="this.form.submit()">
+                <select id="summarySemesterSelect" name="semester_id" class="form-select">
                   <% (semesters || []).forEach(function(semester) { %>
                     <option value="<%= semester.id %>" <%= activeSemester && Number(semester.id) === Number(activeSemester.id) ? 'selected' : '' %>>
                       <%= semester.title %> · <%= semester.weeks_count %> тижнів
@@ -638,6 +646,49 @@
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? labelLight : labelDark;
       });
+
+      const scopeForm = document.getElementById('semesterSummaryScopeForm');
+      const courseSelect = document.getElementById('summaryCourseSelect');
+      const semesterSelect = document.getElementById('summarySemesterSelect');
+
+      const navigateByScope = (event) => {
+        if (!scopeForm) return;
+        const params = new URLSearchParams(window.location.search || '');
+        const rawCourseValue = courseSelect ? String(courseSelect.value || '').trim() : '';
+        if (rawCourseValue) {
+          params.set('course_id', rawCourseValue);
+        } else {
+          params.delete('course_id');
+        }
+        params.delete('course');
+        if (event && event.target === courseSelect) {
+          params.delete('semester_id');
+        } else {
+          const rawSemesterValue = semesterSelect ? String(semesterSelect.value || '').trim() : '';
+          if (rawSemesterValue) {
+            params.set('semester_id', rawSemesterValue);
+          } else {
+            params.delete('semester_id');
+          }
+        }
+        const action = scopeForm.getAttribute('action') || '/admin/schedule-summary';
+        const nextQuery = params.toString();
+        const nextUrl = nextQuery ? `${action}?${nextQuery}` : action;
+        window.location.assign(nextUrl);
+      };
+
+      if (courseSelect && !courseSelect.disabled) {
+        courseSelect.addEventListener('change', navigateByScope);
+      }
+      if (semesterSelect) {
+        semesterSelect.addEventListener('change', navigateByScope);
+      }
+      if (scopeForm) {
+        scopeForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          navigateByScope(event);
+        });
+      }
     </script>
     <script src="/js/design-system.js" defer></script>
     <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>

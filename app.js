@@ -47709,60 +47709,39 @@ const buildSemesterSummaryTable = async ({ courseId, semester }) => {
       )
     : [];
 
-  const scheduleParams = [normalizedCourseId, semesterId];
-  let scheduleSql = `
-    SELECT
-      se.id,
-      se.subject_id,
-      se.group_number,
-      se.day_of_week,
-      se.class_number,
-      se.week_number,
-      COALESCE(se.lesson_type, '') AS lesson_type,
-      se.room_id,
-      s.name AS subject_name,
-      r.label AS room_name,
-      r.code AS room_code,
-      r.building AS room_building
-    FROM schedule_entries se
-    JOIN subjects s ON s.id = se.subject_id
-    LEFT JOIN rooms r ON r.id = se.room_id
-    WHERE se.course_id = ?
-      AND se.semester_id = ?
-      AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')
-  `;
-  if (activeSubjectIds.length) {
-    scheduleSql += ' AND se.subject_id = ANY(?::int[])';
-    scheduleParams.push(activeSubjectIds);
-  }
-  scheduleSql += `
-    ORDER BY se.day_of_week ASC,
-             se.class_number ASC,
-             COALESCE(se.week_number, 0) ASC,
-             s.name ASC,
-             COALESCE(se.group_number, 0) ASC,
-             se.id ASC
-  `;
-  const scheduleRows = await db.all(scheduleSql, scheduleParams);
-
-  if (!activeSubjects.length) {
-    const fallbackSubjectMap = new Map();
-    (scheduleRows || []).forEach((row) => {
-      const subjectId = Number(row && row.subject_id || 0);
-      if (!Number.isInteger(subjectId) || subjectId < 1) return;
-      if (!fallbackSubjectMap.has(subjectId)) {
-        fallbackSubjectMap.set(subjectId, {
-          id: subjectId,
-          name: String(row && row.subject_name || `Предмет ${subjectId}`),
-        });
-      }
-    });
-    activeSubjects = Array.from(fallbackSubjectMap.values())
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
-    activeSubjectIds = activeSubjects
-      .map((subject) => Number(subject.id || 0))
-      .filter((value) => Number.isInteger(value) && value > 0);
-  }
+  const scheduleRows = activeSubjectIds.length
+    ? await db.all(
+        `
+          SELECT
+            se.id,
+            se.subject_id,
+            se.group_number,
+            se.day_of_week,
+            se.class_number,
+            se.week_number,
+            COALESCE(se.lesson_type, '') AS lesson_type,
+            se.room_id,
+            s.name AS subject_name,
+            r.label AS room_name,
+            r.code AS room_code,
+            r.building AS room_building
+          FROM schedule_entries se
+          JOIN subjects s ON s.id = se.subject_id
+          LEFT JOIN rooms r ON r.id = se.room_id
+          WHERE se.course_id = ?
+            AND se.semester_id = ?
+            AND se.subject_id = ANY(?::int[])
+            AND COALESCE(LOWER(TRIM(CAST(s.visible AS TEXT))), '1') IN ('1', 'true', 't', 'yes', 'on', '')
+          ORDER BY se.day_of_week ASC,
+                   se.class_number ASC,
+                   COALESCE(se.week_number, 0) ASC,
+                   s.name ASC,
+                   COALESCE(se.group_number, 0) ASC,
+                   se.id ASC
+        `,
+        [normalizedCourseId, semesterId, activeSubjectIds]
+      )
+    : [];
 
   const teacherSubjectIds = Array.from(new Set([
     ...activeSubjectIds,
@@ -47936,7 +47915,7 @@ app.get('/admin/schedule-summary', requireScheduleSectionAccess, async (req, res
       return res.status(403).send('Forbidden (course access)');
     }
     courses = allowedCourses;
-    const requestedCourse = Number(req.query.course);
+    const requestedCourse = Number(req.query.course_id || req.query.course);
     if (allowedCourseIds.has(requestedCourse)) {
       courseId = requestedCourse;
     } else if (!allowedCourseIds.has(courseId)) {
