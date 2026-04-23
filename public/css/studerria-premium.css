@@ -490,7 +490,7 @@ body.page-vision .vision-logo-mark {
   width: 30px;
   height: 30px;
   border-radius: 10px;
-  object-fit: cover;
+  object-fit: contain;
   box-shadow: 0 10px 22px rgba(139, 92, 246, 0.2);
 }
 
@@ -993,7 +993,7 @@ body.page-vision .vision-auth-logo {
   display: block;
   margin: 0 auto 12px;
   border-radius: 24px;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 body.page-vision .vision-auth-logo--light,
@@ -1078,6 +1078,7 @@ body.page-vision .vision-logo-pair img {
   width: 64px;
   height: 64px;
   border-radius: 18px;
+  object-fit: contain;
 }
 
 body.page-vision .vision-logo-pair strong,
@@ -1305,7 +1306,7 @@ body.page-login .login-brand-mark {
   width: 94px;
   height: 94px;
   border-radius: 28px;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 body.page-login .login-brand-mark--light,
