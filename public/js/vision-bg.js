@@ -6,6 +6,7 @@
 
   const bgRoot = document.getElementById('visionBg');
   const trailHost = document.getElementById('visionMouseTrail');
+  const asciiCanvas = document.getElementById('visionAsciiFluid');
   const themeToggle = document.getElementById('visionThemeToggle');
   if (!bgRoot || !trailHost || !themeToggle) {
     return;
@@ -32,6 +33,21 @@
   const CELL_MEMORY_MS = 4200;
   const PATH_STAMP_STEP = 8;
   const MORPH_FRAME_MS = 42;
+  const ASCII_CONFIG = {
+    charset: '○>_ ',
+    fontSize: 9,
+    fps: 30,
+    contrast: 2,
+    gamma: 0.5,
+    invertLuma: true,
+    hoverRadiusPx: 28,
+    splashRangePx: 184,
+    splashThicknessPx: 100,
+    diffusion: 0.16,
+    iterations: 2,
+    velocityDissipation: 0.9,
+    densityDissipation: 0.925
+  };
 
   const BLOB_MORPH_SHAPES = {
     primary: [
@@ -149,6 +165,345 @@
     };
   });
 
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function createAsciiFluid(canvas) {
+    const noop = {
+      resize() {},
+      refreshTheme() {},
+      setInteractive() {},
+      pointerMove() {},
+      pointerDown() {},
+      pointerUp() {},
+      pointerLeave() {},
+      update() {}
+    };
+
+    if (!canvas) {
+      return noop;
+    }
+
+    const context = canvas.getContext('2d', { alpha: true });
+    if (!context) {
+      return noop;
+    }
+
+    const config = ASCII_CONFIG;
+    const frameInterval = 1000 / config.fps;
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let cols = 0;
+    let rows = 0;
+    let size = 0;
+    let density = new Float32Array(0);
+    let densityNext = new Float32Array(0);
+    let velocityX = new Float32Array(0);
+    let velocityY = new Float32Array(0);
+    let velocityXNext = new Float32Array(0);
+    let velocityYNext = new Float32Array(0);
+    let enabled = false;
+    let hasPointer = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let lastFrameAt = 0;
+    let colorRgb = '205, 214, 255';
+
+    function indexOf(x, y) {
+      return y * cols + x;
+    }
+
+    function swapFields() {
+      let swap = density;
+      density = densityNext;
+      densityNext = swap;
+
+      swap = velocityX;
+      velocityX = velocityXNext;
+      velocityXNext = swap;
+
+      swap = velocityY;
+      velocityY = velocityYNext;
+      velocityYNext = swap;
+    }
+
+    function sample(field, x, y) {
+      const x0 = clamp(Math.floor(x), 0, cols - 1);
+      const y0 = clamp(Math.floor(y), 0, rows - 1);
+      const x1 = clamp(x0 + 1, 0, cols - 1);
+      const y1 = clamp(y0 + 1, 0, rows - 1);
+      const tx = clamp(x - x0, 0, 1);
+      const ty = clamp(y - y0, 0, 1);
+      const a = field[indexOf(x0, y0)];
+      const b = field[indexOf(x1, y0)];
+      const c = field[indexOf(x0, y1)];
+      const d = field[indexOf(x1, y1)];
+      return (a * (1 - tx) * (1 - ty)) + (b * tx * (1 - ty)) + (c * (1 - tx) * ty) + (d * tx * ty);
+    }
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      cols = Math.max(1, Math.ceil(width / config.fontSize));
+      rows = Math.max(1, Math.ceil(height / config.fontSize));
+      size = cols * rows;
+
+      canvas.width = Math.ceil(width * dpr);
+      canvas.height = Math.ceil(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.textBaseline = 'top';
+      context.font = `${config.fontSize}px "SF Mono", "Menlo", "Consolas", monospace`;
+
+      density = new Float32Array(size);
+      densityNext = new Float32Array(size);
+      velocityX = new Float32Array(size);
+      velocityY = new Float32Array(size);
+      velocityXNext = new Float32Array(size);
+      velocityYNext = new Float32Array(size);
+      refreshTheme();
+    }
+
+    function refreshTheme() {
+      const computed = window.getComputedStyle(canvas);
+      colorRgb = computed.getPropertyValue('--ascii-fluid-rgb').trim() || colorRgb;
+    }
+
+    function addForce(x, y, dx, dy, radiusPx, amount) {
+      if (!enabled || !size) {
+        return;
+      }
+
+      const cellSize = config.fontSize;
+      const cx = x / cellSize;
+      const cy = y / cellSize;
+      const radius = Math.max(1, radiusPx / cellSize);
+      const minX = clamp(Math.floor(cx - radius), 0, cols - 1);
+      const maxX = clamp(Math.ceil(cx + radius), 0, cols - 1);
+      const minY = clamp(Math.floor(cy - radius), 0, rows - 1);
+      const maxY = clamp(Math.ceil(cy + radius), 0, rows - 1);
+      const forceX = clamp(dx / cellSize, -8, 8);
+      const forceY = clamp(dy / cellSize, -8, 8);
+
+      for (let yy = minY; yy <= maxY; yy += 1) {
+        for (let xx = minX; xx <= maxX; xx += 1) {
+          const localX = xx - cx;
+          const localY = yy - cy;
+          const dist = Math.hypot(localX, localY);
+          if (dist > radius) {
+            continue;
+          }
+
+          const falloff = Math.pow(1 - (dist / radius), 2);
+          const i = indexOf(xx, yy);
+          density[i] = clamp(density[i] + (amount * falloff), 0, 1.65);
+          velocityX[i] += forceX * falloff * 0.7;
+          velocityY[i] += forceY * falloff * 0.7;
+        }
+      }
+    }
+
+    function splash(x, y) {
+      if (!enabled || !size) {
+        return;
+      }
+
+      const cellSize = config.fontSize;
+      const cx = x / cellSize;
+      const cy = y / cellSize;
+      const range = config.splashRangePx / cellSize;
+      const thickness = Math.max(1, config.splashThicknessPx / cellSize);
+      const minX = clamp(Math.floor(cx - range), 0, cols - 1);
+      const maxX = clamp(Math.ceil(cx + range), 0, cols - 1);
+      const minY = clamp(Math.floor(cy - range), 0, rows - 1);
+      const maxY = clamp(Math.ceil(cy + range), 0, rows - 1);
+      const target = range * 0.48;
+
+      for (let yy = minY; yy <= maxY; yy += 1) {
+        for (let xx = minX; xx <= maxX; xx += 1) {
+          const localX = xx - cx;
+          const localY = yy - cy;
+          const dist = Math.hypot(localX, localY);
+          if (dist > range) {
+            continue;
+          }
+
+          const ring = Math.exp(-Math.pow((dist - target) / thickness, 2));
+          const radial = dist > 0.01 ? 1 / dist : 0;
+          const i = indexOf(xx, yy);
+          density[i] = clamp(density[i] + (ring * 1.18), 0, 1.8);
+          velocityX[i] += localX * radial * ring * 3.2;
+          velocityY[i] += localY * radial * ring * 3.2;
+        }
+      }
+    }
+
+    function diffuseField(source, target, rate) {
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = indexOf(x, y);
+          const left = source[indexOf(Math.max(0, x - 1), y)];
+          const right = source[indexOf(Math.min(cols - 1, x + 1), y)];
+          const up = source[indexOf(x, Math.max(0, y - 1))];
+          const down = source[indexOf(x, Math.min(rows - 1, y + 1))];
+          const avg = (left + right + up + down) * 0.25;
+          target[i] = source[i] + ((avg - source[i]) * rate);
+        }
+      }
+    }
+
+    function stepFluid() {
+      for (let iteration = 0; iteration < config.iterations; iteration += 1) {
+        diffuseField(density, densityNext, config.diffusion);
+        diffuseField(velocityX, velocityXNext, config.diffusion * 0.72);
+        diffuseField(velocityY, velocityYNext, config.diffusion * 0.72);
+        swapFields();
+      }
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = indexOf(x, y);
+          const prevX = x - (velocityX[i] * 0.24);
+          const prevY = y - (velocityY[i] * 0.24);
+          densityNext[i] = sample(density, prevX, prevY) * config.densityDissipation;
+          velocityXNext[i] = sample(velocityX, prevX, prevY) * config.velocityDissipation;
+          velocityYNext[i] = sample(velocityY, prevX, prevY) * config.velocityDissipation;
+        }
+      }
+
+      swapFields();
+    }
+
+    function draw(now) {
+      context.clearRect(0, 0, width, height);
+      context.font = `${config.fontSize}px "SF Mono", "Menlo", "Consolas", monospace`;
+
+      const time = now * 0.001;
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const i = indexOf(x, y);
+          const px = x * config.fontSize;
+          const py = y * config.fontSize;
+          const wave = (Math.sin((x * 0.13) + (time * 0.74)) + Math.cos((y * 0.19) - (time * 0.48))) * 0.025;
+          const lowerGlow = clamp((py - (height * 0.48)) / Math.max(1, height * 0.42), 0, 1) * 0.08;
+          const field = clamp(density[i] + wave + lowerGlow, 0, 1);
+          const corrected = Math.pow(clamp(field * config.contrast, 0, 1), config.gamma);
+          const ink = config.invertLuma ? corrected : 1 - corrected;
+          const charIndex = clamp(Math.floor((1 - ink) * (config.charset.length - 1)), 0, config.charset.length - 1);
+          const char = config.charset[charIndex];
+
+          if (char === ' ' || ink < 0.13) {
+            continue;
+          }
+
+          const alpha = clamp((ink - 0.11) * 0.74, 0, 0.52);
+          context.fillStyle = `rgba(${colorRgb}, ${alpha.toFixed(3)})`;
+          context.fillText(char, px, py);
+        }
+      }
+    }
+
+    function pointerMove(event) {
+      if (!enabled) {
+        return;
+      }
+
+      if (!hasPointer) {
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+        hasPointer = true;
+      }
+
+      const dx = event.clientX - lastPointerX;
+      const dy = event.clientY - lastPointerY;
+      const distance = Math.hypot(dx, dy);
+      const steps = Math.min(18, Math.max(1, Math.ceil(distance / 9)));
+
+      for (let step = 1; step <= steps; step += 1) {
+        const t = step / steps;
+        addForce(
+          lastPointerX + (dx * t),
+          lastPointerY + (dy * t),
+          dx / steps,
+          dy / steps,
+          config.hoverRadiusPx,
+          0.44
+        );
+      }
+
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+    }
+
+    function pointerDown(event) {
+      if (!enabled) {
+        return;
+      }
+
+      hasPointer = true;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      splash(event.clientX, event.clientY);
+    }
+
+    function pointerUp(event) {
+      if (!enabled) {
+        return;
+      }
+
+      addForce(event.clientX, event.clientY, 0, 0, config.hoverRadiusPx * 1.4, 0.5);
+    }
+
+    function pointerLeave() {
+      hasPointer = false;
+    }
+
+    function setInteractive(nextInteractive) {
+      enabled = Boolean(nextInteractive);
+      canvas.hidden = !enabled;
+      body.classList.toggle('vision-ascii-ready', enabled);
+
+      if (!enabled) {
+        context.clearRect(0, 0, width, height);
+        hasPointer = false;
+        return;
+      }
+
+      if (!size) {
+        resize();
+      }
+    }
+
+    function update(now) {
+      if (!enabled || !size || now - lastFrameAt < frameInterval) {
+        return;
+      }
+
+      lastFrameAt = now;
+      stepFluid();
+      draw(now);
+    }
+
+    resize();
+
+    return {
+      resize,
+      refreshTheme,
+      setInteractive,
+      pointerMove,
+      pointerDown,
+      pointerUp,
+      pointerLeave,
+      update
+    };
+  }
+
+  const asciiFluid = createAsciiFluid(asciiCanvas);
+
   let viewportWidth = window.innerWidth;
   let viewportHeight = window.innerHeight;
   let centerX = viewportWidth / 2;
@@ -194,6 +549,7 @@
     themeToggle.textContent = themeClass === 'theme-dark'
       ? themeToggle.dataset.lightLabel
       : themeToggle.dataset.darkLabel;
+    asciiFluid.refreshTheme();
   }
 
   function initTheme() {
@@ -280,6 +636,7 @@
     interactive = !isReducedMotion && !isCoarsePointer;
 
     body.classList.toggle('vision-reduced-motion', !interactive);
+    asciiFluid.setInteractive(interactive);
 
     if (!interactive) {
       pointerInside = false;
@@ -302,6 +659,10 @@
     }
 
     fallbackParticle.style.opacity = '0';
+    if (asciiCanvas) {
+      clearTrailParticles();
+      recentStampCells.clear();
+    }
     lastMoveAt = performance.now();
   }
 
@@ -314,6 +675,10 @@
   }
 
   function spawnBrushStamp(now, x, y, movementX, movementY) {
+    if (asciiCanvas) {
+      return;
+    }
+
     const magnitude = Math.hypot(movementX, movementY);
     if (magnitude > 0.2) {
       lastDirection = Math.atan2(movementY, movementX);
@@ -431,6 +796,8 @@
       lastStampAt = now;
     }
 
+    asciiFluid.pointerMove(event);
+
     const zone = pointerZone(event.clientX, event.clientY);
     if (zone !== stableZone) {
       stableZone = zone;
@@ -446,6 +813,7 @@
     hasPointerSample = false;
     stableZone = '';
     stableZoneSince = 0;
+    asciiFluid.pointerLeave();
     clearFocus();
   }
 
@@ -457,6 +825,7 @@
     resizeTimer = window.setTimeout(() => {
       resizeTimer = null;
       updateViewportMetrics();
+      asciiFluid.resize();
       if (!interactive) {
         fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
       }
@@ -533,6 +902,7 @@
       }
 
       updateTrail(now);
+      asciiFluid.update(now);
     } else {
       smoothX = centerX;
       smoothY = centerY;
@@ -581,6 +951,9 @@
   updateMotionMode();
 
   document.addEventListener('pointermove', onPointerMove, { passive: true });
+  document.addEventListener('pointerdown', (event) => asciiFluid.pointerDown(event), { passive: true });
+  document.addEventListener('pointerup', (event) => asciiFluid.pointerUp(event), { passive: true });
+  document.addEventListener('pointercancel', onPointerLeave, { passive: true });
   document.addEventListener('pointerleave', onPointerLeave, { passive: true });
   window.addEventListener('blur', onPointerLeave, { passive: true });
   window.addEventListener('resize', onResize, { passive: true });

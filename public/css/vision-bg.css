@@ -124,6 +124,35 @@ body.page-vision {
     var(--vision-base-gradient);
 }
 
+.ascii-fluid-canvas {
+  --ascii-fluid-rgb: 205, 214, 255;
+  --ascii-fluid-opacity: 0.42;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: var(--ascii-fluid-opacity);
+  mix-blend-mode: screen;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 62%, rgba(0, 0, 0, 0.5) 82%, transparent 100%);
+}
+
+body.theme-light .ascii-fluid-canvas {
+  --ascii-fluid-rgb: 72, 61, 160;
+  --ascii-fluid-opacity: 0.23;
+  mix-blend-mode: multiply;
+}
+
+.ascii-overlay-safe {
+  position: relative;
+  z-index: 2;
+}
+
+.vision-ascii-ready .mouse-trail {
+  display: none;
+}
+
 .bg-morph-layer {
   position: fixed;
   inset: 0;
