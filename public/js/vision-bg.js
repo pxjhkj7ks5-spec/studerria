@@ -1,45 +1,32 @@
-﻿(() => {
+(() => {
   const body = document.body;
   if (!body || !body.classList.contains('page-vision')) {
     return;
   }
 
   const bgRoot = document.getElementById('visionBg');
-  const trailHost = document.getElementById('visionMouseTrail');
   const asciiCanvas = document.getElementById('visionAsciiFluid');
   const themeToggle = document.getElementById('visionThemeToggle');
-  if (!bgRoot || !trailHost || !themeToggle) {
+  const heroElement = document.getElementById('visionHero');
+  if (!bgRoot || !asciiCanvas || !themeToggle) {
     return;
   }
 
-  const shapeWraps = Array.from(bgRoot.querySelectorAll('.bg-shape-wrap'));
+  const safeElements = Array.from(document.querySelectorAll('[data-ascii-safe]'));
+  const shapeStates = Array.from(bgRoot.querySelectorAll('.bg-shape-wrap')).map((element) => ({
+    element,
+    depth: Number(element.dataset.depth || 0.016),
+    x: 0,
+    y: 0
+  }));
 
   const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
 
-  const BRUSH_PATTERN = [
-    { symbol: '_', variant: 'outer', lane: -2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -1.2 },
-    { symbol: '>', variant: 'mid', lane: -1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.45 },
-    { symbol: 'o', variant: 'center', lane: 0, ttl: 3000, scale: 0.92, opacity: 0.44, forwardOffset: 0 },
-    { symbol: '>', variant: 'mid', lane: 1, ttl: 2200, scale: 0.86, opacity: 0.34, forwardOffset: -0.45 },
-    { symbol: '_', variant: 'outer', lane: 2, ttl: 1400, scale: 0.8, opacity: 0.22, forwardOffset: -1.2 }
-  ];
-
-  const MAX_TRAIL_PARTICLES = 320;
-  const STAMP_INTERVAL_MS = 44;
-  const TRAIL_GRID_SIZE = 12;
-  const CELL_COOLDOWN_MS = 320;
-  const MIN_STAMP_DISTANCE = 4;
-  const CELL_MEMORY_MS = 4200;
-  const PATH_STAMP_STEP = 8;
-  const MORPH_FRAME_MS = 42;
   const ASCII_CONFIG = {
     charset: '○>_ ',
     fontSize: 9,
     fps: 30,
-    contrast: 2,
-    gamma: 0.5,
-    invertLuma: true,
     hoverRadiusPx: 28,
     splashRangePx: 184,
     splashThicknessPx: 100,
@@ -62,97 +49,6 @@
     ]
   };
 
-  function toBlobPath(values) {
-    return `M${values[0].toFixed(2)} ${values[1].toFixed(2)} C${values[2].toFixed(2)} ${values[3].toFixed(2)} ${values[4].toFixed(2)} ${values[5].toFixed(2)} ${values[6].toFixed(2)} ${values[7].toFixed(2)} C${values[8].toFixed(2)} ${values[9].toFixed(2)} ${values[10].toFixed(2)} ${values[11].toFixed(2)} ${values[12].toFixed(2)} ${values[13].toFixed(2)} C${values[14].toFixed(2)} ${values[15].toFixed(2)} ${values[16].toFixed(2)} ${values[17].toFixed(2)} ${values[18].toFixed(2)} ${values[19].toFixed(2)} C${values[20].toFixed(2)} ${values[21].toFixed(2)} ${values[22].toFixed(2)} ${values[23].toFixed(2)} ${values[24].toFixed(2)} ${values[25].toFixed(2)} Z`;
-  }
-
-  function smoothstep(value) {
-    return value * value * (3 - (2 * value));
-  }
-
-  class TrailParticle {
-    constructor(host) {
-      this.el = document.createElement('span');
-      this.el.className = 'trail-char';
-      host.appendChild(this.el);
-
-      this.active = false;
-      this.originX = 0;
-      this.originY = 0;
-      this.driftX = 0;
-      this.driftY = 0;
-      this.rotation = 0;
-      this.spin = 0;
-      this.birth = 0;
-      this.ttl = 0;
-      this.baseScale = 1;
-      this.baseOpacity = 0.6;
-    }
-
-    spawn(config) {
-      this.active = true;
-      this.el.className = `trail-char ${config.variant}`;
-      this.el.textContent = config.symbol;
-
-      this.originX = config.x;
-      this.originY = config.y;
-      this.driftX = config.driftX;
-      this.driftY = config.driftY;
-      this.rotation = config.rotation;
-      this.spin = config.spin;
-      this.birth = config.now;
-      this.ttl = config.ttl;
-      this.baseScale = config.scale;
-      this.baseOpacity = config.opacity;
-      this.el.style.opacity = '0';
-    }
-
-    hide() {
-      this.active = false;
-      this.el.style.opacity = '0';
-    }
-
-    update(now) {
-      if (!this.active) {
-        return;
-      }
-
-      const life = now - this.birth;
-      const progress = life / this.ttl;
-      if (progress >= 1) {
-        this.hide();
-        return;
-      }
-
-      const fade = Math.pow(1 - progress, 1.26);
-      const opacity = this.baseOpacity * fade;
-      const x = this.originX + this.driftX * progress;
-      const y = this.originY + this.driftY * progress;
-      const scale = this.baseScale + progress * 0.05;
-      const rotation = this.rotation + this.spin * progress;
-
-      this.el.style.opacity = opacity.toFixed(3);
-      this.el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(3)}) rotate(${rotation.toFixed(2)}deg)`;
-    }
-  }
-
-  const trailParticles = Array.from({ length: MAX_TRAIL_PARTICLES }, () => new TrailParticle(trailHost));
-  let trailCursor = 0;
-
-  const fallbackParticle = document.createElement('span');
-  fallbackParticle.className = 'trail-char fallback';
-  fallbackParticle.textContent = 'o';
-  trailHost.appendChild(fallbackParticle);
-
-  const shapeStates = shapeWraps.map((el) => ({
-    el,
-    depth: Number(el.dataset.depth || 0.02),
-    x: 0,
-    y: 0,
-    scale: 1,
-    targetScale: 1
-  }));
-
   const morphStates = Array.from(bgRoot.querySelectorAll('[data-blob-path]')).map((pathEl, index) => {
     const kind = pathEl.dataset.blobPath === 'secondary' ? 'secondary' : 'primary';
     const frames = BLOB_MORPH_SHAPES[kind] || BLOB_MORPH_SHAPES.primary;
@@ -160,16 +56,56 @@
     return {
       pathEl,
       frames,
-      duration: kind === 'secondary' ? 45000 : 30000,
-      offset: index * 6200
+      duration: kind === 'secondary' ? 68000 : 54000,
+      offset: index * 7800
     };
   });
+
+  const DUST_POINTS = Array.from({ length: 30 }, (_, index) => {
+    const seed = index + 1;
+    const x = fract(Math.sin(seed * 12.9898) * 43758.5453);
+    const y = fract(Math.sin(seed * 78.233) * 12831.5937);
+    const size = 0.4 + (fract(Math.sin(seed * 4.73) * 4152.114) * 1.1);
+    const alpha = 0.08 + (fract(Math.sin(seed * 1.37) * 9421.4) * 0.24);
+    return { x, y, size, alpha };
+  });
+
+  let viewportWidth = window.innerWidth;
+  let viewportHeight = window.innerHeight;
+  let centerX = viewportWidth / 2;
+  let centerY = viewportHeight / 2;
+  let pointerX = centerX;
+  let pointerY = centerY;
+  let smoothX = centerX;
+  let smoothY = centerY;
+  let pointerInside = false;
+  let isReducedMotion = reducedMotionQuery.matches;
+  let isCoarsePointer = coarsePointerQuery.matches;
+  let interactive = !isReducedMotion && !isCoarsePointer;
+  let lastMorphAt = 0;
+  let resizeTimer = null;
+  let rafId = 0;
+  let running = false;
+
+  const asciiFluid = createAsciiFluid(asciiCanvas, heroElement, safeElements);
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
 
-  function createAsciiFluid(canvas) {
+  function fract(value) {
+    return value - Math.floor(value);
+  }
+
+  function smoothstep(value) {
+    return value * value * (3 - (2 * value));
+  }
+
+  function toBlobPath(values) {
+    return `M${values[0].toFixed(2)} ${values[1].toFixed(2)} C${values[2].toFixed(2)} ${values[3].toFixed(2)} ${values[4].toFixed(2)} ${values[5].toFixed(2)} ${values[6].toFixed(2)} ${values[7].toFixed(2)} C${values[8].toFixed(2)} ${values[9].toFixed(2)} ${values[10].toFixed(2)} ${values[11].toFixed(2)} ${values[12].toFixed(2)} ${values[13].toFixed(2)} C${values[14].toFixed(2)} ${values[15].toFixed(2)} ${values[16].toFixed(2)} ${values[17].toFixed(2)} ${values[18].toFixed(2)} ${values[19].toFixed(2)} C${values[20].toFixed(2)} ${values[21].toFixed(2)} ${values[22].toFixed(2)} ${values[23].toFixed(2)} ${values[24].toFixed(2)} ${values[25].toFixed(2)} Z`;
+  }
+
+  function createAsciiFluid(canvas, hero, safeNodes) {
     const noop = {
       resize() {},
       refreshTheme() {},
@@ -181,12 +117,10 @@
       update() {}
     };
 
-    if (!canvas) {
-      return noop;
-    }
-
     const context = canvas.getContext('2d', { alpha: true });
-    if (!context) {
+    const fieldCanvas = document.createElement('canvas');
+    const fieldContext = fieldCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
+    if (!context || !fieldContext) {
       return noop;
     }
 
@@ -198,18 +132,18 @@
     let cols = 0;
     let rows = 0;
     let size = 0;
+    let enabled = false;
+    let lastFrameAt = 0;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let hasPointer = false;
+    let colorRgb = '205, 214, 255';
     let density = new Float32Array(0);
     let densityNext = new Float32Array(0);
     let velocityX = new Float32Array(0);
     let velocityY = new Float32Array(0);
     let velocityXNext = new Float32Array(0);
     let velocityYNext = new Float32Array(0);
-    let enabled = false;
-    let hasPointer = false;
-    let lastPointerX = 0;
-    let lastPointerY = 0;
-    let lastFrameAt = 0;
-    let colorRgb = '205, 214, 255';
 
     function indexOf(x, y) {
       return y * cols + x;
@@ -243,6 +177,73 @@
       return (a * (1 - tx) * (1 - ty)) + (b * tx * (1 - ty)) + (c * (1 - tx) * ty) + (d * tx * ty);
     }
 
+    function getHeroRect() {
+      if (hero) {
+        const rect = hero.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return rect;
+        }
+      }
+
+      return {
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: Math.min(height * 0.86, 880),
+        width,
+        height: Math.min(height * 0.86, 880)
+      };
+    }
+
+    function pointWithinRect(x, y, rect, padding = 0) {
+      return (
+        x >= rect.left - padding &&
+        x <= rect.right + padding &&
+        y >= rect.top - padding &&
+        y <= rect.bottom + padding
+      );
+    }
+
+    function collectSafeRects() {
+      return safeNodes
+        .map((node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+    }
+
+    function safeFactorAt(x, y, safeRects) {
+      let factor = 1;
+
+      for (const rect of safeRects) {
+        const padding = rect.width > 520 ? 96 : 56;
+        const dx = Math.max(rect.left - x, 0, x - rect.right);
+        const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+        const distance = Math.hypot(dx, dy);
+
+        if (distance <= 0.01) {
+          return 0;
+        }
+
+        if (distance < padding) {
+          factor = Math.min(factor, smoothstep(distance / padding));
+        }
+      }
+
+      return factor;
+    }
+
+    function heroMaskAt(x, y, rect) {
+      const relativeX = (x - rect.left) / Math.max(1, rect.width);
+      const relativeY = (y - rect.top) / Math.max(1, rect.height);
+      if (relativeX < -0.08 || relativeX > 1.08 || relativeY < -0.16 || relativeY > 1.1) {
+        return 0;
+      }
+
+      const xFade = smoothstep(clamp(1 - (Math.abs(relativeX - 0.5) / 0.66), 0, 1));
+      const topFade = smoothstep(clamp((relativeY + 0.1) / 0.2, 0, 1));
+      const bottomFade = smoothstep(clamp((1.08 - relativeY) / 0.36, 0, 1));
+      return xFade * topFade * bottomFade;
+    }
+
     function resize() {
       width = window.innerWidth;
       height = window.innerHeight;
@@ -256,8 +257,11 @@
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
-      context.textBaseline = 'top';
       context.font = `${config.fontSize}px "SF Mono", "Menlo", "Consolas", monospace`;
+      context.textBaseline = 'top';
+
+      fieldCanvas.width = cols;
+      fieldCanvas.height = rows;
 
       density = new Float32Array(size);
       densityNext = new Float32Array(size);
@@ -278,31 +282,35 @@
         return;
       }
 
-      const cellSize = config.fontSize;
-      const cx = x / cellSize;
-      const cy = y / cellSize;
-      const radius = Math.max(1, radiusPx / cellSize);
+      const heroRect = getHeroRect();
+      if (!pointWithinRect(x, y, heroRect, 48)) {
+        return;
+      }
+
+      const cx = x / config.fontSize;
+      const cy = y / config.fontSize;
+      const radius = Math.max(1, radiusPx / config.fontSize);
       const minX = clamp(Math.floor(cx - radius), 0, cols - 1);
       const maxX = clamp(Math.ceil(cx + radius), 0, cols - 1);
       const minY = clamp(Math.floor(cy - radius), 0, rows - 1);
       const maxY = clamp(Math.ceil(cy + radius), 0, rows - 1);
-      const forceX = clamp(dx / cellSize, -8, 8);
-      const forceY = clamp(dy / cellSize, -8, 8);
+      const forceX = clamp(dx / config.fontSize, -7, 7);
+      const forceY = clamp(dy / config.fontSize, -7, 7);
 
       for (let yy = minY; yy <= maxY; yy += 1) {
         for (let xx = minX; xx <= maxX; xx += 1) {
           const localX = xx - cx;
           const localY = yy - cy;
-          const dist = Math.hypot(localX, localY);
-          if (dist > radius) {
+          const distance = Math.hypot(localX, localY);
+          if (distance > radius) {
             continue;
           }
 
-          const falloff = Math.pow(1 - (dist / radius), 2);
-          const i = indexOf(xx, yy);
-          density[i] = clamp(density[i] + (amount * falloff), 0, 1.65);
-          velocityX[i] += forceX * falloff * 0.7;
-          velocityY[i] += forceY * falloff * 0.7;
+          const falloff = Math.pow(1 - (distance / radius), 2);
+          const index = indexOf(xx, yy);
+          density[index] = clamp(density[index] + (amount * falloff), 0, 1.65);
+          velocityX[index] += forceX * falloff * 0.68;
+          velocityY[index] += forceY * falloff * 0.68;
         }
       }
     }
@@ -312,32 +320,36 @@
         return;
       }
 
-      const cellSize = config.fontSize;
-      const cx = x / cellSize;
-      const cy = y / cellSize;
-      const range = config.splashRangePx / cellSize;
-      const thickness = Math.max(1, config.splashThicknessPx / cellSize);
+      const heroRect = getHeroRect();
+      if (!pointWithinRect(x, y, heroRect, 60)) {
+        return;
+      }
+
+      const cx = x / config.fontSize;
+      const cy = y / config.fontSize;
+      const range = config.splashRangePx / config.fontSize;
+      const thickness = Math.max(1, config.splashThicknessPx / config.fontSize);
       const minX = clamp(Math.floor(cx - range), 0, cols - 1);
       const maxX = clamp(Math.ceil(cx + range), 0, cols - 1);
       const minY = clamp(Math.floor(cy - range), 0, rows - 1);
       const maxY = clamp(Math.ceil(cy + range), 0, rows - 1);
-      const target = range * 0.48;
+      const ringTarget = range * 0.5;
 
       for (let yy = minY; yy <= maxY; yy += 1) {
         for (let xx = minX; xx <= maxX; xx += 1) {
           const localX = xx - cx;
           const localY = yy - cy;
-          const dist = Math.hypot(localX, localY);
-          if (dist > range) {
+          const distance = Math.hypot(localX, localY);
+          if (distance > range) {
             continue;
           }
 
-          const ring = Math.exp(-Math.pow((dist - target) / thickness, 2));
-          const radial = dist > 0.01 ? 1 / dist : 0;
-          const i = indexOf(xx, yy);
-          density[i] = clamp(density[i] + (ring * 1.18), 0, 1.8);
-          velocityX[i] += localX * radial * ring * 3.2;
-          velocityY[i] += localY * radial * ring * 3.2;
+          const ring = Math.exp(-Math.pow((distance - ringTarget) / thickness, 2));
+          const radial = distance > 0.01 ? 1 / distance : 0;
+          const index = indexOf(xx, yy);
+          density[index] = clamp(density[index] + (ring * 1.18), 0, 1.8);
+          velocityX[index] += localX * radial * ring * 3.15;
+          velocityY[index] += localY * radial * ring * 3.15;
         }
       }
     }
@@ -345,13 +357,13 @@
     function diffuseField(source, target, rate) {
       for (let y = 0; y < rows; y += 1) {
         for (let x = 0; x < cols; x += 1) {
-          const i = indexOf(x, y);
+          const index = indexOf(x, y);
           const left = source[indexOf(Math.max(0, x - 1), y)];
           const right = source[indexOf(Math.min(cols - 1, x + 1), y)];
           const up = source[indexOf(x, Math.max(0, y - 1))];
           const down = source[indexOf(x, Math.min(rows - 1, y + 1))];
-          const avg = (left + right + up + down) * 0.25;
-          target[i] = source[i] + ((avg - source[i]) * rate);
+          const average = (left + right + up + down) * 0.25;
+          target[index] = source[index] + ((average - source[index]) * rate);
         }
       }
     }
@@ -366,43 +378,199 @@
 
       for (let y = 0; y < rows; y += 1) {
         for (let x = 0; x < cols; x += 1) {
-          const i = indexOf(x, y);
-          const prevX = x - (velocityX[i] * 0.24);
-          const prevY = y - (velocityY[i] * 0.24);
-          densityNext[i] = sample(density, prevX, prevY) * config.densityDissipation;
-          velocityXNext[i] = sample(velocityX, prevX, prevY) * config.velocityDissipation;
-          velocityYNext[i] = sample(velocityY, prevX, prevY) * config.velocityDissipation;
+          const index = indexOf(x, y);
+          const prevX = x - (velocityX[index] * 0.24);
+          const prevY = y - (velocityY[index] * 0.24);
+          densityNext[index] = sample(density, prevX, prevY) * config.densityDissipation;
+          velocityXNext[index] = sample(velocityX, prevX, prevY) * config.velocityDissipation;
+          velocityYNext[index] = sample(velocityY, prevX, prevY) * config.velocityDissipation;
         }
       }
 
       swapFields();
     }
 
+    function renderRibbonPath(kind, gx, gy, gw, gh, drift) {
+      const path = new Path2D();
+
+      if (kind === 'secondary') {
+        path.moveTo(gx - (gw * 0.06), gy + (gh * 0.78) - (drift * 0.42));
+        path.bezierCurveTo(
+          gx + (gw * 0.16), gy + (gh * 0.96),
+          gx + (gw * 0.34), gy + (gh * 0.48),
+          gx + (gw * 0.58), gy + (gh * 0.72)
+        );
+        path.bezierCurveTo(
+          gx + (gw * 0.82), gy + (gh * 0.9),
+          gx + (gw * 0.94), gy + (gh * 0.54),
+          gx + (gw * 1.06), gy + (gh * 0.68) + (drift * 0.22)
+        );
+        return path;
+      }
+
+      path.moveTo(gx - (gw * 0.12), gy + (gh * 0.42) + drift);
+      path.bezierCurveTo(
+        gx + (gw * 0.08), gy + (gh * 0.1) - drift,
+        gx + (gw * 0.32), gy + (gh * 0.7) + (drift * 0.55),
+        gx + (gw * 0.56), gy + (gh * 0.56) - (drift * 0.24)
+      );
+      path.bezierCurveTo(
+        gx + (gw * 0.78), gy + (gh * 0.42),
+        gx + (gw * 0.92), gy + (gh * 0.18) - drift,
+        gx + (gw * 1.08), gy + (gh * 0.34) + (drift * 0.3)
+      );
+      return path;
+    }
+
+    function renderField(now, heroRect) {
+      const themeDark = body.classList.contains('theme-dark');
+      const gx = heroRect.left / config.fontSize;
+      const gy = heroRect.top / config.fontSize;
+      const gw = heroRect.width / config.fontSize;
+      const gh = heroRect.height / config.fontSize;
+
+      fieldContext.clearRect(0, 0, cols, rows);
+
+      const baseGradient = fieldContext.createLinearGradient(0, gy, 0, gy + gh);
+      if (themeDark) {
+        baseGradient.addColorStop(0, 'rgba(12, 15, 29, 0.96)');
+        baseGradient.addColorStop(0.54, 'rgba(18, 22, 41, 0.92)');
+        baseGradient.addColorStop(1, 'rgba(23, 18, 44, 0.9)');
+      } else {
+        baseGradient.addColorStop(0, 'rgba(245, 247, 255, 0.98)');
+        baseGradient.addColorStop(0.56, 'rgba(235, 240, 255, 0.92)');
+        baseGradient.addColorStop(1, 'rgba(239, 235, 255, 0.9)');
+      }
+
+      fieldContext.fillStyle = baseGradient;
+      fieldContext.fillRect(Math.max(0, gx - 8), Math.max(0, gy - 8), gw + 16, gh + 16);
+
+      const ambientGlow = fieldContext.createRadialGradient(
+        gx + (gw * 0.5),
+        gy + (gh * 0.26),
+        0,
+        gx + (gw * 0.5),
+        gy + (gh * 0.26),
+        gw * 0.6
+      );
+      if (themeDark) {
+        ambientGlow.addColorStop(0, 'rgba(118, 114, 255, 0.34)');
+        ambientGlow.addColorStop(0.46, 'rgba(92, 64, 190, 0.16)');
+        ambientGlow.addColorStop(1, 'rgba(5, 8, 18, 0)');
+      } else {
+        ambientGlow.addColorStop(0, 'rgba(140, 148, 255, 0.16)');
+        ambientGlow.addColorStop(0.48, 'rgba(164, 126, 255, 0.08)');
+        ambientGlow.addColorStop(1, 'rgba(245, 247, 255, 0)');
+      }
+      fieldContext.fillStyle = ambientGlow;
+      fieldContext.fillRect(Math.max(0, gx - 12), Math.max(0, gy - 8), gw + 24, gh + 18);
+
+      const ribbonDrift = Math.sin(now * 0.00008) * gh * 0.05;
+      const primaryRibbon = renderRibbonPath('primary', gx, gy, gw, gh, ribbonDrift);
+      const secondaryRibbon = renderRibbonPath('secondary', gx, gy, gw, gh, ribbonDrift);
+
+      fieldContext.save();
+      fieldContext.lineCap = 'round';
+      fieldContext.lineJoin = 'round';
+      fieldContext.shadowBlur = themeDark ? gh * 0.34 : gh * 0.22;
+      fieldContext.shadowColor = themeDark ? 'rgba(147, 92, 255, 0.28)' : 'rgba(144, 130, 240, 0.18)';
+
+      fieldContext.strokeStyle = themeDark ? 'rgba(112, 96, 255, 0.22)' : 'rgba(132, 122, 240, 0.13)';
+      fieldContext.lineWidth = Math.max(7, gh * 0.22);
+      fieldContext.stroke(primaryRibbon);
+
+      fieldContext.strokeStyle = themeDark ? 'rgba(150, 104, 255, 0.18)' : 'rgba(170, 146, 255, 0.1)';
+      fieldContext.lineWidth = Math.max(6, gh * 0.16);
+      fieldContext.stroke(secondaryRibbon);
+
+      fieldContext.shadowBlur = 0;
+      fieldContext.strokeStyle = themeDark ? 'rgba(244, 238, 255, 0.26)' : 'rgba(255, 255, 255, 0.16)';
+      fieldContext.lineWidth = Math.max(1.4, gh * 0.028);
+      fieldContext.stroke(primaryRibbon);
+
+      fieldContext.strokeStyle = themeDark ? 'rgba(222, 216, 255, 0.2)' : 'rgba(255, 255, 255, 0.14)';
+      fieldContext.lineWidth = Math.max(1.2, gh * 0.022);
+      fieldContext.stroke(secondaryRibbon);
+      fieldContext.restore();
+
+      fieldContext.save();
+      fieldContext.fillStyle = themeDark ? 'rgba(240, 238, 255, 0.56)' : 'rgba(92, 86, 184, 0.24)';
+      DUST_POINTS.forEach((point) => {
+        const px = gx + (gw * point.x);
+        const py = gy + (gh * point.y);
+        const sizePx = point.size * (themeDark ? 0.9 : 0.75);
+        fieldContext.globalAlpha = point.alpha;
+        fieldContext.beginPath();
+        fieldContext.arc(px, py, sizePx, 0, Math.PI * 2);
+        fieldContext.fill();
+      });
+      fieldContext.restore();
+
+      return fieldContext.getImageData(0, 0, cols, rows).data;
+    }
+
     function draw(now) {
+      const heroRect = getHeroRect();
+      const safeRects = collectSafeRects();
+      const lumaField = renderField(now, heroRect);
+      const themeDark = body.classList.contains('theme-dark');
+
       context.clearRect(0, 0, width, height);
       context.font = `${config.fontSize}px "SF Mono", "Menlo", "Consolas", monospace`;
 
-      const time = now * 0.001;
       for (let y = 0; y < rows; y += 1) {
         for (let x = 0; x < cols; x += 1) {
-          const i = indexOf(x, y);
+          const index = indexOf(x, y);
           const px = x * config.fontSize;
           const py = y * config.fontSize;
-          const wave = (Math.sin((x * 0.13) + (time * 0.74)) + Math.cos((y * 0.19) - (time * 0.48))) * 0.025;
-          const lowerGlow = clamp((py - (height * 0.48)) / Math.max(1, height * 0.42), 0, 1) * 0.08;
-          const field = clamp(density[i] + wave + lowerGlow, 0, 1);
-          const corrected = Math.pow(clamp(field * config.contrast, 0, 1), config.gamma);
-          const ink = config.invertLuma ? corrected : 1 - corrected;
-          const charIndex = clamp(Math.floor((1 - ink) * (config.charset.length - 1)), 0, config.charset.length - 1);
-          const char = config.charset[charIndex];
+          const cellX = px + (config.fontSize * 0.5);
+          const cellY = py + (config.fontSize * 0.58);
 
-          if (char === ' ' || ink < 0.13) {
+          const heroMask = heroMaskAt(cellX, cellY, heroRect);
+          if (heroMask <= 0.015) {
             continue;
           }
 
-          const alpha = clamp((ink - 0.11) * 0.74, 0, 0.52);
+          const safeFactor = safeFactorAt(cellX, cellY, safeRects);
+          if (safeFactor <= 0.01) {
+            continue;
+          }
+
+          const fieldIndex = index * 4;
+          const alphaChannel = lumaField[fieldIndex + 3] / 255;
+          if (alphaChannel <= 0.01) {
+            continue;
+          }
+
+          const red = lumaField[fieldIndex];
+          const green = lumaField[fieldIndex + 1];
+          const blue = lumaField[fieldIndex + 2];
+          const luma = (((red * 0.299) + (green * 0.587) + (blue * 0.114)) / 255) * alphaChannel;
+          const reveal = clamp(density[index], 0, 1.35);
+          const ambient = Math.pow(clamp(luma, 0, 1), 1.08);
+          const intensity = clamp((ambient * 0.16) + (ambient * reveal * 1.08) + (reveal * 0.08), 0, 1);
+          const charTone = clamp((ambient * 0.84) + (reveal * 0.22), 0, 1);
+          const charIndex = clamp(
+            Math.floor((1 - charTone) * (config.charset.length - 1)),
+            0,
+            config.charset.length - 1
+          );
+          const character = config.charset[charIndex];
+          if (character === ' ') {
+            continue;
+          }
+
+          const alpha = clamp(
+            intensity * heroMask * safeFactor * (themeDark ? 0.56 : 0.34),
+            0,
+            themeDark ? 0.46 : 0.24
+          );
+          if (alpha <= 0.028) {
+            continue;
+          }
+
           context.fillStyle = `rgba(${colorRgb}, ${alpha.toFixed(3)})`;
-          context.fillText(char, px, py);
+          context.fillText(character, px, py);
         }
       }
     }
@@ -412,10 +580,17 @@
         return;
       }
 
+      const heroRect = getHeroRect();
+      if (!pointWithinRect(event.clientX, event.clientY, heroRect, 44)) {
+        hasPointer = false;
+        return;
+      }
+
       if (!hasPointer) {
         lastPointerX = event.clientX;
         lastPointerY = event.clientY;
         hasPointer = true;
+        return;
       }
 
       const dx = event.clientX - lastPointerX;
@@ -424,10 +599,10 @@
       const steps = Math.min(18, Math.max(1, Math.ceil(distance / 9)));
 
       for (let step = 1; step <= steps; step += 1) {
-        const t = step / steps;
+        const progress = step / steps;
         addForce(
-          lastPointerX + (dx * t),
-          lastPointerY + (dy * t),
+          lastPointerX + (dx * progress),
+          lastPointerY + (dy * progress),
           dx / steps,
           dy / steps,
           config.hoverRadiusPx,
@@ -444,6 +619,11 @@
         return;
       }
 
+      const heroRect = getHeroRect();
+      if (!pointWithinRect(event.clientX, event.clientY, heroRect, 52)) {
+        return;
+      }
+
       hasPointer = true;
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
@@ -455,7 +635,7 @@
         return;
       }
 
-      addForce(event.clientX, event.clientY, 0, 0, config.hoverRadiusPx * 1.4, 0.5);
+      addForce(event.clientX, event.clientY, 0, 0, config.hoverRadiusPx * 1.45, 0.48);
     }
 
     function pointerLeave() {
@@ -470,10 +650,7 @@
       if (!enabled) {
         context.clearRect(0, 0, width, height);
         hasPointer = false;
-        return;
-      }
-
-      if (!size) {
+      } else if (!size) {
         resize();
       }
     }
@@ -502,43 +679,6 @@
     };
   }
 
-  const asciiFluid = createAsciiFluid(asciiCanvas);
-
-  let viewportWidth = window.innerWidth;
-  let viewportHeight = window.innerHeight;
-  let centerX = viewportWidth / 2;
-  let centerY = viewportHeight / 2;
-
-  let pointerX = centerX;
-  let pointerY = centerY;
-  let smoothX = centerX;
-  let smoothY = centerY;
-  let lastDirection = 0;
-
-  let pointerInside = false;
-  let lastMoveAt = 0;
-  let lastStampAt = 0;
-  let lastStampX = centerX;
-  let lastStampY = centerY;
-  let lastPointerSampleX = centerX;
-  let lastPointerSampleY = centerY;
-  let hasPointerSample = false;
-
-  let stableZone = '';
-  let stableZoneSince = 0;
-  let focusedShape = null;
-  let cleanupCellsAt = 0;
-  let lastMorphAt = 0;
-
-  let isReducedMotion = reducedMotionQuery.matches;
-  let isCoarsePointer = coarsePointerQuery.matches;
-  let interactive = !isReducedMotion && !isCoarsePointer;
-
-  let resizeTimer = null;
-  let rafId = 0;
-  let running = false;
-  const recentStampCells = new Map();
-
   function applyTheme(themeClass) {
     body.classList.remove('theme-light', 'theme-dark');
     body.classList.add(themeClass);
@@ -554,13 +694,13 @@
 
   function initTheme() {
     const savedTheme = localStorage.getItem('ui-theme');
-    const initial = savedTheme === 'theme-dark' ? 'theme-dark' : 'theme-light';
-    applyTheme(initial);
+    const initialTheme = savedTheme === 'theme-light' ? 'theme-light' : 'theme-dark';
+    applyTheme(initialTheme);
 
     themeToggle.addEventListener('click', () => {
-      const next = body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
-      applyTheme(next);
-      localStorage.setItem('ui-theme', next);
+      const nextTheme = body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
+      applyTheme(nextTheme);
+      localStorage.setItem('ui-theme', nextTheme);
     });
   }
 
@@ -576,66 +716,13 @@
     }
   }
 
-  function clearFocus() {
-    if (focusedShape) {
-      focusedShape.classList.remove('is-focused');
-      focusedShape = null;
-    }
-
-    bgRoot.classList.remove('focus-mode');
-    shapeStates.forEach((shapeState) => {
-      shapeState.targetScale = 1;
-      shapeState.el.classList.remove('is-focused');
-    });
-  }
-
-  function focusNearestShape(x, y) {
-    let nearest = null;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    shapeStates.forEach((shapeState) => {
-      const rect = shapeState.el.getBoundingClientRect();
-      const dx = x - (rect.left + rect.width / 2);
-      const dy = y - (rect.top + rect.height / 2);
-      const distance = dx * dx + dy * dy;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = shapeState;
-      }
-    });
-
-    if (!nearest) {
-      return;
-    }
-
-    bgRoot.classList.add('focus-mode');
-    shapeStates.forEach((shapeState) => {
-      const isFocused = shapeState === nearest;
-      shapeState.targetScale = isFocused ? 1.16 : 0.9;
-      shapeState.el.classList.toggle('is-focused', isFocused);
-    });
-
-    focusedShape = nearest.el;
-  }
-
-  function pointerZone(x, y) {
-    const column = Math.max(0, Math.min(2, Math.floor((x / Math.max(1, viewportWidth)) * 3)));
-    const row = Math.max(0, Math.min(1, Math.floor((y / Math.max(1, viewportHeight)) * 2)));
-    return `${row}:${column}`;
-  }
-
-  function clearTrailParticles() {
-    trailParticles.forEach((particle) => {
-      particle.hide();
-    });
-  }
-
   function updateMotionMode() {
     isReducedMotion = reducedMotionQuery.matches;
     isCoarsePointer = coarsePointerQuery.matches;
     interactive = !isReducedMotion && !isCoarsePointer;
 
     body.classList.toggle('vision-reduced-motion', !interactive);
+    body.classList.toggle('vision-coarse-pointer', isCoarsePointer);
     asciiFluid.setInteractive(interactive);
 
     if (!interactive) {
@@ -644,114 +731,7 @@
       pointerY = centerY;
       smoothX = centerX;
       smoothY = centerY;
-      lastStampX = centerX;
-      lastStampY = centerY;
-      lastPointerSampleX = centerX;
-      lastPointerSampleY = centerY;
-      hasPointerSample = false;
-      clearFocus();
-      clearTrailParticles();
-      recentStampCells.clear();
-
-      fallbackParticle.style.opacity = '0.3';
-      fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
-      return;
-    }
-
-    fallbackParticle.style.opacity = '0';
-    if (asciiCanvas) {
-      clearTrailParticles();
-      recentStampCells.clear();
-    }
-    lastMoveAt = performance.now();
-  }
-
-  function toGrid(value) {
-    return Math.round(value / TRAIL_GRID_SIZE) * TRAIL_GRID_SIZE;
-  }
-
-  function cellKey(x, y) {
-    return `${Math.round(x / TRAIL_GRID_SIZE)}:${Math.round(y / TRAIL_GRID_SIZE)}`;
-  }
-
-  function spawnBrushStamp(now, x, y, movementX, movementY) {
-    if (asciiCanvas) {
-      return;
-    }
-
-    const magnitude = Math.hypot(movementX, movementY);
-    if (magnitude > 0.2) {
-      lastDirection = Math.atan2(movementY, movementX);
-    }
-
-    const distanceFromLast = Math.hypot(x - lastStampX, y - lastStampY);
-    if (distanceFromLast < MIN_STAMP_DISTANCE) {
-      return;
-    }
-
-    const quantizedX = toGrid(x);
-    const quantizedY = toGrid(y);
-    lastStampX = quantizedX;
-    lastStampY = quantizedY;
-
-    if (now >= cleanupCellsAt) {
-      cleanupCellsAt = now + 600;
-      recentStampCells.forEach((timestamp, key) => {
-        if (now - timestamp > CELL_MEMORY_MS) {
-          recentStampCells.delete(key);
-        }
-      });
-    }
-
-    const forwardX = Math.cos(lastDirection);
-    const forwardY = Math.sin(lastDirection);
-    const normalX = -forwardY;
-    const normalY = forwardX;
-    const laneStep = 10;
-    const thisStampCells = new Set();
-    let hasSpawned = false;
-
-    BRUSH_PATTERN.forEach((node) => {
-      const rawX = quantizedX + (normalX * node.lane * laneStep) + (forwardX * node.forwardOffset * laneStep);
-      const rawY = quantizedY + (normalY * node.lane * laneStep) + (forwardY * node.forwardOffset * laneStep);
-      const px = toGrid(rawX);
-      const py = toGrid(rawY);
-      const key = cellKey(px, py);
-
-      if (thisStampCells.has(key)) {
-        return;
-      }
-
-      const lastSymbolAt = recentStampCells.get(key) || 0;
-      if (now - lastSymbolAt < CELL_COOLDOWN_MS) {
-        return;
-      }
-
-      thisStampCells.add(key);
-      recentStampCells.set(key, now);
-
-      const particle = trailParticles[trailCursor];
-      trailCursor = (trailCursor + 1) % trailParticles.length;
-      hasSpawned = true;
-
-      particle.spawn({
-        variant: node.variant,
-        symbol: node.symbol,
-        x: px,
-        y: py,
-        driftX: forwardX * 0.06,
-        driftY: forwardY * 0.06,
-        rotation: (Math.random() - 0.5) * 1.5,
-        spin: (Math.random() - 0.5) * 2.2,
-        ttl: node.ttl,
-        scale: node.scale,
-        opacity: node.opacity,
-        now
-      });
-    });
-
-    if (!hasSpawned) {
-      return;
+      asciiFluid.pointerLeave();
     }
   }
 
@@ -763,58 +743,14 @@
     pointerInside = true;
     pointerX = event.clientX;
     pointerY = event.clientY;
-
-    const now = performance.now();
-    lastMoveAt = now;
-
-    if (!hasPointerSample) {
-      lastPointerSampleX = event.clientX;
-      lastPointerSampleY = event.clientY;
-      hasPointerSample = true;
-    }
-
-    const dx = event.clientX - lastPointerSampleX;
-    const dy = event.clientY - lastPointerSampleY;
-    const segmentDistance = Math.hypot(dx, dy);
-    const spacing = Math.max(6, PATH_STAMP_STEP);
-
-    if (segmentDistance > 0) {
-      const steps = Math.min(30, Math.max(1, Math.ceil(segmentDistance / spacing)));
-      for (let i = 1; i <= steps; i += 1) {
-        const t = i / steps;
-        const sx = lastPointerSampleX + (dx * t);
-        const sy = lastPointerSampleY + (dy * t);
-        spawnBrushStamp(now + i, sx, sy, dx, dy);
-      }
-      lastStampAt = now;
-      lastPointerSampleX = event.clientX;
-      lastPointerSampleY = event.clientY;
-    } else if (now - lastStampAt >= STAMP_INTERVAL_MS) {
-      const movementX = Number.isFinite(event.movementX) ? event.movementX : 0;
-      const movementY = Number.isFinite(event.movementY) ? event.movementY : 0;
-      spawnBrushStamp(now, event.clientX, event.clientY, movementX, movementY);
-      lastStampAt = now;
-    }
-
     asciiFluid.pointerMove(event);
-
-    const zone = pointerZone(event.clientX, event.clientY);
-    if (zone !== stableZone) {
-      stableZone = zone;
-      stableZoneSince = now;
-      clearFocus();
-    }
   }
 
   function onPointerLeave() {
     pointerInside = false;
     pointerX = centerX;
     pointerY = centerY;
-    hasPointerSample = false;
-    stableZone = '';
-    stableZoneSince = 0;
     asciiFluid.pointerLeave();
-    clearFocus();
   }
 
   function onResize() {
@@ -826,9 +762,6 @@
       resizeTimer = null;
       updateViewportMetrics();
       asciiFluid.resize();
-      if (!interactive) {
-        fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
-      }
     }, 140);
   }
 
@@ -836,28 +769,25 @@
     const offsetX = smoothX - centerX;
     const offsetY = smoothY - centerY;
 
-    shapeStates.forEach((shapeState) => {
-      const tx = offsetX * shapeState.depth;
-      const ty = offsetY * shapeState.depth;
-
-      shapeState.x += (tx - shapeState.x) * 0.09;
-      shapeState.y += (ty - shapeState.y) * 0.09;
-      shapeState.scale += (shapeState.targetScale - shapeState.scale) * 0.08;
-
-      shapeState.el.style.transform = `translate3d(${shapeState.x.toFixed(2)}px, ${shapeState.y.toFixed(2)}px, 0) scale(${shapeState.scale.toFixed(3)})`;
+    shapeStates.forEach((shapeState, index) => {
+      const direction = index % 2 === 0 ? 1 : -1;
+      const targetX = offsetX * shapeState.depth * 0.56 * direction;
+      const targetY = offsetY * shapeState.depth * 0.48;
+      shapeState.x += (targetX - shapeState.x) * 0.065;
+      shapeState.y += (targetY - shapeState.y) * 0.065;
+      shapeState.element.style.transform = `translate3d(${shapeState.x.toFixed(2)}px, ${shapeState.y.toFixed(2)}px, 0)`;
     });
   }
 
   function updateBlobMorph(now) {
-    if (now - lastMorphAt < MORPH_FRAME_MS) {
+    if (now - lastMorphAt < 54) {
       return;
     }
 
     lastMorphAt = now;
 
     morphStates.forEach((state) => {
-      const frames = state.frames;
-      const frameCount = frames.length;
+      const frameCount = state.frames.length;
       if (frameCount < 2) {
         return;
       }
@@ -867,21 +797,15 @@
       const fromIndex = Math.floor(progress) % frameCount;
       const toIndex = (fromIndex + 1) % frameCount;
       const localT = smoothstep(progress - Math.floor(progress));
-
-      const from = frames[fromIndex];
-      const to = frames[toIndex];
+      const from = state.frames[fromIndex];
+      const to = state.frames[toIndex];
       const mixed = new Array(from.length);
-      for (let i = 0; i < from.length; i += 1) {
-        mixed[i] = from[i] + ((to[i] - from[i]) * localT);
+
+      for (let index = 0; index < from.length; index += 1) {
+        mixed[index] = from[index] + ((to[index] - from[index]) * localT);
       }
 
       state.pathEl.setAttribute('d', toBlobPath(mixed));
-    });
-  }
-
-  function updateTrail(now) {
-    trailParticles.forEach((particle) => {
-      particle.update(now);
     });
   }
 
@@ -891,29 +815,18 @@
     }
 
     if (interactive) {
-      smoothX += (pointerX - smoothX) * 0.1;
-      smoothY += (pointerY - smoothY) * 0.1;
-
-      const focusReady = pointerInside && stableZone && now - stableZoneSince > 700;
-      if (focusReady) {
-        focusNearestShape(smoothX, smoothY);
-      } else if (now - lastMoveAt > 1500) {
-        clearFocus();
-      }
-
-      updateTrail(now);
+      smoothX += (pointerX - smoothX) * 0.065;
+      smoothY += (pointerY - smoothY) * 0.065;
       asciiFluid.update(now);
     } else {
-      smoothX = centerX;
-      smoothY = centerY;
-      fallbackParticle.style.transform = `translate3d(${centerX.toFixed(2)}px, ${centerY.toFixed(2)}px, 0) translate(-50%, -50%) scale(0.88)`;
+      smoothX += (centerX - smoothX) * 0.08;
+      smoothY += (centerY - smoothY) * 0.08;
     }
 
     if (!isReducedMotion) {
       updateBlobMorph(now);
+      updateShapeParallax();
     }
-
-    updateShapeParallax();
 
     rafId = window.requestAnimationFrame(animationFrame);
   }

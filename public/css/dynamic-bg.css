@@ -20,6 +20,14 @@
   --trail-color: rgba(55, 48, 163, 0.42);
   --trail-shadow: rgba(79, 70, 229, 0.26);
   --trail-blend-mode: multiply;
+  --bg-ribbon-fill-a: var(--st-ribbon-fill-a, rgba(126, 126, 255, 0.16));
+  --bg-ribbon-fill-b: var(--st-ribbon-fill-b, rgba(180, 136, 255, 0.22));
+  --bg-ribbon-edge: var(--st-ribbon-edge, rgba(255, 255, 255, 0.16));
+  --bg-ribbon-inner: var(--st-ribbon-inner, rgba(255, 255, 255, 0.18));
+  --bg-ribbon-glow: var(--st-ribbon-glow, rgba(156, 134, 255, 0.18));
+  --bg-ribbon-opacity: 0.5;
+  --bg-dust-opacity: var(--st-dust-opacity, 0.16);
+  --bg-dust-color: rgba(96, 94, 186, 0.5);
 }
 
 html[data-theme='dark'],
@@ -46,6 +54,14 @@ body.theme-dark {
   --trail-color: rgba(165, 180, 252, 0.44);
   --trail-shadow: rgba(129, 140, 248, 0.24);
   --trail-blend-mode: screen;
+  --bg-ribbon-fill-a: var(--st-ribbon-fill-a, rgba(96, 110, 255, 0.22));
+  --bg-ribbon-fill-b: var(--st-ribbon-fill-b, rgba(182, 98, 255, 0.28));
+  --bg-ribbon-edge: var(--st-ribbon-edge, rgba(219, 210, 255, 0.18));
+  --bg-ribbon-inner: var(--st-ribbon-inner, rgba(255, 255, 255, 0.18));
+  --bg-ribbon-glow: var(--st-ribbon-glow, rgba(126, 78, 255, 0.2));
+  --bg-ribbon-opacity: 0.68;
+  --bg-dust-opacity: var(--st-dust-opacity, 0.22);
+  --bg-dust-color: rgba(218, 216, 255, 0.58);
 }
 
 html[data-theme='light'],
@@ -68,6 +84,17 @@ body.dynamic-bg-ready {
   transition: opacity 220ms ease;
 }
 
+#dynamic-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(58% 42% at 50% 6%, rgba(158, 173, 255, 0.08), transparent 70%),
+    radial-gradient(46% 36% at 50% 88%, rgba(18, 20, 38, 0.18), transparent 78%);
+  opacity: 0.78;
+}
+
 .gradient-layer,
 .bg-morph-layer,
 .morph-blob,
@@ -88,6 +115,128 @@ body.dynamic-bg-ready {
     radial-gradient(55% 72% at 90% 16%, var(--bg-side-right), transparent 72%),
     radial-gradient(40% 52% at 50% 84%, var(--bg-center-soft), transparent 78%),
     var(--bg-base);
+}
+
+.studerria-ambient-ribbons,
+.studerria-ribbon,
+.studerria-ribbon-glint,
+.studerria-star-dust {
+  position: absolute;
+}
+
+.studerria-ambient-ribbons {
+  inset: -12% -14% -10%;
+  z-index: 2;
+  opacity: var(--bg-ribbon-opacity);
+  filter: saturate(1.04);
+  animation: dynamicRibbonDrift 42s ease-in-out infinite;
+}
+
+.studerria-ribbon,
+.studerria-ribbon-glint {
+  border-radius: 999px;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.studerria-ribbon {
+  background:
+    linear-gradient(180deg, var(--bg-ribbon-inner), transparent 28%),
+    linear-gradient(102deg, var(--bg-ribbon-fill-a) 0%, var(--bg-ribbon-fill-b) 46%, rgba(19, 24, 43, 0.02) 100%);
+  border: 1px solid var(--bg-ribbon-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 30px var(--bg-ribbon-glow),
+    0 0 82px rgba(109, 77, 255, 0.06);
+  mix-blend-mode: screen;
+  opacity: 0.52;
+  filter: blur(2px);
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, transparent 35%, #000 42%, #000 58%, transparent 65%);
+  mask-image: radial-gradient(120% 100% at 50% 50%, transparent 35%, #000 42%, #000 58%, transparent 65%);
+}
+
+.studerria-ribbon::before,
+.studerria-ribbon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.studerria-ribbon::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 48%, transparent 100%);
+  opacity: 0.22;
+  filter: blur(8px);
+}
+
+.studerria-ribbon::after {
+  inset: 14%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0.18;
+  filter: blur(18px);
+}
+
+.studerria-ribbon--primary {
+  width: min(134vw, 2000px);
+  height: clamp(280px, 32vw, 560px);
+  left: -20vw;
+  top: 8vh;
+  transform: rotate(-13deg);
+}
+
+.studerria-ribbon--secondary {
+  width: min(118vw, 1780px);
+  height: clamp(250px, 28vw, 500px);
+  right: -16vw;
+  top: 44vh;
+  transform: rotate(14deg);
+  opacity: 0.6;
+  animation: dynamicRibbonFloat 56s ease-in-out infinite;
+}
+
+.studerria-ribbon-glint {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 49%, rgba(224, 206, 255, 0.66) 52%, transparent 100%);
+  filter: blur(16px);
+  mix-blend-mode: screen;
+  opacity: 0.16;
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, transparent 39%, #000 44%, #000 54%, transparent 59%);
+  mask-image: radial-gradient(120% 100% at 50% 50%, transparent 39%, #000 44%, #000 54%, transparent 59%);
+}
+
+.studerria-ribbon-glint--a {
+  width: min(136vw, 2040px);
+  height: clamp(260px, 31vw, 540px);
+  left: -22vw;
+  top: 9vh;
+  transform: rotate(-13deg);
+}
+
+.studerria-ribbon-glint--b {
+  width: min(118vw, 1780px);
+  height: clamp(242px, 27vw, 480px);
+  right: -16vw;
+  top: 46vh;
+  transform: rotate(14deg);
+  opacity: 0.12;
+}
+
+.studerria-star-dust {
+  inset: 0;
+  z-index: 2;
+  opacity: var(--bg-dust-opacity);
+  background:
+    radial-gradient(circle at 14% 18%, var(--bg-dust-color) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 22% 30%, var(--bg-dust-color) 0 1.1px, transparent 1.7px),
+    radial-gradient(circle at 38% 22%, var(--bg-dust-color) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 52% 36%, var(--bg-dust-color) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 68% 28%, var(--bg-dust-color) 0 1.1px, transparent 1.8px),
+    radial-gradient(circle at 74% 18%, var(--bg-dust-color) 0 0.9px, transparent 1.6px),
+    radial-gradient(circle at 82% 44%, var(--bg-dust-color) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 58% 62%, var(--bg-dust-color) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 34% 68%, var(--bg-dust-color) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 76% 72%, var(--bg-dust-color) 0 1px, transparent 1.8px);
+  animation: dynamicDustDrift 60s linear infinite;
 }
 
 .bg-morph-layer {
@@ -138,6 +287,38 @@ body.dynamic-bg-ready {
   }
   100% {
     transform: translate3d(-1.1%, 1.1%, 0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes dynamicRibbonDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0.6%, -1.8%, 0);
+  }
+}
+
+@keyframes dynamicRibbonFloat {
+  0%,
+  100% {
+    transform: rotate(14deg) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: rotate(12deg) translate3d(-0.8%, 1.6%, 0);
+  }
+}
+
+@keyframes dynamicDustDrift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-1.2%, 1.4%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -220,6 +401,26 @@ body.dynamic-bg-reduced .trail-char {
 }
 
 @media (max-width: 900px) {
+  .studerria-ambient-ribbons {
+    inset: -10% -22% -12%;
+  }
+
+  .studerria-ribbon--primary,
+  .studerria-ribbon-glint--a {
+    width: min(170vw, 1600px);
+    height: clamp(220px, 42vw, 380px);
+    left: -48vw;
+    top: 10vh;
+  }
+
+  .studerria-ribbon--secondary,
+  .studerria-ribbon-glint--b {
+    width: min(150vw, 1500px);
+    height: clamp(210px, 38vw, 360px);
+    right: -44vw;
+    top: 54vh;
+  }
+
   .dot-pattern {
     width: 68px;
     background-size: 8px 8px;
@@ -242,6 +443,11 @@ body.dynamic-bg-reduced .trail-char {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .studerria-ambient-ribbons,
+  .studerria-star-dust {
+    animation: none !important;
+  }
+
   .bg-blob {
     animation: none !important;
   }
