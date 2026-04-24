@@ -46,12 +46,13 @@ body.theme-dark.page-vision {
 }
 
 .vision-bg {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: -2;
   overflow: hidden;
   pointer-events: none;
-  transform: translateZ(0);
+  min-height: 100%;
+  height: auto;
 }
 
 .vision-gradient,
@@ -72,6 +73,33 @@ body.theme-dark.page-vision {
   background: var(--vision-base-gradient);
 }
 
+.vision-gradient::before,
+.vision-gradient::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.vision-gradient::before {
+  inset: 0;
+  background:
+    radial-gradient(54% 36% at 50% 9%, rgba(168, 178, 255, 0.18), transparent 72%),
+    radial-gradient(42% 28% at 18% 46%, rgba(126, 85, 255, 0.1), transparent 72%),
+    radial-gradient(44% 30% at 88% 38%, rgba(191, 93, 255, 0.1), transparent 74%);
+  opacity: 0.72;
+}
+
+.vision-gradient::after {
+  inset: min(8vw, 120px) 0 auto;
+  height: min(70vh, 820px);
+  background:
+    linear-gradient(115deg, transparent 0 22%, rgba(118, 95, 255, 0.06) 34%, rgba(231, 214, 255, 0.1) 46%, transparent 61%),
+    linear-gradient(164deg, transparent 0 38%, rgba(150, 84, 255, 0.08) 50%, rgba(255, 255, 255, 0.07) 54%, transparent 65%);
+  opacity: 0.62;
+  transform: skewY(-8deg);
+  filter: blur(0.2px);
+}
+
 .vision-bg::after {
   content: "";
   position: absolute;
@@ -84,11 +112,12 @@ body.theme-dark.page-vision {
 }
 
 .studerria-ambient-ribbons {
-  inset: -12% -14% -10%;
+  inset: 0 -10% auto;
+  height: min(1080px, 118svh);
   z-index: 2;
   opacity: var(--vision-ribbon-opacity);
   filter: saturate(1.04);
-  animation: visionRibbonDrift 42s ease-in-out infinite;
+  animation: visionRibbonDrift 72s ease-in-out infinite;
 }
 
 .studerria-ribbon,
@@ -100,18 +129,18 @@ body.theme-dark.page-vision {
 
 .studerria-ribbon {
   background:
-    linear-gradient(180deg, var(--vision-ribbon-inner), transparent 28%),
-    linear-gradient(102deg, var(--vision-ribbon-fill-a) 0%, var(--vision-ribbon-fill-b) 46%, rgba(19, 24, 43, 0.02) 100%);
+    linear-gradient(180deg, var(--vision-ribbon-inner), transparent 34%),
+    linear-gradient(102deg, rgba(255, 255, 255, 0.02) 0%, var(--vision-ribbon-fill-a) 28%, var(--vision-ribbon-fill-b) 54%, rgba(19, 24, 43, 0.02) 100%);
   border: 1px solid var(--vision-ribbon-edge);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 30px var(--vision-ribbon-glow),
-    0 0 82px rgba(109, 77, 255, 0.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 22px var(--vision-ribbon-glow),
+    0 0 64px rgba(109, 77, 255, 0.045);
   mix-blend-mode: screen;
-  opacity: 0.52;
-  filter: blur(2px);
-  -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, transparent 35%, #000 42%, #000 58%, transparent 65%);
-  mask-image: radial-gradient(120% 100% at 50% 50%, transparent 35%, #000 42%, #000 58%, transparent 65%);
+  opacity: 0.5;
+  filter: blur(0.8px);
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, transparent 32%, #000 40%, #000 58%, transparent 67%);
+  mask-image: radial-gradient(120% 100% at 50% 50%, transparent 32%, #000 40%, #000 58%, transparent 67%);
 }
 
 .studerria-ribbon::before,
@@ -124,60 +153,60 @@ body.theme-dark.page-vision {
 }
 
 .studerria-ribbon::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 48%, transparent 100%);
-  opacity: 0.22;
-  filter: blur(8px);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.22) 48%, transparent 100%);
+  opacity: 0.2;
+  filter: blur(4px);
 }
 
 .studerria-ribbon::after {
-  inset: 14%;
+  inset: 18%;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  opacity: 0.18;
-  filter: blur(18px);
+  opacity: 0.14;
+  filter: blur(12px);
 }
 
 .studerria-ribbon--primary {
-  width: min(134vw, 2000px);
-  height: clamp(280px, 32vw, 560px);
-  left: -20vw;
-  top: 8vh;
-  transform: rotate(-13deg);
+  width: min(132vw, 1960px);
+  height: clamp(250px, 28vw, 500px);
+  left: -24vw;
+  top: 4vh;
+  transform: rotate(-12deg);
 }
 
 .studerria-ribbon--secondary {
-  width: min(118vw, 1780px);
-  height: clamp(250px, 28vw, 500px);
-  right: -16vw;
-  top: 44vh;
-  transform: rotate(14deg);
-  opacity: 0.6;
-  animation: visionRibbonFloat 56s ease-in-out infinite;
+  width: min(124vw, 1840px);
+  height: clamp(230px, 25vw, 450px);
+  right: -18vw;
+  top: 42vh;
+  transform: rotate(12deg);
+  opacity: 0.56;
+  animation: visionRibbonFloat 82s ease-in-out infinite;
 }
 
 .studerria-ribbon-glint {
   background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 49%, rgba(224, 206, 255, 0.66) 52%, transparent 100%);
-  filter: blur(16px);
+  filter: blur(9px);
   mix-blend-mode: screen;
-  opacity: 0.16;
+  opacity: 0.14;
   -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, transparent 39%, #000 44%, #000 54%, transparent 59%);
   mask-image: radial-gradient(120% 100% at 50% 50%, transparent 39%, #000 44%, #000 54%, transparent 59%);
 }
 
 .studerria-ribbon-glint--a {
-  width: min(136vw, 2040px);
-  height: clamp(260px, 31vw, 540px);
-  left: -22vw;
-  top: 9vh;
-  transform: rotate(-13deg);
+  width: min(132vw, 1960px);
+  height: clamp(240px, 27vw, 480px);
+  left: -24vw;
+  top: 5vh;
+  transform: rotate(-12deg);
 }
 
 .studerria-ribbon-glint--b {
-  width: min(118vw, 1780px);
-  height: clamp(242px, 27vw, 480px);
-  right: -16vw;
-  top: 46vh;
-  transform: rotate(14deg);
-  opacity: 0.12;
+  width: min(124vw, 1840px);
+  height: clamp(220px, 24vw, 420px);
+  right: -18vw;
+  top: 44vh;
+  transform: rotate(12deg);
+  opacity: 0.1;
 }
 
 .studerria-star-dust {
@@ -200,22 +229,25 @@ body.theme-dark.page-vision {
 
 .ascii-fluid-canvas {
   --ascii-fluid-rgb: 214, 220, 255;
-  --ascii-fluid-opacity: 0.38;
-  inset: 0;
+  --ascii-fluid-opacity: 0.58;
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: auto;
   z-index: 4;
   width: 100%;
-  height: 100%;
+  height: min(1120px, 118svh);
   pointer-events: none;
   opacity: var(--ascii-fluid-opacity);
   mix-blend-mode: screen;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58%, rgba(0, 0, 0, 0.74) 80%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 58%, rgba(0, 0, 0, 0.74) 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 72%, rgba(0, 0, 0, 0.48) 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, rgba(0, 0, 0, 0.48) 88%, transparent 100%);
 }
 
 html[data-theme='light'] .ascii-fluid-canvas,
 body.theme-light .ascii-fluid-canvas {
   --ascii-fluid-rgb: 88, 84, 184;
-  --ascii-fluid-opacity: 0.22;
+  --ascii-fluid-opacity: 0.28;
   mix-blend-mode: multiply;
 }
 
