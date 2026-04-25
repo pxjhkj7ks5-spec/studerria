@@ -1,0 +1,47 @@
+<%
+  const activeSection = typeof active !== 'undefined' ? String(active) : 'home';
+  const navItems = [
+    { id: 'home', label: 'Головна', href: '/testhome', icon: 'home' },
+    { id: 'schedule', label: 'Розклад', href: '/testschedule', icon: 'calendar' },
+    { id: 'tasks', label: 'Завдання', href: '#tasks', icon: 'tasks' },
+    { id: 'materials', label: 'Матеріали', href: '#materials', icon: 'materials' },
+    { id: 'analytics', label: 'Аналітика', href: '#analytics', icon: 'analytics' }
+  ];
+%>
+<header class="td-topnav" aria-label="Studerria test navigation">
+  <a class="td-brand" href="/vision" aria-label="Studerria Design Lab">
+    <span class="td-brand-mark" aria-hidden="true">
+      <img src="/favicon.svg" alt="" />
+    </span>
+    <span>Studerria</span>
+  </a>
+  <nav class="td-navlinks" aria-label="Основна навігація">
+    <% navItems.forEach(function(item) { %>
+      <a
+        href="<%= item.href %>"
+        class="td-navlink <%= item.id === activeSection ? 'is-active' : '' %>"
+        <%= item.id === activeSection ? 'aria-current="page"' : '' %>
+      >
+        <%- include('test-icon', { name: item.icon, className: 'td-navlink-icon' }) %>
+        <span><%= item.label %></span>
+      </a>
+    <% }); %>
+  </nav>
+  <div class="td-nav-actions">
+    <label class="td-search" aria-label="Пошук">
+      <%- include('test-icon', { name: 'search', className: 'td-search-icon' }) %>
+      <input type="search" placeholder="Пошук..." />
+    </label>
+    <button class="td-icon-button" type="button" aria-label="Сповіщення">
+      <%- include('test-icon', { name: 'bell', className: 'td-button-icon' }) %>
+    </button>
+    <button class="td-user-chip" type="button" aria-label="Меню користувача">
+      <span class="td-avatar" aria-hidden="true">А</span>
+      <span class="td-user-copy">
+        <strong>Андрій</strong>
+        <small>Студент</small>
+      </span>
+      <%- include('test-icon', { name: 'chevronDown', className: 'td-chevron-icon' }) %>
+    </button>
+  </div>
+</header>

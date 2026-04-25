@@ -1,312 +1,77 @@
 <!doctype html>
-<html lang="<%= lang || 'uk' %>">
+<html lang="uk" data-theme="light">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
-    <title>Studerria Vision</title>
-    <link rel="stylesheet" href="/css/vision-bg.css" />
-    <%- include('partials/studerria-system-head') %>
+    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
+    <title>Studerria Design Lab</title>
+    <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
-  <body class="studerria-theme theme-dark page-vision" data-theme="dark">
-    <%- include('partials/theme-bootstrap-body') %>
-    <%- include('partials/vision-bg') %>
-
-    <div class="vision-shell">
-      <header class="vision-header st-nav" data-ascii-safe>
-        <a href="/" class="vision-logo" aria-label="Studerria home">
-          <img src="/favicon-dark.png" alt="" class="vision-logo-mark vision-logo-mark--dark" />
-          <img src="/favicon-light.png" alt="" class="vision-logo-mark vision-logo-mark--light" />
-          <span>STUDERRIA</span>
+  <body class="td-page td-page--hub" data-theme="light">
+    <main class="td-hub-shell" aria-label="Studerria design experiments">
+      <header class="td-hub-hero td-glass-panel">
+        <a class="td-hub-brand" href="/vision" aria-label="Studerria">
+          <span class="td-hub-mark" aria-hidden="true">
+            <img src="/favicon.svg" alt="" />
+          </span>
+          <span>Studerria</span>
         </a>
-        <nav class="vision-nav" aria-label="Design system sections">
-          <a href="#schedule">Розклад</a>
-          <a href="#admin">Адмінка</a>
-          <a href="#login">Логін</a>
-          <a href="#profile">Профіль</a>
-        </nav>
-        <div class="vision-header-actions">
-          <button
-            type="button"
-            class="theme-toggle"
-            id="visionThemeToggle"
-            data-light-label="Світла"
-            data-dark-label="Темна"
-            aria-label="Toggle theme"
-          >
-            Світла
-          </button>
-          <a class="signup-btn" href="/login">Open app</a>
-        </div>
+        <p class="td-eyebrow">Design experiment</p>
+        <h1>Studerria Design Lab</h1>
+        <p>
+          Apple-inspired redesign experiments for a calm academic workspace:
+          violet primary actions, glass surfaces, top navigation, and soft
+          blue-lavender light mode.
+        </p>
       </header>
 
-      <main class="vision-main">
-        <section class="vision-hero" id="visionHero" aria-label="Studerria hero">
-          <div class="vision-hero-copy ascii-overlay-safe" data-ascii-safe>
-            <div class="vision-hero-brand">
-              <div class="vision-hero-brand-mark" aria-hidden="true">
-                <img src="/favicon-dark.png" alt="" class="vision-hero-logo vision-hero-logo--dark" />
-                <img src="/favicon-light.png" alt="" class="vision-hero-logo vision-hero-logo--light" />
-              </div>
-              <span class="vision-hero-wordmark">STUDERRIA</span>
-            </div>
-            <p class="st-kicker">Studerria product surface</p>
-            <h1>Спокійний інтерфейс для навчання щодня.</h1>
-            <p class="vision-hero-body">
-              Один візуальний шар для логіну, розкладу, адмінки й профілю: чиста ієрархія, м’який glass-material і
-              стриманий cursor-driven ASCII фон без зайвого шуму.
-            </p>
-            <div class="vision-hero-actions" data-ascii-safe>
-              <a class="signup-btn vision-hero-cta" href="/login">Open app</a>
-            </div>
-          </div>
+      <section class="td-hub-grid" aria-label="Test pages">
+        <a class="td-hub-card td-surface-card" href="/testlogin">
+          <span class="td-card-icon">
+            <%- include('partials/test-icon', { name: 'lock', className: 'td-card-svg' }) %>
+          </span>
+          <span class="td-hub-card-copy">
+            <strong>Login concept</strong>
+            <small>Clean centered sign-in card with premium glass details.</small>
+          </span>
+          <%- include('partials/test-icon', { name: 'arrowRight', className: 'td-hub-arrow' }) %>
+        </a>
 
-          <div class="vision-hero-preview-wrap ascii-overlay-safe" data-ascii-safe>
-            <article class="vision-hero-preview st-surface-elevated" aria-label="Studerria dashboard preview">
-              <div class="vision-preview-topbar">
-                <div class="vision-preview-brand">
-                  <img src="/favicon-dark.png" alt="" class="vision-preview-logo vision-preview-logo--dark" />
-                  <img src="/favicon-light.png" alt="" class="vision-preview-logo vision-preview-logo--light" />
-                  <span>Studerria</span>
-                </div>
-                <div class="vision-preview-search">
-                  <span aria-hidden="true">⌘K</span>
-                  <span>Search anything…</span>
-                </div>
-                <span class="vision-preview-pill">Vision</span>
-              </div>
+        <a class="td-hub-card td-surface-card" href="/testhome">
+          <span class="td-card-icon">
+            <%- include('partials/test-icon', { name: 'home', className: 'td-card-svg' }) %>
+          </span>
+          <span class="td-hub-card-copy">
+            <strong>Home concept</strong>
+            <small>Dashboard with top navbar, stats, tasks, progress, and AI strip.</small>
+          </span>
+          <%- include('partials/test-icon', { name: 'arrowRight', className: 'td-hub-arrow' }) %>
+        </a>
 
-              <div class="vision-preview-grid">
-                <aside class="vision-preview-sidebar">
-                  <div class="vision-preview-sidebar-item is-active">Vision</div>
-                  <div class="vision-preview-sidebar-item">Schedule</div>
-                  <div class="vision-preview-sidebar-item">Tasks</div>
-                  <div class="vision-preview-sidebar-item">Messages</div>
-                  <div class="vision-preview-sidebar-item">Profile</div>
-                </aside>
+        <a class="td-hub-card td-surface-card" href="/testschedule">
+          <span class="td-card-icon">
+            <%- include('partials/test-icon', { name: 'calendar', className: 'td-card-svg' }) %>
+          </span>
+          <span class="td-hub-card-copy">
+            <strong>Schedule concept</strong>
+            <small>Weekly calendar grid with soft event blocks and visible rhythm.</small>
+          </span>
+          <%- include('partials/test-icon', { name: 'arrowRight', className: 'td-hub-arrow' }) %>
+        </a>
+      </section>
 
-                <div class="vision-preview-content">
-                  <div class="vision-preview-intro">
-                    <div>
-                      <p class="st-kicker">Morning overview</p>
-                      <h2>Good morning, Andrii</h2>
-                    </div>
-                    <p>Один спокійний dashboard з чистою ієрархією, м’яким glow і системними surfaces.</p>
-                  </div>
-
-                  <div class="vision-preview-metrics">
-                    <article><span>Classes today</span><strong>4</strong><em>+1 from yesterday</em></article>
-                    <article><span>Study time</span><strong>5h 30m</strong><em>+1h 20m</em></article>
-                    <article><span>AI insights</span><strong>12</strong><em>New recommendations</em></article>
-                    <article><span>Tasks done</span><strong>8</strong><em>Steady cadence</em></article>
-                  </div>
-
-                  <div class="vision-preview-panels">
-                    <article class="vision-preview-schedule">
-                      <header>
-                        <h3>Today’s schedule</h3>
-                        <span class="st-pill">View full schedule</span>
-                      </header>
-                      <div class="vision-preview-rows">
-                        <div><span>09:00</span><strong>Mathematics</strong><em>Lecture · Room 201</em></div>
-                        <div><span>11:00</span><strong>Physics</strong><em>Lecture · Room 305</em></div>
-                        <div><span>13:00</span><strong>Computer Science</strong><em>Lab · Room 118</em></div>
-                      </div>
-                    </article>
-
-                    <article class="vision-preview-assistant">
-                      <span class="vision-preview-spark">✦</span>
-                      <h3>AI Study Assistant</h3>
-                      <p>You’ve been focusing well. Review Calculus basics before tomorrow’s class.</p>
-                      <a href="/login" class="signup-btn">Ask AI anything</a>
-                    </article>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section class="vision-samples" aria-label="Studerria surface samples">
-          <div class="vision-section-head ascii-overlay-safe" data-ascii-safe>
-            <div>
-              <p class="st-kicker">Surface samples</p>
-              <h2>Reusable product primitives below the hero.</h2>
-            </div>
-            <p class="vision-section-copy">
-              Тут уже не концепт-hero, а приклади реальних поверхонь: читабельні, щільні там де треба і спокійні в обох темах.
-            </p>
-          </div>
-
-          <div class="vision-reference-grid">
-            <article class="vision-product-panel vision-product-panel--schedule" id="schedule" aria-label="Schedule reference">
-              <header class="vision-showcase-head">
-                <div>
-                  <p class="st-kicker">Навчання</p>
-                  <h2 class="st-title">Тиждень 14</h2>
-                </div>
-                <div class="vision-control-cluster">
-                  <span class="st-badge">Сьогодні</span>
-                  <span class="vision-icon-pill" aria-hidden="true">‹</span>
-                  <span class="vision-icon-pill" aria-hidden="true">›</span>
-                </div>
-              </header>
-
-              <div class="vision-days" aria-label="Week cards">
-                <div class="vision-day is-active"><strong>Пн</strong><span>14 квіт · 4 пари</span></div>
-                <div class="vision-day"><strong>Вт</strong><span>15 квіт · 4 пари</span></div>
-                <div class="vision-day"><strong>Ср</strong><span>16 квіт · 3 пари</span></div>
-                <div class="vision-day"><strong>Чт</strong><span>17 квіт · 5 пар</span></div>
-                <div class="vision-day"><strong>Пт</strong><span>18 квіт · 4 пари</span></div>
-                <div class="vision-day"><strong>Сб</strong><span>19 квіт · —</span></div>
-                <div class="vision-day"><strong>Нд</strong><span>20 квіт · —</span></div>
-              </div>
-
-              <div class="vision-lessons">
-                <article class="vision-lesson">
-                  <div class="vision-lesson-number">1</div>
-                  <div>
-                    <h3>Правознавство</h3>
-                    <p>10:00 - 11:20 · група 1 · ауд. 201</p>
-                  </div>
-                  <span class="st-badge">Лекція</span>
-                </article>
-                <article class="vision-lesson">
-                  <div class="vision-lesson-number">2</div>
-                  <div>
-                    <h3>Політологія</h3>
-                    <p>11:40 - 13:00 · група 2 · ауд. 305</p>
-                  </div>
-                  <span class="st-badge">Семінар</span>
-                </article>
-                <article class="vision-lesson">
-                  <div class="vision-lesson-number">3</div>
-                  <div>
-                    <h3>Іноземна мова</h3>
-                    <p>15:10 - 16:30 · група 3 · ауд. 409</p>
-                  </div>
-                  <span class="st-badge">Практика</span>
-                </article>
-              </div>
-            </article>
-
-            <article class="vision-product-panel vision-product-panel--admin" id="admin" aria-label="Admin reference">
-              <header class="vision-showcase-head">
-                <div>
-                  <p class="st-kicker">Control center</p>
-                  <h2 class="st-title">Адмін-панель</h2>
-                </div>
-                <span class="vision-status-pill">Session OK</span>
-              </header>
-
-              <div class="vision-admin-layout">
-                <aside class="vision-admin-sidebar" aria-label="Admin sidebar preview">
-                  <span class="vision-select">ППБД 25 Київ</span>
-                  <a class="is-active" href="#admin">Overview</a>
-                  <a href="#admin">Academic Setup</a>
-                  <a href="#admin">Import/Export</a>
-                  <a href="#admin">Homework</a>
-                  <a href="#admin">Messages</a>
-                </aside>
-                <div class="vision-admin-content">
-                  <div class="vision-metrics">
-                    <div><span>Users</span><strong>30</strong></div>
-                    <div><span>Subjects</span><strong>8</strong></div>
-                    <div><span>Homework</span><strong>0</strong></div>
-                  </div>
-                  <div class="vision-tools">
-                    <span>Генератор розкладу</span>
-                    <span>Генератор сесій</span>
-                    <span>Import/Export</span>
-                  </div>
-                  <div class="vision-nearest">
-                    <h3>Найближчі пари</h3>
-                    <p>Сьогодні, 10:00 - 11:20 · Правознавство · ауд. 201</p>
-                    <p>Сьогодні, 11:40 - 13:00 · Політологія · ауд. 305</p>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article class="vision-product-panel vision-product-panel--login" id="login" aria-label="Login reference">
-              <div class="vision-auth-card">
-                <img src="/favicon-dark.png" alt="" class="vision-auth-logo vision-auth-logo--dark" />
-                <img src="/favicon-light.png" alt="" class="vision-auth-logo vision-auth-logo--light" />
-                <p class="vision-auth-wordmark">STUDERRIA</p>
-                <h2>Ласкаво просимо</h2>
-                <label>
-                  <span>Email або імʼя користувача</span>
-                  <input type="text" value="" aria-label="Email або імʼя користувача" />
-                </label>
-                <label>
-                  <span>Пароль</span>
-                  <input type="password" value="studerria" aria-label="Пароль" />
-                </label>
-                <button type="button">Увійти</button>
-              </div>
-            </article>
-
-            <article class="vision-profile-card" id="profile">
-              <header>
-                <div class="avatar" aria-hidden="true">MA</div>
-                <div>
-                  <p class="st-kicker">Profile</p>
-                  <h2>Редагування профілю</h2>
-                </div>
-              </header>
-              <div class="vision-profile-stats">
-                <span><strong>1</strong>Додано ДЗ</span>
-                <span><strong>0</strong>Командні</span>
-                <span><strong>0</strong>Бали</span>
-              </div>
-              <label>
-                <span>ПІБ</span>
-                <input type="text" value="Марченко Андрій" aria-label="ПІБ" />
-              </label>
-              <button type="button">Зберегти</button>
-            </article>
-          </div>
-        </section>
-
-        <section class="vision-brand-lab" aria-label="Logo and design system usage">
-          <article class="vision-brand-card">
-            <p class="st-kicker">Logo usage</p>
-            <div class="vision-logo-pair">
-              <img src="/favicon-dark.png" alt="" />
-              <div>
-                <strong>Variant 1</strong>
-                <span>Навігація, бейджі, favicon, компактні UI-елементи.</span>
-              </div>
-            </div>
-            <div class="vision-logo-pair">
-              <img src="/favicon-light.png" alt="" />
-              <div>
-                <strong>Variant 2</strong>
-                <span>Логін, hero, заставки і виразні бренд-поверхні.</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="vision-primitive-board">
-            <div class="vision-primitive vision-primitive--wide">
-              <div>
-                <strong>Page background</strong>
-                <span>Deep indigo base, restrained ribbons, low-density dust and a hero-scoped ASCII layer.</span>
-              </div>
-              <span class="st-pill">Dark + Light</span>
-            </div>
-            <div class="vision-primitive-grid">
-              <article class="vision-primitive"><strong>Liquid surface</strong><span>For nav, hero card, auth and elevated focus panels.</span></article>
-              <article class="vision-primitive"><strong>Data surface</strong><span>More opaque cards for schedule rows, lists and dense control centers.</span></article>
-              <article class="vision-primitive"><strong>Pills + badges</strong><span>One rounded system with restrained tint, border and readable contrast.</span></article>
-              <article class="vision-primitive"><strong>Inputs + CTA</strong><span>Quiet outlines, visible focus rings and one premium gradient family.</span></article>
-            </div>
-          </article>
-        </section>
-      </main>
-    </div>
-
-    <script src="/js/vision-bg.js" defer></script>
+      <section class="td-system-panel td-glass-panel" aria-label="Design system notes">
+        <div>
+          <p class="td-eyebrow">System direction</p>
+          <h2>Liquid minimal Studerria</h2>
+        </div>
+        <div class="td-system-list">
+          <span>Violet primary actions</span>
+          <span>Apple-like top navigation</span>
+          <span>Soft glass surfaces</span>
+          <span>Calm academic workspace</span>
+        </div>
+      </section>
+    </main>
   </body>
 </html>

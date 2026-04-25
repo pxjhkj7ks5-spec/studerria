@@ -18539,7 +18539,19 @@ app.post('/help/support', requireLogin, writeLimiter, async (req, res) => {
 });
 
 app.get('/vision', (req, res) => {
-  res.render('vision');
+  res.render('vision', { layout: false });
+});
+
+app.get('/testlogin', (req, res) => {
+  res.render('testlogin', { layout: false });
+});
+
+app.get('/testhome', (req, res) => {
+  res.render('testhome', { layout: false });
+});
+
+app.get('/testschedule', (req, res) => {
+  res.render('testschedule', { layout: false });
 });
 
 app.get('/briefcase', (req, res) => {
