@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/test-theme-head') %>
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <title>Studerria · Test Schedule</title>
     <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
@@ -151,5 +152,6 @@
         </main>
       </section>
     </div>
+    <script src="/js/test-design.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

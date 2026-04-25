@@ -1,0 +1,17 @@
+<%
+  const markClass = typeof className !== 'undefined' ? String(className) : 'td-brand-glyph';
+  const gradientId = `td-brand-gradient-${Math.random().toString(36).slice(2, 10)}`;
+%>
+<svg class="<%= markClass %>" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="<%= gradientId %>" x1="10" y1="54" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b7cfa" />
+      <stop offset="0.52" stop-color="#7c3aed" />
+      <stop offset="1" stop-color="#f08be8" />
+    </linearGradient>
+  </defs>
+  <path class="td-brand-glyph__plate" fill="url(#<%= gradientId %>)" d="M16 15.5 39.5 2a15 15 0 0 1 22.5 13v18.5a15 15 0 0 1-7.5 13L31 60a15 15 0 0 1-22.5-13V28.5a15 15 0 0 1 7.5-13Z" />
+  <path class="td-brand-glyph__cut" d="M47 19 25.5 31.5c-6.4 3.7-6.4 12.9.1 16.5 4.2 2.3 9.2 1.4 13.1-.9L47 42" />
+  <path class="td-brand-glyph__mark" stroke="url(#<%= gradientId %>)" d="M44 11 19.5 25.2c-8.2 4.8-8.2 16.8 0 21.6 6 3.5 12.6 2.7 18.5-.7L45 42" />
+  <path class="td-brand-glyph__mark" stroke="url(#<%= gradientId %>)" d="M20 53 44.5 38.8c8.2-4.8 8.2-16.8 0-21.6-6-3.5-12.6-2.7-18.5.7L19 22" />
+</svg>

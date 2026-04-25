@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/test-theme-head') %>
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <title>Studerria Design Lab</title>
     <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
@@ -12,10 +13,15 @@
       <header class="td-hub-hero td-glass-panel">
         <a class="td-hub-brand" href="/vision" aria-label="Studerria">
           <span class="td-hub-mark" aria-hidden="true">
-            <img src="/favicon.svg" alt="" />
+            <%- include('partials/test-brand-mark', { className: 'td-brand-glyph' }) %>
           </span>
           <span>Studerria</span>
         </a>
+        <button class="td-theme-toggle td-hub-theme-toggle" type="button" data-theme-toggle aria-label="Увімкнути темну тему" aria-pressed="false">
+          <%- include('partials/test-icon', { name: 'moon', className: 'td-button-icon td-theme-moon' }) %>
+          <%- include('partials/test-icon', { name: 'sun', className: 'td-button-icon td-theme-sun' }) %>
+          <span data-theme-label>Dark</span>
+        </button>
         <p class="td-eyebrow">Design experiment</p>
         <h1>Studerria Design Lab</h1>
         <p>
@@ -73,5 +79,6 @@
         </div>
       </section>
     </main>
+    <script src="/js/test-design.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

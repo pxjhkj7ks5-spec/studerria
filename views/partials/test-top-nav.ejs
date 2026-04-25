@@ -11,7 +11,7 @@
 <header class="td-topnav" aria-label="Studerria test navigation">
   <a class="td-brand" href="/vision" aria-label="Studerria Design Lab">
     <span class="td-brand-mark" aria-hidden="true">
-      <img src="/favicon.svg" alt="" />
+      <%- include('test-brand-mark', { className: 'td-brand-glyph' }) %>
     </span>
     <span>Studerria</span>
   </a>
@@ -34,6 +34,10 @@
     </label>
     <button class="td-icon-button" type="button" aria-label="Сповіщення">
       <%- include('test-icon', { name: 'bell', className: 'td-button-icon' }) %>
+    </button>
+    <button class="td-icon-button td-theme-toggle" type="button" data-theme-toggle aria-label="Увімкнути темну тему" aria-pressed="false">
+      <%- include('test-icon', { name: 'moon', className: 'td-button-icon td-theme-moon' }) %>
+      <%- include('test-icon', { name: 'sun', className: 'td-button-icon td-theme-sun' }) %>
     </button>
     <button class="td-user-chip" type="button" aria-label="Меню користувача">
       <span class="td-avatar" aria-hidden="true">А</span>

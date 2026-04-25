@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/test-theme-head') %>
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <title>Studerria · Test Login</title>
     <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
@@ -11,7 +12,7 @@
     <main class="td-login-main">
       <section class="td-login-brand" aria-label="Studerria">
         <span class="td-login-logo" aria-hidden="true">
-          <img src="/favicon.svg" alt="" />
+          <%- include('partials/test-brand-mark', { className: 'td-brand-glyph td-brand-glyph--login' }) %>
         </span>
         <span class="td-login-wordmark">STUDERRIA</span>
         <p>Платформа для сучасних студентів</p>
@@ -72,10 +73,16 @@
 
     <footer class="td-login-footer">
       <button type="button" class="td-language-pill">UA <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
+      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="Увімкнути темну тему" aria-pressed="false">
+        <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
+        <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
+        <span data-theme-label>Dark</span>
+      </button>
       <a href="#support">Підтримка</a>
       <a href="#terms">Умови використання</a>
       <a href="#privacy">Політика конфіденційності</a>
       <span>© Studerria 2024</span>
     </footer>
+    <script src="/js/test-design.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
