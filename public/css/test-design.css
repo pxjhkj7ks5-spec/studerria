@@ -2757,8 +2757,9 @@ html[data-theme="dark"] .td-language-pill,
 html[data-theme="dark"] .td-user-chip,
 html[data-theme="dark"] .td-hub-theme-toggle {
   color: var(--td-text-soft);
-  border-color: rgba(226, 232, 240, 0.12);
+  border-color: rgba(139, 164, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
 }
 
 html[data-theme="dark"] .td-primary-button::before,
@@ -2780,11 +2781,11 @@ html[data-theme="dark"] .td-language-pill:hover,
 html[data-theme="dark"] .td-user-chip:hover,
 html[data-theme="dark"] .td-hub-theme-toggle:hover {
   color: #ddd6fe;
-  border-color: rgba(196, 181, 253, 0.22);
+  border-color: rgba(139, 164, 255, 0.22);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.095), rgba(124, 58, 237, 0.18)),
     rgba(124, 58, 237, 0.18);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.035) inset;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
 }
 
 html[data-theme="dark"] .td-search input,
@@ -2820,7 +2821,7 @@ html[data-theme="dark"] .td-empty-state,
 html[data-theme="dark"] .td-lesson-card,
 html[data-theme="dark"] .td-overview-grid span,
 html[data-theme="dark"] .td-homework-item {
-  border-color: rgba(226, 232, 240, 0.1);
+  border-color: rgba(139, 164, 255, 0.1);
   background: rgba(255, 255, 255, 0.055);
 }
 
@@ -2835,7 +2836,7 @@ html[data-theme="dark"] .td-empty-state {
 
 html[data-theme="dark"] .td-day-pill:hover,
 html[data-theme="dark"] .td-lesson-card:hover {
-  border-color: rgba(139, 164, 255, 0.2);
+  border-color: rgba(139, 164, 255, 0.16);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.045)),
     rgba(255, 255, 255, 0.075);
@@ -2844,11 +2845,19 @@ html[data-theme="dark"] .td-lesson-card:hover {
 html[data-theme="dark"] .td-day-pill.is-active,
 html[data-theme="dark"] .td-lesson-card.is-now {
   color: #dbe4ff;
-  border-color: rgba(139, 164, 255, 0.28);
+  border-color: rgba(139, 164, 255, 0.2);
   background:
     linear-gradient(135deg, rgba(98, 117, 255, 0.2), rgba(167, 139, 250, 0.11)),
     rgba(255, 255, 255, 0.055);
   box-shadow: 0 18px 44px rgba(98, 117, 255, 0.11);
+}
+
+html[data-theme="dark"] .td-day-pill {
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .td-day-pill:hover {
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
 }
 
 html[data-theme="dark"] .td-live-pill,
