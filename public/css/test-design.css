@@ -2761,6 +2761,18 @@ html[data-theme="dark"] .td-hub-theme-toggle {
   background: rgba(255, 255, 255, 0.06);
 }
 
+html[data-theme="dark"] .td-primary-button::before,
+html[data-theme="dark"] .td-secondary-button::before,
+html[data-theme="dark"] .td-small-button::before,
+html[data-theme="dark"] .td-icon-button::before,
+html[data-theme="dark"] .td-arrow-button::before,
+html[data-theme="dark"] .td-language-pill::before,
+html[data-theme="dark"] .td-user-chip::before,
+html[data-theme="dark"] .td-day-pill::before {
+  background: linear-gradient(135deg, rgba(139, 164, 255, 0.11), rgba(167, 139, 250, 0.08));
+  transform: none;
+}
+
 html[data-theme="dark"] .td-secondary-button:hover,
 html[data-theme="dark"] .td-small-button:hover,
 html[data-theme="dark"] .td-icon-button:hover,
