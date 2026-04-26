@@ -43,6 +43,7 @@ body {
 
 body.td-page {
   position: relative;
+  isolation: isolate;
   min-width: 0;
   min-height: 100vh;
   overflow-x: hidden;
@@ -62,13 +63,27 @@ body.td-page::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
   opacity: 0.18;
   background-image:
     linear-gradient(rgba(120, 130, 170, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(120, 130, 170, 0.07) 1px, transparent 1px);
   background-size: 42px 42px;
   mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 78%, transparent 100%);
+}
+
+.td-codex-cursor-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  opacity: 0.36;
+  color: rgba(78, 96, 198, 0.58);
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  contain: strict;
 }
 
 a {
@@ -104,6 +119,14 @@ button {
   background: var(--td-surface);
   box-shadow: var(--td-shadow);
   backdrop-filter: blur(14px) saturate(1.08);
+}
+
+.td-hub-shell,
+.td-login-main,
+.td-login-footer,
+.td-app-shell {
+  position: relative;
+  z-index: 1;
 }
 
 .td-surface-card {
@@ -2403,6 +2426,10 @@ body[data-theme="dark"] .td-brand-logo--dark {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+
+  .td-codex-cursor-canvas {
+    display: none;
+  }
 }
 
 html[data-theme="dark"] {
@@ -2435,6 +2462,12 @@ html[data-theme="dark"] body.td-page::before {
   background-image:
     linear-gradient(rgba(226, 232, 240, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(226, 232, 240, 0.06) 1px, transparent 1px);
+}
+
+html[data-theme="dark"] .td-codex-cursor-canvas {
+  opacity: 0.34;
+  color: rgba(191, 169, 255, 0.72);
+  mix-blend-mode: screen;
 }
 
 html[data-theme="dark"] .td-topnav {
