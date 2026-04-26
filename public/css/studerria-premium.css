@@ -184,36 +184,14 @@ body.page-vision::after {
   display: none;
 }
 
+body.studerria-theme.dynamic-bg-ready::before,
+body.studerria-theme.dynamic-bg-ready::after {
+  display: none;
+}
+
 body.theme-light.studerria-theme::after,
 body.theme-light.page-vision::after {
   opacity: 0.36;
-}
-
-#dynamic-bg .gradient-layer,
-.vision-gradient {
-  background: var(--st-page-gradient) !important;
-}
-
-#dynamic-bg .morph-blob,
-.vision-bg .morph-blob {
-  opacity: 0.16 !important;
-}
-
-body.theme-light #dynamic-bg .morph-blob,
-body.theme-light .vision-bg .morph-blob {
-  opacity: 0.09 !important;
-}
-
-#dynamic-bg .noise-overlay,
-.vision-bg .noise-overlay,
-#dynamic-bg .dot-pattern,
-.vision-bg .dot-pattern {
-  opacity: 0.018 !important;
-}
-
-#dynamic-bg .mouse-highlight,
-.vision-bg .mouse-trail {
-  opacity: 0.24;
 }
 
 .st-shell {

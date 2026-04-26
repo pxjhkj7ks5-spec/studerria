@@ -278,6 +278,7 @@ html[data-theme="dark"] .td-page .td-theme-toggle .td-theme-sun {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  overflow: hidden;
   border: 1px solid rgba(124, 58, 237, 0.16);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(243, 232, 255, 0.62));
 }
@@ -293,12 +294,13 @@ html[data-theme="dark"] .td-page .td-theme-toggle .td-theme-sun {
   width: 31px;
   height: 31px;
   border: 0;
-  border-radius: 0;
+  border-radius: 9px;
   background: transparent;
   box-shadow: none;
 }
 
-.td-brand .td-brand-glyph {
+.td-brand .td-brand-glyph,
+.td-brand-logo {
   width: 100%;
   height: 100%;
 }
@@ -307,28 +309,33 @@ html[data-theme="dark"] .td-page .td-theme-toggle .td-theme-sun {
   display: block;
   width: 72%;
   height: 72%;
-  overflow: visible;
+  border-radius: inherit;
+  object-fit: contain;
+}
+
+.td-brand-logo {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.td-brand-logo--dark {
+  display: none;
+}
+
+html[data-theme="dark"] .td-brand-logo--light,
+body[data-theme="dark"] .td-brand-logo--light {
+  display: none;
+}
+
+html[data-theme="dark"] .td-brand-logo--dark,
+body[data-theme="dark"] .td-brand-logo--dark {
+  display: block;
 }
 
 .td-brand-glyph--login {
-  width: 70%;
-  height: 70%;
-}
-
-.td-brand-glyph__segment {
-  fill: none;
-  stroke-width: 24;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.td-brand-glyph__cutout {
-  fill: none;
-  stroke: #000;
-  stroke-width: 12.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  width: 100%;
+  height: 100%;
 }
 
 .td-hub-hero h1 {

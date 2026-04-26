@@ -1,462 +1,257 @@
 :root {
-  --bg-base: linear-gradient(135deg, #eef2ff 0%, #e8edff 50%, #e0e7ff 100%);
-  --bg-side-left: rgba(99, 102, 241, 0.24);
-  --bg-side-right: rgba(168, 85, 247, 0.22);
-  --bg-center-soft: rgba(236, 72, 153, 0.12);
-
-  --morph-primary-a: rgba(129, 140, 248, 0.58);
-  --morph-primary-b: rgba(139, 92, 246, 0.54);
-  --morph-primary-c: rgba(168, 85, 247, 0.5);
-  --morph-secondary-a: rgba(56, 189, 248, 0.42);
-  --morph-secondary-b: rgba(99, 102, 241, 0.5);
-  --morph-secondary-c: rgba(147, 197, 253, 0.38);
-  --morph-opacity-primary: 0.2;
-  --morph-opacity-secondary: 0.17;
-
-  --highlight-opacity: 0.3;
-  --noise-opacity: 0.04;
-  --dot-opacity: 0.045;
-  --dot-color: #cbd5e1;
-  --trail-color: rgba(55, 48, 163, 0.42);
-  --trail-shadow: rgba(79, 70, 229, 0.26);
-  --trail-blend-mode: multiply;
-  --bg-ribbon-fill-a: var(--st-ribbon-fill-a, rgba(126, 126, 255, 0.16));
-  --bg-ribbon-fill-b: var(--st-ribbon-fill-b, rgba(180, 136, 255, 0.22));
-  --bg-ribbon-edge: var(--st-ribbon-edge, rgba(255, 255, 255, 0.16));
-  --bg-ribbon-inner: var(--st-ribbon-inner, rgba(255, 255, 255, 0.18));
-  --bg-ribbon-glow: var(--st-ribbon-glow, rgba(156, 134, 255, 0.18));
-  --bg-ribbon-opacity: 0.5;
-  --bg-dust-opacity: var(--st-dust-opacity, 0.16);
-  --bg-dust-color: rgba(96, 94, 186, 0.5);
+  --product-bg-base:
+    radial-gradient(1100px 760px at 20% 14%, rgba(103, 92, 255, 0.13), transparent 62%),
+    radial-gradient(900px 680px at 84% 44%, rgba(198, 91, 255, 0.1), transparent 62%),
+    linear-gradient(180deg, #050711 0%, #070918 42%, #080d1b 72%, #070913 100%);
+  --product-bg-center-scrim:
+    radial-gradient(760px 520px at 50% 28%, rgba(4, 6, 16, 0.34), transparent 78%);
+  --product-ribbon-blue: rgba(91, 116, 255, 0.18);
+  --product-ribbon-purple: rgba(127, 69, 255, 0.24);
+  --product-ribbon-pink: rgba(222, 86, 255, 0.17);
+  --product-ribbon-edge: rgba(191, 170, 255, 0.28);
+  --product-ribbon-edge-hot: rgba(250, 239, 255, 0.52);
+  --product-ribbon-transparent: rgba(100, 80, 255, 0);
+  --product-texture-dot: rgba(221, 216, 255, 0.44);
+  --product-texture-opacity: 0.12;
+  --product-ribbon-opacity: 0.72;
+  --product-ribbon-top: 18px;
+  --product-ribbon-width: max(1480px, 116vw);
+  --product-ribbon-height: min(980px, 116svh);
 }
 
-html[data-theme='dark'],
-body[data-theme='dark'],
-body.theme-dark {
-  --bg-base: linear-gradient(135deg, #1e1b4b 0%, #221a5a 50%, #251b67 100%);
-  --bg-side-left: rgba(67, 56, 202, 0.32);
-  --bg-side-right: rgba(124, 58, 237, 0.3);
-  --bg-center-soft: rgba(59, 130, 246, 0.16);
-
-  --morph-primary-a: rgba(99, 102, 241, 0.7);
-  --morph-primary-b: rgba(139, 92, 246, 0.64);
-  --morph-primary-c: rgba(168, 85, 247, 0.6);
-  --morph-secondary-a: rgba(59, 130, 246, 0.5);
-  --morph-secondary-b: rgba(99, 102, 241, 0.56);
-  --morph-secondary-c: rgba(124, 58, 237, 0.48);
-  --morph-opacity-primary: 0.35;
-  --morph-opacity-secondary: 0.3;
-
-  --highlight-opacity: 0.26;
-  --noise-opacity: 0.045;
-  --dot-opacity: 0.04;
-  --dot-color: #6366f1;
-  --trail-color: rgba(165, 180, 252, 0.44);
-  --trail-shadow: rgba(129, 140, 248, 0.24);
-  --trail-blend-mode: screen;
-  --bg-ribbon-fill-a: var(--st-ribbon-fill-a, rgba(96, 110, 255, 0.22));
-  --bg-ribbon-fill-b: var(--st-ribbon-fill-b, rgba(182, 98, 255, 0.28));
-  --bg-ribbon-edge: var(--st-ribbon-edge, rgba(219, 210, 255, 0.18));
-  --bg-ribbon-inner: var(--st-ribbon-inner, rgba(255, 255, 255, 0.18));
-  --bg-ribbon-glow: var(--st-ribbon-glow, rgba(126, 78, 255, 0.2));
-  --bg-ribbon-opacity: 0.68;
-  --bg-dust-opacity: var(--st-dust-opacity, 0.22);
-  --bg-dust-color: rgba(218, 216, 255, 0.58);
-}
-
-html[data-theme='light'],
-body[data-theme='light'],
+html[data-theme="light"],
+body[data-theme="light"],
 body.theme-light {
-  --bg-base: linear-gradient(135deg, #eef2ff 0%, #e8edff 50%, #e0e7ff 100%);
+  --product-bg-base:
+    radial-gradient(1120px 780px at 20% 12%, rgba(128, 148, 255, 0.16), transparent 64%),
+    radial-gradient(900px 680px at 84% 46%, rgba(200, 151, 255, 0.12), transparent 62%),
+    linear-gradient(180deg, #fcfdff 0%, #f6f8ff 44%, #eff3ff 100%);
+  --product-bg-center-scrim:
+    radial-gradient(760px 520px at 50% 28%, rgba(255, 255, 255, 0.5), transparent 78%);
+  --product-ribbon-blue: rgba(106, 126, 255, 0.11);
+  --product-ribbon-purple: rgba(152, 116, 255, 0.13);
+  --product-ribbon-pink: rgba(229, 157, 255, 0.12);
+  --product-ribbon-edge: rgba(148, 137, 255, 0.14);
+  --product-ribbon-edge-hot: rgba(255, 255, 255, 0.5);
+  --product-ribbon-transparent: rgba(142, 127, 255, 0);
+  --product-texture-dot: rgba(96, 94, 186, 0.34);
+  --product-texture-opacity: 0.08;
+  --product-ribbon-opacity: 0.62;
 }
 
-body.dynamic-bg-ready {
-  background: transparent !important;
+body.studerria-theme,
+body.page-vision {
+  position: relative;
+  min-height: 100vh;
+  background: var(--product-bg-base) !important;
 }
 
-#dynamic-bg {
-  position: fixed;
+body.dynamic-bg-ready,
+body.page-vision {
+  isolation: isolate;
+}
+
+.studerria-product-bg {
+  position: absolute;
   inset: 0;
-  z-index: -2;
+  z-index: 0;
+  min-height: 100%;
   overflow: hidden;
   pointer-events: none;
-  transform: translateZ(0);
-  transition: opacity 220ms ease;
+  background: var(--product-bg-base);
 }
 
-#dynamic-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
+body.dynamic-bg-ready > :not(#dynamic-bg):not(script):not(style),
+body.page-vision > :not(#visionBg):not(script):not(style) {
+  position: relative;
   z-index: 1;
-  background:
-    radial-gradient(58% 42% at 50% 6%, rgba(158, 173, 255, 0.08), transparent 70%),
-    radial-gradient(46% 36% at 50% 88%, rgba(18, 20, 38, 0.18), transparent 78%);
-  opacity: 0.78;
 }
 
-.gradient-layer,
-.bg-morph-layer,
-.morph-blob,
-.bg-blob,
-.mouse-trail,
-.trail-char,
-.noise-overlay,
-.dot-pattern,
-.mouse-highlight {
+.product-bg-base,
+.product-bg-ambient,
+.product-bg-texture {
   position: absolute;
-  will-change: transform, opacity;
 }
 
-.gradient-layer {
+.product-bg-base {
   inset: 0;
+  z-index: 0;
   background:
-    radial-gradient(55% 72% at 10% 16%, var(--bg-side-left), transparent 72%),
-    radial-gradient(55% 72% at 90% 16%, var(--bg-side-right), transparent 72%),
-    radial-gradient(40% 52% at 50% 84%, var(--bg-center-soft), transparent 78%),
-    var(--bg-base);
+    var(--product-bg-center-scrim),
+    var(--product-bg-base);
 }
 
-.studerria-ambient-ribbons,
-.studerria-ribbon,
-.studerria-ribbon-glint,
-.studerria-star-dust {
-  position: absolute;
-}
-
-.studerria-ambient-ribbons {
-  inset: -12% -14% -10%;
-  z-index: 2;
-  opacity: var(--bg-ribbon-opacity);
-  filter: saturate(1.04);
-  animation: dynamicRibbonDrift 42s ease-in-out infinite;
-}
-
-.studerria-ribbon,
-.studerria-ribbon-glint {
-  border-radius: 999px;
-  transform-origin: center;
-  will-change: transform, opacity;
-}
-
-.studerria-ribbon {
-  background:
-    linear-gradient(180deg, var(--bg-ribbon-inner), transparent 28%),
-    linear-gradient(102deg, var(--bg-ribbon-fill-a) 0%, var(--bg-ribbon-fill-b) 46%, rgba(19, 24, 43, 0.02) 100%);
-  border: 1px solid var(--bg-ribbon-edge);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 30px var(--bg-ribbon-glow),
-    0 0 82px rgba(109, 77, 255, 0.06);
-  mix-blend-mode: screen;
-  opacity: 0.52;
-  filter: blur(2px);
-  -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, transparent 35%, #000 42%, #000 58%, transparent 65%);
-  mask-image: radial-gradient(120% 100% at 50% 50%, transparent 35%, #000 42%, #000 58%, transparent 65%);
-}
-
-.studerria-ribbon::before,
-.studerria-ribbon::after {
+.product-bg-base::before,
+.product-bg-base::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   pointer-events: none;
 }
 
-.studerria-ribbon::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 48%, transparent 100%);
+.product-bg-base::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 20%, transparent 76%, rgba(0, 0, 0, 0.18)),
+    radial-gradient(680px 420px at 50% 16%, rgba(255, 255, 255, 0.055), transparent 72%);
+  opacity: 0.86;
+}
+
+.product-bg-base::after {
+  top: min(92vh, 980px);
+  background:
+    radial-gradient(70% 44% at 50% 10%, rgba(95, 82, 255, 0.07), transparent 70%),
+    linear-gradient(180deg, rgba(5, 7, 17, 0), rgba(5, 7, 17, 0.72) 38%, rgba(5, 7, 17, 0.94));
+}
+
+html[data-theme="light"] .product-bg-base::after,
+body.theme-light .product-bg-base::after {
+  background:
+    radial-gradient(70% 44% at 50% 10%, rgba(126, 112, 255, 0.07), transparent 70%),
+    linear-gradient(180deg, rgba(246, 248, 255, 0), rgba(246, 248, 255, 0.72) 38%, rgba(244, 247, 255, 0.96));
+}
+
+.product-bg-ambient {
+  top: var(--product-ribbon-top);
+  left: 50%;
+  z-index: 1;
+  width: var(--product-ribbon-width);
+  height: var(--product-ribbon-height);
+  transform: translateX(-50%);
+  opacity: var(--product-ribbon-opacity);
+}
+
+.product-bg-ribbon-fill,
+.product-bg-ribbon-edge,
+.product-bg-ribbon-ghost {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.product-bg-ribbon-fill--a {
+  stroke: url("#productBgRibbonFillA");
+  stroke-width: 142;
+  opacity: 0.38;
+}
+
+.product-bg-ribbon-fill--b {
+  stroke: url("#productBgRibbonFillB");
+  stroke-width: 108;
   opacity: 0.22;
-  filter: blur(8px);
 }
 
-.studerria-ribbon::after {
-  inset: 14%;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  opacity: 0.18;
-  filter: blur(18px);
+.product-bg-ribbon-edge {
+  stroke: url("#productBgRibbonEdge");
+  stroke-width: 2.8;
+  opacity: 0.52;
 }
 
-.studerria-ribbon--primary {
-  width: min(134vw, 2000px);
-  height: clamp(280px, 32vw, 560px);
-  left: -20vw;
-  top: 8vh;
-  transform: rotate(-13deg);
+.product-bg-ribbon-edge--b {
+  stroke-width: 2.1;
+  opacity: 0.3;
 }
 
-.studerria-ribbon--secondary {
-  width: min(118vw, 1780px);
-  height: clamp(250px, 28vw, 500px);
-  right: -16vw;
-  top: 44vh;
-  transform: rotate(14deg);
-  opacity: 0.6;
-  animation: dynamicRibbonFloat 56s ease-in-out infinite;
-}
-
-.studerria-ribbon-glint {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 49%, rgba(224, 206, 255, 0.66) 52%, transparent 100%);
-  filter: blur(16px);
-  mix-blend-mode: screen;
-  opacity: 0.16;
-  -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, transparent 39%, #000 44%, #000 54%, transparent 59%);
-  mask-image: radial-gradient(120% 100% at 50% 50%, transparent 39%, #000 44%, #000 54%, transparent 59%);
-}
-
-.studerria-ribbon-glint--a {
-  width: min(136vw, 2040px);
-  height: clamp(260px, 31vw, 540px);
-  left: -22vw;
-  top: 9vh;
-  transform: rotate(-13deg);
-}
-
-.studerria-ribbon-glint--b {
-  width: min(118vw, 1780px);
-  height: clamp(242px, 27vw, 480px);
-  right: -16vw;
-  top: 46vh;
-  transform: rotate(14deg);
+.product-bg-ribbon-ghost {
+  stroke: url("#productBgRibbonFillB");
+  stroke-width: 38;
   opacity: 0.12;
 }
 
-.studerria-star-dust {
+.product-bg-ribbon-ghost--b {
+  stroke-width: 30;
+  opacity: 0.06;
+}
+
+.product-bg-points {
+  fill: var(--product-texture-dot);
+  opacity: 0.26;
+}
+
+.product-bg-texture {
   inset: 0;
   z-index: 2;
-  opacity: var(--bg-dust-opacity);
+  opacity: var(--product-texture-opacity);
   background:
-    radial-gradient(circle at 14% 18%, var(--bg-dust-color) 0 1px, transparent 1.6px),
-    radial-gradient(circle at 22% 30%, var(--bg-dust-color) 0 1.1px, transparent 1.7px),
-    radial-gradient(circle at 38% 22%, var(--bg-dust-color) 0 1px, transparent 1.8px),
-    radial-gradient(circle at 52% 36%, var(--bg-dust-color) 0 1px, transparent 1.8px),
-    radial-gradient(circle at 68% 28%, var(--bg-dust-color) 0 1.1px, transparent 1.8px),
-    radial-gradient(circle at 74% 18%, var(--bg-dust-color) 0 0.9px, transparent 1.6px),
-    radial-gradient(circle at 82% 44%, var(--bg-dust-color) 0 1px, transparent 1.8px),
-    radial-gradient(circle at 58% 62%, var(--bg-dust-color) 0 1px, transparent 1.8px),
-    radial-gradient(circle at 34% 68%, var(--bg-dust-color) 0 1px, transparent 1.8px),
-    radial-gradient(circle at 76% 72%, var(--bg-dust-color) 0 1px, transparent 1.8px);
-  animation: dynamicDustDrift 60s linear infinite;
+    radial-gradient(circle at 14% 18%, var(--product-texture-dot) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 22% 30%, var(--product-texture-dot) 0 1.1px, transparent 1.7px),
+    radial-gradient(circle at 38% 22%, var(--product-texture-dot) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 52% 36%, var(--product-texture-dot) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 68% 28%, var(--product-texture-dot) 0 1.1px, transparent 1.8px),
+    radial-gradient(circle at 74% 18%, var(--product-texture-dot) 0 0.9px, transparent 1.6px),
+    radial-gradient(circle at 82% 44%, var(--product-texture-dot) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 58% 62%, var(--product-texture-dot) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 34% 68%, var(--product-texture-dot) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 76% 72%, var(--product-texture-dot) 0 1px, transparent 1.8px),
+    url('/assets/grain.png');
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+  background-size: auto, auto, auto, auto, auto, auto, auto, auto, auto, auto, 190px 190px;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.52) 56%, rgba(0, 0, 0, 0.18));
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.52) 56%, rgba(0, 0, 0, 0.18));
 }
 
-.bg-morph-layer {
-  inset: 0;
-  overflow: hidden;
+body.page-login {
+  --product-ribbon-top: 48px;
+  --product-ribbon-opacity: 0.76;
 }
 
-.morph-blob {
-  width: min(70vw, 1200px);
-  height: min(84vh, 1200px);
-  overflow: visible;
+body.page-schedule,
+body.page-profile,
+body.page-admin {
+  --product-ribbon-opacity: 0.52;
+  --product-texture-opacity: 0.08;
 }
 
-.morph-primary {
-  top: -23vh;
-  left: -23vw;
-  opacity: var(--morph-opacity-primary);
+body.page-vision {
+  --product-ribbon-opacity: 0.8;
+  --product-ribbon-top: 24px;
+  --product-ribbon-width: max(1480px, 116vw);
 }
 
-.morph-secondary {
-  top: -15vh;
-  right: -25vw;
-  opacity: var(--morph-opacity-secondary);
+.studerria-product-bg[data-product-bg="vision"] .product-bg-ribbon-fill--a {
+  stroke-width: 150;
+  opacity: 0.42;
 }
 
-.bg-blob {
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-  transform-origin: center;
-  filter: blur(86px);
-  animation: blob-float 30s ease-in-out infinite;
+.studerria-product-bg[data-product-bg="vision"] .product-bg-ribbon-fill--b {
+  stroke-width: 118;
+  opacity: 0.26;
 }
 
-.morph-secondary .bg-blob {
-  filter: blur(98px);
-  animation-duration: 45s;
-  animation-delay: -12s;
-}
-
-@keyframes blob-float {
-  0% {
-    transform: translate3d(-1.5%, 0.6%, 0) scale(1) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(2.2%, -1.4%, 0) scale(1.2) rotate(10deg);
-  }
-  100% {
-    transform: translate3d(-1.1%, 1.1%, 0) scale(1) rotate(0deg);
-  }
-}
-
-@keyframes dynamicRibbonDrift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0.6%, -1.8%, 0);
-  }
-}
-
-@keyframes dynamicRibbonFloat {
-  0%,
-  100% {
-    transform: rotate(14deg) translate3d(0, 0, 0);
-  }
-  50% {
-    transform: rotate(12deg) translate3d(-0.8%, 1.6%, 0);
-  }
-}
-
-@keyframes dynamicDustDrift {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(-1.2%, 1.4%, 0);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-.mouse-highlight {
-  top: 50%;
-  left: 50%;
-  width: min(46vw, 780px);
-  height: min(46vh, 540px);
-  border-radius: 50%;
-  transform: translate3d(-50%, -50%, 0);
-  background: radial-gradient(circle, rgba(255, 255, 255, var(--highlight-opacity)), transparent 62%);
-  transition: opacity 260ms ease;
-}
-
-.mouse-trail {
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.trail-char {
-  left: 0;
-  top: 0;
-  font-size: clamp(8px, 0.75vw, 10px);
-  font-weight: 620;
-  line-height: 1;
-  color: var(--trail-color);
-  text-shadow: 0 0 5px var(--trail-shadow);
-  opacity: 0;
-  transform: translate3d(-50%, -50%, 0) scale(0.64);
-  transform-origin: center;
-  pointer-events: none;
-  user-select: none;
-  mix-blend-mode: var(--trail-blend-mode);
-}
-
-.noise-overlay {
-  inset: 0;
-  background-image: url('/assets/grain.png');
-  background-repeat: repeat;
-  background-size: 190px 190px;
-  opacity: var(--noise-opacity);
-  mix-blend-mode: soft-light;
-}
-
-.dot-pattern {
-  top: 0;
-  width: 108px;
-  height: 100%;
-  color: var(--dot-color);
-  background-image: radial-gradient(currentColor 1px, transparent 1px);
-  background-size: 7px 7px;
-  opacity: var(--dot-opacity);
-}
-
-.dot-pattern.left {
-  left: 0;
-  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0));
-}
-
-.dot-pattern.right {
-  right: 0;
-  mask-image: linear-gradient(to left, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0));
-}
-
-body.dynamic-bg-coarse .mouse-highlight {
-  opacity: 0.52;
-}
-
-body.dynamic-bg-reduced .bg-blob {
-  animation: none !important;
-}
-
-body.dynamic-bg-reduced .mouse-highlight {
-  display: none !important;
-}
-
-body.dynamic-bg-reduced .trail-char {
-  display: none !important;
+.studerria-product-bg[data-product-bg="vision"] .product-bg-ribbon-edge {
+  opacity: 0.62;
 }
 
 @media (max-width: 900px) {
-  .studerria-ambient-ribbons {
-    inset: -10% -22% -12%;
+  body.studerria-theme,
+  body.page-vision {
+    --product-ribbon-top: 84px;
+    --product-ribbon-width: 1320px;
+    --product-ribbon-height: 940px;
+    --product-ribbon-opacity: 0.58;
   }
 
-  .studerria-ribbon--primary,
-  .studerria-ribbon-glint--a {
-    width: min(170vw, 1600px);
-    height: clamp(220px, 42vw, 380px);
-    left: -48vw;
-    top: 10vh;
+  .product-bg-ambient {
+    left: 44%;
   }
 
-  .studerria-ribbon--secondary,
-  .studerria-ribbon-glint--b {
-    width: min(150vw, 1500px);
-    height: clamp(210px, 38vw, 360px);
-    right: -44vw;
-    top: 54vh;
+  .product-bg-ribbon-fill--a {
+    stroke-width: 104;
+    opacity: 0.3;
   }
 
-  .dot-pattern {
-    width: 68px;
-    background-size: 8px 8px;
+  .product-bg-ribbon-fill--b {
+    stroke-width: 76;
+    opacity: 0.18;
   }
 
-  .morph-blob {
-    width: min(92vw, 700px);
-    height: min(56vh, 560px);
-  }
-
-  .morph-primary {
-    top: -18vh;
-    left: -36vw;
-  }
-
-  .morph-secondary {
-    top: -12vh;
-    right: -42vw;
+  .product-bg-ribbon-edge {
+    opacity: 0.46;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .studerria-ambient-ribbons,
-  .studerria-star-dust {
-    animation: none !important;
-  }
-
-  .bg-blob {
-    animation: none !important;
-  }
-
-  .mouse-highlight {
-    display: none !important;
-  }
-
-  .trail-char {
-    display: none !important;
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+  .studerria-product-bg {
+    --product-ribbon-opacity: 0.5;
   }
 }
