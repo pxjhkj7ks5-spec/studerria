@@ -29,10 +29,41 @@
     applyTheme(readTheme() === 'dark' ? 'light' : 'dark');
   }
 
+  function setSidebar(open) {
+    if (!document.body) return;
+    document.body.classList.toggle('td-sidebar-open', Boolean(open));
+    document.querySelectorAll('[data-sidebar-toggle]').forEach(function(button) {
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+
   document.addEventListener('click', function(event) {
     var button = event.target.closest('[data-theme-toggle]');
-    if (!button) return;
-    toggleTheme();
+    if (button) {
+      toggleTheme();
+      return;
+    }
+
+    if (event.target.closest('[data-sidebar-toggle]')) {
+      setSidebar(!(document.body && document.body.classList.contains('td-sidebar-open')));
+      return;
+    }
+
+    if (event.target.closest('[data-sidebar-dismiss]') || event.target.closest('.td-sidebar-link')) {
+      setSidebar(false);
+    }
+  });
+
+  document.addEventListener('pointerdown', function(event) {
+    if (!document.body || !document.body.classList.contains('td-sidebar-open')) return;
+    if (event.target.closest('.td-sidebar') || event.target.closest('[data-sidebar-toggle]')) return;
+    setSidebar(false);
+  });
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      setSidebar(false);
+    }
   });
 
   if (document.readyState === 'loading') {

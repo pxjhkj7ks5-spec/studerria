@@ -13,141 +13,170 @@
       <section class="td-app-frame td-glass-panel" aria-label="Studerria schedule concept">
         <%- include('partials/test-top-nav', { active: 'schedule' }) %>
 
-        <main class="td-app-content">
-          <section class="td-schedule-board td-surface-card">
-            <header class="td-schedule-head">
-              <div>
-                <h1>Розклад</h1>
-                <p>12 – 18 травня 2024</p>
-              </div>
-              <div class="td-schedule-controls" aria-label="Керування розкладом">
-                <button class="td-small-button" type="button">Тиждень <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
-                <button class="td-small-button" type="button">Сьогодні</button>
+        <main class="td-app-content td-schedule-workspace">
+          <header class="td-page-header">
+            <div>
+              <p class="td-page-kicker">Week 14 · 13-19 травня</p>
+              <h1>Твій розклад</h1>
+              <p>Середа, 15 травня. Пари, аудиторії та найближчі дії на день.</p>
+            </div>
+            <div class="td-page-actions" aria-label="Керування розкладом">
+              <button class="td-small-button" type="button">Today</button>
+              <button class="td-small-button" type="button">This week</button>
+              <span class="td-button-cluster">
                 <button class="td-icon-button" type="button" aria-label="Попередній тиждень">
                   <%- include('partials/test-icon', { name: 'chevronLeft', className: 'td-button-icon' }) %>
                 </button>
                 <button class="td-icon-button" type="button" aria-label="Наступний тиждень">
                   <%- include('partials/test-icon', { name: 'chevronRight', className: 'td-button-icon' }) %>
                 </button>
-              </div>
-            </header>
-
-            <div class="td-week-header" aria-label="Тиждень">
-              <span></span>
-              <div><small>Пн</small><strong>12</strong></div>
-              <div><small>Вт</small><strong>13</strong></div>
-              <div class="is-active"><small>Ср</small><strong>14</strong></div>
-              <div><small>Чт</small><strong>15</strong></div>
-              <div><small>Пт</small><strong>16</strong></div>
-              <div><small>Сб</small><strong>17</strong></div>
-              <div><small>Нд</small><strong>18</strong></div>
+              </span>
             </div>
+          </header>
 
-            <div class="td-calendar-scroll">
-              <div class="td-calendar-grid" aria-label="Календар розкладу">
-                <div class="td-time-axis" aria-hidden="true">
-                  <span>08:00</span>
-                  <span>09:00</span>
-                  <span>10:00</span>
-                  <span>11:00</span>
-                  <span>12:00</span>
-                  <span>13:00</span>
-                  <span>14:00</span>
-                  <span>15:00</span>
-                  <span>16:00</span>
-                  <span>17:00</span>
-                  <span>18:00</span>
+          <section class="td-day-switcher td-surface-card" aria-label="Дні тижня">
+            <button class="td-day-pill" type="button">
+              <span>Mon</span>
+              <strong>13</strong>
+              <small>3 пари</small>
+            </button>
+            <button class="td-day-pill" type="button">
+              <span>Tue</span>
+              <strong>14</strong>
+              <small>2 пари</small>
+            </button>
+            <button class="td-day-pill is-active is-today" type="button" aria-current="date">
+              <span>Wed</span>
+              <strong>15</strong>
+              <small>4 пари</small>
+            </button>
+            <button class="td-day-pill" type="button">
+              <span>Thu</span>
+              <strong>16</strong>
+              <small>2 пари</small>
+            </button>
+            <button class="td-day-pill" type="button">
+              <span>Fri</span>
+              <strong>17</strong>
+              <small>3 пари</small>
+            </button>
+            <button class="td-day-pill" type="button">
+              <span>Sat</span>
+              <strong>18</strong>
+              <small>1 пара</small>
+            </button>
+            <button class="td-day-pill is-quiet" type="button">
+              <span>Sun</span>
+              <strong>19</strong>
+              <small>вільно</small>
+            </button>
+          </section>
+
+          <section class="td-schedule-layout">
+            <article class="td-schedule-panel td-surface-card" aria-label="Пари на сьогодні">
+              <header class="td-section-head">
+                <div>
+                  <h2>Сьогодні</h2>
+                  <p>4 пари · наступна о 11:00</p>
                 </div>
+                <span class="td-live-pill"><i></i>Now</span>
+              </header>
 
-                <div class="td-current-time" aria-hidden="true"><span>10:30</span></div>
-
-                <div class="td-day-lane">
-                  <article class="td-event td-event--lecture" style="--start: 1; --span: 1.35">
+              <div class="td-lesson-list">
+                <article class="td-lesson-card td-lesson-card--lecture">
+                  <time>09:00 - 10:30</time>
+                  <div class="td-lesson-main">
                     <strong>Операційні системи</strong>
-                    <span>Лекція</span>
-                    <small>ауд. 204</small>
-                  </article>
-                  <article class="td-event td-event--practice" style="--start: 5; --span: 1.25">
+                    <span>CS-23 · Лекція · проф. Ірина Коваль</span>
+                  </div>
+                  <div class="td-lesson-meta">
+                    <span class="td-location"><%- include('partials/test-icon', { name: 'pin', className: 'td-inline-icon' }) %> ауд. 204</span>
+                    <span class="td-badge td-badge--blue">Lecture</span>
+                  </div>
+                </article>
+
+                <article class="td-lesson-card td-lesson-card--practice is-now">
+                  <time>11:00 - 12:30</time>
+                  <div class="td-lesson-main">
+                    <strong>Бази даних</strong>
+                    <span>CS-23 · Практика · Андрій Мельник</span>
+                  </div>
+                  <div class="td-lesson-meta">
+                    <span class="td-location"><%- include('partials/test-icon', { name: 'pin', className: 'td-inline-icon' }) %> ауд. 301</span>
+                    <span class="td-badge td-badge--violet">Now</span>
+                  </div>
+                </article>
+
+                <article class="td-lesson-card td-lesson-card--seminar">
+                  <time>13:10 - 14:40</time>
+                  <div class="td-lesson-main">
                     <strong>Англійська мова</strong>
-                    <span>Практичне</span>
-                    <small>ауд. 105</small>
-                  </article>
-                  <article class="td-event td-event--other" style="--start: 9; --span: 1.25">
+                    <span>Група 2 · Семінар · Олена Сидоренко</span>
+                  </div>
+                  <div class="td-lesson-meta">
+                    <span class="td-location"><%- include('partials/test-icon', { name: 'pin', className: 'td-inline-icon' }) %> ауд. 105</span>
+                    <span class="td-badge td-badge--soft">Seminar</span>
+                  </div>
+                </article>
+
+                <article class="td-lesson-card td-lesson-card--lab">
+                  <time>15:00 - 16:30</time>
+                  <div class="td-lesson-main">
                     <strong>Математичний аналіз</strong>
-                    <span>Практичне</span>
-                    <small>ауд. 405</small>
-                  </article>
-                </div>
-
-                <div class="td-day-lane">
-                  <article class="td-event td-event--practice" style="--start: 3; --span: 1.25">
-                    <strong>Бази даних</strong>
-                    <span>Практичне</span>
-                    <small>ауд. 301</small>
-                  </article>
-                  <article class="td-event td-event--lab" style="--start: 7; --span: 1.25">
-                    <strong>Філософія</strong>
-                    <span>Лекція</span>
-                    <small>ауд. 210</small>
-                  </article>
-                </div>
-
-                <div class="td-day-lane is-today">
-                  <article class="td-event td-event--lecture" style="--start: 1; --span: 1.35">
-                    <strong>Операційні системи</strong>
-                    <span>Лекція</span>
-                    <small>ауд. 204</small>
-                  </article>
-                  <article class="td-event td-event--practice" style="--start: 3; --span: 1.25">
-                    <strong>Бази даних</strong>
-                    <span>Практичне</span>
-                    <small>ауд. 301</small>
-                  </article>
-                  <article class="td-event td-event--practice" style="--start: 5; --span: 1.25">
-                    <strong>Англійська мова</strong>
-                    <span>Практичне</span>
-                    <small>ауд. 105</small>
-                  </article>
-                </div>
-
-                <div class="td-day-lane"></div>
-
-                <div class="td-day-lane">
-                  <article class="td-event td-event--lecture" style="--start: 1; --span: 1.35">
-                    <strong>Операційні системи</strong>
-                    <span>Лекція</span>
-                    <small>ауд. 204</small>
-                  </article>
-                  <article class="td-event td-event--practice" style="--start: 3; --span: 1.25">
-                    <strong>Бази даних</strong>
-                    <span>Практичне</span>
-                    <small>ауд. 301</small>
-                  </article>
-                  <article class="td-event td-event--other" style="--start: 9; --span: 1.25">
-                    <strong>Математичний аналіз</strong>
-                    <span>Практичне</span>
-                    <small>ауд. 405</small>
-                  </article>
-                </div>
-
-                <div class="td-day-lane">
-                  <article class="td-event td-event--lab" style="--start: 7; --span: 1.25">
-                    <strong>Філософія</strong>
-                    <span>Лекція</span>
-                    <small>ауд. 210</small>
-                  </article>
-                </div>
-
-                <div class="td-day-lane"></div>
+                    <span>CS-23 · Лабораторна · Марія Литвин</span>
+                  </div>
+                  <div class="td-lesson-meta">
+                    <span class="td-location"><%- include('partials/test-icon', { name: 'pin', className: 'td-inline-icon' }) %> ауд. 405</span>
+                    <span class="td-badge td-badge--green">Lab</span>
+                  </div>
+                </article>
               </div>
-            </div>
+            </article>
 
-            <footer class="td-legend">
-              <span><i class="td-dot td-dot--lecture"></i>Лекція</span>
-              <span><i class="td-dot td-dot--practice"></i>Практичне</span>
-              <span><i class="td-dot td-dot--lab"></i>Лабораторна</span>
-              <span><i class="td-dot td-dot--other"></i>Інше</span>
-            </footer>
+            <aside class="td-schedule-aside" aria-label="Огляд дня">
+              <section class="td-overview-card td-surface-card">
+                <header class="td-section-head">
+                  <div>
+                    <h2>Today overview</h2>
+                    <p>Короткий стан дня</p>
+                  </div>
+                </header>
+                <div class="td-overview-grid">
+                  <span><strong>4</strong><small>Пари</small></span>
+                  <span><strong>2</strong><small>Аудиторії</small></span>
+                  <span><strong>1</strong><small>Дедлайн</small></span>
+                </div>
+                <div class="td-next-card">
+                  <span class="td-next-icon"><%- include('partials/test-icon', { name: 'calendarCheck', className: 'td-stat-svg' }) %></span>
+                  <div>
+                    <strong>Наступна пара</strong>
+                    <span>Бази даних · 11:00 · ауд. 301</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="td-overview-card td-surface-card" id="homework">
+                <header class="td-section-head">
+                  <div>
+                    <h2>Найближче ДЗ</h2>
+                    <p>До завтра</p>
+                  </div>
+                  <span class="td-badge td-badge--violet">1 task</span>
+                </header>
+                <div class="td-homework-item">
+                  <strong>SQL joins practice</strong>
+                  <span>Бази даних · здати до 18:00</span>
+                </div>
+              </section>
+
+              <section class="td-empty-state td-surface-card" aria-label="Приклад порожнього дня">
+                <span class="td-empty-orb"><%- include('partials/test-icon', { name: 'calendar', className: 'td-empty-icon' }) %></span>
+                <div>
+                  <h2>Неділя вільна</h2>
+                  <p>Коли на день немає пар, показуємо спокійний empty state замість порожньої області.</p>
+                </div>
+              </section>
+            </aside>
           </section>
         </main>
       </section>

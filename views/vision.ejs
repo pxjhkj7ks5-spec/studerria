@@ -26,7 +26,7 @@
         <h1>Studerria Design Lab</h1>
         <p>
           Apple-inspired redesign experiments for a calm academic workspace:
-          violet primary actions, glass surfaces, top navigation, and soft
+          violet primary actions, glass surfaces, sidebar navigation, and soft
           blue-lavender light mode.
         </p>
       </header>
@@ -49,7 +49,7 @@
           </span>
           <span class="td-hub-card-copy">
             <strong>Home concept</strong>
-            <small>Dashboard with top navbar, stats, tasks, progress, and AI strip.</small>
+            <small>Dashboard shell with the new liquid sidebar and compact content hierarchy.</small>
           </span>
           <%- include('partials/test-icon', { name: 'arrowRight', className: 'td-hub-arrow' }) %>
         </a>
@@ -60,10 +60,36 @@
           </span>
           <span class="td-hub-card-copy">
             <strong>Schedule concept</strong>
-            <small>Weekly calendar grid with soft event blocks and visible rhythm.</small>
+            <small>Daily working interface with day pills, lesson cards, and overview panel.</small>
           </span>
           <%- include('partials/test-icon', { name: 'arrowRight', className: 'td-hub-arrow' }) %>
         </a>
+      </section>
+
+      <section class="td-sidebar-showcase td-glass-panel" aria-label="Sidebar system preview">
+        <div class="td-sidebar-sample">
+          <div class="td-sidebar-sample-brand">
+            <span class="td-brand-mark" aria-hidden="true">
+              <%- include('partials/test-brand-mark', { className: 'td-brand-glyph' }) %>
+            </span>
+            <span><strong>Studerria</strong><small>Student OS</small></span>
+          </div>
+          <div class="td-sidebar-sample-links">
+            <span class="td-sidebar-link is-active"><%- include('partials/test-icon', { name: 'calendar', className: 'td-sidebar-icon' }) %>Schedule</span>
+            <span class="td-sidebar-link"><%- include('partials/test-icon', { name: 'homework', className: 'td-sidebar-icon' }) %>Homework</span>
+            <span class="td-sidebar-link"><%- include('partials/test-icon', { name: 'messages', className: 'td-sidebar-icon' }) %>Messages</span>
+            <span class="td-sidebar-link"><%- include('partials/test-icon', { name: 'teamwork', className: 'td-sidebar-icon' }) %>Teamwork</span>
+          </div>
+        </div>
+        <div class="td-sidebar-showcase-copy">
+          <p class="td-eyebrow">Navigation direction</p>
+          <h2>Sidebar instead of top navbar</h2>
+          <p>
+            The test shell now uses a native macOS-like sidebar: glass material,
+            calm lavender-blue active state, thin SF-style icons, and a mobile drawer.
+          </p>
+          <a class="td-secondary-button" href="/testschedule">Open schedule preview</a>
+        </div>
       </section>
 
       <section class="td-system-panel td-glass-panel" aria-label="Design system notes">
@@ -73,8 +99,9 @@
         </div>
         <div class="td-system-list">
           <span>Violet primary actions</span>
-          <span>Apple-like top navigation</span>
+          <span>Apple-like sidebar navigation</span>
           <span>Soft glass surfaces</span>
+          <span>Thin system icons</span>
           <span>Calm academic workspace</span>
         </div>
       </section>
