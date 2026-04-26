@@ -2746,8 +2746,13 @@ html[data-theme="dark"] .td-login-logo,
 html[data-theme="dark"] .td-card-icon,
 html[data-theme="dark"] .td-stat-icon,
 html[data-theme="dark"] .td-ai-icon {
-  border-color: rgba(196, 181, 253, 0.2);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(124, 58, 237, 0.18));
+  border-color: rgba(139, 164, 255, 0.12);
+  background: linear-gradient(145deg, rgba(139, 164, 255, 0.1), rgba(124, 58, 237, 0.16));
+}
+
+html[data-theme="dark"] .td-surface-card {
+  border-color: rgba(139, 164, 255, 0.08);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.2);
 }
 
 html[data-theme="dark"] .td-secondary-button,
