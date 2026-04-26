@@ -453,30 +453,16 @@ html[data-theme="dark"] .td-page .td-theme-toggle .td-theme-sun {
 .td-login-brand {
   display: grid;
   justify-items: center;
-  gap: 12px;
-  margin-bottom: 28px;
+  gap: 0;
+  margin-bottom: 30px;
   text-align: center;
 }
 
 .td-login-logo {
-  width: 70px;
-  height: 70px;
-  border-radius: 24px;
-  box-shadow: 0 20px 44px rgba(124, 58, 237, 0.12);
-}
-
-.td-login-wordmark {
-  color: var(--td-text);
-  font-size: 1.02rem;
-  font-weight: 800;
-  letter-spacing: 0.42em;
-  padding-left: 0.42em;
-}
-
-.td-login-brand p {
-  margin: 0;
-  color: var(--td-muted);
-  font-size: 0.95rem;
+  width: 88px;
+  height: 88px;
+  border-radius: 28px;
+  box-shadow: 0 24px 54px rgba(124, 58, 237, 0.16);
 }
 
 .td-login-card {
