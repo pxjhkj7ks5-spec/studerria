@@ -251,6 +251,84 @@
     rafId = window.requestAnimationFrame(step);
   }
 
+  function initScheduleNextClass() {
+    var chip = document.querySelector('[data-next-class]');
+    if (!chip) return;
+
+    var kind = chip.querySelector('[data-next-kind]');
+    var label = chip.querySelector('[data-next-label]');
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.td-lesson-card'));
+
+    function minutesFromTime(value) {
+      var match = String(value || '').match(/(\d{1,2}):(\d{2})/);
+      if (!match) return null;
+      return Number(match[1]) * 60 + Number(match[2]);
+    }
+
+    function textFromCard(card) {
+      var timeText = card.querySelector('time') ? card.querySelector('time').textContent : '';
+      var title = card.querySelector('.td-lesson-main strong') ? card.querySelector('.td-lesson-main strong').textContent.trim() : '';
+      var locationText = card.querySelector('.td-location') ? card.querySelector('.td-location').textContent : '';
+      var locationMatch = String(locationText || '').match(/ауд\.\s*\S+/i);
+      var times = String(timeText || '').split('-');
+      var start = minutesFromTime(times[0]);
+      var end = minutesFromTime(times[1]);
+
+      return {
+        card: card,
+        title: title || 'Пара',
+        room: locationMatch ? locationMatch[0].trim() : '',
+        startText: times[0] ? times[0].trim() : '',
+        endText: times[1] ? times[1].trim() : '',
+        start: start,
+        end: end
+      };
+    }
+
+    function setChip(state, text) {
+      chip.classList.toggle('is-now', state === 'Now');
+      if (kind) kind.textContent = state;
+      if (label) label.textContent = text;
+    }
+
+    var lessons = cards
+      .map(textFromCard)
+      .filter(function(lesson) {
+        return Number.isFinite(lesson.start) && Number.isFinite(lesson.end);
+      })
+      .sort(function(a, b) {
+        return a.start - b.start;
+      });
+
+    if (!lessons.length) {
+      setChip('Free', 'No classes today');
+      return;
+    }
+
+    var now = new Date();
+    var currentMinutes = now.getHours() * 60 + now.getMinutes();
+    var active = lessons.find(function(lesson) {
+      return currentMinutes >= lesson.start && currentMinutes < lesson.end;
+    });
+
+    if (active) {
+      setChip('Now', 'Now: ' + active.title + ' · до ' + active.endText);
+      return;
+    }
+
+    var next = lessons.find(function(lesson) {
+      return lesson.start > currentMinutes;
+    });
+
+    if (next) {
+      var roomSuffix = next.room ? ' · ' + next.room : '';
+      setChip('Next', 'Next: ' + next.title + ' · ' + next.startText + roomSuffix);
+      return;
+    }
+
+    setChip('Done', 'Done for today');
+  }
+
   function setSidebar(open) {
     if (!document.body) return;
     document.body.classList.toggle('td-sidebar-open', Boolean(open));
@@ -291,10 +369,12 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
       applyTheme(readTheme());
+      initScheduleNextClass();
       initCodexCursorLayer();
     }, { once: true });
   } else {
     applyTheme(readTheme());
+    initScheduleNextClass();
     initCodexCursorLayer();
   }
 })();
