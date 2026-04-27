@@ -33,6 +33,8 @@
       'page-admin',
       'page-teamwork'
     ].some((className) => body.classList.contains(className));
+    const ENABLE_TRAIL_PARTICLES = false;
+    const ENABLE_BLOB_MORPH = false;
 
     if (isLowPowerPage) {
       body.classList.add('studerria-bg-low-power');
@@ -66,7 +68,7 @@
     const CELL_MEMORY_MS = 4200;
     const PATH_STAMP_STEP = isLowPowerPage ? 9 : 8;
     const MIN_STAMP_DISTANCE = 4;
-    const MAX_PARTICLES = isLowPowerPage ? 120 : 180;
+    const MAX_PARTICLES = ENABLE_TRAIL_PARTICLES ? (isLowPowerPage ? 48 : 72) : 0;
     const LERP_FACTOR = isLowPowerPage ? 0.08 : 0.09;
 
     const state = {
@@ -369,9 +371,7 @@
 
     function applyCursorGlow() {
       if (!cursorGlow) return;
-      cursorGlow.style.left = `${state.currentX.toFixed(2)}px`;
-      cursorGlow.style.top = `${state.currentY.toFixed(2)}px`;
-      cursorGlow.style.transform = 'translate3d(-50%, -50%, 0)';
+      cursorGlow.style.transform = `translate3d(${state.currentX.toFixed(2)}px, ${state.currentY.toFixed(2)}px, 0) translate3d(-50%, -50%, 0)`;
     }
 
     function applyParallax() {
@@ -381,6 +381,7 @@
     }
 
     function updateMorph(now) {
+      if (!ENABLE_BLOB_MORPH) return;
       if (state.reducedMotion || now - state.lastMorphAt < MORPH_FRAME_MS) return;
       state.lastMorphAt = now;
 
@@ -416,7 +417,7 @@
     }
 
     function spawnBrushStamp(now, x, y, movementX, movementY) {
-      if (!particles.length || state.reducedMotion || state.coarsePointer) return;
+      if (!ENABLE_TRAIL_PARTICLES || !particles.length || state.reducedMotion || state.coarsePointer) return;
 
       const magnitude = Math.hypot(movementX, movementY);
       if (magnitude > 0.22) {
@@ -489,7 +490,7 @@
     }
 
     function spawnTrail(now, x, y) {
-      if (state.reducedMotion || state.coarsePointer || !particles.length) {
+      if (!ENABLE_TRAIL_PARTICLES || state.reducedMotion || state.coarsePointer || !particles.length) {
         return;
       }
 
@@ -601,7 +602,9 @@
       state.targetY = y;
       state.lastMoveAt = now;
 
-      spawnTrail(now, x, y);
+      if (ENABLE_TRAIL_PARTICLES) {
+        spawnTrail(now, x, y);
+      }
     }
 
     function onPointerLeave() {

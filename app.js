@@ -848,8 +848,8 @@ const bellSchedule = {
 app.set('view engine', 'ejs');
 
 const GLOBAL_LAYOUT_EXCLUDED_VIEWS = new Set(['vision', 'studerria-codex']);
-const BACKGROUND_STYLE_TAG_RE = /<link[^>]+href=["']\/css\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background|studerria-ui)\.css["'][^>]*>\s*/gi;
-const BACKGROUND_SCRIPT_TAG_RE = /<script[^>]+src=["']\/js\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background)\.js["'][^>]*><\/script>\s*/gi;
+const BACKGROUND_STYLE_TAG_RE = /<link[^>]+href=["']\/css\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background|studerria-ui|studerria-premium|navbar-enhanced|modal-enhanced)\.css(?:\?[^"']*)?["'][^>]*>\s*/gi;
+const BACKGROUND_SCRIPT_TAG_RE = /<script[^>]+src=["']\/js\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background)\.js(?:\?[^"']*)?["'][^>]*><\/script>\s*/gi;
 const BACKGROUND_ELEMENT_IDS = ['dynamic-bg', 'dynamic-login-bg', 'schedule-bg', 'visionBg', 'showcaseBg', 'studerriaBg'];
 
 function extractHtmlAttribute(rawAttributes, attributeName) {

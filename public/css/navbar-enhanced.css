@@ -1185,3 +1185,100 @@ body.theme-light .snav-mobile-logout-btn {
     transition: none !important;
   }
 }
+
+@media (min-width: 992px) {
+  body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    width: 272px !important;
+    max-width: 272px !important;
+    padding: 16px !important;
+    border-radius: 28px;
+    contain: layout paint style;
+    background:
+      radial-gradient(120% 72% at 16% 0%, rgba(129, 140, 248, 0.13), transparent 58%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035)),
+      var(--studerria-topbar-bg) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.1) !important;
+    backdrop-filter: blur(18px) saturate(1.1) !important;
+    box-shadow:
+      0 20px 52px rgba(2, 6, 23, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  }
+
+  body.theme-light.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    background:
+      radial-gradient(120% 72% at 14% 0%, rgba(129, 140, 248, 0.12), transparent 58%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(235, 242, 255, 0.72)),
+      var(--studerria-topbar-bg) !important;
+    box-shadow:
+      0 18px 44px rgba(15, 23, 42, 0.09),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+  }
+
+  body.page-authenticated.studerria-theme {
+    --studerria-sidebar-width: 316px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack {
+    position: relative;
+    min-height: 46px;
+    justify-content: center;
+    padding-left: 54px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack::before {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 15px;
+    background:
+      url("/assets/brand/studerria-mark-dark-512.png") center / 78% 78% no-repeat,
+      linear-gradient(145deg, rgba(139, 164, 255, 0.16), rgba(124, 58, 237, 0.18));
+    border: 1px solid rgba(139, 164, 255, 0.14);
+    box-shadow: 0 14px 26px rgba(79, 70, 229, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack::before {
+    background:
+      url("/assets/brand/studerria-mark-light-512.png") center / 78% 78% no-repeat,
+      linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(224, 231, 255, 0.78));
+    border-color: rgba(99, 102, 241, 0.16);
+    box-shadow: 0 14px 26px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-list {
+    gap: 5px;
+    padding: 2px 1px 2px 2px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link {
+    min-height: 42px;
+    border-radius: 15px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link::before,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #a5b4fc, #60a5fa);
+    box-shadow: 0 0 14px rgba(129, 140, 248, 0.42);
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link[aria-current="page"] {
+    padding-left: 16px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:hover,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-open > .snav-link {
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.11);
+  }
+}
