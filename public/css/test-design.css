@@ -702,6 +702,28 @@ body[data-theme="dark"] .td-brand-logo--dark {
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
 }
 
+.td-input-wrap input:-webkit-autofill,
+.td-input-wrap input:-webkit-autofill:hover,
+.td-input-wrap input:-webkit-autofill:focus,
+.td-input-wrap input:-webkit-autofill:active {
+  border-color: var(--td-border);
+  caret-color: var(--td-text);
+  -webkit-text-fill-color: var(--td-text);
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.86) inset;
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.86) inset;
+  transition: background-color 9999s ease-out, color 9999s ease-out;
+}
+
+.td-input-wrap input:-webkit-autofill:focus {
+  border-color: rgba(124, 58, 237, 0.5);
+  -webkit-box-shadow:
+    0 0 0 1000px rgba(255, 255, 255, 0.96) inset,
+    0 0 0 4px rgba(124, 58, 237, 0.12);
+  box-shadow:
+    0 0 0 1000px rgba(255, 255, 255, 0.96) inset,
+    0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
 .td-input-wrap--password input {
   padding-right: 48px;
 }
@@ -3102,6 +3124,27 @@ html[data-theme="dark"] .td-input-wrap input {
   color: var(--td-text);
   border-color: rgba(226, 232, 240, 0.12);
   background: rgba(255, 255, 255, 0.07);
+}
+
+html[data-theme="dark"] .td-input-wrap input:-webkit-autofill,
+html[data-theme="dark"] .td-input-wrap input:-webkit-autofill:hover,
+html[data-theme="dark"] .td-input-wrap input:-webkit-autofill:focus,
+html[data-theme="dark"] .td-input-wrap input:-webkit-autofill:active {
+  border-color: rgba(226, 232, 240, 0.12);
+  caret-color: var(--td-text);
+  -webkit-text-fill-color: var(--td-text);
+  -webkit-box-shadow: 0 0 0 1000px rgb(40, 42, 61) inset;
+  box-shadow: 0 0 0 1000px rgb(40, 42, 61) inset;
+}
+
+html[data-theme="dark"] .td-input-wrap input:-webkit-autofill:focus {
+  border-color: rgba(124, 58, 237, 0.5);
+  -webkit-box-shadow:
+    0 0 0 1000px rgb(40, 42, 61) inset,
+    0 0 0 4px rgba(124, 58, 237, 0.22);
+  box-shadow:
+    0 0 0 1000px rgb(40, 42, 61) inset,
+    0 0 0 4px rgba(124, 58, 237, 0.22);
 }
 
 html[data-theme="dark"] .td-password-reveal,

@@ -723,6 +723,35 @@ body.theme-light.studerria-theme .app-footer .footer-release-pill {
     var(--studerria-control-shadow);
 }
 
+.studerria-theme input.form-control:-webkit-autofill,
+.studerria-theme input.form-control:-webkit-autofill:hover,
+.studerria-theme input.form-control:-webkit-autofill:focus,
+.studerria-theme input.form-control:-webkit-autofill:active,
+.studerria-theme textarea.form-control:-webkit-autofill,
+.studerria-theme textarea.form-control:-webkit-autofill:hover,
+.studerria-theme textarea.form-control:-webkit-autofill:focus,
+.studerria-theme textarea.form-control:-webkit-autofill:active {
+  caret-color: var(--studerria-control-text);
+  -webkit-text-fill-color: var(--studerria-control-text);
+  -webkit-box-shadow: 0 0 0 1000px rgba(245, 248, 255, 0.92) inset;
+  box-shadow: 0 0 0 1000px rgba(245, 248, 255, 0.92) inset;
+  transition: background-color 9999s ease-out, color 9999s ease-out;
+}
+
+body.theme-dark.studerria-theme input.form-control:-webkit-autofill,
+body.theme-dark.studerria-theme input.form-control:-webkit-autofill:hover,
+body.theme-dark.studerria-theme input.form-control:-webkit-autofill:focus,
+body.theme-dark.studerria-theme input.form-control:-webkit-autofill:active,
+body.theme-dark.studerria-theme textarea.form-control:-webkit-autofill,
+body.theme-dark.studerria-theme textarea.form-control:-webkit-autofill:hover,
+body.theme-dark.studerria-theme textarea.form-control:-webkit-autofill:focus,
+body.theme-dark.studerria-theme textarea.form-control:-webkit-autofill:active {
+  caret-color: var(--studerria-control-text);
+  -webkit-text-fill-color: var(--studerria-control-text);
+  -webkit-box-shadow: 0 0 0 1000px rgb(24, 32, 63) inset;
+  box-shadow: 0 0 0 1000px rgb(24, 32, 63) inset;
+}
+
 .studerria-theme .form-control:disabled,
 .studerria-theme .form-select:disabled,
 .studerria-theme .form-control[readonly] {
