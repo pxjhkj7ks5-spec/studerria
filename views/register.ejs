@@ -461,17 +461,18 @@
         overflow-y: auto;
       }
 </style>
-      <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
     <link rel="stylesheet" href="/css/auth-actions.css" />
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <%- include('partials/studerria-system-head') %>
   </head>
-  <body class="studerria-theme theme-light">
+  <body class="studerria-theme theme-light td-page td-page--login page-register" data-theme="light">
     <%- include('partials/theme-bootstrap-body') %>
-    <%- include('partials/dynamic-bg') %>
     <div class="theme-toggle-floating">
       <button
         class="theme-toggle-min"
@@ -484,65 +485,110 @@
         🌙
       </button>
     </div>
-    <div class="container">
-      <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
-        <div class="col-11 col-sm-8 col-md-6 col-lg-4 tooltip-host">
-          <div class="card auth-card glass">
-            <div class="card-body p-4">
-              <h1 class="h4 mb-3 text-center"><%= t('register.title') %></h1>
+    <main class="td-login-main">
+      <section class="td-login-brand" aria-label="Studerria">
+        <span class="td-login-logo" aria-hidden="true">
+          <%- include('partials/test-brand-mark', { className: 'td-brand-glyph td-brand-glyph--login' }) %>
+        </span>
+      </section>
 
-              <% if (registerErrorText) { %>
-              <div class="alert alert-danger" role="alert"><%= registerErrorText %></div>
-              <% } %>
+      <section class="td-login-card td-glass-panel tooltip-host" aria-label="<%= t('register.title') %>">
+        <header class="td-login-card-head">
+          <h1><%= t('register.title') %></h1>
+          <p>Створи профіль Studerria для свого навчального простору.</p>
+        </header>
 
-              <form id="registerForm" method="POST" action="/register" novalidate>
-                <div class="mb-3">
-                  <label for="full_name" class="form-label"><%= t('register.fullName') %></label>
-                  <input id="full_name" name="full_name" class="form-control" placeholder="<%= t('register.fullNamePlaceholder') %>" value="<%= pendingFullName || '' %>" required />
-                </div>
-                <div class="mb-3">
-                  <label for="password" class="form-label"><%= t('register.password') %></label>
-                  <div class="input-with-icon">
-                    <input id="password" name="password" type="password" class="form-control" placeholder="<%= t('register.passwordPlaceholder') %>" minlength="8" required />
-                    <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
-                  </div>
-                </div>
-                <div class="mb-3">
-                  <label for="confirm_password" class="form-label"><%= t('register.confirmPassword') %></label>
-                  <div class="input-with-icon">
-                    <input id="confirm_password" name="confirm_password" type="password" class="form-control" placeholder="<%= t('register.confirmPasswordPlaceholder') %>" minlength="8" required />
-                    <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">👀</button>
-                  </div>
-                </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="agree" name="agree" required />
-            <label class="form-check-label" for="agree">
-              <%= t('register.agree') %>
-              <button
-                type="button"
-                class="btn btn-link btn-sm p-0 align-baseline ms-1"
-                data-bs-toggle="modal"
-                data-bs-target="#privacyModal"
-              >
-                <%= t('register.more') %>
-              </button>
+        <% if (registerErrorText) { %>
+          <div class="alert alert-danger login-feedback-stack" role="alert">
+            <%= registerErrorText %>
+          </div>
+        <% } %>
+
+        <form id="registerForm" class="td-form" method="POST" action="/register" novalidate>
+          <label class="td-field" for="full_name">
+            <span><%= t('register.fullName') %></span>
+            <span class="td-input-wrap">
+              <%- include('partials/test-icon', { name: 'user', className: 'td-input-icon' }) %>
+              <input
+                id="full_name"
+                name="full_name"
+                type="text"
+                placeholder="<%= t('register.fullNamePlaceholder') %>"
+                value="<%= pendingFullName || '' %>"
+                autocomplete="name"
+                required
+              />
+            </span>
+          </label>
+
+          <label class="td-field" for="password">
+            <span><%= t('register.password') %></span>
+            <span class="td-input-wrap input-with-icon">
+              <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="<%= t('register.passwordPlaceholder') %>"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              />
+              <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
+            </span>
+          </label>
+
+          <label class="td-field" for="confirm_password">
+            <span><%= t('register.confirmPassword') %></span>
+            <span class="td-input-wrap input-with-icon">
+              <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
+              <input
+                id="confirm_password"
+                name="confirm_password"
+                type="password"
+                placeholder="<%= t('register.confirmPasswordPlaceholder') %>"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              />
+              <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">👀</button>
+            </span>
+          </label>
+
+          <div class="td-form-row td-form-row--stack">
+            <label class="td-checkbox" for="agree">
+              <input type="checkbox" id="agree" name="agree" required />
+              <span><%= t('register.agree') %></span>
             </label>
+            <button
+              type="button"
+              class="td-inline-link"
+              data-bs-toggle="modal"
+              data-bs-target="#privacyModal"
+            >
+              <%= t('register.more') %>
+            </button>
           </div>
           <div class="field-error" id="consent-error" aria-live="polite"></div>
-          <div class="auth-action-stack mt-4">
-            <button type="submit" class="btn btn-primary auth-action-btn"><%= t('register.continue') %></button>
-          </div>
-              </form>
 
-              <div class="text-center mt-3">
-                <a href="/login"><%= t('register.haveAccount') %></a>
-              </div>
-            </div>
-          </div>
-          <%- include('partials/app-footer') %>
-        </div>
-      </div>
-    </div>
+          <button type="submit" class="td-primary-button"><%= t('register.continue') %></button>
+        </form>
+
+        <p class="td-login-bottom"><a href="/login"><%= t('register.haveAccount') %></a></p>
+      </section>
+    </main>
+
+    <footer class="td-login-footer">
+      <button type="button" class="td-language-pill">UA <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
+      <button type="button" class="td-language-pill td-theme-toggle" id="tdThemeToggleMirror" aria-label="Увімкнути темну тему" aria-pressed="false">
+        <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
+        <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
+        <span data-theme-label>Dark</span>
+      </button>
+      <a href="/help">Підтримка</a>
+      <button type="button" class="td-footer-link" data-bs-toggle="modal" data-bs-target="#changelogModal">Changelog</button>
+      <span>© Studerria 2026</span>
+    </footer>
     <div class="modal fade" id="privacyModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -794,17 +840,45 @@
         });
       }
       const themeToggle = document.getElementById('themeToggle');
+      const applyThemeAttr = () => {
+        if (document.body.classList.contains('theme-dark')) {
+          document.body.setAttribute('data-theme', 'dark');
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.body.setAttribute('data-theme', 'light');
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      };
       const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
+      applyThemeAttr();
       themeToggle.textContent = savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       themeToggle.addEventListener('click', () => {
         const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
         document.body.classList.remove('theme-light', 'theme-dark');
         document.body.classList.add(next);
+        applyThemeAttr();
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       });
+
+      const tdThemeToggle = document.getElementById('tdThemeToggleMirror');
+      const syncTdThemeToggle = () => {
+        if (!tdThemeToggle) return;
+        const isDark = document.body.classList.contains('theme-dark');
+        tdThemeToggle.setAttribute('aria-pressed', String(isDark));
+        tdThemeToggle.setAttribute('aria-label', isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему');
+        const label = tdThemeToggle.querySelector('[data-theme-label]');
+        if (label) label.textContent = isDark ? 'Light' : 'Dark';
+      };
+      if (tdThemeToggle) {
+        tdThemeToggle.addEventListener('click', () => {
+          themeToggle.click();
+          syncTdThemeToggle();
+        });
+        syncTdThemeToggle();
+      }
     </script>
       <script src="/js/design-system.js" defer></script>
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>

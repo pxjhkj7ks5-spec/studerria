@@ -352,6 +352,7 @@
 </style>
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/pages/auth.css" />
     <link rel="stylesheet" href="/css/auth-actions.css" />
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
@@ -359,9 +360,8 @@
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <%- include('partials/studerria-system-head') %>
   </head>
-  <body class="studerria-theme theme-dark page-login">
+  <body class="studerria-theme theme-dark td-page td-page--login page-login" data-theme="dark">
     <%- include('partials/theme-bootstrap-body') %>
-    <%- include('partials/dynamic-bg') %>
     <div class="theme-toggle-floating">
       <button
         class="theme-toggle-min"
@@ -374,71 +374,79 @@
         🌙
       </button>
     </div>
-    <div class="container">
-      <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
-        <div class="col-11 col-sm-8 col-md-6 col-lg-4 tooltip-host">
-          <div class="card login-card glass">
-            <div class="card-body p-4">
-              <div class="login-brand-lockup" aria-label="Studerria">
-                <span class="login-brand-mark-wrap" aria-hidden="true">
-                  <img src="/favicon-dark.png" alt="" class="login-brand-mark login-brand-mark--dark" />
-                  <img src="/favicon-light.png" alt="" class="login-brand-mark login-brand-mark--light" />
-                </span>
-                <span class="login-brand-wordmark">STUDERRIA</span>
-                <span class="login-brand-subtitle">Платформа для сучасних студентів.</span>
-              </div>
-              <h1 class="h4 mb-3 text-center"><%= t('login.title') %></h1>
+    <main class="td-login-main">
+      <section class="td-login-brand" aria-label="Studerria">
+        <span class="td-login-logo" aria-hidden="true">
+          <%- include('partials/test-brand-mark', { className: 'td-brand-glyph td-brand-glyph--login' }) %>
+        </span>
+      </section>
 
-              <% if (error) { %>
-              <div class="alert alert-danger login-feedback-stack" role="alert">
-                <%= loginErrorText || t('login.error') %>
-              </div>
-              <% } %>
+      <section class="td-login-card td-glass-panel tooltip-host" aria-label="<%= t('login.title') %>">
+        <header class="td-login-card-head">
+          <h1><%= t('login.title') %></h1>
+          <p>Раді бачити тебе знову.</p>
+        </header>
 
-              <form id="loginForm" method="POST" action="/login">
-                <div class="login-form-stack">
-                <div class="mb-3">
-                  <label for="full_name" class="form-label"><%= t('login.fullName') %></label>
-                  <input
-                    id="full_name"
-                    name="full_name"
-                    type="text"
-                    class="form-control"
-                    placeholder="<%= t('login.fullNamePlaceholder') %>"
-                    autocomplete="username"
-                    required
-                  />
-                </div>
-
-                <div class="mb-2 password-row">
-                  <label for="password" class="form-label mb-1"><%= t('login.password') %></label>
-                  <div class="input-with-icon">
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      class="form-control"
-                      placeholder="<%= t('login.passwordPlaceholder') %>"
-                      autocomplete="current-password"
-                      required
-                    />
-                    <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
-                  </div>
-                </div>
-                <div class="helper mb-3"><%= t('login.forgot') %></div>
-
-                <div class="login-action-stack auth-action-stack auth-action-stack--grid">
-                  <button type="submit" class="btn btn-primary auth-action-btn"><%= t('login.signIn') %></button>
-                  <a class="btn btn-outline-primary auth-action-btn" href="/register"><%= t('login.createAccount') %></a>
-                </div>
-                </div>
-              </form>
-            </div>
+        <% if (error) { %>
+          <div class="alert alert-danger login-feedback-stack" role="alert">
+            <%= loginErrorText || t('login.error') %>
           </div>
-          <%- include('partials/app-footer', { footerMetaClass: 'glass-dock' }) %>
-        </div>
-      </div>
-    </div>
+        <% } %>
+
+        <form id="loginForm" class="td-form" method="POST" action="/login">
+          <label class="td-field" for="full_name">
+            <span><%= t('login.fullName') %></span>
+            <span class="td-input-wrap">
+              <%- include('partials/test-icon', { name: 'mail', className: 'td-input-icon' }) %>
+              <input
+                id="full_name"
+                name="full_name"
+                type="text"
+                placeholder="<%= t('login.fullNamePlaceholder') %>"
+                autocomplete="username"
+                required
+              />
+            </span>
+          </label>
+
+          <label class="td-field" for="password">
+            <span><%= t('login.password') %></span>
+            <span class="td-input-wrap input-with-icon">
+              <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="<%= t('login.passwordPlaceholder') %>"
+                autocomplete="current-password"
+                required
+              />
+              <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
+            </span>
+          </label>
+
+          <div class="td-form-row">
+            <span class="helper"><%= t('login.forgot') %></span>
+          </div>
+
+          <button type="submit" class="td-primary-button"><%= t('login.signIn') %></button>
+        </form>
+
+        <p class="td-login-bottom"><%= lang === 'en' ? 'No account yet?' : 'Ще немає акаунту?' %> <a href="/register"><%= t('login.createAccount') %></a></p>
+      </section>
+    </main>
+
+    <footer class="td-login-footer">
+      <button type="button" class="td-language-pill">UA <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
+      <button type="button" class="td-language-pill td-theme-toggle" id="tdThemeToggleMirror" aria-label="Увімкнути темну тему" aria-pressed="false">
+        <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
+        <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
+        <span data-theme-label>Dark</span>
+      </button>
+      <a href="/help">Підтримка</a>
+      <button type="button" class="td-footer-link" data-bs-toggle="modal" data-bs-target="#changelogModal">Changelog</button>
+      <span>© Studerria 2026</span>
+    </footer>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
@@ -577,6 +585,23 @@
         localStorage.setItem('ui-theme', next);
         themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
       });
+
+      const tdThemeToggle = document.getElementById('tdThemeToggleMirror');
+      const syncTdThemeToggle = () => {
+        if (!tdThemeToggle) return;
+        const isDark = document.body.classList.contains('theme-dark');
+        tdThemeToggle.setAttribute('aria-pressed', String(isDark));
+        tdThemeToggle.setAttribute('aria-label', isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему');
+        const label = tdThemeToggle.querySelector('[data-theme-label]');
+        if (label) label.textContent = isDark ? 'Light' : 'Dark';
+      };
+      if (tdThemeToggle) {
+        tdThemeToggle.addEventListener('click', () => {
+          themeToggle.click();
+          syncTdThemeToggle();
+        });
+        syncTdThemeToggle();
+      }
     </script>
       <script src="/js/design-system.js" defer></script>
     <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
