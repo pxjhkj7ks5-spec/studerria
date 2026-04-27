@@ -46,7 +46,7 @@
 
           <label class="td-field" for="password">
             <span><%= t('login.password') %></span>
-            <span class="td-input-wrap">
+            <span class="td-input-wrap td-input-wrap--password" data-password-field>
               <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
               <input
                 id="password"
@@ -55,7 +55,12 @@
                 placeholder="<%= t('login.passwordPlaceholder') %>"
                 autocomplete="current-password"
                 required
+                data-password-input
               />
+              <button class="td-password-reveal" type="button" aria-label="Показати пароль" data-password-reveal hidden>
+                <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
+                <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
+              </button>
             </span>
           </label>
 
@@ -84,8 +89,10 @@
       <a href="/help">Підтримка</a>
       <a href="/terms">Умови використання</a>
       <a href="/privacy">Політика конфіденційності</a>
+      <button type="button" class="td-footer-link" data-auth-changelog-open>Changelog</button>
       <span>© Studerria 2026</span>
     </footer>
+    <%- include('partials/auth-lite-changelog') %>
     <script src="/js/login-auth.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

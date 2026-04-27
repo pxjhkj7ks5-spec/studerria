@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="uk" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%- include('partials/test-theme-head') %>
+    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
+    <title><%= legalTitle %> · Studerria</title>
+    <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+  </head>
+  <body class="td-page td-page--legal" data-theme="light">
+    <main class="td-legal-main">
+      <a class="td-legal-logo" href="/login" aria-label="Studerria login">
+        <%- include('partials/test-brand-mark', { className: 'td-brand-glyph td-brand-glyph--login' }) %>
+      </a>
+
+      <article class="td-legal-card td-glass-panel">
+        <header class="td-legal-head">
+          <a class="td-legal-back" href="/login">Назад до входу</a>
+          <p class="td-lite-kicker">Studerria</p>
+          <h1><%= legalTitle %></h1>
+          <p><%= legalLead %></p>
+          <span>Останнє оновлення: 27 квітня 2026</span>
+        </header>
+
+        <div class="td-legal-sections">
+          <% legalSections.forEach(function(section) { %>
+            <section class="td-legal-section">
+              <h2><%= section.title %></h2>
+              <% if (section.body) { %>
+                <p><%= section.body %></p>
+              <% } %>
+              <% if (section.items && section.items.length) { %>
+                <ul>
+                  <% section.items.forEach(function(item) { %>
+                    <li><%= item %></li>
+                  <% }); %>
+                </ul>
+              <% } %>
+            </section>
+          <% }); %>
+        </div>
+      </article>
+    </main>
+
+    <footer class="td-login-footer">
+      <button type="button" class="td-language-pill">UA <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
+      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="Увімкнути темну тему" aria-pressed="false">
+        <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
+        <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
+        <span data-theme-label>Dark</span>
+      </button>
+      <a href="/help">Підтримка</a>
+      <a href="/terms">Умови використання</a>
+      <a href="/privacy">Політика конфіденційності</a>
+      <button type="button" class="td-footer-link" data-auth-changelog-open>Changelog</button>
+      <span>© Studerria 2026</span>
+    </footer>
+    <%- include('partials/auth-lite-changelog') %>
+    <script src="/js/login-auth.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+  </body>
+</html>
