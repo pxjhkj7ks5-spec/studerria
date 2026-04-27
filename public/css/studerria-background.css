@@ -508,9 +508,9 @@ html[data-theme='dark'],
 body[data-theme='dark'],
 body.theme-dark {
   --studerria-bg-base: linear-gradient(180deg, #0f1024 0%, #14162c 52%, #0d1224 100%);
-  --studerria-bg-left: rgba(124, 58, 237, 0.18);
-  --studerria-bg-right: rgba(59, 130, 246, 0.14);
-  --studerria-bg-center: rgba(255, 255, 255, 0.05);
+  --studerria-bg-left: rgba(124, 58, 237, 0.12);
+  --studerria-bg-right: rgba(59, 130, 246, 0.11);
+  --studerria-bg-center: rgba(255, 255, 255, 0.035);
   --studerria-cursor-color: rgba(191, 169, 255, 0.72);
   --studerria-cursor-blend: screen;
 }
@@ -552,9 +552,9 @@ body.theme-dark .studerria-bg::before {
   z-index: 2;
   opacity: 1;
   background:
-    radial-gradient(circle at 0% 0%, var(--studerria-bg-left), transparent 34rem),
-    radial-gradient(circle at 100% 100%, var(--studerria-bg-right), transparent 36rem),
-    radial-gradient(circle at 52% 42%, var(--studerria-bg-center), transparent 42rem);
+    radial-gradient(38rem 34rem at 0% 0%, var(--studerria-bg-left), transparent 72%),
+    radial-gradient(42rem 36rem at 100% 100%, var(--studerria-bg-right), transparent 74%),
+    radial-gradient(42rem 32rem at 52% 42%, var(--studerria-bg-center), transparent 76%);
 }
 
 .studerria-bg-gradient {
