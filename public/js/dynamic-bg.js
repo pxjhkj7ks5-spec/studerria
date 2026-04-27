@@ -23,4 +23,12 @@
     reducedMotionQuery.addListener(applyMode);
     coarsePointerQuery.addListener(applyMode);
   }
+
+  if (!window.__studerriaBackgroundInitialized && !document.querySelector('script[data-studerria-background-runtime]')) {
+    const script = document.createElement('script');
+    script.src = '/js/studerria-background.js';
+    script.defer = true;
+    script.setAttribute('data-studerria-background-runtime', 'true');
+    document.head.appendChild(script);
+  }
 })();

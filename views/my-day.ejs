@@ -12,13 +12,15 @@
       integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
       crossorigin="anonymous"
     />
+    <link rel="stylesheet" href="/css/studerria-background.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
-    <link rel="stylesheet" href="/css/pages/my-day.css" />    <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
-    <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/pages/my-day.css" />
+    <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/navbar-enhanced.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
-  <body class="studerria-theme theme-dark page-my-day page-local-topbar">
+  <body class="studerria-theme theme-dark page-my-day page-local-topbar page-authenticated page-app-shell">
     <%- include('partials/theme-bootstrap-body') %>
-    <%- include('partials/dynamic-bg') %>
+    <%- include('partials/studerria-background') %>
     <%
       const cockpit = myDay || {};
       const brief = cockpit.brief || {};
@@ -327,6 +329,87 @@
       <% if (errMessage) { %>
         <div class="alert alert-danger cockpit-alert" role="alert"><%= errMessage %></div>
       <% } %>
+
+      <section class="studerria-home-vision" aria-label="Огляд дня Studerria">
+        <header class="td-dashboard-header studerria-home-head">
+          <div>
+            <p class="td-page-kicker">Studerria · Home</p>
+            <h1>Доброго дня, <%= username || 'Studerria' %>!</h1>
+            <p><%= brief.message || 'Ось що відбувається сьогодні.' %></p>
+          </div>
+          <a class="td-small-button" href="/schedule">Відкрити розклад</a>
+        </header>
+
+        <section class="td-stats-grid studerria-home-stats" aria-label="Показники">
+          <article class="td-stat-card td-surface-card">
+            <span>Завдання</span>
+            <strong><%= deadlineItems.length %></strong>
+            <small><%= Number(activity.overdue || 0) %> прострочено</small>
+          </article>
+          <article class="td-stat-card td-surface-card">
+            <span>Пари</span>
+            <strong><%= classItems.length %></strong>
+            <small>найближчі сьогодні / завтра</small>
+          </article>
+          <article class="td-stat-card td-surface-card">
+            <span>Повідомлення</span>
+            <strong><%= inboxMessageSummary ? Number(inboxMessageSummary.unread || inboxMessageSummary.fresh_unread || 0) : inboxItems.length %></strong>
+            <small>потребують уваги</small>
+          </article>
+          <article class="td-stat-card td-surface-card">
+            <span>Прогрес</span>
+            <strong><%= hasProgressDashboard ? Number(progressDashboard.at_risk_count || 0) : Number(competencies.length || 0) %></strong>
+            <small><%= hasProgressDashboard ? 'ризикових дисциплін' : 'компетенцій' %></small>
+          </article>
+        </section>
+
+        <section class="td-dashboard-grid studerria-home-preview">
+          <article class="td-dashboard-card td-surface-card td-schedule-preview">
+            <header class="td-card-header">
+              <h2>Розклад на сьогодні</h2>
+              <a class="td-small-button" href="/schedule">Весь розклад</a>
+            </header>
+            <div class="td-schedule-list">
+              <% if (!classItems.length) { %>
+                <div class="td-empty-inline">Найближчих пар поки немає.</div>
+              <% } else { %>
+                <% classItems.slice(0, 3).forEach((item, index) => { %>
+                  <div class="td-schedule-row <%= index === 0 ? 'is-current' : '' %>">
+                    <time><%= item.start || '--:--' %></time>
+                    <div>
+                      <strong><%= item.subject_name || t('myDay.item.subjectFallback') %></strong>
+                      <span><%= getDayContext(item) %><% if (item.room_label) { %> · ауд. <%= item.room_label %><% } %></span>
+                    </div>
+                    <span class="td-badge <%= index === 0 ? 'td-badge--violet' : '' %>"><%= index === 0 ? 'Далі' : 'План' %></span>
+                  </div>
+                <% }) %>
+              <% } %>
+            </div>
+          </article>
+
+          <article class="td-dashboard-card td-surface-card">
+            <header class="td-card-header">
+              <h2>Завдання</h2>
+              <a class="td-small-button" href="/schedule#homework">Усі завдання</a>
+            </header>
+            <div class="td-task-list">
+              <% if (!deadlineItems.length) { %>
+                <div class="td-empty-inline">Немає термінових дедлайнів.</div>
+              <% } else { %>
+                <% deadlineItems.slice(0, 4).forEach((item) => { %>
+                  <div class="td-task-row">
+                    <div>
+                      <strong><%= item.description || t('myDay.item.taskFallback') %></strong>
+                      <span><%= item.subject_name || t('myDay.item.subjectFallback') %></span>
+                    </div>
+                    <time><%= formatShortDate(item.deadline_date) %></time>
+                  </div>
+                <% }) %>
+              <% } %>
+            </div>
+          </article>
+        </section>
+      </section>
 
       <% if (isTeacherMyDayView) { %>
       <section class="teacher-home-hero<%= showMissionStrip ? ' has-rail' : '' %>">
@@ -1387,7 +1470,6 @@
         whatIfFetchError: t('myDay.whatIf.fetchError'),
         whatIfCalcError: t('myDay.whatIf.calcError'),
       }) %>;
-      const themeToggles = document.querySelectorAll('.theme-toggle');
       if (window.bootstrap && window.bootstrap.Tooltip) {
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
           window.bootstrap.Tooltip.getOrCreateInstance(el);
@@ -1396,22 +1478,6 @@
       const scheduleDrawer = document.getElementById('scheduleActionDrawer');
       const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
       const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
-      const storedTheme = localStorage.getItem('ui-theme') || 'theme-dark';
-      document.body.classList.remove('theme-dark', 'theme-light');
-      document.body.classList.add(storedTheme);
-      themeToggles.forEach((btn) => {
-        btn.textContent = storedTheme === 'theme-dark' ? btn.dataset.lightLabel : btn.dataset.darkLabel;
-        btn.addEventListener('click', () => {
-          const isDark = document.body.classList.contains('theme-dark');
-          const next = isDark ? 'theme-light' : 'theme-dark';
-          document.body.classList.remove('theme-dark', 'theme-light');
-          document.body.classList.add(next);
-          localStorage.setItem('ui-theme', next);
-          themeToggles.forEach((toggle) => {
-            toggle.textContent = next === 'theme-dark' ? toggle.dataset.lightLabel : toggle.dataset.darkLabel;
-          });
-        });
-      });
 
       const welcomeModalEl = document.getElementById('welcomeModal');
       if (welcomeModalEl && window.bootstrap && window.bootstrap.Modal) {
@@ -1961,6 +2027,6 @@
       }
     </script>
     <script src="/js/design-system.js" defer></script>
-      <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+    <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

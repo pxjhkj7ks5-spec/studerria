@@ -5,42 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/test-theme-head') %>
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
-    <title><%= legalTitle %> · Studerria</title>
+    <title>Studerria · Changelog</title>
     <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
-  <body class="td-page td-page--legal" data-theme="light">
+  <body class="td-page td-page--login td-page--legal" data-theme="light">
     <main class="td-legal-main">
-      <a class="td-legal-logo" href="/login" aria-label="Studerria login">
-        <%- include('partials/test-brand-mark', { className: 'td-brand-glyph td-brand-glyph--login' }) %>
-      </a>
+      <section class="td-login-brand" aria-label="Studerria">
+        <span class="td-login-logo" aria-hidden="true">
+          <%- include('partials/test-brand-mark', { className: 'td-brand-glyph td-brand-glyph--login' }) %>
+        </span>
+      </section>
 
-      <article class="td-legal-card td-glass-panel">
-        <header class="td-legal-head">
-          <a class="td-legal-back" href="/login">Назад до входу</a>
-          <p class="td-lite-kicker">Studerria</p>
-          <h1><%= legalTitle %></h1>
-          <p><%= legalLead %></p>
-          <span>Останнє оновлення: 27 квітня 2026</span>
+      <section class="td-legal-card td-glass-panel" aria-label="Changelog">
+        <header class="td-login-card-head">
+          <p class="td-lite-kicker">Studerria updates</p>
+          <h1>Changelog</h1>
+          <p>Всі публічні зміни Studerria в одному місці.</p>
         </header>
 
-        <div class="td-legal-sections">
-          <% legalSections.forEach(function(section) { %>
-            <section class="td-legal-section">
-              <h2><%= section.title %></h2>
-              <% if (section.body) { %>
-                <p><%= section.body %></p>
-              <% } %>
-              <% if (section.items && section.items.length) { %>
+        <div class="td-lite-release-list td-lite-release-list--full">
+          <% if (changelog && changelog.length) { %>
+            <% changelog.forEach(function(entry) { %>
+              <article class="td-lite-release">
+                <div class="td-lite-release-head">
+                  <strong>v<%= entry.version %></strong>
+                  <% if (entry.date) { %>
+                    <span><%= entry.date %></span>
+                  <% } %>
+                </div>
                 <ul>
-                  <% section.items.forEach(function(item) { %>
+                  <% (entry.items || []).forEach(function(item) { %>
                     <li><%= item %></li>
                   <% }); %>
                 </ul>
-              <% } %>
-            </section>
-          <% }); %>
+              </article>
+            <% }); %>
+          <% } else { %>
+            <p class="td-lite-empty">Оновлень поки немає.</p>
+          <% } %>
         </div>
-      </article>
+      </section>
     </main>
 
     <footer class="td-login-footer">
@@ -50,14 +54,11 @@
         <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
         <span data-theme-label>Dark</span>
       </button>
-      <a href="/help">Підтримка</a>
+      <a href="/login">Вхід</a>
       <a href="/terms">Умови використання</a>
       <a href="/privacy">Політика конфіденційності</a>
-      <button type="button" class="td-footer-link" data-auth-changelog-open>Changelog</button>
       <span>© Studerria 2026</span>
     </footer>
-    <%- include('partials/auth-lite-changelog') %>
     <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
-    <script src="/js/login-auth.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

@@ -255,3 +255,63 @@ body.page-vision {
     --product-ribbon-opacity: 0.5;
   }
 }
+
+/* Test-design background transfer for legacy standalone pages */
+body.studerria-theme {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.08), transparent 34rem),
+    radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.08), transparent 36rem),
+    radial-gradient(circle at 52% 42%, rgba(255, 255, 255, 0.45), transparent 42rem),
+    linear-gradient(180deg, #eef2ff 0%, #f7f8ff 52%, #edf4ff 100%) !important;
+}
+
+body.theme-dark.studerria-theme {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.18), transparent 34rem),
+    radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.14), transparent 36rem),
+    radial-gradient(circle at 52% 42%, rgba(255, 255, 255, 0.05), transparent 42rem),
+    linear-gradient(180deg, #0f1024 0%, #14162c 52%, #0d1224 100%) !important;
+}
+
+.studerria-product-bg,
+.product-bg-base {
+  background: transparent !important;
+}
+
+.product-bg-base::before {
+  opacity: 0.18;
+  background-image:
+    linear-gradient(rgba(120, 130, 170, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 130, 170, 0.07) 1px, transparent 1px);
+  background-size: 42px 42px;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 78%, transparent 100%);
+}
+
+.product-bg-base::after,
+.product-bg-ambient {
+  display: none !important;
+}
+
+.product-bg-texture {
+  opacity: 0.12;
+  animation: none !important;
+}
+
+.studerria-codex-cursor-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  color: rgba(78, 96, 198, 0.58);
+  opacity: 0.36;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  contain: strict;
+}
+
+body.theme-dark .studerria-codex-cursor-canvas {
+  color: rgba(191, 169, 255, 0.72);
+  mix-blend-mode: screen;
+}

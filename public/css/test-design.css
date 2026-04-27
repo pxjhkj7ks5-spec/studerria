@@ -978,6 +978,22 @@ body[data-theme="dark"] .td-brand-logo--dark {
   margin-top: 5px;
 }
 
+.td-lite-sheet-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+}
+
+.td-lite-sheet-footer .td-secondary-button {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.td-lite-release-list--full {
+  max-height: none;
+  padding-right: 0;
+}
+
 .td-language-pill {
   min-height: 34px;
   padding: 0 12px;

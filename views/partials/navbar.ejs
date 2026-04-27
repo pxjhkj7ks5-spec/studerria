@@ -95,7 +95,25 @@
       ? fallbackLimitedStaffNav
       : (hasRole('teacher') ? fallbackTeacherNav : fallbackStudentNav));
   const safeNavItems = markCurrent(providedNavItems.length ? providedNavItems : fallbackNavItems);
-  const visibleNavItems = safeNavItems.filter((item) => !item.hidden && String(item.section || 'main') === 'main');
+  const flattenSidebarItems = (items) => items.reduce((result, item) => {
+    if (!item || item.hidden || String(item.section || 'main') !== 'main') {
+      return result;
+    }
+    const children = Array.isArray(item.children) ? item.children : [];
+    if ((item.href && !item.isDisabledLink) || item.navAction || !children.length || item.isCurrent || item.isCurrentContainer) {
+      result.push({
+        ...item,
+        children: [],
+        isCurrent: Boolean(item.isCurrent),
+        isCurrentContainer: Boolean(item.isCurrentContainer),
+      });
+    }
+    if (children.length) {
+      result.push(...flattenSidebarItems(children));
+    }
+    return result;
+  }, []);
+  const visibleNavItems = flattenSidebarItems(safeNavItems);
   const shouldRenderAppNav = safeForceAppNavbar || (isAuthed && visibleNavItems.length > 0);
   const allowMessages = Boolean(safeUserNav && safeUserNav.flags && safeUserNav.flags.allowMessages);
   const personalLabel = String((safeNavMeta && safeNavMeta.personalLabel) || (safeUserNav && safeUserNav.personalLabel) || 'Особисте').trim() || 'Особисте';

@@ -2184,15 +2184,16 @@
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/pages/schedule.css" />
+    <link rel="stylesheet" href="/css/studerria-background.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
-    <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/navbar-enhanced.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <%- include('partials/studerria-system-head') %>
     <script src="/js/schedule-zoom-fallback.js" defer></script>
   </head>
-  <body class="studerria-theme theme-dark page-schedule page-local-topbar">
+  <body class="studerria-theme theme-dark page-schedule page-local-topbar page-authenticated page-app-shell">
     <%- include('partials/theme-bootstrap-body') %>
-    <%- include('partials/dynamic-bg') %>
+    <%- include('partials/studerria-background') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
     <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
       <div class="drawer-head">
@@ -2351,6 +2352,28 @@
           </div>
         <% } %>
 
+        <aside class="td-floating-next schedule-floating-next" data-next-class aria-live="polite" aria-label="Найближча пара">
+          <span data-next-kind>Next</span>
+          <strong data-next-label>Пари завантажуються</strong>
+        </aside>
+
+        <section class="td-day-switcher schedule-day-switcher" aria-label="Дні тижня">
+          <% daysOfWeek.forEach(function(day) { %>
+            <% const dayEntries = scheduleByDay[day] || []; %>
+            <% const dayDateValue = dayDates && dayDates[day] ? dayDates[day] : ''; %>
+            <% const dayNumber = dayDateValue ? new Date(dayDateValue).toLocaleDateString(localeCode, { day: '2-digit', timeZone: 'Europe/Kyiv' }) : ''; %>
+            <a
+              class="td-day-pill schedule-day-pill <%= dayEntries.length ? 'has-classes' : 'is-quiet' %>"
+              href="#day-<%= day %>"
+              data-schedule-day-link="<%= day %>"
+            >
+              <span><%= day.slice(0, 3) %></span>
+              <strong><%= dayNumber || day %></strong>
+              <small><%= dayEntries.length ? `${dayEntries.length} ${dayEntries.length === 1 ? 'пара' : 'пари'}` : 'вільно' %></small>
+            </a>
+          <% }); %>
+        </section>
+
         <div id="scheduleWeekGrid">
         <% daysOfWeek.forEach(function(day) { %>
           <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
@@ -2368,7 +2391,7 @@
             <% if (currentStreak > maxStreak) { maxStreak = currentStreak; } %>
           <% } %>
           <% const isDenseDay = maxStreak >= 3; %>
-          <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
+          <div id="day-<%= day %>" class="card mb-3 glass day-card liquid-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
             <div class="day-header">
               <div class="day-title">
                 <span class="day-name dayTitle"><%= day %></span>
@@ -6120,24 +6143,6 @@
       updateDailyPhrase();
       scheduleNextMidnight();
 
-      const themeToggles = document.querySelectorAll('.theme-toggle');
-      const storedTheme = localStorage.getItem('ui-theme') || 'theme-light';
-      document.body.classList.remove('theme-dark', 'theme-light');
-      document.body.classList.add(storedTheme);
-      themeToggles.forEach((btn) => {
-        btn.textContent = storedTheme === 'theme-dark' ? btn.dataset.lightLabel : btn.dataset.darkLabel;
-        btn.addEventListener('click', () => {
-          const isDark = document.body.classList.contains('theme-dark');
-          const next = isDark ? 'theme-light' : 'theme-dark';
-          document.body.classList.remove('theme-dark', 'theme-light');
-          document.body.classList.add(next);
-          localStorage.setItem('ui-theme', next);
-          themeToggles.forEach((b) => {
-            b.textContent = next === 'theme-dark' ? b.dataset.lightLabel : b.dataset.darkLabel;
-          });
-        });
-      });
-
       document.querySelectorAll('.file-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
           const target = btn.dataset.fileTarget;
@@ -6161,8 +6166,84 @@
         const instance = bootstrap.Modal.getInstance(openModal);
         if (instance) instance.hide();
       });
+
+      function initLiquidScheduleStatus() {
+        const dayLinks = Array.from(document.querySelectorAll('[data-schedule-day-link]'));
+        const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+        dayLinks.forEach((link) => {
+          const day = link.dataset.scheduleDayLink || '';
+          const card = document.getElementById(`day-${day}`);
+          const date = card ? String(card.dataset.dayDate || '') : '';
+          if (date && date === todayIso) {
+            link.classList.add('is-today', 'is-active');
+            link.setAttribute('aria-current', 'date');
+          }
+        });
+
+        const chip = document.querySelector('[data-next-class]');
+        if (!chip) return;
+        const kind = chip.querySelector('[data-next-kind]');
+        const label = chip.querySelector('[data-next-label]');
+        const cards = Array.from(document.querySelectorAll('.schedule-card[data-date][data-time-base]'));
+        const now = new Date();
+        const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+        const nowMinutes = Number(now.toLocaleTimeString('en-GB', {
+          timeZone: 'Europe/Kyiv',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).replace(':', ''));
+
+        const parseTime = (timeValue) => {
+          const match = String(timeValue || '').match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+          if (!match) return null;
+          return {
+            start: Number(`${match[1].padStart(2, '0')}${match[2]}`),
+            end: Number(`${match[3].padStart(2, '0')}${match[4]}`),
+            startLabel: `${match[1].padStart(2, '0')}:${match[2]}`,
+            endLabel: `${match[3].padStart(2, '0')}:${match[4]}`,
+          };
+        };
+
+        const todayCards = cards
+          .filter((card) => String(card.dataset.date || '') === today)
+          .map((card) => ({ card, time: parseTime(card.dataset.timeBase || card.dataset.time || '') }))
+          .filter((item) => item.time)
+          .sort((a, b) => a.time.start - b.time.start);
+
+        const active = todayCards.find((item) => nowMinutes >= item.time.start && nowMinutes <= item.time.end);
+        const next = todayCards.find((item) => nowMinutes < item.time.start);
+        const selected = active || next;
+
+        cards.forEach((card) => card.classList.remove('is-now', 'is-next'));
+        if (active) active.card.classList.add('is-now');
+        if (!active && next) next.card.classList.add('is-next');
+
+        if (!todayCards.length) {
+          if (kind) kind.textContent = 'Free';
+          if (label) label.textContent = 'No classes today';
+          return;
+        }
+        if (!selected) {
+          if (kind) kind.textContent = 'Done';
+          if (label) label.textContent = 'Done for today';
+          return;
+        }
+
+        const subject = selected.card.dataset.subject || selected.card.dataset.class || 'Пара';
+        const room = selected.card.dataset.roomLabel ? ` · ауд. ${selected.card.dataset.roomLabel}` : '';
+        if (active) {
+          if (kind) kind.textContent = 'Now';
+          if (label) label.textContent = `Now: ${subject} · до ${selected.time.endLabel}${room}`;
+        } else {
+          if (kind) kind.textContent = 'Next';
+          if (label) label.textContent = `Next: ${subject} · ${selected.time.startLabel}${room}`;
+        }
+      }
+
+      initLiquidScheduleStatus();
     </script>
       <script src="/js/design-system.js" defer></script>
-    <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+    <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

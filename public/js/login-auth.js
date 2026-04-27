@@ -25,12 +25,6 @@
     });
   }
 
-  document.addEventListener('click', function(event) {
-    var toggle = event.target && event.target.closest ? event.target.closest('[data-theme-toggle]') : null;
-    if (!toggle) return;
-    applyTheme(readTheme() === 'dark' ? 'light' : 'dark');
-  });
-
   function initPasswordReveal() {
     var input = document.querySelector('[data-password-input]');
     var button = document.querySelector('[data-password-reveal]');
@@ -212,5 +206,4 @@
   applyTheme(readTheme());
   initPasswordReveal();
   initChangelog();
-  initCodexCursor();
 })();

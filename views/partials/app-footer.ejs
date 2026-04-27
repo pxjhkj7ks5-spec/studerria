@@ -16,8 +16,9 @@
     offline: t('footer.offline'),
   };
 %>
-<footer class="app-footer text-center py-4">
+<footer class="app-footer td-login-footer text-center py-4">
   <small class="<%= footerMetaClassList.join(' ') %>">
+    <button type="button" class="td-language-pill">UA</button>
     <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
       &copy; A.M.
     </span>
@@ -47,6 +48,10 @@
     >
       <%= t('footer.changelog') %>
     </button>
+    <a class="footer-link" href="/changelog">Всі зміни</a>
+    <a class="footer-link" href="/terms">Умови використання</a>
+    <a class="footer-link" href="/privacy">Політика конфіденційності</a>
+    <a class="footer-link" href="/help">Підтримка</a>
   </small>
 </footer>
 <script>

@@ -40,18 +40,6 @@
   </head>
   <body class="studerria-theme theme-light td-page td-page--login page-register" data-theme="light">
     <%- include('partials/theme-bootstrap-body') %>
-    <div class="theme-toggle-floating">
-      <button
-        class="theme-toggle-min"
-        type="button"
-        id="themeToggle"
-        aria-label="Toggle theme"
-        data-light-label="☀️"
-        data-dark-label="🌙"
-      >
-        🌙
-      </button>
-    </div>
     <main class="td-login-main">
       <section class="td-login-brand" aria-label="Studerria">
         <span class="td-login-logo" aria-hidden="true">
@@ -90,7 +78,7 @@
 
           <label class="td-field" for="password">
             <span><%= t('register.password') %></span>
-            <span class="td-input-wrap input-with-icon">
+            <span class="td-input-wrap td-input-wrap--password input-with-icon">
               <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
               <input
                 id="password"
@@ -101,13 +89,16 @@
                 minlength="8"
                 required
               />
-              <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
+              <button class="td-password-reveal is-visible" type="button" id="togglePassword" aria-label="Показати пароль">
+                <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
+                <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
+              </button>
             </span>
           </label>
 
           <label class="td-field" for="confirm_password">
             <span><%= t('register.confirmPassword') %></span>
-            <span class="td-input-wrap input-with-icon">
+            <span class="td-input-wrap td-input-wrap--password input-with-icon">
               <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
               <input
                 id="confirm_password"
@@ -118,14 +109,22 @@
                 minlength="8"
                 required
               />
-              <button class="icon-btn" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">👀</button>
+              <button class="td-password-reveal is-visible" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">
+                <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
+                <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
+              </button>
             </span>
           </label>
 
           <div class="td-form-row td-form-row--stack">
             <label class="td-checkbox" for="agree">
               <input type="checkbox" id="agree" name="agree" required />
-              <span><%= t('register.agree') %></span>
+              <span>
+                Я погоджуюсь із
+                <a href="/terms" target="_blank" rel="noopener">умовами використання</a>,
+                <a href="/privacy" target="_blank" rel="noopener">політикою конфіденційності</a>
+                та даю згоду на обробку персональних даних для роботи Studerria.
+              </span>
             </label>
             <button
               type="button"
@@ -153,6 +152,8 @@
         <span data-theme-label>Dark</span>
       </button>
       <a href="/help">Підтримка</a>
+      <a href="/terms">Умови використання</a>
+      <a href="/privacy">Політика конфіденційності</a>
       <button type="button" class="td-footer-link" data-bs-toggle="modal" data-bs-target="#changelogModal">Changelog</button>
       <span>© Studerria 2026</span>
     </footer>
@@ -270,7 +271,7 @@
         btn.addEventListener('click', () => {
           const isHidden = input.type === 'password';
           input.type = isHidden ? 'text' : 'password';
-          btn.textContent = isHidden ? '🙈' : '👀';
+          btn.classList.toggle('is-showing', isHidden);
           btn.setAttribute('aria-label', isHidden ? 'Сховати пароль' : 'Показати пароль');
         });
       };
@@ -406,7 +407,7 @@
           }
         });
       }
-      const themeToggle = document.getElementById('themeToggle');
+      const themeToggle = document.getElementById('tdThemeToggleMirror');
       const applyThemeAttr = () => {
         if (document.body.classList.contains('theme-dark')) {
           document.body.setAttribute('data-theme', 'dark');
@@ -420,15 +421,10 @@
       document.body.classList.remove('theme-light', 'theme-dark');
       document.body.classList.add(savedTheme);
       applyThemeAttr();
-      themeToggle.textContent = savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
-      themeToggle.addEventListener('click', () => {
-        const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
-        document.body.classList.remove('theme-light', 'theme-dark');
-        document.body.classList.add(next);
-        applyThemeAttr();
-        localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
-      });
+      if (themeToggle) {
+        const label = themeToggle.querySelector('[data-theme-label]');
+        if (label) label.textContent = savedTheme === 'theme-dark' ? 'Light' : 'Dark';
+      }
 
       const tdThemeToggle = document.getElementById('tdThemeToggleMirror');
       const syncTdThemeToggle = () => {
@@ -447,5 +443,6 @@
         syncTdThemeToggle();
       }
     </script>
+    <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>

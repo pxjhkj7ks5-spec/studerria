@@ -12492,6 +12492,26 @@ function buildAcademicV2StudentProjectionAlert(req, issues = {}, context = 'subj
   };
 }
 
+function logAcademicV2StudentProjection(context, userId, state = {}) {
+  const issues = state && state.projectionIssues && typeof state.projectionIssues === 'object'
+    ? state.projectionIssues
+    : {};
+  if (!issues.has_issues) {
+    return;
+  }
+  const summary = {
+    context,
+    user_id: Number(userId || 0) || null,
+    missing_scope: Boolean(issues.missing_scope),
+    missing_active_term: Boolean(issues.missing_active_term),
+    missing_legacy_course: Boolean(issues.missing_legacy_course),
+    missing_legacy_semester: Boolean(issues.missing_legacy_semester),
+    unmapped_subjects: Array.isArray(issues.unmapped_subjects) ? issues.unmapped_subjects.length : 0,
+    unmapped_schedule_entries: Array.isArray(issues.unmapped_schedule_entries) ? issues.unmapped_schedule_entries.length : 0,
+  };
+  console.warn('Academic v2 student projection incomplete', summary);
+}
+
 function buildAcademicV2CourseProjectionAlert(req, issues = {}, context = 'course') {
   const normalizedIssues = issues && typeof issues === 'object' ? issues : {};
   const hasIssues = Boolean(
@@ -18363,6 +18383,8 @@ app.get(['/terms', '/privacy'], (req, res) => {
     layout: false,
   });
 });
+
+app.get('/changelog', (req, res) => res.render('changelog', { layout: false }));
 
 app.get('/about', requireLogin, (req, res) => {
   const aboutCards = [
