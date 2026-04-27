@@ -2287,12 +2287,17 @@ body[data-theme="dark"] .td-brand-logo--dark {
 .td-empty-orb {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgba(98, 117, 255, 0.16);
-  border-radius: 16px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(98, 117, 255, 0.12);
+  border-radius: 13px;
   color: #526bff;
-  background: rgba(239, 246, 255, 0.78);
+  background: rgba(239, 246, 255, 0.52);
+}
+
+.td-next-card-icon {
+  width: 17px;
+  height: 17px;
 }
 
 .td-next-card strong,

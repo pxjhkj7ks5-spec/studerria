@@ -152,7 +152,7 @@
                   <span><strong>1</strong><small>Дедлайн</small></span>
                 </div>
                 <div class="td-next-card">
-                  <span class="td-next-icon"><%- include('partials/test-icon', { name: 'calendarCheck', className: 'td-stat-svg' }) %></span>
+                  <span class="td-next-icon"><%- include('partials/test-icon', { name: 'clock', className: 'td-next-card-icon' }) %></span>
                   <div>
                     <strong>Наступна пара</strong>
                     <span>Бази даних · 11:00 · ауд. 301</span>
@@ -174,13 +174,6 @@
                 </div>
               </section>
 
-              <section class="td-empty-state td-surface-card" aria-label="Приклад порожнього дня">
-                <span class="td-empty-orb"><%- include('partials/test-icon', { name: 'calendar', className: 'td-empty-icon' }) %></span>
-                <div>
-                  <h2>Неділя вільна</h2>
-                  <p>Коли на день немає пар, показуємо спокійний empty state замість порожньої області.</p>
-                </div>
-              </section>
             </aside>
           </section>
         </main>
