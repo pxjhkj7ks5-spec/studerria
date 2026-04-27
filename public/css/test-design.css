@@ -633,6 +633,17 @@ body[data-theme="dark"] .td-brand-logo--dark {
   padding: 30px;
 }
 
+.td-login-alert {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  color: var(--td-text);
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  border-radius: var(--td-radius-sm);
+  background: rgba(248, 113, 113, 0.12);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
 .td-login-card-head {
   margin-bottom: 24px;
   text-align: center;
@@ -783,6 +794,20 @@ body[data-theme="dark"] .td-brand-logo--dark {
 }
 
 .td-login-footer a:hover {
+  color: var(--td-primary);
+}
+
+.td-footer-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--td-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.td-footer-link:hover {
   color: var(--td-primary);
 }
 

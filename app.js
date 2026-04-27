@@ -18267,6 +18267,7 @@ app.get('/', (req, res) => {
   res.render('login', {
     error: Boolean(loginErrorText),
     loginErrorText,
+    layout: false,
   });
 });
 
@@ -18279,6 +18280,7 @@ app.get('/login', (req, res) => {
   res.render('login', {
     error: Boolean(loginErrorText),
     loginErrorText,
+    layout: false,
   });
 });
 

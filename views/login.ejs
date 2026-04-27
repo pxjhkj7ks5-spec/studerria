@@ -1,34 +1,14 @@
 <!doctype html>
-<html lang="<%= lang %>">
+<html lang="uk" data-theme="light">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'dark' }) %>
+    <%- include('partials/test-theme-head') %>
+    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <title><%= t('login.title') %></title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
-      crossorigin="anonymous"
-    />
     <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
-    <link rel="stylesheet" href="/css/pages/auth.css" />
   </head>
-  <body class="studerria-theme theme-dark td-page td-page--login page-login" data-theme="dark">
-    <%- include('partials/theme-bootstrap-body') %>
-    <div class="theme-toggle-floating">
-      <button
-        class="theme-toggle-min"
-        type="button"
-        id="themeToggle"
-        aria-label="Toggle theme"
-        data-light-label="☀️"
-        data-dark-label="🌙"
-      >
-        🌙
-      </button>
-    </div>
+  <body class="td-page td-page--login" data-theme="light">
     <main class="td-login-main">
       <section class="td-login-brand" aria-label="Studerria">
         <span class="td-login-logo" aria-hidden="true">
@@ -36,28 +16,28 @@
         </span>
       </section>
 
-      <section class="td-login-card td-glass-panel tooltip-host" aria-label="<%= t('login.title') %>">
+      <section class="td-login-card td-glass-panel" aria-label="<%= t('login.title') %>">
         <header class="td-login-card-head">
-          <h1><%= t('login.title') %></h1>
-          <p>Раді бачити тебе знову.</p>
+          <h1>Вхід</h1>
+          <p>Раді бачити тебе знову! 👋</p>
         </header>
 
         <% if (error) { %>
-          <div class="alert alert-danger login-feedback-stack" role="alert">
+          <div class="td-login-alert" role="alert">
             <%= loginErrorText || t('login.error') %>
           </div>
         <% } %>
 
         <form id="loginForm" class="td-form" method="POST" action="/login">
           <label class="td-field" for="full_name">
-            <span><%= t('login.fullName') %></span>
+            <span>Email або логін</span>
             <span class="td-input-wrap">
               <%- include('partials/test-icon', { name: 'mail', className: 'td-input-icon' }) %>
               <input
                 id="full_name"
                 name="full_name"
                 type="text"
-                placeholder="<%= t('login.fullNamePlaceholder') %>"
+                placeholder="Введіть email або логін"
                 autocomplete="username"
                 required
               />
@@ -66,7 +46,7 @@
 
           <label class="td-field" for="password">
             <span><%= t('login.password') %></span>
-            <span class="td-input-wrap input-with-icon">
+            <span class="td-input-wrap">
               <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
               <input
                 id="password"
@@ -76,187 +56,36 @@
                 autocomplete="current-password"
                 required
               />
-              <button class="icon-btn" type="button" id="togglePassword" aria-label="Показати пароль">👀</button>
             </span>
           </label>
 
           <div class="td-form-row">
-            <span class="helper"><%= t('login.forgot') %></span>
+            <label class="td-checkbox">
+              <input type="checkbox" name="remember" />
+              <span>Запамʼятати мене</span>
+            </label>
+            <a href="/help">Забули пароль?</a>
           </div>
 
-          <button type="submit" class="td-primary-button"><%= t('login.signIn') %></button>
+          <button class="td-primary-button" type="submit">Увійти</button>
         </form>
 
-        <p class="td-login-bottom"><%= lang === 'en' ? 'No account yet?' : 'Ще немає акаунту?' %> <a href="/register"><%= t('login.createAccount') %></a></p>
+        <p class="td-login-bottom">Ще немає акаунту? <a href="/register">Зареєструватися</a></p>
       </section>
     </main>
 
     <footer class="td-login-footer">
       <button type="button" class="td-language-pill">UA <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
-      <button type="button" class="td-language-pill td-theme-toggle" id="tdThemeToggleMirror" aria-label="Увімкнути темну тему" aria-pressed="false">
+      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="Увімкнути темну тему" aria-pressed="false">
         <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
         <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
         <span data-theme-label>Dark</span>
       </button>
       <a href="/help">Підтримка</a>
-      <button type="button" class="td-footer-link" data-bs-toggle="modal" data-bs-target="#changelogModal">Changelog</button>
+      <a href="/terms">Умови використання</a>
+      <a href="/privacy">Політика конфіденційності</a>
       <span>© Studerria 2026</span>
     </footer>
-
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-      crossorigin="anonymous"
-    ></script>
-    <%- include('partials/changelog-modal') %>
-    <script>
-      function showCustomTooltip(el, message) {
-        document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
-        const anchor = el.closest('.input-with-icon') || el.closest('.form-check') || el.closest('.input-group') || el;
-        const tooltipHost = anchor.closest('.tooltip-host');
-        const renderHost = tooltipHost || document.body;
-        const key = el.id || el.name || anchor.id || '';
-        const tip = document.createElement('div');
-        tip.className = 'custom-tooltip';
-        tip.textContent = message || 'Перевірте поле';
-        if (key) tip.dataset.for = key;
-        renderHost.appendChild(tip);
-
-        const rect = anchor.getBoundingClientRect();
-        const tipRect = tip.getBoundingClientRect();
-        const margin = 10;
-        const viewportPadding = 8;
-        const arrowPadding = 18;
-        let anchorCenter = rect.left + (rect.width / 2);
-        let top = rect.bottom + margin;
-        let left = anchorCenter - (tipRect.width / 2);
-        let placeBelow = true;
-        if (tooltipHost) {
-          const hostRect = tooltipHost.getBoundingClientRect();
-          const hostHeight = Math.max(hostRect.height, tooltipHost.scrollHeight, tooltipHost.clientHeight);
-          anchorCenter = (rect.left - hostRect.left) + (rect.width / 2);
-          top = (rect.bottom - hostRect.top) + margin;
-          left = anchorCenter - (tipRect.width / 2);
-          const aboveTop = (rect.top - hostRect.top) - tipRect.height - margin;
-          if (top + tipRect.height > hostHeight - viewportPadding && aboveTop >= -viewportPadding) {
-            top = aboveTop;
-            placeBelow = false;
-          }
-          const maxLeft = Math.max(viewportPadding, hostRect.width - tipRect.width - viewportPadding);
-          if (left > maxLeft) left = maxLeft;
-          if (left < viewportPadding) left = viewportPadding;
-          tip.style.position = 'absolute';
-        } else {
-          if (top + tipRect.height > window.innerHeight - viewportPadding) {
-            top = rect.top - tipRect.height - margin;
-            placeBelow = false;
-          }
-          if (left + tipRect.width > window.innerWidth - viewportPadding) {
-            left = window.innerWidth - tipRect.width - viewportPadding;
-          }
-          if (left < viewportPadding) left = viewportPadding;
-          tip.style.position = 'fixed';
-        }
-        const arrowLeft = Math.max(
-          arrowPadding,
-          Math.min(tipRect.width - arrowPadding, anchorCenter - left)
-        );
-        tip.style.top = `${Math.round(top)}px`;
-        tip.style.left = `${Math.round(left)}px`;
-        tip.style.setProperty('--tooltip-arrow-left', `${Math.round(arrowLeft)}px`);
-        if (placeBelow) tip.classList.add('below');
-        requestAnimationFrame(() => tip.classList.add('show'));
-        const remove = () => tip.remove();
-        tip.addEventListener('click', remove);
-        setTimeout(remove, 3500);
-      }
-
-      function attachValidationTooltips(root = document) {
-        root.querySelectorAll('input, select, textarea').forEach((el) => {
-          el.addEventListener('invalid', (event) => {
-            event.preventDefault();
-            showCustomTooltip(el, el.validationMessage);
-          });
-          el.addEventListener('input', () => {
-            document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
-          });
-          el.addEventListener('blur', () => {
-            document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
-          });
-        });
-      }
-
-      attachValidationTooltips();
-
-      const loginForm = document.getElementById('loginForm');
-      const nameInput = document.getElementById('full_name');
-      const pwdInput = document.getElementById('password');
-      if (nameInput && pwdInput) {
-        nameInput.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            pwdInput.focus();
-          }
-        });
-      }
-      if (loginForm) {
-        loginForm.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            loginForm.requestSubmit();
-          }
-        });
-      }
-      const toggle = document.getElementById('togglePassword');
-      const pwd = document.getElementById('password');
-      if (toggle && pwd) {
-        toggle.addEventListener('click', () => {
-          const isHidden = pwd.type === 'password';
-          pwd.type = isHidden ? 'text' : 'password';
-          toggle.textContent = isHidden ? '🙈' : '👀';
-          toggle.setAttribute('aria-label', isHidden ? 'Сховати пароль' : 'Показати пароль');
-        });
-      }
-      const themeToggle = document.getElementById('themeToggle');
-      const applyThemeAttr = () => {
-        if (document.body.classList.contains('theme-dark')) {
-          document.body.setAttribute('data-theme', 'dark');
-          document.documentElement.setAttribute('data-theme', 'dark');
-        } else {
-          document.body.setAttribute('data-theme', 'light');
-          document.documentElement.setAttribute('data-theme', 'light');
-        }
-      };
-      const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
-      document.body.classList.remove('theme-light', 'theme-dark');
-      document.body.classList.add(savedTheme);
-      applyThemeAttr();
-      themeToggle.textContent = savedTheme === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
-      themeToggle.addEventListener('click', () => {
-        const next = document.body.classList.contains('theme-dark') ? 'theme-light' : 'theme-dark';
-        document.body.classList.remove('theme-light', 'theme-dark');
-        document.body.classList.add(next);
-        applyThemeAttr();
-        localStorage.setItem('ui-theme', next);
-        themeToggle.textContent = next === 'theme-dark' ? themeToggle.dataset.lightLabel : themeToggle.dataset.darkLabel;
-      });
-
-      const tdThemeToggle = document.getElementById('tdThemeToggleMirror');
-      const syncTdThemeToggle = () => {
-        if (!tdThemeToggle) return;
-        const isDark = document.body.classList.contains('theme-dark');
-        tdThemeToggle.setAttribute('aria-pressed', String(isDark));
-        tdThemeToggle.setAttribute('aria-label', isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему');
-        const label = tdThemeToggle.querySelector('[data-theme-label]');
-        if (label) label.textContent = isDark ? 'Light' : 'Dark';
-      };
-      if (tdThemeToggle) {
-        tdThemeToggle.addEventListener('click', () => {
-          themeToggle.click();
-          syncTdThemeToggle();
-        });
-        syncTdThemeToggle();
-      }
-    </script>
+    <script src="/js/login-auth.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
