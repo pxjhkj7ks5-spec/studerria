@@ -2,7 +2,7 @@
   const safeForceAppNavbar = (typeof forceAppNavbar !== 'undefined') && Boolean(forceAppNavbar);
   const safeShowGlobalNavbar = (typeof showGlobalNavbar === 'undefined') ? true : showGlobalNavbar !== false;
   const safeUserNav = (typeof userNav !== 'undefined' && userNav) ? userNav : null;
-  const safeNavItems = Array.isArray(typeof navItems !== 'undefined' ? navItems : null) ? navItems : [];
+  const providedNavItems = Array.isArray(typeof navItems !== 'undefined' ? navItems : null) ? navItems : [];
   const safeNavMeta = (typeof navMeta !== 'undefined' && navMeta) ? navMeta : null;
   const translate = (typeof t === 'function') ? t : null;
 
@@ -10,7 +10,91 @@
   const currentRole = String((safeUserNav && safeUserNav.role) || role || '').trim();
   const userRoles = Array.isArray(safeUserNav && safeUserNav.roles) ? safeUserNav.roles : (currentRole ? [currentRole] : []);
   const isAuthed = Boolean(safeUserNav && safeUserNav.isAuthenticated) || Boolean(currentRole);
+  const activeRawPath = String((typeof currentPath !== 'undefined' && currentPath) || '').split('#')[0] || '';
+  const activePath = activeRawPath.split('?')[0] || '';
+  const activeNavId = String((typeof activePage !== 'undefined' && activePage) || '').trim();
   const displayName = String((safeUserNav && safeUserNav.name) || username || '').trim();
+  const normalizeRole = (value) => String(value || '').trim().toLowerCase();
+  const normalizedRoleSet = new Set(userRoles.map(normalizeRole).filter(Boolean));
+  if (currentRole) normalizedRoleSet.add(normalizeRole(currentRole));
+  const hasRole = (...roles) => roles.some((roleKey) => normalizedRoleSet.has(normalizeRole(roleKey)));
+  const markCurrent = (items) => items.map((item) => {
+    const next = { ...item };
+    const hrefRaw = String(next.href || '');
+    const hrefNoHash = hrefRaw.split('#')[0] || '';
+    const hrefPath = hrefNoHash.split('?')[0] || '';
+    const hasHrefQuery = hrefRaw.includes('?');
+    const hasHrefHash = hrefRaw.includes('#');
+    const isCurrent = activeNavId
+      ? String(next.id || '') === activeNavId
+      : Boolean(
+        activePath
+          && hrefPath
+          && !hasHrefHash
+          && (
+            (hasHrefQuery && activeRawPath === hrefNoHash)
+            || (!hasHrefQuery && (activePath === hrefPath || (hrefPath !== '/' && activePath.startsWith(`${hrefPath}/`))))
+          )
+      );
+    if (isCurrent) next.isCurrent = true;
+    if (Array.isArray(next.children) && next.children.length) {
+      next.children = markCurrent(next.children);
+      if (next.children.some((child) => child.isCurrent || child.isCurrentContainer)) {
+        next.isCurrentContainer = true;
+      }
+    }
+    return next;
+  });
+  const fallbackStudentNav = [
+    { id: 'home', label: 'Home', href: '/home' },
+    { id: 'schedule', label: 'Schedule', href: '/schedule' },
+    { id: 'homework', label: 'Homework', href: '/schedule#homework' },
+    { id: 'messages', label: 'Messages', href: '/schedule?panel=messages', navAction: 'messages' },
+    { id: 'teamwork', label: 'Teamwork', href: '/teamwork' },
+    { id: 'subjects', label: 'Resources', href: '/subjects' },
+    { id: 'profile', label: 'Profile', href: '/profile' },
+    { id: 'help', label: 'Help', href: '/help' },
+    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+  ];
+  const fallbackStaffNav = [
+    { id: 'admin', label: 'Dashboard', href: '/admin' },
+    { id: 'schedule', label: 'Schedule', href: '/schedule' },
+    { id: 'admin-schedule', label: 'Schedule list', href: '/admin/schedule-list' },
+    { id: 'admin-students', label: 'Students', href: '/admin?tab=admin-users' },
+    { id: 'admin-groups', label: 'Groups', href: '/admin?tab=admin-users' },
+    { id: 'admin-subjects', label: 'Subjects', href: '/admin?tab=admin-subjects' },
+    { id: 'admin-homework', label: 'Homework', href: '/admin?tab=admin-homework' },
+    { id: 'messages', label: 'Messages', href: '/admin?tab=admin-messages' },
+    { id: 'setup', label: 'Academic Setup', href: '/admin/pathways' },
+    { id: 'reports', label: 'Reports', href: '/admin/overview' },
+    { id: 'profile', label: 'Settings', href: '/profile' },
+    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+  ];
+  const fallbackLimitedStaffNav = [
+    { id: 'admin', label: 'Dashboard', href: '/admin' },
+    { id: 'schedule', label: 'Schedule', href: '/schedule' },
+    { id: 'admin-homework', label: 'Homework', href: '/admin?tab=admin-homework' },
+    { id: 'admin-teamwork', label: 'Teamwork', href: '/admin?tab=admin-teamwork' },
+    { id: 'messages', label: 'Messages', href: '/admin?tab=admin-messages' },
+    { id: 'profile', label: 'Settings', href: '/profile' },
+    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+  ];
+  const fallbackTeacherNav = [
+    { id: 'teacher-hub', label: 'Home', href: '/teacher' },
+    { id: 'schedule', label: 'Schedule', href: '/schedule' },
+    { id: 'teacher-subjects', label: 'Subjects', href: '/teacher/subjects' },
+    { id: 'teacher-workspace', label: 'Homework', href: '/teacher/workspace' },
+    { id: 'journal', label: 'Journal', href: '/journal' },
+    { id: 'messages', label: 'Messages', href: '/schedule?panel=messages', navAction: 'messages' },
+    { id: 'profile', label: 'Settings', href: '/profile' },
+    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+  ];
+  const fallbackNavItems = hasRole('admin')
+    ? fallbackStaffNav
+    : (hasRole('deanery', 'starosta')
+      ? fallbackLimitedStaffNav
+      : (hasRole('teacher') ? fallbackTeacherNav : fallbackStudentNav));
+  const safeNavItems = markCurrent(providedNavItems.length ? providedNavItems : fallbackNavItems);
   const visibleNavItems = safeNavItems.filter((item) => !item.hidden && String(item.section || 'main') === 'main');
   const shouldRenderAppNav = safeForceAppNavbar || (isAuthed && visibleNavItems.length > 0);
   const allowMessages = Boolean(safeUserNav && safeUserNav.flags && safeUserNav.flags.allowMessages);
@@ -26,6 +110,7 @@
   const displayRoleText = displayName
     ? `${displayRoleLabel}: ${displayName}`
     : displayRoleLabel;
+  const userInitial = (displayName || displayRoleLabel || 'S').trim().charAt(0).toUpperCase() || 'S';
   const mobileGlyphMap = {
     admin: 'AD',
     deanery: 'DN',
@@ -141,6 +226,9 @@
     if (item.isCurrentContainer) {
       classNames.push('is-current');
     }
+    if (item.isCurrent) {
+      classNames.push('is-current');
+    }
     return classNames.join(' ');
   };
 
@@ -153,7 +241,8 @@
     if (Array.isArray(item.children) && item.children.length && level > 0) {
       indicator = '<span class="snav-indicator snav-indicator--submenu" aria-hidden="true">&rsaquo;</span>';
     }
-    return `<span class="snav-label">${label}${unreadMarker}</span>${indicator}`;
+    const icon = `<span class="snav-icon" data-snav-icon="${escapeHtml(item.id || 'nav')}" aria-hidden="true"></span>`;
+    return `${icon}<span class="snav-label">${label}${unreadMarker}</span>${indicator}`;
   };
 
   const renderTrigger = (item, level) => {
@@ -197,6 +286,9 @@
       classNames.push('snav-item--has-children');
     }
     if (item.isCurrentContainer) {
+      classNames.push('is-current');
+    }
+    if (item.isCurrent) {
       classNames.push('is-current');
     }
 
@@ -283,7 +375,13 @@
         </div>
         <div class="d-flex align-items-center gap-2 topbar-actions snav-actions justify-content-end">
           <% if (displayRoleText) { %>
-            <span class="me-2 muted text-nowrap snav-user-meta"><%= displayRoleText %></span>
+            <div class="snav-account-card" aria-label="Поточний профіль">
+              <span class="snav-account-avatar" aria-hidden="true"><%= userInitial %></span>
+              <span class="snav-account-copy">
+                <span class="snav-account-name"><%= displayName || 'Studerria' %></span>
+                <span class="snav-user-meta"><%= displayRoleLabel || displayRoleText %></span>
+              </span>
+            </div>
           <% } %>
           <button
             type="button"

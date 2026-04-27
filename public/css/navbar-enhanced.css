@@ -800,3 +800,388 @@ body.theme-light .snav-mobile-logout-btn {
     display: none !important;
   }
 }
+
+@media (min-width: 992px) {
+  body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    position: fixed;
+    inset: 22px auto 22px 22px;
+    z-index: 1040;
+    width: 260px;
+    max-width: 260px;
+    height: auto;
+    margin: 0;
+    padding: 18px !important;
+    border-radius: 30px;
+    border-color: color-mix(in srgb, var(--studerria-topbar-border) 86%, rgba(191, 219, 254, 0.22)) !important;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 32%),
+      var(--studerria-topbar-bg) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(1.16) !important;
+    backdrop-filter: blur(24px) saturate(1.16) !important;
+    box-shadow:
+      0 26px 64px rgba(2, 6, 23, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+    overflow: hidden;
+  }
+
+  body.theme-light.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(232, 239, 252, 0.72)),
+      var(--studerria-topbar-bg) !important;
+    box-shadow:
+      0 22px 54px rgba(15, 23, 42, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  }
+
+  body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .container {
+    height: 100%;
+    min-height: 0;
+    padding: 0 !important;
+    align-items: stretch;
+    justify-content: flex-start !important;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-main {
+    min-height: 0;
+    flex: 1 1 auto;
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack {
+    gap: 8px;
+    padding: 4px 4px 0;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .navbar-brand.topbar-title-spotlight {
+    font-size: 1.18rem !important;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-spacer {
+    display: none;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-list {
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    padding: 2px;
+    scrollbar-width: thin;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item {
+    width: 100%;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link {
+    position: relative;
+    width: 100%;
+    min-height: 44px;
+    justify-content: flex-start;
+    gap: 11px;
+    padding: 0 13px;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    opacity: 0.86;
+    font-size: 0.92rem;
+    font-weight: 650;
+    letter-spacing: 0;
+    background: transparent;
+    box-shadow: none;
+    transition:
+      transform 190ms cubic-bezier(0.2, 0.9, 0.2, 1),
+      background 190ms ease,
+      border-color 190ms ease,
+      box-shadow 190ms ease,
+      opacity 190ms ease;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link::after {
+    display: none;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:hover,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-open > .snav-link {
+    transform: translateY(-1px);
+    opacity: 1;
+    border-color: rgba(165, 180, 252, 0.2);
+    background: rgba(255, 255, 255, 0.075);
+    box-shadow: 0 12px 24px rgba(2, 6, 23, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:hover,
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-open > .snav-link {
+    border-color: rgba(99, 102, 241, 0.18);
+    background: rgba(255, 255, 255, 0.54);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:active {
+    transform: translateY(1px) scale(0.99);
+    box-shadow: 0 6px 14px rgba(2, 6, 23, 0.12), inset 0 1px 4px rgba(2, 6, 23, 0.14);
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link[aria-current="page"] {
+    opacity: 1;
+    color: #eef2ff !important;
+    border-color: rgba(167, 139, 250, 0.44);
+    background:
+      linear-gradient(135deg, rgba(99, 102, 241, 0.42), rgba(96, 165, 250, 0.22)),
+      rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 16px 30px rgba(79, 70, 229, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-link[aria-current="page"] {
+    color: #25307a !important;
+    border-color: rgba(99, 102, 241, 0.32);
+    background:
+      linear-gradient(135deg, rgba(224, 231, 255, 0.96), rgba(219, 234, 254, 0.82)),
+      rgba(255, 255, 255, 0.72);
+    box-shadow: 0 14px 28px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  }
+
+  .snav-icon {
+    position: relative;
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+    color: currentColor;
+    opacity: 0.78;
+  }
+
+  .snav-icon::before,
+  .snav-icon::after {
+    content: "";
+    position: absolute;
+    display: block;
+    box-sizing: border-box;
+  }
+
+  .snav-icon::before {
+    inset: 2px;
+    border: 1.65px solid currentColor;
+    border-radius: 5px;
+  }
+
+  .snav-icon::after {
+    width: 4px;
+    height: 4px;
+    right: 1px;
+    top: 1px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 16%, transparent);
+  }
+
+  .snav-link:hover .snav-icon,
+  .snav-link:focus-visible .snav-icon,
+  .snav-item.is-current .snav-icon {
+    opacity: 1;
+  }
+
+  .snav-icon[data-snav-icon*="home"]::before,
+  .snav-icon[data-snav-icon="teacher-hub"]::before {
+    border-radius: 4px 4px 6px 6px;
+    transform: translateY(2px) rotate(45deg) scale(0.82);
+  }
+
+  .snav-icon[data-snav-icon*="schedule"]::before {
+    border-radius: 5px;
+  }
+
+  .snav-icon[data-snav-icon*="schedule"]::after {
+    left: 6px;
+    right: auto;
+    top: 6px;
+    width: 7px;
+    height: 1.6px;
+    border-radius: 999px;
+    box-shadow: 0 4px 0 currentColor;
+  }
+
+  .snav-icon[data-snav-icon*="message"]::before {
+    border-radius: 8px;
+  }
+
+  .snav-icon[data-snav-icon*="message"]::after {
+    right: 4px;
+    top: 11px;
+    width: 6px;
+    height: 6px;
+    border-radius: 0 0 2px 0;
+    transform: rotate(45deg);
+    box-shadow: none;
+  }
+
+  .snav-icon[data-snav-icon*="team"]::before,
+  .snav-icon[data-snav-icon*="student"]::before,
+  .snav-icon[data-snav-icon*="group"]::before {
+    width: 7px;
+    height: 7px;
+    inset: 2px auto auto 2px;
+    border-radius: 50%;
+  }
+
+  .snav-icon[data-snav-icon*="team"]::after,
+  .snav-icon[data-snav-icon*="student"]::after,
+  .snav-icon[data-snav-icon*="group"]::after {
+    left: 5px;
+    right: auto;
+    top: 10px;
+    width: 11px;
+    height: 6px;
+    border: 1.65px solid currentColor;
+    border-radius: 999px 999px 4px 4px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .snav-icon[data-snav-icon*="subject"]::before,
+  .snav-icon[data-snav-icon*="resources"]::before,
+  .snav-icon[data-snav-icon*="teacher-subjects"]::before {
+    border-radius: 3px 7px 7px 3px;
+  }
+
+  .snav-icon[data-snav-icon*="profile"]::before,
+  .snav-icon[data-snav-icon*="settings"]::before {
+    border-radius: 50%;
+  }
+
+  .snav-icon[data-snav-icon*="admin"]::before,
+  .snav-icon[data-snav-icon*="report"]::before {
+    border-radius: 4px;
+    box-shadow: inset 6px 0 0 color-mix(in srgb, currentColor 34%, transparent);
+  }
+
+  .snav-icon[data-snav-icon*="theme"]::before {
+    border-radius: 50%;
+  }
+
+  .snav-icon[data-snav-icon*="theme"]::after {
+    inset: 4px auto 4px 9px;
+    width: 6px;
+    height: 11px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: none;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-actions {
+    width: 100%;
+    margin-left: 0;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px !important;
+  }
+
+  .snav-account-card {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11);
+  }
+
+  body.theme-light .snav-account-card {
+    border-color: rgba(100, 116, 139, 0.16);
+    background: rgba(255, 255, 255, 0.58);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .snav-account-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+    font-weight: 750;
+    color: #eef2ff;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.92), rgba(168, 85, 247, 0.78));
+    box-shadow: 0 12px 22px rgba(79, 70, 229, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  }
+
+  .snav-account-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .snav-account-name,
+  .snav-user-meta {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .snav-account-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--studerria-topbar-text);
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-user-meta {
+    display: block;
+    max-width: none;
+    font-size: 0.76rem;
+    line-height: 1.25;
+    color: var(--studerria-topbar-muted) !important;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-logout-form {
+    width: 100%;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn {
+    width: 100% !important;
+    min-height: 42px !important;
+    padding: 0 13px !important;
+    justify-content: flex-start;
+    gap: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.18) !important;
+    border-radius: 16px !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    font-size: 0.9rem !important;
+    line-height: 1 !important;
+    opacity: 0.78;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn::after {
+    content: "Logout";
+    font-weight: 650;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studerria-nav-shell .snav-link,
+  .studerria-nav-shell .snav-menu-link,
+  .snav-mobile-panel,
+  .snav-mobile-link,
+  .snav-mobile-trigger {
+    transition: none !important;
+  }
+}

@@ -914,6 +914,7 @@ function splitRenderedDocument(renderedHtml) {
   const hasLegacyTopbar = /class=["'][^"']*\btopbar\b[^"']*["']/i.test(bodyContent);
   const hasStuderriaNavbar = /class=["'][^"']*\bstuderria-navbar\b[^"']*["']/i.test(bodyContent);
   const hasAdminNavbar = /<nav\b[^>]*class=["'][^"']*\badmin-nav\b[^"']*["'][^>]*>/i.test(bodyContent);
+  const hasAdminSidebar = /class=["'][^"']*\badmin-sidebar\b[^"']*["']/i.test(bodyContent);
 
   return {
     pageLang,
@@ -922,7 +923,8 @@ function splitRenderedDocument(renderedHtml) {
     bodyContent,
     bodyClass,
     bodyTheme,
-    hasTopbar: hasLegacyTopbar || hasStuderriaNavbar || hasAdminNavbar,
+    hasTopbar: hasLegacyTopbar || hasStuderriaNavbar || (hasAdminNavbar && hasAdminSidebar),
+    hasAdminSidebar,
   };
 }
 
@@ -960,8 +962,13 @@ app.use((req, res, next) => {
       const parsed = splitRenderedDocument(renderedHtml);
       const sessionUser = req.session && req.session.user ? req.session.user : null;
       const sessionRole = req.session && req.session.role ? req.session.role : '';
+      const layoutRole = baseOptions.role || res.locals.role || sessionRole || '';
+      const layoutUsername = baseOptions.username || res.locals.username || (sessionUser && sessionUser.username ? sessionUser.username : '');
+      const hasSessionNav = Boolean(layoutRole || layoutUsername || sessionUser);
       const mergedBodyClass = [
         String(parsed.bodyClass || '').trim(),
+        hasSessionNav ? 'page-authenticated' : '',
+        hasSessionNav && !parsed.hasAdminSidebar ? 'page-app-shell' : '',
         parsed.hasTopbar ? 'page-local-topbar' : '',
         isAuthView ? 'page-auth' : '',
         viewName === 'login' ? 'page-login' : '',
@@ -981,8 +988,13 @@ app.use((req, res, next) => {
         pageBodyClass: mergedBodyClass,
         pageTheme: parsed.bodyTheme || (/\btheme-dark\b/.test(mergedBodyClass) ? 'dark' : 'light'),
         showGlobalNavbar: !hideGlobalNavbar,
-        role: baseOptions.role || res.locals.role || sessionRole || '',
-        username: baseOptions.username || res.locals.username || (sessionUser && sessionUser.username ? sessionUser.username : ''),
+        role: layoutRole,
+        username: layoutUsername,
+        currentPath: baseOptions.currentPath || req.originalUrl || req.path || '',
+        activePage: baseOptions.activePage || '',
+        navItems: baseOptions.navItems || res.locals.navItems || undefined,
+        navMeta: baseOptions.navMeta || res.locals.navMeta || undefined,
+        userNav: baseOptions.userNav || res.locals.userNav || undefined,
         body: parsed.bodyContent,
       };
 

@@ -42,7 +42,17 @@
       })();
     </script>
     <%- include('../partials/studerria-background') %>
-    <%- include('../partials/navbar', { showGlobalNavbar, role, username, t }) %>
+    <%- include('../partials/navbar', {
+      showGlobalNavbar,
+      role,
+      username,
+      t,
+      currentPath: (typeof currentPath !== 'undefined') ? currentPath : '',
+      activePage: (typeof activePage !== 'undefined') ? activePage : '',
+      navItems: (typeof navItems !== 'undefined') ? navItems : undefined,
+      navMeta: (typeof navMeta !== 'undefined') ? navMeta : undefined,
+      userNav: (typeof userNav !== 'undefined') ? userNav : undefined,
+    }) %>
 
     <main class="page-container">
       <%- body %>

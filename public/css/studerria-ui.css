@@ -1606,53 +1606,6 @@ body.page-local-topbar.studerria-theme .topbar.topbar--title-spotlight.studerria
   }
 }
 
-/* Schedule uses opaque surfaces for now, so disable every remaining glass blur there. */
-body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell,
-body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-link,
-body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-menu-link,
-body.page-schedule.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .snav-logout-btn,
-body.page-schedule .topbar,
-body.page-schedule .topbar .btn-glass,
-body.page-schedule .topbar .theme-toggle-min,
-body.page-schedule .topbar .mobile-menu-btn,
-body.page-schedule .topbar .drawer-menu-btn,
-body.page-schedule .topbar .msg-btn,
-body.page-schedule .topbar .sync-pill,
-body.page-schedule .app-footer .footer-meta,
-body.page-schedule .app-footer .footer-meta.glass-dock,
-body.page-schedule .glass,
-body.page-schedule .glass-card,
-body.page-schedule .glass-panel,
-body.page-schedule .glass-inset,
-body.page-schedule button.glass,
-body.page-schedule .btn-glass,
-body.page-schedule .glass-tabs,
-body.page-schedule .week-hero,
-body.page-schedule .schedule-panel,
-body.page-schedule .day-card,
-body.page-schedule .schedule-card,
-body.page-schedule .density-summary,
-body.page-schedule .week-rail,
-body.page-schedule .week-pager,
-body.page-schedule .week-slider,
-body.page-schedule .week-nav-btn,
-body.page-schedule .list-group-item,
-body.page-schedule .form-control,
-body.page-schedule .form-select,
-body.page-schedule input.form-control,
-body.page-schedule textarea.form-control,
-body.page-schedule .schedule-drawer,
-body.page-schedule .topbar-sync-pill,
-body.page-schedule .footer-sync-pill,
-body.page-schedule .sync-pill,
-body.page-schedule .density-chip,
-body.page-schedule .modal.show .modal-dialog .modal-content,
-body.page-schedule .modal.show .modal-header,
-body.page-schedule .modal.show .modal-footer {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-}
-
 @media (min-width: 1200px) {
   html.studerria-zoom-fallback body.page-local-topbar.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
     width: min(var(--studerria-shell-max-width), calc(100vw - var(--studerria-shell-gutter)));
@@ -1806,5 +1759,209 @@ body.page-schedule .week-rail {
   body.page-schedule .schedule-time {
     font-size: 0.82rem;
     white-space: nowrap;
+  }
+}
+
+@media (min-width: 992px) {
+  body.page-app-shell.studerria-theme {
+    --studerria-sidebar-width: 304px;
+  }
+
+  body.page-app-shell.studerria-theme .page-container {
+    width: auto;
+    max-width: none;
+    margin-left: var(--studerria-sidebar-width);
+    margin-right: 0;
+    padding: 32px 32px 128px 0;
+  }
+
+  body.page-app-shell.page-local-topbar .page-container {
+    padding-top: 32px;
+  }
+
+  body.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    position: fixed !important;
+    inset: 22px auto 22px 22px !important;
+    width: 260px !important;
+    max-width: 260px !important;
+    margin: 0 !important;
+  }
+
+  body.page-app-shell.studerria-theme .container:not(.container-fluid),
+  body.page-app-shell.studerria-theme .schedule-content.container,
+  body.page-app-shell.studerria-theme .teacher-home,
+  body.page-app-shell.studerria-theme .profile-shell,
+  body.page-app-shell.studerria-theme .subjects-shell,
+  body.page-app-shell.studerria-theme .teamwork-shell {
+    max-width: min(1280px, calc(100vw - var(--studerria-sidebar-width) - 48px));
+  }
+
+  body.page-app-shell.page-schedule.studerria-theme .schedule-content.container,
+  body.page-app-shell.studerria-theme .admin-shell,
+  body.page-app-shell.studerria-theme .academic-v2-shell {
+    max-width: min(1520px, calc(100vw - var(--studerria-sidebar-width) - 48px));
+  }
+
+  body.page-app-shell.studerria-theme .app-footer {
+    max-width: min(1280px, calc(100vw - var(--studerria-sidebar-width) - 48px));
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 991px) {
+  body.page-app-shell.studerria-theme .page-container {
+    padding-top: 84px;
+  }
+
+  body.page-app-shell.page-local-topbar .page-container {
+    padding-top: 8px;
+  }
+}
+
+body.page-authenticated.studerria-theme .page-header,
+body.page-authenticated.studerria-theme .section-header,
+body.page-authenticated.studerria-theme .teacher-home-hero,
+body.page-authenticated.studerria-theme .profile-hero,
+body.page-authenticated.studerria-theme .subjects-hero,
+body.page-authenticated.studerria-theme .teamwork-hero {
+  border: 1px solid var(--studerria-panel-border);
+  border-radius: 30px;
+  background: var(--studerria-panel-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+  backdrop-filter: blur(20px) saturate(1.12);
+  box-shadow: var(--studerria-panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.page-authenticated.studerria-theme .dashboard-card,
+body.page-authenticated.studerria-theme .metric-card,
+body.page-authenticated.studerria-theme .action-card,
+body.page-authenticated.studerria-theme .homework-card,
+body.page-authenticated.studerria-theme .message-card,
+body.page-authenticated.studerria-theme .team-card,
+body.page-authenticated.studerria-theme .file-card,
+body.page-authenticated.studerria-theme .support-card,
+body.page-authenticated.studerria-theme .admin-card,
+body.page-authenticated.studerria-theme .settings-card {
+  border: 1px solid var(--studerria-panel-border);
+  border-radius: 24px;
+  background: var(--studerria-panel-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: blur(18px) saturate(1.1);
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.page-authenticated.studerria-theme .badge,
+body.page-authenticated.studerria-theme .pill,
+body.page-authenticated.studerria-theme .chip {
+  border-radius: 999px;
+}
+
+body.page-authenticated.studerria-theme .alert {
+  border-radius: 20px;
+  border: 1px solid var(--studerria-panel-border);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.1);
+}
+
+body.theme-dark.page-authenticated.studerria-theme .alert {
+  background: rgba(15, 23, 42, 0.68);
+  color: var(--studerria-text-primary);
+}
+
+body.page-authenticated.studerria-theme .admin-nav {
+  margin: 16px auto 18px;
+  width: min(100%, 1520px);
+  border: 1px solid var(--studerria-panel-border);
+  border-radius: 26px;
+  background: var(--studerria-panel-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+  backdrop-filter: blur(20px) saturate(1.12);
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.page-authenticated.studerria-theme .admin-nav .container,
+body.page-authenticated.studerria-theme .admin-nav .container-fluid {
+  max-width: none;
+  padding-inline: 16px;
+}
+
+body.page-authenticated.studerria-theme .admin-sidebar {
+  border: 1px solid var(--studerria-panel-border);
+  border-radius: 28px;
+  background: var(--studerria-panel-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+  backdrop-filter: blur(20px) saturate(1.12);
+  box-shadow: 0 22px 54px rgba(2, 6, 23, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.page-authenticated.studerria-theme .admin-sidebar-inner {
+  padding: 16px;
+}
+
+body.page-authenticated.studerria-theme .admin-sidebar-title {
+  color: var(--studerria-text-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body.page-authenticated.studerria-theme .admin-nav-link {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 0.48rem 0.72rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--studerria-text-primary);
+  text-align: left;
+  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.2, 1), background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+body.page-authenticated.studerria-theme .admin-nav-link:hover,
+body.page-authenticated.studerria-theme .admin-nav-link:focus-visible,
+body.page-authenticated.studerria-theme .admin-nav-link.active,
+body.page-authenticated.studerria-theme .admin-nav-link.is-active {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--studerria-cta-start) 30%, var(--studerria-panel-border));
+  background: color-mix(in srgb, var(--studerria-pill-bg) 82%, rgba(129, 140, 248, 0.16));
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+body.page-authenticated.studerria-theme .admin-nav-link:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: 0 6px 14px rgba(2, 6, 23, 0.1), inset 0 1px 4px rgba(2, 6, 23, 0.12);
+}
+
+body.page-schedule .week-hero,
+body.page-schedule .schedule-panel,
+body.page-schedule .day-card,
+body.page-schedule .density-summary,
+body.page-schedule .week-rail,
+body.page-schedule .schedule-card,
+body.page-schedule .form-control,
+body.page-schedule .form-select,
+body.page-schedule .btn-glass,
+body.page-schedule .glass,
+body.page-schedule .glass-card,
+body.page-schedule .glass-panel {
+  -webkit-backdrop-filter: blur(18px) saturate(1.12) !important;
+  backdrop-filter: blur(18px) saturate(1.12) !important;
+}
+
+body.page-schedule .schedule-card:active {
+  transform: translateY(1px) scale(0.99) !important;
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.18), inset 0 1px 4px rgba(2, 6, 23, 0.14) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-authenticated.studerria-theme *,
+  body.page-authenticated.studerria-theme *::before,
+  body.page-authenticated.studerria-theme *::after {
+    scroll-behavior: auto !important;
   }
 }
