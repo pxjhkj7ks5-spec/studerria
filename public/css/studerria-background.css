@@ -493,3 +493,132 @@ body.page-auth .page-container {
   padding: 0;
   min-height: 100vh;
 }
+
+/* Studerria test-design global background transfer */
+:root {
+  --studerria-bg-base: linear-gradient(180deg, #eef2ff 0%, #f7f8ff 52%, #edf4ff 100%);
+  --studerria-bg-left: rgba(124, 58, 237, 0.08);
+  --studerria-bg-right: rgba(59, 130, 246, 0.08);
+  --studerria-bg-center: rgba(255, 255, 255, 0.45);
+  --studerria-cursor-color: rgba(78, 96, 198, 0.58);
+  --studerria-cursor-blend: multiply;
+}
+
+html[data-theme='dark'],
+body[data-theme='dark'],
+body.theme-dark {
+  --studerria-bg-base: linear-gradient(180deg, #0f1024 0%, #14162c 52%, #0d1224 100%);
+  --studerria-bg-left: rgba(124, 58, 237, 0.18);
+  --studerria-bg-right: rgba(59, 130, 246, 0.14);
+  --studerria-bg-center: rgba(255, 255, 255, 0.05);
+  --studerria-cursor-color: rgba(191, 169, 255, 0.72);
+  --studerria-cursor-blend: screen;
+}
+
+body.studerria-theme {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+.studerria-bg {
+  background: var(--studerria-bg-base);
+}
+
+.studerria-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(rgba(120, 130, 170, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 130, 170, 0.07) 1px, transparent 1px);
+  background-size: 42px 42px;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 78%, transparent 100%);
+}
+
+html[data-theme='dark'] .studerria-bg::before,
+body.theme-dark .studerria-bg::before {
+  opacity: 0.12;
+  background-image:
+    linear-gradient(rgba(226, 232, 240, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(226, 232, 240, 0.06) 1px, transparent 1px);
+}
+
+.studerria-bg::after {
+  z-index: 2;
+  opacity: 1;
+  background:
+    radial-gradient(circle at 0% 0%, var(--studerria-bg-left), transparent 34rem),
+    radial-gradient(circle at 100% 100%, var(--studerria-bg-right), transparent 36rem),
+    radial-gradient(circle at 52% 42%, var(--studerria-bg-center), transparent 42rem);
+}
+
+.studerria-bg-gradient {
+  z-index: 0;
+  background: var(--studerria-bg-base);
+}
+
+.studerria-ambient-ribbons,
+.studerria-bg-morph-layer,
+.studerria-morph-blob,
+.studerria-bg-particles,
+.studerria-bg-particle,
+.studerria-ribbon,
+.studerria-ribbon-glint {
+  display: none !important;
+}
+
+.studerria-star-dust {
+  z-index: 2;
+  opacity: 0.12;
+  filter: blur(0.1px);
+  animation: none;
+}
+
+.studerria-dot-pattern {
+  z-index: 2;
+  opacity: 0.16;
+  filter: none;
+}
+
+.studerria-cursor-glow {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle, rgba(124, 58, 237, 0.18) 0%, rgba(98, 117, 255, 0.11) 35%, transparent 70%);
+  mix-blend-mode: var(--studerria-cursor-blend);
+  transform: translate3d(50vw, 38vh, 0) translate3d(-50%, -50%, 0);
+  transition: opacity 180ms ease;
+  contain: layout paint style;
+}
+
+.studerria-codex-cursor-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  width: 100vw;
+  height: 100vh;
+  color: var(--studerria-cursor-color);
+  opacity: 0.36;
+  pointer-events: none;
+  mix-blend-mode: var(--studerria-cursor-blend);
+  contain: strict;
+}
+
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+  .studerria-codex-cursor-canvas,
+  .studerria-cursor-glow {
+    display: none !important;
+  }
+}

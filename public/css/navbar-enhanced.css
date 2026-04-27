@@ -1187,6 +1187,174 @@ body.theme-light .snav-mobile-logout-btn {
 }
 
 @media (min-width: 992px) {
+  body.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    border: 1px solid rgba(120, 130, 170, 0.16) !important;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.46)),
+      rgba(255, 255, 255, 0.58) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 24px 60px rgba(47, 56, 95, 0.1) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(1.14) !important;
+    backdrop-filter: blur(16px) saturate(1.14) !important;
+  }
+
+  body.theme-dark.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    border-color: rgba(139, 164, 255, 0.12) !important;
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.22), rgba(167, 139, 250, 0.12)),
+      rgba(255, 255, 255, 0.055) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 30px rgba(98, 117, 255, 0.12) !important;
+  }
+
+  body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link {
+    min-height: 40px !important;
+    width: 100% !important;
+    padding: 0 10px !important;
+    border: 1px solid transparent !important;
+    border-radius: 14px !important;
+  }
+
+  body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link {
+    color: #364fc7 !important;
+    border-color: rgba(98, 117, 255, 0.24) !important;
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.16), rgba(140, 114, 255, 0.12)),
+      rgba(255, 255, 255, 0.68) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 10px 26px rgba(98, 117, 255, 0.12) !important;
+  }
+
+  body.theme-dark.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.theme-dark.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link {
+    color: #8ba4ff !important;
+    border-color: rgba(139, 164, 255, 0.24) !important;
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.2), rgba(140, 114, 255, 0.14)),
+      rgba(255, 255, 255, 0.07) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 10px 26px rgba(0, 0, 0, 0.16) !important;
+  }
+}
+
+/* Studerria test-design sidebar transfer */
+body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+  border: 1px solid rgba(120, 130, 170, 0.16) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.46)),
+    rgba(255, 255, 255, 0.58) !important;
+  color: #171a24 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 24px 60px rgba(47, 56, 95, 0.1) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.14) !important;
+  backdrop-filter: blur(16px) saturate(1.14) !important;
+}
+
+body.theme-dark.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+  border-color: rgba(139, 164, 255, 0.12) !important;
+  background:
+    linear-gradient(135deg, rgba(98, 117, 255, 0.22), rgba(167, 139, 250, 0.12)),
+    rgba(255, 255, 255, 0.055) !important;
+  color: #f8fafc !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 30px rgba(98, 117, 255, 0.12) !important;
+}
+
+body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .container {
+  gap: 12px;
+}
+
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link,
+body.page-authenticated.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn,
+body.page-authenticated.studerria-theme .snav-mobile-link,
+body.page-authenticated.studerria-theme .snav-mobile-close,
+body.page-authenticated.studerria-theme .snav-mobile-trigger {
+  border-radius: 14px;
+  transition:
+    transform 190ms cubic-bezier(0.2, 0.82, 0.2, 1),
+    color 190ms ease,
+    background 190ms ease,
+    border-color 190ms ease,
+    box-shadow 190ms ease,
+    opacity 190ms ease;
+}
+
+@media (min-width: 992px) {
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link {
+    min-height: 40px;
+    width: 100%;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    color: var(--studerria-topbar-text) !important;
+    opacity: 0.82;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link::after {
+    display: none;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:hover,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:hover,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:focus-visible {
+    opacity: 1;
+    transform: translateY(-1px);
+    color: #6d28d9 !important;
+    border-color: rgba(120, 130, 170, 0.16);
+    background: rgba(255, 255, 255, 0.58);
+    box-shadow: 0 10px 26px rgba(98, 117, 255, 0.1);
+  }
+
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:hover,
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:hover,
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:focus-visible {
+    color: #ddd6fe !important;
+    border-color: rgba(139, 164, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link {
+    opacity: 1;
+    color: #364fc7 !important;
+    border-color: rgba(98, 117, 255, 0.24);
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.16), rgba(140, 114, 255, 0.12)),
+      rgba(255, 255, 255, 0.68);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 10px 26px rgba(98, 117, 255, 0.12);
+  }
+
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link {
+    color: #8ba4ff !important;
+    border-color: rgba(139, 164, 255, 0.24);
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.2), rgba(140, 114, 255, 0.14)),
+      rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 10px 26px rgba(0, 0, 0, 0.16);
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:active,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:active,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn:active {
+    transform: translateY(1px) scale(0.988);
+    box-shadow: 0 5px 14px rgba(98, 117, 255, 0.14);
+  }
+}
+
+body.page-authenticated.studerria-theme .snav-account-card {
+  border-radius: 20px;
+  border-color: rgba(120, 130, 170, 0.16);
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+body.theme-dark.page-authenticated.studerria-theme .snav-account-card {
+  border-color: rgba(139, 164, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@media (min-width: 992px) {
   body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
     width: 272px !important;
     max-width: 272px !important;
@@ -1280,5 +1448,61 @@ body.theme-light .snav-mobile-logout-btn {
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-open > .snav-link {
     box-shadow: 0 10px 22px rgba(2, 6, 23, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.11);
+  }
+}
+
+@media (min-width: 992px) {
+  body.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell,
+  body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    border: 1px solid rgba(120, 130, 170, 0.16) !important;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.46)),
+      rgba(255, 255, 255, 0.58) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 24px 60px rgba(47, 56, 95, 0.1) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(1.14) !important;
+    backdrop-filter: blur(16px) saturate(1.14) !important;
+  }
+
+  body.theme-dark.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell,
+  body.theme-dark.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+    border-color: rgba(139, 164, 255, 0.12) !important;
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.22), rgba(167, 139, 250, 0.12)),
+      rgba(255, 255, 255, 0.055) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 30px rgba(98, 117, 255, 0.12) !important;
+  }
+
+  body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link {
+    min-height: 40px !important;
+    width: 100% !important;
+    padding: 0 10px !important;
+    border: 1px solid transparent !important;
+    border-radius: 14px !important;
+  }
+
+  body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link {
+    padding-left: 16px !important;
+    color: #364fc7 !important;
+    border-color: rgba(98, 117, 255, 0.24) !important;
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.16), rgba(140, 114, 255, 0.12)),
+      rgba(255, 255, 255, 0.68) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 10px 26px rgba(98, 117, 255, 0.12) !important;
+  }
+
+  body.theme-dark.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.theme-dark.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link,
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+  body.theme-dark.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link {
+    color: #8ba4ff !important;
+    border-color: rgba(139, 164, 255, 0.24) !important;
+    background:
+      linear-gradient(135deg, rgba(98, 117, 255, 0.2), rgba(140, 114, 255, 0.14)),
+      rgba(255, 255, 255, 0.07) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 10px 26px rgba(0, 0, 0, 0.16) !important;
   }
 }
