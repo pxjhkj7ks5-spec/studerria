@@ -1,5 +1,6 @@
 const APP_ROLES = ['admin', 'deanery', 'starosta', 'teacher', 'student'];
 const PERSONAL_LABEL = 'Особисте';
+const PERSONAL_LABEL_KEY = 'nav.personal';
 const ADMIN_PANEL_ROLES = ['admin', 'deanery', 'starosta', 'teacher'];
 const DEADLINE_ROLES = ['student', 'starosta', 'teacher'];
 const JOURNAL_ROLES = ['admin', 'deanery', 'starosta', 'teacher', 'student'];
@@ -7,11 +8,13 @@ const JOURNAL_INSIGHT_ROLES = ['admin', 'deanery', 'starosta', 'teacher'];
 
 const navConfig = {
   personalLabel: PERSONAL_LABEL,
+  personalLabelKey: PERSONAL_LABEL_KEY,
   items: [
     // TODO: replace this temporary role/flag blend with the final centralized RBAC policy once it is exported outside app.js.
     {
       id: 'admin',
       label: 'Адмінка',
+      labelKey: 'nav.admin',
       href: '/admin',
       section: 'main',
       rolesAllowed: ADMIN_PANEL_ROLES,
@@ -21,6 +24,7 @@ const navConfig = {
     {
       id: 'home',
       label: 'Головна',
+      labelKey: 'nav.home',
       href: '/home',
       section: 'main',
       rolesAllowed: APP_ROLES,
@@ -30,6 +34,7 @@ const navConfig = {
         {
           id: 'about',
           label: 'Про сайт',
+          labelKey: 'nav.about',
           href: '/about',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -38,6 +43,7 @@ const navConfig = {
         {
           id: 'help',
           label: 'FAQ & Help',
+          labelKey: 'nav.help',
           href: '/help',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -48,6 +54,7 @@ const navConfig = {
     {
       id: 'learning',
       label: 'Навчання',
+      labelKey: 'nav.learning',
       href: '/schedule',
       section: 'main',
       hideInSidebar: true,
@@ -57,6 +64,7 @@ const navConfig = {
         {
           id: 'schedule',
           label: 'Розклад',
+          labelKey: 'nav.schedule',
           href: '/schedule',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -65,6 +73,7 @@ const navConfig = {
         {
           id: 'journal',
           label: 'Журнал',
+          labelKey: 'nav.journal',
           href: '/journal',
           section: 'main',
           rolesAllowed: JOURNAL_ROLES,
@@ -74,6 +83,7 @@ const navConfig = {
             {
               id: 'journal-insights',
               label: 'Insights',
+              labelKey: 'nav.insights',
               href: '/journal/insights',
               section: 'main',
               rolesAllowed: JOURNAL_INSIGHT_ROLES,
@@ -84,6 +94,7 @@ const navConfig = {
         {
           id: 'teamwork',
           label: 'Teamwork',
+          labelKey: 'nav.teamwork',
           href: '/teamwork',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -92,6 +103,7 @@ const navConfig = {
         {
           id: 'custom-deadlines',
           label: 'Дивні дедлайни',
+          labelKey: 'nav.customDeadlines',
           href: '/schedule?panel=deadlines',
           section: 'main',
           rolesAllowed: DEADLINE_ROLES,
@@ -102,6 +114,7 @@ const navConfig = {
         {
           id: 'subjects',
           label: 'Дисципліни',
+          labelKey: 'nav.subjects',
           href: '/subjects',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -110,6 +123,7 @@ const navConfig = {
         {
           id: 'teacher-hub',
           label: 'Teacher hub',
+          labelKey: 'nav.teacherHub',
           href: '/teacher',
           section: 'main',
           rolesAllowed: ['teacher'],
@@ -119,6 +133,7 @@ const navConfig = {
         {
           id: 'teacher-workspace',
           label: 'Teacher workspace',
+          labelKey: 'nav.teacherWorkspace',
           href: '/teacher/workspace',
           section: 'main',
           rolesAllowed: ['teacher'],
@@ -128,6 +143,7 @@ const navConfig = {
         {
           id: 'teacher-subjects',
           label: 'Teacher subjects',
+          labelKey: 'nav.teacherSubjects',
           href: '/teacher/subjects',
           section: 'main',
           rolesAllowed: ['teacher'],
@@ -139,6 +155,7 @@ const navConfig = {
     {
       id: 'personal',
       label: PERSONAL_LABEL,
+      labelKey: 'nav.personal',
       href: '/profile',
       section: 'main',
       hideInSidebar: true,
@@ -148,6 +165,7 @@ const navConfig = {
         {
           id: 'profile',
           label: 'Профіль',
+          labelKey: 'nav.profile',
           href: '/profile',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -156,6 +174,7 @@ const navConfig = {
         {
           id: 'messages',
           label: 'Повідомлення',
+          labelKey: 'nav.messages',
           href: '/schedule?panel=messages',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -166,6 +185,7 @@ const navConfig = {
         {
           id: 'theme',
           label: 'Зміна теми',
+          labelKey: 'nav.theme',
           href: '#theme-toggle',
           section: 'main',
           rolesAllowed: APP_ROLES,
@@ -176,6 +196,7 @@ const navConfig = {
     {
       id: 'admin-pathways',
       label: 'Pathways',
+      labelKey: 'nav.pathways',
       href: '/admin/pathways',
       section: 'main',
       rolesAllowed: ADMIN_PANEL_ROLES,
@@ -186,6 +207,7 @@ const navConfig = {
     {
       id: 'deanery',
       label: 'Deanery',
+      labelKey: 'nav.deanery',
       href: '/deanery',
       section: 'main',
       rolesAllowed: ['deanery'],

@@ -5,6 +5,12 @@
   const providedNavItems = Array.isArray(typeof navItems !== 'undefined' ? navItems : null) ? navItems : [];
   const safeNavMeta = (typeof navMeta !== 'undefined' && navMeta) ? navMeta : null;
   const translate = (typeof t === 'function') ? t : null;
+  const tr = (key, fallback) => {
+    if (!translate) return fallback;
+    const translated = translate(key);
+    if (translated && translated !== key) return translated;
+    return fallback;
+  };
 
   const shouldRenderNavbar = safeShowGlobalNavbar || safeForceAppNavbar;
   const currentRole = String((safeUserNav && safeUserNav.role) || role || '').trim();
@@ -46,48 +52,48 @@
     return next;
   });
   const fallbackStudentNav = [
-    { id: 'home', label: 'Home', href: '/home' },
-    { id: 'schedule', label: 'Schedule', href: '/schedule' },
-    { id: 'homework', label: 'Homework', href: '/schedule#homework' },
-    { id: 'messages', label: 'Messages', href: '/schedule?panel=messages', navAction: 'messages' },
-    { id: 'teamwork', label: 'Teamwork', href: '/teamwork' },
-    { id: 'subjects', label: 'Resources', href: '/subjects' },
-    { id: 'profile', label: 'Profile', href: '/profile' },
-    { id: 'help', label: 'Help', href: '/help' },
-    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+    { id: 'home', label: tr('nav.home', 'Home'), href: '/home' },
+    { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
+    { id: 'homework', label: tr('nav.homework', 'Homework'), href: '/schedule#homework' },
+    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/schedule?panel=messages', navAction: 'messages' },
+    { id: 'teamwork', label: tr('nav.teamwork', 'Teamwork'), href: '/teamwork' },
+    { id: 'subjects', label: tr('nav.subjects', 'Subjects'), href: '/subjects' },
+    { id: 'profile', label: tr('nav.profile', 'Profile'), href: '/profile' },
+    { id: 'help', label: tr('nav.help', 'Help'), href: '/help' },
+    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackStaffNav = [
-    { id: 'admin', label: 'Dashboard', href: '/admin' },
-    { id: 'schedule', label: 'Schedule', href: '/schedule' },
-    { id: 'admin-schedule', label: 'Schedule list', href: '/admin/schedule-list' },
-    { id: 'admin-students', label: 'Students', href: '/admin?tab=admin-users' },
-    { id: 'admin-groups', label: 'Groups', href: '/admin?tab=admin-users' },
-    { id: 'admin-subjects', label: 'Subjects', href: '/admin?tab=admin-subjects' },
-    { id: 'admin-homework', label: 'Homework', href: '/admin?tab=admin-homework' },
-    { id: 'messages', label: 'Messages', href: '/admin?tab=admin-messages' },
-    { id: 'setup', label: 'Academic Setup', href: '/admin/pathways' },
-    { id: 'reports', label: 'Reports', href: '/admin/overview' },
-    { id: 'profile', label: 'Settings', href: '/profile' },
-    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+    { id: 'admin', label: tr('nav.dashboard', 'Dashboard'), href: '/admin' },
+    { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
+    { id: 'admin-schedule', label: tr('nav.scheduleList', 'Schedule list'), href: '/admin/schedule-list' },
+    { id: 'admin-students', label: tr('nav.students', 'Students'), href: '/admin?tab=admin-users' },
+    { id: 'admin-groups', label: tr('nav.groups', 'Groups'), href: '/admin?tab=admin-users' },
+    { id: 'admin-subjects', label: tr('nav.subjects', 'Subjects'), href: '/admin?tab=admin-subjects' },
+    { id: 'admin-homework', label: tr('nav.homework', 'Homework'), href: '/admin?tab=admin-homework' },
+    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/admin?tab=admin-messages' },
+    { id: 'setup', label: tr('nav.academicSetup', 'Academic Setup'), href: '/admin/pathways' },
+    { id: 'reports', label: tr('nav.reports', 'Reports'), href: '/admin/overview' },
+    { id: 'profile', label: tr('nav.settings', 'Settings'), href: '/profile' },
+    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackLimitedStaffNav = [
-    { id: 'admin', label: 'Dashboard', href: '/admin' },
-    { id: 'schedule', label: 'Schedule', href: '/schedule' },
-    { id: 'admin-homework', label: 'Homework', href: '/admin?tab=admin-homework' },
-    { id: 'admin-teamwork', label: 'Teamwork', href: '/admin?tab=admin-teamwork' },
-    { id: 'messages', label: 'Messages', href: '/admin?tab=admin-messages' },
-    { id: 'profile', label: 'Settings', href: '/profile' },
-    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+    { id: 'admin', label: tr('nav.dashboard', 'Dashboard'), href: '/admin' },
+    { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
+    { id: 'admin-homework', label: tr('nav.homework', 'Homework'), href: '/admin?tab=admin-homework' },
+    { id: 'admin-teamwork', label: tr('nav.teamwork', 'Teamwork'), href: '/admin?tab=admin-teamwork' },
+    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/admin?tab=admin-messages' },
+    { id: 'profile', label: tr('nav.settings', 'Settings'), href: '/profile' },
+    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackTeacherNav = [
-    { id: 'teacher-hub', label: 'Home', href: '/teacher' },
-    { id: 'schedule', label: 'Schedule', href: '/schedule' },
-    { id: 'teacher-subjects', label: 'Subjects', href: '/teacher/subjects' },
-    { id: 'teacher-workspace', label: 'Homework', href: '/teacher/workspace' },
-    { id: 'journal', label: 'Journal', href: '/journal' },
-    { id: 'messages', label: 'Messages', href: '/schedule?panel=messages', navAction: 'messages' },
-    { id: 'profile', label: 'Settings', href: '/profile' },
-    { id: 'theme', label: 'Theme', navAction: 'theme-toggle' },
+    { id: 'teacher-hub', label: tr('nav.home', 'Home'), href: '/teacher' },
+    { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
+    { id: 'teacher-subjects', label: tr('nav.subjects', 'Subjects'), href: '/teacher/subjects' },
+    { id: 'teacher-workspace', label: tr('nav.homework', 'Homework'), href: '/teacher/workspace' },
+    { id: 'journal', label: tr('nav.journal', 'Journal'), href: '/journal' },
+    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/schedule?panel=messages', navAction: 'messages' },
+    { id: 'profile', label: tr('nav.settings', 'Settings'), href: '/profile' },
+    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackNavItems = hasRole('admin')
     ? fallbackStaffNav
@@ -116,13 +122,13 @@
   const visibleNavItems = flattenSidebarItems(safeNavItems);
   const shouldRenderAppNav = safeForceAppNavbar || (isAuthed && visibleNavItems.length > 0);
   const allowMessages = Boolean(safeUserNav && safeUserNav.flags && safeUserNav.flags.allowMessages);
-  const personalLabel = String((safeNavMeta && safeNavMeta.personalLabel) || (safeUserNav && safeUserNav.personalLabel) || 'Особисте').trim() || 'Особисте';
+  const personalLabel = String((safeNavMeta && safeNavMeta.personalLabel) || (safeUserNav && safeUserNav.personalLabel) || tr('nav.personal', 'Personal')).trim() || tr('nav.personal', 'Personal');
   const roleLabelMap = {
-    admin: (translate ? translate('role.admin') : 'Адмін'),
-    starosta: (translate ? translate('role.starosta') : 'Староста'),
-    deanery: (translate ? translate('role.deanery') : 'Деканат'),
-    teacher: (translate ? translate('role.teacher') : 'Викладач'),
-    student: (translate ? translate('role.student') : 'Студент'),
+    admin: tr('role.admin', 'Admin'),
+    starosta: tr('role.starosta', 'Starosta'),
+    deanery: tr('role.deanery', 'Deanery'),
+    teacher: tr('role.teacher', 'Teacher'),
+    student: tr('role.student', 'Student'),
   };
   const displayRoleLabel = roleLabelMap[currentRole] || currentRole || '';
   const displayRoleText = displayName
@@ -157,6 +163,22 @@
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+  const themeLabel = tr('nav.theme', 'Theme');
+  const escapedThemeLabel = escapeHtml(themeLabel);
+  const logoutLabel = tr('nav.logout', 'Logout');
+  const openNavLabel = tr('nav.openNavigation', 'Open navigation');
+  const closeNavLabel = tr('nav.closeNavigation', 'Close navigation');
+  const currentProfileLabel = tr('nav.currentProfile', 'Current profile');
+  const mobileSpaceLabel = tr('nav.space', 'Space');
+  const mobileMainNavigationLabel = tr('nav.mainNavigation', 'Main navigation');
+  const mobileOverviewLabel = tr('nav.overview', 'Overview');
+  const mobileActiveProfileLabel = tr('nav.activeProfile', 'Active profile');
+  const mobileProfileFallbackLabel = tr('nav.profileStuderria', 'Studerria profile');
+  const signedInLabel = tr('nav.signedIn', 'Signed in');
+  const toggleThemeLabel = tr('nav.toggleTheme', 'Toggle theme');
+  const openAppLabel = tr('nav.openApp', 'Open app');
+  const signUpLabel = tr('nav.signUp', 'Sign up');
+  const loginLabel = tr('nav.login', 'Login');
 
   const getMobileGlyph = (item) => {
     const mapped = mobileGlyphMap[item && item.id ? item.id : ''];
@@ -281,8 +303,8 @@
     }
 
     if (item.navAction === 'theme-toggle') {
-      attrs.push('data-light-label="Зміна теми"');
-      attrs.push('data-dark-label="Зміна теми"');
+      attrs.push(`data-light-label="${escapedThemeLabel}"`);
+      attrs.push(`data-dark-label="${escapedThemeLabel}"`);
       attrs.push('data-static-label="true"');
     }
 
@@ -346,8 +368,8 @@
 
     if (item.navAction === 'theme-toggle') {
       attrs.push('data-theme-toggle');
-      attrs.push('data-light-label="Зміна теми"');
-      attrs.push('data-dark-label="Зміна теми"');
+      attrs.push(`data-light-label="${escapedThemeLabel}"`);
+      attrs.push(`data-dark-label="${escapedThemeLabel}"`);
       attrs.push('data-static-label="true"');
     }
 
@@ -395,7 +417,7 @@
         </div>
         <div class="d-flex align-items-center gap-2 topbar-actions snav-actions justify-content-end">
           <% if (displayRoleText) { %>
-            <div class="snav-account-card" aria-label="Поточний профіль">
+            <div class="snav-account-card" aria-label="<%= currentProfileLabel %>">
               <span class="snav-account-avatar" aria-hidden="true"><%= userInitial %></span>
               <span class="snav-account-copy">
                 <span class="snav-account-name"><%= displayName || 'Studerria' %></span>
@@ -407,7 +429,7 @@
             type="button"
             class="snav-mobile-trigger"
             data-mobile-nav-toggle
-            aria-label="Відкрити навігацію"
+            aria-label="<%= openNavLabel %>"
             aria-expanded="false"
             aria-controls="studerriaMobileNav"
           >
@@ -415,9 +437,9 @@
             <span class="snav-mobile-trigger-line"></span>
           </button>
           <form method="POST" action="/logout" class="snav-logout-form">
-            <button class="theme-toggle-min snav-logout-btn" type="submit" aria-label="Вийти">
+            <button class="theme-toggle-min snav-logout-btn" type="submit" aria-label="<%= logoutLabel %>">
               <span class="snav-icon nav-icon" data-snav-icon="logout" aria-hidden="true"></span>
-              <span>Вийти</span>
+              <span><%= logoutLabel %></span>
             </button>
           </form>
         </div>
@@ -433,7 +455,7 @@
           type="button"
           class="snav-mobile-backdrop"
           data-mobile-nav-backdrop
-          aria-label="Закрити навігацію"
+          aria-label="<%= closeNavLabel %>"
           tabindex="-1"
         ></button>
         <section
@@ -444,7 +466,7 @@
         >
           <div class="snav-mobile-panel-head">
             <div class="snav-mobile-panel-copy">
-              <p class="snav-mobile-kicker">Простір</p>
+              <p class="snav-mobile-kicker"><%= mobileSpaceLabel %></p>
               <h2 class="snav-mobile-title" id="studerriaMobileNavTitle">Studerria</h2>
               <% if (displayRoleText) { %>
                 <p class="snav-mobile-panel-meta"><%= displayRoleText %></p>
@@ -454,15 +476,15 @@
               type="button"
               class="snav-mobile-close"
               data-mobile-nav-close
-              aria-label="Закрити навігацію"
+              aria-label="<%= closeNavLabel %>"
             >
               <span aria-hidden="true">&times;</span>
             </button>
           </div>
           <div class="snav-mobile-scroll">
             <% if (mobilePrimaryItems.length) { %>
-              <section class="snav-mobile-section" aria-label="Основна навігація">
-                <div class="snav-mobile-section-label">Огляд</div>
+              <section class="snav-mobile-section" aria-label="<%= mobileMainNavigationLabel %>">
+                <div class="snav-mobile-section-label"><%= mobileOverviewLabel %></div>
                 <div class="snav-mobile-link-list">
                   <% mobilePrimaryItems.forEach((item) => { %>
                     <%- renderMobileLink(item) %>
@@ -483,11 +505,11 @@
           </div>
           <div class="snav-mobile-footer">
             <div class="snav-mobile-account">
-              <span class="snav-mobile-account-label">Активний профіль</span>
-              <span class="snav-mobile-account-value"><%= displayRoleText || 'Профіль Studerria' %></span>
+              <span class="snav-mobile-account-label"><%= mobileActiveProfileLabel %></span>
+              <span class="snav-mobile-account-value"><%= displayRoleText || mobileProfileFallbackLabel %></span>
             </div>
             <form method="POST" action="/logout" class="snav-mobile-logout-form">
-              <button type="submit" class="snav-mobile-logout-btn" data-mobile-nav-dismiss>Вийти</button>
+              <button type="submit" class="snav-mobile-logout-btn" data-mobile-nav-dismiss><%= logoutLabel %></button>
             </form>
           </div>
         </section>
@@ -499,37 +521,37 @@
 
       <div class="studerria-nav-links">
         <% if (isAuthed) { %>
-          <a class="studerria-nav-link" href="/home">Головна</a>
-          <a class="studerria-nav-link" href="/schedule">Навчання</a>
+          <a class="studerria-nav-link" href="/home"><%= tr('nav.home', 'Home') %></a>
+          <a class="studerria-nav-link" href="/schedule"><%= tr('nav.learning', 'Learning') %></a>
           <a class="studerria-nav-link" href="/profile"><%= personalLabel %></a>
           <% if (userRoles.some((roleKey) => ['admin', 'deanery', 'starosta', 'teacher'].includes(roleKey))) { %>
-            <a class="studerria-nav-link" href="/admin">Адмінка</a>
+            <a class="studerria-nav-link" href="/admin"><%= tr('nav.admin', 'Admin') %></a>
           <% } %>
         <% } else { %>
-          <a class="studerria-nav-link" href="/">Overview</a>
-          <a class="studerria-nav-link" href="/login">Login</a>
+          <a class="studerria-nav-link" href="/"><%= tr('nav.overview', 'Overview') %></a>
+          <a class="studerria-nav-link" href="/login"><%= loginLabel %></a>
         <% } %>
       </div>
 
       <div class="studerria-nav-actions">
         <% if (displayName) { %>
-          <span class="studerria-user-pill" title="Signed in"><%= displayName %></span>
+          <span class="studerria-user-pill" title="<%= signedInLabel %>"><%= displayName %></span>
         <% } %>
         <button
           type="button"
           class="studerria-theme-toggle"
           id="studerriaThemeToggle"
-          aria-label="Toggle theme"
-          data-light-label="Зміна теми"
-          data-dark-label="Зміна теми"
+          aria-label="<%= toggleThemeLabel %>"
+          data-light-label="<%= themeLabel %>"
+          data-dark-label="<%= themeLabel %>"
           data-static-label="true"
         >
-          Зміна теми
+          <%= themeLabel %>
         </button>
         <% if (isAuthed) { %>
-          <a class="studerria-signup" href="/home">Open App</a>
+          <a class="studerria-signup" href="/home"><%= openAppLabel %></a>
         <% } else { %>
-          <a class="studerria-signup" href="/register">Sign up</a>
+          <a class="studerria-signup" href="/register"><%= signUpLabel %></a>
         <% } %>
       </div>
     </nav>

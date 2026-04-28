@@ -63,6 +63,29 @@ function cloneNavItem(item, overrides = {}) {
   };
 }
 
+function resolveTranslation(translate, key, fallback) {
+  if (typeof translate !== 'function' || !key) {
+    return fallback;
+  }
+  const translated = translate(key);
+  if (translated && translated !== key) {
+    return translated;
+  }
+  return fallback;
+}
+
+function localizeNavItem(item, translate) {
+  const localizedLabel = resolveTranslation(translate, item.labelKey, item.label);
+  const localizedChildren = Array.isArray(item.children)
+    ? item.children.map((child) => localizeNavItem(child, translate))
+    : [];
+  return {
+    ...item,
+    label: localizedLabel,
+    children: localizedChildren,
+  };
+}
+
 function canUseCustomDeadlines(userNav, settings) {
   if (!settings || !settings.allow_custom_deadlines) {
     return false;
@@ -117,6 +140,7 @@ function buildUserNav(req, res) {
     ? (Array.isArray(session.roles) && session.roles.length ? session.roles : [role])
     : [];
   const settings = res && res.locals ? res.locals.settings : {};
+  const translate = res && res.locals ? res.locals.t : null;
 
   return {
     isAuthenticated: Boolean(sessionUser),
@@ -130,14 +154,17 @@ function buildUserNav(req, res) {
       allowCustomDeadlines: Boolean(settings && settings.allow_custom_deadlines),
       canUseCustomDeadlines: canUseCustomDeadlines({ roles }, settings),
     },
-    personalLabel: navConfig.personalLabel,
+    personalLabel: resolveTranslation(translate, navConfig.personalLabelKey, navConfig.personalLabel),
   };
 }
 
 module.exports = function navMiddleware(req, res, next) {
   const currentPath = normalizePath(req.path);
   const userNav = buildUserNav(req, res);
-  const configItems = Array.isArray(navConfig.items) ? navConfig.items.map((item) => cloneNavItem(item)) : [];
+  const translate = res && res.locals ? res.locals.t : null;
+  const configItems = Array.isArray(navConfig.items)
+    ? navConfig.items.map((item) => localizeNavItem(item, translate))
+    : [];
   const visibleItems = userNav.isAuthenticated
     ? filterNavItems(configItems, { currentPath, userNav })
     : [];
