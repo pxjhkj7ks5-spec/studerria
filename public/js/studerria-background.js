@@ -54,6 +54,9 @@
       }
       if (control.dataset.navAction === 'theme-toggle') {
         const label = control.querySelector('.snav-label');
+        if (control.dataset.staticLabel === 'true') {
+          return;
+        }
         const nextText = isDark
           ? (control.getAttribute('data-light-label') || '')
           : (control.getAttribute('data-dark-label') || '');

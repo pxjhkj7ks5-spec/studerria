@@ -283,6 +283,7 @@
     if (item.navAction === 'theme-toggle') {
       attrs.push('data-light-label="Зміна теми"');
       attrs.push('data-dark-label="Зміна теми"');
+      attrs.push('data-static-label="true"');
     }
 
     if (item.isCurrent || item.isCurrentContainer) {
@@ -347,6 +348,7 @@
       attrs.push('data-theme-toggle');
       attrs.push('data-light-label="Зміна теми"');
       attrs.push('data-dark-label="Зміна теми"');
+      attrs.push('data-static-label="true"');
     }
 
     if (item.isCurrent) {
@@ -518,10 +520,11 @@
           class="studerria-theme-toggle"
           id="studerriaThemeToggle"
           aria-label="Toggle theme"
-          data-light-label="Світла"
-          data-dark-label="Темна"
+          data-light-label="Зміна теми"
+          data-dark-label="Зміна теми"
+          data-static-label="true"
         >
-          Темна
+          Зміна теми
         </button>
         <% if (isAuthed) { %>
           <a class="studerria-signup" href="/home">Open App</a>

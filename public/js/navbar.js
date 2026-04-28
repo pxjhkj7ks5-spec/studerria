@@ -295,6 +295,13 @@
     }
 
     const labelTarget = control.querySelector('[data-mobile-link-label]');
+    if (control.dataset.staticLabel === 'true') {
+      window.dispatchEvent(new CustomEvent('studerria:theme-toggled', {
+        detail: { theme: nextTheme },
+      }));
+      return;
+    }
+
     if (labelTarget instanceof HTMLElement) {
       labelTarget.textContent = nextTheme === 'theme-dark'
         ? (control.dataset.lightLabel || 'Світла тема')
@@ -314,6 +321,9 @@
     const isDark = document.body.classList.contains('theme-dark');
     root.querySelectorAll(MOBILE_THEME_SELECTOR).forEach((control) => {
       if (!(control instanceof HTMLElement)) {
+        return;
+      }
+      if (control.dataset.staticLabel === 'true') {
         return;
       }
 
