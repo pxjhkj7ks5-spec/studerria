@@ -1945,8 +1945,9 @@ body.page-schedule .week-pager .week-nav-btn:hover {
 body.page-schedule .week-pager .week-nav-btn:focus-visible,
 body.page-schedule .week-pager .week-carousel-card:focus-visible {
   outline: none;
+  border-color: rgba(125, 211, 252, 0.5);
   box-shadow:
-    0 0 0 2px rgba(125, 211, 252, 0.42),
+    inset 0 0 0 1px rgba(125, 211, 252, 0.54),
     0 18px 30px rgba(2, 6, 23, 0.22);
 }
 
@@ -1967,9 +1968,25 @@ body.theme-light.page-schedule .week-pager .week-nav-btn:hover {
 
 body.theme-light.page-schedule .week-pager .week-nav-btn:focus-visible,
 body.theme-light.page-schedule .week-pager .week-carousel-card:focus-visible {
+  border-color: rgba(96, 165, 250, 0.42);
   box-shadow:
-    0 0 0 2px rgba(96, 165, 250, 0.34),
+    inset 0 0 0 1px rgba(96, 165, 250, 0.42),
     0 16px 28px rgba(130, 146, 173, 0.2);
+}
+
+body.page-schedule .td-day-pill.schedule-day-pill:focus-visible {
+  outline: none;
+  border-color: rgba(125, 211, 252, 0.52);
+  box-shadow:
+    inset 0 0 0 1px rgba(125, 211, 252, 0.54),
+    0 14px 28px rgba(2, 6, 23, 0.2);
+}
+
+body.theme-light.page-schedule .td-day-pill.schedule-day-pill:focus-visible {
+  border-color: rgba(96, 165, 250, 0.44);
+  box-shadow:
+    inset 0 0 0 1px rgba(96, 165, 250, 0.42),
+    0 14px 24px rgba(130, 146, 173, 0.16);
 }
 
 body.page-schedule .week-pager .week-nav-btn:disabled {
