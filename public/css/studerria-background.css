@@ -572,17 +572,10 @@ body.theme-dark .studerria-bg::before {
   display: none !important;
 }
 
-.studerria-star-dust {
-  z-index: 2;
-  opacity: 0.12;
-  filter: blur(0.1px);
-  animation: none;
-}
-
+.studerria-star-dust,
+.studerria-grain-overlay,
 .studerria-dot-pattern {
-  z-index: 2;
-  opacity: 0.16;
-  filter: none;
+  display: none !important;
 }
 
 .studerria-cursor-glow {

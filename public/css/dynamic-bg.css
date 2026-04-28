@@ -294,8 +294,7 @@ body.theme-dark.studerria-theme {
 }
 
 .product-bg-texture {
-  opacity: 0.12;
-  animation: none !important;
+  display: none !important;
 }
 
 .studerria-codex-cursor-canvas {
