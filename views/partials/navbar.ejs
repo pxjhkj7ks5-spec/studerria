@@ -259,7 +259,7 @@
     if (Array.isArray(item.children) && item.children.length && level > 0) {
       indicator = '<span class="snav-indicator snav-indicator--submenu" aria-hidden="true">&rsaquo;</span>';
     }
-    const icon = `<span class="snav-icon" data-snav-icon="${escapeHtml(item.id || 'nav')}" aria-hidden="true"></span>`;
+    const icon = `<span class="snav-icon nav-icon" data-snav-icon="${escapeHtml(item.id || 'nav')}" aria-hidden="true"></span>`;
     return `${icon}<span class="snav-label">${label}${unreadMarker}</span>${indicator}`;
   };
 
@@ -413,7 +413,10 @@
             <span class="snav-mobile-trigger-line"></span>
           </button>
           <form method="POST" action="/logout" class="snav-logout-form">
-            <button class="theme-toggle-min snav-logout-btn" type="submit" aria-label="Вийти">Вийти</button>
+            <button class="theme-toggle-min snav-logout-btn" type="submit" aria-label="Вийти">
+              <span class="snav-icon nav-icon" data-snav-icon="logout" aria-hidden="true"></span>
+              <span>Вийти</span>
+            </button>
           </form>
         </div>
       </div>

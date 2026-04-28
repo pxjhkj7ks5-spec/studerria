@@ -1306,10 +1306,36 @@ body[data-theme="dark"] .td-brand-logo--dark {
   background: linear-gradient(180deg, #8aa0ff, #b68cff);
 }
 
-.td-sidebar-icon {
-  width: 19px;
-  height: 19px;
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   color: currentColor;
+  opacity: 0.72;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease;
+}
+
+.td-sidebar-icon {
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+}
+
+.td-sidebar-link:hover .nav-icon,
+.td-sidebar-logout:hover .nav-icon {
+  opacity: 0.95;
+  transform: translateY(-1px) scale(1.015);
+}
+
+.td-sidebar-link.is-active .nav-icon,
+.td-sidebar-link[aria-current="page"] .nav-icon,
+.td-sidebar-logout:focus-visible .nav-icon {
+  opacity: 1;
+  filter: drop-shadow(0 0 8px rgba(150, 130, 255, 0.25));
 }
 
 .td-sidebar-spacer {

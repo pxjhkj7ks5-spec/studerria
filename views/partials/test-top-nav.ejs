@@ -1,19 +1,19 @@
 <%
   const activeSection = typeof active !== 'undefined' ? String(active) : 'home';
   const mainNavItems = [
-    { id: 'home', label: 'Home', href: '/testhome', icon: 'home' },
-    { id: 'schedule', label: 'Schedule', href: '/testschedule', icon: 'calendar' },
-    { id: 'homework', label: 'Homework', href: '#homework', icon: 'homework' },
-    { id: 'messages', label: 'Messages', href: '#messages', icon: 'messages' },
-    { id: 'teamwork', label: 'Teamwork', href: '#teamwork', icon: 'teamwork' },
-    { id: 'materials', label: 'Resources', href: '#materials', icon: 'files' },
-    { id: 'grades', label: 'Grades', href: '#grades', icon: 'grades' }
+    { id: 'home', label: 'Home', href: '/testhome', icon: 'navHome' },
+    { id: 'schedule', label: 'Schedule', href: '/testschedule', icon: 'navSchedule' },
+    { id: 'homework', label: 'Homework', href: '#homework', icon: 'navHomework' },
+    { id: 'messages', label: 'Messages', href: '#messages', icon: 'navMessages' },
+    { id: 'teamwork', label: 'Teamwork', href: '#teamwork', icon: 'navTeamwork' },
+    { id: 'materials', label: 'Resources', href: '#materials', icon: 'navResources' },
+    { id: 'grades', label: 'Grades', href: '#grades', icon: 'navGrades' }
   ];
   const adminNavItems = [
-    { id: 'admin', label: 'Admin', href: '#admin', icon: 'admin' },
-    { id: 'students', label: 'Students', href: '#students', icon: 'users' },
-    { id: 'subjects', label: 'Subjects', href: '#subjects', icon: 'book' },
-    { id: 'setup', label: 'Academic setup', href: '#setup', icon: 'settings' }
+    { id: 'admin', label: 'Admin', href: '#admin', icon: 'navAdmin' },
+    { id: 'students', label: 'Students', href: '#students', icon: 'navStudents' },
+    { id: 'subjects', label: 'Subjects', href: '#subjects', icon: 'navSubjects' },
+    { id: 'setup', label: 'Academic setup', href: '#setup', icon: 'navSetup' }
   ];
 %>
 <header class="td-mobile-topbar" aria-label="Studerria mobile navigation">
@@ -58,7 +58,7 @@
           class="td-sidebar-link <%= item.id === activeSection ? 'is-active' : '' %>"
           <%= item.id === activeSection ? 'aria-current="page"' : '' %>
         >
-          <%- include('test-icon', { name: item.icon, className: 'td-sidebar-icon' }) %>
+          <%- include('test-icon', { name: item.icon, className: 'td-sidebar-icon nav-icon' }) %>
           <span><%= item.label %></span>
         </a>
       <% }); %>
@@ -68,7 +68,7 @@
       <span class="td-sidebar-section-title">Staff preview</span>
       <% adminNavItems.forEach(function(item) { %>
         <a href="<%= item.href %>" class="td-sidebar-link <%= item.id === activeSection ? 'is-active' : '' %>">
-          <%- include('test-icon', { name: item.icon, className: 'td-sidebar-icon' }) %>
+          <%- include('test-icon', { name: item.icon, className: 'td-sidebar-icon nav-icon' }) %>
           <span><%= item.label %></span>
         </a>
       <% }); %>
@@ -78,7 +78,7 @@
 
     <div class="td-sidebar-footer">
       <a class="td-sidebar-link td-sidebar-link--settings <%= activeSection === 'settings' ? 'is-active' : '' %>" href="#settings">
-        <%- include('test-icon', { name: 'settings', className: 'td-sidebar-icon' }) %>
+        <%- include('test-icon', { name: 'navProfile', className: 'td-sidebar-icon nav-icon' }) %>
         <span>Settings</span>
       </a>
       <div class="td-sidebar-user">
@@ -89,7 +89,7 @@
         </span>
       </div>
       <button class="td-sidebar-logout" type="button">
-        <%- include('test-icon', { name: 'logout', className: 'td-sidebar-icon' }) %>
+        <%- include('test-icon', { name: 'navLogout', className: 'td-sidebar-icon nav-icon' }) %>
         <span>Logout</span>
       </button>
     </div>
