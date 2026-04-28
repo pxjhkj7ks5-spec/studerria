@@ -100,7 +100,7 @@
       return result;
     }
     const children = Array.isArray(item.children) ? item.children : [];
-    if ((item.href && !item.isDisabledLink) || item.navAction || !children.length || item.isCurrent || item.isCurrentContainer) {
+    if (!item.hideInSidebar && ((item.href && !item.isDisabledLink) || item.navAction || !children.length || item.isCurrent || item.isCurrentContainer)) {
       result.push({
         ...item,
         children: [],
@@ -281,8 +281,8 @@
     }
 
     if (item.navAction === 'theme-toggle') {
-      attrs.push('data-light-label="☀️ Зміна теми"');
-      attrs.push('data-dark-label="🌙 Зміна теми"');
+      attrs.push('data-light-label="Зміна теми"');
+      attrs.push('data-dark-label="Зміна теми"');
     }
 
     if (item.isCurrent || item.isCurrentContainer) {
@@ -345,8 +345,8 @@
 
     if (item.navAction === 'theme-toggle') {
       attrs.push('data-theme-toggle');
-      attrs.push('data-light-label="Світла тема"');
-      attrs.push('data-dark-label="Темна тема"');
+      attrs.push('data-light-label="Зміна теми"');
+      attrs.push('data-dark-label="Зміна теми"');
     }
 
     if (item.isCurrent) {

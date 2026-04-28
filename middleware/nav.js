@@ -96,6 +96,7 @@ function filterNavItems(items, context) {
     }
 
     if (active) {
+      result.push(nextItem);
       return result;
     }
 

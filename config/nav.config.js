@@ -50,6 +50,7 @@ const navConfig = {
       label: 'Навчання',
       href: '/schedule',
       section: 'main',
+      hideInSidebar: true,
       rolesAllowed: APP_ROLES,
       keepWhenActive: true,
       children: [
@@ -140,6 +141,7 @@ const navConfig = {
       label: PERSONAL_LABEL,
       href: '/profile',
       section: 'main',
+      hideInSidebar: true,
       rolesAllowed: APP_ROLES,
       keepWhenActive: true,
       children: [

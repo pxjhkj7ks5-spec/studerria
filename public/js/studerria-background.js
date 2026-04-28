@@ -54,7 +54,10 @@
       }
       if (control.dataset.navAction === 'theme-toggle') {
         const label = control.querySelector('.snav-label');
-        if (label) label.textContent = isDark ? 'Світла' : 'Темна';
+        const nextText = isDark
+          ? (control.getAttribute('data-light-label') || '')
+          : (control.getAttribute('data-dark-label') || '');
+        if (label && nextText) label.textContent = nextText;
       }
     });
   }
