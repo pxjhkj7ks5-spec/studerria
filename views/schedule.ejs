@@ -2376,10 +2376,7 @@
                   <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
                   <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
                 </div>
-                <span class="week-pill-progress" aria-hidden="true">
-                  <span class="week-pill-progress-fill" id="weekPillProgress"></span>
-                </span>
-                <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
+                <strong class="week-pill-range" id="weekPillRange"><%= scheduleViewText.weekRangeFallback %></strong>
               </div>
               <button class="td-icon-button week-nav-btn" id="weekNext" type="button" aria-label="<%= scheduleViewText.nextWeekAria %>">&rsaquo;</button>
             </div>
@@ -4862,8 +4859,7 @@
       const weekPager = document.getElementById('weekPager');
       const weekPill = document.getElementById('weekPill');
       const weekPillCount = document.getElementById('weekPillCount');
-      const weekPillProgress = document.getElementById('weekPillProgress');
-      const weekCarousel = document.getElementById('weekCarousel');
+      const weekPillRange = document.getElementById('weekPillRange');
       const messagesBtn = document.getElementById('messagesBtn');
       const messagesBtnMobile = document.getElementById('messagesBtnMobile');
       const messagesList = document.getElementById('messagesList');
@@ -4956,63 +4952,6 @@
         return `${kyivWeekFormatter.format(range.start)} - ${kyivWeekFormatter.format(range.end)}`;
       }
 
-      function getWeekCarouselOffsets() {
-        return window.innerWidth <= 560 ? [-1, 0, 1] : [-2, -1, 0, 1, 2];
-      }
-
-      function renderWeekCarousel(activeWeek) {
-        if (!weekCarousel) return;
-        weekCarousel.textContent = '';
-        const fragment = document.createDocumentFragment();
-        const offsets = getWeekCarouselOffsets();
-        weekCarousel.style.setProperty('--week-carousel-columns', String(offsets.length));
-        weekCarousel.dataset.compact = offsets.length <= 3 ? 'true' : 'false';
-        weekCarousel.dataset.viewport = window.innerWidth <= 560 ? 'mobile' : 'desktop';
-        let activeChip = null;
-
-        offsets.forEach((offset) => {
-          const week = activeWeek + offset;
-          const distance = Math.abs(offset);
-          if (week < 1 || week > totalWeeks) {
-            const ghost = document.createElement('span');
-            ghost.className = 'week-carousel-card week-carousel-card--ghost';
-            ghost.dataset.distance = String(distance);
-            ghost.dataset.offset = String(offset);
-            ghost.setAttribute('aria-hidden', 'true');
-            fragment.appendChild(ghost);
-            return;
-          }
-
-          const chip = document.createElement('button');
-          chip.type = 'button';
-          chip.className = 'week-carousel-card';
-          chip.dataset.week = String(week);
-          chip.dataset.distance = String(distance);
-          chip.dataset.offset = String(offset);
-          chip.setAttribute('aria-label', `${weekLabelText} ${week}`);
-          if (week === activeWeek) {
-            chip.classList.add('is-active');
-            chip.setAttribute('aria-current', 'page');
-            activeChip = chip;
-          }
-          chip.innerHTML = `
-            <span class="week-carousel-card__shine" aria-hidden="true"></span>
-            <span class="week-carousel-card__label">${weekLabelText}</span>
-            <span class="week-carousel-card__number">${String(week).padStart(2, '0')}</span>
-            <span class="week-carousel-card__range">${formatWeekRange(week)}</span>
-          `;
-          chip.addEventListener('click', () => goToWeek(week));
-          fragment.appendChild(chip);
-        });
-
-        weekCarousel.appendChild(fragment);
-        if (weekCarousel.dataset.viewport === 'mobile' && activeChip && typeof activeChip.scrollIntoView === 'function') {
-          window.requestAnimationFrame(() => {
-            activeChip.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'auto' });
-          });
-        }
-      }
-
       function getKyivAcademicWeek() {
         if (!semesterStartDate) return clampWeek(currentWeek);
         const startUtc = parseDateUtc(semesterStartDate);
@@ -5047,17 +4986,15 @@
         if (weekPillCount) {
           weekPillCount.textContent = `${displayWeek} / ${String(totalWeeks).padStart(2, '0')}`;
         }
-        if (weekPillProgress) {
-          const ratio = totalWeeks > 0 ? safe / totalWeeks : 1;
-          weekPillProgress.style.transform = `scaleX(${ratio})`;
-        }
         if (weekRangeLabel) {
           weekRangeLabel.textContent = formatWeekRange(safe);
+        }
+        if (weekPillRange) {
+          weekPillRange.textContent = formatWeekRange(safe);
         }
         if (weekPrev) weekPrev.disabled = safe <= 1;
         if (weekNext) weekNext.disabled = safe >= totalWeeks;
         if (weekPill) weekPill.setAttribute('aria-label', `${weekLabelText} ${safe}`);
-        renderWeekCarousel(safe);
       }
 
       function goToWeek(targetWeek) {

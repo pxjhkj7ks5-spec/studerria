@@ -2488,3 +2488,95 @@ body.page-schedule.schedule-drawer-open .drawer-action {
     display: none !important;
   }
 }
+
+/* Compact week switcher (without week carousel cards). */
+body.page-schedule .week-pager {
+  padding: 8px 10px;
+  border-radius: 22px;
+}
+
+body.page-schedule .schedule-week-strip-head {
+  margin-bottom: 8px;
+}
+
+body.page-schedule .schedule-week-carousel-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+body.page-schedule .week-pager .week-pill {
+  min-height: 0;
+  padding: 10px 12px;
+  border-radius: 16px;
+  gap: 6px;
+}
+
+body.page-schedule .week-pager .week-pill::before {
+  display: none;
+}
+
+body.page-schedule .week-pager .week-pill-head {
+  align-items: center;
+  gap: 8px;
+}
+
+body.page-schedule .week-pager .week-pill-kicker {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+body.page-schedule .week-pager .week-pill-count {
+  min-height: 22px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+body.page-schedule .week-pager .week-pill-range {
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: rgba(241, 245, 249, 0.92);
+}
+
+body.theme-light.page-schedule .week-pager .week-pill-range {
+  color: rgba(30, 41, 59, 0.88);
+}
+
+body.page-schedule .week-pager .week-nav-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+}
+
+@media (max-width: 991px) {
+  body.page-schedule .week-pager {
+    border-radius: 18px;
+    padding: 7px;
+  }
+
+  body.page-schedule .schedule-week-strip-head {
+    margin-bottom: 6px;
+  }
+
+  body.page-schedule .week-pager .week-pill {
+    border-radius: 14px;
+    padding: 8px 10px;
+    gap: 5px;
+  }
+
+  body.page-schedule .week-pager .week-pill-range {
+    font-size: 0.86rem;
+  }
+
+  body.page-schedule .week-pager .week-nav-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+}
