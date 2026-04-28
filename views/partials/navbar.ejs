@@ -257,13 +257,14 @@
 
   const buildTriggerClass = (level, item) => {
     const classNames = [level === 0 ? 'snav-link' : 'snav-menu-link'];
+    const hasChildren = Array.isArray(item.children) && item.children.length > 0;
     if (Array.isArray(item.children) && item.children.length) {
       classNames.push('snav-trigger');
     }
     if (item.navAction === 'theme-toggle') {
       classNames.push('theme-toggle');
     }
-    if (item.isCurrentContainer) {
+    if (item.isCurrentContainer && hasChildren) {
       classNames.push('is-current');
     }
     if (item.isCurrent) {
@@ -308,7 +309,7 @@
       attrs.push('data-static-label="true"');
     }
 
-    if (item.isCurrent || item.isCurrentContainer) {
+    if (item.isCurrent || (item.isCurrentContainer && hasChildren)) {
       attrs.push('aria-current="page"');
     }
 
