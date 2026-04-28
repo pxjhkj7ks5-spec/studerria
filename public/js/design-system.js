@@ -257,6 +257,24 @@
     });
   }
 
+  function initLanguageToggle() {
+    document.addEventListener('click', (event) => {
+      const button = event.target instanceof Element ? event.target.closest('[data-lang-toggle]') : null;
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+      event.preventDefault();
+
+      const current = String(button.getAttribute('data-current-lang') || document.documentElement.lang || 'uk')
+        .trim()
+        .toLowerCase();
+      const next = current === 'en' ? 'uk' : 'en';
+      const url = new URL(window.location.href);
+      url.searchParams.set('lang', next);
+      window.location.assign(url.toString());
+    });
+  }
+
   function initLivingSeparators() {
     const root = document.documentElement;
     if (!root || !document.querySelector('.living-separator')) {
@@ -542,6 +560,7 @@
     applyGlassDock(document);
     applyFocusHalo(document);
     initBootstrapTooltips(document);
+    initLanguageToggle();
     initLivingSeparators();
     observeThemeChanges();
     observeDynamicBadges();

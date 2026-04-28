@@ -25,6 +25,20 @@
     });
   }
 
+  function initLanguageToggle() {
+    document.addEventListener('click', function(event) {
+      var button = event.target && event.target.closest ? event.target.closest('[data-lang-toggle]') : null;
+      if (!button) return;
+      event.preventDefault();
+
+      var current = String(button.getAttribute('data-current-lang') || document.documentElement.lang || 'uk').trim().toLowerCase();
+      var next = current === 'en' ? 'uk' : 'en';
+      var url = new URL(window.location.href);
+      url.searchParams.set('lang', next);
+      window.location.assign(url.toString());
+    });
+  }
+
   function initPasswordReveal() {
     var input = document.querySelector('[data-password-input]');
     var button = document.querySelector('[data-password-reveal]');
@@ -204,6 +218,7 @@
   }
 
   applyTheme(readTheme());
+  initLanguageToggle();
   initPasswordReveal();
   initChangelog();
 })();

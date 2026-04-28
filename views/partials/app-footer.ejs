@@ -18,7 +18,13 @@
 %>
 <footer class="app-footer td-login-footer text-center py-4">
   <small class="<%= footerMetaClassList.join(' ') %>">
-    <button type="button" class="td-language-pill">UA</button>
+    <button
+      type="button"
+      class="td-language-pill"
+      data-lang-toggle
+      data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
+      aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+    ><%= lang === 'en' ? 'EN' : 'UA' %></button>
     <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
       &copy; A.M.
     </span>
