@@ -18387,44 +18387,178 @@ app.get(['/terms', '/privacy'], (req, res) => {
 app.get('/changelog', (req, res) => res.render('changelog', { layout: false }));
 
 app.get('/about', requireLogin, (req, res) => {
-  const aboutCards = [
-    {
-      kicker: 'Для чого',
-      chipClass: 'status-chip status-chip--info',
-      title: 'Для чого Studerria',
-      body: 'Studerria збирає щоденний навчальний потік в один цілісний простір, щоб студент, викладач і команда адміністрування працювали в одному інтерфейсі без розриву між сервісами.',
-      items: [
-        'Один вхід для щоденного фокусу, розкладу й особистого простору.',
-        'Менше ручних переходів між різними навчальними модулями.',
-        'Спільний простір і однакова логіка навігації для всіх ролей.',
-      ],
-    },
-    {
-      kicker: 'Модулі',
-      chipClass: 'status-chip status-chip--active',
-      title: 'Ключові модулі',
-      body: 'Ядро сайту побудоване навколо щоденного маршруту користувача: від My Day і розкладу з дедлайнами до журналу, teamwork, Teacher Workspace і Help.',
-      items: [
-        'My Day: фокус дня, сигнали успішності, рейтингу та відвідуваності.',
-        'Навчання: розклад (пари, сесії, custom і teamwork дедлайни), журнал, дисципліни й матеріали.',
-        'Help і профіль: FAQ, треди підтримки, історія відповідей та керування персональними налаштуваннями.',
-      ],
-    },
-    {
-      kicker: 'Доступи',
-      chipClass: 'status-chip status-chip--neutral',
-      title: 'Ролі та доступи',
-      body: 'Studerria показує різний інструментарій залежно від ролі, але лишається в одному візуальному контурі, щоб перехід між сценаріями не ламав відчуття системи.',
-      items: [
-        'Студенти й старости працюють із власним маршрутом навчання, дедлайнами та журналом.',
-        'Викладачі керують дисциплінами, журналом, teamwork і Teacher Workspace.',
-        'Адміністратор і деканат керують академічними налаштуваннями, повідомленнями та підтримкою.',
-      ],
-    },
-  ];
+  const lang = getPreferredLang(req);
+  const isEn = lang === 'en';
+  const aboutPage = isEn
+    ? {
+        pageTitle: 'About',
+        badgePrimary: 'About',
+        badgeSecondary: 'Vision',
+        subtitle: 'Learning platform',
+        lead: 'Studerria is an educational platform designed to make student life simpler, clearer, and less chaotic.',
+        intro:
+          'In many universities, the learning process is scattered across multiple places: schedule in one chat, assignments in another, deadlines in spreadsheets, and messages in messengers. Studerria brings all of this into one system.',
+        cards: [
+          {
+            kicker: 'Why',
+            chipClass: 'status-chip status-chip--info',
+            title: 'Why Studerria matters',
+            body:
+              'A major problem in education is often organization, not just content quality. Students lose momentum because information is fragmented and hard to track.',
+            items: [
+              'Unclear schedule and constant context switching.',
+              'Forgotten deadlines and scattered messages.',
+              'Continuous feeling that something must be checked somewhere else.',
+            ],
+          },
+          {
+            kicker: 'How',
+            chipClass: 'status-chip status-chip--active',
+            title: 'What Studerria does',
+            body:
+              'Studerria unifies the core learning flow so students can instantly see what is happening, what to do next, and where to focus.',
+            items: [
+              'Personal schedule, tasks, and deadlines.',
+              'Messages, disciplines, and study groups.',
+              'Teamwork, student progress, and admin controls.',
+            ],
+          },
+          {
+            kicker: 'Value',
+            chipClass: 'status-chip status-chip--neutral',
+            title: 'Main product value',
+            body:
+              'Studerria is not just a feature list. Its key value is reducing unnecessary actions between a student and actual learning.',
+            items: [
+              'Fewer manual jumps between tools and channels.',
+              'One clear daily entry point for study routines.',
+              'Less operational stress around coordination and communication.',
+            ],
+          },
+          {
+            kicker: 'Origin',
+            chipClass: 'status-chip status-chip--neutral',
+            title: 'Project idea',
+            body:
+              'Studerria started as a response to a simple need: students do not need another complex system, they need a practical space that truly helps them learn.',
+            items: [
+              'Built from real student workflows, not bureaucracy-first design.',
+              'Covers the morning-to-evening study routine in one place.',
+              'Reframes an education platform as an intelligent learning space.',
+            ],
+          },
+          {
+            kicker: 'Audience',
+            chipClass: 'status-chip status-chip--active',
+            title: 'Who it is for',
+            body:
+              'Studerria is built for students, group leaders, teachers, and faculty administration.',
+            items: [
+              'Students: a clear entry point into the study day.',
+              'Group leaders: less manual coordination work.',
+              'Teachers and administration: better communication and holistic process visibility.',
+            ],
+          },
+          {
+            kicker: 'Future',
+            chipClass: 'status-chip status-chip--info',
+            title: 'Vision',
+            body:
+              'The goal is to make study organization so simple that it no longer distracts from learning itself.',
+            items: [
+              'Smarter guidance and routine automation.',
+              'Progress analytics and stronger communication loops.',
+              'Personalized support that reduces educational chaos.',
+            ],
+          },
+        ],
+      }
+    : {
+        pageTitle: 'Про сайт',
+        badgePrimary: 'Про сайт',
+        badgeSecondary: 'Бачення',
+        subtitle: 'Навчальна платформа',
+        lead: 'Studerria - це навчальна платформа, створена для того, щоб зробити студентське життя простішим, зрозумілішим і менш хаотичним.',
+        intro:
+          'У багатьох університетах навчальний процес розпадається на десятки окремих місць: розклад в одному чаті, домашні завдання в іншому, дедлайни в таблицях, повідомлення в месенджерах. Studerria збирає це в одну систему.',
+        cards: [
+          {
+            kicker: 'Чому',
+            chipClass: 'status-chip status-chip--info',
+            title: 'Чому це важливо',
+            body:
+              'Проблема сучасної освіти часто не лише в якості контенту, а в організації. Студенти втрачають мотивацію через розкидані процеси і постійне відчуття, що треба щось десь перевіряти.',
+            items: [
+              'Незрозумілий розклад і постійні перемикання між каналами.',
+              'Забуті дедлайни та розкидані повідомлення.',
+              'Зайва напруга від хаотичної організації навчального дня.',
+            ],
+          },
+          {
+            kicker: 'Як',
+            chipClass: 'status-chip status-chip--active',
+            title: 'Що робить Studerria',
+            body:
+              'Платформа поєднує ключові елементи навчального процесу, щоб студент одразу бачив, що відбувається, що потрібно зробити і куди рухатися далі.',
+            items: [
+              'Персональний розклад, завдання та дедлайни.',
+              'Повідомлення, дисципліни та навчальні групи.',
+              'Командна робота, прогрес студента та адміністративні інструменти.',
+            ],
+          },
+          {
+            kicker: 'Цінність',
+            chipClass: 'status-chip status-chip--neutral',
+            title: 'Головна цінність',
+            body:
+              'Studerria - це не просто набір функцій. Головна цінність у тому, що платформа зменшує кількість зайвих дій між студентом і навчанням.',
+            items: [
+              'Менше ручних переходів між різними сервісами.',
+              'Одна зрозуміла точка входу в навчальний день.',
+              'Менше операційного шуму навколо навчального процесу.',
+            ],
+          },
+          {
+            kicker: 'Ідея',
+            chipClass: 'status-chip status-chip--neutral',
+            title: 'Ідея проєкту',
+            body:
+              'Studerria почалася як відповідь на дуже звичайну проблему: студентам потрібна не ще одна складна система, а простий простір, який справді допомагає вчитися.',
+            items: [
+              'Побудовано від реального студентського досвіду, а не від бюрократичної моделі.',
+              'Підтримує щоденний сценарій: від наступної пари до планування дня.',
+              'Переосмислює платформу як інтелектуальний навчальний простір.',
+            ],
+          },
+          {
+            kicker: 'Для кого',
+            chipClass: 'status-chip status-chip--active',
+            title: 'Для кого ця платформа',
+            body:
+              'Studerria створена для студентів, старост, викладачів і адміністрації факультетів або університетів.',
+            items: [
+              'Студентам - зрозуміла точка входу в навчальний день.',
+              'Старостам - менше ручної організаційної роботи.',
+              'Викладачам і адміністрації - цілісне бачення навчального процесу.',
+            ],
+          },
+          {
+            kicker: 'Майбутнє',
+            chipClass: 'status-chip status-chip--info',
+            title: 'Бачення',
+            body:
+              'Мета Studerria - зробити організацію навчання настільки простою, щоб вона перестала відволікати від самого навчання.',
+            items: [
+              'Розумні підказки та автоматизація рутини.',
+              'Аналітика прогресу і краща комунікація.',
+              'Персоналізована підтримка, яка прибирає хаос.',
+            ],
+          },
+        ],
+      };
 
   return res.render('about', {
-    aboutCards,
+    aboutPage,
   });
 });
 
