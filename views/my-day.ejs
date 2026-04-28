@@ -85,6 +85,7 @@
         || Number(activity.recent_feedback || 0) > 0;
       const showInboxSection = !isTeacherMyDayView && (hasInboxSummaryData || inboxItems.length > 0 || whatIfSubjects.length > 0);
       const showWhatIfBlock = whatIfSubjects.length > 0;
+      const showLegacyHomeBlocks = false;
 
       const formatShortDate = (value) => {
         if (!value) return '-';
@@ -593,7 +594,7 @@
         </aside>
         <% } %>
       </section>
-      <% } else if (isStudentLikeMyDayView) { %>
+      <% } else if (isStudentLikeMyDayView && showLegacyHomeBlocks) { %>
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
           <span class="brief-kicker"><%= t('myDay.briefKicker') %></span>
@@ -617,6 +618,7 @@
       </section>
 
       <% } else { %>
+      <% if (showLegacyHomeBlocks) { %>
       <section class="cockpit-card brief-card <%= briefToneClass %>">
         <div class="brief-head">
           <span class="brief-kicker"><%= t('myDay.briefKicker') %></span>
@@ -638,6 +640,7 @@
           <% } %>
         </div>
       </section>
+      <% } %>
 
       <% if (showMissionStrip) { %>
       <section class="mission-strip">
@@ -794,7 +797,7 @@
       <% } %>
 
       <section class="cockpit-grid<%= isStudentLikeMyDayView ? ' student-cockpit-grid' : '' %>">
-        <% if (isStudentLikeMyDayView) { %>
+        <% if (isStudentLikeMyDayView && showLegacyHomeBlocks) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card" id="deadlinesClassesBlock">
             <div class="section-head">
               <h2 class="section-title"><%= t('myDay.student.dualFocusTitle') %></h2>
@@ -899,7 +902,7 @@
           </article>
         <% } %>
 
-        <% if (isTeacherMyDayView) { %>
+        <% if (isTeacherMyDayView && showLegacyHomeBlocks) { %>
           <article class="cockpit-card section-card order-1 dual-focus-card teacher-focus-card" id="teacherClassesRemindersBlock">
             <div class="section-head">
               <h2 class="section-title"><%= t('myDay.classes.title') %></h2>
@@ -984,7 +987,7 @@
           </article>
         <% } %>
 
-        <% if (isDefaultStaffMyDayView) { %>
+        <% if (isDefaultStaffMyDayView && showLegacyHomeBlocks) { %>
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-1' : '' %>" id="deadlinesBlock">
           <div class="section-head">
             <h2 class="section-title"><%= t('myDay.deadlines.title') %></h2>
@@ -1244,7 +1247,7 @@
           </article>
         <% } %>
 
-        <% if (showInboxSection) { %>
+        <% if (showInboxSection && showLegacyHomeBlocks) { %>
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView ? ' order-3' : '' %>" id="inboxBlock">
           <div class="section-head">
             <h2 class="section-title"><%= t('myDay.inbox.title') %></h2>
@@ -1317,7 +1320,7 @@
         </article>
         <% } %>
 
-        <% if (!isTeacherMyDayView) { %>
+        <% if (!isTeacherMyDayView && showLegacyHomeBlocks) { %>
         <article class="cockpit-card section-card reminder-card<%= isStudentLikeMyDayView ? ' order-4' : '' %>" id="remindersBlock">
           <div class="section-head">
             <h2 class="section-title"><%= t('myDay.reminders.title') %></h2>
@@ -1367,6 +1370,7 @@
         </article>
         <% } %>
 
+        <% if (showLegacyHomeBlocks) { %>
         <article class="cockpit-card section-card<%= isStudentLikeMyDayView || isTeacherMyDayView ? ' order-2 competency-card-compact' : '' %><%= isTeacherMyDayView ? ' teacher-competency-card' : '' %>" id="competencyBlock">
           <div class="section-head">
             <h2 class="section-title"><%= t('myDay.competency.title') %></h2>
@@ -1455,6 +1459,7 @@
             <% } %>
           </div>
         </article>
+        <% } %>
       </section>
     </main>
 
