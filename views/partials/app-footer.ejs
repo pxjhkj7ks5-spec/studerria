@@ -3,6 +3,8 @@
   if (typeof footerMetaClass === 'string' && footerMetaClass.trim()) {
     footerMetaClassList.push(footerMetaClass.trim());
   }
+  const footerModeValue = typeof footerMode === 'string' ? footerMode : 'default';
+  const isAuthLiteFooter = footerModeValue === 'auth-lite';
   const showFooterSyncStatus = (typeof footerSyncStatus !== 'undefined') ? Boolean(footerSyncStatus) : true;
   const latestRelease = Array.isArray(changelog) && changelog.length ? changelog[0] : null;
   const footerReleaseProps = {
@@ -17,48 +19,65 @@
   };
 %>
 <footer class="app-footer td-login-footer text-center py-4">
-  <small class="<%= footerMetaClassList.join(' ') %>">
-    <button
-      type="button"
-      class="td-language-pill"
-      data-lang-toggle
-      data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-      aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
-    ><%= lang === 'en' ? 'EN' : 'UA' %></button>
-    <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
-      &copy; A.M.
-    </span>
-    <% if (showFooterSyncStatus) { %>
-      <span
-        class="footer-sync-pill"
-        data-footer-network-status
-        role="status"
-        aria-live="polite"
-        aria-label="<%= footerNetworkLabels.online %>"
-      >
-        <span class="sync-dot" data-footer-sync-dot aria-hidden="true"></span>
-        <span class="footer-sync-label" data-footer-sync-label><%= footerNetworkLabels.online %></span>
+  <% if (isAuthLiteFooter) { %>
+    <small class="<%= footerMetaClassList.join(' ') %> footer-meta--auth-lite">
+      <button
+        type="button"
+        class="td-language-pill"
+        data-lang-toggle
+        data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
+        aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+      ><%= lang === 'en' ? 'EN' : 'UA' %></button>
+      <a class="footer-link" href="/help"><%= lang === 'en' ? 'Support' : 'Підтримка' %></a>
+      <a class="footer-link" href="/terms"><%= lang === 'en' ? 'Terms of use' : 'Умови використання' %></a>
+      <a class="footer-link" href="/privacy"><%= lang === 'en' ? 'Privacy policy' : 'Політика конфіденційності' %></a>
+      <button type="button" class="td-footer-link footer-link" data-auth-changelog-open>Changelog</button>
+      <span class="footer-signature">© Studerria 2026</span>
+    </small>
+  <% } else { %>
+    <small class="<%= footerMetaClassList.join(' ') %>">
+      <button
+        type="button"
+        class="td-language-pill"
+        data-lang-toggle
+        data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
+        aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+      ><%= lang === 'en' ? 'EN' : 'UA' %></button>
+      <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
+        &copy; A.M.
       </span>
-    <% } %>
-    <span
-      class="footer-release-slot"
-      data-react-island="footer-release-pill"
-      data-island-props='<%- footerReleasePropsJson %>'
-      aria-hidden="true"
-    ></span>
-    <button
-      type="button"
-      class="footer-link"
-      data-bs-toggle="modal"
-      data-bs-target="#changelogModal"
-    >
-      <%= t('footer.changelog') %>
-    </button>
-    <a class="footer-link" href="/changelog">Всі зміни</a>
-    <a class="footer-link" href="/terms">Умови використання</a>
-    <a class="footer-link" href="/privacy">Політика конфіденційності</a>
-    <a class="footer-link" href="/help">Підтримка</a>
-  </small>
+      <% if (showFooterSyncStatus) { %>
+        <span
+          class="footer-sync-pill"
+          data-footer-network-status
+          role="status"
+          aria-live="polite"
+          aria-label="<%= footerNetworkLabels.online %>"
+        >
+          <span class="sync-dot" data-footer-sync-dot aria-hidden="true"></span>
+          <span class="footer-sync-label" data-footer-sync-label><%= footerNetworkLabels.online %></span>
+        </span>
+      <% } %>
+      <span
+        class="footer-release-slot"
+        data-react-island="footer-release-pill"
+        data-island-props='<%- footerReleasePropsJson %>'
+        aria-hidden="true"
+      ></span>
+      <button
+        type="button"
+        class="footer-link"
+        data-bs-toggle="modal"
+        data-bs-target="#changelogModal"
+      >
+        <%= t('footer.changelog') %>
+      </button>
+      <a class="footer-link" href="/changelog">Всі зміни</a>
+      <a class="footer-link" href="/terms">Умови використання</a>
+      <a class="footer-link" href="/privacy">Політика конфіденційності</a>
+      <a class="footer-link" href="/help">Підтримка</a>
+    </small>
+  <% } %>
 </footer>
 <script>
   window.__KMA_APP_META__ = Object.assign({}, window.__KMA_APP_META__, <%- JSON.stringify(footerReleaseProps) %>);
@@ -94,17 +113,19 @@
 
   window.__updateFooterNetworkStatus();
 </script>
-<script
-  src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"
-  crossorigin="anonymous"
-  defer
-></script>
-<script
-  src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"
-  crossorigin="anonymous"
-  defer
-></script>
-<script src="/js/islands/runtime.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
-<script src="/js/islands/footer-release-island.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+<% if (!isAuthLiteFooter) { %>
+  <script
+    src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"
+    crossorigin="anonymous"
+    defer
+  ></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"
+    crossorigin="anonymous"
+    defer
+  ></script>
+  <script src="/js/islands/runtime.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+  <script src="/js/islands/footer-release-island.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+<% } %>
 <script src="/js/islands/checklist-toolbar-island.js" defer></script>
 <script src="/js/islands/insights-period-preset-island.js" defer></script>

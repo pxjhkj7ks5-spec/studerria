@@ -2580,3 +2580,173 @@ body.page-schedule .week-pager .week-nav-btn {
     min-width: 34px;
   }
 }
+
+/* Schedule footer in login-style mode. */
+body.page-schedule .app-footer {
+  width: min(100vw - 32px, 900px);
+  margin: 16px auto 0;
+  padding: 12px 0 26px !important;
+  border-top: 0 !important;
+}
+
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  color: var(--td-muted, rgba(148, 163, 184, 0.9));
+  font-size: 0.82rem;
+}
+
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite::before {
+  display: none !important;
+}
+
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .footer-link,
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .td-footer-link,
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .footer-signature {
+  color: inherit !important;
+  text-decoration: none;
+}
+
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .footer-link:hover,
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .td-footer-link:hover {
+  color: var(--studerria-accent, #8b5cf6) !important;
+}
+
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .td-footer-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+}
+
+/* Auth-lite changelog modal (same pattern as login). */
+body.page-schedule .td-lite-modal[hidden] {
+  display: none;
+}
+
+body.page-schedule .td-lite-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1065;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+body.page-schedule .td-lite-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 18, 36, 0.22);
+  backdrop-filter: blur(14px);
+  border: 0;
+}
+
+body.page-schedule .td-lite-sheet {
+  position: relative;
+  width: min(100%, 620px);
+  max-height: min(78vh, 720px);
+  padding: 24px;
+  overflow: auto;
+  border-radius: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.74);
+  transform: translateY(8px) scale(0.985);
+  opacity: 0;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+body.theme-dark.page-schedule .td-lite-sheet {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.76);
+}
+
+body.page-schedule .td-lite-modal.is-open .td-lite-sheet {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+body.page-schedule .td-lite-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+body.page-schedule .td-lite-kicker {
+  margin: 0 0 8px;
+  color: var(--studerria-accent, #8b5cf6);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body.page-schedule .td-lite-sheet-head h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+body.page-schedule .td-lite-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--td-muted, rgba(148, 163, 184, 0.95));
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+body.theme-dark.page-schedule .td-lite-close {
+  background: rgba(148, 163, 184, 0.14);
+}
+
+body.page-schedule .td-lite-release-list {
+  display: grid;
+  gap: 10px;
+}
+
+body.page-schedule .td-lite-release {
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+body.theme-dark.page-schedule .td-lite-release {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+body.page-schedule .td-lite-release-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+body.page-schedule .td-lite-release ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+body.page-schedule .td-lite-sheet-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}

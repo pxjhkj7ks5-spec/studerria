@@ -2246,16 +2246,6 @@
 
     <div class="schedule-shell" id="scheduleShell">
       <main class="container pt-2 pb-4 schedule-content enter">
-        <div class="glass week-hero liquid-card mb-4">
-          <div>
-            <h1 class="hero-title weekHeadline mb-1"><%= t('schedule.header') %></h1>
-            <div class="hero-sub" id="daily-phrase"><%= scheduleViewText.heroPhrase %></div>
-          </div>
-          <div class="hero-actions">
-            <span class="badge-glow"><%= t('schedule.week') %> <%= currentWeek %></span>
-          </div>
-        </div>
-
         <% if (subgroupError === 'exists') { %>
           <div class="alert alert-warning glass text-white border-0">
             <%= t('schedule.homeworkModal.subgroupAlreadyJoined') %>
@@ -2874,11 +2864,11 @@
         </section>
         <section class="month-summary glass liquid-card d-none" id="scheduleMonthSummary" aria-live="polite"></section>
       </main>
-
-      <%- include('partials/app-footer', { footerSyncStatus: true }) %>
     </div>
 
-    <%- include('partials/changelog-modal') %>
+    <%- include('partials/app-footer', { footerMode: 'auth-lite', footerSyncStatus: false, footerMetaClass: 'schedule-footer-auth-lite' }) %>
+
+    <%- include('partials/auth-lite-changelog') %>
     <div class="modal fade" id="homeworkModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -6068,13 +6058,48 @@
         }
       });
 
-      const changelogTrigger = document.querySelector('.footer-link[data-bs-target="#changelogModal"]');
-      const changelogModalEl = document.getElementById('changelogModal');
-      if (changelogTrigger && changelogModalEl && window.bootstrap && window.bootstrap.Modal) {
-        changelogTrigger.addEventListener('click', (event) => {
-          event.preventDefault();
-          const modal = window.bootstrap.Modal.getOrCreateInstance(changelogModalEl);
-          modal.show();
+      const authLiteChangelogModal = document.querySelector('[data-auth-changelog]');
+      if (authLiteChangelogModal) {
+        const authLiteSheet = authLiteChangelogModal.querySelector('.td-lite-sheet');
+        let authLiteLastFocus = null;
+
+        const openAuthLiteChangelog = () => {
+          authLiteLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          authLiteChangelogModal.hidden = false;
+          document.body.classList.add('studerria-changelog-open');
+          window.requestAnimationFrame(() => {
+            authLiteChangelogModal.classList.add('is-open');
+            if (authLiteSheet) authLiteSheet.focus({ preventScroll: true });
+          });
+        };
+
+        const closeAuthLiteChangelog = () => {
+          authLiteChangelogModal.classList.remove('is-open');
+          document.body.classList.remove('studerria-changelog-open');
+          window.setTimeout(() => {
+            authLiteChangelogModal.hidden = true;
+            if (authLiteLastFocus) authLiteLastFocus.focus({ preventScroll: true });
+          }, 180);
+        };
+
+        document.addEventListener('click', (event) => {
+          const open = event.target && event.target.closest ? event.target.closest('[data-auth-changelog-open]') : null;
+          if (open) {
+            event.preventDefault();
+            openAuthLiteChangelog();
+            return;
+          }
+          const close = event.target && event.target.closest ? event.target.closest('[data-auth-changelog-close]') : null;
+          if (close && !authLiteChangelogModal.hidden) {
+            event.preventDefault();
+            closeAuthLiteChangelog();
+          }
+        });
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && !authLiteChangelogModal.hidden) {
+            closeAuthLiteChangelog();
+          }
         });
       }
 
