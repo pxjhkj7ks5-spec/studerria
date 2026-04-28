@@ -215,7 +215,7 @@
     navAction: String(item && item.navAction ? item.navAction : ''),
     glyph: getMobileGlyph(item),
     meta: buildMobileMeta(trail),
-    isCurrent: Boolean(item && (item.isCurrent || item.isCurrentContainer)),
+    isCurrent: Boolean(item && (item.isCurrent || (item.isCurrentContainer && Array.isArray(item.children) && item.children.length > 0))),
     hasUnread: allowMessages && String(item && item.id ? item.id : '') === 'messages',
   });
 
@@ -327,7 +327,7 @@
     if (hasChildren) {
       classNames.push('snav-item--has-children');
     }
-    if (item.isCurrentContainer) {
+    if (item.isCurrentContainer && hasChildren) {
       classNames.push('is-current');
     }
     if (item.isCurrent) {
