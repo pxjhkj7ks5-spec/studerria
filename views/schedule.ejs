@@ -2352,6 +2352,38 @@
           </div>
         <% } %>
 
+        <header class="td-page-header schedule-page-header">
+          <div>
+            <p class="td-page-kicker">Studerria · <%= lang === 'en' ? 'Schedule' : 'Розклад' %></p>
+            <h1><%= lang === 'en' ? 'Your schedule' : 'Твій розклад' %></h1>
+            <p><%= scheduleViewText.heroPhrase %></p>
+          </div>
+        </header>
+
+        <section class="td-surface-card schedule-week-strip" id="weekPager">
+          <div class="schedule-week-strip-head">
+            <div>
+              <p class="td-page-kicker"><%= scheduleViewText.weekCarouselKicker %></p>
+              <strong class="schedule-week-range" id="scheduleWeekRangeLabel"><%= scheduleViewText.weekRangeFallback %></strong>
+            </div>
+            <span class="td-live-pill"><i></i><%= lang === 'en' ? 'Week' : 'Тиждень' %> <%= String(currentWeek).padStart(2, '0') %></span>
+          </div>
+          <div class="schedule-week-carousel-shell">
+            <button class="td-icon-button week-nav-btn" id="weekPrev" type="button" aria-label="<%= scheduleViewText.previousWeekAria %>">&lsaquo;</button>
+            <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
+              <div class="week-pill-head week-pill-head--compact">
+                <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
+                <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+              </div>
+              <span class="week-pill-progress" aria-hidden="true">
+                <span class="week-pill-progress-fill" id="weekPillProgress"></span>
+              </span>
+              <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
+            </div>
+            <button class="td-icon-button week-nav-btn" id="weekNext" type="button" aria-label="<%= scheduleViewText.nextWeekAria %>">&rsaquo;</button>
+          </div>
+        </section>
+
         <aside class="td-floating-next schedule-floating-next" data-next-class aria-live="polite" aria-label="Найближча пара">
           <span data-next-kind>Next</span>
           <strong data-next-label>Пари завантажуються</strong>
@@ -2374,7 +2406,8 @@
           <% }); %>
         </section>
 
-        <div id="scheduleWeekGrid">
+        <section class="td-schedule-layout schedule-selected-layout">
+        <div id="scheduleWeekGrid" class="schedule-day-panels">
         <% daysOfWeek.forEach(function(day) { %>
           <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
           <% const dayEntries = scheduleByDay[day] || []; %>
@@ -2804,23 +2837,44 @@
           <% }); %>
         <% } %>
         </div>
+        <aside class="schedule-selected-aside" aria-label="<%= lang === 'en' ? 'Day overview' : 'Огляд дня' %>">
+          <section class="td-surface-card schedule-overview-card">
+            <header class="td-card-header">
+              <div>
+                <h2 id="scheduleSelectedDayHeading"><%= lang === 'en' ? 'Today overview' : 'Огляд дня' %></h2>
+                <p id="scheduleSelectedDayMeta"><%= lang === 'en' ? 'Summary of the selected day' : 'Короткий стан вибраного дня' %></p>
+              </div>
+            </header>
+            <div class="schedule-overview-grid">
+              <span><strong id="scheduleOverviewClasses">0</strong><small><%= lang === 'en' ? 'Classes' : 'Пари' %></small></span>
+              <span><strong id="scheduleOverviewRooms">0</strong><small><%= lang === 'en' ? 'Rooms' : 'Аудиторії' %></small></span>
+              <span><strong id="scheduleOverviewDeadlines">0</strong><small><%= lang === 'en' ? 'Deadlines' : 'Дедлайни' %></small></span>
+            </div>
+            <div class="schedule-overview-next">
+              <span class="schedule-overview-icon" aria-hidden="true">◔</span>
+              <div>
+                <strong id="scheduleOverviewNextTitle"><%= lang === 'en' ? 'Next class' : 'Наступна пара' %></strong>
+                <span id="scheduleOverviewNextLabel"><%= lang === 'en' ? 'Choose a day' : 'Оберіть день' %></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="td-surface-card schedule-overview-card" id="homework">
+            <header class="td-card-header">
+              <div>
+                <h2><%= lang === 'en' ? 'Nearest homework' : 'Найближче ДЗ' %></h2>
+                <p id="scheduleHomeworkMeta"><%= lang === 'en' ? 'For the selected day' : 'Для вибраного дня' %></p>
+              </div>
+            </header>
+            <div class="td-homework-item">
+              <strong id="scheduleHomeworkTitle"><%= lang === 'en' ? 'No deadlines yet' : 'Поки без дедлайнів' %></strong>
+              <span id="scheduleHomeworkLine"><%= lang === 'en' ? 'No assignments attached to this day.' : 'Для цього дня поки немає привʼязаних завдань.' %></span>
+            </div>
+          </section>
+        </aside>
+        </section>
         <section class="month-summary glass liquid-card d-none" id="scheduleMonthSummary" aria-live="polite"></section>
       </main>
-
-      <div class="week-rail week-pager" id="weekPager">
-        <div class="week-pager-shell">
-          <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
-            <div class="week-pill-head week-pill-head--compact">
-              <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
-              <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
-            </div>
-            <span class="week-pill-progress" aria-hidden="true">
-              <span class="week-pill-progress-fill" id="weekPillProgress"></span>
-            </span>
-            <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
-          </div>
-        </div>
-      </div>
 
       <%- include('partials/app-footer', { footerSyncStatus: true }) %>
     </div>
@@ -4987,12 +5041,16 @@
         const safe = clampWeek(week);
         const displayWeek = String(safe).padStart(2, '0');
         currentWeek = safe;
+        const weekRangeLabel = document.getElementById('scheduleWeekRangeLabel');
         if (weekPillCount) {
           weekPillCount.textContent = `${displayWeek} / ${String(totalWeeks).padStart(2, '0')}`;
         }
         if (weekPillProgress) {
           const ratio = totalWeeks > 0 ? safe / totalWeeks : 1;
           weekPillProgress.style.transform = `scaleX(${ratio})`;
+        }
+        if (weekRangeLabel) {
+          weekRangeLabel.textContent = formatWeekRange(safe);
         }
         if (weekPrev) weekPrev.disabled = safe <= 1;
         if (weekNext) weekNext.disabled = safe >= totalWeeks;
@@ -5810,6 +5868,7 @@
             updateDensitySummary(weekGrid);
             applyScheduleMode(currentScheduleMode, { persist: false, bounce: false });
             initTooltips(weekGrid);
+            initLiquidScheduleStatus();
             writeScheduleCache(weekGrid.innerHTML);
           }
         } catch (err) {
@@ -6169,22 +6228,21 @@
 
       function initLiquidScheduleStatus() {
         const dayLinks = Array.from(document.querySelectorAll('[data-schedule-day-link]'));
-        const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
-        dayLinks.forEach((link) => {
-          const day = link.dataset.scheduleDayLink || '';
-          const card = document.getElementById(`day-${day}`);
-          const date = card ? String(card.dataset.dayDate || '') : '';
-          if (date && date === todayIso) {
-            link.classList.add('is-today', 'is-active');
-            link.setAttribute('aria-current', 'date');
-          }
-        });
-
+        const weekGridRoot = document.getElementById('scheduleWeekGrid');
         const chip = document.querySelector('[data-next-class]');
-        if (!chip) return;
-        const kind = chip.querySelector('[data-next-kind]');
-        const label = chip.querySelector('[data-next-label]');
-        const cards = Array.from(document.querySelectorAll('.schedule-card[data-date][data-time-base]'));
+        const kind = chip ? chip.querySelector('[data-next-kind]') : null;
+        const label = chip ? chip.querySelector('[data-next-label]') : null;
+        const selectedHeading = document.getElementById('scheduleSelectedDayHeading');
+        const selectedMeta = document.getElementById('scheduleSelectedDayMeta');
+        const overviewClasses = document.getElementById('scheduleOverviewClasses');
+        const overviewRooms = document.getElementById('scheduleOverviewRooms');
+        const overviewDeadlines = document.getElementById('scheduleOverviewDeadlines');
+        const overviewNextTitle = document.getElementById('scheduleOverviewNextTitle');
+        const overviewNextLabel = document.getElementById('scheduleOverviewNextLabel');
+        const homeworkMeta = document.getElementById('scheduleHomeworkMeta');
+        const homeworkTitle = document.getElementById('scheduleHomeworkTitle');
+        const homeworkLine = document.getElementById('scheduleHomeworkLine');
+        const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
         const now = new Date();
         const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
         const nowMinutes = Number(now.toLocaleTimeString('en-GB', {
@@ -6193,6 +6251,27 @@
           minute: '2-digit',
           hour12: false,
         }).replace(':', ''));
+        const storageKey = `schedule-selected-day:<%= selectedCourseId || 'all' %>:<%= userId || 'guest' %>:${currentWeek}`;
+        const copy = {
+          freeKind: <%- JSON.stringify(lang === 'en' ? 'Free' : 'Вільно') %>,
+          freeLabel: <%- JSON.stringify(lang === 'en' ? 'No classes today' : 'Немає пар сьогодні') %>,
+          doneKind: <%- JSON.stringify(lang === 'en' ? 'Done' : 'Готово') %>,
+          doneLabel: <%- JSON.stringify(lang === 'en' ? 'Done for today' : 'На сьогодні все') %>,
+          nextKind: <%- JSON.stringify(lang === 'en' ? 'Next' : 'Далі') %>,
+          nowKind: <%- JSON.stringify(lang === 'en' ? 'Now' : 'Зараз') %>,
+          selectedOverview: <%- JSON.stringify(lang === 'en' ? 'Selected day overview' : 'Огляд вибраного дня') %>,
+          selectedMeta: <%- JSON.stringify(lang === 'en' ? 'Summary of the selected day' : 'Короткий стан вибраного дня') %>,
+          classSingle: <%- JSON.stringify(lang === 'en' ? 'class' : 'пара') %>,
+          classPlural: <%- JSON.stringify(lang === 'en' ? 'classes' : 'пари') %>,
+          noDeadlinesTitle: <%- JSON.stringify(lang === 'en' ? 'No deadlines yet' : 'Поки без дедлайнів') %>,
+          noDeadlinesLine: <%- JSON.stringify(lang === 'en' ? 'No assignments attached to this day.' : 'Для цього дня поки немає привʼязаних завдань.') %>,
+          noDeadlinesMeta: <%- JSON.stringify(lang === 'en' ? 'For the selected day' : 'Для вибраного дня') %>,
+          firstClass: <%- JSON.stringify(lang === 'en' ? 'First class' : 'Перша пара') %>,
+          nextClass: <%- JSON.stringify(lang === 'en' ? 'Next class' : 'Наступна пара') %>,
+          currentClass: <%- JSON.stringify(lang === 'en' ? 'Current class' : 'Поточна пара') %>,
+          quietDay: <%- JSON.stringify(lang === 'en' ? 'Free day' : 'Вільний день') %>,
+          quietDayLine: <%- JSON.stringify(lang === 'en' ? 'No classes scheduled.' : 'Пари не заплановані.') %>,
+        };
 
         const parseTime = (timeValue) => {
           const match = String(timeValue || '').match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
@@ -6205,40 +6284,185 @@
           };
         };
 
-        const todayCards = cards
-          .filter((card) => String(card.dataset.date || '') === today)
-          .map((card) => ({ card, time: parseTime(card.dataset.timeBase || card.dataset.time || '') }))
-          .filter((item) => item.time)
-          .sort((a, b) => a.time.start - b.time.start);
+        const buildSelection = (scopeCards, scopeDate) => {
+          const datedCards = scopeCards
+            .filter((card) => String(card.dataset.date || '') === String(scopeDate || ''))
+            .map((card) => ({ card, time: parseTime(card.dataset.timeBase || card.dataset.time || '') }))
+            .filter((item) => item.time)
+            .sort((a, b) => a.time.start - b.time.start);
 
-        const active = todayCards.find((item) => nowMinutes >= item.time.start && nowMinutes <= item.time.end);
-        const next = todayCards.find((item) => nowMinutes < item.time.start);
-        const selected = active || next;
+          const isTodaySelection = String(scopeDate || '') === today;
+          const active = isTodaySelection ? datedCards.find((item) => nowMinutes >= item.time.start && nowMinutes <= item.time.end) : null;
+          const next = isTodaySelection ? datedCards.find((item) => nowMinutes < item.time.start) : null;
+          const first = datedCards[0] || null;
+          return { datedCards, isTodaySelection, active, next, first, selected: active || next || first };
+        };
 
-        cards.forEach((card) => card.classList.remove('is-now', 'is-next'));
-        if (active) active.card.classList.add('is-now');
-        if (!active && next) next.card.classList.add('is-next');
+        const applyFloatingChip = () => {
+          if (!chip) return;
+          const cards = Array.from(document.querySelectorAll('.schedule-card[data-date][data-time-base]'));
+          const todayState = buildSelection(cards, today);
 
-        if (!todayCards.length) {
-          if (kind) kind.textContent = 'Free';
-          if (label) label.textContent = 'No classes today';
-          return;
+          cards.forEach((card) => card.classList.remove('is-now', 'is-next'));
+          if (todayState.active) todayState.active.card.classList.add('is-now');
+          if (!todayState.active && todayState.next) todayState.next.card.classList.add('is-next');
+
+          if (!todayState.datedCards.length) {
+            if (kind) kind.textContent = copy.freeKind;
+            if (label) label.textContent = copy.freeLabel;
+            return;
+          }
+          if (!todayState.selected) {
+            if (kind) kind.textContent = copy.doneKind;
+            if (label) label.textContent = copy.doneLabel;
+            return;
+          }
+
+          const subject = todayState.selected.card.dataset.subject || todayState.selected.card.dataset.class || scheduleViewText.classLabel;
+          const room = todayState.selected.card.dataset.roomLabel ? ` · ауд. ${todayState.selected.card.dataset.roomLabel}` : '';
+          if (todayState.active) {
+            if (kind) kind.textContent = copy.nowKind;
+            if (label) label.textContent = `${copy.nowKind}: ${subject} · до ${todayState.selected.time.endLabel}${room}`;
+          } else {
+            if (kind) kind.textContent = copy.nextKind;
+            if (label) label.textContent = `${copy.nextKind}: ${subject} · ${todayState.selected.time.startLabel}${room}`;
+          }
+        };
+
+        const updateOverview = (dayCard) => {
+          if (!(dayCard instanceof HTMLElement)) return;
+          const date = String(dayCard.dataset.dayDate || '');
+          const dayName = dayCard.querySelector('.day-name') ? dayCard.querySelector('.day-name').textContent.trim() : scheduleViewText.dayFallback;
+          const dayDate = dayCard.querySelector('.day-date') ? dayCard.querySelector('.day-date').textContent.trim() : '';
+          const classCards = Array.from(dayCard.querySelectorAll('.schedule-card[data-date][data-time-base]'));
+          const deadlines = Array.from(dayCard.querySelectorAll('.deadline-item'));
+          const rooms = new Set(classCards.map((card) => String(card.dataset.roomLabel || '').trim()).filter(Boolean));
+          const state = buildSelection(classCards, date);
+
+          if (selectedHeading) selectedHeading.textContent = `${copy.selectedOverview} · ${dayName}`;
+          if (selectedMeta) {
+            const classCount = classCards.length;
+            const classText = `${classCount} ${classCount === 1 ? copy.classSingle : copy.classPlural}`;
+            selectedMeta.textContent = dayDate ? `${dayDate} · ${classText}` : classText;
+          }
+          if (overviewClasses) overviewClasses.textContent = String(classCards.length);
+          if (overviewRooms) overviewRooms.textContent = String(rooms.size);
+          if (overviewDeadlines) overviewDeadlines.textContent = String(deadlines.length);
+
+          if (!classCards.length) {
+            if (overviewNextTitle) overviewNextTitle.textContent = copy.quietDay;
+            if (overviewNextLabel) overviewNextLabel.textContent = copy.quietDayLine;
+          } else if (state.active) {
+            const subject = state.active.card.dataset.subject || scheduleViewText.classLabel;
+            const room = state.active.card.dataset.roomLabel ? ` · ауд. ${state.active.card.dataset.roomLabel}` : '';
+            if (overviewNextTitle) overviewNextTitle.textContent = copy.currentClass;
+            if (overviewNextLabel) overviewNextLabel.textContent = `${subject} · до ${state.active.time.endLabel}${room}`;
+          } else if (state.next) {
+            const subject = state.next.card.dataset.subject || scheduleViewText.classLabel;
+            const room = state.next.card.dataset.roomLabel ? ` · ауд. ${state.next.card.dataset.roomLabel}` : '';
+            if (overviewNextTitle) overviewNextTitle.textContent = copy.nextClass;
+            if (overviewNextLabel) overviewNextLabel.textContent = `${subject} · ${state.next.time.startLabel}${room}`;
+          } else if (state.first) {
+            const subject = state.first.card.dataset.subject || scheduleViewText.classLabel;
+            const room = state.first.card.dataset.roomLabel ? ` · ауд. ${state.first.card.dataset.roomLabel}` : '';
+            if (overviewNextTitle) overviewNextTitle.textContent = copy.firstClass;
+            if (overviewNextLabel) overviewNextLabel.textContent = `${subject} · ${state.first.time.startLabel}${room}`;
+          }
+
+          const firstDeadline = deadlines[0];
+          if (!firstDeadline) {
+            if (homeworkMeta) homeworkMeta.textContent = copy.noDeadlinesMeta;
+            if (homeworkTitle) homeworkTitle.textContent = copy.noDeadlinesTitle;
+            if (homeworkLine) homeworkLine.textContent = copy.noDeadlinesLine;
+            return;
+          }
+
+          const deadlineStrong = firstDeadline.querySelector('.deadline-subtitle, .fw-semibold');
+          const deadlineMeta = firstDeadline.querySelector('.deadline-meta');
+          const deadlineSubject = firstDeadline.querySelector('.fw-semibold');
+          if (homeworkMeta) {
+            homeworkMeta.textContent = deadlineSubject ? deadlineSubject.textContent.trim() : copy.noDeadlinesMeta;
+          }
+          if (homeworkTitle) {
+            homeworkTitle.textContent = deadlineStrong ? deadlineStrong.textContent.trim() : copy.noDeadlinesTitle;
+          }
+          if (homeworkLine) {
+            homeworkLine.textContent = deadlineMeta ? deadlineMeta.textContent.trim() : copy.noDeadlinesLine;
+          }
+        };
+
+        const resolveInitialDay = () => {
+          const hashDay = String(window.location.hash || '').replace(/^#day-/, '');
+          let storedDay = '';
+          try {
+            storedDay = localStorage.getItem(storageKey) || '';
+          } catch (_error) {}
+          const preferred = [hashDay, storedDay].find(Boolean);
+          if (preferred && document.getElementById(`day-${preferred}`)) {
+            return preferred;
+          }
+          const todayMatch = dayLinks.find((link) => {
+            const card = document.getElementById(`day-${link.dataset.scheduleDayLink || ''}`);
+            return card && String(card.dataset.dayDate || '') === todayIso;
+          });
+          if (todayMatch) return todayMatch.dataset.scheduleDayLink || '';
+          const classMatch = dayLinks.find((link) => {
+            const card = document.getElementById(`day-${link.dataset.scheduleDayLink || ''}`);
+            return card && card.querySelector('.schedule-card');
+          });
+          return (classMatch && classMatch.dataset.scheduleDayLink) || (dayLinks[0] && dayLinks[0].dataset.scheduleDayLink) || '';
+        };
+
+        const setActiveDay = (day, persist) => {
+          if (!day) return;
+          const targetCard = document.getElementById(`day-${day}`);
+          if (!(targetCard instanceof HTMLElement)) return;
+
+          dayLinks.forEach((link) => {
+            const linkDay = link.dataset.scheduleDayLink || '';
+            const card = document.getElementById(`day-${linkDay}`);
+            const isTodayLink = card && String(card.dataset.dayDate || '') === todayIso;
+            const isActive = linkDay === day;
+            link.classList.toggle('is-active', isActive);
+            link.classList.toggle('is-today', Boolean(isTodayLink));
+            if (isActive) {
+              link.setAttribute('aria-current', isTodayLink ? 'date' : 'page');
+            } else {
+              link.removeAttribute('aria-current');
+            }
+            if (card instanceof HTMLElement) {
+              card.hidden = !isActive;
+              card.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+            }
+          });
+
+          updateOverview(targetCard);
+          if (persist) {
+            try {
+              localStorage.setItem(storageKey, day);
+            } catch (_error) {}
+          }
+        };
+
+        if (weekGridRoot) {
+          Array.from(weekGridRoot.children).forEach((card) => {
+            if (card instanceof HTMLElement && card.classList.contains('day-card')) {
+              card.hidden = true;
+              card.setAttribute('aria-hidden', 'true');
+            }
+          });
         }
-        if (!selected) {
-          if (kind) kind.textContent = 'Done';
-          if (label) label.textContent = 'Done for today';
-          return;
-        }
 
-        const subject = selected.card.dataset.subject || selected.card.dataset.class || 'Пара';
-        const room = selected.card.dataset.roomLabel ? ` · ауд. ${selected.card.dataset.roomLabel}` : '';
-        if (active) {
-          if (kind) kind.textContent = 'Now';
-          if (label) label.textContent = `Now: ${subject} · до ${selected.time.endLabel}${room}`;
-        } else {
-          if (kind) kind.textContent = 'Next';
-          if (label) label.textContent = `Next: ${subject} · ${selected.time.startLabel}${room}`;
-        }
+        dayLinks.forEach((link) => {
+          link.onclick = (event) => {
+            event.preventDefault();
+            const day = link.dataset.scheduleDayLink || '';
+            setActiveDay(day, true);
+          };
+        });
+
+        applyFloatingChip();
+        setActiveDay(resolveInitialDay(), false);
       }
 
       initLiquidScheduleStatus();

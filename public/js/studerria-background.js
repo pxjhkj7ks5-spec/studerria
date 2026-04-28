@@ -84,14 +84,14 @@
       return;
     }
 
-    const host = document.getElementById('studerriaBg') || document.body;
+    const host = document.body;
     if (!host) return;
 
     const canvas = document.createElement('canvas');
     canvas.className = 'studerria-codex-cursor-canvas td-codex-cursor-canvas';
     canvas.setAttribute('data-td-codex-cursor', 'true');
     canvas.setAttribute('aria-hidden', 'true');
-    host.appendChild(canvas);
+    host.prepend(canvas);
 
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {

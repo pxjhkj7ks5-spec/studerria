@@ -409,6 +409,88 @@
             </div>
           </article>
         </section>
+
+        <%
+          const progressPercentRaw = hasProgressDashboard
+            ? Number(progressDashboard.average_score_percent || progressDashboard.completion_percent || progressDashboard.overall_percent || 0)
+            : Number(activity.completion_percent || activity.progress_percent || 0);
+          const progressPercent = Math.max(0, Math.min(100, Number.isFinite(progressPercentRaw) ? progressPercentRaw : 0));
+          const progressRows = [
+            {
+              label: 'Ризикові дисципліни',
+              value: hasProgressDashboard ? Number(progressDashboard.at_risk_count || 0) : Number(activity.overdue || 0),
+            },
+            {
+              label: 'Виконано завдань',
+              value: hasProgressDashboard
+                ? `${Number(progressDashboard.completed_tasks || 0)}`
+                : `${Math.max(0, deadlineItems.length - Number(activity.overdue || 0))}`,
+            },
+            {
+              label: 'Непрочитані повідомлення',
+              value: inboxMessageSummary ? Number(inboxMessageSummary.unread || inboxMessageSummary.fresh_unread || 0) : inboxItems.length,
+            },
+          ];
+          const progressBars = (Array.isArray(progressSubjects) && progressSubjects.length ? progressSubjects.slice(0, 7) : [])
+            .map((item, index) => {
+              const label = String(item.subject_name || item.subject || item.name || '').trim() || ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'][index] || `D${index + 1}`;
+              const valueRaw = Number(item.percent || item.score_percent || item.progress_percent || item.completion_percent || item.value || 0);
+              const value = Math.max(18, Math.min(100, Number.isFinite(valueRaw) ? valueRaw : 18));
+              return { label, value };
+            });
+          while (progressBars.length < 7) {
+            const label = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'][progressBars.length] || `D${progressBars.length + 1}`;
+            progressBars.push({ label, value: 22 + (progressBars.length * 6) });
+          }
+          const strongestBarValue = Math.max.apply(null, progressBars.map((item) => item.value));
+        %>
+
+        <section class="td-lower-grid">
+          <article class="td-dashboard-card td-surface-card">
+            <header class="td-card-header">
+              <h2>Ваш прогрес</h2>
+            </header>
+            <div class="td-progress-layout">
+              <div class="td-progress-ring" style="--td-progress-value: <%= progressPercent %>%;" aria-label="Прогрес <%= progressPercent %>%">
+                <span><%= Math.round(progressPercent) %>%</span>
+              </div>
+              <div class="td-progress-content">
+                <strong><%= progressPercent >= 70 ? '+ стабільний темп цього тижня' : 'є простір для вирівнювання темпу' %></strong>
+                <% progressRows.forEach((row) => { %>
+                  <div class="td-progress-row">
+                    <span><%= row.label %></span>
+                    <b><%= row.value %></b>
+                  </div>
+                <% }) %>
+                <a class="td-small-button" href="/profile">Профіль і налаштування</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="td-dashboard-card td-surface-card" id="analytics">
+            <header class="td-card-header">
+              <h2>Аналітика навчання</h2>
+              <a class="td-small-button" href="/schedule">Тиждень</a>
+            </header>
+            <div class="td-bar-chart" aria-label="Навчальна активність">
+              <div class="td-bar-axis"><span>100</span><span>75</span><span>50</span><span>0</span></div>
+              <div class="td-bars">
+                <% progressBars.forEach((item) => { %>
+                  <span class="<%= item.value === strongestBarValue ? 'is-active' : '' %>" style="--bar: <%= item.value %>%"><b><%= item.label.slice(0, 2) %></b></span>
+                <% }) %>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="td-ai-strip" aria-label="Studerria quick actions">
+          <span class="schedule-overview-icon" aria-hidden="true">✦</span>
+          <div>
+            <h2>Швидкий фокус на день</h2>
+            <p><%= brief.message || 'Відкрий розклад, перевір дедлайни й тримай день в одному ритмі.' %></p>
+          </div>
+          <a class="td-small-button" href="/schedule">До розкладу</a>
+        </section>
       </section>
 
       <% if (isTeacherMyDayView) { %>

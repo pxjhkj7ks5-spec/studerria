@@ -57,12 +57,6 @@ body.studerria-theme {
   --studerria-empty-accent: rgba(129, 140, 248, 0.6);
 }
 
-@media (min-width: 1200px) {
-  body.studerria-theme {
-    zoom: 0.75;
-  }
-}
-
 html[data-theme='light'] body.studerria-theme,
 body.theme-light.studerria-theme {
   --studerria-text-primary: #0f172a;
@@ -1847,9 +1841,17 @@ body.page-schedule .week-rail {
   }
 
   body.page-app-shell.studerria-theme .app-footer {
-    max-width: min(1280px, calc(100vw - var(--studerria-sidebar-width) - 48px));
+    display: flex;
+    justify-content: center;
+    width: calc(100vw - var(--studerria-sidebar-width) - 48px);
+    max-width: none;
     margin-left: var(--studerria-sidebar-width);
     margin-right: 24px;
+  }
+
+  body.page-app-shell.studerria-theme .app-footer .footer-meta,
+  body.page-app-shell.studerria-theme .app-footer .footer-meta.glass-dock {
+    margin-inline: auto;
   }
 }
 
@@ -2214,6 +2216,38 @@ body.page-authenticated.studerria-theme .td-day-switcher {
   margin-bottom: 24px;
 }
 
+.td-page-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 22px;
+  min-width: 0;
+  padding: 4px 4px 0;
+}
+
+.td-page-header h1 {
+  margin: 0;
+  color: var(--td-text);
+  font-size: clamp(2rem, 4vw, 3.05rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.td-page-header p:not(.td-page-kicker) {
+  max-width: 46rem;
+  margin: 10px 0 0;
+  color: var(--td-muted);
+  font-size: 0.98rem;
+}
+
+.td-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .studerria-home-head {
   display: flex;
   align-items: flex-start;
@@ -2228,6 +2262,70 @@ body.page-authenticated.studerria-theme .td-day-switcher {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.td-secondary-button,
+.td-small-button,
+.td-icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(120, 130, 170, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--td-text);
+  text-decoration: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 10px 26px rgba(47, 56, 95, 0.08);
+  transition: transform 210ms var(--td-ease-glass), border-color 210ms var(--td-ease-glass), background 210ms var(--td-ease-glass), box-shadow 210ms var(--td-ease-glass);
+}
+
+body.theme-dark .td-secondary-button,
+body.theme-dark .td-small-button,
+body.theme-dark .td-icon-button {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(139, 164, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.td-secondary-button:hover,
+.td-small-button:hover,
+.td-icon-button:hover {
+  transform: translateY(-2px) scale(1.006);
+  border-color: rgba(98, 117, 255, 0.26);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 16px 34px rgba(98, 117, 255, 0.12);
+}
+
+body.theme-dark .td-secondary-button:hover,
+body.theme-dark .td-small-button:hover,
+body.theme-dark .td-icon-button:hover {
+  background: rgba(255, 255, 255, 0.085);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 14px 30px rgba(0, 0, 0, 0.22);
+}
+
+.td-secondary-button:active,
+.td-small-button:active,
+.td-icon-button:active {
+  transform: translateY(1px) scale(0.988);
+  box-shadow: 0 6px 16px rgba(47, 56, 95, 0.12);
+}
+
+.td-small-button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.td-icon-button {
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  font-size: 1.2rem;
 }
 
 .td-dashboard-header h1,
@@ -2246,6 +2344,33 @@ body.page-authenticated.studerria-theme .td-day-switcher {
 .td-card-header p {
   margin: 8px 0 0;
   color: var(--td-muted);
+}
+
+.td-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(98, 117, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(98, 117, 255, 0.1);
+  color: #4f46e5;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+body.theme-dark .td-live-pill {
+  color: #c4b5fd;
+  background: rgba(98, 117, 255, 0.14);
+}
+
+.td-live-pill i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 6px rgba(98, 117, 255, 0.14);
 }
 
 .td-stats-grid {
@@ -2300,6 +2425,160 @@ body.page-authenticated.studerria-theme .td-day-switcher {
 .td-task-list {
   display: grid;
   gap: 10px;
+}
+
+.td-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.td-progress-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+}
+
+.td-progress-ring {
+  --td-progress-value: 72%;
+  display: grid;
+  place-items: center;
+  width: 116px;
+  height: 116px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.98) 0 56%, transparent 57%),
+    conic-gradient(var(--td-primary) 0 var(--td-progress-value), rgba(196, 181, 253, 0.45) var(--td-progress-value) 100%);
+  box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.12), 0 16px 38px rgba(124, 58, 237, 0.1);
+}
+
+body.theme-dark .td-progress-ring {
+  background:
+    radial-gradient(circle, rgba(25, 27, 48, 0.98) 0 56%, transparent 57%),
+    conic-gradient(var(--td-primary) 0 var(--td-progress-value), rgba(196, 181, 253, 0.24) var(--td-progress-value) 100%);
+}
+
+.td-progress-ring span {
+  color: var(--td-text);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.td-progress-content {
+  display: grid;
+  gap: 12px;
+}
+
+.td-progress-content > strong {
+  color: #16a34a;
+  font-size: 0.88rem;
+}
+
+.td-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--td-muted);
+  font-size: 0.88rem;
+}
+
+.td-progress-row b {
+  color: var(--td-text);
+  font-size: 0.9rem;
+}
+
+.td-bar-chart {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 184px;
+}
+
+.td-bar-axis {
+  display: grid;
+  color: var(--td-muted);
+  font-size: 0.78rem;
+}
+
+.td-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(26px, 1fr));
+  align-items: end;
+  gap: 14px;
+  min-height: 176px;
+  padding-top: 8px;
+  border-bottom: 1px solid rgba(120, 130, 170, 0.16);
+  background-image: linear-gradient(to top, rgba(120, 130, 170, 0.12) 1px, transparent 1px);
+  background-size: 100% 44px;
+}
+
+.td-bars span {
+  position: relative;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  height: var(--bar, 44%);
+  min-height: 44px;
+  border-radius: 10px 10px 4px 4px;
+  background: rgba(196, 181, 253, 0.75);
+}
+
+.td-bars span.is-active {
+  background: var(--td-primary-gradient);
+}
+
+.td-bars b {
+  position: absolute;
+  bottom: -28px;
+  color: var(--td-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+body.theme-dark .td-bars {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  background-image: linear-gradient(to top, rgba(226, 232, 240, 0.08) 1px, transparent 1px);
+}
+
+body.theme-dark .td-bars span {
+  background: rgba(124, 58, 237, 0.22);
+}
+
+.td-ai-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid rgba(124, 58, 237, 0.14);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(243, 232, 255, 0.74), rgba(239, 246, 255, 0.72));
+  box-shadow: var(--td-shadow-soft);
+}
+
+body.theme-dark .td-ai-strip {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(59, 130, 246, 0.1));
+  border-color: rgba(139, 164, 255, 0.14);
+}
+
+.td-ai-strip h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.td-ai-strip p {
+  margin: 4px 0 0;
+  color: var(--td-muted);
+  font-size: 0.9rem;
+}
+
+.td-create-link {
+  display: inline-flex;
+  margin: 16px 0 0 30px;
+  font-size: 0.88rem;
 }
 
 .td-schedule-row,
@@ -2519,6 +2798,175 @@ body.theme-dark .td-floating-next.schedule-floating-next span {
   white-space: nowrap;
 }
 
+.schedule-page-header {
+  margin-bottom: 14px;
+}
+
+.schedule-week-strip {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+}
+
+.schedule-week-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.schedule-week-range {
+  color: var(--td-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.schedule-week-carousel-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-selected-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(300px, 0.58fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.schedule-day-panels {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.schedule-day-panels .day-card {
+  margin-bottom: 0 !important;
+}
+
+.schedule-day-panels .day-card[hidden] {
+  display: none !important;
+}
+
+.schedule-selected-aside {
+  display: grid;
+  gap: 18px;
+}
+
+.schedule-overview-card {
+  padding: 20px;
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.52)),
+    rgba(255, 255, 255, 0.58);
+}
+
+body.theme-dark .schedule-overview-card {
+  background:
+    linear-gradient(180deg, rgba(19, 25, 51, 0.8), rgba(12, 18, 37, 0.62)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.schedule-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.schedule-overview-grid span {
+  display: grid;
+  gap: 3px;
+  min-height: 92px;
+  padding: 16px;
+  border: 1px solid var(--td-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+body.theme-dark .schedule-overview-grid span {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.schedule-overview-grid strong {
+  color: var(--td-text);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.schedule-overview-grid small {
+  color: var(--td-muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.schedule-overview-next {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(98, 117, 255, 0.22);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(98, 117, 255, 0.18), rgba(140, 114, 255, 0.12));
+}
+
+.schedule-overview-next strong,
+.schedule-overview-next span {
+  display: block;
+}
+
+.schedule-overview-next span {
+  color: var(--td-muted);
+  margin-top: 4px;
+}
+
+.schedule-overview-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  border: 1px solid rgba(120, 130, 170, 0.14);
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--td-text);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.schedule-overview-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.td-homework-item {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  margin-top: 14px;
+  border: 1px solid rgba(120, 130, 170, 0.14);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+body.theme-dark .td-homework-item {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.td-homework-item strong {
+  color: var(--td-text);
+  font-size: 1rem;
+}
+
+.td-homework-item span {
+  color: var(--td-muted);
+  font-size: 0.9rem;
+}
+
 @keyframes tdFloatingIn {
   from {
     opacity: 0;
@@ -2532,13 +2980,18 @@ body.theme-dark .td-floating-next.schedule-floating-next span {
 
 @media (max-width: 991px) {
   .studerria-home-head,
-  .td-card-header {
+  .td-card-header,
+  .td-page-header,
+  .schedule-week-strip-head,
+  .schedule-week-carousel-shell {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .td-stats-grid,
-  .td-dashboard-grid {
+  .td-dashboard-grid,
+  .td-lower-grid,
+  .schedule-selected-layout {
     grid-template-columns: 1fr;
   }
 
@@ -2556,5 +3009,9 @@ body.theme-dark .td-floating-next.schedule-floating-next span {
     max-width: 100%;
     justify-self: stretch;
     margin: 0 0 14px;
+  }
+
+  .schedule-overview-grid {
+    grid-template-columns: 1fr;
   }
 }
