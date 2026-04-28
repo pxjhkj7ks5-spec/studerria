@@ -424,6 +424,9 @@ body.page-local-topbar .topbar-title-spotlight::after {
   padding-top: 1rem !important;
   border-top: 1px solid var(--studerria-footer-border);
   color: var(--studerria-footer-text);
+  display: flex;
+  justify-content: center;
+  text-align: center;
 }
 
 .studerria-theme .app-footer .footer-meta,
@@ -1788,6 +1791,7 @@ body.page-schedule .week-rail {
 @media (min-width: 992px) {
   body.page-app-shell.studerria-theme {
     --studerria-sidebar-width: 304px;
+    overflow-x: hidden;
   }
 
   body.page-app-shell.studerria-theme .page-container {
@@ -1827,31 +1831,40 @@ body.page-schedule .week-rail {
 
   body.page-app-shell.page-schedule.studerria-theme .schedule-shell,
   body.page-app-shell.page-my-day.studerria-theme .cockpit-page {
-    width: auto;
+    width: calc(100vw - var(--studerria-sidebar-width) - 46px);
+    max-width: calc(100vw - var(--studerria-sidebar-width) - 46px);
     margin-left: var(--studerria-sidebar-width);
     margin-right: 24px;
+    box-sizing: border-box;
+    overflow-x: hidden;
   }
 
   body.page-app-shell.page-schedule.studerria-theme .schedule-content.container,
   body.page-app-shell.page-my-day.studerria-theme .cockpit-page.container {
-    width: min(1520px, calc(100vw - var(--studerria-sidebar-width) - 48px)) !important;
-    max-width: min(1520px, calc(100vw - var(--studerria-sidebar-width) - 48px)) !important;
+    width: 100% !important;
+    max-width: min(1480px, 100%) !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
+    box-sizing: border-box;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
   body.page-app-shell.studerria-theme .app-footer {
     display: flex;
     justify-content: center;
-    width: calc(100vw - var(--studerria-sidebar-width) - 48px);
-    max-width: none;
+    width: auto;
+    max-width: min(1480px, calc(100vw - var(--studerria-sidebar-width) - 56px));
     margin-left: var(--studerria-sidebar-width);
     margin-right: 24px;
+    text-align: center;
   }
 
   body.page-app-shell.studerria-theme .app-footer .footer-meta,
   body.page-app-shell.studerria-theme .app-footer .footer-meta.glass-dock {
     margin-inline: auto;
+    max-width: min(860px, calc(100vw - var(--studerria-sidebar-width) - 88px));
+    justify-content: center;
   }
 }
 
@@ -2409,6 +2422,11 @@ body.theme-dark .td-live-pill {
   gap: 18px;
 }
 
+.td-dashboard-grid > *,
+.td-lower-grid > * {
+  min-width: 0;
+}
+
 .td-dashboard-card {
   padding: 22px;
 }
@@ -2668,6 +2686,18 @@ body.theme-dark .td-badge--violet {
   margin-bottom: 18px;
   padding: 14px;
   overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.td-day-switcher.schedule-day-switcher::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 992px) {
+  .td-day-switcher.schedule-day-switcher {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    overflow-x: hidden;
+  }
 }
 
 .td-day-pill.schedule-day-pill {
@@ -2807,6 +2837,7 @@ body.theme-dark .td-floating-next.schedule-floating-next span {
   gap: 12px;
   margin-bottom: 18px;
   padding: 14px 16px;
+  overflow: hidden;
 }
 
 .schedule-week-strip-head {
@@ -2834,6 +2865,7 @@ body.theme-dark .td-floating-next.schedule-floating-next span {
   grid-template-columns: minmax(0, 1.42fr) minmax(300px, 0.58fr);
   gap: 18px;
   align-items: start;
+  min-width: 0;
 }
 
 .schedule-day-panels {

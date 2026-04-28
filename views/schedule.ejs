@@ -2360,27 +2360,29 @@
           </div>
         </header>
 
-        <section class="td-surface-card schedule-week-strip" id="weekPager">
-          <div class="schedule-week-strip-head">
-            <div>
-              <p class="td-page-kicker"><%= scheduleViewText.weekCarouselKicker %></p>
-              <strong class="schedule-week-range" id="scheduleWeekRangeLabel"><%= scheduleViewText.weekRangeFallback %></strong>
-            </div>
-            <span class="td-live-pill"><i></i><%= lang === 'en' ? 'Week' : 'Тиждень' %> <%= String(currentWeek).padStart(2, '0') %></span>
-          </div>
-          <div class="schedule-week-carousel-shell">
-            <button class="td-icon-button week-nav-btn" id="weekPrev" type="button" aria-label="<%= scheduleViewText.previousWeekAria %>">&lsaquo;</button>
-            <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
-              <div class="week-pill-head week-pill-head--compact">
-                <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
-                <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+        <section class="td-surface-card schedule-week-strip week-pager" id="weekPager">
+          <div class="week-pager-shell">
+            <div class="schedule-week-strip-head">
+              <div>
+                <p class="td-page-kicker"><%= scheduleViewText.weekCarouselKicker %></p>
+                <strong class="schedule-week-range" id="scheduleWeekRangeLabel"><%= scheduleViewText.weekRangeFallback %></strong>
               </div>
-              <span class="week-pill-progress" aria-hidden="true">
-                <span class="week-pill-progress-fill" id="weekPillProgress"></span>
-              </span>
-              <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
+              <span class="td-live-pill"><i></i><%= lang === 'en' ? 'Week' : 'Тиждень' %> <%= String(currentWeek).padStart(2, '0') %></span>
             </div>
-            <button class="td-icon-button week-nav-btn" id="weekNext" type="button" aria-label="<%= scheduleViewText.nextWeekAria %>">&rsaquo;</button>
+            <div class="schedule-week-carousel-shell">
+              <button class="td-icon-button week-nav-btn" id="weekPrev" type="button" aria-label="<%= scheduleViewText.previousWeekAria %>">&lsaquo;</button>
+              <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
+                <div class="week-pill-head week-pill-head--compact">
+                  <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
+                  <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+                </div>
+                <span class="week-pill-progress" aria-hidden="true">
+                  <span class="week-pill-progress-fill" id="weekPillProgress"></span>
+                </span>
+                <div class="week-carousel" id="weekCarousel" aria-label="<%= scheduleViewText.weekCarouselAria %>"></div>
+              </div>
+              <button class="td-icon-button week-nav-btn" id="weekNext" type="button" aria-label="<%= scheduleViewText.nextWeekAria %>">&rsaquo;</button>
+            </div>
           </div>
         </section>
 
