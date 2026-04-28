@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="uk" data-theme="light">
+<html lang="<%= lang %>" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/test-theme-head') %>
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
-    <title>Studerria · Changelog</title>
+    <title>Studerria · <%= t('changelog.title') %></title>
     <link rel="stylesheet" href="/css/test-design.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="td-page td-page--login td-page--legal" data-theme="light">
@@ -18,9 +18,9 @@
 
       <section class="td-legal-card td-glass-panel" aria-label="Changelog">
         <header class="td-login-card-head">
-          <p class="td-lite-kicker">Studerria updates</p>
-          <h1>Changelog</h1>
-          <p>Всі публічні зміни Studerria в одному місці.</p>
+          <p class="td-lite-kicker"><%= t('changelog.releaseNotes') %></p>
+          <h1><%= t('changelog.title') %></h1>
+          <p><%= t('changelog.subtitle') %></p>
         </header>
 
         <div class="td-lite-release-list td-lite-release-list--full">
@@ -41,7 +41,7 @@
               </article>
             <% }); %>
           <% } else { %>
-            <p class="td-lite-empty">Оновлень поки немає.</p>
+            <p class="td-lite-empty"><%= t('changelog.noUpdates') %></p>
           <% } %>
         </div>
       </section>
@@ -53,17 +53,17 @@
         class="td-language-pill"
         data-lang-toggle
         data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
       ><%= lang === 'en' ? 'EN' : 'UA' %> <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
-      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="Увімкнути темну тему" aria-pressed="false">
+      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="<%= t('theme.toggleToDark') %>" aria-pressed="false">
         <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
         <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
         <span data-theme-label>Dark</span>
       </button>
-      <a href="/login">Вхід</a>
-      <a href="/terms">Умови використання</a>
-      <a href="/privacy">Політика конфіденційності</a>
-      <span>© Studerria 2026</span>
+      <a href="/login"><%= t('login.title') %></a>
+      <a href="/terms"><%= t('footer.terms') %></a>
+      <a href="/privacy"><%= t('footer.privacy') %></a>
+      <span><%= t('footer.copyright') %></span>
     </footer>
     <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
     <script src="/js/login-auth.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>

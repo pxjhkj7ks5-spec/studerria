@@ -2,14 +2,14 @@
   const authLiteChangelogItems = Array.isArray(changelog) ? changelog.slice(0, 10) : [];
 %>
 <div class="td-lite-modal" data-auth-changelog hidden role="dialog" aria-modal="true" aria-labelledby="authChangelogTitle">
-  <button class="td-lite-modal-backdrop" type="button" data-auth-changelog-close aria-label="Закрити changelog"></button>
+  <button class="td-lite-modal-backdrop" type="button" data-auth-changelog-close aria-label="<%= t('changelog.close') %>"></button>
   <section class="td-lite-sheet td-glass-panel" tabindex="-1">
     <header class="td-lite-sheet-head">
       <div>
-        <p class="td-lite-kicker">Studerria updates</p>
-        <h2 id="authChangelogTitle">Changelog</h2>
+        <p class="td-lite-kicker"><%= t('changelog.releaseNotes') %></p>
+        <h2 id="authChangelogTitle"><%= t('changelog.title') %></h2>
       </div>
-      <button class="td-lite-close" type="button" data-auth-changelog-close aria-label="Закрити">×</button>
+      <button class="td-lite-close" type="button" data-auth-changelog-close aria-label="<%= t('changelog.close') %>">×</button>
     </header>
 
     <div class="td-lite-release-list">
@@ -30,11 +30,11 @@
           </article>
         <% }); %>
       <% } else { %>
-        <p class="td-lite-empty">Оновлень поки немає.</p>
+        <p class="td-lite-empty"><%= t('changelog.noUpdates') %></p>
       <% } %>
     </div>
     <footer class="td-lite-sheet-footer">
-      <a class="td-secondary-button" href="/changelog">Відкрити всі зміни</a>
+      <a class="td-secondary-button" href="/changelog"><%= t('changelog.openAll') %></a>
     </footer>
   </section>
 </div>

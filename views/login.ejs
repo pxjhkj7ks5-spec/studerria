@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="uk" data-theme="light">
+<html lang="<%= lang %>" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -18,8 +18,8 @@
 
       <section class="td-login-card td-glass-panel" aria-label="<%= t('login.title') %>">
         <header class="td-login-card-head">
-          <h1>Вхід</h1>
-          <p>Раді бачити тебе знову! 👋</p>
+          <h1><%= t('login.title') %></h1>
+          <p><%= t('login.subtitle') %></p>
         </header>
 
         <% if (error) { %>
@@ -30,14 +30,14 @@
 
         <form id="loginForm" class="td-form" method="POST" action="/login">
           <label class="td-field" for="full_name">
-            <span>Email або логін</span>
+            <span><%= t('login.usernameOrEmail') %></span>
             <span class="td-input-wrap">
               <%- include('partials/test-icon', { name: 'mail', className: 'td-input-icon' }) %>
               <input
                 id="full_name"
                 name="full_name"
                 type="text"
-                placeholder="Введіть email або логін"
+                placeholder="<%= t('login.usernameOrEmailPlaceholder') %>"
                 autocomplete="username"
                 required
               />
@@ -57,7 +57,7 @@
                 required
                 data-password-input
               />
-              <button class="td-password-reveal" type="button" aria-label="Показати пароль" data-password-reveal hidden>
+              <button class="td-password-reveal" type="button" aria-label="<%= t('auth.showPassword') %>" data-password-reveal hidden>
                 <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
                 <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
               </button>
@@ -67,15 +67,15 @@
           <div class="td-form-row">
             <label class="td-checkbox">
               <input type="checkbox" name="remember" />
-              <span>Запамʼятати мене</span>
+              <span><%= t('login.rememberMe') %></span>
             </label>
-            <a href="/help">Забули пароль?</a>
+            <a href="/help"><%= t('login.forgotPassword') %></a>
           </div>
 
-          <button class="td-primary-button" type="submit">Увійти</button>
+          <button class="td-primary-button" type="submit"><%= t('login.signIn') %></button>
         </form>
 
-        <p class="td-login-bottom">Ще немає акаунту? <a href="/register">Зареєструватися</a></p>
+        <p class="td-login-bottom"><%= t('login.noAccount') %> <a href="/register"><%= t('login.createAccountCta') %></a></p>
       </section>
     </main>
 
@@ -85,18 +85,18 @@
         class="td-language-pill"
         data-lang-toggle
         data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
       ><%= lang === 'en' ? 'EN' : 'UA' %> <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
-      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="Увімкнути темну тему" aria-pressed="false">
+      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="<%= t('theme.toggleToDark') %>" aria-pressed="false">
         <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
         <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
         <span data-theme-label>Dark</span>
       </button>
-      <a href="/help">Підтримка</a>
-      <a href="/terms">Умови використання</a>
-      <a href="/privacy">Політика конфіденційності</a>
-      <button type="button" class="td-footer-link" data-auth-changelog-open>Changelog</button>
-      <span>© Studerria 2026</span>
+      <a href="/help"><%= t('footer.support') %></a>
+      <a href="/terms"><%= t('footer.terms') %></a>
+      <a href="/privacy"><%= t('footer.privacy') %></a>
+      <button type="button" class="td-footer-link" data-auth-changelog-open><%= t('footer.changelog') %></button>
+      <span><%= t('footer.copyright') %></span>
     </footer>
     <%- include('partials/auth-lite-changelog') %>
     <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>

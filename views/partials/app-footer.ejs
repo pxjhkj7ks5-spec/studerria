@@ -26,13 +26,13 @@
         class="td-language-pill"
         data-lang-toggle
         data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
       ><%= lang === 'en' ? 'EN' : 'UA' %></button>
-      <a class="footer-link" href="/help"><%= lang === 'en' ? 'Support' : 'Підтримка' %></a>
-      <a class="footer-link" href="/terms"><%= lang === 'en' ? 'Terms of use' : 'Умови використання' %></a>
-      <a class="footer-link" href="/privacy"><%= lang === 'en' ? 'Privacy policy' : 'Політика конфіденційності' %></a>
-      <button type="button" class="td-footer-link footer-link" data-auth-changelog-open>Changelog</button>
-      <span class="footer-signature">© Studerria 2026</span>
+      <a class="footer-link" href="/help"><%= t('footer.support') %></a>
+      <a class="footer-link" href="/terms"><%= t('footer.terms') %></a>
+      <a class="footer-link" href="/privacy"><%= t('footer.privacy') %></a>
+      <button type="button" class="td-footer-link footer-link" data-auth-changelog-open><%= t('footer.changelog') %></button>
+      <span class="footer-signature"><%= t('footer.copyright') %></span>
     </small>
   <% } else { %>
     <small class="<%= footerMetaClassList.join(' ') %>">
@@ -41,7 +41,7 @@
         class="td-language-pill"
         data-lang-toggle
         data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
       ><%= lang === 'en' ? 'EN' : 'UA' %></button>
       <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
         &copy; A.M.
@@ -72,10 +72,10 @@
       >
         <%= t('footer.changelog') %>
       </button>
-      <a class="footer-link" href="/changelog">Всі зміни</a>
-      <a class="footer-link" href="/terms">Умови використання</a>
-      <a class="footer-link" href="/privacy">Політика конфіденційності</a>
-      <a class="footer-link" href="/help">Підтримка</a>
+      <a class="footer-link" href="/changelog"><%= t('changelog.openAll') %></a>
+      <a class="footer-link" href="/terms"><%= t('footer.terms') %></a>
+      <a class="footer-link" href="/privacy"><%= t('footer.privacy') %></a>
+      <a class="footer-link" href="/help"><%= t('footer.support') %></a>
     </small>
   <% } %>
 </footer>

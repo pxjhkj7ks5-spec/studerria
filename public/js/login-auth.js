@@ -1,6 +1,25 @@
 (function initStuderriaLoginAuth() {
   var STORAGE_KEY = 'studerria-test-theme';
   var root = document.documentElement;
+  var locale = (String(root.getAttribute('lang') || 'uk').toLowerCase().indexOf('en') === 0) ? 'en' : 'uk';
+  var uiText = {
+    uk: {
+      showPassword: 'Показати пароль',
+      hidePassword: 'Сховати пароль',
+      toggleToLight: 'Увімкнути світлу тему',
+      toggleToDark: 'Увімкнути темну тему'
+    },
+    en: {
+      showPassword: 'Show password',
+      hidePassword: 'Hide password',
+      toggleToLight: 'Switch to light theme',
+      toggleToDark: 'Switch to dark theme'
+    }
+  };
+
+  function text(key) {
+    return (uiText[locale] && uiText[locale][key]) || uiText.uk[key] || '';
+  }
 
   function readTheme() {
     return root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
@@ -18,7 +37,7 @@
     document.querySelectorAll('[data-theme-toggle]').forEach(function(button) {
       var isDark = nextTheme === 'dark';
       button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-      button.setAttribute('aria-label', isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему');
+      button.setAttribute('aria-label', isDark ? text('toggleToLight') : text('toggleToDark'));
       button.querySelectorAll('[data-theme-label]').forEach(function(label) {
         label.textContent = isDark ? 'Light' : 'Dark';
       });
@@ -54,7 +73,7 @@
     button.addEventListener('click', function() {
       var shouldShow = input.type === 'password';
       input.type = shouldShow ? 'text' : 'password';
-      button.setAttribute('aria-label', shouldShow ? 'Сховати пароль' : 'Показати пароль');
+      button.setAttribute('aria-label', shouldShow ? text('hidePassword') : text('showPassword'));
       sync();
       input.focus();
     });

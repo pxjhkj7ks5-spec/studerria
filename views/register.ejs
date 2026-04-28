@@ -50,7 +50,7 @@
       <section class="td-login-card td-glass-panel tooltip-host" aria-label="<%= t('register.title') %>">
         <header class="td-login-card-head">
           <h1><%= t('register.title') %></h1>
-          <p>Створи профіль Studerria для свого навчального простору.</p>
+          <p><%= t('register.subtitle') %></p>
         </header>
 
         <% if (registerErrorText) { %>
@@ -89,7 +89,7 @@
                 minlength="8"
                 required
               />
-              <button class="td-password-reveal is-visible" type="button" id="togglePassword" aria-label="Показати пароль">
+              <button class="td-password-reveal is-visible" type="button" id="togglePassword" aria-label="<%= t('auth.showPassword') %>">
                 <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
                 <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
               </button>
@@ -109,7 +109,7 @@
                 minlength="8"
                 required
               />
-              <button class="td-password-reveal is-visible" type="button" id="toggleConfirmPassword" aria-label="Показати пароль">
+              <button class="td-password-reveal is-visible" type="button" id="toggleConfirmPassword" aria-label="<%= t('auth.showPassword') %>">
                 <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
                 <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
               </button>
@@ -120,10 +120,10 @@
             <label class="td-checkbox" for="agree">
               <input type="checkbox" id="agree" name="agree" required />
               <span>
-                Я погоджуюсь із
-                <a href="/terms" target="_blank" rel="noopener">умовами використання</a>,
-                <a href="/privacy" target="_blank" rel="noopener">політикою конфіденційності</a>
-                та даю згоду на обробку персональних даних для роботи Studerria.
+                <%= t('register.consentLead') %>
+                <a href="/terms" target="_blank" rel="noopener"><%= t('register.consentTerms') %></a>,
+                <a href="/privacy" target="_blank" rel="noopener"><%= t('register.consentPrivacy') %></a>
+                <%= t('register.consentTail') %>
               </span>
             </label>
             <button
@@ -150,25 +150,25 @@
         class="td-language-pill"
         data-lang-toggle
         data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? 'Switch language to Ukrainian' : 'Перемкнути мову на English' %>"
+        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
       ><%= lang === 'en' ? 'EN' : 'UA' %> <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
-      <button type="button" class="td-language-pill td-theme-toggle" id="tdThemeToggleMirror" aria-label="Увімкнути темну тему" aria-pressed="false">
+      <button type="button" class="td-language-pill td-theme-toggle" id="tdThemeToggleMirror" aria-label="<%= t('theme.toggleToDark') %>" aria-pressed="false">
         <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
         <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
         <span data-theme-label>Dark</span>
       </button>
-      <a href="/help">Підтримка</a>
-      <a href="/terms">Умови використання</a>
-      <a href="/privacy">Політика конфіденційності</a>
-      <button type="button" class="td-footer-link" data-bs-toggle="modal" data-bs-target="#changelogModal">Changelog</button>
-      <span>© Studerria 2026</span>
+      <a href="/help"><%= t('footer.support') %></a>
+      <a href="/terms"><%= t('footer.terms') %></a>
+      <a href="/privacy"><%= t('footer.privacy') %></a>
+      <button type="button" class="td-footer-link" data-bs-toggle="modal" data-bs-target="#changelogModal"><%= t('footer.changelog') %></button>
+      <span><%= t('footer.copyright') %></span>
     </footer>
     <div class="modal fade" id="privacyModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title"><%= t('register.modalTitle') %></h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= t('changelog.close') %>"></button>
           </div>
           <div class="modal-body">
             <p><%= t('register.modalIntro') %></p>
@@ -201,6 +201,10 @@
         confirmPasswordRequired: <%- JSON.stringify(t('register.errorConfirmPasswordRequired')) %>,
         passwordMismatch: <%- JSON.stringify(t('register.errorPasswordMismatch')) %>,
         consentRequired: <%- JSON.stringify(t('register.errorConsentRequired')) %>,
+        showPassword: <%- JSON.stringify(t('auth.showPassword')) %>,
+        hidePassword: <%- JSON.stringify(t('auth.hidePassword')) %>,
+        themeToLight: <%- JSON.stringify(t('theme.toggleToLight')) %>,
+        themeToDark: <%- JSON.stringify(t('theme.toggleToDark')) %>,
       };
       function showCustomTooltip(el, message) {
         document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
@@ -278,7 +282,7 @@
           const isHidden = input.type === 'password';
           input.type = isHidden ? 'text' : 'password';
           btn.classList.toggle('is-showing', isHidden);
-          btn.setAttribute('aria-label', isHidden ? 'Сховати пароль' : 'Показати пароль');
+          btn.setAttribute('aria-label', isHidden ? registerValidationCopy.hidePassword : registerValidationCopy.showPassword);
         });
       };
       toggleField(togglePassword, passwordInput);
@@ -298,7 +302,7 @@
         clearInvalidState();
         el.classList.add('field-invalid');
         if (el === agreeInput && consentError) {
-          consentError.textContent = message || 'Поставте прапорець згоди';
+          consentError.textContent = message || registerValidationCopy.consentRequired;
           consentError.classList.add('is-visible');
         } else {
           showCustomTooltip(el, message);
@@ -306,25 +310,6 @@
         if (shouldFocus) {
           el.focus({ preventScroll: true });
         }
-      }
-
-      function getFieldValidationMessage(el) {
-        if (el === nameInput && !nameInput.value.trim()) {
-          return nameInput.validationMessage || 'Заповніть ім\'я';
-        }
-        if (el === passwordInput && !passwordInput.value) {
-          return passwordInput.validationMessage || 'Вкажіть пароль';
-        }
-        if (el === confirmInput && !confirmInput.value) {
-          return confirmInput.validationMessage || 'Підтвердіть пароль';
-        }
-        if (el === confirmInput && passwordInput && confirmInput.value !== passwordInput.value) {
-          return 'Паролі не співпадають';
-        }
-        if (el === agreeInput && !agreeInput.checked) {
-          return 'Поставте прапорець згоди';
-        }
-        return '';
       }
 
       function getFieldValidationMessage(el) {
@@ -437,7 +422,7 @@
         if (!tdThemeToggle) return;
         const isDark = document.body.classList.contains('theme-dark');
         tdThemeToggle.setAttribute('aria-pressed', String(isDark));
-        tdThemeToggle.setAttribute('aria-label', isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему');
+        tdThemeToggle.setAttribute('aria-label', isDark ? registerValidationCopy.themeToLight : registerValidationCopy.themeToDark);
         const label = tdThemeToggle.querySelector('[data-theme-label]');
         if (label) label.textContent = isDark ? 'Light' : 'Dark';
       };
