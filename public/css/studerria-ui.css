@@ -1829,12 +1829,20 @@ body.page-schedule .week-rail {
     max-width: min(1520px, calc(100vw - var(--studerria-sidebar-width) - 48px));
   }
 
-  body.page-app-shell.page-schedule.studerria-theme .schedule-shell,
   body.page-app-shell.page-my-day.studerria-theme .cockpit-page {
     width: calc(100vw - var(--studerria-sidebar-width) - 46px);
     max-width: calc(100vw - var(--studerria-sidebar-width) - 46px);
     margin-left: var(--studerria-sidebar-width);
     margin-right: 24px;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  body.page-app-shell.page-schedule.studerria-theme .schedule-shell {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
     box-sizing: border-box;
     overflow-x: hidden;
   }
