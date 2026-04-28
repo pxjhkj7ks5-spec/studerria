@@ -3,9 +3,10 @@
     var root = document.documentElement;
     var stored = null;
     try {
-      stored = localStorage.getItem('studerria-test-theme');
+      stored = localStorage.getItem('ui-theme') || localStorage.getItem('studerria-test-theme');
     } catch (_error) {}
-    var theme = stored === 'dark' ? 'dark' : 'light';
+    var normalized = String(stored || '').trim().toLowerCase();
+    var theme = (normalized === 'dark' || normalized === 'theme-dark') ? 'dark' : 'light';
     root.setAttribute('data-theme', theme);
     window.__studerriaTestTheme = theme;
   })();
