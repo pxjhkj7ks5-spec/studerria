@@ -105,6 +105,9 @@
     if (!item || item.hidden || String(item.section || 'main') !== 'main') {
       return result;
     }
+    if (item.navAction === 'theme-toggle') {
+      return result;
+    }
     const children = Array.isArray(item.children) ? item.children : [];
     if (!item.hideInSidebar && ((item.href && !item.isDisabledLink) || item.navAction || !children.length || item.isCurrent || item.isCurrentContainer)) {
       result.push({
