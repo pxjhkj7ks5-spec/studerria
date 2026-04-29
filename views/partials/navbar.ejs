@@ -405,6 +405,7 @@
 %>
 <% if (shouldRenderNavbar) { %>
   <% if (shouldRenderAppNav) { %>
+    <link rel="stylesheet" href="/css/render-stability.css?v=<%= encodeURIComponent(String(typeof appVersion !== 'undefined' ? appVersion : '0.0.0')) %>" />
     <nav class="navbar navbar-expand-lg topbar topbar--title-spotlight studerria-nav-shell" aria-label="Global Navigation" data-studerria-nav>
       <div class="container">
         <div class="snav-main">
