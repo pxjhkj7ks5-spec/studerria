@@ -326,6 +326,10 @@ body.theme-dark .week-hero .hero-sub {
   box-shadow: 0 10px 24px rgba(2, 6, 23, 0.12);
   backdrop-filter: blur(14px) saturate(1.1);
   overflow: hidden;
+  outline: 1px solid transparent;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 body.theme-light .glass-tabs {
@@ -343,9 +347,13 @@ body.theme-light .glass-tabs {
   background: linear-gradient(160deg, rgba(191, 219, 254, 0.44), rgba(125, 211, 252, 0.26));
   border: 1px solid rgba(148, 163, 184, 0.36);
   box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.18);
+  transform: translate3d(0, 0, 0);
   transition: transform 360ms cubic-bezier(0.22, 1.36, 0.36, 1), width 220ms ease-out;
   will-change: transform, width, opacity;
   pointer-events: none;
+  outline: 1px solid transparent;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .glass-tabs-indicator.is-bounce {
@@ -723,6 +731,10 @@ body.theme-light .density-summary .density-chip-row {
   border-radius: var(--radius-lg);
   overflow: visible;
   backdrop-filter: none;
+  outline: 1px solid transparent;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .day-card.mb-3 {
@@ -861,7 +873,9 @@ body.theme-dark .day-chip--primary {
   transform: translate3d(0, 0, 0);
   will-change: transform;
   contain: paint;
+  outline: 1px solid transparent;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .schedule-card::before {
@@ -1073,7 +1087,7 @@ body.theme-light .schedule-card:hover {
 }
 
 .schedule-card:active {
-  transform: translate3d(0, 0, 0) scale(0.99);
+  transform: translate3d(0, 0, 0);
   box-shadow: 0 6px 14px rgba(2, 6, 23, 0.08);
 }
 
@@ -1299,6 +1313,7 @@ body.page-schedule .week-pager {
   padding: 10px;
   border-radius: 30px;
   backdrop-filter: blur(calc(var(--week-glass-blur) + 2px));
+  -webkit-backdrop-filter: blur(calc(var(--week-glass-blur) + 2px));
   border: 1px solid var(--week-glass-dark-border);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
@@ -1307,6 +1322,10 @@ body.page-schedule .week-pager {
     0 24px 60px rgba(2, 6, 23, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   isolation: isolate;
+  outline: 1px solid transparent;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 body.page-schedule .week-pager::before {
@@ -1368,6 +1387,10 @@ body.page-schedule .week-pager .week-pill {
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 18px 36px rgba(2, 6, 23, 0.16);
   overflow: hidden;
+  outline: 1px solid transparent;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 body.page-schedule .week-pager .week-pill::before {
@@ -1544,8 +1567,11 @@ body.page-schedule .week-pager .week-carousel-card--ghost {
   position: relative;
   min-width: 0;
   border-radius: 18px;
-  transform: translateY(var(--week-card-shift)) scale(var(--week-card-scale));
+  transform: translateY(var(--week-card-shift)) scale(var(--week-card-scale)) translateZ(0);
   transform-origin: center bottom;
+  outline: 1px solid transparent;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 body.page-schedule .week-pager .week-carousel-card {
@@ -1921,6 +1947,10 @@ body.page-schedule .week-pager .week-nav-btn {
   -webkit-appearance: none;
   padding: 0;
   line-height: 1;
+  transform: translateZ(0);
+  outline: 1px solid transparent;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   transition:
     transform 180ms var(--week-apple-curve),
     background 180ms ease,
@@ -1935,7 +1965,7 @@ body.page-schedule .week-pager .week-nav-btn__icon {
 }
 
 body.page-schedule .week-pager .week-nav-btn:hover {
-  transform: translateY(-1px) scale(1.01);
+  transform: translateY(-1px) scale(1.01) translateZ(0);
   border-color: rgba(125, 211, 252, 0.36);
   box-shadow:
     0 18px 30px rgba(2, 6, 23, 0.24),
@@ -2105,11 +2135,11 @@ body.is-scrolling .week-pager {
 }
 
 body.page-schedule .week-pager[data-direction="forward"] .week-pill {
-  transform: translateX(2px);
+  transform: translateX(2px) translateZ(0);
 }
 
 body.page-schedule .week-pager[data-direction="backward"] .week-pill {
-  transform: translateX(-2px);
+  transform: translateX(-2px) translateZ(0);
 }
 
 body.page-schedule .week-pager .week-carousel-card:hover {
