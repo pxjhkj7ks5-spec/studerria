@@ -19,12 +19,104 @@
 </footer>
 <%- include('auth-lite-changelog') %>
 <script>
-  if (!window.__authLiteChangelogBound) {
+  if (!window.__appFooterControlsBound) {
+    const normalizeTheme = (rawValue) => {
+      const value = String(rawValue || '').trim().toLowerCase();
+      if (value === 'dark' || value === 'theme-dark') return 'dark';
+      if (value === 'light' || value === 'theme-light') return 'light';
+      return '';
+    };
+
+    const readStoredTheme = () => {
+      try {
+        return (
+          normalizeTheme(window.localStorage.getItem('ui-theme'))
+          || normalizeTheme(window.localStorage.getItem('studerria-test-theme'))
+        );
+      } catch (_error) {
+        return '';
+      }
+    };
+
+    const resolveTheme = () => {
+      const body = document.body;
+      const root = document.documentElement;
+      if (body && body.classList.contains('theme-dark')) return 'dark';
+      if (body && body.classList.contains('theme-light')) return 'light';
+      const bodyTheme = body ? normalizeTheme(body.getAttribute('data-theme')) : '';
+      if (bodyTheme) return bodyTheme;
+      const rootTheme = normalizeTheme(root && root.getAttribute('data-theme'));
+      return rootTheme || readStoredTheme() || 'light';
+    };
+
+    const syncThemeControls = (theme) => {
+      const isDark = theme === 'dark';
+      document.querySelectorAll('[data-theme-toggle]').forEach((control) => {
+        if (!(control instanceof HTMLElement)) return;
+        control.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+        control.setAttribute('aria-label', isDark
+          ? <%- JSON.stringify(t('theme.toggleToLight')) %>
+          : <%- JSON.stringify(t('theme.toggleToDark')) %>);
+        control.querySelectorAll('[data-theme-label]').forEach((label) => {
+          label.textContent = isDark ? 'Light' : 'Dark';
+        });
+      });
+    };
+
+    const persistTheme = (theme) => {
+      try {
+        window.localStorage.setItem('ui-theme', theme === 'dark' ? 'theme-dark' : 'theme-light');
+        window.localStorage.setItem('studerria-test-theme', theme);
+      } catch (_error) {}
+    };
+
+    const applyTheme = (theme) => {
+      const next = theme === 'dark' ? 'dark' : 'light';
+      const body = document.body;
+      const root = document.documentElement;
+      root.setAttribute('data-theme', next);
+      if (body) {
+        body.setAttribute('data-theme', next);
+        body.classList.remove('theme-light', 'theme-dark', 'light', 'dark');
+        body.classList.add(next === 'dark' ? 'theme-dark' : 'theme-light');
+      }
+      persistTheme(next);
+      syncThemeControls(next);
+      window.dispatchEvent(new CustomEvent('studerria:theme-toggled', {
+        detail: { theme: next === 'dark' ? 'theme-dark' : 'theme-light' },
+      }));
+    };
+
     document.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+
+      const langButton = target.closest('.app-footer [data-lang-toggle]');
+      if (langButton instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const current = String(langButton.getAttribute('data-current-lang') || document.documentElement.lang || 'uk')
+          .trim()
+          .toLowerCase();
+        const next = current === 'en' ? 'uk' : 'en';
+        const url = new URL(window.location.href);
+        url.searchParams.set('lang', next);
+        window.location.assign(url.toString());
+        return;
+      }
+
+      const themeButton = target.closest('.app-footer [data-theme-toggle]');
+      if (themeButton instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        applyTheme(resolveTheme() === 'dark' ? 'light' : 'dark');
+        return;
+      }
+
       const changelogModal = document.querySelector('[data-auth-changelog]');
       if (!changelogModal) return;
       const changelogSheet = changelogModal.querySelector('.td-lite-sheet');
-      const open = event.target && event.target.closest ? event.target.closest('[data-auth-changelog-open]') : null;
+      const open = target.closest('[data-auth-changelog-open]');
       if (open) {
         event.preventDefault();
         changelogModal.hidden = false;
@@ -34,7 +126,7 @@
         });
         return;
       }
-      const close = event.target && event.target.closest ? event.target.closest('[data-auth-changelog-close]') : null;
+      const close = target.closest('[data-auth-changelog-close]');
       if (close && !changelogModal.hidden) {
         event.preventDefault();
         changelogModal.classList.remove('is-open');
@@ -54,7 +146,8 @@
       }, 180);
     });
 
-    window.__authLiteChangelogBound = true;
+    syncThemeControls(resolveTheme());
+    window.__appFooterControlsBound = true;
   }
 </script>
 <script src="/js/islands/checklist-toolbar-island.js" defer></script>

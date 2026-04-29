@@ -291,6 +291,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     applyTheme(resolveTheme(), false);
     document.addEventListener('click', (event) => {
+      if (event.defaultPrevented) return;
       const target = event.target instanceof Element ? event.target.closest(THEME_CONTROL_SELECTOR) : null;
       if (!(target instanceof HTMLElement)) return;
       const action = target.dataset.themeToggle || target.dataset.navAction;
