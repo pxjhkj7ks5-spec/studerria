@@ -1876,6 +1876,14 @@ body.page-schedule .week-rail {
   }
 }
 
+@media (min-width: 2200px) {
+  body.page-app-shell.page-schedule.studerria-theme .schedule-content.container {
+    max-width: min(1560px, calc(100vw - var(--studerria-sidebar-width) - 96px)) !important;
+    margin-left: auto !important;
+    margin-right: clamp(18px, 2.2vw, 64px) !important;
+  }
+}
+
 @media (max-width: 991px) {
   body.page-app-shell.studerria-theme .page-container {
     padding-top: 84px;
