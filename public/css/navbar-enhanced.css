@@ -1525,3 +1525,51 @@ html.studerria-page-transitioning .studerria-nav-shell .snav-menu {
   animation: none !important;
   transform: translateZ(0) !important;
 }
+
+body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell::before,
+body.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell::before,
+body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::before,
+body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::after,
+body.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::before,
+body.page-app-shell.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::after,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link::before,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link::after,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link::before,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link::after {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+}
+
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-menu-link {
+  transform: translateZ(0) !important;
+  box-shadow: none !important;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease !important;
+}
+
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:hover,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:hover,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:focus-visible,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-open > .snav-link,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link,
+body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link[aria-current="page"],
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link:hover,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link:focus-visible,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-menu-link:hover,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-menu-link:focus-visible,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-open > .snav-link,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link,
+body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link[aria-current="page"] {
+  transform: translateZ(0) !important;
+  box-shadow: none !important;
+}
