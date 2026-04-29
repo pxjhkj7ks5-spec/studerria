@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "version": "1.7.90",
+      "date": "2026-04-29",
+      "items": [
+        "cleanup(main): remove legacy test/codex surface and dead islands"
+      ]
+    },
+    {
       "version": "1.7.89",
       "date": "2026-04-29",
       "items": [
