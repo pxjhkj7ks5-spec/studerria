@@ -1517,3 +1517,26 @@ body.theme-dark.page-authenticated.studerria-theme .snav-account-card {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 10px 26px rgba(0, 0, 0, 0.16) !important;
   }
 }
+
+html.studerria-page-transitioning body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+html.studerria-page-transitioning body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell::before,
+html.studerria-page-transitioning body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::before,
+html.studerria-page-transitioning body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .topbar-title-spotlight::after,
+html.studerria-page-transitioning .studerria-nav-shell .snav-link::after {
+  display: none !important;
+}
+
+html.studerria-page-transitioning .studerria-nav-shell .snav-link,
+html.studerria-page-transitioning .studerria-nav-shell .snav-menu-link,
+html.studerria-page-transitioning .studerria-nav-shell .snav-indicator,
+html.studerria-page-transitioning .studerria-nav-shell .snav-unread-chip,
+html.studerria-page-transitioning .studerria-nav-shell .snav-menu {
+  transition: none !important;
+  animation: none !important;
+  transform: translateZ(0) !important;
+}

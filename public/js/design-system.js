@@ -1,6 +1,8 @@
 (() => {
   const THEME_ATTR = 'data-theme';
   const THEME_VALUES = new Set(['dark', 'light']);
+  const NAV_TRANSITION_BOOT_FLAG = '__studerriaNavTransitionBound';
+  const PREFETCH_BOOT_FLAG = '__studerriaLinkPrefetchBound';
   let isThemeSyncing = false;
 
   function normalizeText(value) {
@@ -542,6 +544,161 @@
     syncSummary();
   }
 
+  function resolveNavigableUrl(anchor) {
+    if (!(anchor instanceof HTMLAnchorElement)) {
+      return '';
+    }
+    if (!anchor.href || anchor.hasAttribute('download')) {
+      return '';
+    }
+    const rel = String(anchor.getAttribute('rel') || '').toLowerCase();
+    if (rel.includes('external') || rel.includes('nofollow')) {
+      return '';
+    }
+    const target = String(anchor.getAttribute('target') || '').toLowerCase();
+    if (target && target !== '_self') {
+      return '';
+    }
+    let url;
+    try {
+      url = new URL(anchor.href, window.location.href);
+    } catch (_error) {
+      return '';
+    }
+    if (url.origin !== window.location.origin) {
+      return '';
+    }
+    if ((url.protocol || '').toLowerCase() !== 'http:' && (url.protocol || '').toLowerCase() !== 'https:') {
+      return '';
+    }
+    return url.href;
+  }
+
+  function initNavTransitionStabilizer() {
+    if (window[NAV_TRANSITION_BOOT_FLAG] === true) {
+      return;
+    }
+    window[NAV_TRANSITION_BOOT_FLAG] = true;
+
+    const root = document.documentElement;
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+
+    const className = 'studerria-page-transitioning';
+    const markTransition = () => {
+      root.classList.add(className);
+    };
+
+    const unmarkTransition = () => {
+      root.classList.remove(className);
+    };
+
+    const isSameDocumentHash = (href) => {
+      try {
+        const target = new URL(href, window.location.href);
+        const current = new URL(window.location.href);
+        target.hash = '';
+        current.hash = '';
+        return target.href === current.href;
+      } catch (_error) {
+        return false;
+      }
+    };
+
+    document.addEventListener('click', (event) => {
+      if (event.defaultPrevented || event.button !== 0) {
+        return;
+      }
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null;
+      if (!(anchor instanceof HTMLAnchorElement)) {
+        return;
+      }
+      const href = resolveNavigableUrl(anchor);
+      if (!href) {
+        return;
+      }
+      if (isSameDocumentHash(href)) {
+        return;
+      }
+      markTransition();
+    }, true);
+
+    document.addEventListener('submit', () => {
+      markTransition();
+    }, true);
+
+    window.addEventListener('beforeunload', markTransition, { capture: true });
+    window.addEventListener('pagehide', markTransition, { capture: true });
+    window.addEventListener('pageshow', unmarkTransition, { capture: true });
+  }
+
+  function initLinkPrefetch() {
+    if (window[PREFETCH_BOOT_FLAG] === true) {
+      return;
+    }
+    window[PREFETCH_BOOT_FLAG] = true;
+
+    const prefetched = new Set();
+    const MAX_PREFETCHES = 24;
+    let prefetchCount = 0;
+
+    const prefetchUrl = (href) => {
+      if (!href || prefetched.has(href) || prefetchCount >= MAX_PREFETCHES) {
+        return;
+      }
+      prefetched.add(href);
+      prefetchCount += 1;
+
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'document';
+      link.href = href;
+      document.head.appendChild(link);
+    };
+
+    const handleIntent = (target) => {
+      const anchor = target instanceof Element ? target.closest('a[href]') : null;
+      if (!(anchor instanceof HTMLAnchorElement)) {
+        return;
+      }
+      if (anchor.dataset.noPrefetch === 'true') {
+        return;
+      }
+      const href = resolveNavigableUrl(anchor);
+      if (!href) {
+        return;
+      }
+
+      try {
+        const current = new URL(window.location.href);
+        const next = new URL(href);
+        current.hash = '';
+        next.hash = '';
+        if (current.href === next.href) {
+          return;
+        }
+      } catch (_error) {}
+
+      prefetchUrl(href);
+    };
+
+    document.addEventListener('pointerenter', (event) => {
+      handleIntent(event.target);
+    }, true);
+
+    document.addEventListener('focusin', (event) => {
+      handleIntent(event.target);
+    }, true);
+
+    document.addEventListener('touchstart', (event) => {
+      handleIntent(event.target);
+    }, { capture: true, passive: true });
+  }
+
   function init() {
     syncThemeAttribute();
     const ambientLayer = ensureAmbientLayer();
@@ -563,6 +720,8 @@
     observeDynamicBadges();
     initModalBehavior();
     applyRegisterCourseTweaks();
+    initNavTransitionStabilizer();
+    initLinkPrefetch();
 
     document.addEventListener('focusin', (event) => {
       if (!(event.target instanceof HTMLElement)) {
