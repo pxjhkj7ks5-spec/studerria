@@ -11,15 +11,15 @@ This stack runs the current KMA app with PostgreSQL, Redis, and centralized logs
 - `loki`: log storage backend
 - `promtail`: Docker log collector that forwards container logs to Loki
 
-The stack includes a compatibility init script that creates the `cloudsqlsuperuser` role before importing Cloud SQL dumps, so Google Cloud exports restore cleanly on plain PostgreSQL.
+The stack includes a compatibility init script that creates `cloudsqlsuperuser` before SQL import, so legacy dumps restore cleanly on plain PostgreSQL.
 
 ## Included database backup
 
-The Cloud SQL dump is expected at:
+The optional SQL dump is expected at:
 
-- `docker/local/db/init/20-cloud-run-backup.sql`
+- `docker/local/db/init/20-backup.sql`
 
-That file is intentionally gitignored. On this machine it has already been prepared from the provided backup. On another machine, place the dump there before the first boot if you want the imported production data.
+That file is intentionally gitignored. On another machine, place the dump there before first boot if you want imported production data.
 
 ## Start
 

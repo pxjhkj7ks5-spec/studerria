@@ -31,13 +31,9 @@ Run this on the server from the repository root:
 cd ~/studerria
 git pull --rebase
 cd docker/local
-docker compose up --build -d
+docker compose up -d
 docker compose ps
 docker compose logs --tail=100 app
 ```
 
 Use `docker compose down -v` only when you intentionally want to recreate the PostgreSQL volume or re-import the SQL dump from scratch.
-
-## Legacy infrastructure
-
-`cloudbuild.yaml` and old Cloud Run-related assets are legacy artifacts and are no longer the active deployment target.

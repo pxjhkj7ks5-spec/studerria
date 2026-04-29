@@ -1,7 +1,0 @@
-body.page-vision {
-  overflow-x: hidden;
-}
-
-body.page-vision .vision-bg {
-  background: var(--product-bg-base);
-}

@@ -1,9 +1,4 @@
 (() => {
-  const islands = window.KMAReactIslands;
-  if (!islands || typeof islands.register !== 'function') {
-    return;
-  }
-
   const toBool = (value, fallback = false) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return value > 0;
@@ -15,21 +10,24 @@
     return fallback;
   };
 
-  islands.register('checklist-toolbar', ({ React, props }) => {
-    if (!React || typeof React.createElement !== 'function') {
-      return null;
+  const parseProps = (rawValue) => {
+    if (!rawValue || typeof rawValue !== 'string') return {};
+    try {
+      const parsed = JSON.parse(rawValue);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_error) {
+      return {};
     }
+  };
 
-    const useEffect = React.useEffect;
-    const useMemo = React.useMemo;
-    const useState = React.useState;
+  const mountChecklistToolbar = (mountNode) => {
+    if (!(mountNode instanceof HTMLElement) || mountNode.dataset.islandMounted === '1') return;
 
+    const props = parseProps(mountNode.getAttribute('data-island-props'));
     const targetSelector = String(props && props.targetSelector ? props.targetSelector : '').trim();
-    if (!targetSelector) return null;
+    if (!targetSelector) return;
 
-    const checkboxSelector = String(props && props.checkboxSelector
-      ? props.checkboxSelector
-      : 'input[type="checkbox"]').trim();
+    const checkboxSelector = String(props && props.checkboxSelector ? props.checkboxSelector : 'input[type="checkbox"]').trim();
     const rowSelector = String(props && props.rowSelector ? props.rowSelector : '[data-checklist-row]').trim();
     const rowTextSelector = String(props && props.rowTextSelector ? props.rowTextSelector : '[data-checklist-text]').trim();
     const searchEnabled = toBool(props && props.searchEnabled, true);
@@ -45,58 +43,59 @@
     const collectCheckboxes = () => {
       const target = resolveTarget();
       if (!(target instanceof HTMLElement)) return [];
-      return Array.from(target.querySelectorAll(checkboxSelector)).filter((node) => (
-        node instanceof HTMLInputElement
-      ));
+      return Array.from(target.querySelectorAll(checkboxSelector)).filter((node) => node instanceof HTMLInputElement);
     };
     const collectRows = () => {
       const target = resolveTarget();
       if (!(target instanceof HTMLElement) || !rowSelector) return [];
       return Array.from(target.querySelectorAll(rowSelector)).filter((node) => node instanceof HTMLElement);
     };
+
+    const root = document.createElement('div');
+    root.className = 'island-toolbar-shell';
+    root.setAttribute('role', 'group');
+    root.setAttribute('aria-label', 'Checklist toolbar');
+
+    let searchInput = null;
+    if (searchEnabled) {
+      searchInput = document.createElement('input');
+      searchInput.type = 'search';
+      searchInput.className = 'form-control form-control-sm island-toolbar-search';
+      searchInput.placeholder = searchPlaceholder;
+      root.appendChild(searchInput);
+    }
+
+    const allButton = document.createElement('button');
+    allButton.type = 'button';
+    allButton.className = 'btn btn-sm island-toolbar-btn';
+    allButton.textContent = labels.all;
+    root.appendChild(allButton);
+
+    const noneButton = document.createElement('button');
+    noneButton.type = 'button';
+    noneButton.className = 'btn btn-sm island-toolbar-btn';
+    noneButton.textContent = labels.none;
+    root.appendChild(noneButton);
+
+    const invertButton = document.createElement('button');
+    invertButton.type = 'button';
+    invertButton.className = 'btn btn-sm island-toolbar-btn';
+    invertButton.textContent = labels.invert;
+    root.appendChild(invertButton);
+
+    const counter = document.createElement('span');
+    counter.className = 'island-toolbar-counter';
+    root.appendChild(counter);
+
     const readStats = () => {
-      const checkboxes = collectCheckboxes();
-      const available = checkboxes.filter((checkbox) => !checkbox.disabled);
+      const available = collectCheckboxes().filter((checkbox) => !checkbox.disabled);
       const checked = available.filter((checkbox) => checkbox.checked);
-      return {
-        total: available.length,
-        checked: checked.length,
-      };
+      return { total: available.length, checked: checked.length };
     };
 
-    const [stats, setStats] = useState(() => readStats());
-    const [query, setQuery] = useState('');
-
-    const syncStats = () => {
-      setStats(readStats());
-    };
-
-    useEffect(() => {
-      const target = resolveTarget();
-      if (!(target instanceof HTMLElement)) return undefined;
-
-      const onChange = (event) => {
-        if (event && event.target && event.target.matches && event.target.matches(checkboxSelector)) {
-          syncStats();
-        }
-      };
-      target.addEventListener('change', onChange);
-      syncStats();
-
-      const observer = new MutationObserver(() => {
-        syncStats();
-      });
-      observer.observe(target, { childList: true, subtree: true });
-
-      return () => {
-        target.removeEventListener('change', onChange);
-        observer.disconnect();
-      };
-    }, [targetSelector, checkboxSelector]);
-
-    useEffect(() => {
-      if (!searchEnabled) return;
-      const needle = String(query || '').trim().toLowerCase();
+    const applySearch = () => {
+      if (!searchInput) return;
+      const needle = String(searchInput.value || '').trim().toLowerCase();
       const rows = collectRows();
       rows.forEach((row) => {
         if (!needle) {
@@ -109,7 +108,18 @@
         const rawText = directText || nestedText || String(row.textContent || '').toLowerCase();
         row.hidden = !rawText.includes(needle);
       });
-    }, [query, searchEnabled, targetSelector, rowSelector, rowTextSelector]);
+    };
+
+    const syncState = () => {
+      const stats = readStats();
+      counter.textContent = stats.total < 1
+        ? `${labels.selected}: 0`
+        : `${labels.selected}: ${stats.checked}/${stats.total}`;
+      allButton.disabled = stats.total < 1 || stats.checked >= stats.total;
+      noneButton.disabled = stats.total < 1 || stats.checked < 1;
+      invertButton.disabled = stats.total < 1;
+      applySearch();
+    };
 
     const mutate = (mode) => {
       const checkboxes = collectCheckboxes().filter((checkbox) => !checkbox.disabled);
@@ -123,57 +133,42 @@
         checkbox.checked = nextChecked;
         checkbox.dispatchEvent(new Event('change', { bubbles: true }));
       });
-      syncStats();
+      syncState();
     };
 
-    const counterLabel = useMemo(() => {
-      if (!stats.total) return `${labels.selected}: 0`;
-      return `${labels.selected}: ${stats.checked}/${stats.total}`;
-    }, [stats, labels.selected]);
+    allButton.addEventListener('click', () => mutate('all'));
+    noneButton.addEventListener('click', () => mutate('none'));
+    invertButton.addEventListener('click', () => mutate('invert'));
+    if (searchInput) {
+      searchInput.addEventListener('input', applySearch);
+    }
 
-    return React.createElement(
-      'div',
-      { className: 'island-toolbar-shell', role: 'group', 'aria-label': 'Checklist toolbar' },
-      searchEnabled
-        ? React.createElement('input', {
-          type: 'search',
-          className: 'form-control form-control-sm island-toolbar-search',
-          placeholder: searchPlaceholder,
-          value: query,
-          onChange: (event) => setQuery(String(event && event.target ? event.target.value : '')),
-        })
-        : null,
-      React.createElement(
-        'button',
-        {
-          type: 'button',
-          className: 'btn btn-sm island-toolbar-btn',
-          onClick: () => mutate('all'),
-          disabled: stats.total < 1 || stats.checked >= stats.total,
-        },
-        labels.all
-      ),
-      React.createElement(
-        'button',
-        {
-          type: 'button',
-          className: 'btn btn-sm island-toolbar-btn',
-          onClick: () => mutate('none'),
-          disabled: stats.total < 1 || stats.checked < 1,
-        },
-        labels.none
-      ),
-      React.createElement(
-        'button',
-        {
-          type: 'button',
-          className: 'btn btn-sm island-toolbar-btn',
-          onClick: () => mutate('invert'),
-          disabled: stats.total < 1,
-        },
-        labels.invert
-      ),
-      React.createElement('span', { className: 'island-toolbar-counter' }, counterLabel)
-    );
-  });
+    const target = resolveTarget();
+    if (target instanceof HTMLElement) {
+      const onChange = (event) => {
+        if (event && event.target && event.target.matches && event.target.matches(checkboxSelector)) {
+          syncState();
+        }
+      };
+      target.addEventListener('change', onChange);
+      const observer = new MutationObserver(syncState);
+      observer.observe(target, { childList: true, subtree: true });
+    }
+
+    mountNode.replaceChildren(root);
+    mountNode.dataset.islandMounted = '1';
+    syncState();
+  };
+
+  const mountAll = () => {
+    document.querySelectorAll('[data-react-island="checklist-toolbar"]').forEach((node) => {
+      mountChecklistToolbar(node);
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountAll, { once: true });
+  } else {
+    mountAll();
+  }
 })();

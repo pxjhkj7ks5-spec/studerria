@@ -1,9 +1,4 @@
 (() => {
-  const islands = window.KMAReactIslands;
-  if (!islands || typeof islands.register !== 'function') {
-    return;
-  }
-
   const toBool = (value, fallback = false) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return value > 0;
@@ -15,18 +10,23 @@
     return fallback;
   };
 
-  islands.register('insights-period-preset', ({ React, props }) => {
-    if (!React || typeof React.createElement !== 'function') {
-      return null;
+  const parseProps = (rawValue) => {
+    if (!rawValue || typeof rawValue !== 'string') return {};
+    try {
+      const parsed = JSON.parse(rawValue);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_error) {
+      return {};
     }
+  };
 
-    const useEffect = React.useEffect;
-    const useMemo = React.useMemo;
-    const useState = React.useState;
+  const mountPeriodPreset = (mountNode) => {
+    if (!(mountNode instanceof HTMLElement) || mountNode.dataset.islandMounted === '1') return;
 
+    const props = parseProps(mountNode.getAttribute('data-island-props'));
     const formSelector = String(props && props.formSelector ? props.formSelector : '').trim();
     const selectSelector = String(props && props.selectSelector ? props.selectSelector : '').trim();
-    if (!selectSelector) return null;
+    if (!selectSelector) return;
 
     const explicitOptions = Array.isArray(props && props.options) ? props.options : [];
     const activeFallback = String(props && props.active ? props.active : '').trim();
@@ -35,8 +35,8 @@
     const resolveSelect = () => document.querySelector(selectSelector);
     const resolveForm = () => {
       if (formSelector) {
-        const form = document.querySelector(formSelector);
-        if (form instanceof HTMLFormElement) return form;
+        const explicitForm = document.querySelector(formSelector);
+        if (explicitForm instanceof HTMLFormElement) return explicitForm;
       }
       const select = resolveSelect();
       if (select && select.closest) {
@@ -46,7 +46,7 @@
       return null;
     };
 
-    const readOptionsFromDom = () => {
+    const readDomOptions = () => {
       const select = resolveSelect();
       if (!(select instanceof HTMLSelectElement)) return [];
       return Array.from(select.options || [])
@@ -57,20 +57,33 @@
         .filter((item) => item.key && item.label);
     };
 
-    const options = useMemo(() => {
-      const normalizedExplicit = explicitOptions
-        .map((item) => ({
-          key: String(item && item.key ? item.key : '').trim(),
-          label: String(item && item.label ? item.label : item && item.key ? item.key : '').trim(),
-        }))
-        .filter((item) => item.key && item.label);
-      if (normalizedExplicit.length) {
-        return normalizedExplicit;
-      }
-      return readOptionsFromDom();
-    }, [props]);
+    const options = explicitOptions.length
+      ? explicitOptions
+          .map((item) => ({
+            key: String(item && item.key ? item.key : '').trim(),
+            label: String(item && item.label ? item.label : item && item.key ? item.key : '').trim(),
+          }))
+          .filter((item) => item.key && item.label)
+      : readDomOptions();
+    if (!options.length) return;
 
-    const readActive = () => {
+    const root = document.createElement('div');
+    root.className = 'insights-period-presets';
+    root.setAttribute('role', 'group');
+    root.setAttribute('aria-label', 'Period presets');
+
+    const buttonsByKey = new Map();
+    options.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-sm island-period-btn';
+      button.textContent = item.label;
+      button.dataset.key = item.key;
+      root.appendChild(button);
+      buttonsByKey.set(item.key, button);
+    });
+
+    const resolveActiveKey = () => {
       const select = resolveSelect();
       if (select instanceof HTMLSelectElement) {
         return String(select.value || '').trim();
@@ -78,43 +91,29 @@
       return activeFallback;
     };
 
-    const [activeKey, setActiveKey] = useState(() => readActive() || activeFallback);
-
-    useEffect(() => {
-      const select = resolveSelect();
-      if (!(select instanceof HTMLSelectElement)) return undefined;
-
-      const onChange = () => {
-        setActiveKey(String(select.value || '').trim());
-      };
-      select.addEventListener('change', onChange);
-      onChange();
-
-      return () => {
-        select.removeEventListener('change', onChange);
-      };
-    }, [selectSelector]);
-
-    if (!options.length) {
-      return null;
-    }
+    const syncActive = () => {
+      const activeKey = resolveActiveKey();
+      buttonsByKey.forEach((button, key) => {
+        const isActive = key === activeKey;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    };
 
     const handlePick = (nextKey) => {
-      const select = resolveSelect();
       const normalizedNext = String(nextKey || '').trim();
       if (!normalizedNext) return;
-
+      const select = resolveSelect();
       if (select instanceof HTMLSelectElement) {
         if (String(select.value || '').trim() !== normalizedNext) {
           select.value = normalizedNext;
           select.dispatchEvent(new Event('change', { bubbles: true }));
         } else {
-          setActiveKey(normalizedNext);
+          syncActive();
         }
       } else {
-        setActiveKey(normalizedNext);
+        syncActive();
       }
-
       if (!submitOnPick) return;
       const form = resolveForm();
       if (!(form instanceof HTMLFormElement)) return;
@@ -125,24 +124,30 @@
       }
     };
 
-    return React.createElement(
-      'div',
-      { className: 'insights-period-presets', role: 'group', 'aria-label': 'Period presets' },
-      options.map((item) => {
-        const isActive = String(item.key) === String(activeKey);
-        return React.createElement(
-          'button',
-          {
-            type: 'button',
-            key: `preset-${item.key}`,
-            className: `btn btn-sm island-period-btn${isActive ? ' is-active' : ''}`,
-            onClick: () => handlePick(item.key),
-            'aria-pressed': isActive ? 'true' : 'false',
-          },
-          item.label
-        );
-      })
-    );
-  });
+    buttonsByKey.forEach((button, key) => {
+      button.addEventListener('click', () => handlePick(key));
+    });
+
+    const select = resolveSelect();
+    if (select instanceof HTMLSelectElement) {
+      select.addEventListener('change', syncActive);
+    }
+
+    mountNode.replaceChildren(root);
+    mountNode.dataset.islandMounted = '1';
+    syncActive();
+  };
+
+  const mountAll = () => {
+    document.querySelectorAll('[data-react-island="insights-period-preset"]').forEach((node) => {
+      mountPeriodPreset(node);
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountAll, { once: true });
+  } else {
+    mountAll();
+  }
 })();
 

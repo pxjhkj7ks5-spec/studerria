@@ -28,6 +28,7 @@ const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
 const sessionGeneratorHelpers = require('./lib/sessionGenerator');
+const { localizeChangelogItems } = require('./lib/changelogI18n');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 let appVersion = pkg.version || '0.0.0';
@@ -50,80 +51,7 @@ try {
 } catch (err) {
   appChangelog = [];
 }
-
-const changelogTextEnMap = new Map([
-  ['Мінорні оновлення сайту для покращення роботи.', 'Minor site updates to improve overall experience.'],
-  ['Локальні покращення стабільності та зручності використання.', 'Local stability and usability improvements.'],
-  ['Поточні доопрацювання для кращого щоденного досвіду.', 'Ongoing refinements for a better daily experience.'],
-  ['Оновлено візуальні деталі для ціліснішого досвіду.', 'Visual details updated for a more cohesive experience.'],
-  ['Оновлено візуальні деталі для зручнішої щоденної роботи.', 'Visual details updated for smoother daily use.'],
-  ['Поточні доопрацювання для ціліснішого щоденного досвіду.', 'Ongoing refinements for a more cohesive daily experience.'],
-  ['Оновлено візуальні деталі для більш цілісного досвіду.', 'Visual details updated for a more unified experience.'],
-  ['Оновлено візуальну узгодженість сторінок для комфортнішої роботи.', 'Visual consistency across pages has been improved for more comfortable use.'],
-  ['Оновлено візуальні деталі для більш цілісного вигляду сайту.', 'Visual details updated for a more cohesive site appearance.'],
-  ['Оновлено відображення навчальних даних для зручнішої роботи з семестром.', 'Academic data display updated for easier semester workflow.'],
-  ['Оновлено поведінку генератора розкладу для стабільного попереднього перегляду.', 'Schedule generator behavior updated for a more stable preview flow.'],
-  ['Локальні покращення зручності роботи зі сторінкою генерації.', 'Local usability improvements for the generation page.'],
-  ['Оновлено правила релізного процесу та перевірок для стабільнішого серверного оновлення.', 'Release process and checks were updated for more stable server updates.'],
-  ['Мінорні оновлення робочих сторінок сайту для кращої зручності та актуальності даних.', 'Minor updates to core pages for better usability and fresher data.'],
-  ['Оновлено правила ведення changelog і уніфіковано стиль записів по всій історії версій.', 'Changelog rules were updated and entry style was unified across version history.'],
-  ['Мінорні оновлення сайту для покращення стабільності та щоденної роботи.', 'Minor site updates to improve stability and daily use.'],
-  ['Локальні покращення продуктивності та дрібні виправлення інтерфейсу.', 'Local performance improvements and minor UI fixes.'],
-  ['Поточні доопрацювання для комфортнішого щоденного користування сайтом.', 'Ongoing refinements for more comfortable daily use of the platform.'],
-  ['Невеликий пакет покращень якості роботи й узгодженості сторінок.', 'A small package of quality and page-consistency improvements.'],
-  ['Планове сервісне оновлення для кращої зручності та надійності.', 'Planned service update for better usability and reliability.'],
-  ['Мінорне оновлення платформи з фокусом на стабільність і UX.', 'Minor platform update focused on stability and UX.'],
-  ['Регулярне покращення якості: швидкість, читабельність і плавність взаємодії.', 'Regular quality improvements: speed, readability, and smoother interaction.'],
-  ['Сервісні доопрацювання без зміни базових сценаріїв використання.', 'Service refinements without changes to core usage flows.'],
-  ['Невеликі покращення для більш передбачуваної роботи основних сторінок.', 'Small improvements for more predictable behavior across core pages.'],
-  ['Технічне полірування інтерфейсу та локальні покращення користувацького досвіду.', 'Technical UI polish and local user-experience improvements.'],
-  ['Реліз 1.6.00 зосереджений на відчутному покращенні щоденного користувацького досвіду.', 'Release 1.6.00 is focused on a noticeable improvement in the daily user experience.'],
-  ['Покращено поведінку ключових навчальних сценаріїв: розклад, дедлайни, журнал і teamwork.', 'Behavior of key academic flows was improved: schedule, deadlines, journal, and teamwork.'],
-  ['Інтерфейс став стабільнішим і прогнозованішим на регулярних щоденних діях.', 'The interface became more stable and predictable in routine daily actions.'],
-  ['Реліз 1.5.00 оновив взаємодію з основними сторінками та щоденним маршрутом користувача.', 'Release 1.5.00 updated interaction with core pages and the daily user journey.'],
-  ['Покращено візуальну узгодженість, читабельність і зручність переходів між ключовими модулями.', 'Visual consistency, readability, and transition comfort between key modules were improved.'],
-  ['Фокус оновлення: менше тертя у щоденних задачах студентів і викладачів.', 'Update focus: less friction in daily tasks for students and teachers.'],
-  ['Реліз 1.4.00 сфокусований на покращенні якості користування навчальними сторінками.', 'Release 1.4.00 is focused on improving usability of academic pages.'],
-  ['Оновлено подачу інформації у щоденних сценаріях, щоб швидше знаходити потрібний контекст.', 'Information presentation in daily scenarios was updated to find needed context faster.'],
-  ['Стабілізовано базові UX-потоки для регулярної роботи з платформою.', 'Core UX flows were stabilized for regular platform use.'],
-  ['Реліз 1.3.00 розширив і вирівняв досвід взаємодії з навчальними модулями.', 'Release 1.3.00 expanded and aligned the interaction experience across academic modules.'],
-  ['Покращено ключові користувацькі сценарії навколо матеріалів, дедлайнів і командної взаємодії.', 'Key user scenarios around materials, deadlines, and team collaboration were improved.'],
-  ['Інтерфейсні потоки стали простішими та більш передбачуваними для щоденного використання.', 'Interface flows became simpler and more predictable for daily use.'],
-  ['Реліз 1.2.00 покращив стартові та базові сценарії роботи користувача з системою.', 'Release 1.2.00 improved onboarding and core user scenarios in the system.'],
-  ['Оновлено зручність взаємодії з профілем і щоденними навчальними сторінками.', 'Interaction with profile and daily study pages was made more convenient.'],
-  ['Зменшено кількість дрібних UX-барєрів у регулярному користуванні платформою.', 'The number of small UX barriers in regular platform use was reduced.'],
-  ['Реліз 1.1.00 присвячений стабілізації та покращенню щоденного користувацького шляху.', 'Release 1.1.00 is dedicated to stabilizing and improving the daily user journey.'],
-  ['Посилено надійність базових навчальних сценаріїв і читабельність інтерфейсу.', 'Reliability of core academic scenarios and interface readability were improved.'],
-  ['Платформа стала більш послідовною в типових щоденних діях.', 'The platform became more consistent in typical daily actions.'],
-  ['Реліз 1.0.00 зафіксував стабільний користувацький досвід для основних сценаріїв платформи.', 'Release 1.0.00 established a stable user experience for core platform scenarios.'],
-  ['Базові модулі навчання та персонального простору приведено до цілісної й зрозумілої взаємодії.', 'Core learning and personal-space modules were aligned into a cohesive and clear interaction model.'],
-  ['Оновлення орієнтоване на передбачуваність, зручність і готовність до щоденного використання.', 'The update is focused on predictability, usability, and readiness for daily use.'],
-  ['Реліз 0.9.00 суттєво покращив щоденний UX і загальну цілісність інтерфейсу.', 'Release 0.9.00 significantly improved daily UX and overall interface cohesion.'],
-  ['Оновлено ключові користувацькі потоки для більш плавної та зрозумілої взаємодії.', 'Key user flows were updated for smoother and clearer interaction.'],
-  ['Підвищено зручність роботи з основними навчальними сценаріями.', 'Usability of core academic scenarios was improved.'],
-  ['Реліз 0.8.00 посилив базовий користувацький досвід і узгодженість сторінок.', 'Release 0.8.00 strengthened core user experience and page consistency.'],
-  ['Покращено щоденні сценарії навігації та взаємодії з навчальним контентом.', 'Daily navigation and learning-content interaction scenarios were improved.'],
-  ['Фокус оновлення: стабільніша робота і простіше сприйняття основних функцій.', 'Update focus: more stable behavior and simpler perception of core features.'],
-  ['Реліз 0.7.00 заклав основу для зручного щоденного користування платформою.', 'Release 0.7.00 laid the foundation for convenient daily platform use.'],
-  ['Оновлено ключові сценарії навчальної взаємодії для більш цілісного користувацького досвіду.', 'Key academic interaction scenarios were updated for a more cohesive user experience.'],
-  ['Підвищено загальну якість інтерфейсу та передбачуваність роботи основних сторінок.', 'Overall interface quality and predictability of core pages were improved.'],
-]);
-
-function localizeChangelogItems(items, lang) {
-  if (!Array.isArray(items) || lang !== 'en') return Array.isArray(items) ? items : [];
-  return items.map((entry) => {
-    if (!entry || typeof entry !== 'object') return entry;
-    const sourceItems = Array.isArray(entry.items) ? entry.items : [];
-    const localizedItems = sourceItems.map((text) => {
-      const normalized = String(text || '').trim();
-      return changelogTextEnMap.get(normalized) || normalized;
-    });
-    return {
-      ...entry,
-      items: localizedItems,
-    };
-  });
-}
+const CHANGELOG_UI_LIMIT = 200;
 
 const buildStamp = new Date().toISOString();
 const SYSTEM_HEALTH_ERROR_EVENT_LIMIT = 400;
@@ -922,10 +850,10 @@ const bellSchedule = {
 
 app.set('view engine', 'ejs');
 
-const GLOBAL_LAYOUT_EXCLUDED_VIEWS = new Set(['vision', 'studerria-codex']);
-const BACKGROUND_STYLE_TAG_RE = /<link[^>]+href=["']\/css\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background|studerria-ui|studerria-premium|navbar-enhanced|modal-enhanced)\.css(?:\?[^"']*)?["'][^>]*>\s*/gi;
-const BACKGROUND_SCRIPT_TAG_RE = /<script[^>]+src=["']\/js\/(?:dynamic-bg|login-bg|schedule-bg|vision-bg|studerria-background)\.js(?:\?[^"']*)?["'][^>]*><\/script>\s*/gi;
-const BACKGROUND_ELEMENT_IDS = ['dynamic-bg', 'dynamic-login-bg', 'schedule-bg', 'visionBg', 'showcaseBg', 'studerriaBg'];
+const GLOBAL_LAYOUT_EXCLUDED_VIEWS = new Set();
+const BACKGROUND_STYLE_TAG_RE = /<link[^>]+href=["']\/css\/(?:dynamic-bg|studerria-background|studerria-ui|studerria-premium|navbar-enhanced|modal-enhanced)\.css(?:\?[^"']*)?["'][^>]*>\s*/gi;
+const BACKGROUND_SCRIPT_TAG_RE = /<script[^>]+src=["']\/js\/(?:dynamic-bg|studerria-background)\.js(?:\?[^"']*)?["'][^>]*><\/script>\s*/gi;
+const BACKGROUND_ELEMENT_IDS = ['dynamic-bg', 'showcaseBg', 'studerriaBg'];
 
 function extractHtmlAttribute(rawAttributes, attributeName) {
   const source = String(rawAttributes || '');
@@ -1506,7 +1434,7 @@ app.use((req, res, next) => {
   res.locals.appVersion = appVersion;
   res.locals.buildStamp = buildStamp;
   res.locals.authorName = 'Andrii Marchenko';
-  res.locals.changelog = localizeChangelogItems(appChangelog, lang);
+  res.locals.changelog = localizeChangelogItems(appChangelog, lang).slice(0, CHANGELOG_UI_LIMIT);
   res.locals.settings = settingsCache;
   res.locals.sessionSecurity = Object.assign({
     last_sensitive_reauth_at: req && req.session ? (req.session.last_sensitive_reauth_at || null) : null,
@@ -13464,6 +13392,44 @@ function getStaffCourse(req) {
   return Number.isNaN(userCourse) ? 1 : userCourse;
 }
 
+function isPrimaryScopeCourseLabel(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized === 'основний курс'
+    || normalized === 'основной курс'
+    || normalized === 'primary course'
+    || normalized === 'main course';
+}
+
+function shouldUseAllCoursesScope(req, allowedCourses = [], options = {}) {
+  const normalizedCourses = Array.isArray(allowedCourses) ? allowedCourses : [];
+  const canUseAllScope = normalizedCourses.length > 1;
+  if (!canUseAllScope) {
+    if (req && req.session) req.session.adminCourseScopeMode = 'course';
+    return false;
+  }
+  const query = options.query && typeof options.query === 'object'
+    ? options.query
+    : ((req && req.query && typeof req.query === 'object') ? req.query : {});
+  const rawCourse = String(query.course || '').trim();
+  const normalizedRawCourse = rawCourse.toLowerCase();
+  if (normalizedRawCourse === 'all') {
+    if (req && req.session) req.session.adminCourseScopeMode = 'all';
+    return true;
+  }
+  const requestedCourseId = parsePositiveIntStrict(rawCourse);
+  if (requestedCourseId) {
+    const requestedCourse = normalizedCourses.find((course) => Number(course.id || 0) === Number(requestedCourseId));
+    const shouldTreatAsAll = Boolean(requestedCourse && isPrimaryScopeCourseLabel(requestedCourse.name));
+    if (req && req.session) {
+      req.session.adminCourseScopeMode = shouldTreatAsAll ? 'all' : 'course';
+    }
+    return shouldTreatAsAll;
+  }
+  const persistedMode = String(req?.session?.adminCourseScopeMode || '').trim().toLowerCase();
+  return persistedMode === 'all';
+}
+
 const ADMIN_SCOPED_USER_BASE_FROM_SQL = `
   FROM users u
   LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
@@ -18945,22 +18911,6 @@ app.post('/help/support', requireLogin, writeLimiter, async (req, res) => {
   } catch (err) {
     return handleDbError(res, err, 'help.support.create');
   }
-});
-
-app.get('/vision', (req, res) => {
-  res.render('vision', { layout: false });
-});
-
-app.get('/testlogin', (req, res) => {
-  res.render('testlogin', { layout: false });
-});
-
-app.get('/testhome', (req, res) => {
-  res.render('testhome', { layout: false });
-});
-
-app.get('/testschedule', (req, res) => {
-  res.render('testschedule', { layout: false });
 });
 
 app.get('/briefcase', (req, res) => {
@@ -41551,6 +41501,12 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
   const courseId = adminAcademicScope && adminAcademicScope.courseId
     ? Number(adminAcademicScope.courseId)
     : getAdminCourse(req);
+  const allCoursesScope = shouldUseAllCoursesScope(req, courses);
+  const overviewScopeCourseIds = allCoursesScope
+    ? (courses || [])
+      .map((course) => Number(course.id || 0))
+      .filter((value) => Number.isInteger(value) && value > 0)
+    : [Number(courseId || 0)].filter((value) => Number.isInteger(value) && value > 0);
   const {
     group_number,
     day,
@@ -42117,10 +42073,49 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                     allSemestersRows,
                                     settingsUpdateRow,
                                   ] = await Promise.all([
-                                    buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null, {
-                                      allowLegacyFallback: false,
-                                      refreshReferenceData: true,
-                                    }),
+                                    (async () => {
+                                      if (!allCoursesScope) {
+                                        return buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null, {
+                                          allowLegacyFallback: false,
+                                          refreshReferenceData: true,
+                                        });
+                                      }
+                                      const perCourseStats = await Promise.all(
+                                        overviewScopeCourseIds.map(async (scopeCourseId) => {
+                                          let scopeSemester = null;
+                                          try {
+                                            scopeSemester = await getActiveSemester(scopeCourseId, { refresh: true });
+                                          } catch (_err) {
+                                            scopeSemester = null;
+                                          }
+                                          return buildCourseDashboardStats(
+                                            scopeCourseId,
+                                            scopeSemester ? Number(scopeSemester.id) : null,
+                                            {
+                                              allowLegacyFallback: false,
+                                              refreshReferenceData: true,
+                                            }
+                                          );
+                                        })
+                                      );
+                                      return perCourseStats.reduce((acc, item) => ({
+                                        users: Number(acc.users || 0) + Number(item && item.users || 0),
+                                        subjects: Number(acc.subjects || 0) + Number(item && item.subjects || 0),
+                                        homework: Number(acc.homework || 0) + Number(item && item.homework || 0),
+                                        teamworkTasks: Number(acc.teamworkTasks || 0) + Number(item && item.teamworkTasks || 0),
+                                        teamworkGroups: Number(acc.teamworkGroups || 0) + Number(item && item.teamworkGroups || 0),
+                                        teamworkMembers: Number(acc.teamworkMembers || 0) + Number(item && item.teamworkMembers || 0),
+                                        compatibilityWarning: acc.compatibilityWarning || (item && item.compatibilityWarning) || null,
+                                      }), {
+                                        users: 0,
+                                        subjects: 0,
+                                        homework: 0,
+                                        teamworkTasks: 0,
+                                        teamworkGroups: 0,
+                                        teamworkMembers: 0,
+                                        compatibilityWarning: null,
+                                      });
+                                    })(),
                                     db.all('SELECT id, title, weeks_count, course_id, start_date FROM semesters ORDER BY start_date DESC'),
                                     db.get(
                                       `
@@ -42185,27 +42180,78 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       subjects: [],
     };
     try {
-      const [weeklySeries, weeklyUsersRows] = await Promise.all([
-        buildCourseWeeklyWorkloadSeries({
-          courseId,
-          semesterId: activeSemester ? Number(activeSemester.id) : null,
-          startIso: weekStart.toISOString(),
-          allowLegacyFallback: false,
-          refreshReferenceData: true,
-        }),
-        db.all(
-          `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
-           FROM users u
-           WHERE (
-             u.course_id = ?
-           ) AND created_at >= ?
-           GROUP BY DATE(created_at), role
-           ORDER BY day`,
-          [courseId, weekStart.toISOString()]
-        ),
-      ]);
-      const weeklyHomeworkRows = weeklySeries.homeworkRows || [];
-      const weeklyTeamworkRows = weeklySeries.teamworkRows || [];
+      let weeklyHomeworkRows = [];
+      let weeklyTeamworkRows = [];
+      let weeklyUsersRows = [];
+      if (allCoursesScope) {
+        const perCourseWeeklyRows = await Promise.all(
+          overviewScopeCourseIds.map(async (scopeCourseId) => {
+            let scopeSemester = null;
+            try {
+              scopeSemester = await getActiveSemester(scopeCourseId, { refresh: true });
+            } catch (_err) {
+              scopeSemester = null;
+            }
+            return buildCourseWeeklyWorkloadSeries({
+              courseId: scopeCourseId,
+              semesterId: scopeSemester ? Number(scopeSemester.id) : null,
+              startIso: weekStart.toISOString(),
+              allowLegacyFallback: false,
+              refreshReferenceData: true,
+            });
+          })
+        );
+        const homeworkDailyMap = new Map();
+        const teamworkDailyMap = new Map();
+        (perCourseWeeklyRows || []).forEach((series) => {
+          (series && series.homeworkRows ? series.homeworkRows : []).forEach((row) => {
+            const day = String(row && row.day ? row.day : '');
+            if (!day) return;
+            homeworkDailyMap.set(day, Number(homeworkDailyMap.get(day) || 0) + Number(row && row.count || 0));
+          });
+          (series && series.teamworkRows ? series.teamworkRows : []).forEach((row) => {
+            const day = String(row && row.day ? row.day : '');
+            if (!day) return;
+            teamworkDailyMap.set(day, Number(teamworkDailyMap.get(day) || 0) + Number(row && row.count || 0));
+          });
+        });
+        weeklyHomeworkRows = Array.from(homeworkDailyMap.entries()).map(([day, count]) => ({ day, count }));
+        weeklyTeamworkRows = Array.from(teamworkDailyMap.entries()).map(([day, count]) => ({ day, count }));
+        weeklyUsersRows = await db.all(
+          `
+            SELECT DATE(created_at) AS day, role, COUNT(*) AS count
+            FROM users u
+            WHERE u.course_id = ANY(?::int[])
+              AND created_at >= ?
+            GROUP BY DATE(created_at), role
+            ORDER BY day
+          `,
+          [overviewScopeCourseIds, weekStart.toISOString()]
+        );
+      } else {
+        const weeklyPair = await Promise.all([
+          buildCourseWeeklyWorkloadSeries({
+            courseId,
+            semesterId: activeSemester ? Number(activeSemester.id) : null,
+            startIso: weekStart.toISOString(),
+            allowLegacyFallback: false,
+            refreshReferenceData: true,
+          }),
+          db.all(
+            `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
+             FROM users u
+             WHERE (
+               u.course_id = ?
+             ) AND created_at >= ?
+             GROUP BY DATE(created_at), role
+             ORDER BY day`,
+            [courseId, weekStart.toISOString()]
+          ),
+        ]);
+        weeklyHomeworkRows = weeklyPair[0].homeworkRows || [];
+        weeklyTeamworkRows = weeklyPair[0].teamworkRows || [];
+        weeklyUsersRows = weeklyPair[1] || [];
+      }
 
       const homeworkMap = {};
       (weeklyHomeworkRows || []).forEach((row) => {
@@ -42423,6 +42469,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         semestersByCourse,
         activeSemester,
                                       selectedCourseId: courseId,
+                                      allCoursesScope,
                                       adminAcademicScope,
                                       academicV2ScheduleLocked: courseSubjectScope && courseSubjectScope.source === 'academic_v2',
                                       adminHomeHref: buildStaffPanelScopeUrl(req, adminAcademicScope || { courseId }),
@@ -55320,11 +55367,20 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       ? new Date(`${labels[0]}T00:00:00.000Z`).toISOString()
       : new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     const courseId = getAdminCourse(req);
-    const isSystemScope = hasSessionRole(req, 'admin');
-    const analyticsScope = isSystemScope ? 'system' : 'course';
     const userId = Number(req?.session?.user?.id || 0);
     const roleKeys = getSessionRoleList(req);
-    const activeSemester = await getActiveSemester(courseId);
+    let allowedCourses = [];
+    try {
+      const allCourses = await getCoursesCached();
+      const baseCourseId = Number(req.session?.user?.course_id || 1);
+      const scopedAccess = await buildStaffCourseAccess(baseCourseId, allCourses, roleKeys);
+      allowedCourses = scopedAccess.allowedCourses || [];
+    } catch (_err) {
+      allowedCourses = [];
+    }
+    const isSystemScope = hasSessionRole(req, 'admin') || shouldUseAllCoursesScope(req, allowedCourses);
+    const analyticsScope = isSystemScope ? 'system' : 'course';
+    const activeSemester = isSystemScope ? null : await getActiveSemester(courseId);
     const {
       sessionJoinSql: visitSessionJoinSql,
       resolvedUserIdExpr: resolvedVisitUserIdExpr,
@@ -55567,16 +55623,18 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
       analyticsUsedFallback = Number(summaryFallback.total_visits || 0) > 0;
     }
     let homeworkSla = null;
-    try {
-      homeworkSla = await buildAdminHomeworkReviewSla({
-        userId,
-        courseId,
-        semesterId: activeSemester ? Number(activeSemester.id) : null,
-        roleKeys,
-        now,
-      });
-    } catch (err) {
-      homeworkSla = null;
+    if (!isSystemScope) {
+      try {
+        homeworkSla = await buildAdminHomeworkReviewSla({
+          userId,
+          courseId,
+          semesterId: activeSemester ? Number(activeSemester.id) : null,
+          roleKeys,
+          now,
+        });
+      } catch (err) {
+        homeworkSla = null;
+      }
     }
 
     const daily = mapDailyByLabels(dailyRows);
@@ -56020,7 +56078,17 @@ app.get('/admin/security-dashboard.json', requireVisitAnalyticsSectionAccess, as
   }
   try {
     const courseId = getAdminCourse(req);
-    const isSystemScope = hasSessionRole(req, 'admin');
+    const roleKeys = getSessionRoleList(req);
+    let allowedCourses = [];
+    try {
+      const allCourses = await getCoursesCached();
+      const baseCourseId = Number(req.session?.user?.course_id || 1);
+      const scopedAccess = await buildStaffCourseAccess(baseCourseId, allCourses, roleKeys);
+      allowedCourses = scopedAccess.allowedCourses || [];
+    } catch (_err) {
+      allowedCourses = [];
+    }
+    const isSystemScope = hasSessionRole(req, 'admin') || shouldUseAllCoursesScope(req, allowedCourses);
     const dashboardScope = isSystemScope ? 'system' : 'course';
     const userScopeSql = isSystemScope ? '' : 'WHERE u.course_id = ?';
     const userScopeParams = isSystemScope ? [] : [courseId];
@@ -56284,7 +56352,17 @@ app.post('/admin/security-dashboard/recompute', requireVisitAnalyticsSectionAcce
   }
   try {
     const courseId = getAdminCourse(req);
-    const isSystemScope = hasSessionRole(req, 'admin');
+    const roleKeys = getSessionRoleList(req);
+    let allowedCourses = [];
+    try {
+      const allCourses = await getCoursesCached();
+      const baseCourseId = Number(req.session?.user?.course_id || 1);
+      const scopedAccess = await buildStaffCourseAccess(baseCourseId, allCourses, roleKeys);
+      allowedCourses = scopedAccess.allowedCourses || [];
+    } catch (_err) {
+      allowedCourses = [];
+    }
+    const isSystemScope = hasSessionRole(req, 'admin') || shouldUseAllCoursesScope(req, allowedCourses);
     const recomputeScope = isSystemScope ? 'system' : 'course';
     const requestedLimit = Number(req.body && req.body.limit ? req.body.limit : SECURITY_DASHBOARD_RECOMPUTE_LIMIT_DEFAULT);
     const recomputeLimit = Number.isFinite(requestedLimit)
