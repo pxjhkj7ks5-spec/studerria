@@ -55626,12 +55626,13 @@ app.get('/admin/visit-analytics.json', requireVisitAnalyticsSectionAccess, async
   }
 });
 
-app.get('/admin/visit-log', requireVisitAnalyticsSectionAccess, async (req, res) => {
+app.get(['/admin/visit-log', '/admin/visit-log/guest'], requireVisitAnalyticsSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {
     return handleDbError(res, err, 'admin.visitLog.init');
   }
+  const guestView = String(req.path || '').endsWith('/guest');
   const roleKeys = getSessionRoleList(req);
   let courses = [];
   let courseId = getStaffCourse(req);
@@ -55680,6 +55681,9 @@ app.get('/admin/visit-log', requireVisitAnalyticsSectionAccess, async (req, res)
     const excludeAdminClause = excludeAdmin
       ? `AND ${resolvedVisitRoleExpr} <> 'admin'`
       : '';
+    const guestOnlyClause = guestView
+      ? `AND LOWER(${resolvedVisitRoleExpr}) IN ('guest', 'anonymous')`
+      : '';
     const scopedVisitWhereSql = isSystemScope
       ? 'v.created_at >= ?'
       : `${courseScopeExpr} = ? AND v.created_at >= ?`;
@@ -55696,74 +55700,210 @@ app.get('/admin/visit-log', requireVisitAnalyticsSectionAccess, async (req, res)
         ${visitUserJoinSql}
         WHERE ${scopedVisitWhereSql}
           ${excludeAdminClause}
-      `,
-      scopedVisitParams
-    );
-    const countRow = await db.get(
-      `
-        SELECT COUNT(*)::int AS total_rows
-        FROM site_visit_events v
-        ${visitSessionJoinSql}
-        ${visitUserJoinSql}
-        WHERE ${scopedVisitWhereSql}
-          ${excludeAdminClause}
+          ${guestOnlyClause}
       `,
       scopedVisitParams
     );
     const perPage = 100;
     const requestedPage = Math.max(1, parsePositiveIntStrict(req.query.page, 1) || 1);
-    const totalRows = Number(countRow && countRow.total_rows || 0);
+    let totalRows = 0;
+    if (guestView) {
+      const guestCountRow = await db.get(
+        `
+          SELECT COUNT(*)::int AS total_rows
+          FROM (
+            SELECT
+              COALESCE(NULLIF(v.ip, ''), '—') AS ip_key,
+              COALESCE(NULLIF(v.user_agent, ''), '—') AS user_agent_key
+            FROM site_visit_events v
+            ${visitSessionJoinSql}
+            ${visitUserJoinSql}
+            WHERE ${scopedVisitWhereSql}
+              ${excludeAdminClause}
+              ${guestOnlyClause}
+            GROUP BY ip_key, user_agent_key
+          ) guest_groups
+        `,
+        scopedVisitParams
+      );
+      totalRows = Number(guestCountRow && guestCountRow.total_rows || 0);
+    } else {
+      const countRow = await db.get(
+        `
+          SELECT COUNT(*)::int AS total_rows
+          FROM site_visit_events v
+          ${visitSessionJoinSql}
+          ${visitUserJoinSql}
+          WHERE ${scopedVisitWhereSql}
+            ${excludeAdminClause}
+            ${guestOnlyClause}
+        `,
+        scopedVisitParams
+      );
+      totalRows = Number(countRow && countRow.total_rows || 0);
+    }
     const totalPages = Math.max(1, Math.ceil(totalRows / perPage));
     const currentPage = Math.min(requestedPage, totalPages);
     const offset = (currentPage - 1) * perPage;
-    const [topUserRows, visitRows] = await Promise.all([
-      db.all(
+    let topUserRows = [];
+    let visitRows = [];
+    let guestGroupedRows = [];
+    if (guestView) {
+      const groupedRowsRaw = await db.all(
         `
+          WITH grouped AS (
+            SELECT
+              COALESCE(NULLIF(v.ip, ''), '—') AS ip,
+              COALESCE(NULLIF(v.user_agent, ''), '—') AS user_agent,
+              COUNT(*)::int AS visits,
+              COUNT(DISTINCT COALESCE(v.route_path, '/'))::int AS routes,
+              MIN(v.created_at) AS first_seen_at,
+              MAX(v.created_at) AS last_seen_at
+            FROM site_visit_events v
+            ${visitSessionJoinSql}
+            ${visitUserJoinSql}
+            WHERE ${scopedVisitWhereSql}
+              ${excludeAdminClause}
+              ${guestOnlyClause}
+            GROUP BY ip, user_agent
+          ),
+          ranked AS (
+            SELECT
+              grouped.*,
+              ROW_NUMBER() OVER (ORDER BY grouped.visits DESC, grouped.last_seen_at DESC, grouped.ip ASC, grouped.user_agent ASC) AS group_rank
+            FROM grouped
+          ),
+          selected AS (
+            SELECT *
+            FROM ranked
+            WHERE group_rank > ?
+              AND group_rank <= ?
+          ),
+          detailed AS (
+            SELECT
+              selected.ip,
+              selected.user_agent,
+              v.created_at,
+              ${resolvedVisitUserNameExpr} AS user_name,
+              ${resolvedVisitRoleExpr} AS role_key,
+              COALESCE(v.page_key, 'unknown') AS page_key,
+              COALESCE(v.route_path, '/') AS route_path,
+              ROW_NUMBER() OVER (
+                PARTITION BY selected.ip, selected.user_agent
+                ORDER BY v.created_at DESC
+              ) AS event_rank
+            FROM site_visit_events v
+            ${visitSessionJoinSql}
+            ${visitUserJoinSql}
+            JOIN selected
+              ON selected.ip = COALESCE(NULLIF(v.ip, ''), '—')
+             AND selected.user_agent = COALESCE(NULLIF(v.user_agent, ''), '—')
+            WHERE ${scopedVisitWhereSql}
+              ${excludeAdminClause}
+              ${guestOnlyClause}
+          )
           SELECT
-            ${resolvedVisitUserIdExpr} AS actor_user_id,
-            ${resolvedVisitUserNameExpr} AS user_name,
-            ${resolvedVisitRoleExpr} AS role_key,
-            COUNT(*)::int AS visits,
-            COUNT(DISTINCT COALESCE(v.page_key, 'unknown'))::int AS pages,
-            MAX(v.created_at) AS last_seen_at
-          FROM site_visit_events v
-          ${visitSessionJoinSql}
-          ${visitUserJoinSql}
-          WHERE ${scopedVisitWhereSql}
-            ${excludeAdminClause}
-          GROUP BY ${resolvedVisitUserIdExpr}, ${resolvedVisitUserNameExpr}, ${resolvedVisitRoleExpr}
-          ORDER BY visits DESC, last_seen_at DESC, user_name ASC
-          LIMIT 20
+            selected.ip,
+            selected.user_agent,
+            selected.visits,
+            selected.routes,
+            selected.first_seen_at,
+            selected.last_seen_at,
+            detailed.event_rank,
+            detailed.created_at AS event_created_at,
+            detailed.user_name AS event_user_name,
+            detailed.role_key AS event_role_key,
+            detailed.page_key AS event_page_key,
+            detailed.route_path AS event_route_path
+          FROM selected
+          LEFT JOIN detailed
+            ON detailed.ip = selected.ip
+           AND detailed.user_agent = selected.user_agent
+           AND detailed.event_rank <= 6
+          ORDER BY selected.group_rank ASC, detailed.event_rank ASC
         `,
-        scopedVisitParams
-      ),
-      db.all(
-        `
-          SELECT
-            v.created_at,
-            ${resolvedVisitUserNameExpr} AS user_name,
-            ${resolvedVisitRoleExpr} AS role_key,
-            COALESCE(v.page_key, 'unknown') AS page_key,
-            COALESCE(v.route_path, '/') AS route_path,
-            COALESCE(NULLIF(v.ip, ''), '—') AS ip
-          FROM site_visit_events v
-          ${visitSessionJoinSql}
-          ${visitUserJoinSql}
-          WHERE ${scopedVisitWhereSql}
-            ${excludeAdminClause}
-          ORDER BY v.created_at DESC
-          LIMIT ? OFFSET ?
-        `,
-        [...scopedVisitParams, perPage, offset]
-      ),
-    ]);
+        [...scopedVisitParams, offset, offset + perPage, ...scopedVisitParams]
+      );
+      const groupedMap = new Map();
+      for (const row of groupedRowsRaw || []) {
+        const key = `${String(row && row.ip || '—')}__${String(row && row.user_agent || '—')}`;
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, {
+            ip: String(row && row.ip || '—'),
+            user_agent: String(row && row.user_agent || '—'),
+            visits: Number(row && row.visits || 0),
+            routes: Number(row && row.routes || 0),
+            first_seen_at: row && row.first_seen_at ? row.first_seen_at : null,
+            last_seen_at: row && row.last_seen_at ? row.last_seen_at : null,
+            events: [],
+          });
+        }
+        if (row && row.event_created_at) {
+          groupedMap.get(key).events.push({
+            created_at: row.event_created_at,
+            user_name: String(row.event_user_name || 'Guest'),
+            role_key: String(row.event_role_key || 'guest'),
+            page_key: String(row.event_page_key || 'unknown'),
+            route_path: String(row.event_route_path || '/'),
+          });
+        }
+      }
+      guestGroupedRows = Array.from(groupedMap.values());
+    } else {
+      [topUserRows, visitRows] = await Promise.all([
+        db.all(
+          `
+            SELECT
+              ${resolvedVisitUserIdExpr} AS actor_user_id,
+              ${resolvedVisitUserNameExpr} AS user_name,
+              ${resolvedVisitRoleExpr} AS role_key,
+              COUNT(*)::int AS visits,
+              COUNT(DISTINCT COALESCE(v.page_key, 'unknown'))::int AS pages,
+              MAX(v.created_at) AS last_seen_at
+            FROM site_visit_events v
+            ${visitSessionJoinSql}
+            ${visitUserJoinSql}
+            WHERE ${scopedVisitWhereSql}
+              ${excludeAdminClause}
+              ${guestOnlyClause}
+            GROUP BY ${resolvedVisitUserIdExpr}, ${resolvedVisitUserNameExpr}, ${resolvedVisitRoleExpr}
+            ORDER BY visits DESC, last_seen_at DESC, user_name ASC
+            LIMIT 20
+          `,
+          scopedVisitParams
+        ),
+        db.all(
+          `
+            SELECT
+              v.created_at,
+              ${resolvedVisitUserNameExpr} AS user_name,
+              ${resolvedVisitRoleExpr} AS role_key,
+              COALESCE(v.page_key, 'unknown') AS page_key,
+              COALESCE(v.route_path, '/') AS route_path,
+              COALESCE(NULLIF(v.ip, ''), '—') AS ip
+            FROM site_visit_events v
+            ${visitSessionJoinSql}
+            ${visitUserJoinSql}
+            WHERE ${scopedVisitWhereSql}
+              ${excludeAdminClause}
+              ${guestOnlyClause}
+            ORDER BY v.created_at DESC
+            LIMIT ? OFFSET ?
+          `,
+          [...scopedVisitParams, perPage, offset]
+        ),
+      ]);
+    }
     const queryParams = new URLSearchParams();
     if (!isSystemScope && courseId) queryParams.set('course', String(courseId));
     if (canUseSystemScope && selectedScope === 'system') queryParams.set('scope', 'system');
     queryParams.set('days', String(days));
     queryParams.set('exclude_admin', excludeAdmin ? '1' : '0');
     const baseQuery = queryParams.toString();
-    const pageBase = baseQuery ? `?${baseQuery}&page=` : '?page=';
+    const viewBasePath = guestView ? '/admin/visit-log/guest' : '/admin/visit-log';
+    const pageBase = baseQuery ? `${viewBasePath}?${baseQuery}&page=` : `${viewBasePath}?page=`;
+    const allVisitsHref = baseQuery ? `/admin/visit-log?${baseQuery}` : '/admin/visit-log';
+    const guestVisitsHref = baseQuery ? `/admin/visit-log/guest?${baseQuery}` : '/admin/visit-log/guest';
     return res.render('admin-visit-log', {
       username: req.session.user.username,
       role: normalizeRoleKey(req.session.role || 'student'),
@@ -55780,6 +55920,10 @@ app.get('/admin/visit-log', requireVisitAnalyticsSectionAccess, async (req, res)
       allowCourseSelect,
       canUseSystemScope,
       selectedScope,
+      viewMode: guestView ? 'guest' : 'all',
+      viewBasePath,
+      allVisitsHref,
+      guestVisitsHref,
       filters: {
         days,
         exclude_admin: excludeAdmin,
@@ -55806,6 +55950,7 @@ app.get('/admin/visit-log', requireVisitAnalyticsSectionAccess, async (req, res)
         route_path: String(row && row.route_path || '/'),
         ip: String(row && row.ip || '—'),
       })),
+      guestGroups: guestGroupedRows,
       pagination: {
         page: currentPage,
         totalPages,

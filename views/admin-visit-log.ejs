@@ -15,7 +15,6 @@
     <style>
       :root {
         --accent: #3b82f6;
-        --accent-dark: #2563eb;
         --radius: 18px;
         --glass-border-dark: rgba(255, 255, 255, 0.14);
         --glass-border-light: rgba(15, 23, 42, 0.12);
@@ -132,6 +131,13 @@
         border-color: rgba(96, 165, 250, 0.24);
         color: #dbeafe;
       }
+      .visit-view-switch {
+        display: inline-flex;
+        gap: 0.5rem;
+      }
+      .visit-view-tab {
+        border-radius: 999px;
+      }
       .visit-stack {
         display: grid;
         gap: 1rem;
@@ -145,6 +151,20 @@
       }
       .visit-table-note {
         font-size: 0.88rem;
+      }
+      .guest-device {
+        display: block;
+        max-width: 28rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .guest-details {
+        margin: 0;
+      }
+      .guest-details summary {
+        cursor: pointer;
+        user-select: none;
       }
       .pagination .page-link {
         border-radius: 999px;
@@ -202,8 +222,8 @@
         if (!parsed || Number.isNaN(parsed.getTime())) return '—';
         return parsed.toLocaleString('uk-UA');
       };
-      const currentPage = Number(pagination && pagination.page || 1);
-      const totalPages = Number(pagination && pagination.totalPages || 1);
+      const currentPage = Number((pagination && pagination.page) || 1);
+      const totalPages = Number((pagination && pagination.totalPages) || 1);
       const pageStart = Math.max(1, currentPage - 2);
       const pageEnd = Math.min(totalPages, currentPage + 2);
       const visiblePages = [];
@@ -211,6 +231,16 @@
       const scopeLabel = selectedScope === 'system'
         ? 'Вся система'
         : (selectedCourse && selectedCourse.name ? selectedCourse.name : 'Обраний курс');
+      const isGuestView = String(viewMode || 'all') === 'guest';
+      const filterActionPath = viewBasePath || (isGuestView ? '/admin/visit-log/guest' : '/admin/visit-log');
+      const guestGroupsList = Array.isArray(guestGroups) ? guestGroups : [];
+      const totalGroups = Number((pagination && pagination.totalRows) || 0);
+      const truncateText = (value, max) => {
+        const normalized = String(value || '');
+        const size = Number(max || 72);
+        if (normalized.length <= size) return normalized;
+        return `${normalized.slice(0, Math.max(1, size - 1))}…`;
+      };
     %>
 
     <nav class="navbar navbar-expand-lg admin-nav">
@@ -245,14 +275,18 @@
           <div class="card-body">
             <div class="visit-page-header">
               <div>
-                <h1 class="h3 mb-1">Журнал візитів</h1>
-                <div class="text-muted">Повний список подій за вибраний період з окремим рейтингом користувачів.</div>
+                <h1 class="h3 mb-1"><%= isGuestView ? 'Guest visits' : 'Журнал візитів' %></h1>
+                <div class="text-muted"><%= isGuestView ? 'Групування guest-візитів за звʼязкою IP + пристрій (user agent).' : 'Повний список подій за вибраний період з окремим рейтингом користувачів.' %></div>
               </div>
               <div class="d-flex flex-wrap gap-2">
                 <span class="visit-chip"><%= scopeLabel %></span>
-                <span class="visit-chip"><%= formatNumber(filters && filters.days || 14) %> днів</span>
+                <span class="visit-chip"><%= formatNumber((filters && filters.days) || 14) %> днів</span>
                 <span class="visit-chip"><%= filters && filters.exclude_admin ? 'Без адмінів' : 'З адмінами' %></span>
               </div>
+            </div>
+            <div class="visit-view-switch mt-3">
+              <a class="btn btn-sm visit-view-tab <%= isGuestView ? 'btn-outline-primary' : 'btn-primary' %>" href="<%= allVisitsHref || '/admin/visit-log' %>">All visits</a>
+              <a class="btn btn-sm visit-view-tab <%= isGuestView ? 'btn-primary' : 'btn-outline-primary' %>" href="<%= guestVisitsHref || '/admin/visit-log/guest' %>">Guest visits</a>
             </div>
           </div>
         </div>
@@ -260,7 +294,7 @@
         <div class="card">
           <div class="card-body">
             <h5 class="card-title mb-3">Фільтри</h5>
-            <form method="GET" action="/admin/visit-log" class="row g-3 align-items-end">
+            <form method="GET" action="<%= filterActionPath %>" class="row g-3 align-items-end">
               <% if (canUseSystemScope) { %>
                 <div class="col-12 col-md-3 col-xl-2">
                   <label class="form-label">Scope</label>
@@ -286,7 +320,7 @@
                 <label class="form-label">Період</label>
                 <select class="form-select" name="days">
                   <% [7, 14, 30, 60, 90].forEach(function(option) { %>
-                    <option value="<%= option %>" <%= Number(filters && filters.days || 14) === option ? 'selected' : '' %>><%= option %> днів</option>
+                    <option value="<%= option %>" <%= Number((filters && filters.days) || 14) === option ? 'selected' : '' %>><%= option %> днів</option>
                   <% }); %>
                 </select>
               </div>
@@ -324,97 +358,178 @@
         </div>
 
         <div class="visit-stack">
-          <div class="card">
-            <div class="card-body">
-              <div class="visit-card-title mb-3">
-                <div>
-                  <h5 class="card-title mb-1">Топ користувачі за візитами</h5>
-                  <div class="text-muted">Рейтинг за період із кількістю сторінок і останньою активністю.</div>
+          <% if (!isGuestView) { %>
+            <div class="card">
+              <div class="card-body">
+                <div class="visit-card-title mb-3">
+                  <div>
+                    <h5 class="card-title mb-1">Топ користувачі за візитами</h5>
+                    <div class="text-muted">Рейтинг за період із кількістю сторінок і останньою активністю.</div>
+                  </div>
+                  <div class="visit-table-note text-muted">Топ 20</div>
                 </div>
-                <div class="visit-table-note text-muted">Топ 20</div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Користувач</th>
-                      <th>Роль</th>
-                      <th>Візити</th>
-                      <th>Сторінки</th>
-                      <th>Останній візит</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% (topUsers || []).forEach(function(row, index) { %>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
                       <tr>
-                        <td><%= index + 1 %></td>
-                        <td><%= row.user_name %></td>
-                        <td><%= formatRoleLabel(row.role_key) %></td>
-                        <td><%= formatNumber(row.visits) %></td>
-                        <td><%= formatNumber(row.pages) %></td>
-                        <td><%= formatDateTime(row.last_seen_at) %></td>
+                        <th>#</th>
+                        <th>Користувач</th>
+                        <th>Роль</th>
+                        <th>Візити</th>
+                        <th>Сторінки</th>
+                        <th>Останній візит</th>
                       </tr>
-                    <% }); %>
-                    <% if (!(topUsers || []).length) { %>
-                      <tr>
-                        <td colspan="6" class="text-muted">Немає візитів за вибраний період.</td>
-                      </tr>
-                    <% } %>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      <% (topUsers || []).forEach(function(row, index) { %>
+                        <tr>
+                          <td><%= index + 1 %></td>
+                          <td><%= row.user_name %></td>
+                          <td><%= formatRoleLabel(row.role_key) %></td>
+                          <td><%= formatNumber(row.visits) %></td>
+                          <td><%= formatNumber(row.pages) %></td>
+                          <td><%= formatDateTime(row.last_seen_at) %></td>
+                        </tr>
+                      <% }); %>
+                      <% if (!(topUsers || []).length) { %>
+                        <tr>
+                          <td colspan="6" class="text-muted">Немає візитів за вибраний період.</td>
+                        </tr>
+                      <% } %>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="card">
-            <div class="card-body">
-              <div class="visit-card-title mb-3">
-                <div>
-                  <h5 class="card-title mb-1">Усі візити</h5>
-                  <div class="text-muted">Список подій у зворотному хронологічному порядку.</div>
+            <div class="card">
+              <div class="card-body">
+                <div class="visit-card-title mb-3">
+                  <div>
+                    <h5 class="card-title mb-1">Усі візити</h5>
+                    <div class="text-muted">Список подій у зворотному хронологічному порядку.</div>
+                  </div>
+                  <div class="visit-table-note text-muted">
+                    Сторінка <%= currentPage %> з <%= totalPages %> · <%= formatNumber((pagination && pagination.totalRows) || 0) %> записів
+                  </div>
                 </div>
-                <div class="visit-table-note text-muted">
-                  Сторінка <%= currentPage %> з <%= totalPages %> · <%= formatNumber(pagination && pagination.totalRows || 0) %> записів
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Час</th>
+                        <th>Користувач</th>
+                        <th>Роль</th>
+                        <th>Сторінка</th>
+                        <th>Шлях</th>
+                        <th>IP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% (visits || []).forEach(function(row) { %>
+                        <tr>
+                          <td><%= formatDateTime(row.created_at) %></td>
+                          <td><%= row.user_name %></td>
+                          <td><%= formatRoleLabel(row.role_key) %></td>
+                          <td><%= formatPageLabel(row.page_key) %></td>
+                          <td><code><%= row.route_path %></code></td>
+                          <td><code><%= row.ip %></code></td>
+                        </tr>
+                      <% }); %>
+                      <% if (!(visits || []).length) { %>
+                        <tr>
+                          <td colspan="6" class="text-muted">Немає візитів за вибраний період.</td>
+                        </tr>
+                      <% } %>
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Час</th>
-                      <th>Користувач</th>
-                      <th>Роль</th>
-                      <th>Сторінка</th>
-                      <th>Шлях</th>
-                      <th>IP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% (visits || []).forEach(function(row) { %>
-                      <tr>
-                        <td><%= formatDateTime(row.created_at) %></td>
-                        <td><%= row.user_name %></td>
-                        <td><%= formatRoleLabel(row.role_key) %></td>
-                        <td><%= formatPageLabel(row.page_key) %></td>
-                        <td><code><%= row.route_path %></code></td>
-                        <td><code><%= row.ip %></code></td>
-                      </tr>
-                    <% }); %>
-                    <% if (!(visits || []).length) { %>
-                      <tr>
-                        <td colspan="6" class="text-muted">Немає візитів за вибраний період.</td>
-                      </tr>
-                    <% } %>
-                  </tbody>
-                </table>
               </div>
             </div>
-          </div>
+          <% } else { %>
+            <div class="card">
+              <div class="card-body">
+                <div class="visit-card-title mb-3">
+                  <div>
+                    <h5 class="card-title mb-1">Guest групи (IP + пристрій)</h5>
+                    <div class="text-muted">Розкрий “Показати”, щоб подивитись IP, пристрій і останні події цієї групи.</div>
+                  </div>
+                  <div class="visit-table-note text-muted">
+                    Сторінка <%= currentPage %> з <%= totalPages %> · <%= formatNumber(totalGroups) %> груп
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Візити</th>
+                        <th>Маршрути</th>
+                        <th>Перший візит</th>
+                        <th>Останній візит</th>
+                        <th>Деталі</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% guestGroupsList.forEach(function(group, index) { %>
+                        <tr>
+                          <td><%= ((currentPage - 1) * Number((pagination && pagination.perPage) || 100)) + index + 1 %></td>
+                          <td><%= formatNumber(group.visits) %></td>
+                          <td><%= formatNumber(group.routes) %></td>
+                          <td><%= formatDateTime(group.first_seen_at) %></td>
+                          <td><%= formatDateTime(group.last_seen_at) %></td>
+                          <td>
+                            <details class="guest-details">
+                              <summary>Показати</summary>
+                              <div class="mt-2"><strong>IP:</strong> <code><%= group.ip %></code></div>
+                              <div class="mt-1"><strong>Device:</strong> <code title="<%= group.user_agent %>" class="guest-device"><%= truncateText(group.user_agent, 120) %></code></div>
+                              <div class="mt-2">
+                                <% if ((group.events || []).length) { %>
+                                  <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                      <tr>
+                                        <th>Час</th>
+                                        <th>Користувач</th>
+                                        <th>Роль</th>
+                                        <th>Сторінка</th>
+                                        <th>Шлях</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <% (group.events || []).forEach(function(eventRow) { %>
+                                        <tr>
+                                          <td><%= formatDateTime(eventRow.created_at) %></td>
+                                          <td><%= eventRow.user_name %></td>
+                                          <td><%= formatRoleLabel(eventRow.role_key) %></td>
+                                          <td><%= formatPageLabel(eventRow.page_key) %></td>
+                                          <td><code><%= eventRow.route_path %></code></td>
+                                        </tr>
+                                      <% }); %>
+                                    </tbody>
+                                  </table>
+                                <% } else { %>
+                                  <div class="text-muted">Немає подій у деталях.</div>
+                                <% } %>
+                              </div>
+                            </details>
+                          </td>
+                        </tr>
+                      <% }); %>
+                      <% if (!guestGroupsList.length) { %>
+                        <tr>
+                          <td colspan="6" class="text-muted">Немає guest-візитів за вибраний період.</td>
+                        </tr>
+                      <% } %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          <% } %>
         </div>
 
         <nav class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <div class="text-muted">Показуємо по <%= formatNumber(pagination && pagination.perPage || 100) %> записів</div>
+          <div class="text-muted">Показуємо по <%= formatNumber((pagination && pagination.perPage) || 100) %> записів</div>
           <ul class="pagination mb-0">
             <li class="page-item <%= currentPage <= 1 ? 'disabled' : '' %>">
               <a class="page-link" href="<%= (pagination && pagination.pageBase ? pagination.pageBase : '?page=') + Math.max(1, currentPage - 1) %>">Назад</a>
