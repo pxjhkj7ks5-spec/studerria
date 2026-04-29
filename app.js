@@ -7901,6 +7901,7 @@ async function getCourseSubjectAccessScope(courseId, options = {}) {
   }
   const subjects = await getSubjectsCached(normalizedCourseId, {
     visibleOnly: options.visibleOnly === true,
+    refresh: options.refreshLegacy === true,
   });
   const normalizedSubjects = Array.isArray(subjects) ? subjects : [];
   const subjectIds = Array.from(new Set(
@@ -7965,6 +7966,7 @@ async function getCourseSharedStorageScope(courseId, options = {}) {
   const subjectScope = await getCourseSubjectAccessScope(normalizedCourseId, {
     visibleOnly: options.visibleOnly === true,
     allowLegacyFallback: options.allowLegacyFallback !== false,
+    refreshLegacy: options.refreshLegacy === true,
   });
   const ownerCourseIds = Array.isArray(subjectScope.owner_course_ids) && subjectScope.owner_course_ids.length
     ? subjectScope.owner_course_ids
@@ -8150,6 +8152,7 @@ async function buildCourseDashboardStats(courseId, semesterId = null, options = 
     visibleOnly: false,
     fallbackSemesterId: hasSemester ? safeSemesterId : null,
     allowLegacyFallback: options.allowLegacyFallback !== false,
+    refreshLegacy: options.refreshReferenceData === true,
   });
   if (!courseScope.subject_ids.length) {
     const usersRow = await usersPromise;
@@ -8249,6 +8252,7 @@ async function buildCourseWeeklyWorkloadSeries({
   semesterId = null,
   startIso,
   allowLegacyFallback = true,
+  refreshReferenceData = false,
 }) {
   const safeCourseId = Number(courseId || 0);
   const safeSemesterId = Number(semesterId || 0);
@@ -8260,6 +8264,7 @@ async function buildCourseWeeklyWorkloadSeries({
     visibleOnly: false,
     fallbackSemesterId: hasSemester ? safeSemesterId : null,
     allowLegacyFallback,
+    refreshLegacy: refreshReferenceData === true,
   });
   if (!courseScope.subject_ids.length) {
     return {
@@ -8350,8 +8355,10 @@ async function getHomeworkForCourse(homeworkId, courseId, options = {}) {
 
 async function getSubjectsCached(courseId, options = {}) {
   const key = `${courseId}|${options.visibleOnly ? 'visible' : 'all'}`;
-  const cached = cacheGet(referenceCache.subjects, key);
-  if (cached) return cached;
+  if (options.refresh !== true) {
+    const cached = cacheGet(referenceCache.subjects, key);
+    if (cached) return cached;
+  }
   const rows = await academicSetupHelpers.listLegacyCourseSubjects(getAcademicSetupStore(), {
     courseId,
     includeHidden: options.visibleOnly !== true,
@@ -14647,9 +14654,11 @@ app.use((req, _res, next) => {
   return next();
 });
 
-async function getActiveSemester(courseId) {
-  const cached = cacheGet(referenceCache.activeSemester, courseId);
-  if (cached) return cached;
+async function getActiveSemester(courseId, options = {}) {
+  if (options.refresh !== true) {
+    const cached = cacheGet(referenceCache.activeSemester, courseId);
+    if (cached) return cached;
+  }
   const row = await academicSetupHelpers.getLegacyCourseActiveSemester(getAcademicSetupStore(), courseId);
   return cacheSet(referenceCache.activeSemester, courseId, row || null);
 }
@@ -41492,6 +41501,9 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
 });
 
 app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     await ensureDbReady();
   } catch (err) {
@@ -41567,7 +41579,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
   const scheduleParams = [];
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId);
+    activeSemester = await getActiveSemester(courseId, { refresh: true });
   } catch (err) {
     return handleDbError(res, err, 'admin.semester');
   }
@@ -42107,6 +42119,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                   ] = await Promise.all([
                                     buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null, {
                                       allowLegacyFallback: false,
+                                      refreshReferenceData: true,
                                     }),
                                     db.all('SELECT id, title, weeks_count, course_id, start_date FROM semesters ORDER BY start_date DESC'),
                                     db.get(
@@ -42178,6 +42191,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
           semesterId: activeSemester ? Number(activeSemester.id) : null,
           startIso: weekStart.toISOString(),
           allowLegacyFallback: false,
+          refreshReferenceData: true,
         }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
@@ -56361,6 +56375,9 @@ app.get('/admin/system-health.json', requireVisitAnalyticsSectionAccess, async (
 });
 
 app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     await ensureDbReady();
   } catch (err) {
@@ -56411,13 +56428,14 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
   }
   let activeSemester = null;
   try {
-    activeSemester = await getActiveSemester(courseId);
+    activeSemester = await getActiveSemester(courseId, { refresh: true });
   } catch (err) {
     return handleDbError(res, err, 'admin.overview.semester');
   }
   try {
     const dashboardStats = await buildCourseDashboardStats(courseId, activeSemester ? Number(activeSemester.id) : null, {
       allowLegacyFallback: false,
+      refreshReferenceData: true,
     });
     const overviewCompatibilityWarning = dashboardStats && dashboardStats.compatibilityWarning
       ? dashboardStats.compatibilityWarning
@@ -56463,6 +56481,7 @@ app.get('/admin/overview', requireOverviewSectionAccess, async (req, res) => {
           semesterId: activeSemester ? Number(activeSemester.id) : null,
           startIso: weekStart.toISOString(),
           allowLegacyFallback: false,
+          refreshReferenceData: true,
         }),
         db.all(
           `SELECT DATE(created_at) AS day, role, COUNT(*) AS count
