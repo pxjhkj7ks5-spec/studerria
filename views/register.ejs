@@ -144,25 +144,7 @@
       </section>
     </main>
 
-    <footer class="td-login-footer">
-      <button
-        type="button"
-        class="td-language-pill"
-        data-lang-toggle
-        data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
-      ><%= lang === 'en' ? 'EN' : 'UA' %> <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
-      <button type="button" class="td-language-pill td-theme-toggle" id="tdThemeToggleMirror" aria-label="<%= t('theme.toggleToDark') %>" aria-pressed="false">
-        <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
-        <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
-        <span data-theme-label>Dark</span>
-      </button>
-      <a href="/help"><%= t('footer.support') %></a>
-      <a href="/terms"><%= t('footer.terms') %></a>
-      <a href="/privacy"><%= t('footer.privacy') %></a>
-      <button type="button" class="td-footer-link" data-bs-toggle="modal" data-bs-target="#changelogModal"><%= t('footer.changelog') %></button>
-      <span><%= t('footer.copyright') %></span>
-    </footer>
+    <%- include('partials/app-footer') %>
     <div class="modal fade" id="privacyModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -186,7 +168,6 @@
         </div>
       </div>
     </div>
-    <%- include('partials/changelog-modal') %>
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"

@@ -1,131 +1,61 @@
-<%
-  const footerMetaClassList = ['footer-meta'];
-  if (typeof footerMetaClass === 'string' && footerMetaClass.trim()) {
-    footerMetaClassList.push(footerMetaClass.trim());
-  }
-  const footerModeValue = typeof footerMode === 'string' ? footerMode : 'default';
-  const isAuthLiteFooter = footerModeValue === 'auth-lite';
-  const showFooterSyncStatus = (typeof footerSyncStatus !== 'undefined') ? Boolean(footerSyncStatus) : true;
-  const latestRelease = Array.isArray(changelog) && changelog.length ? changelog[0] : null;
-  const footerReleaseProps = {
-    appVersion: appVersion || '',
-    latestVersion: latestRelease && latestRelease.version ? String(latestRelease.version) : '',
-    latestDate: latestRelease && latestRelease.date ? String(latestRelease.date) : '',
-  };
-  const footerReleasePropsJson = JSON.stringify(footerReleaseProps).replace(/'/g, '&#39;');
-  const footerNetworkLabels = {
-    online: t('footer.online'),
-    offline: t('footer.offline'),
-  };
-%>
-<footer class="app-footer td-login-footer text-center py-4">
-  <% if (isAuthLiteFooter) { %>
-    <small class="<%= footerMetaClassList.join(' ') %> footer-meta--auth-lite">
-      <button
-        type="button"
-        class="td-language-pill"
-        data-lang-toggle
-        data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
-      ><%= lang === 'en' ? 'EN' : 'UA' %></button>
-      <a class="footer-link" href="/help"><%= t('footer.support') %></a>
-      <a class="footer-link" href="/terms"><%= t('footer.terms') %></a>
-      <a class="footer-link" href="/privacy"><%= t('footer.privacy') %></a>
-      <button type="button" class="td-footer-link footer-link" data-auth-changelog-open><%= t('footer.changelog') %></button>
-      <span class="footer-signature"><%= t('footer.copyright') %></span>
-    </small>
-  <% } else { %>
-    <small class="<%= footerMetaClassList.join(' ') %>">
-      <button
-        type="button"
-        class="td-language-pill"
-        data-lang-toggle
-        data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
-      ><%= lang === 'en' ? 'EN' : 'UA' %></button>
-      <span class="footer-signature" title="All rights reserved" aria-label="All rights reserved by A.M.">
-        &copy; A.M.
-      </span>
-      <% if (showFooterSyncStatus) { %>
-        <span
-          class="footer-sync-pill"
-          data-footer-network-status
-          role="status"
-          aria-live="polite"
-          aria-label="<%= footerNetworkLabels.online %>"
-        >
-          <span class="sync-dot" data-footer-sync-dot aria-hidden="true"></span>
-          <span class="footer-sync-label" data-footer-sync-label><%= footerNetworkLabels.online %></span>
-        </span>
-      <% } %>
-      <span
-        class="footer-release-slot"
-        data-react-island="footer-release-pill"
-        data-island-props='<%- footerReleasePropsJson %>'
-        aria-hidden="true"
-      ></span>
-      <button
-        type="button"
-        class="footer-link"
-        data-bs-toggle="modal"
-        data-bs-target="#changelogModal"
-      >
-        <%= t('footer.changelog') %>
-      </button>
-      <a class="footer-link" href="/changelog"><%= t('changelog.openAll') %></a>
-      <a class="footer-link" href="/terms"><%= t('footer.terms') %></a>
-      <a class="footer-link" href="/privacy"><%= t('footer.privacy') %></a>
-      <a class="footer-link" href="/help"><%= t('footer.support') %></a>
-    </small>
-  <% } %>
+<footer class="app-footer td-login-footer">
+  <button
+    type="button"
+    class="td-language-pill"
+    data-lang-toggle
+    data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
+    aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
+  ><%= lang === 'en' ? 'EN' : 'UA' %> <%- include('test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
+  <button type="button" class="td-language-pill td-theme-toggle" id="tdThemeToggleMirror" data-theme-toggle aria-label="<%= t('theme.toggleToDark') %>" aria-pressed="false">
+    <%- include('test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
+    <%- include('test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
+    <span data-theme-label>Dark</span>
+  </button>
+  <a class="footer-link" href="/help"><%= t('footer.support') %></a>
+  <a class="footer-link" href="/terms"><%= t('footer.terms') %></a>
+  <a class="footer-link" href="/privacy"><%= t('footer.privacy') %></a>
+  <button type="button" class="td-footer-link footer-link" data-auth-changelog-open><%= t('footer.changelog') %></button>
+  <span class="footer-signature"><%= t('footer.copyright') %></span>
 </footer>
+<%- include('auth-lite-changelog') %>
 <script>
-  window.__KMA_APP_META__ = Object.assign({}, window.__KMA_APP_META__, <%- JSON.stringify(footerReleaseProps) %>);
-  window.__KMA_FOOTER_LABELS__ = Object.assign({}, window.__KMA_FOOTER_LABELS__, <%- JSON.stringify(footerNetworkLabels) %>);
-  if (typeof window.__updateFooterNetworkStatus !== 'function') {
-    window.__updateFooterNetworkStatus = function updateFooterNetworkStatus(root) {
-      const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
-      const isOnline = navigator.onLine;
-      const labels = Object.assign({ online: 'Online', offline: 'Offline' }, window.__KMA_FOOTER_LABELS__ || {});
+  if (!window.__authLiteChangelogBound) {
+    document.addEventListener('click', (event) => {
+      const changelogModal = document.querySelector('[data-auth-changelog]');
+      if (!changelogModal) return;
+      const changelogSheet = changelogModal.querySelector('.td-lite-sheet');
+      const open = event.target && event.target.closest ? event.target.closest('[data-auth-changelog-open]') : null;
+      if (open) {
+        event.preventDefault();
+        changelogModal.hidden = false;
+        requestAnimationFrame(() => {
+          changelogModal.classList.add('is-open');
+          if (changelogSheet) changelogSheet.focus({ preventScroll: true });
+        });
+        return;
+      }
+      const close = event.target && event.target.closest ? event.target.closest('[data-auth-changelog-close]') : null;
+      if (close && !changelogModal.hidden) {
+        event.preventDefault();
+        changelogModal.classList.remove('is-open');
+        setTimeout(() => {
+          changelogModal.hidden = true;
+        }, 180);
+      }
+    });
 
-      scope.querySelectorAll('[data-footer-network-status]').forEach((pill) => {
-        if (!(pill instanceof HTMLElement)) {
-          return;
-        }
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      const changelogModal = document.querySelector('[data-auth-changelog]');
+      if (!changelogModal || changelogModal.hidden) return;
+      changelogModal.classList.remove('is-open');
+      setTimeout(() => {
+        changelogModal.hidden = true;
+      }, 180);
+    });
 
-        pill.classList.toggle('is-offline', !isOnline);
-        pill.setAttribute('aria-label', isOnline ? labels.online : labels.offline);
-
-        const label = pill.querySelector('[data-footer-sync-label]');
-        if (label instanceof HTMLElement) {
-          label.textContent = isOnline ? labels.online : labels.offline;
-        }
-      });
-    };
+    window.__authLiteChangelogBound = true;
   }
-
-  if (!window.__footerNetworkStatusBound) {
-    const syncFooterNetworkStatus = () => window.__updateFooterNetworkStatus();
-    window.addEventListener('online', syncFooterNetworkStatus);
-    window.addEventListener('offline', syncFooterNetworkStatus);
-    window.__footerNetworkStatusBound = true;
-  }
-
-  window.__updateFooterNetworkStatus();
 </script>
-<% if (!isAuthLiteFooter) { %>
-  <script
-    src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"
-    crossorigin="anonymous"
-    defer
-  ></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"
-    crossorigin="anonymous"
-    defer
-  ></script>
-  <script src="/js/islands/runtime.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
-  <script src="/js/islands/footer-release-island.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
-<% } %>
 <script src="/js/islands/checklist-toolbar-island.js" defer></script>
 <script src="/js/islands/insights-period-preset-island.js" defer></script>

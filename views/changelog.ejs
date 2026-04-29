@@ -47,24 +47,7 @@
       </section>
     </main>
 
-    <footer class="td-login-footer">
-      <button
-        type="button"
-        class="td-language-pill"
-        data-lang-toggle
-        data-current-lang="<%= lang === 'en' ? 'en' : 'uk' %>"
-        aria-label="<%= lang === 'en' ? t('language.switchToUkrainian') : t('language.switchToEnglish') %>"
-      ><%= lang === 'en' ? 'EN' : 'UA' %> <%- include('partials/test-icon', { name: 'chevronDown', className: 'td-mini-chevron' }) %></button>
-      <button type="button" class="td-language-pill td-theme-toggle" data-theme-toggle aria-label="<%= t('theme.toggleToDark') %>" aria-pressed="false">
-        <%- include('partials/test-icon', { name: 'moon', className: 'td-mini-chevron td-theme-moon' }) %>
-        <%- include('partials/test-icon', { name: 'sun', className: 'td-mini-chevron td-theme-sun' }) %>
-        <span data-theme-label>Dark</span>
-      </button>
-      <a href="/login"><%= t('login.title') %></a>
-      <a href="/terms"><%= t('footer.terms') %></a>
-      <a href="/privacy"><%= t('footer.privacy') %></a>
-      <span><%= t('footer.copyright') %></span>
-    </footer>
+    <%- include('partials/app-footer') %>
     <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
     <script src="/js/login-auth.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>

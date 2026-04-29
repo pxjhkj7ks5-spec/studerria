@@ -898,6 +898,20 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   padding-bottom: var(--space-16);
 }
 
+.app-footer.td-login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  width: min(100% - 32px, 900px);
+  min-height: 76px;
+  margin: 0 auto;
+  padding: 18px 0 28px;
+  border-top: 0;
+  font-size: 0.82rem;
+}
+
 .app-footer .footer-meta,
 .app-footer .footer-version,
 .app-footer .footer-build,

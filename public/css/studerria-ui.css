@@ -1861,10 +1861,10 @@ body.page-schedule .week-rail {
   body.page-app-shell.studerria-theme .app-footer {
     display: flex;
     justify-content: center;
-    width: auto;
-    max-width: min(1480px, calc(100vw - var(--studerria-sidebar-width) - 56px));
-    margin-left: var(--studerria-sidebar-width);
-    margin-right: 24px;
+    width: min(100% - 32px, 900px);
+    max-width: min(100% - 32px, 900px);
+    margin-left: auto;
+    margin-right: auto;
     text-align: center;
   }
 
