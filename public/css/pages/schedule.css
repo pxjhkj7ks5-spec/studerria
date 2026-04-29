@@ -1319,6 +1319,8 @@ body.page-schedule .week-pager {
     0 24px 60px rgba(2, 6, 23, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   isolation: isolate;
+  overflow: clip;
+  contain: paint;
   outline: 1px solid transparent;
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
@@ -1379,7 +1381,7 @@ body.page-schedule .week-pager .week-pill {
   display: grid;
   gap: 7px;
   min-height: 128px;
-  transition: transform 220ms var(--week-apple-curve), border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+  transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 18px 36px rgba(2, 6, 23, 0.16);
@@ -1536,7 +1538,8 @@ body.page-schedule .week-pager .week-carousel {
   gap: 8px;
   min-height: 70px;
   padding: 4px 1px 1px;
-  overflow: visible;
+  overflow: clip;
+  contain: paint;
 }
 
 body.page-schedule .week-pager .week-carousel::before {
@@ -1546,8 +1549,8 @@ body.page-schedule .week-pager .week-carousel::before {
   height: 34%;
   border-radius: 999px;
   background: radial-gradient(circle, rgba(125, 211, 252, 0.24), rgba(96, 165, 250, 0.04) 72%, transparent 100%);
-  filter: blur(18px);
-  opacity: 0.76;
+  filter: none;
+  opacity: 0.56;
   pointer-events: none;
   z-index: 0;
 }
@@ -1564,7 +1567,7 @@ body.page-schedule .week-pager .week-carousel-card--ghost {
   position: relative;
   min-width: 0;
   border-radius: 18px;
-  transform: translateY(var(--week-card-shift)) scale(var(--week-card-scale)) translateZ(0);
+  transform: translateY(var(--week-card-shift)) translateZ(0);
   transform-origin: center bottom;
   outline: 1px solid transparent;
   -webkit-backface-visibility: hidden;
@@ -1962,7 +1965,7 @@ body.page-schedule .week-pager .week-nav-btn__icon {
 }
 
 body.page-schedule .week-pager .week-nav-btn:hover {
-  transform: translateY(-1px) scale(1.01) translateZ(0);
+  transform: translateZ(0);
   border-color: rgba(125, 211, 252, 0.36);
   box-shadow:
     0 18px 30px rgba(2, 6, 23, 0.24),
@@ -2132,15 +2135,15 @@ body.is-scrolling .week-pager {
 }
 
 body.page-schedule .week-pager[data-direction="forward"] .week-pill {
-  transform: translateX(2px) translateZ(0);
+  transform: translateZ(0);
 }
 
 body.page-schedule .week-pager[data-direction="backward"] .week-pill {
-  transform: translateX(-2px) translateZ(0);
+  transform: translateZ(0);
 }
 
 body.page-schedule .week-pager .week-carousel-card:hover {
-  transform: translateY(calc(var(--week-card-shift) - 2px)) scale(calc(var(--week-card-scale) + 0.02));
+  transform: translateY(calc(var(--week-card-shift) - 1px)) translateZ(0);
   border-color: rgba(125, 211, 252, 0.28);
   box-shadow:
     0 18px 24px rgba(2, 6, 23, 0.18),

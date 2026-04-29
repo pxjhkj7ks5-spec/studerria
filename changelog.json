@@ -1,6 +1,20 @@
 {
   "items": [
     {
+      "version": "1.7.82",
+      "date": "2026-04-29",
+      "items": [
+        "Minor site updates to improve stability and daily usability."
+      ]
+    },
+    {
+      "version": "1.7.81",
+      "date": "2026-04-29",
+      "items": [
+        "Поточні доопрацювання для кращого щоденного досвіду."
+      ]
+    },
+    {
       "version": "1.7.80",
       "date": "2026-04-29",
       "items": [
