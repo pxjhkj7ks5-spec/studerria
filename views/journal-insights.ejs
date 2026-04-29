@@ -87,6 +87,15 @@
         padding-bottom: 48px;
       }
       .glass {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        contain: paint;
+        background-clip: padding-box;
+        outline: 1px solid transparent;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
         border-radius: 22px;
         backdrop-filter: blur(18px);
       }
@@ -148,6 +157,15 @@
         color: rgba(15, 23, 42, 0.62);
       }
       .hero-stat {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        contain: paint;
+        background-clip: padding-box;
+        outline: 1px solid transparent;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
         border-radius: 18px;
         border: 1px solid rgba(148, 163, 184, 0.22);
         background: rgba(8, 15, 34, 0.34);
@@ -224,6 +242,15 @@
         color: rgba(15, 23, 42, 0.54);
       }
       .soft-panel {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        contain: paint;
+        background-clip: padding-box;
+        outline: 1px solid transparent;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
         border-radius: 14px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: rgba(15, 23, 42, 0.26);
@@ -256,13 +283,20 @@
       }
       .summary-card {
         position: relative;
-        overflow: hidden;
+        isolation: isolate;
+        overflow: clip;
+        contain: paint;
+        background-clip: padding-box;
+        outline: 1px solid transparent;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
         --card-delay: 0ms;
         border-radius: 14px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: rgba(15, 23, 42, 0.28);
         padding: 12px;
-        transform: translateY(8px) scale(0.985);
+        transform: translateY(8px);
         opacity: 0;
         animation: insights-card-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
         animation-delay: var(--card-delay);
@@ -287,6 +321,7 @@
         width: 100%;
         height: 1px;
         background: linear-gradient(90deg, rgba(125, 211, 252, 0.5), rgba(167, 139, 250, 0.2), transparent 90%);
+        opacity: 0.7;
       }
       body.theme-light .summary-card {
         border-color: rgba(15, 23, 42, 0.12);
@@ -305,9 +340,17 @@
         font-weight: 700;
       }
       .table-shell {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        contain: paint;
+        background-clip: padding-box;
+        outline: 1px solid transparent;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
         border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 14px;
-        overflow: hidden;
         background: rgba(8, 15, 34, 0.24);
       }
       body.theme-light .table-shell {
@@ -352,6 +395,7 @@
       }
       .insights-table tbody tr:hover td {
         background: rgba(99, 102, 241, 0.12);
+        transition: background-color 120ms ease;
       }
       body.theme-light .insights-table tbody tr:hover td {
         background: rgba(99, 102, 241, 0.08);
@@ -421,6 +465,15 @@
         margin-bottom: 12px;
       }
       .publish-card {
+        position: relative;
+        isolation: isolate;
+        overflow: clip;
+        contain: paint;
+        background-clip: padding-box;
+        outline: 1px solid transparent;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
         border-radius: 16px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: rgba(15, 23, 42, 0.22);
@@ -503,11 +556,11 @@
       @keyframes insights-card-rise {
         from {
           opacity: 0;
-          transform: translateY(8px) scale(0.985);
+          transform: translateY(8px);
         }
         to {
           opacity: 1;
-          transform: translateY(0) scale(1);
+          transform: translateY(0);
         }
       }
       @keyframes insights-trend-fill {

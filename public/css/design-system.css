@@ -325,6 +325,14 @@ hr,
 .admin-panel,
 .panel,
 .list-card {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  background-clip: padding-box;
+  outline: 1px solid transparent;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   transition:
     box-shadow var(--dur-slow) var(--ease-apple),
     border-color var(--dur-med) var(--ease-apple),
@@ -352,7 +360,6 @@ hr,
   .panel:hover,
   .list-card:hover {
     transform: none;
-    box-shadow: var(--shadow-soft);
   }
 }
 
@@ -375,7 +382,6 @@ hr,
 .panel:active,
 .list-card:active {
   transform: none;
-  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.16);
 }
 
 .btn,
