@@ -2231,6 +2231,125 @@ body.studerria-theme .app-footer #tdThemeToggleMirror [data-theme-label] {
   font-weight: 700;
 }
 
+.td-lite-modal[hidden] {
+  display: none !important;
+}
+
+.td-lite-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1240;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.td-lite-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(16, 18, 36, 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.td-lite-sheet {
+  position: relative;
+  width: min(100%, 620px);
+  max-height: min(78vh, 720px);
+  padding: 24px;
+  overflow: auto;
+  border-radius: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.74);
+  transform: translateY(8px) scale(0.985);
+  opacity: 0;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+body.theme-dark .td-lite-sheet {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.76);
+}
+
+.td-lite-modal.is-open .td-lite-sheet {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.td-lite-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.td-lite-kicker {
+  margin: 0 0 8px;
+  color: var(--studerria-accent, #8b5cf6);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.td-lite-sheet-head h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.td-lite-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--td-muted, rgba(148, 163, 184, 0.95));
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+body.theme-dark .td-lite-close {
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.td-lite-release-list {
+  display: grid;
+  gap: 10px;
+}
+
+.td-lite-release {
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+body.theme-dark .td-lite-release {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.td-lite-release-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.td-lite-release ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.td-lite-sheet-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body.studerria-theme :where(.btn, .btn-glass, .btn-soft, .mobile-menu-btn, .drawer-menu-btn, .week-nav-btn, .footer-link, .island-toolbar-btn, .island-period-btn) {
     transition: none !important;

@@ -259,15 +259,6 @@
       body.theme-dark .stat-tile .text-muted {
         color: rgba(248, 250, 252, 0.92);
       }
-      .app-footer {
-        font-size: 0.8rem;
-      }
-      body.theme-dark .app-footer {
-        color: rgba(255, 255, 255, 0.6);
-      }
-      body.theme-light .app-footer {
-        color: rgba(15, 23, 42, 0.6);
-      }
       .topbar {
         backdrop-filter: blur(12px);
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -607,9 +598,9 @@
               </div>
             </div>
           </div>
-          <%- include('partials/app-footer') %>
         </div>
       </div>
+      <%- include('partials/app-footer') %>
     </div>
     <%- include('partials/changelog-modal') %>
     <%- include('partials/mobile-menu-modal', { role, t, activePage: 'profile' }) %>
