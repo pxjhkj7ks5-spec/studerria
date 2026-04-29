@@ -29,8 +29,8 @@
   "login.createAccount": "Створити акаунт",
   "register.title": "Реєстрація",
   "register.subtitle": "Створи профіль Studerria для свого навчального простору.",
-  "register.fullName": "ПІБ",
-  "register.fullNamePlaceholder": "Введіть повне імʼя",
+  "register.fullName": "ПІП",
+  "register.fullNamePlaceholder": "Введіть ПІП",
   "register.password": "Пароль",
   "register.passwordPlaceholder": "Створіть пароль",
   "register.confirmPassword": "Підтвердіть пароль",
@@ -45,7 +45,7 @@
   "register.haveAccount": "Вже є акаунт? Увійти",
   "register.modalTitle": "Згода на обробку персональних даних",
   "register.modalIntro": "Я, користувач, надаю згоду адміністрації платформи на обробку моїх персональних даних, зокрема:",
-  "register.modalItem1": "ПІБ;",
+  "register.modalItem1": "ПІП;",
   "register.modalItem2": "логін та пароль (в зашифрованому вигляді);",
   "register.modalItem3": "обрана навчальна група та курс;",
   "register.modalItem4": "активність на платформі (розклад, командна робота, повідомлення тощо).",
@@ -750,13 +750,13 @@
   "journalInsights.empty.attendanceTrend": "Для вибраних фільтрів немає даних про тренд відвідуваності.",
   "journalInsights.trend.absent": "пропусків"
   ,"register.errorCheckDetails": "Перевірте дані реєстрації."
-  ,"register.errorFullNameRequired": "Введіть ПІБ."
+  ,"register.errorFullNameRequired": "Введіть ПІП."
   ,"register.errorPasswordRequired": "Введіть пароль."
   ,"register.errorPasswordTooShort": "Пароль має містити щонайменше 8 символів."
   ,"register.errorConfirmPasswordRequired": "Підтвердіть пароль."
   ,"register.errorPasswordMismatch": "Паролі не співпадають."
   ,"register.errorConsentRequired": "Підтвердьте згоду на обробку персональних даних."
-  ,"register.errorUserExists": "Користувач із таким ПІБ уже існує."
+  ,"register.errorUserExists": "Користувач із таким ПІП уже існує."
   ,"register.errorTooManyRequests": "Забагато спроб реєстрації. Зачекайте хвилину й спробуйте ще раз."
   ,"register.errorDb": "Не вдалося завершити реєстрацію. Спробуйте ще раз."
   ,"nav.admin": "Адмінка"
