@@ -2168,6 +2168,12 @@ body.studerria-theme .app-footer .footer-link:hover {
 }
 
 body.studerria-theme .app-footer .td-language-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  white-space: nowrap;
+  line-height: 1;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid rgba(120, 130, 170, 0.16);
@@ -2181,6 +2187,40 @@ body.studerria-theme .app-footer .td-language-pill {
 body.theme-dark.studerria-theme .app-footer .td-language-pill {
   border-color: rgba(139, 164, 255, 0.12);
   background: rgba(255, 255, 255, 0.055);
+}
+
+body.studerria-theme .app-footer .td-language-pill svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+body.studerria-theme .app-footer #tdThemeToggleMirror {
+  min-width: 96px;
+  padding-inline: 14px;
+}
+
+body.studerria-theme .app-footer #tdThemeToggleMirror .td-theme-sun {
+  display: none;
+}
+
+html[data-theme="dark"] body.studerria-theme .app-footer #tdThemeToggleMirror .td-theme-moon {
+  display: none;
+}
+
+html[data-theme="dark"] body.studerria-theme .app-footer #tdThemeToggleMirror .td-theme-sun {
+  display: inline-block;
+}
+
+body.studerria-theme .app-footer #tdThemeToggleMirror [data-theme-label] {
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {
