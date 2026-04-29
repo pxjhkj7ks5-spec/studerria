@@ -390,16 +390,13 @@ body.theme-dark .glass-tab.is-active {
   color: rgba(241, 245, 249, 0.92);
 }
 
-.glass-tab:focus-visible,
-.glass-tab.focus-halo.is-focus-halo {
+.glass-tab:focus-visible {
   outline: none;
-  box-shadow: none !important;
 }
 
 .glass-tab:focus,
 .glass-tab:active {
   outline: none;
-  box-shadow: none !important;
   background: transparent;
 }
 

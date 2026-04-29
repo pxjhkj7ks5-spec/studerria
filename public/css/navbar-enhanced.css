@@ -12,6 +12,10 @@ body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
   backdrop-filter: blur(18px) saturate(1.14) !important;
   box-shadow: var(--studerria-topbar-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
   overflow: visible;
+  outline: 1px solid transparent;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .container {
@@ -105,6 +109,10 @@ body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .text-m
   line-height: 1.1;
   letter-spacing: -0.01em;
   white-space: nowrap;
+  outline: 1px solid transparent;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   transition: opacity 160ms ease, transform 160ms ease, color 160ms ease;
 }
 
@@ -135,9 +143,8 @@ body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .text-m
   height: 1px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.58);
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 180ms ease;
+  opacity: 0;
+  transition: opacity 180ms ease;
 }
 
 body.theme-light .studerria-nav-shell .snav-link::after {
@@ -147,7 +154,7 @@ body.theme-light .studerria-nav-shell .snav-link::after {
 .studerria-nav-shell .snav-item.is-open > .snav-link::after,
 .studerria-nav-shell .snav-link:hover::after,
 .studerria-nav-shell .snav-link:focus-visible::after {
-  transform: scaleX(1);
+  opacity: 1;
 }
 
 .studerria-nav-shell .snav-menu-link {
@@ -162,7 +169,7 @@ body.theme-light .studerria-nav-shell .snav-link::after {
 .studerria-nav-shell .snav-menu-link:focus-visible,
 .studerria-nav-shell .snav-item.is-subopen > .snav-menu-link {
   opacity: 1;
-  transform: translateX(2px);
+  transform: translateZ(0);
 }
 
 .snav-label {
@@ -219,7 +226,7 @@ body.theme-light .snav-unread-chip {
 .snav-menu-link:hover .snav-indicator,
 .snav-menu-link:focus-visible .snav-indicator {
   opacity: 0.92;
-  transform: translateX(2px);
+  transform: translateZ(0);
 }
 
 .snav-menu {
@@ -237,6 +244,9 @@ body.theme-light .snav-unread-chip {
   pointer-events: none;
   transition: opacity 180ms ease, transform 180ms ease;
   z-index: 48;
+  outline: 1px solid transparent;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 body.theme-dark .snav-menu {

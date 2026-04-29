@@ -232,12 +232,9 @@
       return;
     }
     scope
-      .querySelectorAll('button, a.btn, .btn-link, input, select, textarea, [role="button"], .drawer-action, .week-dot, .week-nav-btn')
+      .querySelectorAll('button, a.btn, .btn-link, input, select, textarea, [role="button"], .drawer-action, .week-dot, .week-nav-btn, .glass-tab, .snav-link, .snav-menu-link')
       .forEach((node) => {
         if (!(node instanceof HTMLElement)) {
-          return;
-        }
-        if (node.classList.contains('glass-tab')) {
           return;
         }
         node.classList.add('focus-halo');
