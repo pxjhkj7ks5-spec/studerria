@@ -303,8 +303,9 @@ body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn {
   background: transparent !important;
   color: inherit !important;
   opacity: 0.86;
+  gap: 8px;
   font-size: 0 !important;
-  line-height: 0 !important;
+  line-height: 1 !important;
   white-space: nowrap;
   box-shadow: none !important;
   backdrop-filter: none !important;
@@ -314,16 +315,8 @@ body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn {
 }
 
 body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn::before {
-  content: "";
-  display: block;
-  width: 16px;
-  height: 16px;
-  background: currentColor;
-  opacity: 1;
-  transform: translateX(0);
-  transition: transform 160ms ease;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='black' d='M3.75 2A1.75 1.75 0 0 0 2 3.75v12.5C2 17.216 2.784 18 3.75 18h6.5A1.75 1.75 0 0 0 12 16.25v-3a.75.75 0 0 0-1.5 0v3a.25.25 0 0 1-.25.25h-6.5a.25.25 0 0 1-.25-.25V3.75a.25.25 0 0 1 .25-.25h6.5a.25.25 0 0 1 .25.25v3a.75.75 0 0 0 1.5 0v-3A1.75 1.75 0 0 0 10.25 2h-6.5Z'/%3E%3Cpath fill='black' d='M13.22 6.22a.75.75 0 0 0 0 1.06L15.19 9.25H7.75a.75.75 0 0 0 0 1.5h7.44l-1.97 1.97a.75.75 0 1 0 1.06 1.06l3.25-3.25a.75.75 0 0 0 0-1.06l-3.25-3.25a.75.75 0 0 0-1.06 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='black' d='M3.75 2A1.75 1.75 0 0 0 2 3.75v12.5C2 17.216 2.784 18 3.75 18h6.5A1.75 1.75 0 0 0 12 16.25v-3a.75.75 0 0 0-1.5 0v3a.25.25 0 0 1-.25.25h-6.5a.25.25 0 0 1-.25-.25V3.75a.25.25 0 0 1 .25-.25h6.5a.25.25 0 0 1 .25.25v3a.75.75 0 0 0 1.5 0v-3A1.75 1.75 0 0 0 10.25 2h-6.5Z'/%3E%3Cpath fill='black' d='M13.22 6.22a.75.75 0 0 0 0 1.06L15.19 9.25H7.75a.75.75 0 0 0 0 1.5h7.44l-1.97 1.97a.75.75 0 1 0 1.06 1.06l3.25-3.25a.75.75 0 0 0 0-1.06l-3.25-3.25a.75.75 0 0 0-1.06 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  content: none;
+  display: none;
 }
 
 body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn:hover,
@@ -336,11 +329,21 @@ body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn:focu
 
 body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn:hover::before,
 body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn:focus-visible::before {
-  transform: translateX(1px);
+  transform: none;
 }
 
 body.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn:focus-visible {
   outline: none;
+}
+
+body.studerria-theme .studerria-nav-shell .snav-logout-text {
+  display: inline-block;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: lowercase;
 }
 
 .snav-user-meta {

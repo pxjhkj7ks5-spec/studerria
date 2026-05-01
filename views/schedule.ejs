@@ -2342,57 +2342,64 @@
           </div>
         <% } %>
 
-        <header class="td-page-header schedule-page-header">
-          <div>
-            <p class="td-page-kicker">Studerria · <%= lang === 'en' ? 'Schedule' : 'Розклад' %></p>
-            <h1><%= lang === 'en' ? 'Your schedule' : 'Твій розклад' %></h1>
-            <p><%= scheduleViewText.heroPhrase %></p>
-          </div>
-        </header>
-
-        <section class="td-surface-card schedule-week-strip week-pager" id="weekPager">
-          <div class="week-pager-shell">
-            <div class="schedule-week-strip-head">
-              <div>
-                <p class="td-page-kicker"><%= scheduleViewText.weekCarouselKicker %></p>
-                <strong class="schedule-week-range" id="scheduleWeekRangeLabel"><%= scheduleViewText.weekRangeFallback %></strong>
-              </div>
-              <span class="td-live-pill"><i></i><%= lang === 'en' ? 'Week' : 'Тиждень' %> <%= String(currentWeek).padStart(2, '0') %></span>
+        <section class="td-surface-card schedule-hero-shell">
+          <header class="td-page-header schedule-page-header">
+            <div>
+              <p class="td-page-kicker">
+                <span id="scheduleWeekNumberLabel"><%= (lang === 'en' ? 'WEEK ' : 'ТИЖДЕНЬ ') + String(currentWeek).padStart(2, '0') %></span>
+                ·
+                <span id="scheduleWeekRangeLabel"><%= scheduleViewText.weekRangeFallback %></span>
+              </p>
+              <h1><%= lang === 'en' ? 'Your schedule' : 'Твій розклад' %></h1>
+              <p><%= scheduleViewText.heroPhrase %></p>
             </div>
-            <div class="schedule-week-carousel-shell">
-              <button class="td-icon-button week-nav-btn" id="weekPrev" type="button" aria-label="<%= scheduleViewText.previousWeekAria %>">&lsaquo;</button>
-              <div class="week-pill" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
-                <div class="week-pill-head week-pill-head--compact">
-                  <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
-                  <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+            <section class="schedule-week-strip" id="weekPager">
+              <div class="week-pager-shell">
+                <div class="schedule-week-strip-head">
+                  <button class="btn-glass schedule-quick-btn" id="weekTodayBtn" type="button"><%= lang === 'en' ? 'Today' : 'Сьогодні' %></button>
+                  <button class="btn-glass schedule-quick-btn" id="weekCurrentBtn" type="button"><%= lang === 'en' ? 'This week' : 'Цей тиждень' %></button>
+                  <button class="td-icon-button week-nav-btn" id="weekPrev" type="button" aria-label="<%= scheduleViewText.previousWeekAria %>">
+                    <span class="week-nav-btn__icon">&lsaquo;</span>
+                  </button>
+                  <button class="td-icon-button week-nav-btn" id="weekNext" type="button" aria-label="<%= scheduleViewText.nextWeekAria %>">
+                    <span class="week-nav-btn__icon">&rsaquo;</span>
+                  </button>
                 </div>
-                <strong class="week-pill-range" id="weekPillRange"><%= scheduleViewText.weekRangeFallback %></strong>
+                <div class="week-pill visually-hidden" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">
+                  <div class="week-pill-head week-pill-head--compact">
+                    <span class="week-pill-kicker"><%= scheduleViewText.weekCarouselKicker %></span>
+                    <span class="week-pill-count" id="weekPillCount"><%= String(currentWeek).padStart(2, '0') %> / <%= String(totalWeeks || 15).padStart(2, '0') %></span>
+                  </div>
+                  <strong class="week-pill-range" id="weekPillRange"><%= scheduleViewText.weekRangeFallback %></strong>
+                </div>
+                <aside class="td-floating-next schedule-floating-next" data-next-class aria-live="polite" aria-label="Найближча пара">
+                  <span data-next-kind>Next</span>
+                  <strong data-next-label>Пари завантажуються</strong>
+                </aside>
               </div>
-              <button class="td-icon-button week-nav-btn" id="weekNext" type="button" aria-label="<%= scheduleViewText.nextWeekAria %>">&rsaquo;</button>
-            </div>
-          </div>
-        </section>
+            </section>
+          </header>
 
-        <aside class="td-floating-next schedule-floating-next" data-next-class aria-live="polite" aria-label="Найближча пара">
-          <span data-next-kind>Next</span>
-          <strong data-next-label>Пари завантажуються</strong>
-        </aside>
-
-        <section class="td-day-switcher schedule-day-switcher" aria-label="Дні тижня">
+          <section class="td-day-switcher schedule-day-switcher" aria-label="Дні тижня">
           <% daysOfWeek.forEach(function(day) { %>
             <% const dayEntries = scheduleByDay[day] || []; %>
             <% const dayDateValue = dayDates && dayDates[day] ? dayDates[day] : ''; %>
             <% const dayNumber = dayDateValue ? new Date(dayDateValue).toLocaleDateString(localeCode, { day: '2-digit', timeZone: 'Europe/Kyiv' }) : ''; %>
+            <% const dayShort = dayDateValue ? new Date(dayDateValue).toLocaleDateString(localeCode, { weekday: 'short', timeZone: 'Europe/Kyiv' }).replace('.', '').toUpperCase() : String(day || '').slice(0, 3).toUpperCase(); %>
+            <% const dayCountLabel = dayEntries.length
+              ? `${dayEntries.length} ${(lang === 'en' ? (dayEntries.length === 1 ? 'class' : 'classes') : (dayEntries.length === 1 ? 'пара' : 'пари'))}`
+              : (lang === 'en' ? 'free' : 'вільно'); %>
             <a
               class="td-day-pill schedule-day-pill <%= dayEntries.length ? 'has-classes' : 'is-quiet' %>"
               href="#day-<%= day %>"
               data-schedule-day-link="<%= day %>"
             >
-              <span><%= day.slice(0, 3) %></span>
+              <span><%= dayShort %></span>
               <strong><%= dayNumber || day %></strong>
-              <small><%= dayEntries.length ? `${dayEntries.length} ${dayEntries.length === 1 ? 'пара' : 'пари'}` : 'вільно' %></small>
+              <small><%= dayCountLabel %></small>
             </a>
           <% }); %>
+          </section>
         </section>
 
         <section class="td-schedule-layout schedule-selected-layout">
@@ -2840,7 +2847,12 @@
               <span><strong id="scheduleOverviewDeadlines">0</strong><small><%= lang === 'en' ? 'Deadlines' : 'Дедлайни' %></small></span>
             </div>
             <div class="schedule-overview-next">
-              <span class="schedule-overview-icon" aria-hidden="true">◔</span>
+              <span class="schedule-overview-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation" focusable="false">
+                  <circle cx="12" cy="12" r="8.25"></circle>
+                  <path d="M12 7.8v4.5l3 1.8"></path>
+                </svg>
+              </span>
               <div>
                 <strong id="scheduleOverviewNextTitle"><%= lang === 'en' ? 'Next class' : 'Наступна пара' %></strong>
                 <span id="scheduleOverviewNextLabel"><%= lang === 'en' ? 'Choose a day' : 'Оберіть день' %></span>
@@ -4849,6 +4861,10 @@
       const weekPill = document.getElementById('weekPill');
       const weekPillCount = document.getElementById('weekPillCount');
       const weekPillRange = document.getElementById('weekPillRange');
+      const weekNumberLabel = document.getElementById('scheduleWeekNumberLabel');
+      const weekTodayBtn = document.getElementById('weekTodayBtn');
+      const weekCurrentBtn = document.getElementById('weekCurrentBtn');
+      const weekTitlePrefix = <%- JSON.stringify(lang === 'en' ? 'WEEK' : 'ТИЖДЕНЬ').replace(/</g, '\\u003c') %>;
       const messagesBtn = document.getElementById('messagesBtn');
       const messagesBtnMobile = document.getElementById('messagesBtnMobile');
       const messagesList = document.getElementById('messagesList');
@@ -4972,6 +4988,9 @@
         const displayWeek = String(safe).padStart(2, '0');
         currentWeek = safe;
         const weekRangeLabel = document.getElementById('scheduleWeekRangeLabel');
+        if (weekNumberLabel) {
+          weekNumberLabel.textContent = `${weekTitlePrefix} ${displayWeek}`;
+        }
         if (weekPillCount) {
           weekPillCount.textContent = `${displayWeek} / ${String(totalWeeks).padStart(2, '0')}`;
         }
@@ -5022,6 +5041,26 @@
         if (weekNext) {
           weekNext.addEventListener('click', () => {
             goToWeek(currentWeek + 1);
+          });
+        }
+
+        if (weekTodayBtn) {
+          weekTodayBtn.addEventListener('click', () => {
+            const todayPill = document.querySelector('.schedule-day-pill.is-today');
+            if (todayPill instanceof HTMLElement) {
+              todayPill.click();
+              return;
+            }
+            const firstPill = document.querySelector('.schedule-day-pill');
+            if (firstPill instanceof HTMLElement) {
+              firstPill.click();
+            }
+          });
+        }
+
+        if (weekCurrentBtn) {
+          weekCurrentBtn.addEventListener('click', () => {
+            goToWeek(getKyivAcademicWeek());
           });
         }
 
