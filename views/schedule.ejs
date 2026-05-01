@@ -693,22 +693,22 @@
         overflow: hidden;
       }
       .modal-backdrop {
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
         background-color: rgba(0, 0, 0, 0.3);
         transition: opacity 0.3s ease-in-out;
         opacity: 0;
-        pointer-events: none;
+        pointer-events: auto;
       }
       body.theme-dark .modal-backdrop {
         background-color: rgba(20, 20, 20, 0.5);
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
       }
       body.theme-light .modal-backdrop {
         background-color: rgba(255, 255, 255, 0.4);
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        -webkit-backdrop-filter: blur(7px);
+        backdrop-filter: blur(7px);
       }
       .modal.fade .modal-dialog {
         transform: scale(0.98);
@@ -3375,7 +3375,7 @@
     <%- include('partials/mobile-menu-modal', { role, t, activePage: 'schedule' }) %>
 
     <% if (settings && settings.allow_messages) { %>
-    <div class="modal fade" id="messagesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="messagesModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
       <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
@@ -3408,6 +3408,9 @@
             <div id="messagesList" class="d-grid gap-3">
               <div class="list-group-item text-muted"><%= t('schedule.messages.loading') %></div>
             </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal"><%= t('changelog.close') %></button>
           </div>
         </div>
       </div>
