@@ -78,6 +78,9 @@
         || showSupportMission
         || showInboxMissionCard
         || hasTeacherQuickActions;
+      const showLegacyMissionStrip = showRatingMission
+        || showSupportMission
+        || hasTeacherQuickActions;
       const hasInboxSummaryData = (activity.on_time_share !== null
         && typeof activity.on_time_share !== 'undefined')
         || Number(activity.overdue || 0) > 0
@@ -642,42 +645,8 @@
       </section>
       <% } %>
 
-      <% if (showMissionStrip) { %>
+      <% if (showLegacyMissionStrip) { %>
       <section class="mission-strip">
-        <% if (showAttendanceMission) { %>
-        <article class="cockpit-card mission-card mission-card-attendance<%= attendanceHealth ? ` is-${attendanceHealth.tone}` : '' %>">
-          <div class="mission-card-kicker"><%= lang === 'en' ? 'Attendance' : 'Відвідуваність' %></div>
-          <div class="mission-card-content">
-            <div class="mission-card-topline">
-              <div class="mission-card-value"><%= attendanceHealth && attendanceHealth.reliability !== null && typeof attendanceHealth.reliability !== 'undefined' ? `${attendanceHealth.reliability}%` : '-' %></div>
-              <span class="mission-card-badge mission-card-badge-<%= attendanceHealth ? (attendanceHealth.tone || 'calm') : 'calm' %>"><%= attendanceHealth ? getAttendanceStatusLabel(attendanceHealth) : (lang === 'en' ? 'No data' : 'Немає даних') %></span>
-            </div>
-            <% if (attendanceHealth) { %>
-              <div class="mission-card-meta">
-                <span><%= lang === 'en' ? 'Present' : 'Присутність' %>: <%= Number(attendanceHealth.present || 0) %></span>
-                <span><%= lang === 'en' ? 'Late' : 'Запізнення' %>: <%= Number(attendanceHealth.late || 0) %></span>
-                <span><%= lang === 'en' ? 'Absent' : 'Відсутність' %>: <%= Number(attendanceHealth.absent || 0) %></span>
-              </div>
-              <div class="mission-card-foot">
-                <span><%= lang === 'en' ? 'Flagged' : 'Ризикові' %>: <%= Number(attendanceHealth.flagged_total || 0) %></span>
-                <span><%= getAttendanceWindowLabel(attendanceHealth) %></span>
-                <% if (attendanceHealth.last_marked_at) { %>
-                  <span><%= lang === 'en' ? 'Last mark' : 'Остання відмітка' %>: <%= formatShortDate(attendanceHealth.last_marked_at) %></span>
-                <% } %>
-              </div>
-              <p class="mission-card-note"><%= getAttendanceNote(attendanceHealth) %></p>
-              <div class="mission-card-foot">
-                <span><%= getAttendanceRecentLabel(attendanceHealth) %></span>
-              </div>
-            <% } else { %>
-              <div class="mission-card-empty"><%= lang === 'en' ? 'No attendance signal yet.' : 'Поки немає сигналу по відвідуваності.' %></div>
-            <% } %>
-          </div>
-          <div class="mission-card-action">
-            <a class="btn btn-inline-link" href="/journal"><%= lang === 'en' ? 'Open journal' : 'Відкрити журнал' %></a>
-          </div>
-        </article>
-        <% } %>
         <% if (showRatingMission) { %>
         <article class="cockpit-card mission-card">
           <div class="mission-card-kicker"><%= lang === 'en' ? 'Latest rating' : 'Останній рейтинг' %></div>
@@ -746,41 +715,6 @@
             <a class="btn btn-inline-link" href="/help"><%= lang === 'en' ? 'Open support' : 'Відкрити підтримку' %></a>
           </div>
         </article>
-        <% } %>
-        <% if (showInboxMissionCard) { %>
-          <article class="cockpit-card mission-card mission-card-announcements<%= inboxMessageSummary ? ` is-${getInboxMessageTone(inboxMessageSummary)}` : '' %>">
-            <div class="mission-card-kicker"><%= lang === 'en' ? 'Message updates' : 'Оновлення повідомлень' %></div>
-            <div class="mission-card-content">
-              <div class="mission-card-topline">
-                <div class="mission-card-value"><%= inboxMessageSummary ? (Number(inboxMessageSummary.fresh_unread || 0) || Number(inboxMessageSummary.fresh || 0) || 0) : 0 %></div>
-                <span class="mission-card-badge mission-card-badge-<%= inboxMessageSummary ? getInboxMessageTone(inboxMessageSummary) : 'calm' %>"><%= inboxMessageSummary ? getInboxMessageStatusLabel(inboxMessageSummary) : (lang === 'en' ? 'Quiet' : 'Спокійно') %></span>
-              </div>
-              <% if (inboxMessageSummary) { %>
-                <div class="mission-card-meta">
-                  <span><%= lang === 'en' ? 'Unread' : 'Непрочитані' %>: <%= Number(inboxMessageSummary.unread || 0) %></span>
-                  <span><%= lang === 'en' ? 'Broadcast' : 'Загальні' %>: <%= Number(inboxMessageSummary.broadcast || 0) %></span>
-                  <span><%= lang === 'en' ? 'Subject' : 'Предметні' %>: <%= Number(inboxMessageSummary.subject || 0) %></span>
-                  <span><%= lang === 'en' ? 'Direct' : 'Адресні' %>: <%= Number(inboxMessageSummary.direct || 0) %></span>
-                </div>
-                <% if (inboxMessageItems[0]) { %>
-                  <p class="mission-card-note"><strong><%= getInboxMessageKindLabel(inboxMessageItems[0]) %></strong>: <%= getInboxMessageCardTitle(inboxMessageItems[0]) %></p>
-                  <% if (getInboxMessageCardBody(inboxMessageItems[0])) { %>
-                    <p class="mission-card-note"><%= getInboxMessageCardBody(inboxMessageItems[0]) %></p>
-                  <% } %>
-                  <div class="mission-card-foot">
-                    <span><%= getInboxMessageMeta(inboxMessageItems[0]) %></span>
-                  </div>
-                <% } else { %>
-                  <p class="mission-card-note"><%= lang === 'en' ? 'Broadcast, group, subject, and direct updates appear here. Support stays separate in Help.' : 'Тут з’являються загальні, групові, предметні й адресні оновлення. Підтримка лишається окремо в Help.' %></p>
-                <% } %>
-              <% } else { %>
-                <div class="mission-card-empty"><%= lang === 'en' ? 'No recent message updates right now.' : 'Наразі немає свіжих оновлень повідомлень.' %></div>
-              <% } %>
-            </div>
-            <div class="mission-card-action">
-              <a class="btn btn-inline-link" href="/schedule?panel=messages"><%= lang === 'en' ? 'Open messages' : 'Відкрити повідомлення' %></a>
-            </div>
-          </article>
         <% } %>
         <% if (hasTeacherQuickActions) { %>
           <article class="cockpit-card mission-card">
