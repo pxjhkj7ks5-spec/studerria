@@ -1073,6 +1073,7 @@
             <div class="admin-sidebar-title">Activity</div>
             <% if (sectionAllowed('admin-visit-analytics')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-visit-analytics">Security analytics</button>
+              <a class="admin-nav-link" href="<%= buildScopedHref('/admin/visit-heatmap') %>">IP heatmap</a>
               <a class="admin-nav-link" href="<%= buildScopedHref('/admin/visit-log') %>">Усі візити</a>
             <% } %>
             <% if (sectionAllowed('admin-history')) { %>
@@ -2891,6 +2892,7 @@
                   <div class="small text-muted">Живі метрики безпеки, візитів, ролей і ризикових сигналів.</div>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
+                  <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/visit-heatmap') %>">IP heatmap</a>
                   <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/visit-log') %>">Усі візити</a>
                   <select class="form-select form-select-sm" id="visitAnalyticsDays" aria-label="Analytics period">
                     <option value="7">7 днів</option>

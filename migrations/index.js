@@ -50,6 +50,7 @@ const securityHardeningAdminControls = require('./049_security_hardening_admin_c
 const adminChangeAuditAppendOnlyFkCleanup = require('./050_admin_change_audit_append_only_fk_cleanup');
 const sessionPersistenceDefaults = require('./051_session_persistence_defaults');
 const teamworkScheduleVisibility = require('./052_teamwork_schedule_visibility');
+const visitIpGeoCache = require('./053_visit_ip_geo_cache');
 
 module.exports = [
   init,
@@ -104,4 +105,5 @@ module.exports = [
   adminChangeAuditAppendOnlyFkCleanup,
   sessionPersistenceDefaults,
   teamworkScheduleVisibility,
+  visitIpGeoCache,
 ];

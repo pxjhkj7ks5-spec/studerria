@@ -1,5 +1,6 @@
 ﻿const express = require('express');
 const http = require('http');
+const https = require('https');
 const helmet = require('helmet');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
@@ -11757,6 +11758,10 @@ const VISIT_DEDUP_WINDOW_MS = 10000;
 const VISIT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const VISIT_DEDUP_MAX_KEYS = 5000;
 const VISIT_RETENTION_DAYS = SITE_VISIT_RETENTION_DAYS_DEFAULT;
+const VISIT_HEATMAP_POINT_LIMIT = 450;
+const VISIT_HEATMAP_RESOLVE_LIMIT = 36;
+const VISIT_GEO_CACHE_REFRESH_HOURS = 24 * 14;
+const VISIT_GEO_LOOKUP_TIMEOUT_MS = 4500;
 const LOGIN_HISTORY_RETENTION_DAYS = LOGIN_HISTORY_RETENTION_DAYS_DEFAULT;
 const ACTIVITY_LOG_RETENTION_DAYS = ACTIVITY_LOG_RETENTION_DAYS_DEFAULT;
 const visitDedupCache = new Map();
@@ -11774,6 +11779,191 @@ const parseVisitExcludeAdmin = (rawValue) => {
   if (rawValue === undefined || rawValue === null || rawValue === '') return true;
   const normalized = String(rawValue).trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+};
+
+const parseVisitGuestOnly = (rawValue) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return false;
+  const normalized = String(rawValue).trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+};
+
+const normalizeVisitHeatmapIp = (rawValue) => normalizeForensicsIp(rawValue);
+
+const shouldResolveVisitHeatmapIp = (rawIp) => {
+  const ip = securityHelpers.normalizeIpAddress(rawIp);
+  if (!ip) return false;
+  if (securityHelpers.isLoopbackIpAddress(ip)) return false;
+  const geoFingerprint = securityHelpers.buildGeoFingerprint(ip);
+  if (!geoFingerprint || geoFingerprint === 'loopback') return false;
+  if (geoFingerprint.startsWith('private:')) return false;
+  return true;
+};
+
+const parseVisitGeoDate = (rawValue) => {
+  if (!rawValue) return null;
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+};
+
+const shouldRefreshVisitGeoCache = (row) => {
+  if (!row || !row.last_resolved_at) return true;
+  const lastResolvedAt = parseVisitGeoDate(row.last_resolved_at);
+  if (!lastResolvedAt) return true;
+  return (Date.now() - lastResolvedAt.getTime()) > (VISIT_GEO_CACHE_REFRESH_HOURS * 60 * 60 * 1000);
+};
+
+const requestJsonOverHttps = (rawUrl, { timeoutMs = VISIT_GEO_LOOKUP_TIMEOUT_MS } = {}) => new Promise((resolve, reject) => {
+  let completed = false;
+  const req = https.request(rawUrl, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': `Studerria/${String(appVersion || '0.0.0')} (visit-heatmap)`,
+    },
+  }, (response) => {
+    const chunks = [];
+    response.on('data', (chunk) => chunks.push(chunk));
+    response.on('end', () => {
+      if (completed) return;
+      completed = true;
+      const statusCode = Number(response.statusCode || 0);
+      if (statusCode < 200 || statusCode >= 300) {
+        return reject(new Error(`http_${statusCode || 'error'}`));
+      }
+      try {
+        const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        return resolve(payload);
+      } catch (_err) {
+        return reject(new Error('invalid_json'));
+      }
+    });
+  });
+  req.on('error', (err) => {
+    if (completed) return;
+    completed = true;
+    reject(err);
+  });
+  req.setTimeout(timeoutMs, () => {
+    req.destroy(new Error('timeout'));
+  });
+  req.end();
+});
+
+const resolveVisitHeatmapGeoByIp = async (rawIp) => {
+  const ip = normalizeVisitHeatmapIp(rawIp);
+  if (!ip) {
+    return { status: 'invalid', error: 'invalid_ip' };
+  }
+  if (!shouldResolveVisitHeatmapIp(ip)) {
+    return { status: 'private', error: 'private_or_loopback' };
+  }
+  const payload = await requestJsonOverHttps(`https://ipwho.is/?ip=${encodeURIComponent(ip)}`);
+  const success = payload && payload.success !== false;
+  if (!success) {
+    const errorMessage = String(
+      (payload && (payload.message || payload.reason || payload.error)) || 'lookup_failed'
+    ).slice(0, 200);
+    return {
+      status: 'error',
+      error: errorMessage || 'lookup_failed',
+    };
+  }
+  const latitude = Number(payload.latitude ?? payload.lat);
+  const longitude = Number(payload.longitude ?? payload.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return { status: 'error', error: 'missing_coordinates' };
+  }
+  return {
+    status: 'ok',
+    latitude,
+    longitude,
+    country: String(payload.country || '').trim() || null,
+    region: String(payload.region || '').trim() || null,
+    city: String(payload.city || '').trim() || null,
+    org: String((payload.connection && (payload.connection.org || payload.connection.isp)) || '').trim() || null,
+    timezone: String((payload.timezone && (payload.timezone.id || payload.timezone.utc)) || payload.timezone || '').trim() || null,
+    source: 'ipwho.is',
+  };
+};
+
+const loadVisitGeoCacheMap = async (ips = []) => {
+  if (!Array.isArray(ips) || !ips.length) return new Map();
+  const rows = await db.all(
+    `
+      SELECT
+        ip,
+        status,
+        latitude,
+        longitude,
+        country,
+        region,
+        city,
+        org,
+        timezone,
+        source,
+        last_error,
+        last_resolved_at
+      FROM visit_ip_geo_cache
+      WHERE ip = ANY(?::text[])
+    `,
+    [ips]
+  );
+  const map = new Map();
+  for (const row of rows || []) {
+    const ip = normalizeVisitHeatmapIp(row && row.ip);
+    if (!ip) continue;
+    map.set(ip, row);
+  }
+  return map;
+};
+
+const upsertVisitGeoCacheRow = async (ip, record) => {
+  await db.run(
+    `
+      INSERT INTO visit_ip_geo_cache (
+        ip,
+        status,
+        latitude,
+        longitude,
+        country,
+        region,
+        city,
+        org,
+        timezone,
+        source,
+        last_error,
+        last_resolved_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      ON CONFLICT (ip) DO UPDATE SET
+        status = EXCLUDED.status,
+        latitude = EXCLUDED.latitude,
+        longitude = EXCLUDED.longitude,
+        country = EXCLUDED.country,
+        region = EXCLUDED.region,
+        city = EXCLUDED.city,
+        org = EXCLUDED.org,
+        timezone = EXCLUDED.timezone,
+        source = EXCLUDED.source,
+        last_error = EXCLUDED.last_error,
+        last_resolved_at = NOW(),
+        updated_at = NOW()
+    `,
+    [
+      ip,
+      record.status || 'error',
+      Number.isFinite(Number(record.latitude)) ? Number(record.latitude) : null,
+      Number.isFinite(Number(record.longitude)) ? Number(record.longitude) : null,
+      record.country || null,
+      record.region || null,
+      record.city || null,
+      record.org || null,
+      record.timezone || null,
+      record.source || null,
+      record.error || null,
+    ]
+  );
 };
 
 const buildVisitDayLabels = (days) => {
@@ -55958,6 +56148,11 @@ app.get(['/admin/visit-log', '/admin/visit-log/guest'], requireVisitAnalyticsSec
     queryParams.set('days', String(days));
     queryParams.set('exclude_admin', excludeAdmin ? '1' : '0');
     const baseQuery = queryParams.toString();
+    const heatmapParams = new URLSearchParams(baseQuery);
+    heatmapParams.set('guest_only', guestView ? '1' : '0');
+    const heatmapHref = heatmapParams.toString()
+      ? `/admin/visit-heatmap?${heatmapParams.toString()}`
+      : '/admin/visit-heatmap';
     const viewBasePath = guestView ? '/admin/visit-log/guest' : '/admin/visit-log';
     const pageBase = baseQuery ? `${viewBasePath}?${baseQuery}&page=` : `${viewBasePath}?page=`;
     const allVisitsHref = baseQuery ? `/admin/visit-log?${baseQuery}` : '/admin/visit-log';
@@ -55982,6 +56177,7 @@ app.get(['/admin/visit-log', '/admin/visit-log/guest'], requireVisitAnalyticsSec
       viewBasePath,
       allVisitsHref,
       guestVisitsHref,
+      heatmapHref,
       filters: {
         days,
         exclude_admin: excludeAdmin,
@@ -56019,6 +56215,332 @@ app.get(['/admin/visit-log', '/admin/visit-log/guest'], requireVisitAnalyticsSec
     });
   } catch (err) {
     return handleDbError(res, err, 'admin.visitLog');
+  }
+});
+
+const resolveVisitHeatmapScope = async (req) => {
+  const roleKeys = getSessionRoleList(req);
+  const baseCourseId = Number(req.session?.user?.course_id || 1);
+  const allCourses = await getCoursesCached();
+  const scopedAccess = await buildStaffCourseAccess(baseCourseId, allCourses, roleKeys);
+  if (!scopedAccess.allowedCourses.length) {
+    return { forbidden: true };
+  }
+  const requestedCourse = Number(req.query.course);
+  const fallbackCourseId = scopedAccess.allowedCourseIds.has(baseCourseId)
+    ? baseCourseId
+    : Number(scopedAccess.allowedCourses[0] && scopedAccess.allowedCourses[0].id || baseCourseId);
+  const selectedCourseId = scopedAccess.allowedCourseIds.has(requestedCourse)
+    ? requestedCourse
+    : fallbackCourseId;
+  req.session.adminCourse = selectedCourseId;
+  const canUseSystemScope = hasSessionRole(req, 'admin');
+  const selectedScope = canUseSystemScope && String(req.query.scope || '').trim().toLowerCase() === 'system'
+    ? 'system'
+    : 'course';
+  const isSystemScope = selectedScope === 'system';
+  const selectedCourse = (scopedAccess.allowedCourses || []).find((course) => Number(course.id || 0) === Number(selectedCourseId || 0)) || null;
+  return {
+    forbidden: false,
+    roleKeys,
+    courses: scopedAccess.allowedCourses || [],
+    allowCourseSelect: (scopedAccess.allowedCourses || []).length > 1,
+    selectedCourseId,
+    selectedCourse,
+    canUseSystemScope,
+    selectedScope,
+    isSystemScope,
+  };
+};
+
+app.get('/admin/visit-heatmap', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitHeatmap.init');
+  }
+  try {
+    const scope = await resolveVisitHeatmapScope(req);
+    if (scope.forbidden) {
+      return res.status(403).send('Forbidden (course access)');
+    }
+    const days = parseVisitDays(req.query.days);
+    const excludeAdmin = parseVisitExcludeAdmin(req.query.exclude_admin);
+    const guestOnly = parseVisitGuestOnly(req.query.guest_only);
+    const queryParams = new URLSearchParams();
+    if (!scope.isSystemScope && scope.selectedCourseId) queryParams.set('course', String(scope.selectedCourseId));
+    if (scope.canUseSystemScope && scope.selectedScope === 'system') queryParams.set('scope', 'system');
+    queryParams.set('days', String(days));
+    queryParams.set('exclude_admin', excludeAdmin ? '1' : '0');
+    queryParams.set('guest_only', guestOnly ? '1' : '0');
+    const baseQuery = queryParams.toString();
+    const dataUrl = baseQuery ? `/admin/visit-heatmap.json?${baseQuery}` : '/admin/visit-heatmap.json';
+    const visitLogHref = baseQuery ? `/admin/visit-log?${baseQuery}` : '/admin/visit-log';
+    return res.render('admin-visit-heatmap', {
+      username: req.session.user.username,
+      role: normalizeRoleKey(req.session.role || 'student'),
+      adminHomeHref: getStaffPanelBase(req, scope.selectedCourseId),
+      analyticsPanelHref: buildStaffPanelScopeUrl(
+        req,
+        getStoredAdminAcademicScope(req),
+        { courseId: scope.selectedCourseId },
+        { tab: 'admin-visit-analytics' }
+      ),
+      courses: scope.courses,
+      selectedCourse: scope.selectedCourse,
+      selectedCourseId: scope.selectedCourseId,
+      allowCourseSelect: scope.allowCourseSelect,
+      canUseSystemScope: scope.canUseSystemScope,
+      selectedScope: scope.selectedScope,
+      filters: {
+        days,
+        exclude_admin: excludeAdmin,
+        guest_only: guestOnly,
+      },
+      visitLogHref,
+      heatmapDataUrl: dataUrl,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitHeatmap');
+  }
+});
+
+app.get('/admin/visit-heatmap.json', requireVisitAnalyticsSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitHeatmapJson.init');
+  }
+  try {
+    const scope = await resolveVisitHeatmapScope(req);
+    if (scope.forbidden) {
+      return res.status(403).json({ ok: false, error: 'forbidden' });
+    }
+    const days = parseVisitDays(req.query.days);
+    const excludeAdmin = parseVisitExcludeAdmin(req.query.exclude_admin);
+    const guestOnly = parseVisitGuestOnly(req.query.guest_only);
+    const labels = buildVisitDayLabels(days);
+    const sinceIso = labels.length
+      ? new Date(`${labels[0]}T00:00:00.000Z`).toISOString()
+      : new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
+    const {
+      sessionJoinSql: visitSessionJoinSql,
+      userJoinSql: visitUserJoinSql,
+      resolvedRoleExpr: resolvedVisitRoleExpr,
+      resolvedUserNameExpr: resolvedVisitUserNameExpr,
+      uniqueVisitorExpr,
+      courseScopeExpr,
+    } = buildVisitAnalyticsSqlParts();
+    const scopedVisitWhereSql = scope.isSystemScope
+      ? 'v.created_at >= ?'
+      : `${courseScopeExpr} = ? AND v.created_at >= ?`;
+    const scopedVisitParams = scope.isSystemScope
+      ? [sinceIso]
+      : [scope.selectedCourseId, sinceIso];
+    const excludeAdminClause = excludeAdmin ? `AND ${resolvedVisitRoleExpr} <> 'admin'` : '';
+    const guestOnlyClause = guestOnly ? `AND LOWER(${resolvedVisitRoleExpr}) IN ('guest', 'anonymous')` : '';
+    const ipNormalizedExpr = `
+      CASE
+        WHEN v.ip IS NULL OR BTRIM(v.ip) = '' THEN ''
+        WHEN v.ip LIKE '::ffff:%' THEN SUBSTRING(v.ip FROM 8)
+        WHEN v.ip = '::1' THEN '127.0.0.1'
+        ELSE v.ip
+      END
+    `;
+    const rows = await db.all(
+      `
+        WITH scoped AS (
+          SELECT
+            ${ipNormalizedExpr} AS ip,
+            LOWER(${resolvedVisitRoleExpr}) AS role_key,
+            ${resolvedVisitUserNameExpr} AS user_name,
+            COALESCE(v.page_key, 'unknown') AS page_key,
+            COALESCE(v.route_path, '/') AS route_path,
+            v.created_at AS created_at,
+            ${uniqueVisitorExpr} AS visitor_key
+          FROM site_visit_events v
+          ${visitSessionJoinSql}
+          ${visitUserJoinSql}
+          WHERE ${scopedVisitWhereSql}
+            ${excludeAdminClause}
+            ${guestOnlyClause}
+            AND NULLIF(${ipNormalizedExpr}, '') IS NOT NULL
+        ),
+        agg AS (
+          SELECT
+            ip,
+            COUNT(*)::int AS visits,
+            COUNT(*) FILTER (WHERE role_key IN ('guest', 'anonymous'))::int AS guest_visits,
+            COUNT(DISTINCT visitor_key)::int AS unique_visitors,
+            MAX(created_at) AS last_seen_at
+          FROM scoped
+          GROUP BY ip
+        ),
+        ranked_users AS (
+          SELECT
+            ip,
+            user_name,
+            role_key,
+            COUNT(*)::int AS hits,
+            ROW_NUMBER() OVER (PARTITION BY ip ORDER BY COUNT(*) DESC, user_name ASC) AS row_num
+          FROM scoped
+          GROUP BY ip, user_name, role_key
+        ),
+        ranked_pages AS (
+          SELECT
+            ip,
+            page_key,
+            COUNT(*)::int AS hits,
+            ROW_NUMBER() OVER (PARTITION BY ip ORDER BY COUNT(*) DESC, page_key ASC) AS row_num
+          FROM scoped
+          GROUP BY ip, page_key
+        )
+        SELECT
+          agg.ip,
+          agg.visits,
+          agg.guest_visits,
+          agg.unique_visitors,
+          agg.last_seen_at,
+          COALESCE(
+            JSONB_AGG(
+              DISTINCT JSONB_BUILD_OBJECT(
+                'name', ranked_users.user_name,
+                'role_key', ranked_users.role_key,
+                'hits', ranked_users.hits
+              )
+            ) FILTER (WHERE ranked_users.row_num <= 4),
+            '[]'::jsonb
+          ) AS users,
+          COALESCE(
+            JSONB_AGG(
+              DISTINCT JSONB_BUILD_OBJECT(
+                'page_key', ranked_pages.page_key,
+                'hits', ranked_pages.hits
+              )
+            ) FILTER (WHERE ranked_pages.row_num <= 4),
+            '[]'::jsonb
+          ) AS pages
+        FROM agg
+        LEFT JOIN ranked_users ON ranked_users.ip = agg.ip
+        LEFT JOIN ranked_pages ON ranked_pages.ip = agg.ip
+        GROUP BY agg.ip, agg.visits, agg.guest_visits, agg.unique_visitors, agg.last_seen_at
+        ORDER BY agg.visits DESC, agg.last_seen_at DESC, agg.ip ASC
+        LIMIT ?
+      `,
+      [...scopedVisitParams, VISIT_HEATMAP_POINT_LIMIT]
+    );
+
+    const ipRows = (rows || []).map((row) => {
+      const ip = normalizeVisitHeatmapIp(row && row.ip);
+      if (!ip) return null;
+      return {
+        ip,
+        visits: Number(row && row.visits || 0),
+        guest_visits: Number(row && row.guest_visits || 0),
+        unique_visitors: Number(row && row.unique_visitors || 0),
+        last_seen_at: row && row.last_seen_at ? row.last_seen_at : null,
+        users: Array.isArray(row && row.users) ? row.users : [],
+        pages: Array.isArray(row && row.pages) ? row.pages : [],
+      };
+    }).filter(Boolean);
+
+    const uniqueIps = Array.from(new Set(ipRows.map((row) => row.ip).filter(Boolean)));
+    const geoCacheMap = await loadVisitGeoCacheMap(uniqueIps);
+    const unresolved = [];
+    const points = [];
+    const ipForResolution = [];
+
+    for (const item of ipRows) {
+      const cached = geoCacheMap.get(item.ip) || null;
+      const isFresh = cached && !shouldRefreshVisitGeoCache(cached);
+      if (cached && isFresh) {
+        if (cached.status === 'ok' && Number.isFinite(Number(cached.latitude)) && Number.isFinite(Number(cached.longitude))) {
+          points.push({
+            ...item,
+            latitude: Number(cached.latitude),
+            longitude: Number(cached.longitude),
+            country: cached.country || null,
+            region: cached.region || null,
+            city: cached.city || null,
+            org: cached.org || null,
+            timezone: cached.timezone || null,
+            geo_source: cached.source || null,
+          });
+        } else {
+          unresolved.push({
+            ip: item.ip,
+            reason: cached.last_error || cached.status || 'unresolved',
+          });
+        }
+        continue;
+      }
+      ipForResolution.push(item);
+    }
+
+    const resolveBatch = ipForResolution.slice(0, VISIT_HEATMAP_RESOLVE_LIMIT);
+    const resolvedNow = [];
+    await Promise.all(resolveBatch.map(async (item) => {
+      const geo = await resolveVisitHeatmapGeoByIp(item.ip).catch((err) => ({
+        status: 'error',
+        error: String(err && err.message ? err.message : 'lookup_failed').slice(0, 200),
+      }));
+      await upsertVisitGeoCacheRow(item.ip, geo).catch((cacheErr) => {
+        console.error('Database error (admin.visitHeatmap.cacheUpsert)', cacheErr);
+      });
+      if (geo.status === 'ok') {
+        points.push({
+          ...item,
+          latitude: Number(geo.latitude),
+          longitude: Number(geo.longitude),
+          country: geo.country || null,
+          region: geo.region || null,
+          city: geo.city || null,
+          org: geo.org || null,
+          timezone: geo.timezone || null,
+          geo_source: geo.source || null,
+        });
+        resolvedNow.push(item.ip);
+      } else {
+        unresolved.push({
+          ip: item.ip,
+          reason: geo.error || geo.status || 'unresolved',
+        });
+      }
+    }));
+
+    if (ipForResolution.length > resolveBatch.length) {
+      ipForResolution.slice(resolveBatch.length).forEach((item) => {
+        unresolved.push({
+          ip: item.ip,
+          reason: 'pending_resolution',
+        });
+      });
+    }
+
+    const totalEvents = ipRows.reduce((sum, row) => sum + Number(row.visits || 0), 0);
+    const totalGuestEvents = ipRows.reduce((sum, row) => sum + Number(row.guest_visits || 0), 0);
+    return res.json({
+      ok: true,
+      scope: scope.selectedScope,
+      course_id: scope.selectedCourseId,
+      filters: {
+        days,
+        exclude_admin: excludeAdmin,
+        guest_only: guestOnly,
+      },
+      summary: {
+        total_events: totalEvents,
+        total_unique_ips: uniqueIps.length,
+        guest_events: totalGuestEvents,
+        plotted_points: points.length,
+        unresolved_points: unresolved.length,
+      },
+      points,
+      unresolved,
+      resolved_now: resolvedNow.length,
+    });
+  } catch (err) {
+    return handleDbError(res, err, 'admin.visitHeatmapJson');
   }
 });
 

@@ -261,6 +261,7 @@
             🌙
           </button>
           <a class="btn btn-outline-primary btn-sm me-2" href="<%= analyticsPanelHref || adminHomeHref || '/admin' %>">Security analytics</a>
+          <a class="btn btn-outline-secondary btn-sm me-2" href="<%= heatmapHref || '/admin/visit-heatmap' %>">IP heatmap</a>
           <a class="btn btn-outline-secondary btn-sm me-2" href="<%= adminHomeHref || '/admin' %>">Назад в адмінку</a>
           <form method="POST" action="/logout">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><%= t('admin.logout') %></button>
