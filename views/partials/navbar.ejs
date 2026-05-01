@@ -169,6 +169,7 @@
   const themeLabel = tr('nav.theme', 'Theme');
   const escapedThemeLabel = escapeHtml(themeLabel);
   const logoutLabel = tr('nav.logout', 'Logout');
+  const logoutTextLabel = tr('nav.exit', 'exit');
   const openNavLabel = tr('nav.openNavigation', 'Open navigation');
   const closeNavLabel = tr('nav.closeNavigation', 'Close navigation');
   const currentProfileLabel = tr('nav.currentProfile', 'Current profile');
@@ -444,7 +445,7 @@
           <form method="POST" action="/logout" class="snav-logout-form">
             <button class="theme-toggle-min snav-logout-btn" type="submit" aria-label="<%= logoutLabel %>">
               <span class="snav-icon nav-icon" data-snav-icon="logout" aria-hidden="true"></span>
-              <span class="snav-logout-text" aria-hidden="true">exit</span>
+              <span class="snav-logout-text" aria-hidden="true"><%= logoutTextLabel %></span>
             </button>
           </form>
         </div>
