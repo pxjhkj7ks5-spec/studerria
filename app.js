@@ -11807,6 +11807,10 @@ const parseVisitGeoDate = (rawValue) => {
 };
 
 const shouldRefreshVisitGeoCache = (row) => {
+  if (String(row && row.source || '') === 'ipwho.is') {
+    // Legacy resolver stored mismatched coordinates when using ipwho.is query mode.
+    return true;
+  }
   if (!row || !row.last_resolved_at) return true;
   const lastResolvedAt = parseVisitGeoDate(row.last_resolved_at);
   if (!lastResolvedAt) return true;
@@ -11858,7 +11862,7 @@ const resolveVisitHeatmapGeoByIp = async (rawIp) => {
   if (!shouldResolveVisitHeatmapIp(ip)) {
     return { status: 'private', error: 'private_or_loopback' };
   }
-  const payload = await requestJsonOverHttps(`https://ipwho.is/?ip=${encodeURIComponent(ip)}`);
+  const payload = await requestJsonOverHttps(`https://ipwho.is/${encodeURIComponent(ip)}`);
   const success = payload && payload.success !== false;
   if (!success) {
     const errorMessage = String(
@@ -11871,6 +11875,10 @@ const resolveVisitHeatmapGeoByIp = async (rawIp) => {
   }
   const latitude = Number(payload.latitude ?? payload.lat);
   const longitude = Number(payload.longitude ?? payload.lon);
+  const resolvedIp = normalizeVisitHeatmapIp(payload && payload.ip);
+  if (resolvedIp && resolvedIp !== ip) {
+    return { status: 'error', error: 'resolved_ip_mismatch' };
+  }
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return { status: 'error', error: 'missing_coordinates' };
   }
@@ -11883,7 +11891,7 @@ const resolveVisitHeatmapGeoByIp = async (rawIp) => {
     city: String(payload.city || '').trim() || null,
     org: String((payload.connection && (payload.connection.org || payload.connection.isp)) || '').trim() || null,
     timezone: String((payload.timezone && (payload.timezone.id || payload.timezone.utc)) || payload.timezone || '').trim() || null,
-    source: 'ipwho.is',
+    source: 'ipwho.is:v2',
   };
 };
 
