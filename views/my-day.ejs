@@ -334,57 +334,57 @@
         <div class="alert alert-danger cockpit-alert" role="alert"><%= errMessage %></div>
       <% } %>
 
-      <section class="studerria-home-vision" aria-label="Огляд дня Studerria">
+      <section class="studerria-home-vision" aria-label="<%= lang === 'en' ? 'Studerria day overview' : 'Огляд дня Studerria' %>">
         <header class="td-dashboard-header studerria-home-head">
           <div>
             <p class="td-page-kicker">Studerria · Home</p>
-            <h1>Доброго дня, <%= username || 'Studerria' %>!</h1>
-            <p><%= brief.message || 'Ось що відбувається сьогодні.' %></p>
+            <h1><%= lang === 'en' ? 'Good day' : 'Доброго дня' %>, <%= username || 'Studerria' %>!</h1>
+            <p><%= brief.message || (lang === 'en' ? "Here's what is happening today." : 'Ось що відбувається сьогодні.') %></p>
           </div>
-          <a class="td-small-button" href="/schedule">Відкрити розклад</a>
+          <a class="td-small-button" href="/schedule"><%= lang === 'en' ? 'Open schedule' : 'Відкрити розклад' %></a>
         </header>
 
-        <section class="td-stats-grid studerria-home-stats" aria-label="Показники">
+        <section class="td-stats-grid studerria-home-stats" aria-label="<%= lang === 'en' ? 'Key stats' : 'Показники' %>">
           <article class="td-stat-card td-surface-card">
-            <span>Завдання</span>
+            <span><%= lang === 'en' ? 'Tasks' : 'Завдання' %></span>
             <strong><%= deadlineItems.length %></strong>
-            <small><%= Number(activity.overdue || 0) %> прострочено</small>
+            <small><%= Number(activity.overdue || 0) %> <%= lang === 'en' ? 'overdue' : 'прострочено' %></small>
           </article>
           <article class="td-stat-card td-surface-card">
-            <span>Пари</span>
+            <span><%= lang === 'en' ? 'Classes' : 'Пари' %></span>
             <strong><%= classItems.length %></strong>
-            <small>найближчі сьогодні / завтра</small>
+            <small><%= lang === 'en' ? 'nearest today / tomorrow' : 'найближчі сьогодні / завтра' %></small>
           </article>
           <article class="td-stat-card td-surface-card">
-            <span>Повідомлення</span>
+            <span><%= lang === 'en' ? 'Messages' : 'Повідомлення' %></span>
             <strong><%= inboxMessageSummary ? Number(inboxMessageSummary.unread || inboxMessageSummary.fresh_unread || 0) : inboxItems.length %></strong>
-            <small>потребують уваги</small>
+            <small><%= lang === 'en' ? 'need attention' : 'потребують уваги' %></small>
           </article>
           <article class="td-stat-card td-surface-card">
-            <span>Прогрес</span>
+            <span><%= lang === 'en' ? 'Progress' : 'Прогрес' %></span>
             <strong><%= hasProgressDashboard ? Number(progressDashboard.at_risk_count || 0) : Number(competencies.length || 0) %></strong>
-            <small><%= hasProgressDashboard ? 'ризикових дисциплін' : 'компетенцій' %></small>
+            <small><%= hasProgressDashboard ? (lang === 'en' ? 'at-risk subjects' : 'ризикових дисциплін') : (lang === 'en' ? 'competencies' : 'компетенцій') %></small>
           </article>
         </section>
 
         <section class="td-dashboard-grid studerria-home-preview">
           <article class="td-dashboard-card td-surface-card td-schedule-preview">
             <header class="td-card-header">
-              <h2>Розклад на сьогодні</h2>
-              <a class="td-small-button" href="/schedule">Весь розклад</a>
+              <h2><%= lang === 'en' ? 'Today schedule' : 'Розклад на сьогодні' %></h2>
+              <a class="td-small-button" href="/schedule"><%= lang === 'en' ? 'Full schedule' : 'Весь розклад' %></a>
             </header>
             <div class="td-schedule-list">
               <% if (!classItems.length) { %>
-                <div class="td-empty-inline">Найближчих пар поки немає.</div>
+                <div class="td-empty-inline"><%= lang === 'en' ? 'No upcoming classes yet.' : 'Найближчих пар поки немає.' %></div>
               <% } else { %>
                 <% classItems.slice(0, 3).forEach((item, index) => { %>
                   <div class="td-schedule-row <%= index === 0 ? 'is-current' : '' %>">
                     <time><%= item.start || '--:--' %></time>
                     <div>
                       <strong><%= item.subject_name || t('myDay.item.subjectFallback') %></strong>
-                      <span><%= getDayContext(item) %><% if (item.room_label) { %> · ауд. <%= item.room_label %><% } %></span>
+                      <span><%= getDayContext(item) %><% if (item.room_label) { %> · <%= lang === 'en' ? 'room' : 'ауд.' %> <%= item.room_label %><% } %></span>
                     </div>
-                    <span class="td-badge <%= index === 0 ? 'td-badge--violet' : '' %>"><%= index === 0 ? 'Далі' : 'План' %></span>
+                    <span class="td-badge <%= index === 0 ? 'td-badge--violet' : '' %>"><%= index === 0 ? (lang === 'en' ? 'Next' : 'Далі') : (lang === 'en' ? 'Plan' : 'План') %></span>
                   </div>
                 <% }) %>
               <% } %>
@@ -393,12 +393,12 @@
 
           <article class="td-dashboard-card td-surface-card">
             <header class="td-card-header">
-              <h2>Завдання</h2>
-              <a class="td-small-button" href="/schedule#homework">Усі завдання</a>
+              <h2><%= lang === 'en' ? 'Tasks' : 'Завдання' %></h2>
+              <a class="td-small-button" href="/schedule#homework"><%= lang === 'en' ? 'All tasks' : 'Усі завдання' %></a>
             </header>
             <div class="td-task-list">
               <% if (!deadlineItems.length) { %>
-                <div class="td-empty-inline">Немає термінових дедлайнів.</div>
+                <div class="td-empty-inline"><%= lang === 'en' ? 'No urgent deadlines.' : 'Немає термінових дедлайнів.' %></div>
               <% } else { %>
                 <% deadlineItems.slice(0, 4).forEach((item) => { %>
                   <div class="td-task-row">
@@ -421,29 +421,35 @@
           const progressPercent = Math.max(0, Math.min(100, Number.isFinite(progressPercentRaw) ? progressPercentRaw : 0));
           const progressRows = [
             {
-              label: 'Ризикові дисципліни',
+              label: lang === 'en' ? 'At-risk subjects' : 'Ризикові дисципліни',
               value: hasProgressDashboard ? Number(progressDashboard.at_risk_count || 0) : Number(activity.overdue || 0),
             },
             {
-              label: 'Виконано завдань',
+              label: lang === 'en' ? 'Completed tasks' : 'Виконано завдань',
               value: hasProgressDashboard
                 ? `${Number(progressDashboard.completed_tasks || 0)}`
                 : `${Math.max(0, deadlineItems.length - Number(activity.overdue || 0))}`,
             },
             {
-              label: 'Непрочитані повідомлення',
+              label: lang === 'en' ? 'Unread messages' : 'Непрочитані повідомлення',
               value: inboxMessageSummary ? Number(inboxMessageSummary.unread || inboxMessageSummary.fresh_unread || 0) : inboxItems.length,
             },
           ];
           const progressBars = (Array.isArray(progressSubjects) && progressSubjects.length ? progressSubjects.slice(0, 7) : [])
             .map((item, index) => {
-              const label = String(item.subject_name || item.subject || item.name || '').trim() || ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'][index] || `D${index + 1}`;
+              const dayFallback = lang === 'en'
+                ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                : ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+              const label = String(item.subject_name || item.subject || item.name || '').trim() || dayFallback[index] || `D${index + 1}`;
               const valueRaw = Number(item.percent || item.score_percent || item.progress_percent || item.completion_percent || item.value || 0);
               const value = Math.max(18, Math.min(100, Number.isFinite(valueRaw) ? valueRaw : 18));
               return { label, value };
             });
           while (progressBars.length < 7) {
-            const label = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'][progressBars.length] || `D${progressBars.length + 1}`;
+            const dayFallback = lang === 'en'
+              ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+              : ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+            const label = dayFallback[progressBars.length] || `D${progressBars.length + 1}`;
             progressBars.push({ label, value: 22 + (progressBars.length * 6) });
           }
           const strongestBarValue = Math.max.apply(null, progressBars.map((item) => item.value));
@@ -452,31 +458,33 @@
         <section class="td-lower-grid">
           <article class="td-dashboard-card td-surface-card">
             <header class="td-card-header">
-              <h2>Ваш прогрес</h2>
+              <h2><%= lang === 'en' ? 'Your progress' : 'Ваш прогрес' %></h2>
             </header>
             <div class="td-progress-layout">
-              <div class="td-progress-ring" style="--td-progress-value: <%= progressPercent %>%;" aria-label="Прогрес <%= progressPercent %>%">
+              <div class="td-progress-ring" style="--td-progress-value: <%= progressPercent %>%;" aria-label="<%= (lang === 'en' ? 'Progress ' : 'Прогрес ') + Math.round(progressPercent) + '%' %>">
                 <span><%= Math.round(progressPercent) %>%</span>
               </div>
               <div class="td-progress-content">
-                <strong><%= progressPercent >= 70 ? '+ стабільний темп цього тижня' : 'є простір для вирівнювання темпу' %></strong>
+                <strong><%= progressPercent >= 70
+                  ? (lang === 'en' ? '+ stable pace this week' : '+ стабільний темп цього тижня')
+                  : (lang === 'en' ? 'there is room to stabilize the pace' : 'є простір для вирівнювання темпу') %></strong>
                 <% progressRows.forEach((row) => { %>
                   <div class="td-progress-row">
                     <span><%= row.label %></span>
                     <b><%= row.value %></b>
                   </div>
                 <% }) %>
-                <a class="td-small-button" href="/profile">Профіль і налаштування</a>
+                <a class="td-small-button" href="/profile"><%= lang === 'en' ? 'Profile and settings' : 'Профіль і налаштування' %></a>
               </div>
             </div>
           </article>
 
           <article class="td-dashboard-card td-surface-card" id="analytics">
             <header class="td-card-header">
-              <h2>Аналітика навчання</h2>
-              <a class="td-small-button" href="/schedule">Тиждень</a>
+              <h2><%= lang === 'en' ? 'Learning analytics' : 'Аналітика навчання' %></h2>
+              <a class="td-small-button" href="/schedule"><%= lang === 'en' ? 'Week' : 'Тиждень' %></a>
             </header>
-            <div class="td-bar-chart" aria-label="Навчальна активність">
+            <div class="td-bar-chart" aria-label="<%= lang === 'en' ? 'Learning activity' : 'Навчальна активність' %>">
               <div class="td-bar-axis"><span>100</span><span>75</span><span>50</span><span>0</span></div>
               <div class="td-bars">
                 <% progressBars.forEach((item) => { %>
@@ -490,10 +498,10 @@
         <section class="td-ai-strip" aria-label="Studerria quick actions">
           <span class="schedule-overview-icon" aria-hidden="true">✦</span>
           <div>
-            <h2>Швидкий фокус на день</h2>
-            <p><%= brief.message || 'Відкрий розклад, перевір дедлайни й тримай день в одному ритмі.' %></p>
+            <h2><%= lang === 'en' ? 'Quick focus for the day' : 'Швидкий фокус на день' %></h2>
+            <p><%= brief.message || (lang === 'en' ? 'Open schedule, check deadlines, and keep the day in one rhythm.' : 'Відкрий розклад, перевір дедлайни й тримай день в одному ритмі.') %></p>
           </div>
-          <a class="td-small-button" href="/schedule">До розкладу</a>
+          <a class="td-small-button" href="/schedule"><%= lang === 'en' ? 'Go to schedule' : 'До розкладу' %></a>
         </section>
       </section>
 
