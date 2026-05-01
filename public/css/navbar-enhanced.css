@@ -1400,32 +1400,33 @@ body.theme-dark.page-authenticated.studerria-theme .snav-account-card {
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack {
     position: relative;
-    min-height: 46px;
+    min-height: 50px;
     justify-content: center;
-    padding-left: 54px;
+    padding-left: 60px;
   }
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack::before {
     content: "";
     position: absolute;
-    left: 4px;
-    top: 0;
-    width: 42px;
-    height: 42px;
-    border-radius: 15px;
+    left: 6px;
+    top: 50%;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    transform: translateY(-50%);
     background:
-      url("/assets/brand/studerria-mark-dark-512.png") center / 78% 78% no-repeat,
+      url("/assets/brand/studerria-mark-dark-512.png") center / 82% 82% no-repeat,
       linear-gradient(145deg, rgba(139, 164, 255, 0.16), rgba(124, 58, 237, 0.18));
-    border: 1px solid rgba(139, 164, 255, 0.14);
-    box-shadow: 0 14px 26px rgba(79, 70, 229, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(139, 164, 255, 0.2);
+    box-shadow: 0 12px 22px rgba(79, 70, 229, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.17);
   }
 
   body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack::before {
     background:
-      url("/assets/brand/studerria-mark-light-512.png") center / 78% 78% no-repeat,
+      url("/assets/brand/studerria-mark-light-512.png") center / 82% 82% no-repeat,
       linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(224, 231, 255, 0.78));
-    border-color: rgba(99, 102, 241, 0.16);
-    box-shadow: 0 14px 26px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    border-color: rgba(99, 102, 241, 0.22);
+    box-shadow: 0 12px 22px rgba(99, 102, 241, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   }
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-list {
