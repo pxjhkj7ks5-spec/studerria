@@ -118,7 +118,7 @@ function baseJournalLocals(overrides = {}) {
           { label: 'Повний доступ', tone: 'success' },
         ],
         primaryActions: [
-          { kind: 'link', href: '/journal/insights?subject_id=101', label: 'Інсайти журналу', variant: 'outline-secondary' },
+          { kind: 'link', href: '/journal/insights?subject_id=101', label: 'Рейтинг журналу', variant: 'outline-secondary' },
         ],
         summaryCards: [
           { key: 'columns', label: 'Колонки', value: '1', meta: 'Активні колонки оцінювання', tone: 'neutral' },
@@ -300,7 +300,7 @@ test('journal closed-subject shell keeps reopen and export affordances', async (
         { label: 'ПЛЕД 25 Київ', tone: 'info' },
         { label: 'Предмет закрито', tone: 'danger' },
       ],
-      primaryActions: [{ kind: 'link', href: '/journal/insights?subject_id=101', label: 'Інсайти журналу', variant: 'outline-secondary' }],
+      primaryActions: [{ kind: 'link', href: '/journal/insights?subject_id=101', label: 'Рейтинг журналу', variant: 'outline-secondary' }],
       summaryCards: [
         { key: 'columns', label: 'Колонки', value: '1', meta: 'Активні колонки оцінювання', tone: 'neutral' },
         { key: 'students', label: 'Студенти', value: '1', meta: 'Студенти в поточному scope', tone: 'neutral' },

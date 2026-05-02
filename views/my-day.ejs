@@ -543,11 +543,11 @@
                 <div class="teacher-home-status-main">
                   <div class="teacher-home-status-label"><%= lang === 'en' ? 'Rating' : 'Рейтинг' %></div>
                   <div class="teacher-home-status-value"><%= latestRatingSnapshot ? (latestRatingSnapshot.scope_label || '—') : '—' %></div>
-                  <p class="teacher-home-status-note"><%= latestRatingSnapshot && latestRatingSnapshot.period_label ? latestRatingSnapshot.period_label : (lang === 'en' ? 'The latest rating is available in Journal Insights.' : 'Останній рейтинг уже доступний у Journal Insights.') %></p>
+                  <p class="teacher-home-status-note"><%= latestRatingSnapshot && latestRatingSnapshot.period_label ? latestRatingSnapshot.period_label : (lang === 'en' ? 'The latest rating is available in Journal Rating.' : 'Останній рейтинг уже доступний у рейтингу журналу.') %></p>
                 </div>
                 <div class="teacher-home-status-side">
                   <span class="mission-card-badge mission-card-badge-<%= getRatingMissionTone(latestRatingSnapshot) %>"><%= getRatingMissionStatusLabel(latestRatingSnapshot) %></span>
-                  <a class="btn btn-inline-link btn-xs teacher-home-status-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open analytics' : 'Відкрити аналітику' %></a>
+                  <a class="btn btn-inline-link btn-xs teacher-home-status-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open rating' : 'Відкрити рейтинг' %></a>
                 </div>
               </article>
             <% } %>
@@ -682,14 +682,14 @@
                   <%= latestRatingSnapshot.top_entry.score_label || latestRatingSnapshot.top_entry.final_score || '' %>
                 </p>
               <% } else { %>
-                <p class="mission-card-note"><%= lang === 'en' ? 'The latest published rating is ready in Journal Insights.' : 'Останній опублікований рейтинг уже доступний у Journal Insights.' %></p>
+                <p class="mission-card-note"><%= lang === 'en' ? 'The latest published rating is ready in Journal Rating.' : 'Останній опублікований рейтинг уже доступний у рейтингу журналу.' %></p>
               <% } %>
             <% } else { %>
               <div class="mission-card-empty"><%= lang === 'en' ? 'No published rating yet.' : 'Опублікованого рейтингу ще немає.' %></div>
             <% } %>
           </div>
           <div class="mission-card-action">
-            <a class="btn btn-inline-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open analytics' : 'Відкрити аналітику' %></a>
+            <a class="btn btn-inline-link" href="<%= latestRatingSnapshot && latestRatingSnapshot.action_href ? latestRatingSnapshot.action_href : '/journal/insights' %>"><%= lang === 'en' ? 'Open rating' : 'Відкрити рейтинг' %></a>
           </div>
         </article>
         <% } %>

@@ -672,11 +672,11 @@
   "teacherHub.quick.openSchedule.desc": "Створюй ДЗ прямо з карток пар і миттєво застосовуй шаблони.",
   "teacherHub.quick.goJournal.title": "Перейти в журнал",
   "teacherHub.quick.goJournal.desc": "Переглядай динаміку оцінювання та прогрес за дисципліною і групою.",
-  "journalInsights.pageTitle": "Інсайти журналу",
-  "journalInsights.title": "Інсайти журналу",
-  "journalInsights.subtitle": "Інсайти про успішність і відвідуваність у різних зрізах: студент, група, предмет або весь курс. Екран для швидкого ранжування, порівняння, експорту й публікації.",
+  "journalInsights.pageTitle": "Рейтинг журналу",
+  "journalInsights.title": "Рейтинг журналу",
+  "journalInsights.subtitle": "Зрозумілий рейтинг студентів у різних зрізах: студент, група, предмет або весь курс. Спочатку дивись лідерборд, а метрики успішності й відвідуваності лишаються як додатковий контекст.",
   "journalInsights.filtersTitle": "Фільтри",
-  "journalInsights.filtersSubtitle": "Налаштуй курс, зріз, період і режим порівняння перед оновленням знімка.",
+  "journalInsights.filtersSubtitle": "Налаштуй курс, зріз і період перед оновленням знімка рейтингу.",
   "journalInsights.course": "Курс",
   "journalInsights.scope": "Зріз",
   "journalInsights.period": "Період",
@@ -697,8 +697,8 @@
   "journalInsights.topN": "Топ N",
   "journalInsights.publishAction": "Опублікувати рейтинг у повідомлення",
   "journalInsights.publishDisabledDefault": "Оберіть коректний зріз для публікації рейтингу.",
-  "journalInsights.summaryTitle": "Підсумок",
-  "journalInsights.summarySubtitle": "Ключові метрики успішності, відвідуваності та ризику для активного зрізу.",
+  "journalInsights.summaryTitle": "Метрики",
+  "journalInsights.summarySubtitle": "Додаткові метрики успішності, відвідуваності та ризику для активного зрізу рейтингу.",
   "journalInsights.summary.averageScore": "Середній бал",
   "journalInsights.summary.median": "Медіана",
   "journalInsights.summary.topScore": "Найвищий бал",
@@ -723,13 +723,13 @@
   "journalInsights.comparisonTitle": "Порівняння",
   "journalInsights.comparisonSubtitle": "Знімок сегментів для вибраного режиму порівняння.",
   "journalInsights.rankingTitle": "Рейтинг",
-  "journalInsights.rankingSubtitle": "Топ студентів у поточному зрізі, відсортований за фінальним балом.",
+  "journalInsights.rankingSubtitle": "Студенти поточного зрізу, відсортовані за фінальним балом.",
   "journalInsights.subjectMixTitle": "Зріз за предметами",
   "journalInsights.subjectMixSubtitle": "Розподіл по предметах для вибраного курсу або агрегованого зрізу.",
-  "journalInsights.gradeTrendTitle": "Тренд оцінок",
-  "journalInsights.gradeTrendSubtitle": "Зміна середнього бала по вибраних часових кошиках.",
-  "journalInsights.attendanceTrendTitle": "Тренд відвідуваності",
-  "journalInsights.attendanceTrendSubtitle": "Динаміка частки пропусків у тих самих періодах, що й оцінки.",
+  "journalInsights.gradeTrendTitle": "Динаміка оцінок",
+  "journalInsights.gradeTrendSubtitle": "Рух середнього бала по вибраних часових кошиках.",
+  "journalInsights.attendanceTrendTitle": "Динаміка відвідуваності",
+  "journalInsights.attendanceTrendSubtitle": "Рух частки пропусків у тих самих періодах, що й оцінки.",
   "journalInsights.table.segment": "Сегмент",
   "journalInsights.table.participants": "Учасники",
   "journalInsights.table.average": "Середнє",
@@ -766,7 +766,7 @@
   ,"nav.learning": "Навчання"
   ,"nav.schedule": "Розклад"
   ,"nav.journal": "Журнал"
-  ,"nav.insights": "Insights"
+  ,"nav.insights": "Рейтинг"
   ,"nav.teamwork": "Teamwork"
   ,"nav.customDeadlines": "Дивні дедлайни"
   ,"nav.subjects": "Дисципліни"

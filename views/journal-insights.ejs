@@ -39,6 +39,7 @@
   const attendanceTrend = (trends && Array.isArray(trends.attendance)) ? trends.attendance : [];
   const gradeMax = Math.max(100, ...gradeTrend.map((item) => Number(item.avg_score_percent || 0)));
   const rankingRows = Array.isArray(rankingTop) ? rankingTop : [];
+  const ratingLeader = rankingRows.length ? rankingRows[0] : null;
   const selectedSubjectHasStorage = Boolean(selectedJournalHasStorageBinding);
   const showNoStorageNotice = Boolean(!isCourseAggregateScope && selectedSubject && !selectedSubjectHasStorage);
 %>
@@ -640,6 +641,17 @@
           </div>
           <div class="hero-side">
             <div class="hero-stat">
+              <div class="hero-stat-label"><%= lang === 'en' ? 'Leader' : 'Лідер' %></div>
+              <div class="hero-stat-value"><%= ratingLeader ? ratingLeader.full_name : '—' %></div>
+              <div class="hero-stat-meta">
+                <% if (ratingLeader) { %>
+                  #<%= Number(ratingLeader.rank || 1) %> · <%= Number(ratingLeader.final_score || 0).toFixed(2).replace(/\.00$/, '') %>
+                <% } else { %>
+                  <%= t('journalInsights.empty.ranking') %>
+                <% } %>
+              </div>
+            </div>
+            <div class="hero-stat">
               <div class="hero-stat-label"><%= t('journalInsights.stat.average') %></div>
               <div class="hero-stat-value"><%= Number(summary && summary.average_score ? summary.average_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
               <div class="hero-stat-meta"><%= t('journalInsights.stat.median') %> <%= Number(summary && summary.median_score ? summary.median_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
@@ -653,11 +665,6 @@
               <div class="hero-stat-label"><%= t('journalInsights.stat.atRisk') %></div>
               <div class="hero-stat-value"><%= Number(summary && summary.at_risk_count ? summary.at_risk_count : 0) %></div>
               <div class="hero-stat-meta"><%= t('journalInsights.stat.excellent') %> <%= Number(summary && summary.excellent_count ? summary.excellent_count : 0) %></div>
-            </div>
-            <div class="hero-stat">
-              <div class="hero-stat-label"><%= t('journalInsights.stat.momentum') %></div>
-              <div class="hero-stat-value"><%= Number(summary && summary.momentum_score ? summary.momentum_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
-              <div class="hero-stat-meta"><%= t('journalInsights.stat.trendDelta') %> <%= Number(summary && summary.grade_delta ? summary.grade_delta : 0).toFixed(2).replace(/\.00$/, '') %></div>
             </div>
           </div>
         </div>
@@ -772,11 +779,11 @@
         <section class="glass section mb-3">
           <div class="soft-panel">
             <div class="summary-label"><%= lang === 'en' ? 'Storage status' : 'Статус storage' %></div>
-            <div class="summary-value fs-5"><%= lang === 'en' ? 'Insights are waiting for journal storage binding' : 'Інсайти очікують на прив’язку journal storage' %></div>
+            <div class="summary-value fs-5"><%= lang === 'en' ? 'Rating is waiting for journal storage binding' : 'Рейтинг очікує на прив’язку journal storage' %></div>
             <p class="section-subtitle mb-3">
               <%= lang === 'en'
-                ? 'This subject exists in Academic V2, but analytics become available only after journal storage is linked.'
-                : 'Цей предмет уже є в Academic V2, але аналітика доступна лише після прив’язки до journal storage.' %>
+                ? 'This subject exists in Academic V2, but rating data becomes available only after journal storage is linked.'
+                : 'Цей предмет уже є в Academic V2, але рейтинг стає доступним лише після прив’язки до journal storage.' %>
             </p>
             <div class="d-flex flex-wrap gap-2">
               <a class="btn btn-outline-secondary" href="<%= backToJournalHref %>"><%= t('journalInsights.backToJournal') %></a>
@@ -785,6 +792,52 @@
           </div>
         </section>
       <% } else { %>
+
+      <section class="glass section mb-3">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title"><%= t('journalInsights.rankingTitle') %></h2>
+            <p class="section-subtitle"><%= t('journalInsights.rankingSubtitle') %></p>
+          </div>
+        </div>
+        <div class="table-shell mt-2">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 insights-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th><%= t('journalInsights.table.student') %></th>
+                  <th><%= t('journalInsights.table.group') %></th>
+                  <th><%= t('journalInsights.table.score') %></th>
+                  <th><%= t('journalInsights.table.subjects') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!rankingRows.length) { %>
+                  <tr>
+                    <td colspan="5" class="empty-state"><%= t('journalInsights.empty.ranking') %></td>
+                  </tr>
+                <% } %>
+                <% rankingRows.forEach((row) => { %>
+                  <tr class="<%= Number(row.rank || 0) <= 3 ? 'ranking-row-top' : '' %>">
+                    <td><span class="ranking-position"><%= row.rank %></span></td>
+                    <td>
+                      <span class="ranking-name"><%= row.full_name %></span>
+                      <span class="ranking-subtext">
+                        <%= lang === 'en' ? 'Group' : 'Група' %> <%= Number(row.group_number || 0) || '-' %>
+                        · <%= Number(row.subjects_count || 1) %> <%= t('journalInsights.table.subjects').toLowerCase() %>
+                      </span>
+                    </td>
+                    <td><%= Number(row.group_number || 0) || '-' %></td>
+                    <td><strong><%= Number(row.final_score || 0).toFixed(2).replace(/\.00$/, '') %></strong></td>
+                    <td><%= Number(row.subjects_count || 1) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <section class="glass section mb-3">
         <div class="section-head">
@@ -846,56 +899,6 @@
             <div class="summary-label"><%= t('journalInsights.summary.momentumScore') %></div>
             <div class="summary-value"><%= Number(summary && summary.momentum_score ? summary.momentum_score : 0).toFixed(2).replace(/\.00$/, '') %></div>
           </div>
-        </div>
-      </section>
-
-      <section class="row g-3 mb-3">
-        <div class="col-12">
-          <article class="glass section h-100">
-            <div class="section-head">
-              <div>
-                <h2 class="section-title"><%= t('journalInsights.rankingTitle') %></h2>
-                <p class="section-subtitle"><%= t('journalInsights.rankingSubtitle') %></p>
-              </div>
-            </div>
-            <div class="table-shell mt-2">
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0 insights-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th><%= t('journalInsights.table.student') %></th>
-                      <th><%= t('journalInsights.table.group') %></th>
-                      <th><%= t('journalInsights.table.score') %></th>
-                      <th><%= t('journalInsights.table.subjects') %></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% if (!rankingRows.length) { %>
-                      <tr>
-                        <td colspan="5" class="empty-state"><%= t('journalInsights.empty.ranking') %></td>
-                      </tr>
-                    <% } %>
-                    <% rankingRows.forEach((row) => { %>
-                      <tr class="<%= Number(row.rank || 0) <= 3 ? 'ranking-row-top' : '' %>">
-                        <td><span class="ranking-position"><%= row.rank %></span></td>
-                        <td>
-                          <span class="ranking-name"><%= row.full_name %></span>
-                          <span class="ranking-subtext">
-                            <%= lang === 'en' ? 'Group' : 'Група' %> <%= Number(row.group_number || 0) || '-' %>
-                            · <%= Number(row.subjects_count || 1) %> <%= t('journalInsights.table.subjects').toLowerCase() %>
-                          </span>
-                        </td>
-                        <td><%= Number(row.group_number || 0) || '-' %></td>
-                        <td><strong><%= Number(row.final_score || 0).toFixed(2).replace(/\.00$/, '') %></strong></td>
-                        <td><%= Number(row.subjects_count || 1) %></td>
-                      </tr>
-                    <% }) %>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </article>
         </div>
       </section>
 

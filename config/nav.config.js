@@ -82,7 +82,7 @@ const navConfig = {
           children: [
             {
               id: 'journal-insights',
-              label: 'Insights',
+              label: 'Rating',
               labelKey: 'nav.insights',
               href: '/journal/insights',
               section: 'main',

@@ -22741,7 +22741,7 @@ function getJournalShellCopy(lang = 'uk') {
       summarySnapshot: 'Snapshot',
       summarySnapshotPending: 'Generated on close',
       summarySnapshotReady: 'Ready for audit',
-      insightsAction: 'Journal insights',
+      insightsAction: 'Journal rating',
       emptyNoSubjectTitle: 'Select a subject to open the journal',
       emptyNoSubjectBody: 'No subject is selected in the current access scope yet.',
       emptyNoStorageTitle: 'Journal storage is not ready for this subject',
@@ -22775,7 +22775,7 @@ function getJournalShellCopy(lang = 'uk') {
     summarySnapshot: 'Знімок',
     summarySnapshotPending: 'Буде згенерований при закритті',
     summarySnapshotReady: 'Готовий до аудиту',
-    insightsAction: 'Інсайти журналу',
+    insightsAction: 'Рейтинг журналу',
     emptyNoSubjectTitle: 'Оберіть предмет, щоб відкрити журнал',
     emptyNoSubjectBody: 'У поточному scope доступу ще не обрано предмет для журналу.',
     emptyNoStorageTitle: 'Для цього предмета ще не готовий journal storage',
@@ -25146,7 +25146,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           href: '/teacher/workspace',
         },
         {
-          label: preferredMyDayLang === 'en' ? 'Journal insights' : 'Journal insights',
+          label: preferredMyDayLang === 'en' ? 'Journal rating' : 'Рейтинг журналу',
           href: '/journal/insights',
         },
         {
@@ -25221,7 +25221,7 @@ async function buildMyDayData(user, role = 'student', roleList = [], options = {
           : '',
       ].filter(Boolean).join(' · '),
       action_href: '/journal/insights',
-      action_label: preferredMyDayLang === 'en' ? 'Open insights' : 'До insights',
+      action_label: preferredMyDayLang === 'en' ? 'Open rating' : 'До рейтингу',
     });
   }
   if (inboxMessageSummary && Number(inboxMessageSummary.fresh_unread || 0) > 0) {
