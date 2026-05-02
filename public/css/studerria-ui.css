@@ -3751,3 +3751,133 @@ body.page-app-shell.studerria-theme :where(
 ):active {
   transform: translateZ(0) !important;
 }
+
+/* Studerria shell refresh: align Home + Schedule with the target visual language */
+body.page-app-shell.page-my-day.studerria-theme,
+body.page-app-shell.page-schedule.studerria-theme {
+  --td-radius-md: 22px;
+  --td-radius-sm: 18px;
+}
+
+body.theme-dark.page-app-shell.page-my-day.studerria-theme,
+body.theme-dark.page-app-shell.page-schedule.studerria-theme {
+  --td-surface: rgba(255, 255, 255, 0.072);
+  --td-surface-strong: rgba(255, 255, 255, 0.086);
+  --td-border: rgba(134, 151, 214, 0.22);
+  --td-border-strong: rgba(154, 175, 247, 0.36);
+  --td-text: #eef2ff;
+  --td-text-soft: #c6d0e5;
+  --td-muted: #a1afc8;
+}
+
+body.page-my-day .studerria-home-head h1 {
+  font-size: clamp(2.7rem, 2.2rem + 1.6vw, 4rem);
+  letter-spacing: -0.03em;
+}
+
+body.page-my-day .studerria-home-head p {
+  font-size: 1.06rem;
+}
+
+body.page-my-day .td-stat-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 156px;
+  padding: 20px;
+}
+
+body.page-my-day .td-stat-card::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(139, 164, 255, 0.38);
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+body.theme-dark.page-my-day .td-stat-card::after {
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.34), rgba(99, 102, 241, 0.12));
+}
+
+body.page-my-day .td-schedule-row,
+body.page-my-day .td-task-row,
+body.page-schedule .schedule-overview-grid span,
+body.page-schedule .td-homework-item {
+  border-radius: 20px;
+}
+
+body.page-my-day .td-schedule-row,
+body.page-my-day .td-task-row {
+  min-height: 72px;
+  padding: 14px 16px;
+}
+
+body.page-schedule .schedule-hero-shell {
+  border-radius: 36px;
+  border-color: rgba(139, 164, 255, 0.25);
+  background:
+    radial-gradient(120% 160% at 24% -14%, rgba(99, 102, 241, 0.22), transparent 58%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
+    rgba(10, 16, 36, 0.84);
+}
+
+body.theme-dark.page-schedule .schedule-week-range {
+  color: rgba(178, 191, 216, 0.95);
+}
+
+body.page-schedule .td-day-switcher.schedule-day-switcher {
+  border-radius: 30px;
+  border-color: rgba(139, 164, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)),
+    rgba(14, 22, 44, 0.62);
+}
+
+body.page-schedule .td-day-pill.schedule-day-pill {
+  min-height: 114px;
+  border-radius: 22px;
+}
+
+body.page-schedule .td-day-pill.schedule-day-pill.is-active,
+body.page-schedule .td-day-pill.schedule-day-pill.is-today {
+  border-color: rgba(128, 147, 255, 0.55);
+  background:
+    linear-gradient(135deg, rgba(98, 117, 255, 0.36), rgba(140, 114, 255, 0.22)),
+    rgba(255, 255, 255, 0.2);
+}
+
+body.page-schedule .schedule-overview-card {
+  border-radius: 28px;
+}
+
+@media (min-width: 992px) {
+  body.page-app-shell.page-schedule.studerria-theme .schedule-content.container,
+  body.page-app-shell.page-my-day.studerria-theme .cockpit-page.container {
+    border: 1px solid rgba(125, 143, 202, 0.28);
+    border-radius: 34px;
+    padding: 24px 26px 28px !important;
+    background:
+      radial-gradient(130% 120% at 0% 0%, rgba(99, 102, 241, 0.14), transparent 58%),
+      linear-gradient(160deg, rgba(9, 14, 30, 0.7), rgba(10, 16, 34, 0.62));
+    box-shadow:
+      0 34px 80px rgba(1, 6, 20, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    -webkit-backdrop-filter: blur(18px) saturate(1.12);
+    backdrop-filter: blur(18px) saturate(1.12);
+  }
+
+  body.page-app-shell.page-my-day.studerria-theme .cockpit-page {
+    width: calc(100vw - var(--studerria-sidebar-width) - 52px);
+    max-width: calc(100vw - var(--studerria-sidebar-width) - 52px);
+    margin-right: 20px;
+  }
+
+  body.page-app-shell.page-schedule.studerria-theme .schedule-content.container,
+  body.page-app-shell.page-my-day.studerria-theme .cockpit-page.container {
+    max-width: min(1540px, 100%) !important;
+  }
+}
