@@ -1307,7 +1307,7 @@ body.page-schedule .week-rail {
 
 body.page-schedule .week-pager {
   position: relative;
-  padding: 10px;
+  padding: 12px 12px 10px;
   border-radius: 30px;
   backdrop-filter: blur(calc(var(--week-glass-blur) + 2px));
   -webkit-backdrop-filter: blur(calc(var(--week-glass-blur) + 2px));
@@ -1319,7 +1319,7 @@ body.page-schedule .week-pager {
     0 24px 60px rgba(2, 6, 23, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   isolation: isolate;
-  overflow: clip;
+  overflow: visible;
   contain: paint;
   outline: 1px solid transparent;
   transform: translateZ(0);
@@ -2521,7 +2521,7 @@ body.page-schedule.schedule-drawer-open .drawer-action {
 
 /* Compact week switcher (without week carousel cards). */
 body.page-schedule .week-pager {
-  padding: 8px 10px;
+  padding: 11px 12px 9px;
   border-radius: 22px;
 }
 
@@ -2587,7 +2587,7 @@ body.page-schedule .week-pager .week-nav-btn {
 @media (max-width: 991px) {
   body.page-schedule .week-pager {
     border-radius: 18px;
-    padding: 7px;
+    padding: 9px 8px;
   }
 
   body.page-schedule .schedule-week-strip-head {
