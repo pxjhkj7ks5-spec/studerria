@@ -3208,12 +3208,12 @@ body.theme-dark .schedule-overview-grid span {
   background: linear-gradient(135deg, rgba(98, 117, 255, 0.18), rgba(140, 114, 255, 0.12));
 }
 
-.schedule-overview-next strong,
-.schedule-overview-next span {
+.schedule-overview-next > div strong,
+.schedule-overview-next > div span {
   display: block;
 }
 
-.schedule-overview-next span {
+.schedule-overview-next > div span {
   color: var(--td-muted);
   margin-top: 4px;
 }
@@ -3235,6 +3235,7 @@ body.theme-dark .schedule-overview-grid span {
 
 .schedule-overview-icon svg {
   display: block;
+  flex: 0 0 auto;
   width: 18px;
   height: 18px;
 }
