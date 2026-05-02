@@ -1,8 +1,8 @@
 /* Shared modal readability layer for every Studerria screen. */
 html body.studerria-theme {
   --studerria-modal-backdrop-blur: 12px;
-  --studerria-modal-backdrop-dark: rgba(5, 9, 22, 0.52);
-  --studerria-modal-backdrop-light: rgba(241, 245, 255, 0.5);
+  --studerria-modal-backdrop-dark: rgba(4, 8, 20, 0.72);
+  --studerria-modal-backdrop-light: rgba(238, 243, 254, 0.68);
 }
 
 html body.studerria-theme .modal-backdrop,
@@ -40,6 +40,23 @@ html body.studerria-theme .td-lite-modal-backdrop {
 
 html body.theme-light.studerria-theme .td-lite-modal-backdrop {
   background: var(--studerria-modal-backdrop-light) !important;
+}
+
+html body.studerria-theme #studerriaBg,
+html body.studerria-theme #studerriaBg::before,
+html body.studerria-theme #studerriaBg::after {
+  transition: filter 220ms ease, opacity 220ms ease;
+}
+
+/* Keep modal background as a full-viewport layer in Atlas/WebView without oval artifacts. */
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::before,
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::after {
+  opacity: 0 !important;
+}
+
+html body.studerria-theme.studerria-apple-webview:is(.modal-open, .studerria-changelog-open) #studerriaBg {
+  -webkit-filter: blur(10px) saturate(1.02);
+  filter: blur(10px) saturate(1.02);
 }
 
 html body.studerria-theme.modal-open,
