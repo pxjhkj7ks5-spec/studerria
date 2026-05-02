@@ -442,27 +442,39 @@
       }
     });
 
-    document.addEventListener('mousedown', (event) => {
-      const modal = event.target;
-      if (!(modal instanceof HTMLElement)) {
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
         return;
       }
 
-      if (!modal.classList.contains('modal') || !modal.classList.contains('show')) {
+      const dismissTrigger = target.closest('[data-bs-dismiss="modal"]');
+      if (dismissTrigger instanceof HTMLElement) {
+        const modal = dismissTrigger.closest('.modal');
+        if (!(modal instanceof HTMLElement)) {
+          return;
+        }
+        const instance = window.bootstrap.Modal.getOrCreateInstance(modal);
+        instance.hide();
         return;
       }
 
       const topModal = getTopVisibleModal();
-      if (modal !== topModal) {
+      if (!(topModal instanceof HTMLElement)) {
+        return;
+      }
+      if (topModal.getAttribute('data-bs-backdrop') === 'static') {
         return;
       }
 
-      if (modal.getAttribute('data-bs-backdrop') === 'static') {
+      if (target.classList.contains('modal') && target === topModal) {
+        const instance = window.bootstrap.Modal.getOrCreateInstance(topModal);
+        instance.hide();
         return;
       }
 
-      const instance = window.bootstrap.Modal.getInstance(modal);
-      if (instance) {
+      if (target.classList.contains('modal-backdrop') && target.classList.contains('show')) {
+        const instance = window.bootstrap.Modal.getOrCreateInstance(topModal);
         instance.hide();
       }
     });

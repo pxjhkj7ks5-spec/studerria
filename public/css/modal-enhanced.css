@@ -1,18 +1,24 @@
 /* Shared modal readability layer for every Studerria screen. */
+html body.studerria-theme {
+  --studerria-modal-backdrop-blur: 12px;
+  --studerria-modal-backdrop-dark: rgba(5, 9, 22, 0.52);
+  --studerria-modal-backdrop-light: rgba(241, 245, 255, 0.5);
+}
+
 html body.studerria-theme .modal-backdrop,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   z-index: 1070 !important;
-  background: transparent !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+  background: var(--studerria-modal-backdrop-dark) !important;
+  -webkit-backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
+  backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
   transition: opacity 220ms ease !important;
 }
 
 html body.theme-light.studerria-theme .modal-backdrop,
 html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
-  background: transparent !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+  background: var(--studerria-modal-backdrop-light) !important;
+  -webkit-backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
+  backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
 }
 
 html body.studerria-theme .modal,
@@ -22,8 +28,18 @@ html body.studerria-theme .modal.show {
 
 html body.studerria-theme .modal-backdrop.show,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) .modal-backdrop.show {
-  opacity: 0 !important;
+  opacity: 1 !important;
   pointer-events: auto !important;
+}
+
+html body.studerria-theme .td-lite-modal-backdrop {
+  background: var(--studerria-modal-backdrop-dark) !important;
+  -webkit-backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
+  backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
+}
+
+html body.theme-light.studerria-theme .td-lite-modal-backdrop {
+  background: var(--studerria-modal-backdrop-light) !important;
 }
 
 html body.studerria-theme.modal-open,

@@ -3409,9 +3409,6 @@
               <div class="list-group-item text-muted"><%= t('schedule.messages.loading') %></div>
             </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary glass" data-bs-dismiss="modal"><%= t('changelog.close') %></button>
-          </div>
         </div>
       </div>
     </div>
@@ -5100,7 +5097,7 @@
             menuInstance.hide();
           }
           if (!messagesModalEl) return;
-          const modal = new bootstrap.Modal(messagesModalEl);
+          const modal = bootstrap.Modal.getOrCreateInstance(messagesModalEl);
           modal.show();
         });
       }
@@ -6076,7 +6073,7 @@
         messagesBtn.addEventListener('click', () => {
           setDrawerOpen(false);
           if (!messagesModalEl) return;
-          const modal = new bootstrap.Modal(messagesModalEl);
+          const modal = bootstrap.Modal.getOrCreateInstance(messagesModalEl);
           modal.show();
         });
       }
