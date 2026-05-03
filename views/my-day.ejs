@@ -496,7 +496,12 @@
         </section>
 
         <section class="td-ai-strip" aria-label="Studerria quick actions">
-          <span class="schedule-overview-icon" aria-hidden="true">✦</span>
+          <span class="schedule-overview-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" focusable="false">
+              <path d="M12 3.8l1.7 4.6 4.5 1.7-4.5 1.7-1.7 4.6-1.7-4.6-4.5-1.7 4.5-1.7L12 3.8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M18.2 14.5l.8 2.1 2 .8-2 .8-.8 2.1-.8-2.1-2-.8 2-.8.8-2.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </span>
           <div>
             <h2><%= lang === 'en' ? 'Quick focus for the day' : 'Швидкий фокус на день' %></h2>
             <p><%= brief.message || (lang === 'en' ? 'Open schedule, check deadlines, and keep the day in one rhythm.' : 'Відкрий розклад, перевір дедлайни й тримай день в одному ритмі.') %></p>

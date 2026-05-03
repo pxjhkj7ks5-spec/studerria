@@ -1094,8 +1094,9 @@ body.theme-light .schedule-card:hover {
 
 .empty-state {
   border-radius: var(--radius-sm);
-  border: 0 !important;
+  border: 1px dashed rgba(148, 163, 184, 0.2) !important;
   background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 46%),
     linear-gradient(
       to right,
       transparent 0%,
@@ -1107,13 +1108,21 @@ body.theme-light .schedule-card:hover {
   font-size: 12px;
   font-weight: var(--w-medium);
   line-height: var(--lh-meta);
-  opacity: 0.66;
+  opacity: 0.78;
   padding: 20px 10px 22px;
 }
 
 .empty-state::before {
-  content: "· ";
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 7px;
+  vertical-align: -3px;
+  background: currentColor;
   opacity: 0.62;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M7%207h10M7%2012h10M7%2017h6'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M7%207h10M7%2012h10M7%2017h6'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
 }
 
 body.theme-light .empty-state {
@@ -1757,7 +1766,8 @@ body.theme-light.page-schedule .week-pager .week-carousel-card--ghost {
   gap: 0;
   overflow: visible;
   scroll-snap-type: none;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: gray transparent;
   line-height: 0;
   font-size: 0;
   width: var(--week-slider-width);
@@ -1914,7 +1924,7 @@ body.theme-light .morph-blob {
 }
 
 .week-slider::-webkit-scrollbar {
-  display: none;
+  height: 8px;
 }
 
 body.theme-dark .week-slider {
@@ -2328,7 +2338,8 @@ body.page-schedule .app-footer {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
-    scrollbar-width: none;
+    scrollbar-width: thin;
+    scrollbar-color: gray transparent;
     -webkit-overflow-scrolling: touch;
     padding: 2px 2px 1px;
   }
@@ -2354,7 +2365,7 @@ body.page-schedule .app-footer {
   }
 
   body.page-schedule .week-pager .week-carousel::-webkit-scrollbar {
-    display: none;
+    height: 8px;
   }
 }
 

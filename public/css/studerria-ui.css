@@ -57,6 +57,34 @@ body.studerria-theme {
   --studerria-empty-accent: rgba(129, 140, 248, 0.6);
 }
 
+body.studerria-theme,
+body.studerria-theme * {
+  scrollbar-width: thin;
+  scrollbar-color: gray transparent;
+}
+
+body.studerria-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.studerria-theme ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.studerria-theme ::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: gray;
+  background-clip: content-box;
+}
+
+body.studerria-theme ::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+  background-clip: content-box;
+}
+
 html[data-theme='light'] body.studerria-theme,
 body.theme-light.studerria-theme {
   --studerria-text-primary: #0f172a;
@@ -971,11 +999,13 @@ body.theme-light.studerria-theme input[type="week"] {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  min-height: 84px;
-  padding: 1rem 1.1rem;
+  min-height: 96px;
+  padding: 1.1rem 1.2rem;
   border-radius: 20px;
   border: 1px dashed var(--studerria-empty-border);
-  background: var(--studerria-empty-bg);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 44%),
+    var(--studerria-empty-bg);
   color: var(--studerria-empty-text);
   text-align: center;
 }
@@ -985,11 +1015,10 @@ body.theme-light.studerria-theme input[type="week"] {
   content: "";
   width: 24px;
   height: 24px;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.62), transparent 44%),
-    linear-gradient(135deg, var(--studerria-empty-accent), color-mix(in srgb, var(--studerria-empty-accent) 18%, transparent));
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--studerria-empty-accent) 22%, transparent);
+  background: var(--studerria-empty-accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M5%207.8h14M5%2012h14M5%2016.2h8'/%3E%3Cpath%20d='M17%2015.2l1.4%201.4%202.6-3'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M5%207.8h14M5%2012h14M5%2016.2h8'/%3E%3Cpath%20d='M17%2015.2l1.4%201.4%202.6-3'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+  filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--studerria-empty-accent) 22%, transparent));
   opacity: 0.88;
 }
 
@@ -2847,10 +2876,15 @@ body.theme-dark .td-badge--violet {
 }
 
 .td-empty-inline {
-  padding: 14px;
+  display: flex;
+  align-items: center;
+  min-height: 54px;
+  padding: 14px 16px;
   color: var(--td-muted);
   border: 1px dashed var(--td-border);
   border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  font-weight: 650;
 }
 
 .td-day-switcher.schedule-day-switcher {
@@ -2863,7 +2897,8 @@ body.theme-dark .td-badge--violet {
   padding: 12px;
   border-radius: 28px;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: gray transparent;
   border: 1px solid rgba(120, 130, 170, 0.16);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
@@ -2871,7 +2906,7 @@ body.theme-dark .td-badge--violet {
 }
 
 .td-day-switcher.schedule-day-switcher::-webkit-scrollbar {
-  display: none;
+  height: 8px;
 }
 
 @media (min-width: 992px) {
@@ -3801,35 +3836,33 @@ body.page-my-day .td-stat-card::after {
 }
 
 body.page-my-day .td-stat-card::before {
+  content: "";
   position: absolute;
   top: 16px;
   right: 16px;
   z-index: 2;
   width: 42px;
   height: 42px;
-  display: grid;
-  place-items: center;
-  color: rgba(225, 232, 255, 0.94);
-  font-size: 1.02rem;
-  font-weight: 700;
-  line-height: 1;
-  text-shadow: 0 2px 10px rgba(49, 46, 129, 0.35);
+  background: rgba(225, 232, 255, 0.94);
+  -webkit-mask: var(--td-stat-symbol) center / 21px 21px no-repeat;
+  mask: var(--td-stat-symbol) center / 21px 21px no-repeat;
+  filter: drop-shadow(0 2px 10px rgba(49, 46, 129, 0.35));
 }
 
 body.page-my-day .td-stats-grid .td-stat-card:nth-child(1)::before {
-  content: "✓";
+  --td-stat-symbol: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='2.1'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Crect%20x='5'%20y='4'%20width='14'%20height='16'%20rx='3'/%3E%3Cpath%20d='M9%2012.5l2.1%202.1L15.5%2010'/%3E%3C/svg%3E");
 }
 
 body.page-my-day .td-stats-grid .td-stat-card:nth-child(2)::before {
-  content: "◷";
+  --td-stat-symbol: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='12'%20cy='12'%20r='7.5'/%3E%3Cpath%20d='M12%207.8v4.7l3.2%201.9'/%3E%3C/svg%3E");
 }
 
 body.page-my-day .td-stats-grid .td-stat-card:nth-child(3)::before {
-  content: "✉";
+  --td-stat-symbol: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M7%207h10a3%203%200%200%201%203%203v3.8a3%203%200%200%201-3%203H12l-4%203v-3H7a3%203%200%200%201-3-3V10a3%203%200%200%201%203-3Z'/%3E%3C/svg%3E");
 }
 
 body.page-my-day .td-stats-grid .td-stat-card:nth-child(4)::before {
-  content: "↗";
+  --td-stat-symbol: url("data:image/svg+xml,%3Csvg%20viewBox='0%200%2024%2024'%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M5%2017.5h14'/%3E%3Cpath%20d='M7%2015l4-4%203%203%204.5-6'/%3E%3Cpath%20d='M15%208h3.5v3.5'/%3E%3C/svg%3E");
 }
 
 body.theme-dark.page-my-day .td-stat-card::after {
@@ -3837,8 +3870,8 @@ body.theme-dark.page-my-day .td-stat-card::after {
 }
 
 body.theme-light.page-my-day .td-stat-card::before {
-  color: rgba(67, 56, 202, 0.92);
-  text-shadow: none;
+  background: rgba(67, 56, 202, 0.92);
+  filter: none;
 }
 
 body.page-my-day .td-schedule-row,
