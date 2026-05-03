@@ -1434,12 +1434,13 @@ body.theme-dark.page-authenticated.studerria-theme .snav-account-card {
   }
 
   body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack::before {
-    background: url("/assets/brand/studerria-mark-light-512.png") center / 76% 76% no-repeat;
-    background-color: rgba(244, 247, 255, 0.96);
-    border-color: rgba(99, 102, 241, 0.22);
+    background: url("/assets/brand/studerria-mark-dark-512.png") center / 78% 78% no-repeat;
+    background-color: rgba(248, 250, 255, 0.88);
+    border-color: rgba(129, 140, 248, 0.24);
     box-shadow:
-      0 14px 30px rgba(99, 102, 241, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.78);
+      0 16px 34px rgba(99, 102, 241, 0.16),
+      0 3px 10px rgba(15, 23, 42, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.86);
   }
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-list {
