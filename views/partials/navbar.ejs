@@ -122,7 +122,66 @@
     }
     return result;
   }, []);
-  const visibleNavItems = flattenSidebarItems(safeNavItems);
+  const navOrderMap = new Map([
+    ['home', 10],
+    ['teacher-hub', 10],
+    ['schedule', 20],
+    ['admin-schedule', 24],
+    ['journal', 30],
+    ['journal-insights', 34],
+    ['insight', 34],
+    ['rating', 36],
+    ['homework', 40],
+    ['admin-homework', 42],
+    ['teacher-workspace', 44],
+    ['teamwork', 50],
+    ['admin-teamwork', 52],
+    ['messages', 60],
+    ['subjects', 70],
+    ['teacher-subjects', 72],
+    ['resources', 74],
+    ['discipline', 76],
+    ['profile', 84],
+    ['personal', 84],
+    ['settings', 86],
+    ['help', 90],
+    ['faq', 90],
+    ['about', 92],
+    ['site', 92],
+    ['admin', 100],
+    ['reports', 104],
+    ['report', 104],
+    ['setup', 108],
+    ['admin-students', 112],
+    ['students', 112],
+    ['student', 112],
+    ['admin-groups', 114],
+    ['groups', 114],
+    ['group', 114],
+  ]);
+  const getSidebarOrder = (item) => {
+    const itemId = String(item && item.id ? item.id : '').trim().toLowerCase();
+    if (navOrderMap.has(itemId)) {
+      return navOrderMap.get(itemId);
+    }
+    for (const [token, rank] of navOrderMap.entries()) {
+      if (itemId.includes(token)) {
+        return rank;
+      }
+    }
+    return 500;
+  };
+  const visibleNavItems = flattenSidebarItems(safeNavItems)
+    .map((item, index) => ({
+      ...item,
+      __sidebarIndex: index,
+    }))
+    .sort((left, right) => {
+      const orderDelta = getSidebarOrder(left) - getSidebarOrder(right);
+      if (orderDelta !== 0) return orderDelta;
+      return left.__sidebarIndex - right.__sidebarIndex;
+    })
+    .map(({ __sidebarIndex, ...item }) => item);
   const shouldRenderAppNav = safeForceAppNavbar || (isAuthed && visibleNavItems.length > 0);
   const allowMessages = Boolean(safeUserNav && safeUserNav.flags && safeUserNav.flags.allowMessages);
   const personalLabel = String((safeNavMeta && safeNavMeta.personalLabel) || (safeUserNav && safeUserNav.personalLabel) || tr('nav.personal', 'Personal')).trim() || tr('nav.personal', 'Personal');
