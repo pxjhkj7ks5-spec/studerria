@@ -37,7 +37,11 @@
                   <span>v<%= seriesKey %>.x</span>
                   <span class="changelog-series__count"><%= seriesItems.length %> <%= t('changelog.releases') %></span>
                 </span>
-                <span class="changelog-series__chevron" aria-hidden="true">›</span>
+                <span class="changelog-series__chevron" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" focusable="false">
+                    <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
               </summary>
               <div class="changelog-series__body">
                 <% seriesItems.forEach(function(entry) { %>

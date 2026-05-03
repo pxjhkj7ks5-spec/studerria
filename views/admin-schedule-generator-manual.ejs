@@ -164,6 +164,11 @@
         background: rgba(255,255,255,.06);
         font-size: .75rem;
       }
+      .manual-shell .manual-slot-remove svg {
+        width: 13px;
+        height: 13px;
+        display: block;
+      }
       .manual-shell .manual-slot-list {
         display: flex;
         flex-wrap: wrap;
@@ -592,7 +597,7 @@
           listNode.innerHTML = rowSlots
             .map((slot) => {
               const slotKey = buildSlotKey(slot);
-              return `<span class="manual-slot-chip">${slot.day_of_week} #${slot.class_number}<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none manual-slot-remove" data-slot-key="${slotKey}" aria-label="remove">×</button></span>`;
+              return `<span class="manual-slot-chip">${slot.day_of_week} #${slot.class_number}<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none manual-slot-remove" data-slot-key="${slotKey}" aria-label="remove"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" focusable="false"><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>`;
             })
             .join('');
         });

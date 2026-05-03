@@ -1222,6 +1222,12 @@ body.modal-open {
   transition: transform 180ms ease;
 }
 
+.changelog-series__chevron svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .changelog-series[open] .changelog-series__chevron {
   transform: rotate(90deg);
 }
@@ -2338,8 +2344,13 @@ body.theme-dark .td-lite-sheet {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.58);
   color: var(--td-muted, rgba(148, 163, 184, 0.95));
-  font-size: 1.35rem;
   line-height: 1;
+}
+
+.td-lite-close svg {
+  width: 17px;
+  height: 17px;
+  display: block;
 }
 
 body.theme-dark .td-lite-close {

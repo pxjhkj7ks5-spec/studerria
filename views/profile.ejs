@@ -735,7 +735,9 @@
           const icon = document.createElement('span');
           icon.className = 'profile-toast__icon';
           icon.setAttribute('aria-hidden', 'true');
-          icon.textContent = type === 'error' ? '!' : '✓';
+          icon.innerHTML = type === 'error'
+            ? '<svg viewBox="0 0 24 24" fill="none" focusable="false"><path d="M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 17.2h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" focusable="false"><path d="M6.5 12.5l3.4 3.4 7.6-8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
           const body = document.createElement('div');
           body.className = 'profile-toast__body';
@@ -754,7 +756,7 @@
           close.className = 'profile-toast__close';
           close.type = 'button';
           close.setAttribute('aria-label', toastStack.dataset.closeLabel || 'Закрити повідомлення');
-          close.textContent = '×';
+          close.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" focusable="false"><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
           close.addEventListener('click', () => dismissToast(toast));
 
           body.appendChild(title);

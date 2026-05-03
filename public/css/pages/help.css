@@ -28,6 +28,12 @@
   font-weight: 700;
 }
 
+.flash-alert__icon svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
 .flash-alert__body {
   min-width: 0;
 }

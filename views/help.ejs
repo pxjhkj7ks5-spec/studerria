@@ -51,7 +51,12 @@
     <section class="studerria-help-shell" aria-labelledby="studerria-help-title">
       <% if (messages && messages.error) { %>
         <div class="alert flash-alert alert-danger mb-0" role="alert">
-          <span class="flash-alert__icon" aria-hidden="true">!</span>
+          <span class="flash-alert__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" focusable="false">
+              <path d="M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 17.2h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+            </svg>
+          </span>
           <div class="flash-alert__body">
             <span class="flash-alert__title"><%= t('help.flash.errorTitle') %></span>
             <p class="flash-alert__text"><%= messages.error %></p>
@@ -60,7 +65,11 @@
       <% } %>
       <% if (messages && messages.success) { %>
         <div class="alert flash-alert alert-success mb-0" role="status">
-          <span class="flash-alert__icon" aria-hidden="true">✓</span>
+          <span class="flash-alert__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" focusable="false">
+              <path d="M6.5 12.5l3.4 3.4 7.6-8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
           <div class="flash-alert__body">
             <span class="flash-alert__title"><%= t('help.flash.successTitle') %></span>
             <p class="flash-alert__text"><%= messages.success %></p>

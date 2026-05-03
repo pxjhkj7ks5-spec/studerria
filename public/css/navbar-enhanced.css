@@ -549,8 +549,13 @@ body.theme-light .snav-mobile-panel {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.2rem;
   line-height: 1;
+}
+
+.snav-mobile-close svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .snav-mobile-close:hover,
@@ -870,7 +875,7 @@ body.theme-light .snav-mobile-logout-btn {
   }
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .navbar-brand.topbar-title-spotlight {
-    font-size: 1.24rem !important;
+    font-size: 1.32rem !important;
     line-height: 1;
     letter-spacing: -0.02em;
   }
@@ -1405,19 +1410,19 @@ body.theme-dark.page-authenticated.studerria-theme .snav-account-card {
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack {
     position: relative;
-    min-height: 64px;
+    min-height: 70px;
     justify-content: center;
-    padding-left: 72px;
+    padding-left: 82px;
   }
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack::before {
     content: "";
     position: absolute;
-    left: 4px;
+    left: 6px;
     top: 50%;
-    width: 58px;
-    height: 58px;
-    border-radius: 18px;
+    width: 66px;
+    height: 66px;
+    border-radius: 20px;
     transform: translateY(-50%);
     background: url("/assets/brand/studerria-mark-dark-512.png") center / 76% 76% no-repeat;
     background-color: rgba(9, 16, 33, 0.9);

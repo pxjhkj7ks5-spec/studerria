@@ -1167,7 +1167,12 @@ body.theme-light .admin-toast.is-error {
   border: none;
   background: transparent;
   color: inherit;
-  font-size: 1.2rem;
+}
+
+.admin-toast-close svg {
+  width: 15px;
+  height: 15px;
+  display: block;
 }
 
 .skeleton-row .skeleton-line {

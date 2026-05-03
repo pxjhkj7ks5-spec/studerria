@@ -1259,8 +1259,12 @@
         border-color: rgba(125, 211, 252, 0.45);
       }
       .catalog-course-chip-remove {
-        font-size: 0.92rem;
         opacity: 0.78;
+      }
+      .catalog-course-chip-remove svg {
+        width: 14px;
+        height: 14px;
+        display: block;
       }
       .catalog-chip-group {
         display: flex;
@@ -3301,7 +3305,11 @@
                           <input type="hidden" name="admission_id" value="<%= selectedAdmissionValue %>" />
                           <button class="catalog-course-chip" type="submit">
                             <span><%= courseLabel.name %></span>
-                            <span class="catalog-course-chip-remove" aria-hidden="true">×</span>
+                            <span class="catalog-course-chip-remove" aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" focusable="false">
+                                <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                              </svg>
+                            </span>
                           </button>
                         </form>
                       <% }) %>
