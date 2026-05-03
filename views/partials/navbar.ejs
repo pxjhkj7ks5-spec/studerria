@@ -282,9 +282,10 @@
     const unreadMarker = allowMessages && (item.id === 'personal' || item.id === 'messages')
       ? `<span class="snav-unread-chip" data-message-indicator="${item.id}" hidden aria-hidden="true"></span>`
       : '';
+    const chevronRightIcon = '<svg viewBox="0 0 24 24" fill="none" focusable="false"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     let indicator = '';
     if (Array.isArray(item.children) && item.children.length && level > 0) {
-      indicator = '<span class="snav-indicator snav-indicator--submenu" aria-hidden="true">&rsaquo;</span>';
+      indicator = `<span class="snav-indicator snav-indicator--submenu" aria-hidden="true">${chevronRightIcon}</span>`;
     }
     const icon = `<span class="snav-icon nav-icon" data-snav-icon="${escapeHtml(item.id || 'nav')}" aria-hidden="true"></span>`;
     return `${icon}<span class="snav-label">${label}${unreadMarker}</span>${indicator}`;
@@ -394,7 +395,11 @@
         <span class="snav-mobile-link-title"><span data-mobile-link-label>${escapeHtml(item.label || '')}</span>${unreadHtml}</span>
         ${metaHtml}
       </span>
-      <span class="snav-mobile-link-chevron" aria-hidden="true">&rsaquo;</span>
+      <span class="snav-mobile-link-chevron" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" focusable="false">
+          <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
     `;
 
     if (item.navAction === 'theme-toggle') {

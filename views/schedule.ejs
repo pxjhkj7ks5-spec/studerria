@@ -2358,10 +2358,18 @@
                   <button class="btn-glass schedule-quick-btn" id="weekTodayBtn" type="button"><%= lang === 'en' ? 'Today' : 'Сьогодні' %></button>
                   <button class="btn-glass schedule-quick-btn" id="weekCurrentBtn" type="button"><%= lang === 'en' ? 'This week' : 'Цей тиждень' %></button>
                   <button class="td-icon-button week-nav-btn" id="weekPrev" type="button" aria-label="<%= scheduleViewText.previousWeekAria %>">
-                    <span class="week-nav-btn__icon">&lsaquo;</span>
+                    <span class="week-nav-btn__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" focusable="false">
+                        <path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </span>
                   </button>
                   <button class="td-icon-button week-nav-btn" id="weekNext" type="button" aria-label="<%= scheduleViewText.nextWeekAria %>">
-                    <span class="week-nav-btn__icon">&rsaquo;</span>
+                    <span class="week-nav-btn__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" focusable="false">
+                        <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </span>
                   </button>
                 </div>
                 <div class="week-pill visually-hidden" id="weekPill" aria-label="<%= scheduleViewText.currentWeekAria %>">

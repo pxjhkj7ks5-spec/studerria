@@ -216,16 +216,24 @@ body.theme-light .snav-unread-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9em;
+  width: 16px;
+  height: 16px;
   opacity: 0.58;
-  transition: transform 180ms ease, opacity 180ms ease;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
+}
+
+.snav-indicator svg,
+.snav-mobile-link-chevron svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .snav-item.is-subopen > .snav-menu-link .snav-indicator,
 .snav-menu-link:hover .snav-indicator,
 .snav-menu-link:focus-visible .snav-indicator {
   opacity: 0.92;
-  transform: translateZ(0);
+  transform: translateX(2px);
 }
 
 .snav-menu {
@@ -682,8 +690,17 @@ body.theme-light .snav-mobile-link-glyph {
 }
 
 .snav-mobile-link-chevron {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0.54;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
+}
+
+.snav-mobile-link:hover .snav-mobile-link-chevron,
+.snav-mobile-link:focus-visible .snav-mobile-link-chevron {
+  opacity: 0.9;
+  transform: translateX(2px);
 }
 
 .snav-mobile-footer {
@@ -1000,6 +1017,8 @@ body.theme-light .snav-mobile-logout-btn {
     -webkit-mask: var(--snav-icon-mask) center / contain no-repeat;
     mask: var(--snav-icon-mask) center / contain no-repeat;
     opacity: 0.94;
+    transform-origin: 50% 50%;
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
   }
 
   .nav-icon::after,
@@ -1014,7 +1033,16 @@ body.theme-light .snav-mobile-logout-btn {
   .theme-toggle-min.snav-logout-btn:hover .nav-icon,
   .theme-toggle-min.snav-logout-btn:focus-visible .nav-icon {
     opacity: 0.95;
-    transform: translateZ(0);
+    transform: translateY(-1px) scale(1.04);
+  }
+
+  .snav-link:hover .nav-icon::before,
+  .snav-link:focus-visible .nav-icon::before,
+  .snav-menu-link:hover .nav-icon::before,
+  .snav-menu-link:focus-visible .nav-icon::before,
+  .theme-toggle-min.snav-logout-btn:hover .nav-icon::before,
+  .theme-toggle-min.snav-logout-btn:focus-visible .nav-icon::before {
+    animation: snavSymbolLift 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .snav-item.is-current .nav-icon,
@@ -1022,6 +1050,18 @@ body.theme-light .snav-mobile-logout-btn {
   .theme-toggle-min.snav-logout-btn:focus-visible .nav-icon {
     opacity: 1;
     filter: drop-shadow(0 0 8px rgba(150, 130, 255, 0.25));
+  }
+
+  @keyframes snavSymbolLift {
+    0% {
+      transform: translateY(0) scale(1);
+    }
+    46% {
+      transform: translateY(-1.5px) scale(1.08);
+    }
+    100% {
+      transform: translateY(-1px) scale(1.04);
+    }
   }
 
   .snav-icon[data-snav-icon*="home"],
@@ -1204,9 +1244,16 @@ body.theme-light .snav-mobile-logout-btn {
 @media (prefers-reduced-motion: reduce) {
   .studerria-nav-shell .snav-link,
   .studerria-nav-shell .snav-menu-link,
+  .studerria-nav-shell .nav-icon,
+  .studerria-nav-shell .nav-icon::before,
+  .studerria-nav-shell .snav-icon,
+  .studerria-nav-shell .snav-icon::before,
+  .studerria-nav-shell .snav-indicator,
   .snav-mobile-panel,
   .snav-mobile-link,
+  .snav-mobile-link-chevron,
   .snav-mobile-trigger {
+    animation: none !important;
     transition: none !important;
   }
 }
