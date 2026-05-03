@@ -1435,8 +1435,8 @@ body.theme-dark.page-authenticated.studerria-theme .snav-account-card {
 
   body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-brand-stack::before {
     background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(239, 243, 255, 0.82)),
-      url("/assets/brand/studerria-mark-512.png") center / 76% 76% no-repeat;
+      url("/assets/brand/studerria-mark-512.png") center / 76% 76% no-repeat,
+      linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(239, 243, 255, 0.82));
     border-color: rgba(129, 140, 248, 0.22);
     box-shadow:
       0 16px 34px rgba(99, 102, 241, 0.15),
