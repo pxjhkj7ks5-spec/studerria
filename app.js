@@ -5,7 +5,6 @@ const helmet = require('helmet');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const RedisStore = require('connect-redis').default;
-const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID, createHash } = require('crypto');
@@ -16,6 +15,9 @@ const { WebSocketServer } = require('ws');
 const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
 const navMiddleware = require('./middleware/nav');
+const { registerServiceProxies } = require('./middleware/serviceProxies');
+const { registerPublicRoutes } = require('./routes/publicRoutes');
+const { registerSystemRoutes } = require('./routes/systemRoutes');
 const supportHelpers = require('./lib/support');
 const messageHelpers = require('./lib/messages');
 const teacherTemplateHelpers = require('./lib/teacherTemplates');
@@ -30,6 +32,7 @@ const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
 const sessionGeneratorHelpers = require('./lib/sessionGenerator');
 const { localizeChangelogItems } = require('./lib/changelogI18n');
+const { publicLegalPages } = require('./lib/legalPages');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 let appVersion = pkg.version || '0.0.0';
@@ -333,10 +336,6 @@ const wss = new WebSocketServer({ noServer: true });
 const SOCKET_CHANNEL_MESSAGES = 'messages';
 const SOCKET_CHANNEL_ADMIN = 'admin';
 const SOCKET_CHANNELS = new Set([SOCKET_CHANNEL_MESSAGES, SOCKET_CHANNEL_ADMIN]);
-const CHARREDMAP_BASE_PATH = '/charredmap';
-const NARADADRUK_BASE_PATH = '/naradadruk';
-const charredmapProxyTarget = String(process.env.CHARREDMAP_PROXY_TARGET || '').trim();
-const naradadrukProxyTarget = String(process.env.NARADADRUK_PROXY_TARGET || '').trim();
 const DANGEROUS_UPLOAD_EXTENSIONS = new Set([
   '.html',
   '.htm',
@@ -349,126 +348,7 @@ const DANGEROUS_UPLOAD_EXTENSIONS = new Set([
   '.json',
 ]);
 
-const hasCharredmapProxy = /^https?:\/\//i.test(charredmapProxyTarget);
-const hasNaradadrukProxy = /^https?:\/\//i.test(naradadrukProxyTarget);
-
-function isCharredmapRequest(req) {
-  const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
-  return pathname === CHARREDMAP_BASE_PATH || pathname.startsWith(`${CHARREDMAP_BASE_PATH}/`);
-}
-
-function isNaradadrukRequest(req) {
-  const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
-  return pathname === NARADADRUK_BASE_PATH || pathname.startsWith(`${NARADADRUK_BASE_PATH}/`);
-}
-
-function respondCharredmapUnavailable(res, statusCode = 503) {
-  if (!res || res.headersSent) return;
-  const body = statusCode === 404 ? 'Not found' : 'Charredmap is temporarily unavailable.';
-  if (typeof res.status === 'function') {
-    res.status(statusCode);
-  } else {
-    res.statusCode = statusCode;
-  }
-  if (typeof res.setHeader === 'function') {
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  }
-  if (typeof res.type === 'function') {
-    res.type('text/plain; charset=utf-8');
-  }
-  if (typeof res.send === 'function') {
-    res.send(body);
-    return;
-  }
-  if (typeof res.end === 'function') {
-    res.end(body);
-  }
-}
-
-function respondNaradadrukUnavailable(res, statusCode = 503) {
-  if (!res || res.headersSent) return;
-  const body = statusCode === 404 ? 'Not found' : 'Narada Druk is temporarily unavailable.';
-  if (typeof res.status === 'function') {
-    res.status(statusCode);
-  } else {
-    res.statusCode = statusCode;
-  }
-  if (typeof res.setHeader === 'function') {
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  }
-  if (typeof res.type === 'function') {
-    res.type('text/plain; charset=utf-8');
-  }
-  if (typeof res.send === 'function') {
-    res.send(body);
-    return;
-  }
-  if (typeof res.end === 'function') {
-    res.end(body);
-  }
-}
-
-const charredmapProxy = hasCharredmapProxy
-  ? createProxyMiddleware({
-      target: charredmapProxyTarget,
-      changeOrigin: false,
-      xfwd: true,
-      ws: false,
-      proxyTimeout: 30000,
-      timeout: 30000,
-      on: {
-        error(err, req, res) {
-          console.error('Charredmap proxy error', err);
-          respondCharredmapUnavailable(res, 503);
-        },
-        proxyReq(proxyReq) {
-          proxyReq.setHeader('x-forwarded-prefix', CHARREDMAP_BASE_PATH);
-        },
-      },
-    })
-  : null;
-
-const naradadrukProxy = hasNaradadrukProxy
-  ? createProxyMiddleware({
-      target: naradadrukProxyTarget,
-      changeOrigin: false,
-      xfwd: true,
-      ws: false,
-      proxyTimeout: 30000,
-      timeout: 30000,
-      on: {
-        error(err, req, res) {
-          console.error('Narada Druk proxy error', err);
-          respondNaradadrukUnavailable(res, 503);
-        },
-        proxyReq(proxyReq) {
-          proxyReq.setHeader('x-forwarded-prefix', NARADADRUK_BASE_PATH);
-        },
-      },
-    })
-  : null;
-
-app.use((req, res, next) => {
-  if (!isCharredmapRequest(req)) {
-    return next();
-  }
-  if (!charredmapProxy) {
-    return respondCharredmapUnavailable(res, 404);
-  }
-  return charredmapProxy(req, res, next);
-});
-
-app.use((req, res, next) => {
-  if (!isNaradadrukRequest(req)) {
-    return next();
-  }
-  if (!naradadrukProxy) {
-    return respondNaradadrukUnavailable(res, 404);
-  }
-  return naradadrukProxy(req, res, next);
-});
+registerServiceProxies(app);
 
 process.on('uncaughtException', (err) => {
   pushRuntimeErrorEvent('unhandled', 'uncaughtException', err && err.message ? err.message : err);
@@ -18526,188 +18406,11 @@ async function attachScopedMessageTargetCounts(rows, { fallbackCourseId = null }
   });
 }
 
-app.get('/', (req, res) => {
-  if (req.session && req.session.user) {
-    return res.redirect('/home');
-  }
-  const lang = getPreferredLang(req);
-  const loginErrorText = buildLoginErrorMessage(lang, req.query.error);
-  res.render('login', {
-    error: Boolean(loginErrorText),
-    loginErrorText,
-    layout: false,
-  });
+registerPublicRoutes(app, {
+  getPreferredLang,
+  buildLoginErrorMessage,
+  publicLegalPages,
 });
-
-app.get('/login', (req, res) => {
-  if (req.session && req.session.user) {
-    return res.redirect('/home');
-  }
-  const lang = getPreferredLang(req);
-  const loginErrorText = buildLoginErrorMessage(lang, req.query.error);
-  res.render('login', {
-    error: Boolean(loginErrorText),
-    loginErrorText,
-    layout: false,
-  });
-});
-
-const publicLegalPages = {
-  uk: {
-    terms: {
-      legalTitle: 'Умови використання',
-      legalLead: 'Ці умови описують базові правила користування Studerria: навчальним простором для розкладу, завдань, повідомлень, матеріалів і командної роботи.',
-      legalSections: [
-        {
-          title: '1. Призначення сервісу',
-          body: 'Studerria допомагає організовувати навчальний процес і щоденну взаємодію між студентами, викладачами та адміністрацією. Сервіс не замінює офіційні документи закладу освіти, якщо інше прямо не визначено адміністрацією.',
-        },
-        {
-          title: '2. Обліковий запис',
-          items: [
-            'Користувач відповідає за коректність даних, які вводить під час реєстрації та використання сайту.',
-            'Пароль потрібно зберігати конфіденційно й не передавати іншим людям.',
-            'Адміністрація може обмежити доступ, якщо акаунт використовується для порушення правил або втручання в роботу сервісу.',
-          ],
-        },
-        {
-          title: '3. Навчальні дані та дії',
-          body: 'Розклад, домашні завдання, повідомлення, матеріали, оцінки та інші навчальні дані показуються відповідно до ролі користувача й наданих прав доступу.',
-          items: [
-            'Не змінюйте й не публікуйте дані, якщо у вас немає на це дозволу.',
-            'Не завантажуйте файли, що порушують права інших людей або можуть пошкодити сервіс.',
-            'Не використовуйте автоматизовані запити, скрипти або інші дії, які створюють зайве навантаження.',
-          ],
-        },
-        {
-          title: '4. Доступність і зміни',
-          body: 'Ми можемо оновлювати інтерфейс, функції та правила роботи Studerria, щоб покращувати стабільність, безпеку й зручність. Окремі функції можуть тимчасово бути недоступними під час технічних робіт.',
-        },
-        {
-          title: '5. Зворотний звʼязок',
-          body: 'Якщо ви помітили помилку, маєте питання щодо доступу або хочете уточнити правила користування, зверніться через сторінку підтримки або до відповідальної особи у вашій навчальній групі.',
-        },
-      ],
-    },
-    privacy: {
-      legalTitle: 'Політика конфіденційності',
-      legalLead: 'Ця політика пояснює, які дані Studerria обробляє, для чого вони потрібні та як ми зберігаємо приватність користувачів.',
-      legalSections: [
-        {
-          title: '1. Які дані обробляються',
-          items: [
-            'Профільні дані: імʼя, роль, курс, група та повʼязані навчальні налаштування.',
-            'Навчальні дані: розклад, завдання, матеріали, повідомлення, teamwork-активність і повʼязані статуси.',
-            'Технічні дані: сесії входу, час активності, IP-адреса, user agent і події безпеки, потрібні для захисту акаунтів.',
-          ],
-        },
-        {
-          title: '2. Для чого використовуються дані',
-          body: 'Дані потрібні, щоб показувати персональний навчальний простір, керувати доступами, доставляти повідомлення, підтримувати роботу розкладу та захищати сервіс від зловживань.',
-        },
-        {
-          title: '3. Доступ до даних',
-          items: [
-            'Користувач бачить дані відповідно до своєї ролі та навчальної групи.',
-            'Викладачі, старости, деканат і адміністратори можуть бачити лише ті розділи, які потрібні для їхніх робочих сценаріїв.',
-            'Ми не продаємо персональні дані та не передаємо їх стороннім рекламним сервісам.',
-          ],
-        },
-        {
-          title: '4. Зберігання та безпека',
-          body: 'Studerria використовує сесії, рольові перевірки та технічні журнали для безпечної роботи. Дані зберігаються стільки, скільки потрібно для навчального процесу, адміністрування, підтримки й захисту сервісу.',
-        },
-        {
-          title: '5. Ваші запити',
-          body: 'Щоб уточнити дані профілю, повідомити про помилку або поставити питання щодо приватності, зверніться через підтримку. Ми опрацюємо запит у межах доступних технічних і організаційних процедур.',
-        },
-      ],
-    },
-  },
-  en: {
-    terms: {
-      legalTitle: 'Terms of Use',
-      legalLead: 'These terms describe the core rules for using Studerria as a learning space for schedule, assignments, messaging, materials, and teamwork.',
-      legalSections: [
-        {
-          title: '1. Service purpose',
-          body: 'Studerria helps organize the learning process and day-to-day interaction between students, teachers, and administration. The service does not replace official institutional documents unless explicitly stated by administration.',
-        },
-        {
-          title: '2. Account responsibility',
-          items: [
-            'The user is responsible for the accuracy of data provided during registration and platform usage.',
-            'Passwords must be kept confidential and not shared with other people.',
-            'Administration may restrict access if an account is used to violate rules or interfere with service operation.',
-          ],
-        },
-        {
-          title: '3. Learning data and actions',
-          body: 'Schedule, assignments, messages, materials, grades, and other study data are shown according to user role and granted permissions.',
-          items: [
-            'Do not modify or publish data without proper permission.',
-            'Do not upload files that violate rights of others or can damage the service.',
-            'Do not use automated requests, scripts, or other actions that create excessive load.',
-          ],
-        },
-        {
-          title: '4. Availability and updates',
-          body: 'We may update Studerria interfaces, features, and operational rules to improve stability, security, and usability. Some features may be temporarily unavailable during maintenance.',
-        },
-        {
-          title: '5. Feedback',
-          body: 'If you notice an issue, have access questions, or need rule clarification, contact support or the responsible person in your study group.',
-        },
-      ],
-    },
-    privacy: {
-      legalTitle: 'Privacy Policy',
-      legalLead: 'This policy explains what data Studerria processes, why it is needed, and how user privacy is protected.',
-      legalSections: [
-        {
-          title: '1. Data we process',
-          items: [
-            'Profile data: name, role, course, group, and related academic settings.',
-            'Learning data: schedule, assignments, materials, messages, teamwork activity, and related statuses.',
-            'Technical data: login sessions, activity timestamps, IP address, user agent, and security events required to protect accounts.',
-          ],
-        },
-        {
-          title: '2. Why data is used',
-          body: 'Data is used to provide a personalized learning workspace, manage permissions, deliver messages, support schedule flows, and protect the service from abuse.',
-        },
-        {
-          title: '3. Access to data',
-          items: [
-            'Each user sees data according to role and academic group.',
-            'Teachers, group leaders, deanery, and administrators can access only sections needed for their workflows.',
-            'We do not sell personal data and do not transfer it to third-party advertising services.',
-          ],
-        },
-        {
-          title: '4. Storage and security',
-          body: 'Studerria uses session controls, role checks, and technical logs for secure operation. Data is stored only as long as needed for the learning process, administration, support, and service protection.',
-        },
-        {
-          title: '5. Your requests',
-          body: 'To update profile data, report an issue, or ask a privacy question, contact support. Requests are processed within available technical and organizational procedures.',
-        },
-      ],
-    },
-  },
-};
-
-app.get(['/terms', '/privacy'], (req, res) => {
-  const lang = getPreferredLang(req);
-  const legalLang = lang === 'en' ? 'en' : 'uk';
-  const key = req.path === '/privacy' ? 'privacy' : 'terms';
-  return res.render('legal', {
-    ...publicLegalPages[legalLang][key],
-    layout: false,
-  });
-});
-
-app.get('/changelog', (req, res) => res.render('changelog', { layout: false }));
 
 app.get('/about', requireLogin, (req, res) => {
   const lang = getPreferredLang(req);
@@ -19130,67 +18833,15 @@ const canAccessOperationalDetails = (req) => {
   });
 };
 
-app.get('/_health', (req, res) => {
-  const dbStatus = initStatus === 'ok' ? 'ok' : (initStatus === 'error' ? 'fail' : 'starting');
-  const sessionStatus = sessionHealthState.ok ? 'ok' : 'fail';
-  const status = dbStatus === 'fail' || sessionStatus === 'fail'
-    ? 'degraded'
-    : (dbStatus === 'starting' ? 'starting' : 'ok');
-  const strictMode = String(req.query.strict || '') === '1';
-  const detailedMode = canAccessOperationalDetails(req);
-  const httpStatus = strictMode && status !== 'ok' ? 503 : 200;
-  res.setHeader('Cache-Control', 'no-store');
-  const payload = {
-    status,
-    healthy: status === 'ok',
-  };
-  if (detailedMode) {
-    payload.db = {
-      initStatus,
-      status: dbStatus,
-      error: initError ? String(initError.message || initError) : null,
-    };
-    payload.session = {
-      ok: sessionHealthState.ok,
-      status: sessionStatus,
-      table: sessionHealthState.table,
-      checks: sessionHealthState.checks,
-      failures: sessionHealthState.failures,
-      probe_interval_seconds: sessionHealthProbeIntervalSeconds,
-      last_checked_at: sessionHealthState.lastCheckedAt,
-      last_ok_at: sessionHealthState.lastOkAt,
-      last_error_at: sessionHealthState.lastErrorAt,
-      last_error: sessionHealthState.lastError,
-      last_duration_ms: sessionHealthState.lastDurationMs,
-    };
-  }
-  res.status(httpStatus).json(payload);
-});
-
-app.get('/__version', (req, res) => {
-  if (!canAccessOperationalDetails(req)) {
-    return res.status(404).send('Not found');
-  }
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({
-    version: appVersion,
-    buildStamp,
-    node: process.version,
-  });
-});
-
-app.post('/_bootstrap', async (req, res) => {
-  const token = String(process.env.BOOTSTRAP_TOKEN || '').trim();
-  const provided = String(req.get('x-bootstrap-token') || '').trim();
-  if (!token || provided !== token) {
-    return res.status(403).json({ ok: false, error: 'Forbidden' });
-  }
-  try {
-    await ensureDbReady();
-    return res.json({ ok: true, initStatus });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: String(err.message || err) });
-  }
+registerSystemRoutes(app, {
+  canAccessOperationalDetails,
+  getInitStatus: () => initStatus,
+  getInitError: () => initError,
+  sessionHealthState,
+  sessionHealthProbeIntervalSeconds,
+  appVersion,
+  buildStamp,
+  ensureDbReady,
 });
 
 app.post('/login', authLimiter, async (req, res) => {
