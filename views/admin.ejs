@@ -911,11 +911,21 @@
     <% const scopeCampusOptions = Array.isArray(scopeState.campusOptions) ? scopeState.campusOptions : []; %>
     <% const scopeAvailableContexts = Array.isArray(scopeState.availableStudyContexts) ? scopeState.availableStudyContexts : []; %>
     <% const scopeAvailableAcademicGroups = Array.isArray(scopeState.availableAcademicGroups) ? scopeState.availableAcademicGroups : []; %>
+    <% const isPrimaryScopeCourseLabelUi = (value) => {
+      const normalized = String(value || '').trim().toLowerCase();
+      return normalized === 'основний курс'
+        || normalized === 'основной курс'
+        || normalized === 'primary course'
+        || normalized === 'main course';
+    }; %>
+    <% const allCoursesScopeEnabled = Boolean(typeof allCoursesScope !== 'undefined' && allCoursesScope); %>
     <% const selectedCourse = (courses || []).find(function(c) { return Number(c.id) === Number(selectedCourseId); }) || {}; %>
-    <% const selectedCourseLabel = selectedCourse.name || (courseMap[selectedCourseId] || ('Course ' + selectedCourseId)); %>
+    <% const selectedCourseLabel = allCoursesScopeEnabled
+      ? 'Всі курси'
+      : (selectedCourse.name || (courseMap[selectedCourseId] || ('Course ' + selectedCourseId))); %>
     <% const selectedCourseCampus = selectedCourse.is_teacher_course ? 'Teachers' : (String(selectedCourse.location || 'kyiv').toLowerCase() === 'munich' ? 'Munich' : 'Kyiv'); %>
     <% const selectedScopeLabel = selectedCourseLabel; %>
-    <% const selectedScopeCampus = scopeState.selectedCampusLabel || selectedCourseCampus; %>
+    <% const selectedScopeCampus = allCoursesScopeEnabled ? 'All' : (scopeState.selectedCampusLabel || selectedCourseCampus); %>
     <% const canSwitchCourse = Boolean((typeof allowCourseSelect !== 'undefined' ? allowCourseSelect : !isLimitedView) && Array.isArray(courses) && courses.length > 1); %>
     <% const scopeFormAction = role === 'deanery' ? '/deanery' : (role === 'starosta' ? '/starosta' : '/admin'); %>
     <% const buildScopedHref = function(basePath, extraParams) {
@@ -958,8 +968,10 @@
                   aria-label="Вибір курсу"
                   data-admin-course-select
                 >
+                  <option value="all" <%= allCoursesScopeEnabled ? 'selected' : '' %>>Всі</option>
                   <% (courses || []).forEach(function(course) { %>
-                    <option value="<%= course.id %>" <%= Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
+                    <% if (isPrimaryScopeCourseLabelUi(course && course.name)) { return; } %>
+                    <option value="<%= course.id %>" <%= !allCoursesScopeEnabled && Number(selectedCourseId) === Number(course.id) ? 'selected' : '' %>><%= course.name %></option>
                   <% }); %>
                 </select>
               </form>
@@ -4529,7 +4541,7 @@
           const targetUrl = new URL(adminCourseForm.getAttribute('action') || currentUrl.pathname, window.location.origin);
           const activeTab = currentUrl.searchParams.get('tab') || safeStorageGet('admin:tab', '');
           targetUrl.searchParams.set('course', nextCourseId);
-          targetUrl.searchParams.set('reset_scope', 'course');
+          targetUrl.searchParams.set('reset_scope', nextCourseId === 'all' ? 'all' : 'course');
           if (activeTab) {
             targetUrl.searchParams.set('tab', activeTab);
           } else {
