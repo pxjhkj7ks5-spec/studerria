@@ -1913,10 +1913,10 @@ body.page-schedule .week-rail {
   }
 }
 
-@media (min-width: 1800px) {
+@media (min-width: 2200px) {
   body.page-app-shell.page-my-day.studerria-theme,
   body.page-app-shell.page-schedule.studerria-theme {
-    --studerria-ultrawide-content-shift: clamp(56px, calc((100vw - 1800px) * 0.34 + 56px), 220px);
+    --studerria-ultrawide-content-shift: clamp(0px, calc((100vw - 2200px) * 0.34), 220px);
   }
 
   body.page-app-shell.page-schedule.studerria-theme .schedule-content.container,
