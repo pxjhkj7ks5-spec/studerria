@@ -265,13 +265,16 @@ const getPreferredLang = (req) => {
   const queryLang = typeof req.query.lang === 'string' ? req.query.lang.toLowerCase() : '';
   if (queryLang && locales[queryLang]) {
     req.session.lang = queryLang;
+    if (req.session && req.session.user) {
+      req.session.user.language = queryLang;
+    }
     return queryLang;
-  }
-  if (req.session && req.session.user && req.session.user.language && locales[req.session.user.language]) {
-    return req.session.user.language;
   }
   if (req.session && req.session.lang && locales[req.session.lang]) {
     return req.session.lang;
+  }
+  if (req.session && req.session.user && req.session.user.language && locales[req.session.user.language]) {
+    return req.session.user.language;
   }
   const header = req.headers['accept-language'];
   if (typeof header === 'string' && header.length) {

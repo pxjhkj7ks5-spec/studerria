@@ -135,6 +135,12 @@ test('navbar partial renders demo role switch and keeps GET forms available', as
   assert.match(html, /action="\/demo\/switch-role"/);
   assert.match(html, /method === 'get'/);
   assert.match(html, /Demo/);
+  assert.match(html, /href="\/schedule"/);
+  assert.match(html, /href="\/subjects"/);
+  assert.match(html, /href="\/teamwork"/);
+  assert.match(html, /href="\/profile"/);
+  assert.match(html, /href="\/about"/);
+  assert.doesNotMatch(html, /href="\/journal"/);
 });
 
 test('demo fixtures render the supported student and teacher pages', async () => {

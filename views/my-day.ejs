@@ -53,6 +53,7 @@
       const supportSummary = cockpit.support_summary || null;
       const supportThreads = Array.isArray(cockpit.support_threads) ? cockpit.support_threads : [];
       const teacherQuickActions = Array.isArray(cockpit.teacher_quick_actions) ? cockpit.teacher_quick_actions : [];
+      const isDemoMyDay = typeof isDemo !== 'undefined' && Boolean(isDemo);
       const effectiveHomeViewRole = typeof homeViewRole === 'string' && homeViewRole ? homeViewRole : role;
       const isStudentLikeMyDayView = effectiveHomeViewRole === 'student'
         || effectiveHomeViewRole === 'admin'
@@ -70,17 +71,21 @@
       const hasInboxMessageMissionData = Boolean(inboxMessageSummary) || inboxMessageItems.length > 0;
       const hasTeacherQuickActions = isTeacherMyDayView && teacherQuickActions.length > 0;
       const showAttendanceMission = Boolean(attendanceHealth);
-      const showRatingMission = Boolean(latestRatingSnapshot) || !isStudentLikeMyDayView;
+      const showRatingMission = !isDemoMyDay && (Boolean(latestRatingSnapshot) || !isStudentLikeMyDayView);
       const showSupportMission = Number(supportMissionSummary.open || 0) > 0;
       const showInboxMissionCard = Boolean(settings && settings.allow_messages && hasInboxMessageMissionData);
-      const showMissionStrip = showAttendanceMission
+      const showMissionStrip = !isDemoMyDay && (
+        showAttendanceMission
         || showRatingMission
         || showSupportMission
         || showInboxMissionCard
-        || hasTeacherQuickActions;
-      const showLegacyMissionStrip = showRatingMission
+        || hasTeacherQuickActions
+      );
+      const showLegacyMissionStrip = !isDemoMyDay && (
+        showRatingMission
         || showSupportMission
-        || hasTeacherQuickActions;
+        || hasTeacherQuickActions
+      );
       const hasInboxSummaryData = (activity.on_time_share !== null
         && typeof activity.on_time_share !== 'undefined')
         || Number(activity.overdue || 0) > 0

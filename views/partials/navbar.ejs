@@ -65,6 +65,7 @@
     { id: 'subjects', label: tr('nav.subjects', 'Subjects'), href: '/subjects' },
     { id: 'profile', label: tr('nav.profile', 'Profile'), href: '/profile' },
     { id: 'help', label: tr('nav.help', 'Help'), href: '/help' },
+    { id: 'about', label: tr('nav.about', 'About'), href: '/about' },
     { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackStaffNav = [
@@ -95,9 +96,11 @@
     { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
     { id: 'teacher-subjects', label: tr('nav.subjects', 'Subjects'), href: '/teacher/subjects' },
     { id: 'teacher-workspace', label: tr('nav.homework', 'Homework'), href: '/teacher/workspace' },
-    { id: 'journal', label: tr('nav.journal', 'Journal'), href: '/journal' },
     { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/schedule?panel=messages', navAction: 'messages' },
+    { id: 'teamwork', label: tr('nav.teamwork', 'Teamwork'), href: '/teamwork' },
     { id: 'profile', label: tr('nav.settings', 'Settings'), href: '/profile' },
+    { id: 'help', label: tr('nav.help', 'Help'), href: '/help' },
+    { id: 'about', label: tr('nav.about', 'About'), href: '/about' },
     { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackNavItems = hasRole('admin')
@@ -105,23 +108,8 @@
     : (hasRole('deanery', 'starosta')
       ? fallbackLimitedStaffNav
       : (hasRole('teacher') ? fallbackTeacherNav : fallbackStudentNav));
-  const demoNavItemIds = new Set([
-    'home',
-    'teacher-hub',
-    'schedule',
-    'homework',
-    'teamwork',
-    'subjects',
-    'teacher-subjects',
-    'teacher-workspace',
-    'profile',
-    'help',
-    'theme',
-  ]);
-  const navSourceItems = providedNavItems.length ? providedNavItems : fallbackNavItems;
-  const safeNavItems = markCurrent(isDemoMode
-    ? navSourceItems.filter((item) => demoNavItemIds.has(String(item && item.id ? item.id : '').trim()))
-    : navSourceItems);
+  const navSourceItems = isDemoMode ? fallbackNavItems : (providedNavItems.length ? providedNavItems : fallbackNavItems);
+  const safeNavItems = markCurrent(navSourceItems);
   const flattenSidebarItems = (items) => items.reduce((result, item) => {
     if (!item || item.hidden || String(item.section || 'main') !== 'main') {
       return result;
