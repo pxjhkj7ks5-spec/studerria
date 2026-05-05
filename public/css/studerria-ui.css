@@ -3520,12 +3520,12 @@ body.page-authenticated.studerria-theme :where(
   .week-window,
   .month-summary
 ) {
-  outline: 1px solid transparent;
+  outline: none;
   background-clip: padding-box;
-  transform: translateZ(0) !important;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  contain: paint;
+  transform: none !important;
+  -webkit-backface-visibility: visible;
+  backface-visibility: visible;
+  contain: layout style;
   transition:
     background-color 140ms ease,
     border-color 140ms ease,
@@ -3604,7 +3604,7 @@ body.page-authenticated.studerria-theme :where(
   .week-window,
   .month-summary
 ):active {
-  transform: translateZ(0) !important;
+  transform: none !important;
 }
 
 body.page-authenticated.studerria-theme :where(
@@ -3758,12 +3758,12 @@ body.page-app-shell.studerria-theme :where(
   .week-window,
   .month-summary
 ) {
-  outline: 1px solid transparent;
+  outline: none;
   background-clip: padding-box;
-  transform: translateZ(0) !important;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  contain: paint;
+  transform: none !important;
+  -webkit-backface-visibility: visible;
+  backface-visibility: visible;
+  contain: layout style;
   transition:
     background-color 140ms ease,
     border-color 140ms ease,
@@ -3842,7 +3842,7 @@ body.page-app-shell.studerria-theme :where(
   .week-window,
   .month-summary
 ):active {
-  transform: translateZ(0) !important;
+  transform: none !important;
 }
 
 /* Studerria shell refresh: align Home + Schedule with the target visual language */

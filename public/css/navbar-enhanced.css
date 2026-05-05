@@ -12,10 +12,10 @@ body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell {
   backdrop-filter: blur(18px) saturate(1.14) !important;
   box-shadow: var(--studerria-topbar-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
   overflow: visible;
-  outline: 1px solid transparent;
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
+  outline: none;
+  transform: none;
+  -webkit-backface-visibility: visible;
+  backface-visibility: visible;
 }
 
 body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .container {
@@ -109,10 +109,10 @@ body.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell .text-m
   line-height: 1.1;
   letter-spacing: -0.01em;
   white-space: nowrap;
-  outline: 1px solid transparent;
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
+  outline: none;
+  transform: none;
+  -webkit-backface-visibility: visible;
+  backface-visibility: visible;
   transition: opacity 160ms ease, color 160ms ease;
 }
 
@@ -961,7 +961,7 @@ body.theme-light .snav-mobile-logout-btn {
   }
 
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:active {
-    transform: translateZ(0);
+    transform: none;
     box-shadow: none;
   }
 
@@ -1405,7 +1405,7 @@ body.page-authenticated.studerria-theme .snav-mobile-trigger {
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link:active,
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:active,
   body.page-authenticated.studerria-theme .studerria-nav-shell .theme-toggle-min.snav-logout-btn:active {
-    transform: translateZ(0);
+    transform: none;
     box-shadow: none;
   }
 }
@@ -1589,7 +1589,7 @@ html.studerria-page-transitioning .studerria-nav-shell .snav-unread-chip,
 html.studerria-page-transitioning .studerria-nav-shell .snav-menu {
   transition: none !important;
   animation: none !important;
-  transform: translateZ(0) !important;
+  transform: none !important;
 }
 
 body.page-authenticated.studerria-theme .topbar.topbar--title-spotlight.studerria-nav-shell::before,
@@ -1611,7 +1611,7 @@ body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link,
 body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link,
 body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link,
 body.page-app-shell.studerria-theme .studerria-nav-shell .snav-menu-link {
-  transform: translateZ(0) !important;
+  transform: none !important;
   box-shadow: none !important;
   transition:
     color 140ms ease,
@@ -1636,6 +1636,6 @@ body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-open > .s
 body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current > .snav-link,
 body.page-app-shell.studerria-theme .studerria-nav-shell .snav-item.is-current-container > .snav-link,
 body.page-app-shell.studerria-theme .studerria-nav-shell .snav-link[aria-current="page"] {
-  transform: translateZ(0) !important;
+  transform: none !important;
   box-shadow: none !important;
 }
