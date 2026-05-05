@@ -24,6 +24,7 @@ html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open)
 html body.studerria-theme .modal,
 html body.studerria-theme .modal.show {
   z-index: 1090 !important;
+  pointer-events: auto !important;
 }
 
 html body.studerria-theme .modal-backdrop.show,
@@ -129,6 +130,14 @@ html body.studerria-theme .modal,
 html body.studerria-theme .modal-dialog,
 html body.studerria-theme .modal-dialog-scrollable .modal-content,
 html body.studerria-theme .modal-content,
+html body.studerria-theme .modal .glass,
+html body.studerria-theme .modal .glass-card,
+html body.studerria-theme .modal .glass-panel,
+html body.studerria-theme .modal .glass-inset,
+html body.studerria-theme .modal .glass-dock,
+html body.studerria-theme .modal .btn-glass,
+html body.studerria-theme .modal .form-control,
+html body.studerria-theme .modal .form-select,
 html body.studerria-theme .modal-header,
 html body.studerria-theme .modal-body,
 html body.studerria-theme .modal-footer,
@@ -140,6 +149,19 @@ html body.studerria-theme .modal-footer::before,
 html body.studerria-theme .modal-footer::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+}
+
+html body.studerria-theme .modal-content,
+html body.studerria-theme .modal-content *,
+html body.studerria-theme .modal-header,
+html body.studerria-theme .modal-body,
+html body.studerria-theme .modal-footer {
+  pointer-events: auto;
+}
+
+html body.studerria-theme .changelog-liquid-modal .modal-content::before,
+html body.studerria-theme .changelog-liquid-modal .modal-content::after {
+  display: none !important;
 }
 
 /* Atlas / embedded Apple webviews use a single temporary scene wrapper instead of per-child blur. */

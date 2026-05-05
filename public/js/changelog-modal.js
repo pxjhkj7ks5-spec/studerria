@@ -290,13 +290,7 @@
   }
 
   function shouldUseAtlasModalHost() {
-    const body = document.body;
-    return Boolean(
-      body instanceof HTMLElement &&
-        body.classList.contains(APPLE_WEBVIEW_CLASS) &&
-        window.innerWidth >= 1200 &&
-        probeBodyZoomAffectsFixedOverlays()
-    );
+    return false;
   }
 
   function primeEnvironmentFlags() {
@@ -416,7 +410,7 @@
       if (modalRoot instanceof HTMLElement && modal.parentElement !== modalRoot) {
         modalRoot.appendChild(modal);
       }
-      modal.style.zIndex = String(BASE_MODAL_Z_INDEX + (index * MODAL_LAYER_STEP));
+      modal.style.zIndex = String((BASE_MODAL_Z_INDEX + 10) + (index * MODAL_LAYER_STEP));
     });
 
     const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
