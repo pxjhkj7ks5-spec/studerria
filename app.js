@@ -31,6 +31,7 @@ const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
 const sessionGeneratorHelpers = require('./lib/sessionGenerator');
+const demoMode = require('./lib/demoMode');
 const { localizeChangelogItems } = require('./lib/changelogI18n');
 const { publicLegalPages } = require('./lib/legalPages');
 const versionFile = path.join(__dirname, 'version.json');
@@ -1324,6 +1325,11 @@ app.use((req, res, next) => {
   }, res.locals.sessionSecurity || {});
   res.locals.lang = lang;
   res.locals.t = (key) => translate(lang, key);
+  res.locals.isDemo = demoMode.isDemoSession(req);
+  res.locals.demoRole = demoMode.getDemoRole(req);
+  res.locals.demoReadOnlyMessage = res.locals.isDemo
+    ? demoMode.buildDemoReadOnlyMessage(lang)
+    : '';
   next();
 });
 
@@ -12355,6 +12361,24 @@ const recordSiteVisit = async (payload) => {
   );
 };
 
+const getDemoVisitSummary = async (sinceIso) => {
+  const row = await db.get(
+    `
+      SELECT
+        COUNT(*)::int AS page_views,
+        COUNT(DISTINCT COALESCE(NULLIF(session_id, ''), ip, CONCAT('demo-', id::text)))::int AS visitors
+      FROM site_visit_events
+      WHERE role_key IN ('demo-student', 'demo-teacher')
+        AND created_at >= ?
+    `,
+    [sinceIso || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()]
+  );
+  return {
+    pageViews: Number(row && row.page_views || 0),
+    visitors: Number(row && row.visitors || 0),
+  };
+};
+
 function handleDbError(res, err, label) {
   const message = normalizeRuntimeErrorMessage(err && err.message ? err.message : err);
   pushRuntimeErrorEvent('db', label, message);
@@ -14667,7 +14691,9 @@ app.use((req, _res, next) => {
     return next();
   }
   const userId = Number(req?.session?.user?.id);
-  const roleKey = req?.session?.role ? normalizeRoleKey(req.session.role) : null;
+  const roleKey = demoMode.isDemoSession(req)
+    ? demoMode.getDemoVisitRoleKey(req.session.demoRole || req.session.role || 'student')
+    : (req?.session?.role ? normalizeRoleKey(req.session.role) : null);
   const courseId = resolveVisitCourseId(req, routePath);
   const payload = {
     userId: Number.isFinite(userId) && userId > 0 ? userId : null,
@@ -18412,6 +18438,158 @@ registerPublicRoutes(app, {
   publicLegalPages,
 });
 
+function getDemoRequestContext(req) {
+  const lang = getPreferredLang(req);
+  const role = demoMode.getDemoRole(req) || demoMode.normalizeDemoRole(req?.session?.demoRole || req?.session?.role || 'student');
+  const user = demoMode.buildDemoUser(role, lang);
+  if (req && req.session && req.session.isDemo) {
+    req.session.demoRole = role;
+    req.session.role = role;
+    req.session.roles = [role];
+    req.session.user = user;
+    req.session.lang = lang;
+  }
+  return { lang, role, user, username: user.username };
+}
+
+async function establishDemoSession(req, role = 'student') {
+  const existingLang = req && req.session && req.session.lang ? req.session.lang : getPreferredLang(req);
+  const normalizedRole = demoMode.normalizeDemoRole(role);
+  const nowIso = new Date().toISOString();
+  await regenerateRequestSession(req);
+  req.session.isDemo = true;
+  req.session.demoRole = normalizedRole;
+  req.session.user = demoMode.buildDemoUser(normalizedRole, existingLang);
+  req.session.role = normalizedRole;
+  req.session.roles = [normalizedRole];
+  req.session.role_fingerprint = buildSessionRoleFingerprint(req.session.roles);
+  req.session.lang = existingLang;
+  req.session.rememberMe = false;
+  req.session.session_created_at = nowIso;
+  req.session.last_seen_at = nowIso;
+  req.session.last_activity_at = nowIso;
+  req.session.last_seen_route = '/demo/start';
+  req.session.last_sensitive_reauth_at = nowIso;
+  await saveRequestSession(req);
+}
+
+function renderDemoView(req, res, viewName, locals = {}) {
+  const context = getDemoRequestContext(req);
+  const base = {
+    role: context.role,
+    username: context.username,
+    settings: settingsCache,
+    ...locals,
+  };
+  if (viewName === 'my-day') {
+    return res.render('my-day', {
+      ...base,
+      ...demoMode.buildMyDayLocals(context),
+      okMessage: String(req.query.ok || ''),
+      errMessage: req.query.demo_readonly
+        ? demoMode.buildDemoReadOnlyMessage(context.lang)
+        : String(req.query.err || ''),
+    });
+  }
+  if (viewName === 'schedule') {
+    return res.render('schedule', {
+      ...base,
+      ...demoMode.buildScheduleLocals({
+        ...context,
+        bellSchedule,
+        daysOfWeek,
+      }),
+    });
+  }
+  if (viewName === 'subjects') {
+    return res.render('subjects', {
+      ...base,
+      ...demoMode.buildSubjectsLocals({
+        ...context,
+        subjectId: req.query.subject_id,
+      }),
+    });
+  }
+  if (viewName === 'teamwork') {
+    return res.render('teamwork', {
+      ...base,
+      ...demoMode.buildTeamworkLocals({
+        ...context,
+        subjectId: req.query.subject_id,
+      }),
+    });
+  }
+  if (viewName === 'profile') {
+    return res.render('profile', {
+      ...base,
+      ...demoMode.buildProfileLocals(context),
+      error: req.query.demo_readonly ? demoMode.buildDemoReadOnlyMessage(context.lang) : '',
+      success: '',
+    });
+  }
+  if (viewName === 'teacher-hub') {
+    return res.render('teacher-hub', {
+      ...base,
+      ...demoMode.buildTeacherHubLocals(context),
+      settings: settingsCache,
+    });
+  }
+  if (viewName === 'teacher-subjects') {
+    return res.render('teacher-subjects', {
+      ...base,
+      ...demoMode.buildTeacherSubjectsLocals(context),
+      settings: settingsCache,
+    });
+  }
+  if (viewName === 'teacher-workspace') {
+    return res.render('teacher-workspace', {
+      ...base,
+      ...demoMode.buildTeacherWorkspaceLocals(context),
+      settings: settingsCache,
+    });
+  }
+  return res.status(404).send('Demo page not found');
+}
+
+app.post('/demo/start', async (req, res) => {
+  try {
+    await establishDemoSession(req, 'student');
+    return res.redirect('/home');
+  } catch (err) {
+    console.error('Demo session start failed', err);
+    return res.redirect('/login?error=1');
+  }
+});
+
+app.post('/demo/switch-role', async (req, res) => {
+  if (!demoMode.isDemoSession(req)) {
+    return res.redirect('/login');
+  }
+  const nextRole = demoMode.normalizeDemoRole(req.body && req.body.role ? req.body.role : req.query.role);
+  const lang = getPreferredLang(req);
+  req.session.demoRole = nextRole;
+  req.session.role = nextRole;
+  req.session.roles = [nextRole];
+  req.session.role_fingerprint = buildSessionRoleFingerprint(req.session.roles);
+  req.session.user = demoMode.buildDemoUser(nextRole, lang);
+  req.session.lang = lang;
+  req.session.last_activity_at = new Date().toISOString();
+  await saveRequestSession(req);
+  return res.redirect(nextRole === 'teacher' ? '/teacher' : '/home');
+});
+
+app.use((req, res, next) => {
+  if (demoMode.shouldAllowDemoWrite(req)) {
+    return next();
+  }
+  const lang = getPreferredLang(req);
+  const message = demoMode.buildDemoReadOnlyMessage(lang);
+  if (demoMode.wantsJson(req)) {
+    return res.status(403).json({ error: message, demo_readonly: true });
+  }
+  return res.redirect(demoMode.buildDemoReadonlyRedirect(req));
+});
+
 app.get('/about', requireLogin, (req, res) => {
   const lang = getPreferredLang(req);
   const isEn = lang === 'en';
@@ -19779,6 +19957,12 @@ app.post('/register/teacher-subjects', registerLimiter, async (req, res) => {
 });
 
 app.get('/teacher', requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    if (demoMode.getDemoRole(req) !== 'teacher') {
+      return res.redirect('/schedule');
+    }
+    return renderDemoView(req, res, 'teacher-hub');
+  }
   try {
     await ensureDbReady();
   } catch (err) {
@@ -19921,6 +20105,12 @@ app.get('/teacher', requireLogin, async (req, res) => {
 });
 
 app.get('/teacher/subjects', requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    if (demoMode.getDemoRole(req) !== 'teacher') {
+      return res.redirect('/schedule');
+    }
+    return renderDemoView(req, res, 'teacher-subjects');
+  }
   try {
     await ensureDbReady();
   } catch (err) {
@@ -20127,6 +20317,12 @@ async function hydrateTeacherWorkspaceRedirectState(state = {}) {
 }
 
 app.get('/teacher/workspace', requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    if (demoMode.getDemoRole(req) !== 'teacher') {
+      return res.redirect('/schedule');
+    }
+    return renderDemoView(req, res, 'teacher-workspace');
+  }
   try {
     await ensureDbReady();
   } catch (err) {
@@ -21710,6 +21906,9 @@ app.get('/teacher/pending', requireLogin, async (req, res) => {
 });
 
 app.get('/profile', requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    return renderDemoView(req, res, 'profile');
+  }
   try {
     await ensureDbReady();
   } catch (err) {
@@ -25223,6 +25422,9 @@ async function buildMyDayWhatIfForecast({
 }
 
 const renderMyDayPage = async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    return renderDemoView(req, res, 'my-day');
+  }
   try {
     await ensureDbReady();
   } catch (err) {
@@ -25264,6 +25466,10 @@ app.get('/my-day', requireLogin, (req, res) => {
 app.get('/home', requireLogin, renderMyDayPage);
 
 app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    const context = getDemoRequestContext(req);
+    return res.json(demoMode.buildMyDayLocals(context).myDay);
+  }
   try {
     const competencySubjectId = Number(req.query.competency_subject_id || 0);
     const roleKeys = normalizeRoleList(req.session.roles || []);
@@ -25281,6 +25487,19 @@ app.get('/api/my-day', requireLogin, readLimiter, async (req, res) => {
 });
 
 app.get('/api/my-day/progress-risk', requireLogin, readLimiter, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    const context = getDemoRequestContext(req);
+    const myDay = demoMode.buildMyDayLocals(context).myDay;
+    return res.json(myDay.progress_dashboard || {
+      enabled: false,
+      subjects: [],
+      at_risk_count: 0,
+      high_risk_count: 0,
+      medium_risk_count: 0,
+      subjects_total: 0,
+      admission_target: STUDENT_RISK_ADMISSION_TARGET,
+    });
+  }
   try {
     const roleKeys = normalizeRoleList(req.session.roles || []);
     const myDayRole = resolveMyDayRole(req.session.role || 'student', roleKeys);
@@ -25306,6 +25525,21 @@ app.get('/api/my-day/what-if', requireLogin, readLimiter, async (req, res) => {
   }
   const target = Number(req.query.target);
   const targets = Number.isFinite(target) ? [target] : [60, 75, 90];
+  if (demoMode.isDemoSession(req)) {
+    return res.json({
+      subject_id: subjectId,
+      current_final_score: 72,
+      remaining_raw_max: 40,
+      max_reachable_final_score: 96,
+      targets: targets.map((targetScore) => ({
+        target: targetScore,
+        reachable: Number(targetScore) <= 90,
+        required_avg_percent: Math.max(20, Math.min(100, Number(targetScore) - 34)),
+        required_raw_points: Math.max(0, Number(targetScore) - 72),
+        needed_points: Math.max(0, Number(targetScore) - 96),
+      })),
+    });
+  }
   try {
     const userId = Number(req.session.user.id);
     const courseId = Number(req.session.user.course_id || 1);
@@ -25327,6 +25561,11 @@ app.get('/api/my-day/what-if', requireLogin, readLimiter, async (req, res) => {
 });
 
 app.get('/api/reminders', requireLogin, readLimiter, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    const context = getDemoRequestContext(req);
+    const myDay = demoMode.buildMyDayLocals(context).myDay;
+    return res.json({ reminders: Array.isArray(myDay.reminders) ? myDay.reminders : [] });
+  }
   const { from, to, status } = req.query;
   if (from && !isValidDateString(String(from))) {
     return res.status(400).json({ error: 'Invalid from date' });
@@ -26855,6 +27094,9 @@ async function loadTeamworkScheduleDeadlines({
 }
 
 app.get('/schedule', requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    return renderDemoView(req, res, 'schedule');
+  }
   const { id: userId, schedule_group: group, username, course_id: courseId } = req.session.user;
   const canCreateHomework = canSessionCreateHomework(req);
   const scheduleDebugRequested = String(req.query.debug_schedule || '').trim() === '1';
@@ -29908,6 +30150,9 @@ async function resolveStoredUploadAccess(req, storedPath) {
 }
 
 app.get(/^\/uploads\/(.+)$/, requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    return res.status(403).send('Demo mode does not expose uploaded files');
+  }
   const requestedPath = normalizeStoredUploadPath(`/uploads/${String(req.params[0] || '')}`);
   if (!requestedPath) {
     return res.status(400).send('Invalid upload path');
@@ -38655,6 +38900,9 @@ app.post('/journal/config/save', requireLogin, writeLimiter, async (req, res) =>
 });
 
 app.get('/subjects', requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    return renderDemoView(req, res, 'subjects');
+  }
   const { id: userId, username, role, course_id: fallbackCourseId } = req.session.user;
   const requestedSubjectId = Number(req.query.subject_id);
   const selectedSubjectId = Number.isFinite(requestedSubjectId) && requestedSubjectId > 0
@@ -39204,6 +39452,9 @@ app.post('/subjects/materials/:id/delete', requireLogin, writeLimiter, async (re
 });
 
 app.get('/teamwork', requireLogin, async (req, res) => {
+  if (demoMode.isDemoSession(req)) {
+    return renderDemoView(req, res, 'teamwork');
+  }
   const { id: userId, username, role, course_id: fallbackCourseId } = req.session.user;
   const requestedSubjectId = Number(req.query.subject_id);
   const selectedSubjectId = Number.isFinite(requestedSubjectId) && requestedSubjectId > 0
@@ -41249,6 +41500,8 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
     teamworkTasks: 0,
     teamworkGroups: 0,
     teamworkMembers: 0,
+    demoVisitors: 0,
+    demoPageViews: 0,
   },
   teamworkTasks: [],
   adminMessages: [],
@@ -42004,6 +42257,15 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
       weeklyLabels.push(d.toISOString().slice(0, 10));
+    }
+    try {
+      const demoVisitSummary = await getDemoVisitSummary(weekStart.toISOString());
+      dashboardStats.demoVisitors = demoVisitSummary.visitors;
+      dashboardStats.demoPageViews = demoVisitSummary.pageViews;
+    } catch (demoStatsErr) {
+      console.error('Database error (admin.demoVisits)', demoStatsErr);
+      dashboardStats.demoVisitors = Number(dashboardStats.demoVisitors || 0);
+      dashboardStats.demoPageViews = Number(dashboardStats.demoPageViews || 0);
     }
     let weeklyHomework = weeklyLabels.map(() => 0);
     let weeklyTeamwork = weeklyLabels.map(() => 0);

@@ -1226,6 +1226,11 @@
                     <div class="small text-muted">Teamwork tasks</div>
                     <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.teamworkTasks : '—' %></div>
                   </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Demo visitors</div>
+                    <div class="admin-metric-value"><%= dashboardStatsData ? (dashboardStatsData.demoVisitors || 0) : '—' %></div>
+                    <div class="small text-muted"><%= dashboardStatsData ? (dashboardStatsData.demoPageViews || 0) : 0 %> page views / 7d</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4991,6 +4996,8 @@
           starosta: 'Староста',
           teacher: 'Викладач',
           student: 'Студент',
+          'demo-student': 'Демо студент',
+          'demo-teacher': 'Демо викладач',
           guest: 'Гість',
         };
         const normalized = String(key || '').trim().toLowerCase();

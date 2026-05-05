@@ -135,6 +135,7 @@ function filterNavItems(items, context) {
 function buildUserNav(req, res) {
   const session = req && req.session ? req.session : {};
   const sessionUser = session && session.user ? session.user : null;
+  const isDemo = session && session.isDemo === true;
   const role = sessionUser ? (String(session.role || '').trim() || 'student') : '';
   const roles = sessionUser
     ? (Array.isArray(session.roles) && session.roles.length ? session.roles : [role])
@@ -144,6 +145,8 @@ function buildUserNav(req, res) {
 
   return {
     isAuthenticated: Boolean(sessionUser),
+    isDemo,
+    demoRole: isDemo ? role : '',
     role,
     roles,
     name: sessionUser && sessionUser.username ? String(sessionUser.username).trim() : '',

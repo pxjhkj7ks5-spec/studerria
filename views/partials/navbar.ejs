@@ -24,6 +24,11 @@
   const normalizedRoleSet = new Set(userRoles.map(normalizeRole).filter(Boolean));
   if (currentRole) normalizedRoleSet.add(normalizeRole(currentRole));
   const hasRole = (...roles) => roles.some((roleKey) => normalizedRoleSet.has(normalizeRole(roleKey)));
+  const isDemoMode = Boolean((safeUserNav && safeUserNav.isDemo) || (typeof isDemo !== 'undefined' && isDemo));
+  const demoActiveRole = normalizeRole((safeUserNav && safeUserNav.demoRole) || (typeof demoRole !== 'undefined' && demoRole) || currentRole || 'student');
+  const demoLabel = tr('demo.badge', 'Demo');
+  const demoStudentLabel = tr('demo.role.student', 'Student');
+  const demoTeacherLabel = tr('demo.role.teacher', 'Teacher');
   const markCurrent = (items) => items.map((item) => {
     const next = { ...item };
     const hrefRaw = String(next.href || '');
@@ -100,7 +105,23 @@
     : (hasRole('deanery', 'starosta')
       ? fallbackLimitedStaffNav
       : (hasRole('teacher') ? fallbackTeacherNav : fallbackStudentNav));
-  const safeNavItems = markCurrent(providedNavItems.length ? providedNavItems : fallbackNavItems);
+  const demoNavItemIds = new Set([
+    'home',
+    'teacher-hub',
+    'schedule',
+    'homework',
+    'teamwork',
+    'subjects',
+    'teacher-subjects',
+    'teacher-workspace',
+    'profile',
+    'help',
+    'theme',
+  ]);
+  const navSourceItems = providedNavItems.length ? providedNavItems : fallbackNavItems;
+  const safeNavItems = markCurrent(isDemoMode
+    ? navSourceItems.filter((item) => demoNavItemIds.has(String(item && item.id ? item.id : '').trim()))
+    : navSourceItems);
   const flattenSidebarItems = (items) => items.reduce((result, item) => {
     if (!item || item.hidden || String(item.section || 'main') !== 'main') {
       return result;
@@ -471,6 +492,72 @@
 <% if (shouldRenderNavbar) { %>
   <% if (shouldRenderAppNav) { %>
     <link rel="stylesheet" href="/css/render-stability.css?v=<%= encodeURIComponent(String(typeof appVersion !== 'undefined' ? appVersion : '0.0.0')) %>" />
+    <% if (isDemoMode) { %>
+      <style>
+        .snav-demo-switch {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px;
+          border: 1px solid rgba(148, 163, 184, 0.28);
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+        }
+        .snav-demo-badge,
+        .snav-demo-option {
+          border: 0;
+          border-radius: 999px;
+          padding: 5px 10px;
+          font-size: 0.78rem;
+          font-weight: 650;
+          line-height: 1;
+          color: rgba(248, 250, 252, 0.9);
+        }
+        .snav-demo-badge {
+          background: rgba(34, 211, 238, 0.18);
+          color: rgba(165, 243, 252, 0.98);
+        }
+        .snav-demo-option {
+          background: transparent;
+          cursor: pointer;
+        }
+        .snav-demo-option.is-active {
+          background: rgba(255, 255, 255, 0.92);
+          color: #0f172a;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+        }
+        .snav-demo-option:not(.is-active):hover {
+          background: rgba(255, 255, 255, 0.14);
+        }
+        body.theme-light .snav-demo-switch {
+          border-color: rgba(15, 23, 42, 0.12);
+          background: rgba(255, 255, 255, 0.68);
+        }
+        body.theme-light .snav-demo-badge {
+          color: #0369a1;
+          background: rgba(14, 165, 233, 0.14);
+        }
+        body.theme-light .snav-demo-option {
+          color: rgba(15, 23, 42, 0.72);
+        }
+        body.theme-light .snav-demo-option.is-active {
+          background: #0f172a;
+          color: #ffffff;
+        }
+        .demo-readonly-disabled {
+          opacity: 0.58 !important;
+          cursor: not-allowed !important;
+        }
+        @media (max-width: 720px) {
+          .snav-demo-switch {
+            order: -1;
+            width: 100%;
+            justify-content: center;
+          }
+        }
+      </style>
+    <% } %>
     <nav class="navbar navbar-expand-lg topbar topbar--title-spotlight studerria-nav-shell" aria-label="Global Navigation" data-studerria-nav>
       <div class="container">
         <div class="snav-main">
@@ -494,6 +581,13 @@
                 <span class="snav-user-meta"><%= displayRoleLabel || displayRoleText %></span>
               </span>
             </div>
+          <% } %>
+          <% if (isDemoMode) { %>
+            <form method="POST" action="/demo/switch-role" class="snav-demo-switch" aria-label="<%= demoLabel %>">
+              <span class="snav-demo-badge"><%= demoLabel %></span>
+              <button class="snav-demo-option <%= demoActiveRole === 'student' ? 'is-active' : '' %>" type="submit" name="role" value="student"><%= demoStudentLabel %></button>
+              <button class="snav-demo-option <%= demoActiveRole === 'teacher' ? 'is-active' : '' %>" type="submit" name="role" value="teacher"><%= demoTeacherLabel %></button>
+            </form>
           <% } %>
           <button
             type="button"
@@ -628,4 +722,38 @@
       </div>
     </nav>
   <% } %>
+<% } %>
+<% if (isDemoMode) { %>
+  <script>
+    (function () {
+      const allowedActions = new Set(['/demo/start', '/demo/switch-role', '/logout']);
+      const message = <%- JSON.stringify(typeof demoReadOnlyMessage !== 'undefined' ? demoReadOnlyMessage : 'Demo mode is read-only.') %>;
+      const resolvePath = (form) => {
+        try {
+          return new URL(form.getAttribute('action') || window.location.href, window.location.origin).pathname;
+        } catch (err) {
+          return '';
+        }
+      };
+      document.querySelectorAll('form').forEach((form) => {
+        const method = String(form.getAttribute('method') || 'GET').toLowerCase();
+        if (method === 'get' || allowedActions.has(resolvePath(form))) return;
+        form.setAttribute('data-demo-readonly-form', 'true');
+        form.querySelectorAll('input, textarea, select, button').forEach((control) => {
+          if (control.type === 'hidden') return;
+          control.disabled = true;
+          control.classList.add('demo-readonly-disabled');
+          if (!control.title) control.title = message;
+        });
+      });
+      document.addEventListener('submit', (event) => {
+        const form = event.target && event.target.closest ? event.target.closest('form') : null;
+        const method = form ? String(form.getAttribute('method') || 'GET').toLowerCase() : 'get';
+        if (!form || method === 'get' || allowedActions.has(resolvePath(form))) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.alert(message);
+      }, true);
+    }());
+  </script>
 <% } %>

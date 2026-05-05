@@ -75,6 +75,10 @@
           <button class="td-primary-button" type="submit"><%= t('login.signIn') %></button>
         </form>
 
+        <form class="td-form mt-2" method="POST" action="/demo/start">
+          <button class="td-secondary-button" type="submit"><%= t('demo.loginCta') %></button>
+        </form>
+
         <p class="td-login-bottom"><%= t('login.noAccount') %> <a href="/register"><%= t('login.createAccountCta') %></a></p>
       </section>
     </main>
