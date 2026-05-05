@@ -48,15 +48,13 @@ html body.studerria-theme #studerriaBg::after {
   transition: filter 220ms ease, opacity 220ms ease;
 }
 
-/* Keep modal background as a full-viewport layer in Atlas/WebView without oval artifacts. */
+/* Keep blur isolated on the modal backdrop instead of softening the whole scene. */
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::before,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::after {
-  opacity: 0 !important;
-}
-
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::after,
 html body.studerria-theme.studerria-apple-webview:is(.modal-open, .studerria-changelog-open) #studerriaBg {
-  -webkit-filter: blur(10px) saturate(1.02);
-  filter: blur(10px) saturate(1.02);
+  -webkit-filter: none !important;
+  filter: none !important;
+  opacity: 1 !important;
 }
 
 html body.studerria-theme.modal-open,
