@@ -1,6 +1,5 @@
 /* Shared modal readability layer for every Studerria screen. */
 html body.studerria-theme {
-  --studerria-modal-backdrop-blur: 12px;
   --studerria-modal-backdrop-dark: rgba(4, 8, 20, 0.72);
   --studerria-modal-backdrop-light: rgba(238, 243, 254, 0.68);
 }
@@ -11,7 +10,59 @@ html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-back
   background: var(--studerria-modal-backdrop-dark) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+  -webkit-filter: none !important;
+  filter: none !important;
   transition: opacity 220ms ease !important;
+}
+
+html body.studerria-theme:is(.modal-open, .studerria-changelog-open) :where(
+  .glass,
+  .glass-card,
+  .glass-panel,
+  .glass-inset,
+  .glass-dock,
+  .surface,
+  .surface--elevated,
+  .card,
+  .topbar,
+  .app-footer,
+  .app-footer .footer-meta,
+  .schedule-content,
+  .schedule-shell,
+  .week-pager,
+  .week-hero,
+  .schedule-panel,
+  .day-card,
+  .density-summary,
+  .week-rail,
+  .schedule-card,
+  .admin-nav,
+  .admin-sidebar,
+  .dropdown-menu,
+  .td-lite-modal-backdrop
+):not(.modal):not(.modal *) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-filter: none !important;
+  filter: none !important;
+}
+
+html body :where(
+  .td-lite-modal,
+  .td-lite-modal *,
+  .td-lite-modal::before,
+  .td-lite-modal::after,
+  .td-lite-modal-backdrop,
+  .td-lite-modal-backdrop::before,
+  .td-lite-modal-backdrop::after,
+  .td-lite-sheet,
+  .td-lite-sheet::before,
+  .td-lite-sheet::after
+) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-filter: none !important;
+  filter: none !important;
 }
 
 html body.theme-light.studerria-theme .modal-backdrop,
@@ -19,6 +70,8 @@ html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open)
   background: var(--studerria-modal-backdrop-light) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+  -webkit-filter: none !important;
+  filter: none !important;
 }
 
 html body.studerria-theme .modal,
@@ -37,6 +90,8 @@ html body.studerria-theme .td-lite-modal-backdrop {
   background: var(--studerria-modal-backdrop-dark) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+  -webkit-filter: none !important;
+  filter: none !important;
 }
 
 html body.theme-light.studerria-theme .td-lite-modal-backdrop {
@@ -49,7 +104,7 @@ html body.studerria-theme #studerriaBg::after {
   transition: filter 220ms ease, opacity 220ms ease;
 }
 
-/* Keep the scene sharp and confine blur to the modal surface itself. */
+/* Keep the scene sharp while a modal is open. */
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::before,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::after,
 html body.studerria-theme.studerria-apple-webview:is(.modal-open, .studerria-changelog-open) #studerriaBg {
@@ -130,6 +185,7 @@ html body.studerria-theme .modal,
 html body.studerria-theme .modal-dialog,
 html body.studerria-theme .modal-dialog-scrollable .modal-content,
 html body.studerria-theme .modal-content,
+html body.studerria-theme .modal-content *,
 html body.studerria-theme .modal .glass,
 html body.studerria-theme .modal .glass-card,
 html body.studerria-theme .modal .glass-panel,
@@ -146,9 +202,21 @@ html body.studerria-theme .modal-content::after,
 html body.studerria-theme .modal-header::before,
 html body.studerria-theme .modal-header::after,
 html body.studerria-theme .modal-footer::before,
-html body.studerria-theme .modal-footer::after {
+html body.studerria-theme .modal-footer::after,
+html body.studerria-theme .td-lite-modal,
+html body.studerria-theme .td-lite-modal *,
+html body.studerria-theme .td-lite-modal::before,
+html body.studerria-theme .td-lite-modal::after,
+html body.studerria-theme .td-lite-modal-backdrop,
+html body.studerria-theme .td-lite-modal-backdrop::before,
+html body.studerria-theme .td-lite-modal-backdrop::after,
+html body.studerria-theme .td-lite-sheet,
+html body.studerria-theme .td-lite-sheet::before,
+html body.studerria-theme .td-lite-sheet::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+  -webkit-filter: none !important;
+  filter: none !important;
 }
 
 html body.studerria-theme .modal-content,
