@@ -9,16 +9,16 @@ html body.studerria-theme .modal-backdrop,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   z-index: 1070 !important;
   background: var(--studerria-modal-backdrop-dark) !important;
-  -webkit-backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
-  backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   transition: opacity 220ms ease !important;
 }
 
 html body.theme-light.studerria-theme .modal-backdrop,
 html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   background: var(--studerria-modal-backdrop-light) !important;
-  -webkit-backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
-  backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 html body.studerria-theme .modal,
@@ -34,8 +34,8 @@ html body.studerria-theme:is(.modal-open, .studerria-changelog-open, .confirm-mo
 
 html body.studerria-theme .td-lite-modal-backdrop {
   background: var(--studerria-modal-backdrop-dark) !important;
-  -webkit-backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
-  backdrop-filter: blur(var(--studerria-modal-backdrop-blur)) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 html body.theme-light.studerria-theme .td-lite-modal-backdrop {
@@ -48,7 +48,7 @@ html body.studerria-theme #studerriaBg::after {
   transition: filter 220ms ease, opacity 220ms ease;
 }
 
-/* Keep blur isolated on the modal backdrop instead of softening the whole scene. */
+/* Keep the scene sharp and confine blur to the modal surface itself. */
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::before,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::after,
 html body.studerria-theme.studerria-apple-webview:is(.modal-open, .studerria-changelog-open) #studerriaBg {
@@ -73,8 +73,8 @@ html body.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
   border: none !important;
   border-radius: 28px !important;
   background-clip: padding-box;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.08) !important;
+  backdrop-filter: blur(18px) saturate(1.08) !important;
   box-shadow: 0 36px 110px rgba(2, 6, 23, 0.5) !important;
 }
 

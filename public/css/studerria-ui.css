@@ -1074,10 +1074,9 @@ body.theme-light.studerria-theme .modal-backdrop {
   backdrop-filter: none !important;
 }
 
-/* Keep the dialog shell sharp while the full-viewport blur lives on the backdrop. */
+/* Keep the page sharp and let the modal surface handle its own localized blur. */
 body.studerria-theme .modal,
 body.studerria-theme .modal-dialog,
-body.studerria-theme .modal-content,
 body.studerria-theme .modal-header,
 body.studerria-theme .modal-body,
 body.studerria-theme .modal-footer,
@@ -1119,8 +1118,8 @@ body.studerria-theme .modal .btn-glass {
   border-radius: 28px;
   border: none;
   background: rgba(10, 16, 34, 0.96);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
   box-shadow: 0 34px 88px rgba(2, 6, 23, 0.42);
 }
 

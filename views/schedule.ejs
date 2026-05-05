@@ -693,8 +693,8 @@
         overflow: hidden;
       }
       .modal-backdrop {
-        -webkit-backdrop-filter: blur(8px);
-        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
         background-color: rgba(0, 0, 0, 0.3);
         transition: opacity 0.3s ease-in-out;
         opacity: 0;
@@ -702,13 +702,13 @@
       }
       body.theme-dark .modal-backdrop {
         background-color: rgba(20, 20, 20, 0.5);
-        -webkit-backdrop-filter: blur(10px);
-        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
       body.theme-light .modal-backdrop {
         background-color: rgba(255, 255, 255, 0.4);
-        -webkit-backdrop-filter: blur(7px);
-        backdrop-filter: blur(7px);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
       .modal.fade .modal-dialog {
         transform: scale(0.98);
@@ -722,8 +722,8 @@
       .modal-content {
         border-radius: 16px;
         box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        -webkit-backdrop-filter: blur(18px) saturate(1.08);
+        backdrop-filter: blur(18px) saturate(1.08);
         border: 1px solid rgba(255, 255, 255, 0.12);
         animation: modalIn 260ms ease;
       }
@@ -2097,8 +2097,8 @@
         overflow: hidden;
         background: var(--glass-bg);
         border: none;
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        -webkit-backdrop-filter: blur(18px) saturate(1.08);
+        backdrop-filter: blur(18px) saturate(1.08);
       }
       body.theme-light .modal-content {
         background: rgba(248, 250, 255, 0.94);
