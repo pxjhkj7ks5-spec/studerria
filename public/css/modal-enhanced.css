@@ -5,6 +5,24 @@ html body.studerria-theme {
   --studerria-modal-backdrop-light: rgba(238, 243, 254, 0.68);
 }
 
+html body.studerria-theme .studerria-modal-cutout-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+html body.studerria-theme .studerria-modal-cutout-strip {
+  position: fixed;
+  background: var(--studerria-modal-backdrop-dark);
+  -webkit-backdrop-filter: blur(var(--studerria-modal-backdrop-blur));
+  backdrop-filter: blur(var(--studerria-modal-backdrop-blur));
+  pointer-events: auto;
+}
+
+html body.theme-light.studerria-theme .studerria-modal-cutout-strip {
+  background: var(--studerria-modal-backdrop-light);
+}
+
 html body.studerria-theme .modal-backdrop,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   z-index: 1070 !important;
@@ -73,8 +91,8 @@ html body.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
   border: none !important;
   border-radius: 28px !important;
   background-clip: padding-box;
-  -webkit-backdrop-filter: blur(18px) saturate(1.08) !important;
-  backdrop-filter: blur(18px) saturate(1.08) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   box-shadow: 0 36px 110px rgba(2, 6, 23, 0.5) !important;
 }
 

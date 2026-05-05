@@ -25,6 +25,8 @@
   const ATLAS_MODAL_SCALE_ORIGIN_VALUE_ATTR = 'data-studerria-atlas-modal-scale-origin-prev-value';
   const ATLAS_MODAL_SCALE_ORIGIN_PRIORITY_ATTR = 'data-studerria-atlas-modal-scale-origin-prev-priority';
   const MODAL_HOST_ID = 'studerriaModalHost';
+  const MODAL_CUTOUT_OVERLAY_ID = 'studerriaModalCutoutOverlay';
+  const MODAL_CUTOUT_STRIP_CLASS = 'studerria-modal-cutout-strip';
   const MODAL_FALLBACK_OPEN_CLASS = 'studerria-modal-fallback-open';
   const MODAL_FALLBACK_SCENE_ID = 'studerriaModalFallbackScene';
   const MODAL_FALLBACK_SCENE_CLASS = 'studerria-modal-fallback-scene';
@@ -227,6 +229,17 @@
     return document.getElementById(MODAL_HOST_ID);
   }
 
+  function getTopVisibleModal() {
+    const visibleModals = Array.from(document.querySelectorAll('.modal.show')).filter(
+      (modal) => modal instanceof HTMLElement
+    );
+    return visibleModals.length ? visibleModals[visibleModals.length - 1] : null;
+  }
+
+  function getModalCutoutOverlay() {
+    return document.getElementById(MODAL_CUTOUT_OVERLAY_ID);
+  }
+
   function isModalHost(node) {
     return node instanceof HTMLElement && node.id === MODAL_HOST_ID;
   }
@@ -328,6 +341,120 @@
     });
   }
 
+  function dismissTopModalFromCutoutOverlay() {
+    const topModal = getTopVisibleModal();
+    if (!(topModal instanceof HTMLElement)) {
+      return;
+    }
+    if (topModal.getAttribute('data-bs-backdrop') === 'static') {
+      return;
+    }
+    const instance = window.bootstrap?.Modal?.getOrCreateInstance(topModal);
+    if (instance) {
+      instance.hide();
+    }
+  }
+
+  function ensureModalCutoutOverlay(modalRoot) {
+    if (!(modalRoot instanceof HTMLElement)) {
+      return null;
+    }
+
+    let overlay = getModalCutoutOverlay();
+    if (!(overlay instanceof HTMLElement)) {
+      overlay = document.createElement('div');
+      overlay.id = MODAL_CUTOUT_OVERLAY_ID;
+      overlay.className = 'studerria-modal-cutout-overlay';
+
+      ['top', 'right', 'bottom', 'left'].forEach((position) => {
+        const strip = document.createElement('div');
+        strip.className = MODAL_CUTOUT_STRIP_CLASS;
+        strip.dataset.cutoutStrip = position;
+        strip.addEventListener('click', dismissTopModalFromCutoutOverlay);
+        overlay.appendChild(strip);
+      });
+    }
+
+    if (overlay.parentElement !== modalRoot) {
+      modalRoot.appendChild(overlay);
+    }
+
+    return overlay;
+  }
+
+  function cleanupModalCutoutOverlay() {
+    const overlay = getModalCutoutOverlay();
+    if (overlay instanceof HTMLElement) {
+      overlay.remove();
+    }
+  }
+
+  function updateModalCutoutOverlay(modalRoot) {
+    const topModal = getTopVisibleModal();
+    if (!(topModal instanceof HTMLElement) || !(modalRoot instanceof HTMLElement)) {
+      cleanupModalCutoutOverlay();
+      return;
+    }
+
+    const overlay = ensureModalCutoutOverlay(modalRoot);
+    if (!(overlay instanceof HTMLElement)) {
+      return;
+    }
+
+    const modalSurface =
+      topModal.querySelector('.modal-content') ||
+      topModal.querySelector('.modal-dialog') ||
+      topModal;
+
+    if (!(modalSurface instanceof HTMLElement)) {
+      cleanupModalCutoutOverlay();
+      return;
+    }
+
+    const rect = modalSurface.getBoundingClientRect();
+    const top = Math.max(0, rect.top);
+    const left = Math.max(0, rect.left);
+    const right = Math.min(window.innerWidth, rect.right);
+    const bottom = Math.min(window.innerHeight, rect.bottom);
+    const width = Math.max(0, right - left);
+    const height = Math.max(0, bottom - top);
+    const overlayZIndex = Math.max(
+      BASE_BACKDROP_Z_INDEX,
+      (Number.parseInt(topModal.style.zIndex || '', 10) || BASE_MODAL_Z_INDEX) - 1
+    );
+
+    overlay.style.zIndex = String(overlayZIndex);
+
+    overlay.querySelectorAll(`.${MODAL_CUTOUT_STRIP_CLASS}`).forEach((node) => {
+      if (!(node instanceof HTMLElement)) {
+        return;
+      }
+
+      const position = node.dataset.cutoutStrip;
+      if (position === 'top') {
+        node.style.left = '0';
+        node.style.top = '0';
+        node.style.width = '100vw';
+        node.style.height = `${top}px`;
+      } else if (position === 'right') {
+        node.style.left = `${right}px`;
+        node.style.top = `${top}px`;
+        node.style.width = `${Math.max(0, window.innerWidth - right)}px`;
+        node.style.height = `${height}px`;
+      } else if (position === 'bottom') {
+        node.style.left = '0';
+        node.style.top = `${bottom}px`;
+        node.style.width = '100vw';
+        node.style.height = `${Math.max(0, window.innerHeight - bottom)}px`;
+      } else if (position === 'left') {
+        node.style.left = '0';
+        node.style.top = `${top}px`;
+        node.style.width = `${left}px`;
+        node.style.height = `${height}px`;
+      }
+    });
+  }
+
   function configureModalHostBase(host) {
     if (!(host instanceof HTMLElement)) {
       return;
@@ -394,6 +521,7 @@
       return;
     }
 
+    cleanupModalCutoutOverlay();
     while (host.firstChild) {
       body.appendChild(host.firstChild);
     }
@@ -446,6 +574,8 @@
     if (activeBackdrop instanceof HTMLElement) {
       activeBackdrop.classList.add(BACKDROP_CLASS);
     }
+
+    updateModalCutoutOverlay(modalRoot);
   }
 
   function portalModal(modal, preferHost = false) {
@@ -1092,6 +1222,7 @@
     body.classList.remove(MODAL_FALLBACK_OPEN_CLASS);
     body.classList.remove(BODY_OPEN_CLASS);
     body.classList.remove(BOOTSTRAP_OPEN_CLASS);
+    cleanupModalCutoutOverlay();
     restoreRootScrollLock();
     syncNoBlurTargets(false);
     syncAtlasModalScale();
@@ -1324,6 +1455,9 @@
     primeEnvironmentFlags();
     bindGlobalModalSync();
     primeStaticModals();
+    window.addEventListener('resize', () => {
+      requestAnimationFrame(syncModalLayers);
+    });
 
     const modal = getModal();
     if (!(modal instanceof HTMLElement)) {

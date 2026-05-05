@@ -1118,8 +1118,8 @@ body.studerria-theme .modal .btn-glass {
   border-radius: 28px;
   border: none;
   background: rgba(10, 16, 34, 0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(1.08);
-  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: 0 34px 88px rgba(2, 6, 23, 0.42);
 }
 
