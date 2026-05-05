@@ -1152,7 +1152,7 @@
         syncNoBlurTargets(false);
       } else {
         syncModalBlurFallback(false);
-        syncNoBlurTargets(false);
+        syncNoBlurTargets(true);
       }
       syncAtlasModalScale();
       window.requestAnimationFrame(() => {

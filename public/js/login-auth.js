@@ -92,6 +92,7 @@
     function openModal() {
       lastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       modal.hidden = false;
+      document.body.classList.add('studerria-changelog-open');
       document.body.style.overflow = 'hidden';
       window.requestAnimationFrame(function() {
         modal.classList.add('is-open');
@@ -101,6 +102,7 @@
 
     function closeModal() {
       modal.classList.remove('is-open');
+      document.body.classList.remove('studerria-changelog-open');
       document.body.style.overflow = '';
       window.setTimeout(function() {
         modal.hidden = true;

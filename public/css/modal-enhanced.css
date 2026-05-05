@@ -4,6 +4,29 @@ html body.studerria-theme {
   --studerria-modal-backdrop-light: rgba(238, 243, 254, 0.68);
 }
 
+html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)),
+html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) {
+  --st-glass: none !important;
+  --st-glass-light: none !important;
+  --glass-blur: 0px !important;
+  --week-glass-blur: 0px !important;
+}
+
+html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)),
+html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open))::before,
+html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open))::after,
+html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open),
+html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)::before,
+html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)::after,
+html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) *,
+html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) *::before,
+html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-filter: none !important;
+  filter: none !important;
+}
+
 html body.studerria-theme .modal-backdrop,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   z-index: 1070 !important;
