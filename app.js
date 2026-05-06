@@ -28077,7 +28077,20 @@ app.get('/schedule', requireLogin, async (req, res) => {
   const loadStudentGroups = (cb) => {
     if (!isAdminViewAs) {
       if (hasSessionRole(req, 'admin')) {
-        return loadCourseSubjectGroupsForSingleGroup(adminFallbackGroupNumber, cb);
+        return loadAcademicV2LegacyStudentRows(userId, {
+          selectedOnly: true,
+          routeKey: 'schedule.admin-self',
+        }).then((studentCompat) => {
+          const scopedRows = (studentCompat && Array.isArray(studentCompat.rows) ? studentCompat.rows : [])
+            .filter((row) => {
+              const ownerCourseId = Number(row && (row.owner_course_id || row.course_id) || 0);
+              return !scheduleCourseId || ownerCourseId === Number(scheduleCourseId);
+            });
+          if (scopedRows.length) {
+            return cb(null, scopedRows);
+          }
+          return loadCourseSubjectGroupsForSingleGroup(adminFallbackGroupNumber, cb);
+        }).catch((err) => cb(err));
       }
       return loadAcademicV2LegacyStudentRows(userId, {
         selectedOnly: true,
@@ -28252,6 +28265,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
         if (!selectedGroups.length) {
           return false;
         }
+        const rowGroupNumber = parsePositiveIntStrict(row && row.group_number);
+        if (rowGroupNumber) {
+          return selectedGroups.includes(rowGroupNumber);
+        }
         const targetGroups = normalizeDebugGroupNumbers(
           row && row.target_group_numbers,
           [parsePositiveIntStrict(row && row.group_number)].filter(Boolean)
@@ -28259,7 +28276,6 @@ app.get('/schedule', requireLogin, async (req, res) => {
         if (targetGroups.length) {
           return selectedGroups.some((groupNumber) => targetGroups.includes(groupNumber));
         }
-        const rowGroupNumber = parsePositiveIntStrict(row && row.group_number);
         return Boolean(rowGroupNumber && selectedGroups.includes(rowGroupNumber));
       };
       let scheduleDebug = null;
@@ -28293,7 +28309,13 @@ app.get('/schedule', requireLogin, async (req, res) => {
           const isLectureSlot = String(row.lesson_type || '').toLowerCase() === 'lecture';
           if (baseGroupsBySubject.size) {
             const allowedGroups = baseGroupsBySubject.get(subjectId);
-            if (!isLectureSlot && (!allowedGroups || !allowedGroups.has(groupNumber))) {
+            if (!allowedGroups) {
+              return;
+            }
+            if (isLectureSlot) {
+              return;
+            }
+            if (!allowedGroups.has(groupNumber)) {
               return;
             }
           }
@@ -28891,13 +28913,16 @@ app.get('/schedule', requireLogin, async (req, res) => {
             const selectedGroups = legacySubjectId && selectedGroupsBySubject.has(legacySubjectId)
               ? Array.from(selectedGroupsBySubject.get(legacySubjectId)).sort((a, b) => a - b)
               : [];
+            const rowGroupNumber = parsePositiveIntStrict(row && row.group_number);
             const included = runtimeRowIds.has(scheduleEntryId);
             let reasonCode = included ? 'included_course_runtime' : 'dropped_course_runtime';
             if (!isVisible) {
               reasonCode = 'dropped_subject_invisible';
             } else if (!mapped || !visibleSubjectIds.has(legacySubjectId)) {
               reasonCode = 'dropped_missing_mapping';
-            } else if (activityType !== 'lecture' && selectedGroups.length && !selectedGroups.some((groupNumber) => targetGroupNumbers.includes(groupNumber))) {
+            } else if (activityType !== 'lecture' && selectedGroups.length && rowGroupNumber && !selectedGroups.includes(rowGroupNumber)) {
+              reasonCode = 'dropped_subgroup_mismatch';
+            } else if (activityType !== 'lecture' && selectedGroups.length && !rowGroupNumber && !selectedGroups.some((groupNumber) => targetGroupNumbers.includes(groupNumber))) {
               reasonCode = 'dropped_subgroup_mismatch';
             } else if (activityType !== 'lecture' && !selectedGroups.length) {
               reasonCode = 'dropped_subject_not_selected';
@@ -29041,6 +29066,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
           const lessonType = String(normalizedRow.lesson_type || normalizedRow.activity_type || '').trim().toLowerCase();
           if (lessonType === 'lecture' && selectedGroup) {
             normalizedRow.selected_group = selectedGroup;
+            normalizedRow.group_number = selectedGroup;
             normalizedRow.group_label = `Група ${selectedGroup}`;
           }
           if (scheduleByDay[normalizedRow.day_of_week]) {
