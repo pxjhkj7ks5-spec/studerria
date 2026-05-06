@@ -490,6 +490,7 @@
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/mobile-workflows.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="studerria-theme theme-dark page-journal page-local-topbar">
     <%- include('partials/theme-bootstrap-body') %>
@@ -1308,6 +1309,42 @@
                 <% }); %>
               </tbody>
             </table>
+          </div>
+          <div class="journal-mobile-grade-list" aria-label="<%= journalCopy.totalOutOfHundred %>">
+            <% journalRows.forEach(function(row, rowIndex) { %>
+              <% const weightedEarned = Number.isFinite(Number(row.weighted_earned)) ? Number(row.weighted_earned) : Number(row.final_score || 0); %>
+              <article class="journal-mobile-grade-card">
+                <div class="journal-mobile-grade-head">
+                  <div>
+                    <strong><%= row.student.full_name %></strong>
+                    <span><%= journalCopy.groupPrefix %> <%= row.student.group_number %></span>
+                  </div>
+                  <div class="journal-mobile-grade-final">
+                    <strong><%= row.final_score.toFixed(2).replace(/\.00$/, '') %></strong>
+                    <span><%= weightedEarned.toFixed(2).replace(/\.00$/, '') %> / 100</span>
+                  </div>
+                </div>
+                <div class="journal-mobile-grade-cells">
+                  <% row.cells.forEach(function(cell, cellIndex) { %>
+                    <% const cellColumn = columns[cellIndex] || null; %>
+                    <% const lockedClass = cellColumn && cellColumn.is_locked ? 'is-locked' : ''; %>
+                    <% const statusClass = cell.status === 'on_time' ? 'is-on-time' : cell.status === 'late' ? 'is-late' : cell.status === 'manual' ? 'is-manual' : 'is-missing'; %>
+                    <button
+                      class="journal-mobile-grade-cell journal-cell-btn <%= statusClass %> <%= lockedClass %>"
+                      type="button"
+                      data-column-id="<%= cell.column_id %>"
+                      data-student-id="<%= cell.student_id %>"
+                      data-row-index="<%= rowIndex %>"
+                      data-column-index="<%= cellIndex %>"
+                      data-can-open="1"
+                    >
+                      <span><%= cellColumn ? cellColumn.title : journalCopy.dash %></span>
+                      <strong><%= Number.isFinite(cell.score) ? String(cell.score).replace(/\.00$/, '') : '—' %></strong>
+                    </button>
+                  <% }); %>
+                </div>
+              </article>
+            <% }); %>
           </div>
         <% } %>
       </section>
