@@ -13103,6 +13103,25 @@ function buildAcademicV2NoticeUrl(kind, message, focus = {}, extraParams = {}) {
   return `/admin/pathways${queryString ? `?${queryString}` : ''}`;
 }
 
+function parseAcademicV2ScheduleListFilters(source = {}) {
+  const payload = source && typeof source === 'object' ? source : {};
+  const week = parsePositiveIntStrict(payload.week);
+  const subjectId = parsePositiveIntStrict(payload.subject_id || payload.subjectId);
+  const warningOnly = String(payload.warning_only || payload.warningOnly || '').trim() === '1';
+  const teacher = sanitizeCompactText(payload.teacher || payload.teacherName, 160);
+  return {
+    ...(week ? { week } : {}),
+    ...(warningOnly ? { warning_only: '1' } : {}),
+    ...(subjectId ? { subject_id: subjectId } : {}),
+    ...(teacher ? { teacher } : {}),
+  };
+}
+
+function buildAcademicV2ScheduleListNoticeUrl(kind, message, focus = {}, filters = {}) {
+  return buildAcademicV2NoticeUrl(kind, message, focus, filters)
+    .replace(/^\/admin\/pathways(?=\?|$)/, '/admin/pathways/schedule-list');
+}
+
 function buildScheduleGeneratorUrl(req, runId = null, extraParams = {}) {
   return buildAdminScopedPathUrl(req, '/admin/schedule-generator', {}, {
     run: parsePositiveIntStrict(runId) || null,
@@ -42869,6 +42888,43 @@ app.get('/admin/pathways/schedule-list', requirePathwaysSectionAccess, async (re
     } catch (fallbackErr) {
       return handleDbError(res, fallbackErr, 'admin.pathways.v2.schedule-list.render');
     }
+  }
+});
+
+app.post('/admin/pathways/schedule-list/:scheduleEntryId/delete', requirePathwaysSectionAccess, writeLimiter, async (req, res) => {
+  const baseFocus = parseAcademicV2Focus(req.body);
+  const filters = parseAcademicV2ScheduleListFilters(req.body);
+  const routeMessages = getAcademicV2ExtendedRouteMessages(req);
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    return handleDbError(res, err, 'admin.pathways.v2.schedule-list.delete.init');
+  }
+  try {
+    const result = await academicV2Helpers.deleteScheduleEntry(getAcademicV2Store(), req.params.scheduleEntryId);
+    try {
+      invalidateAcademicV2CompatibilityCaches();
+    } catch (cacheErr) {
+      console.error('admin.pathways.v2.schedule-list.delete.compatibility-cache', cacheErr);
+    }
+    const focus = {
+      ...baseFocus,
+      groupId: Number(result && result.row && result.row.group_id) || baseFocus.groupId,
+    };
+    return res.redirect(buildAcademicV2ScheduleListNoticeUrl(
+      'ok',
+      routeMessages.scheduleDeleted,
+      focus,
+      filters
+    ));
+  } catch (err) {
+    console.error('admin.pathways.v2.schedule-list.delete', err);
+    return res.redirect(buildAcademicV2ScheduleListNoticeUrl(
+      'err',
+      resolveAcademicV2RouteMessage(req, err),
+      baseFocus,
+      filters
+    ));
   }
 });
 

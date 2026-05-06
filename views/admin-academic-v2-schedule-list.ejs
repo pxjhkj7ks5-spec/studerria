@@ -31,6 +31,22 @@
   const activeSubjectFilter = numberOrZero(filterState.subjectId);
   const activeTeacherFilter = String(filterState.teacherName || '').trim();
   const requestedScheduleEntryId = numberOrZero(filterState.scheduleEntryId);
+  const escapeAttr = (value) => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const renderScheduleListStateFields = () => `
+    <input type="hidden" name="focus_program_id" value="${activeProgramId || ''}" />
+    <input type="hidden" name="focus_cohort_id" value="${activeCohortId || ''}" />
+    <input type="hidden" name="focus_group_id" value="${activeGroupId || ''}" />
+    <input type="hidden" name="focus_term_id" value="${activeTermId || ''}" />
+    <input type="hidden" name="focus_template_stage" value="${activeTemplateStage || 1}" />
+    <input type="hidden" name="week" value="${activeWeekFilter || ''}" />
+    <input type="hidden" name="warning_only" value="${warningOnly ? '1' : ''}" />
+    <input type="hidden" name="subject_id" value="${activeSubjectFilter || ''}" />
+    <input type="hidden" name="teacher" value="${escapeAttr(activeTeacherFilter)}" />
+  `;
   const buildWorkspaceHref = (overrides = {}) => {
     const merged = Object.assign({}, {
       program_id: activeProgramId,
@@ -558,6 +574,16 @@
                   <% } %>
                   <div class="academic-v2-list-card-actions">
                     <a class="btn btn-outline-secondary btn-sm" href="<%= buildWorkspaceEditorHref(entry) %>">Редагувати у workspace</a>
+                    <form method="post" action="/admin/pathways/schedule-list/<%= entry.id %>/delete">
+                      <%- renderScheduleListStateFields() %>
+                      <button
+                        type="submit"
+                        class="btn btn-outline-danger btn-sm"
+                        onclick="return confirm('Видалити цей слот розкладу?');"
+                      >
+                        Видалити
+                      </button>
+                    </form>
                   </div>
                 </article>
               <% }); %>
