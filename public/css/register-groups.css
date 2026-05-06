@@ -18,7 +18,8 @@
   --reg-groups-chip-text: rgba(30, 41, 59, 0.74);
   --reg-groups-text: #0f172a;
   --reg-groups-heading: rgba(15, 23, 42, 0.96);
-  --reg-groups-sticky-width: min(calc(100vw - 32px), 46rem);
+  --reg-groups-content-width: min(calc(100vw - 32px), 46rem);
+  --reg-groups-sticky-width: var(--reg-groups-content-width);
   --reg-groups-sticky-safe-area: 10.4rem;
   padding-bottom: var(--reg-groups-sticky-safe-area);
   scroll-padding-bottom: calc(var(--reg-groups-sticky-safe-area) + 1.25rem);
@@ -46,6 +47,28 @@
   --reg-groups-heading: #f8fafc;
 }
 
+.page-register-subjects > .container {
+  width: 100%;
+  max-width: none;
+  padding-top: clamp(0.85rem, 2.4vh, 1.9rem) !important;
+  padding-right: 16px;
+  padding-left: 16px;
+}
+
+.page-register-subjects > .container > .row {
+  --bs-gutter-x: 0;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.page-register-subjects > .container > .row > [class*="col-"] {
+  flex: 0 0 var(--reg-groups-content-width);
+  width: var(--reg-groups-content-width);
+  max-width: var(--reg-groups-content-width);
+  padding-right: 0;
+  padding-left: 0;
+}
+
 .page-register-subjects .auth-card {
   border-radius: 28px;
   border: 1px solid rgba(191, 219, 254, 0.16);
@@ -70,14 +93,17 @@
 
 .page-register-subjects .reg-groups-card {
   margin-bottom: 1.35rem;
-  max-width: 46rem;
+  width: 100%;
+  max-width: var(--reg-groups-content-width);
   margin-inline: auto;
   container-type: inline-size;
   color: var(--reg-groups-text);
 }
 
 .page-register-subjects .app-footer {
-  width: min(100%, 46rem);
+  width: 100%;
+  max-width: var(--reg-groups-content-width);
+  margin-top: 1rem;
   margin-inline: auto;
 }
 
@@ -703,8 +729,13 @@
 
 @media (max-width: 767.98px) {
   .page-register-subjects {
-    --reg-groups-sticky-width: calc(100vw - 20px);
+    --reg-groups-content-width: calc(100vw - 20px);
     --reg-groups-sticky-safe-area: 12.6rem;
+  }
+
+  .page-register-subjects > .container {
+    padding-right: 10px;
+    padding-left: 10px;
   }
 
   .page-register-subjects .reg-groups-card {
