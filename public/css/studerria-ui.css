@@ -1050,11 +1050,11 @@ body.theme-light.studerria-theme input[type="week"] {
 .studerria-theme .modal {
   position: fixed !important;
   inset: 0;
-  z-index: 1080 !important;
+  z-index: var(--studerria-layer-bootstrap-modal, 1090);
 }
 
 body.studerria-theme .modal-backdrop {
-  z-index: 1070 !important;
+  z-index: var(--studerria-layer-bootstrap-backdrop, 1070);
   --bs-backdrop-opacity: 1;
   background: transparent !important;
   -webkit-backdrop-filter: none !important;
@@ -1094,7 +1094,7 @@ body.studerria-theme .modal .btn-glass {
 
 .studerria-theme .modal-dialog {
   position: relative;
-  z-index: 1085;
+  z-index: 1;
   pointer-events: none;
   margin: min(4vh, 2rem) auto;
 }
@@ -2287,7 +2287,7 @@ body.studerria-theme .app-footer #tdThemeToggleMirror [data-theme-label] {
 .td-lite-modal {
   position: fixed;
   inset: 0;
-  z-index: 1240;
+  z-index: var(--studerria-layer-auth-lite-modal, 1160);
   display: grid;
   place-items: center;
   padding: 20px;
@@ -2299,7 +2299,8 @@ body.studerria-theme .app-footer #tdThemeToggleMirror [data-theme-label] {
   border: 0;
   padding: 0;
   background: rgba(16, 18, 36, 0.24);
-  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .td-lite-sheet {

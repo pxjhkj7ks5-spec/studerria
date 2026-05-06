@@ -120,6 +120,7 @@
       if (open) {
         event.preventDefault();
         changelogModal.hidden = false;
+        document.body?.classList.add('studerria-changelog-open');
         requestAnimationFrame(() => {
           changelogModal.classList.add('is-open');
           if (changelogSheet) changelogSheet.focus({ preventScroll: true });
@@ -130,6 +131,7 @@
       if (close && !changelogModal.hidden) {
         event.preventDefault();
         changelogModal.classList.remove('is-open');
+        document.body?.classList.remove('studerria-changelog-open');
         setTimeout(() => {
           changelogModal.hidden = true;
         }, 180);
@@ -141,6 +143,7 @@
       const changelogModal = document.querySelector('[data-auth-changelog]');
       if (!changelogModal || changelogModal.hidden) return;
       changelogModal.classList.remove('is-open');
+      document.body?.classList.remove('studerria-changelog-open');
       setTimeout(() => {
         changelogModal.hidden = true;
       }, 180);

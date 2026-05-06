@@ -2681,7 +2681,7 @@ body.page-schedule .td-lite-modal[hidden] {
 body.page-schedule .td-lite-modal {
   position: fixed;
   inset: 0;
-  z-index: 1065;
+  z-index: var(--studerria-layer-auth-lite-modal, 1160);
   display: grid;
   place-items: center;
   padding: 20px;
@@ -2691,7 +2691,8 @@ body.page-schedule .td-lite-modal-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(16, 18, 36, 0.22);
-  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   border: 0;
 }
 

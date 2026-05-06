@@ -9,9 +9,9 @@
   const BODY_OPEN_CLASS = 'studerria-changelog-open';
   const BOOTSTRAP_OPEN_CLASS = 'modal-open';
   const GLOBAL_SYNC_BOOT_FLAG = '__studerriaGlobalModalSyncBoot';
-  const BASE_BACKDROP_Z_INDEX = 1070;
-  const BASE_MODAL_Z_INDEX = 1080;
-  const MODAL_LAYER_STEP = 20;
+  const FALLBACK_BACKDROP_Z_INDEX = 1070;
+  const FALLBACK_MODAL_Z_INDEX = 1090;
+  const FALLBACK_LAYER_STEP = 20;
   const SCROLL_LOCK_STATE_ATTR = 'data-studerria-scroll-lock';
   const SCROLL_LOCK_VALUE_ATTR = 'data-studerria-scroll-lock-overflow-value';
   const SCROLL_LOCK_PRIORITY_ATTR = 'data-studerria-scroll-lock-overflow-priority';
@@ -112,10 +112,40 @@
     return document.querySelector(`${MODAL_SELECTOR}.show`) instanceof HTMLElement;
   }
 
+  function closeAuthLiteModal() {
+    const modal = document.querySelector('[data-auth-changelog]');
+    if (!(modal instanceof HTMLElement) || modal.hidden) {
+      return;
+    }
+
+    modal.classList.remove('is-open');
+    modal.hidden = true;
+    document.body?.classList.remove(BODY_OPEN_CLASS);
+  }
+
   function hasVisibleModalExcluding(excludedModal) {
     return Array.from(document.querySelectorAll('.modal.show')).some(
       (modal) => modal instanceof HTMLElement && modal !== excludedModal
     );
+  }
+
+  function readLayerVar(name, fallback) {
+    const source = document.body instanceof HTMLElement ? document.body : document.documentElement;
+    const value = window.getComputedStyle(source).getPropertyValue(name).trim();
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function getBaseBackdropZIndex() {
+    return readLayerVar('--studerria-layer-bootstrap-backdrop', FALLBACK_BACKDROP_Z_INDEX);
+  }
+
+  function getBaseModalZIndex() {
+    return readLayerVar('--studerria-layer-bootstrap-modal', FALLBACK_MODAL_Z_INDEX);
+  }
+
+  function getLayerStep() {
+    return readLayerVar('--studerria-layer-step', FALLBACK_LAYER_STEP);
   }
 
   function isAtlasLikeAppleWebView() {
@@ -335,7 +365,7 @@
     host.style.height = `${Math.max(window.innerHeight || 0, 1)}px`;
     host.style.overflow = 'visible';
     host.style.pointerEvents = 'none';
-    host.style.zIndex = String(BASE_BACKDROP_Z_INDEX - 5);
+    host.style.zIndex = String(getBaseBackdropZIndex() - 5);
     host.style.isolation = 'isolate';
     host.style.transformOrigin = 'top left';
     host.style.zoom = compensation.toFixed(6);
@@ -406,11 +436,15 @@
     const visibleModals = Array.from(document.querySelectorAll('.modal.show')).filter(
       (modal) => modal instanceof HTMLElement
     );
+    const baseBackdropZIndex = getBaseBackdropZIndex();
+    const baseModalZIndex = getBaseModalZIndex();
+    const layerStep = getLayerStep();
+
     visibleModals.forEach((modal, index) => {
       if (modalRoot instanceof HTMLElement && modal.parentElement !== modalRoot) {
         modalRoot.appendChild(modal);
       }
-      modal.style.zIndex = String((BASE_MODAL_Z_INDEX + 10) + (index * MODAL_LAYER_STEP));
+      modal.style.zIndex = String(baseModalZIndex + (index * layerStep));
     });
 
     const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
@@ -424,7 +458,7 @@
 
       backdrop.style.pointerEvents = index === backdrops.length - 1 ? 'auto' : 'none';
       backdrop.style.opacity = fallbackBackdropUsesTint ? '1' : 'var(--bs-backdrop-opacity, 0.42)';
-      backdrop.style.zIndex = String(BASE_BACKDROP_Z_INDEX + (index * MODAL_LAYER_STEP));
+      backdrop.style.zIndex = String(baseBackdropZIndex + (index * layerStep));
       if (fallbackBackdropUsesTint) {
         const fallbackBackdropColor = getModalFallbackBackdropColor();
         backdrop.style.setProperty('--bs-backdrop-bg', fallbackBackdropColor);
@@ -1185,6 +1219,9 @@
         }
 
         const isChangelogModal = isChangelogModalElement(event.target);
+        if (!isChangelogModal) {
+          closeAuthLiteModal();
+        }
         syncBodyOpenClasses(true, isChangelogModal);
         portalModal(event.target, true);
         requestAnimationFrame(() => {

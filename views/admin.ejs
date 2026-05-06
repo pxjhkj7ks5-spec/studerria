@@ -110,19 +110,15 @@
         overscroll-behavior: contain;
       }
       .modal-backdrop {
-        backdrop-filter: blur(12px);
         background-color: rgba(0, 0, 0, 0.3);
         transition: opacity 0.3s ease-in-out;
         opacity: 0;
-        pointer-events: none;
       }
       body.theme-dark .modal-backdrop {
         background-color: rgba(20, 20, 20, 0.5);
-        backdrop-filter: blur(16px);
       }
       body.theme-light .modal-backdrop {
         background-color: rgba(255, 255, 255, 0.4);
-        backdrop-filter: blur(8px);
       }
       .modal.fade .modal-dialog {
         transform: scale(0.98);
@@ -136,7 +132,6 @@
       .modal-content {
         border-radius: 16px;
         box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.12);
       }
       body.theme-dark .modal-content {
@@ -645,7 +640,6 @@
         overflow: hidden;
         background: var(--glass-bg);
         border: var(--border-subtle);
-        backdrop-filter: blur(var(--glass-blur));
       }
       body.theme-light .modal-content {
         background: var(--glass-bg-light);
@@ -656,7 +650,6 @@
         position: sticky;
         z-index: 2;
         background: inherit;
-        backdrop-filter: blur(var(--glass-blur));
       }
       .modal-header {
         top: 0;

@@ -169,6 +169,17 @@
     return true;
   }
 
+  function closeAuthLiteModal() {
+    const modal = document.querySelector('[data-auth-changelog]');
+    if (!(modal instanceof HTMLElement) || modal.hidden) {
+      return;
+    }
+
+    modal.classList.remove('is-open');
+    modal.hidden = true;
+    document.body?.classList.remove('studerria-changelog-open');
+  }
+
   function isMobileViewport() {
     if (typeof window.matchMedia === 'function') {
       return window.matchMedia('(max-width: 991px)').matches;
@@ -346,9 +357,14 @@
     }
 
     const currentPath = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
-    if (currentPath === '/schedule' && openPanelAction(action)) {
+    if (currentPath === '/schedule' && PANEL_MAP[action]) {
       event.preventDefault();
+      closeAuthLiteModal();
+      if (isMobileNavOpen(root)) {
+        setMobileNavOpen(root, false, { restoreFocus: false });
+      }
       closeAll(root);
+      openPanelAction(action);
     }
   }
 

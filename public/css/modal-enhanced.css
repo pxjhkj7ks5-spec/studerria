@@ -2,6 +2,11 @@
 html body.studerria-theme {
   --studerria-modal-backdrop-dark: rgba(4, 8, 20, 0.72);
   --studerria-modal-backdrop-light: rgba(238, 243, 254, 0.68);
+  --studerria-layer-bootstrap-backdrop: 1070;
+  --studerria-layer-mobile-nav: 1080;
+  --studerria-layer-bootstrap-modal: 1090;
+  --studerria-layer-auth-lite-modal: 1160;
+  --studerria-layer-step: 20;
 }
 
 html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)),
@@ -29,7 +34,7 @@ html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) *::aft
 
 html body.studerria-theme .modal-backdrop,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
-  z-index: 1070 !important;
+  z-index: var(--studerria-layer-bootstrap-backdrop);
   background: var(--studerria-modal-backdrop-dark) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
@@ -99,14 +104,19 @@ html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open)
 
 html body.studerria-theme .modal,
 html body.studerria-theme .modal.show {
-  z-index: 1090 !important;
+  z-index: var(--studerria-layer-bootstrap-modal);
   pointer-events: auto !important;
 }
 
 html body.studerria-theme .modal-backdrop.show,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) .modal-backdrop.show {
   opacity: 0.72 !important;
-  pointer-events: auto !important;
+  pointer-events: auto;
+}
+
+html body.studerria-theme .td-lite-modal {
+  z-index: var(--studerria-layer-auth-lite-modal);
+  pointer-events: auto;
 }
 
 html body.studerria-theme .td-lite-modal-backdrop {
@@ -145,7 +155,6 @@ html body.studerria-theme.studerria-changelog-open {
 html body.studerria-theme .modal.show .modal-dialog .modal-content,
 html body.studerria-theme #confirmActionModal.modal.show .modal-content,
 html body.studerria-theme #journalCellModal.modal.show .modal-content,
-html body.studerria-theme #mobileMenuModal.modal.show .modal-content,
 html body.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
   background: linear-gradient(180deg, rgba(19, 26, 48, 0.985), rgba(8, 13, 28, 0.995)) !important;
   color: #f8fafc !important;
@@ -160,7 +169,6 @@ html body.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
 html body.theme-light.studerria-theme .modal.show .modal-dialog .modal-content,
 html body.theme-light.studerria-theme #confirmActionModal.modal.show .modal-content,
 html body.theme-light.studerria-theme #journalCellModal.modal.show .modal-content,
-html body.theme-light.studerria-theme #mobileMenuModal.modal.show .modal-content,
 html body.theme-light.studerria-theme .changelog-liquid-modal.modal.show .modal-content {
   background: linear-gradient(180deg, rgba(249, 251, 255, 0.99), rgba(239, 244, 255, 0.996)) !important;
   color: #0f172a !important;

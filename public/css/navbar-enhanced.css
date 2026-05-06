@@ -437,7 +437,7 @@ body.studerria-mobile-nav-open {
 .snav-mobile-sheet {
   position: fixed;
   inset: 0;
-  z-index: 1180;
+  z-index: var(--studerria-layer-mobile-nav, 1080);
   pointer-events: none;
 }
 
