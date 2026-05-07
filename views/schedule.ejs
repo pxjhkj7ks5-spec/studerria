@@ -695,17 +695,18 @@
       .modal-backdrop {
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
-        background-color: rgba(0, 0, 0, 0.3);
+        background-color: transparent !important;
         transition: opacity 0.3s ease-in-out;
-        opacity: 0;
+        opacity: 0 !important;
+        pointer-events: none !important;
       }
       body.theme-dark .modal-backdrop {
-        background-color: rgba(20, 20, 20, 0.5);
+        background-color: transparent !important;
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
       }
       body.theme-light .modal-backdrop {
-        background-color: rgba(255, 255, 255, 0.4);
+        background-color: transparent !important;
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
       }
@@ -2087,7 +2088,9 @@
         box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
       }
       .modal-backdrop.show {
-        opacity: 0.48;
+        opacity: 0 !important;
+        background-color: transparent !important;
+        pointer-events: none !important;
       }
       .modal-content {
         display: flex;

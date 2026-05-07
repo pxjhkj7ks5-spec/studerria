@@ -430,9 +430,6 @@
     if (modalRoot instanceof HTMLElement && modalRoot !== document.body) {
       configureModalHostBase(modalRoot);
     }
-    const fallbackBackdropUsesTint =
-      document.body instanceof HTMLElement && document.body.classList.contains(MODAL_FALLBACK_OPEN_CLASS);
-
     const visibleModals = Array.from(document.querySelectorAll('.modal.show')).filter(
       (modal) => modal instanceof HTMLElement
     );
@@ -456,16 +453,13 @@
         modalRoot.appendChild(backdrop);
       }
 
-      backdrop.style.pointerEvents = index === backdrops.length - 1 ? 'auto' : 'none';
-      backdrop.style.opacity = fallbackBackdropUsesTint ? '1' : 'var(--bs-backdrop-opacity, 0.42)';
+      backdrop.style.pointerEvents = 'none';
+      backdrop.style.opacity = '0';
       backdrop.style.zIndex = String(baseBackdropZIndex + (index * layerStep));
-      if (fallbackBackdropUsesTint) {
-        const fallbackBackdropColor = getModalFallbackBackdropColor();
-        backdrop.style.setProperty('--bs-backdrop-bg', fallbackBackdropColor);
-        backdrop.style.background = fallbackBackdropColor;
-        backdrop.style.backgroundColor = fallbackBackdropColor;
-        backdrop.style.transition = MODAL_BACKDROP_TRANSITION_VALUE;
-      }
+      backdrop.style.setProperty('--bs-backdrop-bg', 'transparent');
+      backdrop.style.background = 'transparent';
+      backdrop.style.backgroundColor = 'transparent';
+      backdrop.style.transition = MODAL_BACKDROP_TRANSITION_VALUE;
       backdrop.style.webkitBackdropFilter = 'none';
       backdrop.style.backdropFilter = 'none';
     });
@@ -844,12 +838,6 @@
       });
       modalBlurCloneCleanupTimer = 0;
     }, MODAL_BLUR_CLEANUP_DELAY_MS);
-  }
-
-  function getModalFallbackBackdropColor() {
-    const body = document.body;
-    const isLightTheme = body instanceof HTMLElement && body.classList.contains('theme-light');
-    return isLightTheme ? 'rgba(236, 242, 252, 0.14)' : 'rgba(7, 11, 24, 0.18)';
   }
 
   function readComputedZoom(target) {

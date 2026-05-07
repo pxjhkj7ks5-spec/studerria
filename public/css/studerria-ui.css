@@ -1059,12 +1059,14 @@ body.studerria-theme .modal-backdrop {
   background: transparent !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+  pointer-events: none !important;
   transition: opacity 220ms ease;
 }
 
 body.studerria-theme .modal-backdrop.show {
   opacity: 0 !important;
   background: transparent !important;
+  pointer-events: none !important;
 }
 
 body.theme-light.studerria-theme .modal-backdrop {
@@ -1072,6 +1074,7 @@ body.theme-light.studerria-theme .modal-backdrop {
   background: transparent !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+  pointer-events: none !important;
 }
 
 /* Keep the page sharp and let the modal surface handle its own localized blur. */

@@ -110,15 +110,16 @@
         overscroll-behavior: contain;
       }
       .modal-backdrop {
-        background-color: rgba(0, 0, 0, 0.3);
+        background-color: transparent !important;
         transition: opacity 0.3s ease-in-out;
-        opacity: 0;
+        opacity: 0 !important;
+        pointer-events: none !important;
       }
       body.theme-dark .modal-backdrop {
-        background-color: rgba(20, 20, 20, 0.5);
+        background-color: transparent !important;
       }
       body.theme-light .modal-backdrop {
-        background-color: rgba(255, 255, 255, 0.4);
+        background-color: transparent !important;
       }
       .modal.fade .modal-dialog {
         transform: scale(0.98);
@@ -161,6 +162,9 @@
       body.confirm-modal-open .modal-backdrop.show {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
+        opacity: 0 !important;
+        background-color: transparent !important;
+        pointer-events: none !important;
       }
       button.glass {
         background: rgba(255, 255, 255, 0.08);
@@ -630,7 +634,9 @@
         background: rgba(255, 255, 255, 0.7);
       }
       .modal-backdrop.show {
-        opacity: 0.48;
+        opacity: 0 !important;
+        background-color: transparent !important;
+        pointer-events: none !important;
       }
       .modal-content {
         display: flex;

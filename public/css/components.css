@@ -436,7 +436,9 @@ select.form-select::-ms-expand {
 
 /* Modals / overlays */
 .modal-backdrop.show {
-  background: rgba(8, 12, 24, 0.45);
+  background: transparent !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }

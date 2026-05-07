@@ -274,6 +274,13 @@ strong,
   backdrop-filter: none !important;
 }
 
+.modal-backdrop,
+.modal-backdrop.show {
+  background: transparent !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .modal-header,
 .modal-body,
 .modal-footer {
