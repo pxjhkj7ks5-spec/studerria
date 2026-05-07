@@ -2673,6 +2673,14 @@ body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .td-footer
   font-weight: 600;
 }
 
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .td-footer-link:focus,
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .td-footer-link:focus-visible,
+body.page-schedule .app-footer .footer-meta.schedule-footer-auth-lite .td-footer-link:active {
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 /* Auth-lite changelog modal (same pattern as login). */
 body.page-schedule .td-lite-modal[hidden] {
   display: none;

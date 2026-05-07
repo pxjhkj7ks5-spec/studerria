@@ -9,29 +9,6 @@ html body.studerria-theme {
   --studerria-layer-step: 20;
 }
 
-html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)),
-html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) {
-  --st-glass: none !important;
-  --st-glass-light: none !important;
-  --glass-blur: 0px !important;
-  --week-glass-blur: 0px !important;
-}
-
-html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)),
-html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open))::before,
-html:has(body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open))::after,
-html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open),
-html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)::before,
-html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open)::after,
-html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) *,
-html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) *::before,
-html body:is(.modal-open, .studerria-changelog-open, .confirm-modal-open) *::after {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  -webkit-filter: none !important;
-  filter: none !important;
-}
-
 html body.studerria-theme .modal-backdrop,
 html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   z-index: var(--studerria-layer-bootstrap-backdrop);
@@ -44,38 +21,6 @@ html body.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-back
   opacity: 0 !important;
   pointer-events: none !important;
   transition: opacity 220ms ease !important;
-}
-
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) :where(
-  .glass,
-  .glass-card,
-  .glass-panel,
-  .glass-inset,
-  .glass-dock,
-  .surface,
-  .surface--elevated,
-  .card,
-  .topbar,
-  .app-footer,
-  .app-footer .footer-meta,
-  .schedule-content,
-  .schedule-shell,
-  .week-pager,
-  .week-hero,
-  .schedule-panel,
-  .day-card,
-  .density-summary,
-  .week-rail,
-  .schedule-card,
-  .admin-nav,
-  .admin-sidebar,
-  .dropdown-menu,
-  .td-lite-modal-backdrop
-):not(.modal):not(.modal *) {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  -webkit-filter: none !important;
-  filter: none !important;
 }
 
 html body :where(
@@ -143,15 +88,6 @@ html body.studerria-theme #studerriaBg,
 html body.studerria-theme #studerriaBg::before,
 html body.studerria-theme #studerriaBg::after {
   transition: filter 220ms ease, opacity 220ms ease;
-}
-
-/* Keep the scene sharp while a modal is open. */
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::before,
-html body.studerria-theme:is(.modal-open, .studerria-changelog-open) #studerriaBg::after,
-html body.studerria-theme.studerria-apple-webview:is(.modal-open, .studerria-changelog-open) #studerriaBg {
-  -webkit-filter: none !important;
-  filter: none !important;
-  opacity: 1 !important;
 }
 
 html body.studerria-theme.modal-open,

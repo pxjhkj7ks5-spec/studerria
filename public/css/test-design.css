@@ -893,6 +893,14 @@ body[data-theme="dark"] .td-brand-logo--dark {
   color: var(--td-primary);
 }
 
+.td-footer-link:focus,
+.td-footer-link:focus-visible,
+.td-footer-link:active {
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
+
 .td-lite-modal[hidden] {
   display: none;
 }

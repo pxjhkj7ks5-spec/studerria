@@ -655,6 +655,17 @@ body.theme-light.studerria-theme .app-footer .footer-release-pill {
   text-decoration: none;
 }
 
+.studerria-theme .app-footer .td-footer-link:focus,
+.studerria-theme .app-footer .td-footer-link:focus-visible,
+.studerria-theme .app-footer .td-footer-link:active,
+.studerria-theme .app-footer [data-auth-changelog-open]:focus,
+.studerria-theme .app-footer [data-auth-changelog-open]:focus-visible,
+.studerria-theme .app-footer [data-auth-changelog-open]:active {
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 .studerria-theme .app-footer .footer-signature {
   cursor: default;
   white-space: nowrap;

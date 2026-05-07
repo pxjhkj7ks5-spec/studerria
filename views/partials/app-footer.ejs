@@ -119,6 +119,9 @@
       const open = target.closest('[data-auth-changelog-open]');
       if (open) {
         event.preventDefault();
+        if (open instanceof HTMLElement) {
+          open.blur();
+        }
         changelogModal.hidden = false;
         document.body?.classList.add('studerria-changelog-open');
         requestAnimationFrame(() => {
@@ -130,6 +133,9 @@
       const close = target.closest('[data-auth-changelog-close]');
       if (close && !changelogModal.hidden) {
         event.preventDefault();
+        if (close instanceof HTMLElement) {
+          close.blur();
+        }
         changelogModal.classList.remove('is-open');
         document.body?.classList.remove('studerria-changelog-open');
         setTimeout(() => {

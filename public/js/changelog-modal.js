@@ -1174,7 +1174,7 @@
         syncNoBlurTargets(false);
       } else {
         syncModalBlurFallback(false);
-        syncNoBlurTargets(true);
+        syncNoBlurTargets(false);
       }
       syncAtlasModalScale();
       window.requestAnimationFrame(() => {
