@@ -51,6 +51,7 @@ const adminChangeAuditAppendOnlyFkCleanup = require('./050_admin_change_audit_ap
 const sessionPersistenceDefaults = require('./051_session_persistence_defaults');
 const teamworkScheduleVisibility = require('./052_teamwork_schedule_visibility');
 const visitIpGeoCache = require('./053_visit_ip_geo_cache');
+const mbProfiles = require('./054_mb_profiles');
 
 module.exports = [
   init,
@@ -106,4 +107,5 @@ module.exports = [
   sessionPersistenceDefaults,
   teamworkScheduleVisibility,
   visitIpGeoCache,
+  mbProfiles,
 ];

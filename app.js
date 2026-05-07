@@ -18458,6 +18458,11 @@ registerPublicRoutes(app, {
   getPreferredLang,
   buildLoginErrorMessage,
   publicLegalPages,
+  pool,
+  createRateLimiter,
+  getClientIp,
+  readLimiter,
+  writeLimiter,
 });
 
 function getDemoRequestContext(req) {
