@@ -41,6 +41,23 @@ html body :where(
   filter: none !important;
 }
 
+html body :where(.td-lite-sheet, .td-lite-modal-backdrop, .td-lite-close):focus,
+html body :where(.td-lite-sheet, .td-lite-modal-backdrop, .td-lite-close):focus-visible,
+html body :where(.td-lite-modal-backdrop, .td-lite-close):active,
+html body .changelog-liquid-modal:focus,
+html body .changelog-liquid-modal:focus-visible,
+html body .changelog-liquid-modal :where(.btn-close, [data-bs-dismiss="modal"]):focus,
+html body .changelog-liquid-modal :where(.btn-close, [data-bs-dismiss="modal"]):focus-visible,
+html body .changelog-liquid-modal :where(.btn-close, [data-bs-dismiss="modal"]):active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+html body .td-lite-sheet:focus,
+html body .td-lite-sheet:focus-visible {
+  box-shadow: var(--td-shadow, var(--td-shadow-soft, none)) !important;
+}
+
 html body.theme-light.studerria-theme .modal-backdrop,
 html body.theme-light.studerria-theme:is(.modal-open, .studerria-changelog-open) .modal-backdrop {
   background: transparent !important;

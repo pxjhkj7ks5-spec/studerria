@@ -6122,11 +6122,17 @@
         };
 
         const closeAuthLiteChangelog = () => {
+          const active = document.activeElement;
+          if (active instanceof HTMLElement && authLiteChangelogModal.contains(active)) {
+            active.blur();
+          }
           authLiteChangelogModal.classList.remove('is-open');
           document.body.classList.remove('studerria-changelog-open');
           window.setTimeout(() => {
             authLiteChangelogModal.hidden = true;
-            if (authLiteLastFocus) authLiteLastFocus.focus({ preventScroll: true });
+            if (authLiteLastFocus && !authLiteLastFocus.matches('[data-auth-changelog-open]')) {
+              authLiteLastFocus.focus({ preventScroll: true });
+            }
           }, 180);
         };
 

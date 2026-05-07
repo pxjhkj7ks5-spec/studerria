@@ -116,6 +116,13 @@
       const changelogModal = document.querySelector('[data-auth-changelog]');
       if (!changelogModal) return;
       const changelogSheet = changelogModal.querySelector('.td-lite-sheet');
+      const clearChangelogFocus = () => {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLElement)) return;
+        if (changelogModal.contains(active) || active.matches('[data-auth-changelog-open]')) {
+          active.blur();
+        }
+      };
       const open = target.closest('[data-auth-changelog-open]');
       if (open) {
         event.preventDefault();
@@ -136,10 +143,12 @@
         if (close instanceof HTMLElement) {
           close.blur();
         }
+        clearChangelogFocus();
         changelogModal.classList.remove('is-open');
         document.body?.classList.remove('studerria-changelog-open');
         setTimeout(() => {
           changelogModal.hidden = true;
+          clearChangelogFocus();
         }, 180);
       }
     });
@@ -148,6 +157,10 @@
       if (event.key !== 'Escape') return;
       const changelogModal = document.querySelector('[data-auth-changelog]');
       if (!changelogModal || changelogModal.hidden) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && changelogModal.contains(active)) {
+        active.blur();
+      }
       changelogModal.classList.remove('is-open');
       document.body?.classList.remove('studerria-changelog-open');
       setTimeout(() => {

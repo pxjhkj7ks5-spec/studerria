@@ -112,6 +112,20 @@
     return document.querySelector(`${MODAL_SELECTOR}.show`) instanceof HTMLElement;
   }
 
+  function clearChangelogModalFocus(modal) {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement)) {
+      return;
+    }
+
+    if (
+      (modal instanceof HTMLElement && modal.contains(active)) ||
+      active.matches('[data-bs-target="#changelogModal"], [href="#changelogModal"]')
+    ) {
+      active.blur();
+    }
+  }
+
   function closeAuthLiteModal() {
     const modal = document.querySelector('[data-auth-changelog]');
     if (!(modal instanceof HTMLElement) || modal.hidden) {
@@ -1318,6 +1332,7 @@
     });
 
     modal.addEventListener('hidden.bs.modal', () => {
+      clearChangelogModalFocus(modal);
       requestAnimationFrame(() => {
         syncAtlasModalScale();
         syncModalLayers();
