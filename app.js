@@ -59538,6 +59538,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     }
     return res.status(400).send('Invalid date');
   }
+  const dayName = getDayNameFromDate(dueDate);
 
   const { schedule_group: group, username, id: userId } = req.session.user;
   const sessionCourseId = req.session.user.course_id || 1;
@@ -59669,7 +59670,6 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
       }
       return res.status(400).send('Invalid group');
     }
-    const dayName = getDayNameFromDate(dueDate);
     let createdId = null;
     for (const targetGroup of targetGroups) {
       const homeworkSubjectName = normalizeSubjectDraftName(
@@ -59788,6 +59788,7 @@ app.post('/homework/custom', requireLogin, uploadLimiter, upload.single('attachm
     }
     return res.redirect('/schedule');
   } catch (err) {
+    console.error('Homework custom deadline create failed', err);
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
