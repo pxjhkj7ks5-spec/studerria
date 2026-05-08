@@ -131,6 +131,54 @@
     });
   }
 
+  function initForgotPasswordModal() {
+    var modal = document.querySelector('[data-forgot-password-modal]');
+    if (!modal) return;
+    var sheet = modal.querySelector('.td-lite-sheet');
+    var lastFocus = null;
+
+    function openModal() {
+      lastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      modal.hidden = false;
+      document.body.classList.add('studerria-changelog-open');
+      document.body.style.overflow = 'hidden';
+      window.requestAnimationFrame(function() {
+        modal.classList.add('is-open');
+        if (sheet) sheet.focus({ preventScroll: true });
+      });
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      document.body.classList.remove('studerria-changelog-open');
+      document.body.style.overflow = '';
+      window.setTimeout(function() {
+        modal.hidden = true;
+        if (lastFocus) lastFocus.focus({ preventScroll: true });
+      }, 180);
+    }
+
+    document.addEventListener('click', function(event) {
+      var open = event.target && event.target.closest ? event.target.closest('[data-forgot-password-open]') : null;
+      if (open) {
+        event.preventDefault();
+        openModal();
+        return;
+      }
+      var close = event.target && event.target.closest ? event.target.closest('[data-forgot-password-close]') : null;
+      if (close && !modal.hidden) {
+        event.preventDefault();
+        closeModal();
+      }
+    });
+
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && !modal.hidden) {
+        closeModal();
+      }
+    });
+  }
+
   function initCodexCursor() {
     if (!document.body || !document.body.classList.contains('td-page')) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -242,4 +290,5 @@
   initLanguageToggle();
   initPasswordReveal();
   initChangelog();
+  initForgotPasswordModal();
 })();

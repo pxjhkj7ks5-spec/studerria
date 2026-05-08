@@ -802,10 +802,29 @@ body[data-theme="dark"] .td-brand-logo--dark {
 }
 
 .td-form-row a,
+.td-inline-link,
 .td-login-bottom a,
 .td-create-link {
   color: var(--td-primary);
   font-weight: 700;
+}
+
+.td-inline-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.td-inline-link:hover {
+  text-decoration: underline;
+}
+
+.td-inline-link:focus-visible {
+  outline: 2px solid rgba(124, 58, 237, 0.35);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
 .td-checkbox {
@@ -1024,6 +1043,18 @@ body[data-theme="dark"] .td-brand-logo--dark {
 .td-lite-release-list--full {
   max-height: none;
   padding-right: 0;
+}
+
+.td-forgot-password-sheet {
+  width: min(100%, 390px);
+  max-height: none;
+  padding: 22px;
+}
+
+.td-forgot-password-text {
+  margin: 0;
+  color: var(--td-text-soft);
+  line-height: 1.5;
 }
 
 .td-language-pill {

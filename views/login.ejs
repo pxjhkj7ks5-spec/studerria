@@ -70,7 +70,7 @@
               <input type="checkbox" name="remember" />
               <span><%= t('login.rememberMe') %></span>
             </label>
-            <a href="/help"><%= t('login.forgotPassword') %></a>
+            <button class="td-inline-link" type="button" data-forgot-password-open><%= t('login.forgotPassword') %></button>
           </div>
 
           <button class="td-primary-button" type="submit"><%= t('login.signIn') %></button>
@@ -83,6 +83,23 @@
         <p class="td-login-bottom"><%= t('login.noAccount') %> <a href="/register"><%= t('login.createAccountCta') %></a></p>
       </section>
     </main>
+
+    <div class="td-lite-modal td-forgot-password-modal" data-forgot-password-modal hidden>
+      <button class="td-lite-modal-backdrop" type="button" aria-label="<%= t('changelog.close') %>" data-forgot-password-close></button>
+      <section class="td-lite-sheet td-forgot-password-sheet td-glass-panel" role="dialog" aria-modal="true" aria-labelledby="forgotPasswordTitle" tabindex="-1">
+        <div class="td-lite-sheet-head">
+          <div>
+            <p class="td-lite-kicker">Studerria</p>
+            <h2 id="forgotPasswordTitle"><%= t('login.forgotPassword') %></h2>
+          </div>
+          <button class="td-lite-close" type="button" aria-label="<%= t('changelog.close') %>" data-forgot-password-close>&times;</button>
+        </div>
+        <p class="td-forgot-password-text">Зверніться до адміністратора системи для скидання паролю.</p>
+        <div class="td-lite-sheet-footer">
+          <button class="td-secondary-button" type="button" data-forgot-password-close>Зрозуміло</button>
+        </div>
+      </section>
+    </div>
 
     <%- include('partials/app-footer') %>
     <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
