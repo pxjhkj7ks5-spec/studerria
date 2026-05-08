@@ -78,7 +78,7 @@
 
           <label class="td-field" for="password">
             <span><%= t('register.password') %></span>
-            <span class="td-input-wrap td-input-wrap--password input-with-icon">
+            <span class="td-input-wrap td-input-wrap--password input-with-icon" data-password-field>
               <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
               <input
                 id="password"
@@ -89,7 +89,7 @@
                 minlength="8"
                 required
               />
-              <button class="td-password-reveal is-visible" type="button" id="togglePassword" aria-label="<%= t('auth.showPassword') %>">
+              <button class="td-password-reveal" type="button" id="togglePassword" aria-label="<%= t('auth.showPassword') %>" hidden>
                 <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
                 <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
               </button>
@@ -98,7 +98,7 @@
 
           <label class="td-field" for="confirm_password">
             <span><%= t('register.confirmPassword') %></span>
-            <span class="td-input-wrap td-input-wrap--password input-with-icon">
+            <span class="td-input-wrap td-input-wrap--password input-with-icon" data-password-field>
               <%- include('partials/test-icon', { name: 'lock', className: 'td-input-icon' }) %>
               <input
                 id="confirm_password"
@@ -109,7 +109,7 @@
                 minlength="8"
                 required
               />
-              <button class="td-password-reveal is-visible" type="button" id="toggleConfirmPassword" aria-label="<%= t('auth.showPassword') %>">
+              <button class="td-password-reveal" type="button" id="toggleConfirmPassword" aria-label="<%= t('auth.showPassword') %>" hidden>
                 <%- include('partials/test-icon', { name: 'eye', className: 'td-password-eye td-password-eye--show' }) %>
                 <%- include('partials/test-icon', { name: 'eyeOff', className: 'td-password-eye td-password-eye--hide' }) %>
               </button>
@@ -184,8 +184,6 @@
         consentRequired: <%- JSON.stringify(t('register.errorConsentRequired')) %>,
         showPassword: <%- JSON.stringify(t('auth.showPassword')) %>,
         hidePassword: <%- JSON.stringify(t('auth.hidePassword')) %>,
-        themeToLight: <%- JSON.stringify(t('theme.toggleToLight')) %>,
-        themeToDark: <%- JSON.stringify(t('theme.toggleToDark')) %>,
       };
       function showCustomTooltip(el, message) {
         document.querySelectorAll('.custom-tooltip').forEach((t) => t.remove());
@@ -259,12 +257,22 @@
 
       const toggleField = (btn, input) => {
         if (!btn || !input) return;
+        const sync = () => {
+          const hasValue = input.value.length > 0;
+          btn.hidden = !hasValue;
+          btn.classList.toggle('is-visible', hasValue);
+          btn.classList.toggle('is-showing', input.type === 'text');
+        };
         btn.addEventListener('click', () => {
           const isHidden = input.type === 'password';
           input.type = isHidden ? 'text' : 'password';
-          btn.classList.toggle('is-showing', isHidden);
           btn.setAttribute('aria-label', isHidden ? registerValidationCopy.hidePassword : registerValidationCopy.showPassword);
+          sync();
+          input.focus({ preventScroll: true });
         });
+        input.addEventListener('input', sync);
+        input.addEventListener('change', sync);
+        sync();
       };
       toggleField(togglePassword, passwordInput);
       toggleField(toggleConfirmPassword, confirmInput);
@@ -378,41 +386,6 @@
             event.preventDefault();
           }
         });
-      }
-      const themeToggle = document.getElementById('tdThemeToggleMirror');
-      const applyThemeAttr = () => {
-        if (document.body.classList.contains('theme-dark')) {
-          document.body.setAttribute('data-theme', 'dark');
-          document.documentElement.setAttribute('data-theme', 'dark');
-        } else {
-          document.body.setAttribute('data-theme', 'light');
-          document.documentElement.setAttribute('data-theme', 'light');
-        }
-      };
-      const savedTheme = localStorage.getItem('ui-theme') || 'theme-light';
-      document.body.classList.remove('theme-light', 'theme-dark');
-      document.body.classList.add(savedTheme);
-      applyThemeAttr();
-      if (themeToggle) {
-        const label = themeToggle.querySelector('[data-theme-label]');
-        if (label) label.textContent = savedTheme === 'theme-dark' ? 'Light' : 'Dark';
-      }
-
-      const tdThemeToggle = document.getElementById('tdThemeToggleMirror');
-      const syncTdThemeToggle = () => {
-        if (!tdThemeToggle) return;
-        const isDark = document.body.classList.contains('theme-dark');
-        tdThemeToggle.setAttribute('aria-pressed', String(isDark));
-        tdThemeToggle.setAttribute('aria-label', isDark ? registerValidationCopy.themeToLight : registerValidationCopy.themeToDark);
-        const label = tdThemeToggle.querySelector('[data-theme-label]');
-        if (label) label.textContent = isDark ? 'Light' : 'Dark';
-      };
-      if (tdThemeToggle) {
-        tdThemeToggle.addEventListener('click', () => {
-          themeToggle.click();
-          syncTdThemeToggle();
-        });
-        syncTdThemeToggle();
       }
     </script>
     <script src="/js/studerria-background.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
