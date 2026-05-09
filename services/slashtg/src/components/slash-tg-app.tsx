@@ -66,7 +66,7 @@ type SlashWish = {
 };
 
 const vibes = ["soft-glow", "clouds", "sparkles", "tiny-faces"];
-const reactionOptions = ["🥹", "🥰", "✨", "🫶", "🌙", "☁️", "💫"];
+const reactionOptions = ["🥹", "🥰", "✨", "🫶", "🤍", "💌", "🌙", "☁️", "🧸", "💫"];
 const emptyMessage =
   "сьогодні тут ще тихо... але, здається, скоро щось з'явиться";
 
