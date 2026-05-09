@@ -46,6 +46,18 @@ type SlashState = {
     text: string;
     animationType: string;
   };
+  history?: {
+    sent: SlashWish[];
+    received: SlashWish[];
+  };
+};
+
+type SlashWish = {
+  id: number;
+  text: string;
+  animationType: string;
+  createdAt: string;
+  createdAtLabel: string;
 };
 
 const vibes = ["soft-glow", "clouds", "sparkles", "tiny-faces"];
@@ -139,6 +151,23 @@ function Avatar({ profile, className = "" }: { profile?: SlashProfile; className
   );
 }
 
+function WishHistoryList({ items, emptyText }: { items: SlashWish[]; emptyText: string }) {
+  if (!items.length) {
+    return <p className="slash-history-empty">{emptyText}</p>;
+  }
+
+  return (
+    <div className="slash-history-list">
+      {items.map((item) => (
+        <article className="slash-history-item" data-vibe={item.animationType} key={item.id}>
+          <p>{item.text}</p>
+          <span>{item.createdAtLabel}</span>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 export function SlashTgApp() {
   const [state, setState] = useState<SlashState | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "locked">("loading");
@@ -152,6 +181,7 @@ export function SlashTgApp() {
   const currentUser = state?.currentUser;
   const otherUser = state?.otherUser;
   const received = state?.receivedMessage;
+  const history = state?.history;
 
   const reactionKey = useMemo(
     () => `slashtg:reaction:${currentUser?.displayName || "anonymous"}`,
@@ -296,10 +326,10 @@ export function SlashTgApp() {
       ) : (
         <section className="slash-app" aria-label="Slash TG private note">
           <header className="slash-topbar">
-            <Avatar profile={currentUser} className="slash-avatar--small" />
+            <Avatar profile={otherUser} className="slash-avatar--small" />
             <div className="slash-topbar-title">
               <span>Slash TG</span>
-              <strong>для тебе сьогодні</strong>
+              <strong>{otherUser?.displayName || "другий учасник"}</strong>
             </div>
             <button className="slash-icon-button" type="button" onClick={logout} aria-label="Вийти">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -325,7 +355,7 @@ export function SlashTgApp() {
             </div>
             <div className="slash-author-row">
               <Avatar profile={otherUser} className="slash-avatar--author" />
-              <span>написано для тебе</span>
+              <span>від {otherUser?.displayName || "другого учасника"}</span>
             </div>
             <p className="slash-note-text">{received?.text || emptyMessage}</p>
             <div className="slash-reactions" aria-label="Реакції">
@@ -358,7 +388,7 @@ export function SlashTgApp() {
             </div>
 
             <form onSubmit={saveMessage}>
-              <label htmlFor="slashMessage">для неї/нього</label>
+              <label htmlFor="slashMessage">для {otherUser?.displayName || "другого учасника"}</label>
               <textarea
                 id="slashMessage"
                 name="text"
@@ -411,6 +441,32 @@ export function SlashTgApp() {
                 зберегти аватар
               </button>
             </form>
+          </section>
+
+          <section className="slash-panel slash-history">
+            <div className="slash-section-head">
+              <div>
+                <span>archive</span>
+                <h2>історія побажань</h2>
+              </div>
+            </div>
+
+            <div className="slash-history-grid">
+              <section>
+                <h3>ти кидав</h3>
+                <WishHistoryList
+                  items={history?.sent || []}
+                  emptyText="Тут зʼявляться побажання, які ти надсилаєш."
+                />
+              </section>
+              <section>
+                <h3>тобі</h3>
+                <WishHistoryList
+                  items={history?.received || []}
+                  emptyText="Тут буде історія побажань для тебе."
+                />
+              </section>
+            </div>
           </section>
         </section>
       )}

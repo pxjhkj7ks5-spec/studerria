@@ -10,6 +10,8 @@
   --slash-peach: #ffb59e;
   --slash-rose: var(--tg-theme-button-color, #ff8fb1);
   --slash-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --slash-glass-button: rgba(255, 255, 255, 0.62);
+  --slash-glass-button-strong: rgba(255, 255, 255, 0.84);
   --slash-lilac: #c8b5ff;
   --slash-sky: #a9ddff;
   --slash-mint: #b9f1dd;
@@ -28,8 +30,10 @@ html[data-tg-scheme="dark"] {
   --slash-muted: #ac91a7;
   --slash-bg: var(--tg-theme-bg-color, #211b25);
   --slash-surface: rgba(42, 34, 48, 0.72);
-  --slash-glass: rgba(42, 34, 48, 0.58);
-  --slash-border: rgba(255, 255, 255, 0.16);
+  --slash-glass: rgba(45, 36, 54, 0.46);
+  --slash-border: rgba(255, 255, 255, 0.28);
+  --slash-glass-button: rgba(255, 255, 255, 0.16);
+  --slash-glass-button-strong: rgba(255, 255, 255, 0.28);
   --slash-shadow: 0 24px 70px rgba(8, 5, 12, 0.34);
   --slash-soft-shadow: 0 14px 34px rgba(8, 5, 12, 0.22);
 }
@@ -162,10 +166,15 @@ html[data-tg-scheme="dark"] .slash-shell {
 .slash-note-card,
 .slash-topbar {
   border: 1px solid var(--slash-border);
-  background: var(--slash-glass);
-  box-shadow: var(--slash-shadow);
-  -webkit-backdrop-filter: blur(24px) saturate(1.18);
-  backdrop-filter: blur(24px) saturate(1.18);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)),
+    var(--slash-glass);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    var(--slash-shadow);
+  -webkit-backdrop-filter: blur(28px) saturate(1.35);
+  backdrop-filter: blur(28px) saturate(1.35);
 }
 
 .slash-login-card {
@@ -332,6 +341,14 @@ html[data-tg-scheme="dark"] .slash-shell {
   overflow: hidden;
 }
 
+html[data-tg-scheme="dark"] .slash-note-card {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 143, 177, 0.18), transparent 34%),
+    radial-gradient(circle at 100% 32%, rgba(169, 221, 255, 0.12), transparent 32%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.035)),
+    rgba(47, 38, 58, 0.5);
+}
+
 .slash-note-card[data-vibe="clouds"] {
   background:
     radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.76), transparent 22%),
@@ -373,7 +390,9 @@ html[data-tg-scheme="dark"] .slash-shell {
 .slash-card-motion span {
   width: 72px;
   height: 72px;
-  background: rgba(255, 255, 255, 0.28);
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.72), transparent 26%),
+    rgba(255, 255, 255, 0.18);
   filter: blur(1px);
 }
 
@@ -391,16 +410,17 @@ html[data-tg-scheme="dark"] .slash-shell {
 }
 
 .slash-card-motion span:nth-child(3) {
-  right: -20px;
-  bottom: 36px;
-  width: 92px;
-  height: 92px;
+  right: -8px;
+  bottom: 46px;
+  width: 74px;
+  height: 74px;
   animation-delay: -4s;
 }
 
 .slash-card-motion b {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-style: normal;
+  opacity: 0.68;
 }
 
 .slash-card-motion b:nth-of-type(1) {
@@ -465,7 +485,8 @@ html[data-tg-scheme="dark"] .slash-shell {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  margin-inline: -2px;
+  padding: 2px 10px 4px 2px;
   scrollbar-width: none;
 }
 
@@ -476,10 +497,16 @@ html[data-tg-scheme="dark"] .slash-shell {
 .slash-reactions button,
 .slash-vibes button,
 .slash-vibe-random {
-  border: 1px solid rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.52);
   color: var(--slash-ink);
-  background: rgba(255, 255, 255, 0.42);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08)),
+    var(--slash-glass-button);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 10px 24px rgba(17, 10, 24, 0.16);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  backdrop-filter: blur(18px) saturate(1.35);
   cursor: pointer;
 }
 
@@ -495,8 +522,12 @@ html[data-tg-scheme="dark"] .slash-shell {
 .slash-reactions button.is-active,
 .slash-vibes button.is-active {
   border-color: rgba(255, 143, 177, 0.72);
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 0 0 4px rgba(255, 143, 177, 0.14);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(255, 143, 177, 0.2)),
+    var(--slash-glass-button-strong);
+  box-shadow:
+    0 0 0 4px rgba(255, 143, 177, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .slash-panel {
@@ -523,7 +554,7 @@ html[data-tg-scheme="dark"] .slash-shell {
   min-height: 36px;
   padding: 0 12px;
   border-radius: 999px;
-  color: var(--slash-soft-ink);
+  color: var(--slash-ink);
   font-size: 0.78rem;
   font-weight: 820;
   white-space: nowrap;
@@ -548,8 +579,12 @@ textarea {
   border-radius: 22px;
   outline: none;
   color: var(--slash-ink);
-  background: var(--slash-surface);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 22px rgba(119, 96, 112, 0.07);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)),
+    var(--slash-surface);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    0 8px 22px rgba(17, 10, 24, 0.1);
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
@@ -591,7 +626,9 @@ html[data-tg-scheme="dark"] textarea:focus {
 
 .slash-secondary {
   color: var(--slash-ink);
-  background: rgba(255, 255, 255, 0.56);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.18)),
+    var(--slash-glass-button);
 }
 
 .slash-vibes {
@@ -605,6 +642,82 @@ html[data-tg-scheme="dark"] textarea:focus {
   border-radius: 16px;
   font-size: 0.82rem;
   font-weight: 820;
+}
+
+.slash-history {
+  display: grid;
+  gap: 4px;
+}
+
+.slash-history-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.slash-history-grid h3 {
+  margin: 0 0 8px;
+  color: var(--slash-soft-ink);
+  font-size: 0.82rem;
+  font-weight: 860;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.slash-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.slash-history-item {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 143, 177, 0.16), transparent 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06)),
+    rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  -webkit-backdrop-filter: blur(18px) saturate(1.24);
+  backdrop-filter: blur(18px) saturate(1.24);
+}
+
+.slash-history-item[data-vibe="clouds"] {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(169, 221, 255, 0.2), transparent 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06)),
+    rgba(255, 255, 255, 0.08);
+}
+
+.slash-history-item[data-vibe="sparkles"] {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255, 233, 168, 0.24), transparent 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06)),
+    rgba(255, 255, 255, 0.08);
+}
+
+.slash-history-item[data-vibe="tiny-faces"] {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(200, 181, 255, 0.22), transparent 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06)),
+    rgba(255, 255, 255, 0.08);
+}
+
+.slash-history-item p {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  font-weight: 720;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.slash-history-item span,
+.slash-history-empty {
+  margin: 0;
+  color: var(--slash-soft-ink);
+  font-size: 0.8rem;
+  font-weight: 720;
 }
 
 .slash-toast {

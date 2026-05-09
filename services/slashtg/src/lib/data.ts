@@ -1,4 +1,4 @@
-import { AnimationType, type Profile } from "@prisma/client";
+import { AnimationType, type Profile, type Wish } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   findAllowedUserByTelegramId,
@@ -26,6 +26,16 @@ function serializeReceived(profile: Profile) {
     animationType: normalizeAnimationType(profile.animationType.replace(/_/g, "-")),
     updatedAt: profile.updatedAt.toISOString(),
     updatedAtLabel: formatSlashDate(profile.updatedAt),
+  };
+}
+
+function serializeWish(wish: Wish) {
+  return {
+    id: wish.id,
+    text: wish.text,
+    animationType: normalizeAnimationType(wish.animationType.replace(/_/g, "-")),
+    createdAt: wish.createdAt.toISOString(),
+    createdAtLabel: formatSlashDate(wish.createdAt),
   };
 }
 
@@ -99,6 +109,29 @@ export async function buildState(keyName: SlashUserKey) {
     throw new Error("profiles_unavailable");
   }
 
+  const [sentWishes, receivedWishes] = await Promise.all([
+    prisma.wish.findMany({
+      where: {
+        senderKey: keyName,
+        targetKey: other.keyName,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 12,
+    }),
+    prisma.wish.findMany({
+      where: {
+        senderKey: other.keyName,
+        targetKey: keyName,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 12,
+    }),
+  ]);
+
   return {
     ok: true,
     authenticated: true,
@@ -109,6 +142,10 @@ export async function buildState(keyName: SlashUserKey) {
       text: other.messageForMe || "",
       animationType: normalizeAnimationType(other.animationType.replace(/_/g, "-")),
     },
+    history: {
+      sent: sentWishes.map(serializeWish),
+      received: receivedWishes.map(serializeWish),
+    },
   };
 }
 
@@ -117,13 +154,28 @@ export async function saveMessage(keyName: SlashUserKey, textRaw: unknown, anima
   const targetKey = getOtherUserKey(keyName);
   const animationType = normalizeAnimationType(animationRaw);
 
-  await prisma.profile.update({
-    where: { keyName: targetKey },
-    data: {
-      messageForMe: normalizeMessage(textRaw),
-      animationType: prismaAnimationByUi[animationType] as AnimationType,
-      updatedBy: keyName,
-    },
+  const text = normalizeMessage(textRaw);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.profile.update({
+      where: { keyName: targetKey },
+      data: {
+        messageForMe: text,
+        animationType: prismaAnimationByUi[animationType] as AnimationType,
+        updatedBy: keyName,
+      },
+    });
+
+    if (text) {
+      await tx.wish.create({
+        data: {
+          senderKey: keyName,
+          targetKey,
+          text,
+          animationType: prismaAnimationByUi[animationType] as AnimationType,
+        },
+      });
+    }
   });
 
   return buildState(keyName);
