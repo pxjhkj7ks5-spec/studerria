@@ -33,6 +33,7 @@
   function todayLabel() {
     try {
       return new Intl.DateTimeFormat('uk-UA', {
+        timeZone: 'Europe/Kyiv',
         day: 'numeric',
         month: 'long',
       }).format(new Date());

@@ -103,6 +103,7 @@ function registerPublicRoutes(app, deps) {
     if (Number.isNaN(date.getTime())) return 'сьогодні';
     try {
       return new Intl.DateTimeFormat('uk-UA', {
+        timeZone: 'Europe/Kyiv',
         day: 'numeric',
         month: 'long',
       }).format(date);

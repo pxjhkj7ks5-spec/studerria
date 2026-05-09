@@ -12,6 +12,14 @@ import {
 } from "@/lib/config";
 import type { TelegramUser } from "@/lib/telegram-auth";
 
+const SLASH_TIME_ZONE = "Europe/Kyiv";
+const KYIV_DATE_PARTS_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: SLASH_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 function serializeProfile(profile: Profile) {
   return {
     displayName: profile.displayName,
@@ -44,12 +52,67 @@ export function formatSlashDate(value?: Date | string | null) {
   if (Number.isNaN(date.getTime())) return "сьогодні";
   try {
     return new Intl.DateTimeFormat("uk-UA", {
+      timeZone: SLASH_TIME_ZONE,
       day: "numeric",
       month: "long",
     }).format(date);
   } catch {
     return "сьогодні";
   }
+}
+
+function getKyivDateKey(value?: Date | string | null) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = KYIV_DATE_PARTS_FORMATTER.formatToParts(date);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+  const year = byType.get("year");
+  const month = byType.get("month");
+  const day = byType.get("day");
+  return year && month && day ? `${year}-${month}-${day}` : "";
+}
+
+function shiftKyivDateKey(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split("-").map((part) => Number.parseInt(part, 10));
+  if (!year || !month || !day) return "";
+  return getKyivDateKey(new Date(Date.UTC(year, month - 1, day + days, 12)));
+}
+
+function buildExchangeStreak(
+  wishes: Pick<Wish, "senderKey" | "targetKey" | "createdAt">[],
+  firstKey: string,
+  secondKey: string,
+) {
+  const firstToSecondDays = new Set<string>();
+  const secondToFirstDays = new Set<string>();
+
+  for (const wish of wishes) {
+    const dateKey = getKyivDateKey(wish.createdAt);
+    if (!dateKey) continue;
+    if (wish.senderKey === firstKey && wish.targetKey === secondKey) {
+      firstToSecondDays.add(dateKey);
+    }
+    if (wish.senderKey === secondKey && wish.targetKey === firstKey) {
+      secondToFirstDays.add(dateKey);
+    }
+  }
+
+  const hasExchange = (dateKey: string) => firstToSecondDays.has(dateKey) && secondToFirstDays.has(dateKey);
+  const todayKey = getKyivDateKey();
+  const todayComplete = hasExchange(todayKey);
+  let cursor = todayComplete ? todayKey : shiftKyivDateKey(todayKey, -1);
+  let days = 0;
+
+  while (cursor && hasExchange(cursor)) {
+    days += 1;
+    cursor = shiftKyivDateKey(cursor, -1);
+  }
+
+  return {
+    days,
+    todayComplete,
+    timeZone: SLASH_TIME_ZONE,
+  };
 }
 
 export async function ensureSlashProfiles() {
@@ -109,7 +172,7 @@ export async function buildState(keyName: SlashUserKey) {
     throw new Error("profiles_unavailable");
   }
 
-  const [sentWishes, receivedWishes] = await Promise.all([
+  const [sentWishes, receivedWishes, streakWishes] = await Promise.all([
     prisma.wish.findMany({
       where: {
         senderKey: keyName,
@@ -130,6 +193,29 @@ export async function buildState(keyName: SlashUserKey) {
       },
       take: 12,
     }),
+    prisma.wish.findMany({
+      where: {
+        OR: [
+          {
+            senderKey: keyName,
+            targetKey: other.keyName,
+          },
+          {
+            senderKey: other.keyName,
+            targetKey: keyName,
+          },
+        ],
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        senderKey: true,
+        targetKey: true,
+        createdAt: true,
+      },
+      take: 1000,
+    }),
   ]);
 
   return {
@@ -146,6 +232,7 @@ export async function buildState(keyName: SlashUserKey) {
       sent: sentWishes.map(serializeWish),
       received: receivedWishes.map(serializeWish),
     },
+    exchangeStreak: buildExchangeStreak(streakWishes, keyName, other.keyName),
   };
 }
 

@@ -50,6 +50,11 @@ type SlashState = {
     sent: SlashWish[];
     received: SlashWish[];
   };
+  exchangeStreak?: {
+    days: number;
+    todayComplete: boolean;
+    timeZone: string;
+  };
 };
 
 type SlashWish = {
@@ -68,12 +73,23 @@ const emptyMessage =
 function todayLabel() {
   try {
     return new Intl.DateTimeFormat("uk-UA", {
+      timeZone: "Europe/Kyiv",
       day: "numeric",
       month: "long",
     }).format(new Date());
   } catch {
     return "сьогодні";
   }
+}
+
+function streakDayLabel(days: number) {
+  const normalized = Math.abs(days);
+  const lastTwo = normalized % 100;
+  const last = normalized % 10;
+  if (lastTwo >= 11 && lastTwo <= 14) return "днів";
+  if (last === 1) return "день";
+  if (last >= 2 && last <= 4) return "дні";
+  return "днів";
 }
 
 function initialsFor(profile?: SlashProfile) {
@@ -176,6 +192,7 @@ export function SlashTgApp() {
   const otherUser = state?.otherUser;
   const received = state?.receivedMessage;
   const history = state?.history;
+  const streakDays = Math.max(0, Number(state?.exchangeStreak?.days || 0));
 
   const reactionKey = useMemo(
     () => `slashtg:reaction:${currentUser?.displayName || "anonymous"}`,
@@ -322,7 +339,17 @@ export function SlashTgApp() {
           <header className="slash-topbar">
             <Avatar profile={otherUser} className="slash-avatar--small" />
             <div className="slash-topbar-title">
-              <span>побажання від</span>
+              <div className="slash-topbar-heading">
+                <span>побажання від</span>
+                <span className="slash-streak" aria-label={`${streakDays} ${streakDayLabel(streakDays)} стріку`}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12.6 2.8c.5 3.1-1.3 4.8-2.9 6.2-1.4 1.2-2.7 2.3-2.7 4.5a5 5 0 0 0 10 0c0-2.3-1.4-3.9-3.1-5.7-.7-.8-1.5-1.7-1.9-2.7" />
+                    <path d="M10.2 16.2a2.2 2.2 0 0 0 4.4 0c0-1.1-.7-1.8-1.5-2.6-.4-.4-.8-.8-1-1.3-.2 1.4-1.9 2-1.9 3.9Z" />
+                  </svg>
+                  <b>{streakDays}</b>
+                  <small>{streakDayLabel(streakDays)}</small>
+                </span>
+              </div>
               <strong>{otherUser?.displayName || "другого учасника"}</strong>
             </div>
             <button className="slash-icon-button" type="button" onClick={logout} aria-label="Вийти">
