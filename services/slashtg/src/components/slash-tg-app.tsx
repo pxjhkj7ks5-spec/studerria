@@ -342,10 +342,7 @@ export function SlashTgApp() {
               <div className="slash-topbar-heading">
                 <span>побажання від</span>
                 <span className="slash-streak" aria-label={`${streakDays} ${streakDayLabel(streakDays)} стріку`}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12.6 2.8c.5 3.1-1.3 4.8-2.9 6.2-1.4 1.2-2.7 2.3-2.7 4.5a5 5 0 0 0 10 0c0-2.3-1.4-3.9-3.1-5.7-.7-.8-1.5-1.7-1.9-2.7" />
-                    <path d="M10.2 16.2a2.2 2.2 0 0 0 4.4 0c0-1.1-.7-1.8-1.5-2.6-.4-.4-.8-.8-1-1.3-.2 1.4-1.9 2-1.9 3.9Z" />
-                  </svg>
+                  <span className="slash-streak-icon" aria-hidden="true">🔥</span>
                   <b>{streakDays}</b>
                   <small>{streakDayLabel(streakDays)}</small>
                 </span>

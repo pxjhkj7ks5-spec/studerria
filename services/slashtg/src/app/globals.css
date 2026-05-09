@@ -307,14 +307,10 @@ html[data-tg-scheme="dark"] .slash-topbar-title .slash-streak {
     linear-gradient(135deg, rgba(255, 196, 110, 0.22), rgba(255, 143, 177, 0.12));
 }
 
-.slash-topbar-title .slash-streak svg {
-  width: 15px;
-  height: 15px;
-  fill: rgba(255, 181, 84, 0.28);
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
+.slash-streak-icon {
+  display: inline-block;
+  font-size: 0.86rem;
+  line-height: 1;
   animation: slashFlamePulse 1.8s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate;
 }
 
