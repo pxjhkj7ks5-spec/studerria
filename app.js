@@ -19019,14 +19019,6 @@ app.post('/help/support', requireLogin, writeLimiter, async (req, res) => {
   }
 });
 
-app.get('/briefcase', (req, res) => {
-  res.render('briefcase', {
-    showGlobalNavbar: false,
-    pageTitle: 'Studerria · Красная кнопка',
-    pageTheme: 'dark',
-  });
-});
-
 const statusAccessToken = String(process.env.STATUS_ACCESS_TOKEN || process.env.BOOTSTRAP_TOKEN || '').trim();
 const canAccessOperationalDetails = (req) => {
   return securityHelpers.canAccessOperationalDetails({
