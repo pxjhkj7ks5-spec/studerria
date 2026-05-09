@@ -61,7 +61,6 @@ type SlashWish = {
 };
 
 const vibes = ["soft-glow", "clouds", "sparkles", "tiny-faces"];
-const moodLabels = ["soft day", "main character mood", "cloudy but cute", "tiny magic"];
 const reactionOptions = ["🥹", "🥰", "✨", "🫶", "🌙", "☁️", "💫"];
 const emptyMessage =
   "сьогодні тут ще тихо... але, здається, скоро щось з'явиться";
@@ -75,11 +74,6 @@ function todayLabel() {
   } catch {
     return "сьогодні";
   }
-}
-
-function moodForToday() {
-  const dayKey = Math.floor(Date.now() / 86400000);
-  return moodLabels[dayKey % moodLabels.length];
 }
 
 function initialsFor(profile?: SlashProfile) {
@@ -328,8 +322,8 @@ export function SlashTgApp() {
           <header className="slash-topbar">
             <Avatar profile={otherUser} className="slash-avatar--small" />
             <div className="slash-topbar-title">
-              <span>Slash TG</span>
-              <strong>{otherUser?.displayName || "другий учасник"}</strong>
+              <span>побажання від</span>
+              <strong>{otherUser?.displayName || "другого учасника"}</strong>
             </div>
             <button className="slash-icon-button" type="button" onClick={logout} aria-label="Вийти">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -351,7 +345,6 @@ export function SlashTgApp() {
             </div>
             <div className="slash-note-meta">
               <span>{received?.updatedAtLabel || todayLabel()}</span>
-              <span className="slash-mood">{moodForToday()}</span>
             </div>
             <div className="slash-author-row">
               <Avatar profile={otherUser} className="slash-avatar--author" />

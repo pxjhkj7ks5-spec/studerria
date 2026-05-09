@@ -10,6 +10,7 @@
   const passwordInput = root.querySelector('[data-password-input]');
   const logoutButton = root.querySelector('[data-logout]');
   const currentAvatar = root.querySelector('[data-current-avatar]');
+  const topbarName = root.querySelector('[data-topbar-name]');
   const authorAvatar = root.querySelector('[data-author-avatar]');
   const avatarPreview = root.querySelector('[data-avatar-preview]');
   const avatarInput = root.querySelector('[data-avatar-input]');
@@ -19,7 +20,6 @@
   const messageText = root.querySelector('[data-message-text]');
   const messageCard = root.querySelector('[data-message-card]');
   const noteDate = root.querySelector('[data-note-date]');
-  const moodBadge = root.querySelector('[data-mood-badge]');
   const vibeOptions = Array.from(root.querySelectorAll('[data-vibe]'));
   const randomVibeButton = root.querySelector('[data-random-vibe]');
   const reactionButtons = Array.from(root.querySelectorAll('[data-reactions] button'));
@@ -27,7 +27,6 @@
 
   const emptyMessage = 'сьогодні тут ще тихо... але, здається, скоро щось зʼявиться 🥹';
   const vibes = ['soft-glow', 'clouds', 'sparkles', 'tiny-faces'];
-  const moods = ['soft day', 'main character mood', 'cloudy but cute', 'tiny magic'];
   let state = null;
   let toastTimer = 0;
 
@@ -40,11 +39,6 @@
     } catch (_error) {
       return 'сьогодні';
     }
-  }
-
-  function moodForToday() {
-    const dayKey = Math.floor(Date.now() / 86400000);
-    return moods[dayKey % moods.length];
   }
 
   function setScreens(isLoggedIn) {
@@ -157,11 +151,11 @@
     renderAvatar(currentAvatar, current);
     renderAvatar(authorAvatar, author);
     renderAvatar(avatarPreview, current);
+    if (topbarName) topbarName.textContent = author.displayName || 'другого учасника';
     if (avatarInput) avatarInput.value = current.avatarUrl || '';
     if (messageInput) messageInput.value = draft.text || '';
     if (messageText) messageText.textContent = received.text || emptyMessage;
     if (noteDate) noteDate.textContent = received.updatedAtLabel || todayLabel();
-    if (moodBadge) moodBadge.textContent = state.mood || moodForToday();
     setVibe(draft.animationType || received.animationType || 'soft-glow');
     renderReaction();
   }
@@ -268,6 +262,5 @@
   });
 
   if (noteDate) noteDate.textContent = todayLabel();
-  if (moodBadge) moodBadge.textContent = moodForToday();
   loadState();
 })();

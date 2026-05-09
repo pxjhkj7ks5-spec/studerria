@@ -315,6 +315,11 @@ textarea:focus {
   text-align: center;
 }
 
+.mb-topbar-title span {
+  letter-spacing: 0.025em;
+  text-transform: none;
+}
+
 .mb-topbar-title strong {
   display: block;
   margin-top: 3px;
@@ -419,9 +424,11 @@ textarea:focus {
   width: 154px;
   aspect-ratio: 1;
   border-radius: 999px;
-  filter: blur(10px);
-  opacity: 0.58;
-  animation: mbFloat 7s ease-in-out infinite alternate;
+  filter: blur(12px);
+  opacity: 0.54;
+  transform: translate3d(0, 0, 0);
+  animation: mbOrbFloat 8.5s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate;
+  will-change: transform, opacity;
 }
 
 .mb-card-motion span:first-child {
@@ -447,7 +454,10 @@ textarea:focus {
 .mb-card-motion b {
   opacity: 0;
   font-size: 1.3rem;
-  animation: mbFaceFloat 6s ease-in-out infinite;
+  filter: drop-shadow(0 8px 18px rgba(86, 67, 95, 0.18));
+  transform: translate3d(0, 0, 0);
+  animation: mbGlintFloat 7.5s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate;
+  will-change: transform, opacity;
 }
 
 .mb-card-motion b:nth-of-type(1) {
@@ -470,29 +480,43 @@ textarea:focus {
 .mb-note-card[data-vibe="clouds"] .mb-card-motion::before,
 .mb-note-card[data-vibe="clouds"] .mb-card-motion::after {
   position: absolute;
-  content: "☁️";
+  width: 112px;
+  height: 54px;
+  content: "";
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 28% 52%, rgba(255, 255, 255, 0.72), transparent 32%),
+    radial-gradient(circle at 56% 38%, rgba(255, 255, 255, 0.66), transparent 34%),
+    radial-gradient(circle at 78% 58%, rgba(255, 255, 255, 0.5), transparent 30%),
+    rgba(255, 255, 255, 0.22);
   opacity: 0.62;
-  filter: blur(0.2px);
+  filter: blur(0.4px);
   animation: mbCloud 10s linear infinite;
 }
 
 .mb-note-card[data-vibe="clouds"] .mb-card-motion::before {
   left: -18%;
   top: 26%;
-  font-size: 3.2rem;
 }
 
 .mb-note-card[data-vibe="clouds"] .mb-card-motion::after {
   left: -32%;
   top: 56%;
-  font-size: 2.4rem;
+  transform: scale(0.76);
   animation-delay: -4s;
 }
 
 .mb-note-card[data-vibe="sparkles"] .mb-card-motion::before,
 .mb-note-card[data-vibe="sparkles"] .mb-card-motion::after {
   position: absolute;
-  content: "✨";
+  width: 10px;
+  height: 10px;
+  content: "";
+  border-radius: 3px;
+  background: rgba(255, 233, 168, 0.94);
+  box-shadow:
+    0 0 0 7px rgba(255, 233, 168, 0.14),
+    0 0 26px rgba(255, 233, 168, 0.34);
   opacity: 0.78;
   animation: mbSparkle 2.4s ease-in-out infinite;
 }
@@ -500,13 +524,13 @@ textarea:focus {
 .mb-note-card[data-vibe="sparkles"] .mb-card-motion::before {
   left: 18%;
   top: 19%;
-  font-size: 1.8rem;
 }
 
 .mb-note-card[data-vibe="sparkles"] .mb-card-motion::after {
   right: 16%;
   bottom: 24%;
-  font-size: 2.2rem;
+  width: 13px;
+  height: 13px;
   animation-delay: -1s;
 }
 
@@ -524,19 +548,12 @@ textarea:focus {
 .mb-note-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   margin-bottom: 22px;
   color: var(--mb-soft-ink);
   font-size: 0.82rem;
   font-weight: 760;
-}
-
-.mb-mood {
-  padding: 8px 11px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
 .mb-author-row {
@@ -729,6 +746,36 @@ textarea:focus {
   }
   50% {
     transform: translateY(-14px) scale(1.08);
+  }
+}
+
+@keyframes mbOrbFloat {
+  from {
+    opacity: 0.42;
+    transform: translate3d(-8px, 10px, 0) rotate(-4deg) scale(0.96);
+  }
+  48% {
+    opacity: 0.68;
+    transform: translate3d(12px, -10px, 0) rotate(3deg) scale(1.05);
+  }
+  to {
+    opacity: 0.5;
+    transform: translate3d(22px, -20px, 0) rotate(8deg) scale(1);
+  }
+}
+
+@keyframes mbGlintFloat {
+  from {
+    opacity: 0.18;
+    transform: translate3d(-2px, 10px, 0) rotate(-8deg) scale(0.92);
+  }
+  44% {
+    opacity: 0.82;
+    transform: translate3d(8px, -8px, 0) rotate(4deg) scale(1.08);
+  }
+  to {
+    opacity: 0.34;
+    transform: translate3d(14px, -18px, 0) rotate(10deg) scale(0.98);
   }
 }
 
