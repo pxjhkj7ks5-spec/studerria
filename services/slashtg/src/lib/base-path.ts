@@ -15,7 +15,7 @@ function normalizeBasePath(basePath?: string) {
 }
 
 export function getBasePath() {
-  return normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH ?? "/slashtg");
+  return normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH ?? "/tg");
 }
 
 export function withBasePath(path: string) {

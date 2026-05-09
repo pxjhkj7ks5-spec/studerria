@@ -2,7 +2,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const CHARREDMAP_BASE_PATH = '/charredmap';
 const NARADADRUK_BASE_PATH = '/naradadruk';
-const SLASHTG_BASE_PATH = '/slashtg';
+const SLASHTG_BASE_PATH = '/tg';
 
 function isServiceRequest(req, basePath) {
   const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];

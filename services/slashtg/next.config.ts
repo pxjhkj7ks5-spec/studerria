@@ -18,7 +18,7 @@ function normalizeBasePath(basePath?: string) {
   return withLeadingSlash.replace(/\/+$/, "");
 }
 
-const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH ?? "/slashtg");
+const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH ?? "/tg");
 
 const securityHeaders = [
   {

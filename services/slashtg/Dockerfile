@@ -13,14 +13,14 @@ COPY prisma ./prisma
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 FROM base AS builder
-ARG NEXT_PUBLIC_BASE_PATH=/slashtg
+ARG NEXT_PUBLIC_BASE_PATH=/tg
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 FROM base AS runner
-ARG NEXT_PUBLIC_BASE_PATH=/slashtg
+ARG NEXT_PUBLIC_BASE_PATH=/tg
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0

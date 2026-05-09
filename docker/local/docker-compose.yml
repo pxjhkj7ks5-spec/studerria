@@ -148,14 +148,14 @@ services:
       context: ../../services/slashtg
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BASE_PATH: /slashtg
+        NEXT_PUBLIC_BASE_PATH: /tg
     init: true
     restart: unless-stopped
     environment:
       NODE_ENV: ${SLASHTG_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
       PORT: 8080
-      NEXT_PUBLIC_BASE_PATH: /slashtg
+      NEXT_PUBLIC_BASE_PATH: /tg
       DATABASE_URL: file:/data/slashtg.db
       SLASHTG_BOT_TOKEN: ${SLASHTG_BOT_TOKEN:-}
       SLASHTG_SESSION_SECRET: ${SLASHTG_SESSION_SECRET:-change-me-slashtg-session-secret-change-this}
@@ -178,7 +178,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:8080/slashtg').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:8080/tg').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
         ]
       interval: 10s
       timeout: 5s
