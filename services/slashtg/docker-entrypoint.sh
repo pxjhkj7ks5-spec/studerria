@@ -13,7 +13,7 @@ if [ -f "$SCHEMA_FILE" ]; then
 
   if [ "$current_schema_hash" != "$previous_schema_hash" ]; then
     echo "[entrypoint] schema changed; running prisma db push"
-    ./node_modules/.bin/prisma db push
+    ./node_modules/.bin/prisma db push --skip-generate
     printf '%s\n' "$current_schema_hash" > "$SCHEMA_HASH_FILE"
   else
     echo "[entrypoint] schema unchanged; skipping prisma db push"
