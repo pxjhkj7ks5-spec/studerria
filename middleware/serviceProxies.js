@@ -2,6 +2,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const CHARREDMAP_BASE_PATH = '/charredmap';
 const NARADADRUK_BASE_PATH = '/naradadruk';
+const SLASHTG_BASE_PATH = '/slashtg';
 
 function isServiceRequest(req, basePath) {
   const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
@@ -58,6 +59,7 @@ function registerServiceProxies(app, deps = {}) {
   const logger = deps.logger || console;
   const charredmapProxyTarget = String(env.CHARREDMAP_PROXY_TARGET || '').trim();
   const naradadrukProxyTarget = String(env.NARADADRUK_PROXY_TARGET || '').trim();
+  const slashtgProxyTarget = String(env.SLASHTG_PROXY_TARGET || '').trim();
 
   const charredmapProxy = createServiceProxy({
     target: charredmapProxyTarget,
@@ -71,6 +73,13 @@ function registerServiceProxies(app, deps = {}) {
     basePath: NARADADRUK_BASE_PATH,
     serviceName: 'Narada Druk',
     logLabel: 'Narada Druk',
+    logger,
+  });
+  const slashtgProxy = createServiceProxy({
+    target: slashtgProxyTarget,
+    basePath: SLASHTG_BASE_PATH,
+    serviceName: 'Slash TG',
+    logLabel: 'Slash TG',
     logger,
   });
 
@@ -92,6 +101,16 @@ function registerServiceProxies(app, deps = {}) {
       return respondServiceUnavailable(res, 'Narada Druk', 404);
     }
     return naradadrukProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (!isServiceRequest(req, SLASHTG_BASE_PATH)) {
+      return next();
+    }
+    if (!slashtgProxy) {
+      return respondServiceUnavailable(res, 'Slash TG', 404);
+    }
+    return slashtgProxy(req, res, next);
   });
 }
 

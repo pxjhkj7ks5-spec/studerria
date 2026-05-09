@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum AnimationType {
+  soft_glow
+  clouds
+  sparkles
+  tiny_faces
+}
+
+model Profile {
+  id                Int           @id @default(autoincrement())
+  keyName           String        @unique
+  telegramId        String        @default("")
+  displayName       String
+  telegramFirstName String        @default("")
+  telegramLastName  String        @default("")
+  telegramUsername  String        @default("")
+  telegramPhotoUrl  String        @default("")
+  customAvatarUrl   String        @default("")
+  messageForMe      String        @default("")
+  animationType     AnimationType @default(soft_glow)
+  updatedBy         String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
