@@ -12744,6 +12744,7 @@ function getAcademicV2RouteMessages(req) {
     scheduleSaved: 'Рядок розкладу збережено',
     scheduleDeleted: 'Рядок розкладу видалено',
     scheduleCleared: 'Розклад вибраного терму очищено',
+    scheduleSubjectsCleared: 'Слоти вибраних предметів видалено з розкладу',
     PROGRAM_NAME_REQUIRED: 'Назва програми обов’язкова',
     PROGRAM_REQUIRED: 'Спочатку виберіть програму',
     COHORT_REQUIRED: 'Спочатку виберіть когорту',
@@ -12776,6 +12777,7 @@ function getAcademicV2RouteMessages(req) {
     SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм, предмет і режим активності',
     SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
     SCHEDULE_WEEK_LIST_INVALID: 'Тижні треба вказати числами через кому, наприклад 1, 3, 5',
+    SCHEDULE_SUBJECT_SELECTION_REQUIRED: 'Виберіть хоча б один предмет для очищення розкладу',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
     STAGE_SUBJECT_ACTIVITY_REQUIRED: 'У stage subject має залишатися хоча б одна activity',
     GROUP_SUBJECT_ACTIVITY_REQUIRED: 'У предмета курсу має залишатися хоча б одна activity',
@@ -12806,6 +12808,7 @@ function getAcademicV2RouteMessages(req) {
     scheduleSaved: 'Schedule entry saved',
     scheduleDeleted: 'Schedule entry deleted',
     scheduleCleared: 'Selected term schedule cleared',
+    scheduleSubjectsCleared: 'Selected subjects removed from the schedule',
     PROGRAM_NAME_REQUIRED: 'Program name is required',
     PROGRAM_REQUIRED: 'Select a program first',
     COHORT_REQUIRED: 'Select a cohort first',
@@ -12838,6 +12841,7 @@ function getAcademicV2RouteMessages(req) {
     SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires a term, subject, and activity mode',
     SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
     SCHEDULE_WEEK_LIST_INVALID: 'Weeks must be provided as comma-separated positive numbers, for example 1, 3, 5',
+    SCHEDULE_SUBJECT_SELECTION_REQUIRED: 'Select at least one subject to clear from the schedule',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Subject template not found',
     STAGE_SUBJECT_ACTIVITY_REQUIRED: 'Stage subject must keep at least one activity',
     GROUP_SUBJECT_ACTIVITY_REQUIRED: 'Course subject must keep at least one activity',
@@ -43469,6 +43473,23 @@ app.post('/admin/pathways/v2/schedule/save', requirePathwaysSectionAccess, write
       termId: Number(result && result.row && result.row.term_id) || focus.termId,
     }),
     logContext: 'admin.pathways.v2.schedule.save',
+  })
+));
+
+app.post('/admin/pathways/v2/schedule/delete-subjects', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.clearScheduleEntriesForSubjects(getAcademicV2Store(), req.body),
+    successMessageKey: 'scheduleSubjectsCleared',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.groupId) || focus.groupId,
+      termId: Number(result && result.termId) || focus.termId,
+    }),
+    extraParamsBuilder: () => ({
+      workspace_tab: 'schedule',
+      schedule_entry_id: '',
+    }),
+    logContext: 'admin.pathways.v2.schedule.delete-subjects',
   })
 ));
 

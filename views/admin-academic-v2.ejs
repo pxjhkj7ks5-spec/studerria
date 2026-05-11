@@ -2771,6 +2771,36 @@
                         </button>
                       </form>
                     </div>
+                    <form method="post" action="/admin/pathways/v2/schedule/delete-subjects" class="mt-3" data-schedule-subject-clear-form data-schedule-subject-clear-label="<%= selectedTermRecord ? selectedTermRecord.title : '' %>">
+                      <%- renderFocusFields() %>
+                      <input type="hidden" name="term_id" value="<%= selectedWorkspaceTermId || '' %>" />
+                      <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                      <div class="academic-v2-subcard-topline">Видалити предмет із розкладу</div>
+                      <% if (scheduleBySubject.length) { %>
+                        <div class="academic-v2-checkboxes mt-2">
+                          <% scheduleBySubject.forEach((item) => { %>
+                            <label>
+                              <input
+                                type="checkbox"
+                                name="group_subject_ids"
+                                value="<%= item.subject.id %>"
+                                data-schedule-subject-clear-option
+                                data-slot-count="<%= item.entries.length %>"
+                              />
+                              <span><%= item.subject.title %> · <%= item.entries.length %> слотів</span>
+                            </label>
+                          <% }); %>
+                        </div>
+                        <div class="academic-v2-muted mt-2">Видаляються тільки рядки розкладу у вибраному термі. Сам предмет, викладачі й activity-набір залишаються.</div>
+                      <% } else { %>
+                        <div class="academic-v2-empty mt-2">У вибраному термі немає предметів зі слотами.</div>
+                      <% } %>
+                      <div class="academic-v2-actions mt-2">
+                        <button type="submit" class="btn btn-outline-danger" <%= selectedWorkspaceTermId && scheduleBySubject.length ? '' : 'disabled' %>>
+                          Видалити вибрані предмети
+                        </button>
+                      </div>
+                    </form>
                   </div>
 
                   <form method="post" action="/admin/pathways/v2/schedule/save" class="academic-v2-subcard" data-editor-form="schedule">
@@ -3123,6 +3153,7 @@
         const scheduleSlots = Array.from(document.querySelectorAll('[data-schedule-slot]'));
         const scheduleAdvancedBlock = document.querySelector('.academic-v2-advanced-block');
         const scheduleClearForms = Array.from(document.querySelectorAll('[data-schedule-clear-form]'));
+        const scheduleSubjectClearForms = Array.from(document.querySelectorAll('[data-schedule-subject-clear-form]'));
         const groupSubjectActivitySubject = document.getElementById('groupSubjectActivitySubject');
         const studentBulkForm = document.getElementById('studentBulkForm');
         const studentCheckboxes = Array.from(document.querySelectorAll('[data-student-checkbox]'));
@@ -4786,6 +4817,29 @@
             const message = termLabel
               ? `Очистити ${slotCount} слотів у термі «${termLabel}»? Цю дію не можна скасувати.`
               : 'Очистити всі слоти у вибраному термі? Цю дію не можна скасувати.';
+            if (!window.confirm(message)) {
+              event.preventDefault();
+            }
+          });
+        });
+
+        scheduleSubjectClearForms.forEach((form) => {
+          form.addEventListener('submit', (event) => {
+            const checkedOptions = Array.from(form.querySelectorAll('[data-schedule-subject-clear-option]'))
+              .filter((checkbox) => checkbox.checked);
+            const subjectCount = checkedOptions.length;
+            const slotCount = checkedOptions.reduce((sum, checkbox) => (
+              sum + Math.max(0, Number(checkbox.getAttribute('data-slot-count') || 0) || 0)
+            ), 0);
+            if (!subjectCount) {
+              event.preventDefault();
+              window.alert('Виберіть хоча б один предмет для очищення розкладу.');
+              return;
+            }
+            const termLabel = String(form.getAttribute('data-schedule-subject-clear-label') || '').trim();
+            const message = termLabel
+              ? `Видалити ${slotCount} слотів для ${subjectCount} предметів у термі «${termLabel}»? Цю дію не можна скасувати.`
+              : `Видалити ${slotCount} слотів для ${subjectCount} предметів? Цю дію не можна скасувати.`;
             if (!window.confirm(message)) {
               event.preventDefault();
             }
