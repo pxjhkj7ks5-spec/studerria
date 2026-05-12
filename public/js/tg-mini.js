@@ -39,7 +39,10 @@
       const data = await response.json().catch(() => null);
       if (!data || !data.redirect) return;
       const currentPath = window.location.pathname || '';
-      if (data.status === 'authenticated' && currentPath !== data.redirect) {
+      const shouldEnterApp = currentPath === '/studerria-tg'
+        || currentPath === '/studerria-tg/login'
+        || currentPath === '/studerria-tg/register';
+      if (data.status === 'authenticated' && shouldEnterApp && currentPath !== data.redirect) {
         window.location.replace(data.redirect);
         return;
       }

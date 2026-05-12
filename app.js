@@ -19089,7 +19089,6 @@ function renderTelegramMiniPage(req, res, viewName, locals = {}) {
     lang,
     t: (key) => translate(lang, key),
     appVersion,
-    changelog: localizeChangelogItems(appChangelog, lang).slice(0, CHANGELOG_UI_LIMIT),
     currentPath: req.path,
     currentTgPage: String(locals.currentTgPage || '').trim(),
     telegramUser: getTelegramMiniPendingUser(req),
