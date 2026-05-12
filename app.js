@@ -19809,6 +19809,51 @@ const studerriaTelegramBotState = {
   botUsername: '',
 };
 
+const STUDERRIA_TG_ACTION_TTL_MS = 10 * 60 * 1000;
+const studerriaTelegramActionStore = new Map();
+const studerriaTelegramDayLabels = {
+  Monday: 'Пн',
+  Tuesday: 'Вт',
+  Wednesday: 'Ср',
+  Thursday: 'Чт',
+  Friday: 'Пт',
+  Saturday: 'Сб',
+  Sunday: 'Нд',
+};
+const studerriaTelegramLessonTypeLabels = {
+  lecture: 'Лекція',
+  seminar: 'Семінар',
+  practice: 'Практика',
+  lab: 'Лаба',
+};
+
+function pruneStuderriaTelegramActionStore(now = Date.now()) {
+  for (const [token, item] of studerriaTelegramActionStore.entries()) {
+    if (!item || Number(item.expiresAt || 0) <= now) {
+      studerriaTelegramActionStore.delete(token);
+    }
+  }
+}
+
+function createStuderriaTelegramActionToken(payload = {}) {
+  pruneStuderriaTelegramActionStore();
+  const token = randomUUID().replace(/-/g, '').slice(0, 24);
+  studerriaTelegramActionStore.set(token, {
+    payload,
+    expiresAt: Date.now() + STUDERRIA_TG_ACTION_TTL_MS,
+  });
+  return `stb:${token}`;
+}
+
+function getStuderriaTelegramActionPayload(callbackData = '') {
+  const raw = String(callbackData || '').trim();
+  if (!raw.startsWith('stb:')) return null;
+  pruneStuderriaTelegramActionStore();
+  const token = raw.slice(4);
+  const item = studerriaTelegramActionStore.get(token);
+  return item && item.payload ? item.payload : null;
+}
+
 async function callStuderriaTelegramBotApi(method, payload = {}) {
   const token = getTelegramMiniBotToken();
   if (!token) throw new Error('missing_bot_token');
@@ -19827,19 +19872,132 @@ async function callStuderriaTelegramBotApi(method, payload = {}) {
   return data.result;
 }
 
-function isStuderriaTelegramStartCommand(message, botUsername = '') {
+function parseStuderriaTelegramCommand(message, botUsername = '') {
   const text = String(message && message.text ? message.text : '').trim();
-  if (!text) return false;
-  const [commandRaw] = text.split(/\s+/, 1);
-  const command = String(commandRaw || '').trim().toLowerCase();
+  if (!text || !text.startsWith('/')) return null;
+  const parts = text.split(/\s+/);
+  const commandRaw = String(parts.shift() || '').trim();
+  const commandParts = commandRaw.slice(1).split('@');
+  const command = String(commandParts[0] || '').trim().toLowerCase();
+  const targetUsername = String(commandParts[1] || '').trim().toLowerCase();
   const username = String(botUsername || '').trim().toLowerCase();
-  return command === '/start'
-    || (username && command === `/start@${username}`);
+  if (!command) return null;
+  if (targetUsername && username && targetUsername !== username) return null;
+  return { command, args: parts.join(' ').trim(), text };
+}
+
+function isStuderriaTelegramStartCommand(message, botUsername = '') {
+  const parsed = parseStuderriaTelegramCommand(message, botUsername);
+  return parsed && parsed.command === 'start';
+}
+
+function getStuderriaTelegramDevIdSet() {
+  return new Set(
+    String(process.env.STUDERRIA_TG_DEV_TELEGRAM_ID || process.env.STUDERRIA_TG_DEV_TELEGRAM_IDS || '')
+      .split(/[\s,;]+/)
+      .map((value) => normalizeTelegramId(value))
+      .filter(Boolean)
+  );
+}
+
+function isStuderriaTelegramDevUser(telegramUser = {}) {
+  const actorId = normalizeTelegramId(telegramUser && telegramUser.id);
+  return Boolean(actorId && getStuderriaTelegramDevIdSet().has(actorId));
+}
+
+function normalizeStuderriaTelegramUsername(rawValue) {
+  return String(rawValue || '').trim().replace(/^@/, '').toLowerCase();
+}
+
+function buildStuderriaTelegramInlineKeyboard(items = [], columns = 1) {
+  const safeColumns = Math.max(1, Math.min(3, Number(columns || 1) || 1));
+  const rows = [];
+  for (let index = 0; index < items.length; index += safeColumns) {
+    rows.push(items.slice(index, index + safeColumns));
+  }
+  return { inline_keyboard: rows };
+}
+
+function getStuderriaTelegramActorId(source = {}) {
+  return normalizeTelegramId(source && source.id);
+}
+
+function resolveStuderriaTelegramGroupNumber(user = {}, subject = {}, activityType = '') {
+  const explicitMaxGroup = parsePositiveIntStrict(subject && subject.group_count);
+  const maxGroup = explicitMaxGroup || 3;
+  if (String(activityType || '').toLowerCase() === 'lecture') return 1;
+  const numericScheduleGroup = parsePositiveIntStrict(user && user.schedule_group);
+  const numericDefaultGroup = parsePositiveIntStrict(subject && subject.default_group);
+  return Math.max(1, Math.min(maxGroup, numericScheduleGroup || numericDefaultGroup || 1));
+}
+
+function getStuderriaTelegramSubjectName(subject = {}) {
+  return sanitizeCompactText(
+    subject.subject_name || subject.name || subject.title || subject.catalog_name || 'Предмет',
+    80
+  );
+}
+
+function getStuderriaTelegramDayLabel(dayName = '') {
+  return studerriaTelegramDayLabels[dayName] || dayName;
+}
+
+function getStuderriaTelegramLessonTypeLabel(value = '') {
+  const key = String(value || '').trim().toLowerCase();
+  return studerriaTelegramLessonTypeLabels[key] || (key ? key : 'Пара');
+}
+
+function clampStuderriaTelegramWeekNumber(value, semester = {}) {
+  const maxWeeks = Math.max(1, Number(semester && semester.weeks_count || 0) || 16);
+  const parsed = Math.max(1, Number(value || 0) || 1);
+  return Math.min(maxWeeks, parsed);
 }
 
 function getStuderriaTelegramMessageThreadId(message = {}) {
   const threadId = Number(message && message.message_thread_id || 0);
   return Number.isInteger(threadId) && threadId > 0 ? threadId : null;
+}
+
+async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
+  if (!chatId || !text) return null;
+  const payload = {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+  };
+  const messageThreadId = options.messageThreadId
+    || getStuderriaTelegramMessageThreadId(options.sourceMessage || {});
+  if (messageThreadId) {
+    payload.message_thread_id = messageThreadId;
+  }
+  if (options.replyMarkup) {
+    payload.reply_markup = options.replyMarkup;
+  }
+  return callStuderriaTelegramBotApi('sendMessage', payload);
+}
+
+async function editStuderriaTelegramMessage(callbackQuery = {}, text, replyMarkup = null) {
+  const message = callbackQuery && callbackQuery.message ? callbackQuery.message : null;
+  if (!message || !text) return null;
+  const payload = {
+    chat_id: message.chat && message.chat.id,
+    message_id: message.message_id,
+    text,
+    disable_web_page_preview: true,
+  };
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
+  }
+  return callStuderriaTelegramBotApi('editMessageText', payload);
+}
+
+async function answerStuderriaTelegramCallback(callbackQuery = {}, text = '') {
+  const callbackQueryId = callbackQuery && callbackQuery.id ? callbackQuery.id : null;
+  if (!callbackQueryId) return;
+  await callStuderriaTelegramBotApi('answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    text: text ? String(text).slice(0, 180) : undefined,
+  }).catch(() => {});
 }
 
 async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
@@ -19891,12 +20049,629 @@ async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
   await callStuderriaTelegramBotApi('sendMessage', payload);
 }
 
+async function findStuderriaTelegramUserByActor(telegramUser = {}) {
+  const telegramId = normalizeTelegramId(telegramUser && telegramUser.id);
+  if (!telegramId) return null;
+  return db.get(
+    `
+      SELECT
+        u.id,
+        u.full_name,
+        u.role,
+        u.schedule_group,
+        u.course_id,
+        u.group_id,
+        u.telegram_id,
+        u.telegram_username,
+        COALESCE(v2_group.legacy_course_id, u.course_id) AS schedule_course_id,
+        v2_group.id AS academic_group_id,
+        v2_group.label AS academic_group_label
+      FROM users u
+      LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+      WHERE u.telegram_id = ?
+      LIMIT 1
+    `,
+    [telegramId]
+  );
+}
+
+async function getStuderriaTelegramUserRoleKeys(userId, fallbackRole = 'student') {
+  const assignment = await getUserRoleAssignmentsForUserIds([userId]);
+  return normalizeRoleList(
+    (assignment.roleKeysByUser && assignment.roleKeysByUser[Number(userId)])
+      || [fallbackRole || 'student']
+  );
+}
+
+async function getStuderriaTelegramActorContext(telegramUser = {}, options = {}) {
+  const actor = await findStuderriaTelegramUserByActor(telegramUser);
+  const actorTelegramId = getStuderriaTelegramActorId(telegramUser);
+  const isDev = isStuderriaTelegramDevUser(telegramUser);
+  if (!actor) {
+    return { actor: null, actorTelegramId, roleKeys: [], isDev, canUseStarosta: false };
+  }
+  const roleKeys = await getStuderriaTelegramUserRoleKeys(actor.id, actor.role);
+  return {
+    actor,
+    actorTelegramId,
+    roleKeys,
+    isDev,
+    canUseStarosta: isDev || roleKeys.includes('starosta') || roleKeys.includes('admin') || roleKeys.includes('deanery'),
+  };
+}
+
+async function resolveStuderriaTelegramRoleTarget(rawTarget = '') {
+  const target = String(rawTarget || '').trim();
+  if (!target) return null;
+  if (target.startsWith('@')) {
+    const username = normalizeStuderriaTelegramUsername(target);
+    if (!username) return null;
+    return db.get(
+      `
+        SELECT id, full_name, role, telegram_id, telegram_username
+        FROM users
+        WHERE LOWER(COALESCE(telegram_username, '')) = ?
+        LIMIT 1
+      `,
+      [username]
+    );
+  }
+  const normalizedTelegramId = normalizeTelegramId(target);
+  if (/^\d+$/.test(normalizedTelegramId)) {
+    const byTelegram = await db.get(
+      `
+        SELECT id, full_name, role, telegram_id, telegram_username
+        FROM users
+        WHERE telegram_id = ?
+        LIMIT 1
+      `,
+      [normalizedTelegramId]
+    );
+    if (byTelegram) return byTelegram;
+    return db.get(
+      `
+        SELECT id, full_name, role, telegram_id, telegram_username
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [Number(normalizedTelegramId)]
+    );
+  }
+  const username = normalizeStuderriaTelegramUsername(target);
+  if (!username) return null;
+  return db.get(
+    `
+      SELECT id, full_name, role, telegram_id, telegram_username
+      FROM users
+      WHERE LOWER(COALESCE(telegram_username, '')) = ?
+      LIMIT 1
+    `,
+    [username]
+  );
+}
+
+async function handleStuderriaTelegramGiveRoleCommand(message = {}, parsedCommand = {}) {
+  const chatId = message && message.chat ? message.chat.id : null;
+  if (!chatId) return;
+  if (!isStuderriaTelegramDevUser(message.from || {})) {
+    await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
+    return;
+  }
+  const args = String(parsedCommand.args || '').trim().split(/\s+/).filter(Boolean);
+  const roleKey = normalizeRoleKey(args[0] || '');
+  const targetRaw = args.slice(1).join(' ');
+  if (roleKey !== 'starosta' || !targetRaw) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Формат: /giverole starosta @username або /giverole starosta 123456789',
+      { sourceMessage: message }
+    );
+    return;
+  }
+  const targetUser = await resolveStuderriaTelegramRoleTarget(targetRaw);
+  if (!targetUser) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Не знайшов користувача. Найнадійніше: попроси його один раз зайти в mini app, тоді можна видати роль по Telegram ID або @username.',
+      { sourceMessage: message }
+    );
+    return;
+  }
+  const existingRoles = await getStuderriaTelegramUserRoleKeys(targetUser.id, targetUser.role);
+  const nextRoles = normalizeRoleList([...existingRoles, 'starosta']);
+  await assignUserRoles(targetUser.id, nextRoles, { preferredPrimary: 'starosta' });
+  broadcast('users_updated');
+  await sendStuderriaTelegramMessage(
+    chatId,
+    `Готово: ${sanitizeCompactText(targetUser.full_name || `user ${targetUser.id}`, 120)} тепер starosta.`,
+    { sourceMessage: message }
+  );
+}
+
+async function loadStuderriaTelegramScheduleContext(telegramUser = {}) {
+  const context = await getStuderriaTelegramActorContext(telegramUser);
+  if (!context.actor) {
+    return { ...context, error: 'Щоб керувати розкладом, спершу зайди в mini app через /start і привʼяжи Telegram.' };
+  }
+  if (!context.canUseStarosta) {
+    return { ...context, error: 'Ця команда доступна тільки для starosta.' };
+  }
+  const courseId = parsePositiveIntStrict(context.actor.schedule_course_id || context.actor.course_id);
+  if (!courseId) {
+    return { ...context, error: 'Не знайшов курс для твого акаунта.' };
+  }
+  const subjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: true }).catch(() => null);
+  const activeSemester = await getActiveSemester(courseId).catch(() => null);
+  const runtimeTerm = subjectScope && subjectScope.source === 'academic_v2'
+    ? await academicV2RuntimeHelpers.loadCourseProjectionState(getAcademicV2Store(), courseId).then((state) => state.term).catch(() => null)
+    : null;
+  const runtimeSemester = runtimeTerm ? {
+    id: runtimeTerm.legacy_semester_id || runtimeTerm.id,
+    start_date: runtimeTerm.start_date,
+    weeks_count: runtimeTerm.weeks_count,
+  } : null;
+  const semester = subjectScope && subjectScope.source === 'academic_v2'
+    ? (runtimeSemester || activeSemester)
+    : (activeSemester || runtimeSemester);
+  if (!semester) {
+    return { ...context, courseId, subjectScope, error: 'Для курсу не знайдено активний семестр.' };
+  }
+  const currentWeek = clampStuderriaTelegramWeekNumber(getAcademicWeekForSemester(new Date(), semester), semester);
+  return {
+    ...context,
+    courseId,
+    subjectScope,
+    activeSemester: semester,
+    runtimeTerm,
+    currentWeek,
+    totalWeeks: Math.max(1, Number(semester.weeks_count || 0) || 16),
+  };
+}
+
+async function listStuderriaTelegramSubjects(scheduleContext = {}) {
+  const subjects = scheduleContext.subjectScope && Array.isArray(scheduleContext.subjectScope.subjects)
+    ? scheduleContext.subjectScope.subjects
+    : await getSubjectsCached(scheduleContext.courseId, { visibleOnly: true });
+  return (subjects || [])
+    .filter((subject) => parsePositiveIntStrict(subject && (subject.subject_id || subject.id)))
+    .slice(0, 24);
+}
+
+async function listStuderriaTelegramSubjectActivities(subject = {}) {
+  const groupSubjectId = parsePositiveIntStrict(subject.group_subject_id);
+  if (!groupSubjectId) return [];
+  const rows = await getAcademicV2Store().all(
+    `
+      SELECT id, activity_type, sort_order
+      FROM academic_v2_group_subject_activities
+      WHERE group_subject_id = ?
+      ORDER BY sort_order ASC, id ASC
+    `,
+    [groupSubjectId]
+  ).catch(() => []);
+  return (rows || [])
+    .map((row) => ({
+      id: parsePositiveIntStrict(row.id),
+      activity_type: normalizeLessonType(row.activity_type) || 'lecture',
+      sort_order: Number(row.sort_order || 0) || 0,
+    }))
+    .filter((row) => row.id);
+}
+
+async function showStuderriaTelegramAddSubjectPicker(message = {}) {
+  const chatId = message && message.chat ? message.chat.id : null;
+  if (!chatId) return;
+  const context = await loadStuderriaTelegramScheduleContext(message.from || {});
+  if (context.error) {
+    await sendStuderriaTelegramMessage(chatId, context.error, { sourceMessage: message });
+    return;
+  }
+  const subjects = await listStuderriaTelegramSubjects(context);
+  if (!subjects.length) {
+    await sendStuderriaTelegramMessage(chatId, 'Немає доступних предметів на активний семестр.', { sourceMessage: message });
+    return;
+  }
+  const keyboard = buildStuderriaTelegramInlineKeyboard(subjects.map((subject) => ({
+    text: getStuderriaTelegramSubjectName(subject),
+    callback_data: createStuderriaTelegramActionToken({
+      flow: 'add_subject',
+      actorTelegramId: context.actorTelegramId,
+      courseId: context.courseId,
+      subjectId: parsePositiveIntStrict(subject.subject_id || subject.id),
+    }),
+  })), 1);
+  await sendStuderriaTelegramMessage(chatId, 'Обери предмет, який треба додати в розклад:', {
+    sourceMessage: message,
+    replyMarkup: keyboard,
+  });
+}
+
+async function showStuderriaTelegramAddActivityPicker(callbackQuery = {}, payload = {}, context = {}, subject = {}) {
+  const activities = context.subjectScope && context.subjectScope.source === 'academic_v2'
+    ? await listStuderriaTelegramSubjectActivities(subject)
+    : [];
+  if (context.subjectScope && context.subjectScope.source === 'academic_v2' && !activities.length) {
+    await editStuderriaTelegramMessage(
+      callbackQuery,
+      'Для цього предмета ще не налаштовані типи пар у семестрі. Додай активність у Pathways, тоді команда зможе швидко ставити пару.'
+    );
+    return;
+  }
+  if (activities.length > 1) {
+    await editStuderriaTelegramMessage(
+      callbackQuery,
+      `Предмет: ${getStuderriaTelegramSubjectName(subject)}\nОбери тип пари:`,
+      buildStuderriaTelegramInlineKeyboard(activities.map((activity) => ({
+        text: getStuderriaTelegramLessonTypeLabel(activity.activity_type),
+        callback_data: createStuderriaTelegramActionToken({
+          ...payload,
+          flow: 'add_activity',
+          activityId: activity.id,
+          lessonType: activity.activity_type,
+        }),
+      })), 2)
+    );
+    return;
+  }
+  const activity = activities[0] || null;
+  await showStuderriaTelegramAddDayPicker(callbackQuery, {
+    ...payload,
+    activityId: activity ? activity.id : null,
+    lessonType: activity ? activity.activity_type : 'lecture',
+  }, context, subject);
+}
+
+async function showStuderriaTelegramAddDayPicker(callbackQuery = {}, payload = {}, context = {}, subject = {}) {
+  const studyDays = await getCourseStudyDays(context.courseId).catch(() => []);
+  const activeDays = (studyDays || []).filter((day) => day.is_active && day.day_name);
+  const dayNames = activeDays.length
+    ? activeDays.map((day) => day.day_name)
+    : daysOfWeek;
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    `Предмет: ${getStuderriaTelegramSubjectName(subject)}\nТип: ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}\nОбери день:`,
+    buildStuderriaTelegramInlineKeyboard(dayNames.map((dayName) => ({
+      text: getStuderriaTelegramDayLabel(dayName),
+      callback_data: createStuderriaTelegramActionToken({
+        ...payload,
+        flow: 'add_day',
+        dayOfWeek: dayName,
+      }),
+    })), 3)
+  );
+}
+
+async function showStuderriaTelegramAddClassPicker(callbackQuery = {}, payload = {}, subject = {}) {
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    `Предмет: ${getStuderriaTelegramSubjectName(subject)}\nДень: ${getStuderriaTelegramDayLabel(payload.dayOfWeek)}\nОбери пару:`,
+    buildStuderriaTelegramInlineKeyboard(Array.from({ length: 7 }, (_value, index) => {
+      const classNumber = index + 1;
+      return {
+        text: `${classNumber} пара`,
+        callback_data: createStuderriaTelegramActionToken({
+          ...payload,
+          flow: 'add_class',
+          classNumber,
+        }),
+      };
+    }), 2)
+  );
+}
+
+async function showStuderriaTelegramAddWeekPicker(callbackQuery = {}, payload = {}, context = {}, subject = {}) {
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    [
+      `Предмет: ${getStuderriaTelegramSubjectName(subject)}`,
+      `Слот: ${getStuderriaTelegramDayLabel(payload.dayOfWeek)}, ${payload.classNumber} пара`,
+      'На які тижні додати?',
+    ].join('\n'),
+    buildStuderriaTelegramInlineKeyboard([
+      {
+        text: `Поточний (${context.currentWeek})`,
+        callback_data: createStuderriaTelegramActionToken({
+          ...payload,
+          flow: 'add_commit',
+          weekMode: 'current',
+        }),
+      },
+      {
+        text: 'Увесь семестр',
+        callback_data: createStuderriaTelegramActionToken({
+          ...payload,
+          flow: 'add_commit',
+          weekMode: 'semester',
+        }),
+      },
+    ], 1)
+  );
+}
+
+async function insertLegacyStuderriaTelegramScheduleEntries(context = {}, subject = {}, payload = {}, weeks = []) {
+  const lessonType = normalizeLessonType(payload.lessonType) || 'lecture';
+  const groupNumber = resolveStuderriaTelegramGroupNumber(context.actor, subject, lessonType);
+  const storageCourseId = parsePositiveIntStrict(subject.owner_course_id || subject.course_id || context.courseId) || context.courseId;
+  const semesterId = parsePositiveIntStrict(context.activeSemester && context.activeSemester.id);
+  const subjectId = parsePositiveIntStrict(subject.subject_id || subject.id);
+  const insertedRows = await db.all(
+    `
+      WITH requested_weeks AS (
+        SELECT DISTINCT unnest(?::int[]) AS week_number
+      )
+      INSERT INTO schedule_entries
+        (subject_id, group_number, day_of_week, class_number, week_number, course_id, semester_id, lesson_type)
+      SELECT ?, ?, ?, ?, requested_weeks.week_number, ?, ?, ?
+      FROM requested_weeks
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM schedule_entries existing
+        WHERE existing.subject_id = ?
+          AND existing.group_number = ?
+          AND existing.day_of_week = ?
+          AND existing.class_number = ?
+          AND existing.week_number = requested_weeks.week_number
+          AND existing.course_id = ?
+          AND existing.semester_id = ?
+          AND COALESCE(existing.lesson_type, '') = COALESCE(?, '')
+      )
+      RETURNING id
+    `,
+    [
+      weeks,
+      subjectId,
+      groupNumber,
+      payload.dayOfWeek,
+      Number(payload.classNumber || 0),
+      storageCourseId,
+      semesterId,
+      lessonType,
+      subjectId,
+      groupNumber,
+      payload.dayOfWeek,
+      Number(payload.classNumber || 0),
+      storageCourseId,
+      semesterId,
+      lessonType,
+    ]
+  );
+  return { inserted: Array.isArray(insertedRows) ? insertedRows.length : 0, groupNumber };
+}
+
+async function insertAcademicV2StuderriaTelegramScheduleEntries(context = {}, subject = {}, payload = {}, weeks = []) {
+  const activityId = parsePositiveIntStrict(payload.activityId);
+  if (!activityId) {
+    throw new Error('Немає типу пари для цього предмета.');
+  }
+  const lessonType = normalizeLessonType(payload.lessonType) || 'lecture';
+  const groupNumber = resolveStuderriaTelegramGroupNumber(context.actor, subject, lessonType);
+  const result = await academicV2Helpers.saveScheduleEntry(getAcademicV2Store(), {
+    group_subject_activity_id: activityId,
+    term_id: parsePositiveIntStrict(context.runtimeTerm && context.runtimeTerm.id),
+    group_number: groupNumber,
+    target_group_numbers: lessonType === 'lecture' ? [] : [groupNumber],
+    day_of_week: payload.dayOfWeek,
+    class_number: Number(payload.classNumber || 0),
+    week_numbers: weeks,
+  });
+  return { inserted: Array.isArray(result && result.rows) ? result.rows.length : 1, groupNumber };
+}
+
+async function commitStuderriaTelegramAddPara(callbackQuery = {}, payload = {}, context = {}, subject = {}) {
+  const totalWeeks = Math.max(1, Number(context.totalWeeks || 0) || 16);
+  const weeks = payload.weekMode === 'semester'
+    ? Array.from({ length: totalWeeks }, (_value, index) => index + 1)
+    : [context.currentWeek];
+  const result = context.subjectScope && context.subjectScope.source === 'academic_v2'
+    ? await insertAcademicV2StuderriaTelegramScheduleEntries(context, subject, payload, weeks)
+    : await insertLegacyStuderriaTelegramScheduleEntries(context, subject, payload, weeks);
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    [
+      'Готово, додав пару.',
+      `${getStuderriaTelegramSubjectName(subject)} · ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}`,
+      `${getStuderriaTelegramDayLabel(payload.dayOfWeek)}, ${payload.classNumber} пара, група ${result.groupNumber}`,
+      payload.weekMode === 'semester' ? `Тижні: 1-${totalWeeks}` : `Тиждень: ${context.currentWeek}`,
+    ].join('\n')
+  );
+}
+
+async function handleStuderriaTelegramAddCallback(callbackQuery = {}, payload = {}) {
+  const context = await loadStuderriaTelegramScheduleContext(callbackQuery.from || {});
+  if (context.error) {
+    await editStuderriaTelegramMessage(callbackQuery, context.error);
+    return;
+  }
+  if (payload.actorTelegramId && payload.actorTelegramId !== context.actorTelegramId) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Це меню відкрив інший користувач.');
+    return;
+  }
+  const subjects = await listStuderriaTelegramSubjects(context);
+  const subjectId = parsePositiveIntStrict(payload.subjectId);
+  const subject = subjects.find((item) => Number(item.subject_id || item.id) === subjectId);
+  if (!subject) {
+    await editStuderriaTelegramMessage(callbackQuery, 'Предмет уже недоступний для цього семестру.');
+    return;
+  }
+  if (payload.flow === 'add_subject') {
+    await showStuderriaTelegramAddActivityPicker(callbackQuery, payload, context, subject);
+    return;
+  }
+  if (payload.flow === 'add_activity') {
+    await showStuderriaTelegramAddDayPicker(callbackQuery, payload, context, subject);
+    return;
+  }
+  if (payload.flow === 'add_day') {
+    await showStuderriaTelegramAddClassPicker(callbackQuery, payload, subject);
+    return;
+  }
+  if (payload.flow === 'add_class') {
+    await showStuderriaTelegramAddWeekPicker(callbackQuery, payload, context, subject);
+    return;
+  }
+  if (payload.flow === 'add_commit') {
+    await commitStuderriaTelegramAddPara(callbackQuery, payload, context, subject);
+  }
+}
+
+async function showStuderriaTelegramDeletePicker(message = {}) {
+  const chatId = message && message.chat ? message.chat.id : null;
+  if (!chatId) return;
+  const context = await loadStuderriaTelegramScheduleContext(message.from || {});
+  if (context.error) {
+    await sendStuderriaTelegramMessage(chatId, context.error, { sourceMessage: message });
+    return;
+  }
+  let rows = [];
+  if (context.subjectScope && context.subjectScope.source === 'academic_v2') {
+    const scheduleState = await academicV2RuntimeHelpers.loadCourseScheduleRows(
+      getAcademicV2Store(),
+      context.courseId,
+      { weekNumber: context.currentWeek, visibleOnly: true }
+    ).catch(() => null);
+    rows = (scheduleState && Array.isArray(scheduleState.scheduleRows) ? scheduleState.scheduleRows : [])
+      .filter((row) => {
+        const lessonType = String(row.lesson_type || row.activity_type || '').toLowerCase();
+        if (lessonType === 'lecture') return true;
+        return Number(row.group_number || 0) === resolveStuderriaTelegramGroupNumber(context.actor, row, lessonType);
+      })
+      .slice(0, 30);
+  } else {
+    const groupNumber = resolveStuderriaTelegramGroupNumber(context.actor, {}, '');
+    rows = await db.all(
+      `
+        SELECT se.id AS schedule_entry_id, se.subject_id, se.group_number, se.day_of_week,
+               se.class_number, se.week_number, se.lesson_type, s.name AS subject_name
+        FROM schedule_entries se
+        JOIN subjects s ON s.id = se.subject_id
+        WHERE se.course_id = ?
+          AND se.semester_id = ?
+          AND se.week_number = ?
+          AND (se.group_number = ? OR LOWER(COALESCE(se.lesson_type, '')) = 'lecture')
+        ORDER BY se.day_of_week ASC, se.class_number ASC, se.id ASC
+        LIMIT 30
+      `,
+      [context.courseId, context.activeSemester.id, context.currentWeek, groupNumber]
+    );
+  }
+  if (!rows.length) {
+    await sendStuderriaTelegramMessage(chatId, `На ${context.currentWeek} тижні пар для видалення не знайшов.`, { sourceMessage: message });
+    return;
+  }
+  const keyboard = buildStuderriaTelegramInlineKeyboard(rows.map((row) => ({
+    text: `${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number}: ${sanitizeCompactText(row.subject_name || row.subject_title || 'Предмет', 34)}`,
+    callback_data: createStuderriaTelegramActionToken({
+      flow: 'delete_commit',
+      actorTelegramId: context.actorTelegramId,
+      source: context.subjectScope && context.subjectScope.source === 'academic_v2' ? 'academic_v2' : 'legacy',
+      courseId: context.courseId,
+      scheduleEntryId: parsePositiveIntStrict(row.schedule_entry_id || row.id),
+    }),
+  })), 1);
+  await sendStuderriaTelegramMessage(chatId, `Обери пару для видалення з ${context.currentWeek} тижня:`, {
+    sourceMessage: message,
+    replyMarkup: keyboard,
+  });
+}
+
+async function handleStuderriaTelegramDeleteCallback(callbackQuery = {}, payload = {}) {
+  const context = await loadStuderriaTelegramScheduleContext(callbackQuery.from || {});
+  if (context.error) {
+    await editStuderriaTelegramMessage(callbackQuery, context.error);
+    return;
+  }
+  if (payload.actorTelegramId && payload.actorTelegramId !== context.actorTelegramId) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Це меню відкрив інший користувач.');
+    return;
+  }
+  const scheduleEntryId = parsePositiveIntStrict(payload.scheduleEntryId);
+  if (!scheduleEntryId) {
+    await editStuderriaTelegramMessage(callbackQuery, 'Не знайшов пару для видалення.');
+    return;
+  }
+  if (payload.source === 'academic_v2') {
+    const row = await getAcademicV2Store().get(
+      `
+        SELECT se.id, gs.group_id, gs.title AS subject_name, se.day_of_week, se.class_number
+        FROM academic_v2_schedule_entries se
+        JOIN academic_v2_group_subject_activities activity ON activity.id = se.group_subject_activity_id
+        JOIN academic_v2_group_subjects gs ON gs.id = activity.group_subject_id
+        JOIN academic_v2_groups g ON g.id = gs.group_id
+        WHERE se.id = ?
+          AND g.legacy_course_id = ?
+        LIMIT 1
+      `,
+      [scheduleEntryId, context.courseId]
+    ).catch(() => null);
+    if (!row) {
+      await editStuderriaTelegramMessage(callbackQuery, 'Пару вже видалено або вона не з твого курсу.');
+      return;
+    }
+    await academicV2Helpers.deleteScheduleEntry(getAcademicV2Store(), scheduleEntryId);
+    await editStuderriaTelegramMessage(
+      callbackQuery,
+      `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`
+    );
+    return;
+  }
+  const row = await db.get(
+    `
+      SELECT se.id, se.day_of_week, se.class_number, s.name AS subject_name
+      FROM schedule_entries se
+      JOIN subjects s ON s.id = se.subject_id
+      WHERE se.id = ?
+        AND se.course_id = ?
+      LIMIT 1
+    `,
+    [scheduleEntryId, context.courseId]
+  );
+  if (!row) {
+    await editStuderriaTelegramMessage(callbackQuery, 'Пару вже видалено або вона не з твого курсу.');
+    return;
+  }
+  await db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [scheduleEntryId, context.courseId]);
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`
+  );
+}
+
+async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
+  await answerStuderriaTelegramCallback(callbackQuery);
+  const payload = getStuderriaTelegramActionPayload(callbackQuery.data);
+  if (!payload) {
+    await editStuderriaTelegramMessage(callbackQuery, 'Це меню застаріло. Запусти команду ще раз.');
+    return;
+  }
+  if (String(payload.flow || '').startsWith('add_')) {
+    await handleStuderriaTelegramAddCallback(callbackQuery, payload);
+    return;
+  }
+  if (payload.flow === 'delete_commit') {
+    await handleStuderriaTelegramDeleteCallback(callbackQuery, payload);
+  }
+}
+
 async function handleStuderriaTelegramBotUpdate(update) {
   const message = update && update.message ? update.message : null;
   if (message && message.chat) {
-    if (isStuderriaTelegramStartCommand(message, studerriaTelegramBotState.botUsername)) {
+    const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
+    if (!parsedCommand) return;
+    if (parsedCommand.command === 'start') {
       await sendStuderriaTelegramWelcome(message.chat, message);
+    } else if (parsedCommand.command === 'giverole') {
+      await handleStuderriaTelegramGiveRoleCommand(message, parsedCommand);
+    } else if (parsedCommand.command === 'addpara') {
+      await showStuderriaTelegramAddSubjectPicker(message);
+    } else if (parsedCommand.command === 'deletepara') {
+      await showStuderriaTelegramDeletePicker(message);
     }
+    return;
+  }
+  const callbackQuery = update && update.callback_query ? update.callback_query : null;
+  if (callbackQuery) {
+    await handleStuderriaTelegramCallbackQuery(callbackQuery);
   }
 }
 
@@ -19911,7 +20686,7 @@ async function startStuderriaTelegramBotPolling() {
   }
   studerriaTelegramBotState.enabled = true;
   studerriaTelegramBotState.running = true;
-  const allowedUpdates = ['message'];
+  const allowedUpdates = ['message', 'callback_query'];
   try {
     const me = await callStuderriaTelegramBotApi('getMe');
     studerriaTelegramBotState.botId = Number(me && me.id || 0) || null;
