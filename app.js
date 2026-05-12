@@ -58887,6 +58887,60 @@ app.get('/admin/tg-users.json', requireTelegramUsersSectionAccess, async (req, r
   }
 });
 
+app.post('/admin/tg-users/:id/delete', requireTelegramUsersSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const userId = parsePositiveIntStrict(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: 'invalid_user_id' });
+    }
+    const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
+    const user = await getAdminScopedUser(adminAcademicScope || {}, userId, {
+      selectClause: `
+        u.id,
+        u.full_name,
+        u.telegram_id,
+        u.telegram_username,
+        COALESCE(v2_group.label, '') AS group_label,
+        COALESCE(v2_group.legacy_course_id, u.course_id) AS course_id
+      `,
+    });
+    if (!user) {
+      return res.status(404).json({ ok: false, error: 'user_not_found' });
+    }
+    if (!normalizeTelegramId(user.telegram_id)) {
+      return res.status(400).json({ ok: false, error: 'telegram_not_linked' });
+    }
+    await db.run(
+      `
+        UPDATE users
+           SET telegram_id = NULL,
+               telegram_username = NULL,
+               telegram_first_name = NULL,
+               telegram_last_name = NULL,
+               telegram_photo_url = NULL,
+               telegram_linked_at = NULL,
+               telegram_last_seen_at = NULL
+         WHERE id = ?
+      `,
+      [userId]
+    );
+    logAction(db, req, 'telegram_mini_admin_unlink_user', {
+      user_id: userId,
+      full_name: user.full_name || '',
+      telegram_id: user.telegram_id,
+      telegram_username: user.telegram_username || '',
+      course_id: user.course_id || null,
+      group_label: user.group_label || '',
+    });
+    const stats = await loadTelegramMiniAdminStats(adminAcademicScope || {});
+    return res.json({ ok: true, user_id: userId, ...stats });
+  } catch (err) {
+    console.error('Database error (admin.tg-users.delete)', err);
+    return res.status(500).json({ ok: false, error: 'Database error' });
+  }
+});
+
 app.post('/admin/import/validate', requireImportExportSectionAccess, writeLimiter, csvUpload.single('csv_file'), async (req, res) => {
   try {
     await ensureDbReady();

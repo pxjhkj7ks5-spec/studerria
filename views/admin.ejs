@@ -2732,7 +2732,7 @@
 
         <% } %>
 
-        <% if (sectionAllowed('admin-users')) { %>
+        <% if (telegramUsersSectionAllowed) { %>
         <div id="admin-tg-users" class="admin-panel" data-admin-title="People / Telegram Users">
           <div class="card mb-4">
             <div class="card-body">
@@ -2771,6 +2771,7 @@
                       <th>Opens</th>
                       <th>Actions</th>
                       <th>Last seen</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody id="tgUsersTableBody">
@@ -2790,10 +2791,20 @@
                         <td><%= row.open_count || 0 %></td>
                         <td><%= row.action_count || 0 %></td>
                         <td><%= formatAdminDateTime(row.telegram_last_seen_at || row.last_action_at) %></td>
+                        <td class="text-end">
+                          <button
+                            class="btn btn-outline-danger btn-sm"
+                            type="button"
+                            data-tg-user-delete="<%= row.id %>"
+                            data-tg-user-label="<%= row.full_name || row.telegram_username || row.telegram_id || 'Telegram user' %>"
+                          >
+                            Видалити TG
+                          </button>
+                        </td>
                       </tr>
                     <% }); %>
                     <% if (!(telegramMiniStatsData.users || []).length) { %>
-                      <tr><td colspan="6" class="text-muted">Telegram users ще немає.</td></tr>
+                      <tr><td colspan="7" class="text-muted">Telegram users ще немає.</td></tr>
                     <% } %>
                   </tbody>
                 </table>
@@ -7566,10 +7577,20 @@
                     <td>${escapeHtml(row.open_count || 0)}</td>
                     <td>${escapeHtml(row.action_count || 0)}</td>
                     <td>${escapeHtml(formatClientDateTime(row.telegram_last_seen_at || row.last_action_at))}</td>
+                    <td class="text-end">
+                      <button
+                        class="btn btn-outline-danger btn-sm"
+                        type="button"
+                        data-tg-user-delete="${escapeHtml(row.id || '')}"
+                        data-tg-user-label="${escapeHtml(row.full_name || tgLabel || 'Telegram user')}"
+                      >
+                        Видалити TG
+                      </button>
+                    </td>
                   </tr>
                 `;
               }).join('')
-            : '<tr><td colspan="6" class="text-muted">Telegram users ще немає.</td></tr>';
+            : '<tr><td colspan="7" class="text-muted">Telegram users ще немає.</td></tr>';
         }
         const actions = Array.isArray(payload && payload.actions) ? payload.actions : [];
         if (tgUsersActionsBody) {
@@ -7606,6 +7627,44 @@
 
       if (tgUsersRefreshBtn) {
         tgUsersRefreshBtn.addEventListener('click', refreshTelegramMiniAdminStats);
+      }
+
+      if (tgUsersTableBody) {
+        tgUsersTableBody.addEventListener('click', async (event) => {
+          const button = event.target && event.target.closest
+            ? event.target.closest('[data-tg-user-delete]')
+            : null;
+          if (!button) return;
+          const userId = Number(button.dataset.tgUserDelete || 0);
+          if (!Number.isFinite(userId) || userId < 1) return;
+          const userLabel = button.dataset.tgUserLabel || 'Telegram user';
+          const confirmed = await openConfirmModal({
+            title: 'Видалити TG',
+            message: `Видалити Telegram-привʼязку для ${userLabel}? Основний акаунт Studerria залишиться.`,
+            level: 'danger',
+          });
+          if (!confirmed) return;
+          button.disabled = true;
+          try {
+            const res = await fetch(`/admin/tg-users/${encodeURIComponent(userId)}/delete`, {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+              },
+              body: '',
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+              throw new Error(data && data.error ? data.error : 'tg_user_delete_failed');
+            }
+            renderTelegramMiniAdminStats(data);
+            showToast('success', 'Telegram-привʼязку видалено.');
+          } catch (err) {
+            button.disabled = false;
+            showToast('error', err.message || 'Не вдалося видалити Telegram-привʼязку');
+          }
+        });
       }
 
       function getForensicsConfidenceClass(level) {
