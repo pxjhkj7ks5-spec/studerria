@@ -213,6 +213,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-change-me-local-session-secret}
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      STUDERRIA_PUBLIC_URL: ${STUDERRIA_PUBLIC_URL:-https://studerria.com}
       CHARREDMAP_PROXY_TARGET: http://charredmap:8080
       NARADADRUK_PROXY_TARGET: http://naradadruk:8080
       SLASHTG_PROXY_TARGET: http://slashtg:8080

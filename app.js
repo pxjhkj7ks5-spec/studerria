@@ -19710,7 +19710,11 @@ function normalizeTelegramUrl(rawValue) {
 function getStuderriaTelegramMiniAppWebUrl() {
   const explicit = normalizeTelegramUrl(process.env.STUDERRIA_TG_MINI_APP_URL);
   if (explicit) return explicit;
-  const publicBase = normalizeTelegramUrl(process.env.STUDERRIA_PUBLIC_URL || process.env.PUBLIC_URL || '');
+  const publicBase = normalizeTelegramUrl(
+    process.env.STUDERRIA_PUBLIC_URL
+    || process.env.PUBLIC_URL
+    || 'https://studerria.com'
+  );
   if (!publicBase) return '';
   try {
     return new URL('/studerria-tg', publicBase).toString();
