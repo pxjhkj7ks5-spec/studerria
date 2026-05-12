@@ -421,6 +421,16 @@ html.is-tg-dark .tg-pill {
   gap: 12px;
 }
 
+.tg-day.is-today {
+  border-color: color-mix(in srgb, var(--tg-theme-accent) 42%, var(--tg-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--tg-theme-accent) 10%, transparent), transparent 58%),
+    var(--tg-card);
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--tg-theme-accent) 52%, transparent),
+    var(--tg-shadow);
+}
+
 .tg-day h2 time {
   flex: 0 0 auto;
   color: var(--tg-muted);

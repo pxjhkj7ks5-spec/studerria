@@ -1,5 +1,6 @@
 <%
   const localeCode = lang === 'en' ? 'en-US' : 'uk-UA';
+  const scheduleTodayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
   const scheduleViewText = lang === 'en'
     ? {
         heroPhrase: "Your rhythm, your focus - let's make this week count.",
@@ -2394,13 +2395,14 @@
           <% daysOfWeek.forEach(function(day) { %>
             <% const dayEntries = scheduleByDay[day] || []; %>
             <% const dayDateValue = dayDates && dayDates[day] ? dayDates[day] : ''; %>
+            <% const isTodayDay = dayDateValue && dayDateValue === scheduleTodayIso; %>
             <% const dayNumber = dayDateValue ? new Date(dayDateValue).toLocaleDateString(localeCode, { day: '2-digit', timeZone: 'Europe/Kyiv' }) : ''; %>
             <% const dayShort = dayDateValue ? new Date(dayDateValue).toLocaleDateString(localeCode, { weekday: 'short', timeZone: 'Europe/Kyiv' }).replace('.', '').toUpperCase() : String(day || '').slice(0, 3).toUpperCase(); %>
             <% const dayCountLabel = dayEntries.length
               ? `${dayEntries.length} ${(lang === 'en' ? (dayEntries.length === 1 ? 'class' : 'classes') : (dayEntries.length === 1 ? 'пара' : 'пари'))}`
               : (lang === 'en' ? 'free' : 'вільно'); %>
             <a
-              class="td-day-pill schedule-day-pill <%= dayEntries.length ? 'has-classes' : 'is-quiet' %>"
+              class="td-day-pill schedule-day-pill <%= dayEntries.length ? 'has-classes' : 'is-quiet' %> <%= isTodayDay ? 'is-today' : '' %>"
               href="#day-<%= day %>"
               data-schedule-day-link="<%= day %>"
             >
@@ -2416,6 +2418,7 @@
         <div id="scheduleWeekGrid" class="schedule-day-panels">
         <% daysOfWeek.forEach(function(day) { %>
           <% const dateLabel = dayDates && dayDates[day] ? new Date(dayDates[day]).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
+          <% const isTodayDay = dayDates && dayDates[day] && dayDates[day] === scheduleTodayIso; %>
           <% const dayEntries = scheduleByDay[day] || []; %>
           <% let maxStreak = 0; let currentStreak = 0; let hasOverlap = false; const seenSlots = {}; %>
           <% for (let i = 0; i < dayEntries.length; i++) { %>
@@ -2430,7 +2433,7 @@
             <% if (currentStreak > maxStreak) { maxStreak = currentStreak; } %>
           <% } %>
           <% const isDenseDay = maxStreak >= 3; %>
-          <div id="day-<%= day %>" class="card mb-3 glass day-card liquid-card" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
+          <div id="day-<%= day %>" class="card mb-3 glass day-card liquid-card <%= isTodayDay ? 'is-today' : '' %>" data-day-date="<%= dayDates && dayDates[day] ? dayDates[day] : '' %>">
             <div class="day-header">
               <div class="day-title">
                 <span class="day-name dayTitle"><%= day %></span>
@@ -2687,7 +2690,7 @@
           <% weekendDeadlineCards.forEach(function(card) { %>
             <% if (activeDaySet.has(card.day)) { return; } %>
             <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
-            <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= card.date || '' %>">
+            <div class="card mb-3 glass day-card liquid-card <%= card.date && card.date === scheduleTodayIso ? 'is-today' : '' %>" data-day-date="<%= card.date || '' %>">
               <div class="day-header">
                 <div class="day-title">
                   <span class="day-name dayTitle"><%= card.day %></span>
@@ -2790,7 +2793,7 @@
           <% weekendTeamworkDeadlineCards.forEach(function(card) { %>
             <% if (activeDaySet.has(card.day) || weekendCustomDateSet.has(card.date)) { return; } %>
             <% const dateLabel = card.date ? new Date(card.date).toLocaleDateString(localeCode, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Kyiv' }) : ''; %>
-            <div class="card mb-3 glass day-card liquid-card" data-day-date="<%= card.date || '' %>">
+            <div class="card mb-3 glass day-card liquid-card <%= card.date && card.date === scheduleTodayIso ? 'is-today' : '' %>" data-day-date="<%= card.date || '' %>">
               <div class="day-header">
                 <div class="day-title">
                   <span class="day-name dayTitle"><%= card.day %></span>

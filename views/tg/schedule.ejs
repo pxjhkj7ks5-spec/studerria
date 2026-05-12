@@ -16,9 +16,10 @@
 <% } %>
 
 <section class="tg-schedule">
+  <% const tgTodayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' }); %>
   <% (days || []).forEach(function(day) { %>
-    <article class="tg-day">
-      <% const dayDate = scheduleDayDates && scheduleDayDates[day] ? scheduleDayDates[day] : null; %>
+    <% const dayDate = scheduleDayDates && scheduleDayDates[day] ? scheduleDayDates[day] : null; %>
+    <article class="tg-day <%= dayDate && dayDate.iso === tgTodayIso ? 'is-today' : '' %>">
       <h2>
         <span><%= day %></span>
         <% if (dayDate && dayDate.label) { %>
