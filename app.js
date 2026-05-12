@@ -19795,25 +19795,6 @@ function isStuderriaTelegramHelloCommand(message, botUsername = '') {
     || (username && (command === `/hello@${username}` || command === `/start@${username}`));
 }
 
-function didStuderriaTelegramBotJoin(message, botId) {
-  const safeBotId = Number(botId || 0);
-  if (!Number.isInteger(safeBotId) || safeBotId < 1) return false;
-  const members = Array.isArray(message && message.new_chat_members) ? message.new_chat_members : [];
-  return members.some((member) => Number(member && member.id || 0) === safeBotId);
-}
-
-function shouldWelcomeStuderriaTelegramBotChatMember(update, botId) {
-  const safeBotId = Number(botId || 0);
-  if (!Number.isInteger(safeBotId) || safeBotId < 1) return false;
-  const memberUpdate = update && update.my_chat_member ? update.my_chat_member : null;
-  if (!memberUpdate || !memberUpdate.new_chat_member || !memberUpdate.old_chat_member) return false;
-  const targetUserId = Number(memberUpdate.new_chat_member.user && memberUpdate.new_chat_member.user.id || 0);
-  if (targetUserId !== safeBotId) return false;
-  const oldStatus = String(memberUpdate.old_chat_member.status || '').toLowerCase();
-  const newStatus = String(memberUpdate.new_chat_member.status || '').toLowerCase();
-  return ['left', 'kicked'].includes(oldStatus) && ['member', 'administrator'].includes(newStatus);
-}
-
 function getStuderriaTelegramMessageThreadId(message = {}) {
   const threadId = Number(message && message.message_thread_id || 0);
   return Number.isInteger(threadId) && threadId > 0 ? threadId : null;
@@ -19887,16 +19868,9 @@ async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
 async function handleStuderriaTelegramBotUpdate(update) {
   const message = update && update.message ? update.message : null;
   if (message && message.chat) {
-    if (
-      isStuderriaTelegramHelloCommand(message, studerriaTelegramBotState.botUsername)
-      || didStuderriaTelegramBotJoin(message, studerriaTelegramBotState.botId)
-    ) {
+    if (isStuderriaTelegramHelloCommand(message, studerriaTelegramBotState.botUsername)) {
       await sendStuderriaTelegramWelcome(message.chat, message);
-      return;
     }
-  }
-  if (shouldWelcomeStuderriaTelegramBotChatMember(update, studerriaTelegramBotState.botId)) {
-    await sendStuderriaTelegramWelcome(update.my_chat_member.chat);
   }
 }
 
@@ -19911,7 +19885,7 @@ async function startStuderriaTelegramBotPolling() {
   }
   studerriaTelegramBotState.enabled = true;
   studerriaTelegramBotState.running = true;
-  const allowedUpdates = ['message', 'my_chat_member'];
+  const allowedUpdates = ['message'];
   try {
     const me = await callStuderriaTelegramBotApi('getMe');
     studerriaTelegramBotState.botId = Number(me && me.id || 0) || null;
