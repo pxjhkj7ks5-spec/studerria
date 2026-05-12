@@ -33,7 +33,7 @@
         window.location.replace(data.redirect);
         return;
       }
-      if (data.status === 'link_required' && currentPath === '/tg') {
+      if (data.status === 'link_required' && (currentPath === '/tg' || currentPath === '/tg/login')) {
         window.location.replace(data.redirect);
       }
     } catch (_error) {}

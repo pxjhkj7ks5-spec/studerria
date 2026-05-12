@@ -26,14 +26,6 @@
         <option value="en" <%= user && user.language === 'en' ? 'selected' : '' %>>English</option>
       </select>
     </label>
-    <label>
-      <span>Новий пароль</span>
-      <input name="password" type="password" minlength="8" autocomplete="new-password" />
-    </label>
-    <label>
-      <span>Повторіть пароль</span>
-      <input name="confirm_password" type="password" minlength="8" autocomplete="new-password" />
-    </label>
     <button class="tg-primary" type="submit">Оновити</button>
   </form>
 </section>

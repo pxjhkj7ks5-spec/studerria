@@ -19112,7 +19112,7 @@ function renderTelegramMiniPage(req, res, viewName, locals = {}) {
 
 function requireTelegramMiniStudent(req, res, next) {
   if (!req.session || !req.session.user) {
-    return res.redirect('/tg/login');
+    return res.redirect('/tg/register');
   }
   if (!canUseTelegramMiniSession(req)) {
     return renderTelegramMiniPage(req, res.status(403), 'denied', {
@@ -19154,12 +19154,89 @@ async function findUserByTelegramId(telegramId) {
   const normalizedId = normalizeTelegramId(telegramId);
   if (!normalizedId) return null;
   return db.get(
-    `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
+    `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, telegram_id, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
      FROM users
      WHERE telegram_id = ?
      LIMIT 1`,
     [normalizedId]
   );
+}
+
+async function buildTelegramMiniFullName(telegramUser) {
+  const normalizedUser = telegramMiniApp.normalizeTelegramUser(telegramUser || {});
+  const displayName = telegramMiniApp.buildTelegramDisplayName(normalizedUser);
+  const baseName = sanitizeCompactText(displayName || `Telegram ${normalizedUser.id}`, 180);
+  const candidates = [
+    baseName,
+    normalizedUser.username ? `@${normalizedUser.username}` : '',
+    `Telegram ${normalizedUser.id}`,
+  ]
+    .map((value) => sanitizeCompactText(value, 180))
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?) LIMIT 1', [candidate]);
+    if (!existing) return candidate;
+  }
+  return sanitizeCompactText(`${baseName} TG ${normalizedUser.id}`, 220);
+}
+
+async function createTelegramMiniUser(req, telegramUser) {
+  const normalizedUser = telegramMiniApp.normalizeTelegramUser(telegramUser || {});
+  if (!normalizedUser.id) {
+    throw new Error('telegram_auth_required');
+  }
+  const existingByTelegram = await findUserByTelegramId(normalizedUser.id);
+  if (existingByTelegram) {
+    return existingByTelegram;
+  }
+  const fullName = await buildTelegramMiniFullName(normalizedUser);
+  const preferredLang = getPreferredLang(req);
+  const row = await db.get(
+    `
+      INSERT INTO users (
+        full_name, role, password_hash, is_active, schedule_group, course_id, language,
+        telegram_id, telegram_username, telegram_first_name, telegram_last_name,
+        telegram_photo_url, telegram_linked_at, telegram_last_seen_at
+      )
+      VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      RETURNING id, full_name, role, schedule_group, course_id, group_id, language, telegram_id
+    `,
+    [
+      fullName,
+      'student',
+      1,
+      'A',
+      null,
+      preferredLang,
+      normalizedUser.id,
+      normalizedUser.username || null,
+      normalizedUser.first_name || null,
+      normalizedUser.last_name || null,
+      normalizedUser.photo_url || null,
+    ]
+  );
+  if (!row || !row.id) {
+    throw new Error('telegram_user_create_failed');
+  }
+  try {
+    await recordUserRegistrationEvent({
+      userId: row.id,
+      fullName,
+      ip: getClientIp(req),
+      userAgent: req.headers['user-agent'] || null,
+      sessionId: req.sessionID || null,
+      source: 'telegram_mini_auto_register',
+      courseId: null,
+    });
+  } catch (eventErr) {
+    console.error('Database error (tg.register.registration_event)', eventErr);
+  }
+  logAction(db, req, 'telegram_mini_auto_register_user', {
+    user_id: row.id,
+    telegram_id: normalizedUser.id,
+  });
+  broadcast('users_updated');
+  return row;
 }
 
 async function linkTelegramMiniUser(req, userId, telegramUser) {
@@ -19248,11 +19325,17 @@ async function loadTelegramMiniRegistrationGroups() {
 async function loadTelegramMiniRegisterState(req) {
   await ensureDbReady();
   const pendingUserId = Number(req.session.pendingUserId || 0);
-  const pendingUser = Number.isInteger(pendingUserId) && pendingUserId > 0
+  const pendingTelegramUser = getTelegramMiniPendingUser(req);
+  const pendingUserRow = Number.isInteger(pendingUserId) && pendingUserId > 0
     ? await db.get(
-      'SELECT id, full_name, group_id, course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
+      'SELECT id, full_name, group_id, course_id, admission_id, study_context_id, study_program_id, study_track, telegram_id FROM users WHERE id = ?',
       [pendingUserId]
     )
+    : null;
+  const pendingUser = pendingTelegramUser
+    && pendingUserRow
+    && normalizeTelegramId(pendingUserRow.telegram_id) === normalizeTelegramId(pendingTelegramUser.id)
+    ? pendingUserRow
     : null;
   const groups = await loadTelegramMiniRegistrationGroups();
   let subjectState = null;
@@ -19285,7 +19368,7 @@ async function loadTelegramMiniRegisterState(req) {
     registerSubjectCards = registerSubjectHelpers.buildRegisterSubjectCards(subjectState.subjects || []);
   }
   const requestedStep = String(req.query.step || '').trim().toLowerCase();
-  const step = requestedStep || (!pendingUser ? 'account' : (pendingUser.group_id ? 'subjects' : 'group'));
+  const step = requestedStep || (!pendingUser ? 'group' : (pendingUser.group_id ? 'subjects' : 'group'));
   return {
     pendingUser,
     groups,
@@ -19411,12 +19494,12 @@ app.post('/tg/auth/init', authLimiter, async (req, res) => {
     const linkedUser = await findUserByTelegramId(telegramUser.id);
     if (!linkedUser) {
       await saveRequestSession(req);
-      return res.json({ ok: true, status: 'link_required', redirect: '/tg/login' });
+      return res.json({ ok: true, status: 'link_required', redirect: '/tg/register' });
     }
     const isActive = linkedUser.is_active === true || Number(linkedUser.is_active) === 1;
     if (!isActive || !isTelegramMiniStudentRole(linkedUser.role)) {
       await saveRequestSession(req);
-      return res.status(403).json({ ok: false, error: 'student_account_required', redirect: '/tg/login' });
+      return res.status(403).json({ ok: false, error: 'student_account_required', redirect: '/tg/register' });
     }
     await establishTelegramMiniSession(req, linkedUser, telegramUser, '/tg/auth/init');
     return res.json({ ok: true, status: 'authenticated', redirect: '/tg/schedule' });
@@ -19431,78 +19514,11 @@ app.get('/tg/login', (req, res) => {
   if (canUseTelegramMiniSession(req)) {
     return res.redirect('/tg/schedule');
   }
-  const telegramUser = getTelegramMiniPendingUser(req);
-  return renderTelegramMiniPage(req, res, 'login', {
-    pageTitle: 'Login',
-    currentTgPage: 'login',
-    error: String(req.query.error || ''),
-    suggestedName: telegramMiniApp.buildTelegramDisplayName(telegramUser),
-  });
+  return res.redirect('/tg/register');
 });
 
 app.post('/tg/login', authLimiter, async (req, res) => {
-  const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
-  const password = String(req.body.password || '');
-  if (!fullName || !password) {
-    return res.redirect('/tg/login?error=missing');
-  }
-  try {
-    await ensureDbReady();
-    const user = await db.get(
-      `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, last_login_ip, last_user_agent, last_login_at, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
-       FROM users
-       WHERE LOWER(full_name) = LOWER(?)
-       LIMIT 1`,
-      [fullName]
-    );
-    const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
-    if (!user || !validHash) {
-      try {
-        await recordAuthFailureEvent({
-          attemptedName: fullName,
-          userId: user && user.id ? Number(user.id) : null,
-          ip: getClientIp(req),
-          userAgent: req.headers['user-agent'] || null,
-          sessionId: req.sessionID || null,
-          courseId: user && Number.isFinite(Number(user.course_id)) ? Number(user.course_id) : null,
-        });
-      } catch (failureErr) {
-        console.error('Database error (tg.login.auth_failure)', failureErr);
-      }
-      return res.redirect('/tg/login?error=invalid');
-    }
-    const isActive = user.is_active === true || Number(user.is_active) === 1;
-    if (!isActive || !isTelegramMiniStudentRole(user.role)) {
-      return res.redirect('/tg/login?error=student-only');
-    }
-    const telegramUser = getTelegramMiniPendingUser(req);
-    if (!telegramUser) {
-      return res.redirect('/tg/login?error=telegram-required');
-    }
-    const loginAt = new Date().toISOString();
-    const loginIp = normalizeForensicsIp(getClientIp(req));
-    const loginUserAgent = normalizeForensicsAgent(req.headers['user-agent'] || null);
-    await db.run(
-      'UPDATE users SET last_login_ip = ?, last_user_agent = ?, last_login_at = ? WHERE id = ?',
-      [loginIp, loginUserAgent, loginAt, user.id]
-    );
-    await db.run(
-      'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [user.id, user.full_name, loginIp, loginUserAgent, loginAt, user.course_id || 1]
-    );
-    try {
-      await establishTelegramMiniSession(req, user, telegramUser, '/tg/login');
-    } catch (linkErr) {
-      if (linkErr && linkErr.code === 'telegram_link_occupied') {
-        return res.redirect('/tg/login?error=telegram-occupied');
-      }
-      throw linkErr;
-    }
-    return res.redirect('/tg/schedule');
-  } catch (err) {
-    console.error('Telegram mini login failed', err);
-    return res.redirect('/tg/login?error=db');
-  }
+  return res.redirect('/tg/register');
 });
 
 app.get('/tg/register', async (req, res) => {
@@ -19525,68 +19541,37 @@ app.get('/tg/register', async (req, res) => {
 });
 
 app.post('/tg/register', registerLimiter, async (req, res) => {
-  const action = String(req.body.action || 'account').trim().toLowerCase();
+  const action = String(req.body.action || 'group').trim().toLowerCase();
   try {
     await ensureDbReady();
-    if (action === 'account') {
-      const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
-      const password = String(req.body.password || '');
-      const confirmPassword = String(req.body.confirm_password || '');
-      const agree = String(req.body.agree || '').trim().toLowerCase();
-      if (!fullName) return res.redirect('/tg/register?step=account&error=missing-name');
-      if (!password || password.length < PASSWORD_MIN_LENGTH) return res.redirect('/tg/register?step=account&error=short-password');
-      if (password !== confirmPassword) return res.redirect('/tg/register?step=account&error=password-mismatch');
-      if (!['on', '1', 'true'].includes(agree)) return res.redirect('/tg/register?step=account&error=consent-required');
-      const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [fullName]);
-      if (existing) return res.redirect('/tg/register?step=account&error=user-exists');
-      const hash = await bcrypt.hash(password, 10);
-      const preferredLang = getPreferredLang(req);
-      const row = await db.get(
-        'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, language) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
-        [fullName, 'student', hash, 1, 'A', null, preferredLang]
-      );
-      if (!row || !row.id) return res.redirect('/tg/register?step=account&error=db');
-      try {
-        const signals = await recordUserRegistrationEvent({
-          userId: row.id,
-          fullName,
-          ip: getClientIp(req),
-          userAgent: req.headers['user-agent'] || null,
-          sessionId: req.sessionID || null,
-          source: 'telegram_mini_register',
-          courseId: null,
-        });
-        const signalRisk = signals && signals.security && signals.security.risk ? signals.security.risk : null;
-        const signalReasons = Array.isArray(signalRisk && signalRisk.reasons) ? signalRisk.reasons : [];
-        const securityCase = await recomputeUserSecurityCase(row.id, {
-          allowAutoQuarantine: true,
-          courseId: null,
-          extraScore: Number(signalRisk && signalRisk.score ? signalRisk.score : 0),
-          extraReasons: signalReasons,
-        });
-        const isQuarantined = securityCase
-          && securityCase.case
-          && (securityCase.case.auto_quarantined === true || Number(securityCase.case.auto_quarantined) === 1);
-        if (isQuarantined) {
-          req.session.pendingUserId = null;
-          req.session.rememberMe = false;
-          return res.redirect('/tg/login?error=quarantine-later');
-        }
-      } catch (securityErr) {
-        console.error('Database error (tg.register.security)', securityErr);
-      }
-      req.session.pendingUserId = row.id;
-      req.session.rememberMe = true;
-      logAction(db, req, 'telegram_mini_register_user', { user_id: row.id, full_name: fullName });
-      broadcast('users_updated');
-      await saveRequestSession(req);
-      return res.redirect('/tg/register?step=group');
-    }
-
     if (action === 'group') {
-      const userId = Number(req.session.pendingUserId || 0);
+      const telegramUser = getTelegramMiniPendingUser(req);
+      if (!telegramUser) {
+        return res.redirect('/tg/register?step=group&error=telegram-required');
+      }
+      let userId = Number(req.session.pendingUserId || 0);
+      const pendingUser = Number.isInteger(userId) && userId > 0
+        ? await db.get(
+          `SELECT id, full_name, role, schedule_group, course_id, group_id, language, telegram_id, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
+           FROM users
+           WHERE id = ?
+           LIMIT 1`,
+          [userId]
+        )
+        : null;
+      let user = pendingUser && normalizeTelegramId(pendingUser.telegram_id) === normalizeTelegramId(telegramUser.id)
+        ? pendingUser
+        : null;
+      if (!user) {
+        user = await createTelegramMiniUser(req, telegramUser);
+        userId = Number(user && user.id ? user.id : 0);
+      }
+      const isActive = user && (user.is_active === true || Number(user.is_active) === 1);
+      if (!isActive || !isTelegramMiniStudentRole(user.role)) {
+        return res.redirect('/tg/register?step=group&error=student-only');
+      }
       const groupId = Number(req.body.group_id || 0);
-      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=account');
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=group&error=db');
       if (!Number.isInteger(groupId) || groupId < 1) return res.redirect('/tg/register?step=group&error=missing-group');
       const groups = await loadTelegramMiniRegistrationGroups();
       const selectedGroup = groups.find((group) => Number(group.group_id) === groupId) || null;
@@ -19608,13 +19593,15 @@ app.post('/tg/register', registerLimiter, async (req, res) => {
         group_id: groupId,
         track_key: normalizeRegistrationTrack(repairedGroup.track_key, 'bachelor'),
       });
+      req.session.pendingUserId = userId;
+      req.session.rememberMe = true;
       await saveRequestSession(req);
       return res.redirect('/tg/register?step=subjects');
     }
 
     if (action === 'subjects') {
       const userId = Number(req.session.pendingUserId || 0);
-      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=account');
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=group');
       try {
         await saveTelegramMiniSubjectChoices(req, userId);
       } catch (choiceErr) {
@@ -19622,16 +19609,16 @@ app.post('/tg/register', registerLimiter, async (req, res) => {
         return res.redirect(`/tg/register?step=subjects&error=${encodeURIComponent(code)}`);
       }
       const user = await db.get(
-        'SELECT id, full_name, role, schedule_group, course_id, group_id, language FROM users WHERE id = ?',
+        'SELECT id, full_name, role, schedule_group, course_id, group_id, language, telegram_id FROM users WHERE id = ?',
         [userId]
       );
-      if (!user) return res.redirect('/tg/login');
+      if (!user) return res.redirect('/tg/register');
       const telegramUser = getTelegramMiniPendingUser(req);
       try {
         await establishTelegramMiniSession(req, user, telegramUser, '/tg/register');
       } catch (linkErr) {
         if (linkErr && linkErr.code === 'telegram_link_occupied') {
-          return res.redirect('/tg/login?error=telegram-occupied');
+          return res.redirect('/tg/register?step=group&error=telegram-occupied');
         }
         throw linkErr;
       }
@@ -19788,19 +19775,11 @@ app.get('/tg/profile', requireTelegramMiniStudent, async (req, res) => {
 
 app.post('/tg/profile', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
   const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
-  const password = String(req.body.password || '');
-  const confirmPassword = String(req.body.confirm_password || '');
   const language = String(req.body.language || '').trim();
   if (!fullName) return res.redirect('/tg/profile?error=missing-name');
-  if ((password || confirmPassword) && password !== confirmPassword) return res.redirect('/tg/profile?error=password-mismatch');
-  if (password && password.length < PASSWORD_MIN_LENGTH) return res.redirect('/tg/profile?error=short-password');
   try {
     const updates = ['full_name = ?'];
     const params = [fullName];
-    if (password) {
-      updates.push('password_hash = ?');
-      params.push(bcrypt.hashSync(password, 10));
-    }
     if (['uk', 'en'].includes(language)) {
       updates.push('language = ?');
       params.push(language);

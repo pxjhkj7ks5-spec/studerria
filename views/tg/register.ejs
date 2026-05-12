@@ -1,11 +1,10 @@
 <%
-  const currentStep = ['account', 'group', 'subjects'].includes(String(step || '')) ? String(step) : 'account';
+  const requestedStep = String(step || '');
+  const currentStep = ['group', 'subjects'].includes(requestedStep) ? requestedStep : 'group';
   const errorMap = {
-    'missing-name': 'Вкажіть повне імʼя.',
-    'short-password': 'Пароль має містити щонайменше 8 символів.',
-    'password-mismatch': 'Паролі не збігаються.',
-    'consent-required': 'Потрібна згода з умовами.',
-    'user-exists': 'Користувач із таким імʼям вже існує.',
+    'telegram-required': 'Відкрийте цю сторінку через Telegram mini app, щоб Studerria отримала ваш Telegram профіль.',
+    'telegram-occupied': 'Цей Telegram вже привʼязаний до іншого акаунта.',
+    'student-only': 'Цей mini app доступний тільки для студентського акаунта.',
     'missing-group': 'Оберіть групу.',
     'invalid-group': 'Ця група недоступна для реєстрації.',
     'repair-failed': 'Групу ще не готово для реєстрації.',
@@ -17,11 +16,10 @@
 %>
 <section class="tg-page-head">
   <p class="tg-kicker">Studerria</p>
-  <h1>Реєстрація</h1>
+  <h1>Старт у Telegram</h1>
   <div class="tg-stepper" aria-label="Registration progress">
-    <span class="<%= currentStep === 'account' ? 'is-active' : '' %>">1</span>
-    <span class="<%= currentStep === 'group' ? 'is-active' : '' %>">2</span>
-    <span class="<%= currentStep === 'subjects' ? 'is-active' : '' %>">3</span>
+    <span class="<%= currentStep === 'group' ? 'is-active' : '' %>">1</span>
+    <span class="<%= currentStep === 'subjects' ? 'is-active' : '' %>">2</span>
   </div>
 </section>
 
@@ -29,37 +27,15 @@
   <div class="tg-alert"><%= registerError %></div>
 <% } %>
 
-<% if (currentStep === 'account') { %>
-  <section class="tg-card">
-    <form class="tg-form" method="POST" action="/tg/register">
-      <input type="hidden" name="action" value="account" />
-      <label>
-        <span>Повне імʼя</span>
-        <input name="full_name" type="text" autocomplete="name" placeholder="Імʼя та прізвище" value="<%= suggestedName || '' %>" required />
-      </label>
-      <label>
-        <span>Пароль</span>
-        <input name="password" type="password" autocomplete="new-password" minlength="8" required />
-      </label>
-      <label>
-        <span>Повторіть пароль</span>
-        <input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required />
-      </label>
-      <label class="tg-check">
-        <input type="checkbox" name="agree" required />
-        <span>Погоджуюсь з умовами використання та політикою приватності.</span>
-      </label>
-      <button class="tg-primary" type="submit">Продовжити</button>
-    </form>
-    <p class="tg-inline-note">Вже є акаунт? <a href="/tg/login">Увійти</a></p>
-  </section>
-<% } %>
-
 <% if (currentStep === 'group') { %>
   <section class="tg-card">
-    <h2>Оберіть групу</h2>
+    <h2>Оберіть курс і групу</h2>
     <% if (pendingUser) { %>
       <p class="tg-muted"><%= pendingUser.full_name %></p>
+    <% } else if (telegramUser && telegramUser.id) { %>
+      <p class="tg-muted">Акаунт буде створено для <%= suggestedName || ('Telegram ' + telegramUser.id) %><%= telegramUser.username ? ' (@' + telegramUser.username + ')' : '' %>.</p>
+    <% } else { %>
+      <p class="tg-muted">Чекаємо Telegram авторизацію. Якщо сторінка не продовжить автоматично, відкрийте її з кнопки mini app у Telegram.</p>
     <% } %>
     <form class="tg-form" method="POST" action="/tg/register">
       <input type="hidden" name="action" value="group" />
@@ -77,7 +53,7 @@
       <% if (!(groups || []).length) { %>
         <p class="tg-muted">Групи для реєстрації ще не налаштовані.</p>
       <% } %>
-      <button class="tg-primary" type="submit" <%= !(groups || []).length ? 'disabled' : '' %>>Продовжити</button>
+      <button class="tg-primary" type="submit" <%= (!(groups || []).length || (!pendingUser && !(telegramUser && telegramUser.id))) ? 'disabled' : '' %>>Продовжити</button>
     </form>
   </section>
 <% } %>
