@@ -19737,19 +19737,26 @@ function getStuderriaTelegramMiniAppDeepLink() {
 function buildStuderriaTelegramWelcomeKeyboard(chatType = '') {
   const webUrl = getStuderriaTelegramMiniAppWebUrl();
   const deepLink = getStuderriaTelegramMiniAppDeepLink();
+  const isPrivateChat = String(chatType || '').toLowerCase() === 'private';
+  const canUseWebAppButton = webUrl.startsWith('https://')
+    && String(process.env.STUDERRIA_TG_USE_WEB_APP_BUTTON || 'true').trim().toLowerCase() !== 'false';
+  if (isPrivateChat && canUseWebAppButton) {
+    return {
+      keyboard: [[{
+        text: 'відкрити',
+        web_app: { url: webUrl },
+      }]],
+      resize_keyboard: true,
+      is_persistent: true,
+      one_time_keyboard: false,
+      input_field_placeholder: 'Відкрий Studerria',
+    };
+  }
   const button = {
     text: 'Відкрити Studerria',
     url: deepLink || webUrl,
   };
-  if (
-    String(chatType || '').toLowerCase() === 'private'
-    && webUrl.startsWith('https://')
-    && String(process.env.STUDERRIA_TG_USE_WEB_APP_BUTTON || 'true').trim().toLowerCase() !== 'false'
-  ) {
-    delete button.url;
-    button.web_app = { url: webUrl };
-  }
-  if (!button.url && !button.web_app) {
+  if (!button.url) {
     return null;
   }
   return { inline_keyboard: [[button]] };
@@ -19814,6 +19821,23 @@ function shouldWelcomeStuderriaTelegramBotChatMember(update, botId) {
 async function sendStuderriaTelegramWelcome(chat = {}) {
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
   if (!chatId) return;
+  const webUrl = getStuderriaTelegramMiniAppWebUrl();
+  if (
+    String(chat.type || '').toLowerCase() === 'private'
+    && webUrl.startsWith('https://')
+    && String(process.env.STUDERRIA_TG_USE_WEB_APP_BUTTON || 'true').trim().toLowerCase() !== 'false'
+  ) {
+    callStuderriaTelegramBotApi('setChatMenuButton', {
+      chat_id: chatId,
+      menu_button: {
+        type: 'web_app',
+        text: 'відкрити',
+        web_app: { url: webUrl },
+      },
+    }).catch((err) => {
+      console.error('Studerria Telegram menu button failed', err && err.message ? err.message : err);
+    });
+  }
   const replyMarkup = buildStuderriaTelegramWelcomeKeyboard(chat.type || '');
   const text = [
     'Привіт! Це Studerria.',
