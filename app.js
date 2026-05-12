@@ -735,6 +735,49 @@ const bellSchedule = {
   7: { start: '18:00', end: '19:20' },
 };
 
+function shiftTimeLabel(rawValue, minuteShift = 0) {
+  const match = String(rawValue || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return String(rawValue || '');
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return String(rawValue || '');
+  const total = (((hours * 60) + minutes + Number(minuteShift || 0)) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function buildDisplayBellSchedule(campusKey = 'kyiv') {
+  const shiftMinutes = String(campusKey || '').trim().toLowerCase() === 'munich' ? -60 : 0;
+  if (!shiftMinutes) return bellSchedule;
+  return Object.fromEntries(
+    Object.entries(bellSchedule).map(([key, slot]) => [
+      key,
+      {
+        start: shiftTimeLabel(slot && slot.start, shiftMinutes),
+        end: shiftTimeLabel(slot && slot.end, shiftMinutes),
+      },
+    ])
+  );
+}
+
+function getScheduleTimeZoneForCampus(campusKey = 'kyiv') {
+  return String(campusKey || '').trim().toLowerCase() === 'munich' ? 'Europe/Berlin' : 'Europe/Kyiv';
+}
+
+function getScheduleTimeLabel(classNumber, displayBellSchedule = bellSchedule) {
+  const slot = displayBellSchedule && displayBellSchedule[Number(classNumber || 0)];
+  return slot && slot.start && slot.end ? `${slot.start}-${slot.end}` : '';
+}
+
+function applyScheduleTimeLabels(scheduleByDay = {}, displayBellSchedule = bellSchedule) {
+  Object.values(scheduleByDay || {}).forEach((rows) => {
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      if (!row) return;
+      row.time_label = getScheduleTimeLabel(row.class_number, displayBellSchedule);
+    });
+  });
+  return scheduleByDay;
+}
+
 app.set('view engine', 'ejs');
 
 const GLOBAL_LAYOUT_EXCLUDED_VIEWS = new Set();
@@ -20167,6 +20210,9 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
     const totalWeeks = baseState && baseState.term
       ? Math.max(1, Number(baseState.term.weeks_count || 0) || 16)
       : 16;
+    const scheduleDisplayBellSchedule = buildDisplayBellSchedule(
+      baseState && baseState.scope ? baseState.scope.campus_key : null
+    );
     let selectedWeek = Number.isInteger(selectedWeekRaw) && selectedWeekRaw > 0
       ? selectedWeekRaw
       : getAcademicWeekForSemester(new Date(), baseState.term);
@@ -20188,11 +20234,10 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       const day = row.day_of_week;
       if (!scheduleByDay[day]) scheduleByDay[day] = [];
       const classNumber = Number(row.class_number || 0);
-      const bell = bellSchedule[classNumber] || {};
       scheduleByDay[day].push({
         ...row,
         class_number: classNumber,
-        time_label: bell.start && bell.end ? `${bell.start}-${bell.end}` : '',
+        time_label: getScheduleTimeLabel(classNumber, scheduleDisplayBellSchedule),
         subject_name: row.subject_name || row.subject_title || row.name || 'Предмет',
         room_label: row.room_label || row.room_name || row.room_code || '',
         lesson_type: row.lesson_type || row.activity_type || '',
@@ -28441,6 +28486,12 @@ app.get('/schedule', requireLogin, async (req, res) => {
       const courseFilter = req.query.course ? Number(req.query.course) : null;
       const selectedCourse = teacherCourses.find((c) => Number(c.id) === Number(courseFilter)) || null;
       const courseIds = selectedCourse ? [selectedCourse.id] : teacherCourses.map((c) => c.id);
+      const selectedCourseMeta = selectedCourse
+        ? await getCourseById(selectedCourse.id)
+        : (courseIds.length === 1 ? await getCourseById(courseIds[0]) : null);
+      const scheduleDisplayCampus = selectedCourseMeta && selectedCourseMeta.location;
+      const scheduleDisplayBellSchedule = buildDisplayBellSchedule(scheduleDisplayCampus);
+      const scheduleDisplayTimeZone = getScheduleTimeZoneForCampus(scheduleDisplayCampus);
       const semesterMap = new Map();
       for (const cid of courseIds) {
         semesterMap.set(cid, await getActiveSemester(cid));
@@ -28996,6 +29047,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         fallbackCourseId: selectedCourse ? selectedCourse.id : (courseIds[0] || null),
         fallbackUseLocalTime: false,
       });
+      applyScheduleTimeLabels(scheduleByDay, scheduleDisplayBellSchedule);
 
       return res.render('schedule', {
         scheduleByDay,
@@ -29004,7 +29056,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
         currentWeek: selectedWeek,
         totalWeeks,
         semester: primarySemester,
-        bellSchedule,
+        bellSchedule: scheduleDisplayBellSchedule,
+        scheduleTimeZone: scheduleDisplayTimeZone,
         group: group || 'A',
         username,
         homework,
@@ -29078,6 +29131,9 @@ app.get('/schedule', requireLogin, async (req, res) => {
       }
 
       const legacyCourseId = parsePositiveIntStrict(scheduleState && scheduleState.scope && scheduleState.scope.legacy_course_id);
+      const scheduleDisplayCampus = scheduleState && scheduleState.scope ? scheduleState.scope.campus_key : null;
+      const scheduleDisplayBellSchedule = buildDisplayBellSchedule(scheduleDisplayCampus);
+      const scheduleDisplayTimeZone = getScheduleTimeZoneForCampus(scheduleDisplayCampus);
       const legacySemesterId = parsePositiveIntStrict(scheduleState && scheduleState.term && scheduleState.term.legacy_semester_id);
       let useLocalTime = false;
       if (legacyCourseId && legacySemesterId) {
@@ -29175,6 +29231,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         fallbackCourseId: legacyCourseId || parsePositiveIntStrict(courseId) || null,
         fallbackUseLocalTime: useLocalTime,
       });
+      applyScheduleTimeLabels(scheduleByDay, scheduleDisplayBellSchedule);
       return res.render('schedule', {
         scheduleByDay,
         daysOfWeek: activeDays,
@@ -29186,7 +29243,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
           start_date: scheduleState.term.start_date,
           weeks_count: Math.max(1, Number(scheduleState.term.weeks_count || 0) || 16),
         } : null,
-        bellSchedule,
+        bellSchedule: scheduleDisplayBellSchedule,
+        scheduleTimeZone: scheduleDisplayTimeZone,
         group: scheduleState && scheduleState.scope && scheduleState.scope.group_label
           ? scheduleState.scope.group_label
           : (group || 'A'),
@@ -29247,6 +29305,10 @@ app.get('/schedule', requireLogin, async (req, res) => {
     ? viewAsCourseId
     : (courseId || 1);
   const viewAsCourse = isAdminViewAs ? await getCourseById(scheduleCourseId) : null;
+  const scheduleCourseMeta = viewAsCourse || await getCourseById(scheduleCourseId);
+  const scheduleDisplayCampus = scheduleCourseMeta && scheduleCourseMeta.location;
+  const scheduleDisplayBellSchedule = buildDisplayBellSchedule(scheduleDisplayCampus);
+  const scheduleDisplayTimeZone = getScheduleTimeZoneForCampus(scheduleDisplayCampus);
   const parsePreferredGroupNumber = (rawValue) => {
     const parsed = Number(rawValue);
     if (!Number.isInteger(parsed) || parsed < 1) return null;
@@ -29761,7 +29823,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
               currentWeek: selectedWeek,
               totalWeeks,
               semester: activeSemester,
-              bellSchedule,
+              bellSchedule: scheduleDisplayBellSchedule,
+              scheduleTimeZone: scheduleDisplayTimeZone,
               group: isAdminViewAs ? `Група ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
               username,
               homework: [],
@@ -29988,7 +30051,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
                 currentWeek: selectedWeek,
                 totalWeeks,
                 semester: activeSemester,
-                bellSchedule,
+                bellSchedule: scheduleDisplayBellSchedule,
+                scheduleTimeZone: scheduleDisplayTimeZone,
                 group: isAdminViewAs ? `Група ${effectiveViewAsGroupNumber || 1}` : (group || 'A'),
                 username,
                 homework,
@@ -30379,6 +30443,7 @@ app.get('/schedule', requireLogin, async (req, res) => {
         activeDays.forEach((day) => {
           scheduleByDay[day].sort((a, b) => a.class_number - b.class_number);
         });
+        applyScheduleTimeLabels(scheduleByDay, scheduleDisplayBellSchedule);
         const homeworkTargets = buildHomeworkTargets(studentGroups, rows || []);
         return loadHomework(homeworkTargets);
     }
@@ -56029,6 +56094,8 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
     activeDays.forEach((day) => {
       scheduleByDay[day].sort((a, b) => a.class_number - b.class_number);
     });
+    const scheduleDisplayBellSchedule = buildDisplayBellSchedule(selectedLocation);
+    applyScheduleTimeLabels(scheduleByDay, scheduleDisplayBellSchedule);
 
     const lastStats = config.last_stats || null;
     const overwriteCount = lastStats && lastStats.diff ? Number(lastStats.diff.overwrite || 0) : 0;
@@ -56059,7 +56126,7 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
       currentWeek: selectedWeek,
       totalWeeks,
       semester: activeSemester,
-      bellSchedule,
+      bellSchedule: scheduleDisplayBellSchedule,
       config,
       lastStats,
       publishRequiresTyped,

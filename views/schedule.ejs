@@ -1,6 +1,7 @@
 <%
   const localeCode = lang === 'en' ? 'en-US' : 'uk-UA';
   const scheduleTodayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+  const scheduleRenderTimeZone = typeof scheduleTimeZone === 'string' && scheduleTimeZone ? scheduleTimeZone : 'Europe/Kyiv';
   const scheduleViewText = lang === 'en'
     ? {
         heroPhrase: "Your rhythm, your focus - let's make this week count.",
@@ -2465,7 +2466,7 @@
               <% } else { %>
                 <% dayEntries.forEach(function(cls, idx) { %>
                   <% const slot = bellSchedule[cls.class_number]; %>
-                  <% const timeLabel = slot ? `${slot.start} - ${slot.end}` : ''; %>
+                  <% const timeLabel = cls.time_label ? String(cls.time_label).replace(/\s*-\s*/, ' - ') : (slot ? `${slot.start} - ${slot.end}` : ''); %>
                   <% const subjectName = cls.subject_name || ''; %>
                   <% const subjectNameLower = subjectName.toLowerCase(); %>
                   <% const inlineType = /(лекц|семін|лаб|практ|lecture|seminar|lab|practice)/.test(subjectNameLower); %>
@@ -5505,7 +5506,7 @@
         });
       });
 
-      const scheduleTimeZone = 'Europe/Kyiv';
+      const scheduleTimeZone = <%- JSON.stringify(scheduleRenderTimeZone).replace(/</g, '\\u003c') %>;
       const scheduleNextMarkerStorageKey = `schedule-next-marker:<%= selectedCourseId || 'all' %>:<%= userId || 'guest' %>:<%= role || 'user' %>:<%= viewAs || 'none' %>`;
 
       function getTimeZoneOffsetMinutes(timeZone, date) {
@@ -6263,11 +6264,11 @@
         const homeworkMeta = document.getElementById('scheduleHomeworkMeta');
         const homeworkTitle = document.getElementById('scheduleHomeworkTitle');
         const homeworkLine = document.getElementById('scheduleHomeworkLine');
-        const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+        const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: scheduleTimeZone });
         const now = new Date();
-        const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+        const today = now.toLocaleDateString('en-CA', { timeZone: scheduleTimeZone });
         const nowMinutes = Number(now.toLocaleTimeString('en-GB', {
-          timeZone: 'Europe/Kyiv',
+          timeZone: scheduleTimeZone,
           hour: '2-digit',
           minute: '2-digit',
           hour12: false,
