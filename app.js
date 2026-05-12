@@ -19931,6 +19931,21 @@ function resolveStuderriaTelegramGroupNumber(user = {}, subject = {}, activityTy
   return Math.max(1, Math.min(maxGroup, numericScheduleGroup || numericDefaultGroup || 1));
 }
 
+function normalizeStuderriaTelegramIntArray(rawValue = []) {
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+      .sort((left, right) => left - right);
+  }
+  return String(rawValue || '')
+    .replace(/[{}]/g, '')
+    .split(',')
+    .map((value) => parsePositiveIntStrict(value.trim()))
+    .filter((value) => Number.isInteger(value) && value > 0)
+    .sort((left, right) => left - right);
+}
+
 function getStuderriaTelegramSubjectName(subject = {}) {
   return sanitizeCompactText(
     subject.subject_name || subject.name || subject.title || subject.catalog_name || 'Предмет',
@@ -20194,9 +20209,23 @@ async function handleStuderriaTelegramGiveRoleCommand(message = {}, parsedComman
     );
     return;
   }
-  const existingRoles = await getStuderriaTelegramUserRoleKeys(targetUser.id, targetUser.role);
+  const assignment = await getUserRoleAssignmentsForUserIds([targetUser.id]);
+  const targetUserId = Number(targetUser.id);
+  const existingRoles = normalizeRoleList(
+    (assignment.roleKeysByUser && assignment.roleKeysByUser[targetUserId])
+      || [targetUser.role || 'student']
+  );
   const nextRoles = normalizeRoleList([...existingRoles, 'starosta']);
-  await assignUserRoles(targetUser.id, nextRoles, { preferredPrimary: 'starosta' });
+  const currentPrimaryRole = normalizeRoleKey(
+    (assignment.primaryRoleByUser && assignment.primaryRoleByUser[targetUserId])
+    || targetUser.role
+    || existingRoles[0]
+    || 'student'
+  );
+  const preferredPrimary = ['admin', 'deanery', 'teacher'].includes(currentPrimaryRole)
+    ? currentPrimaryRole
+    : 'starosta';
+  await assignUserRoles(targetUser.id, nextRoles, { preferredPrimary });
   broadcast('users_updated');
   await sendStuderriaTelegramMessage(
     chatId,
@@ -20462,14 +20491,35 @@ async function insertAcademicV2StuderriaTelegramScheduleEntries(context = {}, su
   }
   const lessonType = normalizeLessonType(payload.lessonType) || 'lecture';
   const groupNumber = resolveStuderriaTelegramGroupNumber(context.actor, subject, lessonType);
+  const termId = parsePositiveIntStrict(context.runtimeTerm && context.runtimeTerm.id);
+  const targetGroupNumbers = lessonType === 'lecture' ? [] : [groupNumber];
+  const targetGroupKey = targetGroupNumbers.join(',');
+  const existingRows = await getAcademicV2Store().all(
+    `
+      SELECT week_number, target_group_numbers
+      FROM academic_v2_schedule_entries
+      WHERE group_subject_activity_id = ?
+        AND term_id = ?
+        AND day_of_week = ?
+        AND class_number = ?
+        AND group_number = ?
+    `,
+    [activityId, termId, payload.dayOfWeek, Number(payload.classNumber || 0), groupNumber]
+  ).catch(() => []);
+  const existingWeeks = (existingRows || [])
+    .filter((row) => normalizeStuderriaTelegramIntArray(row.target_group_numbers).join(',') === targetGroupKey)
+    .map((row) => parsePositiveIntStrict(row.week_number))
+    .filter((weekNumber) => Number.isInteger(weekNumber) && weekNumber > 0);
+  const weekNumbers = Array.from(new Set([...existingWeeks, ...weeks]))
+    .sort((left, right) => left - right);
   const result = await academicV2Helpers.saveScheduleEntry(getAcademicV2Store(), {
     group_subject_activity_id: activityId,
-    term_id: parsePositiveIntStrict(context.runtimeTerm && context.runtimeTerm.id),
+    term_id: termId,
     group_number: groupNumber,
-    target_group_numbers: lessonType === 'lecture' ? [] : [groupNumber],
+    target_group_numbers: targetGroupNumbers,
     day_of_week: payload.dayOfWeek,
     class_number: Number(payload.classNumber || 0),
-    week_numbers: weeks,
+    week_numbers: weekNumbers,
   });
   return { inserted: Array.isArray(result && result.rows) ? result.rows.length : 1, groupNumber };
 }
