@@ -9,6 +9,8 @@
     "test": "node --test",
     "start": "node app.js",
     "lint": "eslint .",
+    "cleanup:audit": "node scripts/repo-cleanup-audit.js",
+    "legacy:archive": "node scripts/legacy-archive.js --dry-run",
     "changelog:update": "node scripts/update-changelog.mjs",
     "version:patch": "node scripts/version.js patch",
     "version:minor": "node scripts/version.js minor",

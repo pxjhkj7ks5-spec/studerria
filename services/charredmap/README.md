@@ -1,6 +1,6 @@
 # charredmap
 
-When this project is vendored inside the Studerria repository, the primary runtime is the root `docker/local` stack, where Studerria proxies `/charredmap` to this service. The standalone `docker/studerria` files below remain as service-level reference.
+When this project is vendored inside the Studerria repository, the primary runtime is the root `docker/local` stack, where Studerria proxies `/charredmap` to this service.
 
 `charredmap` is a Next.js fullstack MVP for a public memorial map of stories from occupied or deoccupied Ukrainian cities. The public side is registration-free, while moderators work through a separate admin path protected by a password and signed cookie session.
 
@@ -40,48 +40,29 @@ npm run dev
 
 The default build assumes the app is mounted under `/charredmap`. If you need to run it from the root locally, override `NEXT_PUBLIC_BASE_PATH=""` before `npm run dev`.
 
-## Studerria VPS deployment
+## Studerria deployment
 
-This repository is now prepared for a path-based deployment on the main Studerria domain:
+The live Studerria deployment is path-based on the main Studerria domain:
 
 - public app: `https://studerria.com/charredmap`
 - admin: `https://studerria.com/charredmap/admin`
 
-The safest setup is to keep `charredmap` in its own container, expose it only on `127.0.0.1`, and proxy only the `/charredmap` prefix from the main nginx virtual host.
-
-### 1. Prepare the compose env
+The service is managed by the root compose stack:
 
 ```bash
-cp docker/studerria/.env.example docker/studerria/.env
+cd ../../docker/local
+docker compose up -d charredmap app
 ```
 
-Set long random values for:
+Production secrets are configured in `docker/local/.env`:
 
-- `ADMIN_PASSWORD`
-- `SESSION_SECRET` with at least 32 random characters
+- `CHARREDMAP_ADMIN_PASSWORD`
+- `CHARREDMAP_SESSION_SECRET` with at least 32 random characters
+- `CHARREDMAP_NODE_ENV=production`
 
-### 2. Start the container
+Studerria proxies only the `/charredmap` prefix to this app, so the rest of Studerria stays isolated from `charredmap`.
 
-```bash
-cd docker/studerria
-docker compose up -d --build
-```
-
-The compose file:
-
-- builds the app with `NEXT_PUBLIC_BASE_PATH=/charredmap`
-- binds the app only to `127.0.0.1:${APP_PORT}`
-- keeps SQLite and uploads in a dedicated Docker volume
-- runs the container read-only except for `/tmp` and `/data`
-- drops Linux capabilities and enables `no-new-privileges`
-
-### 3. Add the nginx location block on Studerria
-
-Use the snippet in `docker/studerria/nginx.charredmap.conf` inside the existing `server {}` block for `studerria.com`.
-
-Only the `/charredmap` prefix is proxied to this app, so the rest of Studerria stays isolated from `charredmap`.
-
-### 4. Persisted content
+Persisted content is stored in the root compose `charredmap_data` volume:
 
 - SQLite database: `/data/charredmap.db`
 - uploaded images: `/data/uploads`

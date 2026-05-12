@@ -6,6 +6,8 @@ This stack runs the current KMA app with PostgreSQL, Redis, and centralized logs
 
 - `app`: the existing Node.js + Express application from this repository
 - `charredmap`: isolated Next.js memorial-map service mounted under `/charredmap`
+- `naradadruk`: isolated Next.js print/catalog service mounted under `/naradadruk`
+- `slashtg`: isolated Next.js Telegram mini-app service mounted under `/tg`
 - `db`: PostgreSQL 18 with first-start initialization from `docker/local/db/init/*.sql`
 - `redis`: Redis 7 for Studerria session storage
 - `loki`: log storage backend
@@ -33,6 +35,8 @@ App URL:
 - [http://localhost:3000](http://localhost:3000)
 - [http://localhost:3000/charredmap](http://localhost:3000/charredmap)
 - [http://localhost:3000/charredmap/admin](http://localhost:3000/charredmap/admin)
+- [http://localhost:3000/naradadruk](http://localhost:3000/naradadruk)
+- [http://localhost:3000/tg](http://localhost:3000/tg)
 
 Observability:
 
@@ -74,6 +78,7 @@ docker compose ps
 docker compose logs --tail=100 app
 docker compose logs --tail=100 charredmap
 docker compose logs --tail=100 naradadruk
+docker compose logs --tail=100 slashtg
 ```
 
 Do not run `docker compose down -v` for a routine update, because that recreates database and cache volumes.
@@ -127,5 +132,21 @@ docker compose up --build -d
 - Container logs are centralized into Loki through Promtail; query them from your preferred Grafana/Loki client.
 - The repository `uploads/` directory is mounted into the app container, so uploaded files stay visible in the workspace.
 - `charredmap` keeps its own SQLite database and uploads in a dedicated Docker volume, so it stays operationally isolated from the Studerria Postgres app.
-- If `charredmap` is unhealthy or stopped, the main Studerria app still starts; only `/charredmap` returns a temporary `503`.
+- `naradadruk` and `slashtg` also keep their own SQLite data in dedicated Docker volumes.
+- If a sidecar service is unhealthy or stopped, the main Studerria app still starts; only that service route returns a temporary `503` or `404`.
 - If the backup file is missing, PostgreSQL still starts empty and the app will create schema via its built-in migrations.
+
+## Cleanup audits
+
+Before deleting generated files or legacy compatibility code, run the read-only audit from the repository root:
+
+```bash
+npm run cleanup:audit
+```
+
+For legacy data, archive first and review the artifact before any destructive migration:
+
+```bash
+npm run legacy:archive
+node scripts/legacy-archive.js --archive
+```
