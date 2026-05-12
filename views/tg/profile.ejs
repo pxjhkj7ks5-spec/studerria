@@ -1,0 +1,56 @@
+<section class="tg-page-head">
+  <p class="tg-kicker">Studerria</p>
+  <h1>Профіль</h1>
+  <% if (placement && placement.group_label) { %>
+    <p class="tg-muted"><%= placement.group_label %></p>
+  <% } %>
+</section>
+
+<% if (error) { %>
+  <div class="tg-alert">Не вдалося оновити профіль.</div>
+<% } %>
+<% if (success) { %>
+  <div class="tg-success">Профіль оновлено.</div>
+<% } %>
+
+<section class="tg-card">
+  <form class="tg-form" method="POST" action="/tg/profile">
+    <label>
+      <span>Повне імʼя</span>
+      <input name="full_name" type="text" value="<%= user && user.full_name ? user.full_name : '' %>" required />
+    </label>
+    <label>
+      <span>Мова</span>
+      <select name="language">
+        <option value="uk" <%= user && user.language === 'uk' ? 'selected' : '' %>>Українська</option>
+        <option value="en" <%= user && user.language === 'en' ? 'selected' : '' %>>English</option>
+      </select>
+    </label>
+    <label>
+      <span>Новий пароль</span>
+      <input name="password" type="password" minlength="8" autocomplete="new-password" />
+    </label>
+    <label>
+      <span>Повторіть пароль</span>
+      <input name="confirm_password" type="password" minlength="8" autocomplete="new-password" />
+    </label>
+    <button class="tg-primary" type="submit">Оновити</button>
+  </form>
+</section>
+
+<section class="tg-card">
+  <h2>Telegram</h2>
+  <% if (user && user.telegram_id) { %>
+    <p class="tg-muted">Привʼязано<%= user.telegram_username ? ': @' + user.telegram_username : '' %></p>
+  <% } else { %>
+    <p class="tg-muted">Telegram ще не привʼязано.</p>
+  <% } %>
+</section>
+
+<section class="tg-card">
+  <h2>Предмети</h2>
+  <p class="tg-muted">Скидання вибору предметів відкриє повторне налаштування груп.</p>
+  <form method="POST" action="/tg/profile/reset-subjects">
+    <button class="tg-secondary" type="submit">Скинути вибір предметів</button>
+  </form>
+</section>

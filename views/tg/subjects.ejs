@@ -1,0 +1,22 @@
+<section class="tg-page-head">
+  <p class="tg-kicker">Studerria</p>
+  <h1>Предмети</h1>
+  <p class="tg-muted">Оновіть групи для предметів, які формують ваш персональний розклад.</p>
+</section>
+
+<% if (error) { %>
+  <div class="tg-alert"><%= error === 'missing_group' ? 'Оберіть групи для всіх обовʼязкових предметів.' : 'Не вдалося зберегти вибір.' %></div>
+<% } %>
+<% if (success) { %>
+  <div class="tg-success">Вибір збережено.</div>
+<% } %>
+
+<section class="tg-card">
+  <% if (subjectState && subjectState.scope && subjectState.scope.group_label) { %>
+    <p class="tg-muted"><%= subjectState.scope.group_label %></p>
+  <% } %>
+  <form class="tg-form" method="POST" action="/tg/subjects">
+    <%- include('subject-picker', { registerSubjectCards }) %>
+    <button class="tg-primary" type="submit">Зберегти</button>
+  </form>
+</section>

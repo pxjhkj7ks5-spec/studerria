@@ -148,14 +148,14 @@ services:
       context: ../../services/slashtg
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BASE_PATH: /tg
+        NEXT_PUBLIC_BASE_PATH: /slash-tg
     init: true
     restart: unless-stopped
     environment:
       NODE_ENV: ${SLASHTG_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
       PORT: 8080
-      NEXT_PUBLIC_BASE_PATH: /tg
+      NEXT_PUBLIC_BASE_PATH: /slash-tg
       DATABASE_URL: file:/data/slashtg.db
       SLASHTG_BOT_TOKEN: ${SLASHTG_BOT_TOKEN:-}
       SLASHTG_SESSION_SECRET: ${SLASHTG_SESSION_SECRET:-change-me-slashtg-session-secret-change-this}
@@ -178,7 +178,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:8080/tg').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:8080/slash-tg').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
         ]
       interval: 10s
       timeout: 5s
@@ -216,6 +216,10 @@ services:
       CHARREDMAP_PROXY_TARGET: http://charredmap:8080
       NARADADRUK_PROXY_TARGET: http://naradadruk:8080
       SLASHTG_PROXY_TARGET: http://slashtg:8080
+      SLASHTG_BASE_PATH: ${SLASHTG_BASE_PATH:-/slash-tg}
+      STUDERRIA_TG_BOT_TOKEN: ${STUDERRIA_TG_BOT_TOKEN:-}
+      STUDERRIA_TG_INIT_DATA_MAX_AGE_SECONDS: ${STUDERRIA_TG_INIT_DATA_MAX_AGE_SECONDS:-86400}
+      STUDERRIA_TG_DEV_TELEGRAM_ID: ${STUDERRIA_TG_DEV_TELEGRAM_ID:-}
     ports:
       - "${APP_PORT_FORWARD:-3000}:${APP_PORT:-3000}"
     volumes:

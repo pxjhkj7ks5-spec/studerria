@@ -1,0 +1,44 @@
+<section class="tg-page-head">
+  <p class="tg-kicker">Studerria</p>
+  <h1>Розклад</h1>
+  <div class="tg-weekbar">
+    <a href="/tg/schedule?week=<%= Math.max(1, Number(currentWeek || 1) - 1) %>">Prev</a>
+    <strong>Week <%= currentWeek || 1 %> / <%= totalWeeks || 1 %></strong>
+    <a href="/tg/schedule?week=<%= Math.min(Number(totalWeeks || 1), Number(currentWeek || 1) + 1) %>">Next</a>
+  </div>
+</section>
+
+<% if (typeof welcome !== 'undefined' && welcome) { %>
+  <div class="tg-success">Акаунт готовий. Telegram привʼязано.</div>
+<% } %>
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="tg-alert">Не вдалося завантажити розклад.</div>
+<% } %>
+
+<section class="tg-schedule">
+  <% (days || []).forEach(function(day) { %>
+    <article class="tg-day">
+      <h2><%= day %></h2>
+      <% const rows = scheduleByDay && scheduleByDay[day] ? scheduleByDay[day] : []; %>
+      <% if (!rows.length) { %>
+        <p class="tg-muted">Немає пар.</p>
+      <% } %>
+      <% rows.forEach(function(item) { %>
+        <div class="tg-lesson">
+          <div class="tg-lesson-time">
+            <strong><%= item.class_number || '' %></strong>
+            <span><%= item.time_label || '' %></span>
+          </div>
+          <div>
+            <h3><%= item.subject_name %></h3>
+            <p>
+              <% if (item.lesson_type) { %><span><%= item.lesson_type %></span><% } %>
+              <% if (item.group_number) { %><span>Group <%= item.group_number %></span><% } %>
+              <% if (item.room_label) { %><span><%= item.room_label %></span><% } %>
+            </p>
+          </div>
+        </div>
+      <% }); %>
+    </article>
+  <% }); %>
+</section>

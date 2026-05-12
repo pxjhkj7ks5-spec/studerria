@@ -32,6 +32,7 @@ const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
 const sessionGeneratorHelpers = require('./lib/sessionGenerator');
 const demoMode = require('./lib/demoMode');
+const telegramMiniApp = require('./lib/telegramMiniApp');
 const { localizeChangelogItems } = require('./lib/changelogI18n');
 const { publicLegalPages } = require('./lib/legalPages');
 const versionFile = path.join(__dirname, 'version.json');
@@ -916,7 +917,7 @@ const contentSecurityDirectives = {
   mediaSrc: ["'self'", 'data:', 'blob:'],
   fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
   styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
-  scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+  scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://telegram.org'],
   connectSrc: ["'self'", 'ws:', 'wss:'],
 };
 if (isProd) {
@@ -2817,6 +2818,7 @@ app.use(async (req, res, next) => {
     '/register/course',
     '/register/teacher-subjects',
     '/register/subjects',
+    '/tg',
   ];
   if (allowedPrefixes.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`))) {
     return next();
@@ -19023,6 +19025,352 @@ app.post('/help/support', requireLogin, writeLimiter, async (req, res) => {
   }
 });
 
+const TG_MINI_STUDENT_ROLES = new Set(['student', 'starosta']);
+const TG_MINI_BLOCKED_ROLES = new Set(['admin', 'deanery', 'teacher']);
+
+function normalizeTelegramId(rawValue) {
+  const normalized = String(rawValue || '').trim();
+  return normalized || '';
+}
+
+function getTelegramMiniBotToken() {
+  return String(process.env.STUDERRIA_TG_BOT_TOKEN || '').trim();
+}
+
+function getTelegramMiniInitDataMaxAgeSeconds() {
+  const parsed = Number(process.env.STUDERRIA_TG_INIT_DATA_MAX_AGE_SECONDS || 86400);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 86400;
+}
+
+function isTelegramMiniDevAuthAllowed() {
+  return process.env.NODE_ENV !== 'production';
+}
+
+function setTelegramMiniPending(req, telegramUser) {
+  if (!req || !req.session || !telegramUser || !telegramUser.id) {
+    return;
+  }
+  req.session.telegramMiniPending = {
+    user: telegramMiniApp.normalizeTelegramUser(telegramUser),
+    created_at: new Date().toISOString(),
+  };
+}
+
+function getTelegramMiniPendingUser(req) {
+  const pending = req && req.session ? req.session.telegramMiniPending : null;
+  const user = pending && pending.user ? telegramMiniApp.normalizeTelegramUser(pending.user) : null;
+  return user && user.id ? user : null;
+}
+
+function clearTelegramMiniPending(req) {
+  if (req && req.session) {
+    req.session.telegramMiniPending = null;
+  }
+}
+
+function isTelegramMiniStudentRole(role) {
+  return TG_MINI_STUDENT_ROLES.has(normalizeRoleKey(role));
+}
+
+function canUseTelegramMiniSession(req) {
+  if (!req || !req.session || !req.session.user) return false;
+  const roles = getSessionRoleList(req);
+  if (roles.some((role) => TG_MINI_BLOCKED_ROLES.has(normalizeRoleKey(role)))) {
+    return false;
+  }
+  return roles.some((role) => TG_MINI_STUDENT_ROLES.has(normalizeRoleKey(role)))
+    || TG_MINI_STUDENT_ROLES.has(normalizeRoleKey(req.session.role));
+}
+
+function renderTelegramMiniPage(req, res, viewName, locals = {}) {
+  const lang = getPreferredLang(req);
+  const baseLocals = {
+    layout: false,
+    lang,
+    t: (key) => translate(lang, key),
+    appVersion,
+    changelog: localizeChangelogItems(appChangelog, lang).slice(0, CHANGELOG_UI_LIMIT),
+    currentPath: req.path,
+    currentTgPage: String(locals.currentTgPage || '').trim(),
+    telegramUser: getTelegramMiniPendingUser(req),
+    sessionUser: req.session && req.session.user ? req.session.user : null,
+    ...locals,
+  };
+  return res.render(`tg/${viewName}`, baseLocals, (viewErr, bodyHtml) => {
+    if (viewErr) {
+      console.error('Telegram mini view failed', viewErr);
+      return res.status(500).send('Telegram mini app render failed');
+    }
+    return res.render('tg/layout', {
+      ...baseLocals,
+      layout: false,
+      bodyHtml,
+      pageTitle: locals.pageTitle || 'Studerria',
+    });
+  });
+}
+
+function requireTelegramMiniStudent(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.redirect('/tg/login');
+  }
+  if (!canUseTelegramMiniSession(req)) {
+    return renderTelegramMiniPage(req, res.status(403), 'denied', {
+      pageTitle: 'Studerria',
+      currentTgPage: '',
+      reason: 'student_only',
+    });
+  }
+  return next();
+}
+
+async function validateTelegramMiniInitData(req) {
+  const initData = String(req.body && req.body.initData ? req.body.initData : '').trim();
+  if (initData) {
+    const validated = telegramMiniApp.validateTelegramInitData(initData, {
+      botToken: getTelegramMiniBotToken(),
+      maxAgeSeconds: getTelegramMiniInitDataMaxAgeSeconds(),
+    });
+    return validated.user;
+  }
+  if (isTelegramMiniDevAuthAllowed()) {
+    const devTelegramId = normalizeTelegramId(
+      req.body && (req.body.devTelegramId || req.body.devTelegramUserId)
+        ? (req.body.devTelegramId || req.body.devTelegramUserId)
+        : process.env.STUDERRIA_TG_DEV_TELEGRAM_ID
+    );
+    if (devTelegramId) {
+      return telegramMiniApp.normalizeTelegramUser({
+        id: devTelegramId,
+        first_name: 'Studerria',
+        username: 'studerria_dev',
+      });
+    }
+  }
+  throw new Error('telegram_auth_required');
+}
+
+async function findUserByTelegramId(telegramId) {
+  const normalizedId = normalizeTelegramId(telegramId);
+  if (!normalizedId) return null;
+  return db.get(
+    `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
+     FROM users
+     WHERE telegram_id = ?
+     LIMIT 1`,
+    [normalizedId]
+  );
+}
+
+async function linkTelegramMiniUser(req, userId, telegramUser) {
+  const normalizedUserId = Number(userId || 0);
+  const normalizedTelegramUser = telegramMiniApp.normalizeTelegramUser(telegramUser || {});
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1 || !normalizedTelegramUser.id) {
+    return false;
+  }
+  const occupied = await db.get(
+    'SELECT id FROM users WHERE telegram_id = ? AND id <> ? LIMIT 1',
+    [normalizedTelegramUser.id, normalizedUserId]
+  );
+  if (occupied && occupied.id) {
+    const err = new Error('telegram_link_occupied');
+    err.code = 'telegram_link_occupied';
+    throw err;
+  }
+  await db.run(
+    `
+      UPDATE users
+      SET telegram_id = ?,
+          telegram_username = ?,
+          telegram_first_name = ?,
+          telegram_last_name = ?,
+          telegram_photo_url = ?,
+          telegram_linked_at = COALESCE(telegram_linked_at, NOW()),
+          telegram_last_seen_at = NOW()
+      WHERE id = ?
+    `,
+    [
+      normalizedTelegramUser.id,
+      normalizedTelegramUser.username || null,
+      normalizedTelegramUser.first_name || null,
+      normalizedTelegramUser.last_name || null,
+      normalizedTelegramUser.photo_url || null,
+      normalizedUserId,
+    ]
+  );
+  logAction(db, req, 'telegram_mini_link', { user_id: normalizedUserId, telegram_id: normalizedTelegramUser.id });
+  return true;
+}
+
+async function establishTelegramMiniSession(req, user, telegramUser = null, lastSeenRoute = '/tg/auth/init') {
+  await establishAuthenticatedSession(req, {
+    user: {
+      id: user.id,
+      username: user.full_name,
+      schedule_group: user.schedule_group,
+      course_id: user.course_id || 1,
+      group_id: user.group_id || null,
+      language: user.language || getPreferredLang(req),
+    },
+    role: normalizeRoleKey(user.role || 'student'),
+    remember: true,
+    sessionData: {
+      last_seen_route: lastSeenRoute,
+      last_seen_at: new Date().toISOString(),
+    },
+  });
+  if (telegramUser && telegramUser.id) {
+    await linkTelegramMiniUser(req, user.id, telegramUser);
+  } else if (user.telegram_id) {
+    await db.run('UPDATE users SET telegram_last_seen_at = NOW() WHERE id = ?', [user.id]);
+  }
+  clearTelegramMiniPending(req);
+  await saveRequestSession(req);
+}
+
+async function loadTelegramMiniRegistrationGroups() {
+  const catalogGroups = await academicV2Helpers.listRegistrationCatalogGroups(getAcademicV2Store());
+  return (Array.isArray(catalogGroups) ? catalogGroups : [])
+    .filter((group) => normalizeRegistrationTrack(group && group.track_key, 'bachelor') !== 'teacher')
+    .map((group) => ({
+      ...group,
+      group_id: Number(group.group_id || 0),
+      label: sanitizeCompactText(group.group_label || group.label || '', 160),
+      track_key: normalizeRegistrationTrack(group.track_key, 'bachelor'),
+      campus_key: normalizeCourseCampus(group.campus_key),
+      stage_number: Math.max(1, Number(group.stage_number || 0) || 1),
+      visible_subject_count: Math.max(0, Number(group.visible_subject_count || 0) || 0),
+      selection_blocked: Boolean(group.selection_blocked),
+    }))
+    .filter((group) => group.group_id);
+}
+
+async function loadTelegramMiniRegisterState(req) {
+  await ensureDbReady();
+  const pendingUserId = Number(req.session.pendingUserId || 0);
+  const pendingUser = Number.isInteger(pendingUserId) && pendingUserId > 0
+    ? await db.get(
+      'SELECT id, full_name, group_id, course_id, admission_id, study_context_id, study_program_id, study_track FROM users WHERE id = ?',
+      [pendingUserId]
+    )
+    : null;
+  const groups = await loadTelegramMiniRegistrationGroups();
+  let subjectState = null;
+  let registerSubjectCards = [];
+  if (pendingUser && pendingUser.group_id) {
+    subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      pendingUser,
+      { selectedOnly: false }
+    );
+    const isRequired = (subject) =>
+      subject && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1');
+    const requiredAuto = (subjectState.subjects || [])
+      .filter((subject) => isRequired(subject) && Number(subject.group_count) === 1);
+    if (requiredAuto.length) {
+      await Promise.all(requiredAuto.map((subject) => db.run(
+        `
+          INSERT INTO student_groups (student_id, subject_id, group_number)
+          VALUES (?, ?, 1)
+          ON CONFLICT(student_id, subject_id) DO NOTHING
+        `,
+        [pendingUser.id, subject.id || subject.subject_id]
+      )));
+      subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+        getAcademicV2Store(),
+        pendingUser,
+        { selectedOnly: false }
+      );
+    }
+    registerSubjectCards = registerSubjectHelpers.buildRegisterSubjectCards(subjectState.subjects || []);
+  }
+  const requestedStep = String(req.query.step || '').trim().toLowerCase();
+  const step = requestedStep || (!pendingUser ? 'account' : (pendingUser.group_id ? 'subjects' : 'group'));
+  return {
+    pendingUser,
+    groups,
+    subjectState,
+    registerSubjectCards,
+    step,
+  };
+}
+
+async function saveTelegramMiniSubjectChoices(req, userId) {
+  const normalizedUserId = Number(userId || 0);
+  const userRow = await db.get(
+    `
+      SELECT id, course_id, admission_id, study_context_id, study_program_id, study_track, group_id
+      FROM users
+      WHERE id = ?
+    `,
+    [normalizedUserId]
+  );
+  if (!userRow) {
+    throw new Error('missing_user');
+  }
+  const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+    getAcademicV2Store(),
+    userRow,
+    { selectedOnly: false }
+  );
+  if (!subjectState.scope || String(subjectState.scope.resolved_via || '') !== 'group_id') {
+    throw new Error('group_required');
+  }
+  if (normalizeRegistrationTrack(subjectState.scope.track_key, 'bachelor') === 'teacher') {
+    throw new Error('teacher_not_allowed');
+  }
+  if (subjectState.projectionIssues && subjectState.projectionIssues.has_issues && !(subjectState.subjects || []).length) {
+    logAcademicV2StudentProjection('tg.subjects.submit', normalizedUserId, subjectState);
+    throw new Error('projection_incomplete');
+  }
+  const upsertStudentGroupSql = `
+    INSERT INTO student_groups (student_id, subject_id, group_number)
+    VALUES (?, ?, ?)
+    ON CONFLICT(student_id, subject_id)
+    DO UPDATE SET group_number = excluded.group_number
+  `;
+  let hasMissingRequired = false;
+  for (const subject of subjectState.subjects || []) {
+    const choice = registerSubjectHelpers.readRegisterSubjectChoice(subject, req.body);
+    const subjectId = Number(choice.id || 0);
+    if (!Number.isFinite(subjectId) || subjectId < 1) continue;
+    if (choice.requiredFlag) {
+      await db.run('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?', [normalizedUserId, subjectId]);
+      if (choice.autoAssigned) {
+        await db.run(upsertStudentGroupSql, [normalizedUserId, subjectId, 1]);
+        continue;
+      }
+      if (choice.missingChoice || choice.invalidGroup || !choice.selectedGroup) {
+        hasMissingRequired = true;
+        continue;
+      }
+      await db.run(upsertStudentGroupSql, [normalizedUserId, subjectId, choice.selectedGroup]);
+      continue;
+    }
+    if (choice.missingChoice || choice.invalidGroup) {
+      hasMissingRequired = true;
+      continue;
+    }
+    if (choice.optedOut) {
+      await db.run('DELETE FROM student_groups WHERE student_id = ? AND subject_id = ?', [normalizedUserId, subjectId]);
+      await db.run(
+        `
+          INSERT INTO user_subject_optouts (user_id, subject_id)
+          VALUES (?, ?)
+          ON CONFLICT(user_id, subject_id) DO NOTHING
+        `,
+        [normalizedUserId, subjectId]
+      );
+      continue;
+    }
+    await db.run('DELETE FROM user_subject_optouts WHERE user_id = ? AND subject_id = ?', [normalizedUserId, subjectId]);
+    await db.run(upsertStudentGroupSql, [normalizedUserId, subjectId, choice.selectedGroup]);
+  }
+  if (hasMissingRequired) {
+    throw new Error('missing_group');
+  }
+}
+
 const statusAccessToken = String(process.env.STATUS_ACCESS_TOKEN || process.env.BOOTSTRAP_TOKEN || '').trim();
 const canAccessOperationalDetails = (req) => {
   return securityHelpers.canAccessOperationalDetails({
@@ -19043,6 +19391,448 @@ registerSystemRoutes(app, {
   appVersion,
   buildStamp,
   ensureDbReady,
+});
+
+app.get('/tg', (req, res) => {
+  if (canUseTelegramMiniSession(req)) {
+    return res.redirect('/tg/schedule');
+  }
+  return renderTelegramMiniPage(req, res, 'start', {
+    pageTitle: 'Studerria Telegram',
+    currentTgPage: '',
+  });
+});
+
+app.post('/tg/auth/init', authLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const telegramUser = await validateTelegramMiniInitData(req);
+    setTelegramMiniPending(req, telegramUser);
+    const linkedUser = await findUserByTelegramId(telegramUser.id);
+    if (!linkedUser) {
+      await saveRequestSession(req);
+      return res.json({ ok: true, status: 'link_required', redirect: '/tg/login' });
+    }
+    const isActive = linkedUser.is_active === true || Number(linkedUser.is_active) === 1;
+    if (!isActive || !isTelegramMiniStudentRole(linkedUser.role)) {
+      await saveRequestSession(req);
+      return res.status(403).json({ ok: false, error: 'student_account_required', redirect: '/tg/login' });
+    }
+    await establishTelegramMiniSession(req, linkedUser, telegramUser, '/tg/auth/init');
+    return res.json({ ok: true, status: 'authenticated', redirect: '/tg/schedule' });
+  } catch (err) {
+    const code = err && err.message ? err.message : 'telegram_auth_failed';
+    const status = code === 'missing_bot_token' ? 503 : 401;
+    return res.status(status).json({ ok: false, error: code });
+  }
+});
+
+app.get('/tg/login', (req, res) => {
+  if (canUseTelegramMiniSession(req)) {
+    return res.redirect('/tg/schedule');
+  }
+  const telegramUser = getTelegramMiniPendingUser(req);
+  return renderTelegramMiniPage(req, res, 'login', {
+    pageTitle: 'Login',
+    currentTgPage: 'login',
+    error: String(req.query.error || ''),
+    suggestedName: telegramMiniApp.buildTelegramDisplayName(telegramUser),
+  });
+});
+
+app.post('/tg/login', authLimiter, async (req, res) => {
+  const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
+  const password = String(req.body.password || '');
+  if (!fullName || !password) {
+    return res.redirect('/tg/login?error=missing');
+  }
+  try {
+    await ensureDbReady();
+    const user = await db.get(
+      `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, last_login_ip, last_user_agent, last_login_at, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
+       FROM users
+       WHERE LOWER(full_name) = LOWER(?)
+       LIMIT 1`,
+      [fullName]
+    );
+    const validHash = user && user.password_hash ? bcrypt.compareSync(password, user.password_hash) : false;
+    if (!user || !validHash) {
+      try {
+        await recordAuthFailureEvent({
+          attemptedName: fullName,
+          userId: user && user.id ? Number(user.id) : null,
+          ip: getClientIp(req),
+          userAgent: req.headers['user-agent'] || null,
+          sessionId: req.sessionID || null,
+          courseId: user && Number.isFinite(Number(user.course_id)) ? Number(user.course_id) : null,
+        });
+      } catch (failureErr) {
+        console.error('Database error (tg.login.auth_failure)', failureErr);
+      }
+      return res.redirect('/tg/login?error=invalid');
+    }
+    const isActive = user.is_active === true || Number(user.is_active) === 1;
+    if (!isActive || !isTelegramMiniStudentRole(user.role)) {
+      return res.redirect('/tg/login?error=student-only');
+    }
+    const telegramUser = getTelegramMiniPendingUser(req);
+    if (!telegramUser) {
+      return res.redirect('/tg/login?error=telegram-required');
+    }
+    const loginAt = new Date().toISOString();
+    const loginIp = normalizeForensicsIp(getClientIp(req));
+    const loginUserAgent = normalizeForensicsAgent(req.headers['user-agent'] || null);
+    await db.run(
+      'UPDATE users SET last_login_ip = ?, last_user_agent = ?, last_login_at = ? WHERE id = ?',
+      [loginIp, loginUserAgent, loginAt, user.id]
+    );
+    await db.run(
+      'INSERT INTO login_history (user_id, full_name, ip, user_agent, created_at, course_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [user.id, user.full_name, loginIp, loginUserAgent, loginAt, user.course_id || 1]
+    );
+    try {
+      await establishTelegramMiniSession(req, user, telegramUser, '/tg/login');
+    } catch (linkErr) {
+      if (linkErr && linkErr.code === 'telegram_link_occupied') {
+        return res.redirect('/tg/login?error=telegram-occupied');
+      }
+      throw linkErr;
+    }
+    return res.redirect('/tg/schedule');
+  } catch (err) {
+    console.error('Telegram mini login failed', err);
+    return res.redirect('/tg/login?error=db');
+  }
+});
+
+app.get('/tg/register', async (req, res) => {
+  if (canUseTelegramMiniSession(req)) {
+    return res.redirect('/tg/schedule');
+  }
+  try {
+    const state = await loadTelegramMiniRegisterState(req);
+    return renderTelegramMiniPage(req, res, 'register', {
+      pageTitle: 'Register',
+      currentTgPage: 'register',
+      error: String(req.query.error || ''),
+      ...state,
+      suggestedName: telegramMiniApp.buildTelegramDisplayName(getTelegramMiniPendingUser(req)),
+    });
+  } catch (err) {
+    console.error('Telegram mini register render failed', err);
+    return res.status(500).send('Database error');
+  }
+});
+
+app.post('/tg/register', registerLimiter, async (req, res) => {
+  const action = String(req.body.action || 'account').trim().toLowerCase();
+  try {
+    await ensureDbReady();
+    if (action === 'account') {
+      const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
+      const password = String(req.body.password || '');
+      const confirmPassword = String(req.body.confirm_password || '');
+      const agree = String(req.body.agree || '').trim().toLowerCase();
+      if (!fullName) return res.redirect('/tg/register?step=account&error=missing-name');
+      if (!password || password.length < PASSWORD_MIN_LENGTH) return res.redirect('/tg/register?step=account&error=short-password');
+      if (password !== confirmPassword) return res.redirect('/tg/register?step=account&error=password-mismatch');
+      if (!['on', '1', 'true'].includes(agree)) return res.redirect('/tg/register?step=account&error=consent-required');
+      const existing = await db.get('SELECT id FROM users WHERE LOWER(full_name) = LOWER(?)', [fullName]);
+      if (existing) return res.redirect('/tg/register?step=account&error=user-exists');
+      const hash = await bcrypt.hash(password, 10);
+      const preferredLang = getPreferredLang(req);
+      const row = await db.get(
+        'INSERT INTO users (full_name, role, password_hash, is_active, schedule_group, course_id, language) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+        [fullName, 'student', hash, 1, 'A', null, preferredLang]
+      );
+      if (!row || !row.id) return res.redirect('/tg/register?step=account&error=db');
+      try {
+        const signals = await recordUserRegistrationEvent({
+          userId: row.id,
+          fullName,
+          ip: getClientIp(req),
+          userAgent: req.headers['user-agent'] || null,
+          sessionId: req.sessionID || null,
+          source: 'telegram_mini_register',
+          courseId: null,
+        });
+        const signalRisk = signals && signals.security && signals.security.risk ? signals.security.risk : null;
+        const signalReasons = Array.isArray(signalRisk && signalRisk.reasons) ? signalRisk.reasons : [];
+        const securityCase = await recomputeUserSecurityCase(row.id, {
+          allowAutoQuarantine: true,
+          courseId: null,
+          extraScore: Number(signalRisk && signalRisk.score ? signalRisk.score : 0),
+          extraReasons: signalReasons,
+        });
+        const isQuarantined = securityCase
+          && securityCase.case
+          && (securityCase.case.auto_quarantined === true || Number(securityCase.case.auto_quarantined) === 1);
+        if (isQuarantined) {
+          req.session.pendingUserId = null;
+          req.session.rememberMe = false;
+          return res.redirect('/tg/login?error=quarantine-later');
+        }
+      } catch (securityErr) {
+        console.error('Database error (tg.register.security)', securityErr);
+      }
+      req.session.pendingUserId = row.id;
+      req.session.rememberMe = true;
+      logAction(db, req, 'telegram_mini_register_user', { user_id: row.id, full_name: fullName });
+      broadcast('users_updated');
+      await saveRequestSession(req);
+      return res.redirect('/tg/register?step=group');
+    }
+
+    if (action === 'group') {
+      const userId = Number(req.session.pendingUserId || 0);
+      const groupId = Number(req.body.group_id || 0);
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=account');
+      if (!Number.isInteger(groupId) || groupId < 1) return res.redirect('/tg/register?step=group&error=missing-group');
+      const groups = await loadTelegramMiniRegistrationGroups();
+      const selectedGroup = groups.find((group) => Number(group.group_id) === groupId) || null;
+      if (!selectedGroup || selectedGroup.selection_blocked) {
+        return res.redirect('/tg/register?step=group&error=invalid-group');
+      }
+      const repairedSelection = await repairRegistrationCatalogGroup(selectedGroup);
+      const repairedGroup = repairedSelection.group || null;
+      if (!repairedGroup) {
+        return res.redirect(`/tg/register?step=group&error=${encodeURIComponent(repairedSelection.error || 'repair-failed')}`);
+      }
+      await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
+        group_id: groupId,
+        user_ids: [userId],
+      });
+      await persistRegistrationAcademicGroupPlacement(userId, repairedGroup);
+      logAction(db, req, 'telegram_mini_register_group_selected', {
+        user_id: userId,
+        group_id: groupId,
+        track_key: normalizeRegistrationTrack(repairedGroup.track_key, 'bachelor'),
+      });
+      await saveRequestSession(req);
+      return res.redirect('/tg/register?step=subjects');
+    }
+
+    if (action === 'subjects') {
+      const userId = Number(req.session.pendingUserId || 0);
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=account');
+      try {
+        await saveTelegramMiniSubjectChoices(req, userId);
+      } catch (choiceErr) {
+        const code = choiceErr && choiceErr.message ? choiceErr.message : 'db';
+        return res.redirect(`/tg/register?step=subjects&error=${encodeURIComponent(code)}`);
+      }
+      const user = await db.get(
+        'SELECT id, full_name, role, schedule_group, course_id, group_id, language FROM users WHERE id = ?',
+        [userId]
+      );
+      if (!user) return res.redirect('/tg/login');
+      const telegramUser = getTelegramMiniPendingUser(req);
+      try {
+        await establishTelegramMiniSession(req, user, telegramUser, '/tg/register');
+      } catch (linkErr) {
+        if (linkErr && linkErr.code === 'telegram_link_occupied') {
+          return res.redirect('/tg/login?error=telegram-occupied');
+        }
+        throw linkErr;
+      }
+      req.session.pendingUserId = null;
+      req.session.rememberMe = true;
+      logAction(db, req, 'telegram_mini_register_subjects', { user_id: user.id });
+      broadcast('users_updated');
+      await saveRequestSession(req);
+      return res.redirect('/tg/schedule?welcome=1');
+    }
+    return res.redirect('/tg/register?error=unknown-action');
+  } catch (err) {
+    console.error('Telegram mini register failed', err);
+    return res.redirect('/tg/register?error=db');
+  }
+});
+
+app.get('/tg/schedule', requireTelegramMiniStudent, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const userId = Number(req.session.user.id || 0);
+    const selectedWeekRaw = Number(req.query.week || 0);
+    const baseState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      userId,
+      { selectedOnly: true }
+    );
+    const totalWeeks = baseState && baseState.term
+      ? Math.max(1, Number(baseState.term.weeks_count || 0) || 16)
+      : 16;
+    let selectedWeek = Number.isInteger(selectedWeekRaw) && selectedWeekRaw > 0
+      ? selectedWeekRaw
+      : getAcademicWeekForSemester(new Date(), baseState.term);
+    if (selectedWeek < 1) selectedWeek = 1;
+    if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
+    const scheduleState = await academicV2StudentHelpers.loadStudentScheduleData(
+      getAcademicV2Store(),
+      userId,
+      { weekNumber: selectedWeek }
+    );
+    const activeDays = Array.from(new Set((scheduleState.scheduleRows || []).map((row) => row.day_of_week).filter(Boolean)));
+    const orderedDays = fullWeekDays.filter((day) => activeDays.includes(day));
+    const fallbackDays = orderedDays.length ? orderedDays : [...daysOfWeek];
+    const scheduleByDay = {};
+    fallbackDays.forEach((day) => {
+      scheduleByDay[day] = [];
+    });
+    (scheduleState.scheduleRows || []).forEach((row) => {
+      const day = row.day_of_week;
+      if (!scheduleByDay[day]) scheduleByDay[day] = [];
+      const classNumber = Number(row.class_number || 0);
+      const bell = bellSchedule[classNumber] || {};
+      scheduleByDay[day].push({
+        ...row,
+        class_number: classNumber,
+        time_label: bell.start && bell.end ? `${bell.start}-${bell.end}` : '',
+        subject_name: row.subject_name || row.subject_title || row.name || 'Предмет',
+        room_label: row.room_label || row.room_name || row.room_code || '',
+        lesson_type: row.lesson_type || row.activity_type || '',
+      });
+    });
+    Object.keys(scheduleByDay).forEach((day) => {
+      scheduleByDay[day].sort((a, b) => Number(a.class_number || 0) - Number(b.class_number || 0));
+    });
+    return renderTelegramMiniPage(req, res, 'schedule', {
+      pageTitle: 'Schedule',
+      currentTgPage: 'schedule',
+      scheduleState,
+      scheduleByDay,
+      days: Object.keys(scheduleByDay),
+      currentWeek: selectedWeek,
+      totalWeeks,
+      welcome: String(req.query.welcome || '') === '1',
+    });
+  } catch (err) {
+    console.error('Telegram mini schedule failed', err);
+    return renderTelegramMiniPage(req, res.status(500), 'schedule', {
+      pageTitle: 'Schedule',
+      currentTgPage: 'schedule',
+      scheduleState: null,
+      scheduleByDay: {},
+      days: [],
+      currentWeek: 1,
+      totalWeeks: 1,
+      error: 'db',
+    });
+  }
+});
+
+app.get('/tg/subjects', requireTelegramMiniStudent, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const userId = Number(req.session.user.id || 0);
+    const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      userId,
+      { selectedOnly: false }
+    );
+    const registerSubjectCards = registerSubjectHelpers.buildRegisterSubjectCards(subjectState.subjects || []);
+    return renderTelegramMiniPage(req, res, 'subjects', {
+      pageTitle: 'Subjects',
+      currentTgPage: 'subjects',
+      subjectState,
+      registerSubjectCards,
+      error: String(req.query.error || ''),
+      success: String(req.query.ok || ''),
+    });
+  } catch (err) {
+    console.error('Telegram mini subjects failed', err);
+    return res.status(500).send('Database error');
+  }
+});
+
+app.post('/tg/subjects', requireTelegramMiniStudent, registerLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+    await saveTelegramMiniSubjectChoices(req, Number(req.session.user.id || 0));
+    logAction(db, req, 'telegram_mini_subjects_update', { user_id: req.session.user.id });
+    broadcast('users_updated');
+    return res.redirect('/tg/subjects?ok=1');
+  } catch (err) {
+    const code = err && err.message ? err.message : 'db';
+    return res.redirect(`/tg/subjects?error=${encodeURIComponent(code)}`);
+  }
+});
+
+app.get('/tg/profile', requireTelegramMiniStudent, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const user = await db.get(
+      `
+        SELECT id, full_name, course_id, language, admission_id, study_program_id, study_track, study_context_id,
+               telegram_id, telegram_username, telegram_first_name, telegram_last_name, telegram_photo_url,
+               telegram_linked_at, telegram_last_seen_at
+        FROM users
+        WHERE id = ?
+      `,
+      [req.session.user.id]
+    );
+    const placement = user ? await resolveUserAcademicPlacement(user, { lang: getPreferredLang(req) }) : null;
+    return renderTelegramMiniPage(req, res, 'profile', {
+      pageTitle: 'Profile',
+      currentTgPage: 'profile',
+      user,
+      placement,
+      error: String(req.query.error || ''),
+      success: String(req.query.ok || ''),
+    });
+  } catch (err) {
+    console.error('Telegram mini profile failed', err);
+    return res.status(500).send('Database error');
+  }
+});
+
+app.post('/tg/profile', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
+  const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
+  const password = String(req.body.password || '');
+  const confirmPassword = String(req.body.confirm_password || '');
+  const language = String(req.body.language || '').trim();
+  if (!fullName) return res.redirect('/tg/profile?error=missing-name');
+  if ((password || confirmPassword) && password !== confirmPassword) return res.redirect('/tg/profile?error=password-mismatch');
+  if (password && password.length < PASSWORD_MIN_LENGTH) return res.redirect('/tg/profile?error=short-password');
+  try {
+    const updates = ['full_name = ?'];
+    const params = [fullName];
+    if (password) {
+      updates.push('password_hash = ?');
+      params.push(bcrypt.hashSync(password, 10));
+    }
+    if (['uk', 'en'].includes(language)) {
+      updates.push('language = ?');
+      params.push(language);
+    }
+    params.push(req.session.user.id);
+    await db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+    req.session.user.username = fullName;
+    if (['uk', 'en'].includes(language)) {
+      req.session.user.language = language;
+      req.session.lang = language;
+    }
+    logAction(db, req, 'telegram_mini_profile_update', { user_id: req.session.user.id });
+    broadcast('users_updated');
+    await saveRequestSession(req);
+    return res.redirect('/tg/profile?ok=1');
+  } catch (err) {
+    return res.redirect('/tg/profile?error=name-exists');
+  }
+});
+
+app.post('/tg/profile/reset-subjects', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
+  try {
+    const userId = Number(req.session.user.id || 0);
+    await db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
+    await db.run('DELETE FROM user_subject_optouts WHERE user_id = ?', [userId]);
+    logAction(db, req, 'telegram_mini_reset_subjects', { user_id: userId });
+    broadcast('users_updated');
+    return res.redirect('/tg/subjects');
+  } catch (err) {
+    console.error('Telegram mini reset subjects failed', err);
+    return res.redirect('/tg/profile?error=db');
+  }
 });
 
 app.post('/login', authLimiter, async (req, res) => {
