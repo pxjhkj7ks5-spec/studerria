@@ -3,6 +3,7 @@ const test = require('node:test');
 
 const {
   buildDataCheckString,
+  buildTelegramDisplayName,
   signTelegramInitDataForTest,
   validateTelegramInitData,
 } = require('../lib/telegramMiniApp');
@@ -10,6 +11,11 @@ const {
 test('buildDataCheckString sorts init data and ignores hash', () => {
   const actual = buildDataCheckString('b=2&hash=skip&a=1');
   assert.equal(actual, 'a=1\nb=2');
+});
+
+test('buildTelegramDisplayName tolerates missing Telegram user', () => {
+  assert.equal(buildTelegramDisplayName(null), '');
+  assert.equal(buildTelegramDisplayName({ username: 'ada' }), '@ada');
 });
 
 test('validateTelegramInitData accepts signed init data', () => {
