@@ -20100,6 +20100,22 @@ async function getStuderriaTelegramActorContext(telegramUser = {}, options = {})
   };
 }
 
+function isStuderriaTelegramPrivateChat(chat = {}) {
+  return String(chat && chat.type || '').toLowerCase() === 'private';
+}
+
+async function canUseStuderriaTelegramGroupCommand(telegramUser = {}) {
+  if (isStuderriaTelegramDevUser(telegramUser)) {
+    return true;
+  }
+  const actor = await findStuderriaTelegramUserByActor(telegramUser).catch(() => null);
+  if (!actor) {
+    return false;
+  }
+  const roleKeys = await getStuderriaTelegramUserRoleKeys(actor.id, actor.role).catch(() => []);
+  return roleKeys.includes('starosta');
+}
+
 async function resolveStuderriaTelegramRoleTarget(rawTarget = '') {
   const target = String(rawTarget || '').trim();
   if (!target) return null;
@@ -20658,6 +20674,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
   if (message && message.chat) {
     const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
     if (!parsedCommand) return;
+    if (!isStuderriaTelegramPrivateChat(message.chat)) {
+      const canUseGroupCommand = await canUseStuderriaTelegramGroupCommand(message.from || {});
+      if (!canUseGroupCommand) return;
+    }
     if (parsedCommand.command === 'start') {
       await sendStuderriaTelegramWelcome(message.chat, message);
     } else if (parsedCommand.command === 'giverole') {
