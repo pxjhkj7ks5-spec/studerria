@@ -19695,6 +19695,223 @@ async function loadTelegramMiniAdminStats(scopeState = {}) {
   };
 }
 
+function normalizeTelegramUrl(rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+  try {
+    const parsed = new URL(value);
+    if (!['https:', 'http:'].includes(parsed.protocol)) return '';
+    return parsed.toString();
+  } catch (_err) {
+    return '';
+  }
+}
+
+function getStuderriaTelegramMiniAppWebUrl() {
+  const explicit = normalizeTelegramUrl(process.env.STUDERRIA_TG_MINI_APP_URL);
+  if (explicit) return explicit;
+  const publicBase = normalizeTelegramUrl(process.env.STUDERRIA_PUBLIC_URL || process.env.PUBLIC_URL || '');
+  if (!publicBase) return '';
+  try {
+    return new URL('/studerria-tg', publicBase).toString();
+  } catch (_err) {
+    return '';
+  }
+}
+
+function getStuderriaTelegramMiniAppDeepLink() {
+  const explicit = normalizeTelegramUrl(process.env.STUDERRIA_TG_MINI_APP_DEEP_LINK);
+  if (explicit) return explicit;
+  const botUsername = String(process.env.STUDERRIA_TG_BOT_USERNAME || '').trim().replace(/^@/, '');
+  const appShortName = String(process.env.STUDERRIA_TG_APP_SHORT_NAME || '').trim().replace(/^\//, '');
+  if (botUsername && appShortName) {
+    return `https://t.me/${encodeURIComponent(botUsername)}/${encodeURIComponent(appShortName)}`;
+  }
+  return '';
+}
+
+function buildStuderriaTelegramWelcomeKeyboard(chatType = '') {
+  const webUrl = getStuderriaTelegramMiniAppWebUrl();
+  const deepLink = getStuderriaTelegramMiniAppDeepLink();
+  const button = {
+    text: 'Відкрити Studerria',
+    url: deepLink || webUrl,
+  };
+  if (
+    String(chatType || '').toLowerCase() === 'private'
+    && webUrl.startsWith('https://')
+    && String(process.env.STUDERRIA_TG_USE_WEB_APP_BUTTON || 'true').trim().toLowerCase() !== 'false'
+  ) {
+    delete button.url;
+    button.web_app = { url: webUrl };
+  }
+  if (!button.url && !button.web_app) {
+    return null;
+  }
+  return { inline_keyboard: [[button]] };
+}
+
+const studerriaTelegramBotState = {
+  enabled: false,
+  running: false,
+  offset: 0,
+  botId: null,
+  botUsername: '',
+};
+
+async function callStuderriaTelegramBotApi(method, payload = {}) {
+  const token = getTelegramMiniBotToken();
+  if (!token) throw new Error('missing_bot_token');
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data || data.ok !== true) {
+    const description = data && data.description ? String(data.description) : `telegram_${method}_failed`;
+    const err = new Error(description);
+    err.telegramResponse = data;
+    throw err;
+  }
+  return data.result;
+}
+
+function isStuderriaTelegramHelloCommand(message, botUsername = '') {
+  const text = String(message && message.text ? message.text : '').trim();
+  if (!text) return false;
+  const [commandRaw] = text.split(/\s+/, 1);
+  const command = String(commandRaw || '').trim().toLowerCase();
+  const username = String(botUsername || '').trim().toLowerCase();
+  return command === '/hello'
+    || command === '/start'
+    || (username && (command === `/hello@${username}` || command === `/start@${username}`));
+}
+
+function didStuderriaTelegramBotJoin(message, botId) {
+  const safeBotId = Number(botId || 0);
+  if (!Number.isInteger(safeBotId) || safeBotId < 1) return false;
+  const members = Array.isArray(message && message.new_chat_members) ? message.new_chat_members : [];
+  return members.some((member) => Number(member && member.id || 0) === safeBotId);
+}
+
+function shouldWelcomeStuderriaTelegramBotChatMember(update, botId) {
+  const safeBotId = Number(botId || 0);
+  if (!Number.isInteger(safeBotId) || safeBotId < 1) return false;
+  const memberUpdate = update && update.my_chat_member ? update.my_chat_member : null;
+  if (!memberUpdate || !memberUpdate.new_chat_member || !memberUpdate.old_chat_member) return false;
+  const targetUserId = Number(memberUpdate.new_chat_member.user && memberUpdate.new_chat_member.user.id || 0);
+  if (targetUserId !== safeBotId) return false;
+  const oldStatus = String(memberUpdate.old_chat_member.status || '').toLowerCase();
+  const newStatus = String(memberUpdate.new_chat_member.status || '').toLowerCase();
+  return ['left', 'kicked'].includes(oldStatus) && ['member', 'administrator'].includes(newStatus);
+}
+
+async function sendStuderriaTelegramWelcome(chat = {}) {
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const replyMarkup = buildStuderriaTelegramWelcomeKeyboard(chat.type || '');
+  const text = [
+    'Привіт! Це Studerria.',
+    'Тут можна швидко відкрити розклад і вибір груп.',
+    '',
+    'Натисни кнопку нижче.',
+  ].join('\n');
+  const payload = {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+  };
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
+  }
+  await callStuderriaTelegramBotApi('sendMessage', payload);
+}
+
+async function handleStuderriaTelegramBotUpdate(update) {
+  const message = update && update.message ? update.message : null;
+  if (message && message.chat) {
+    if (
+      isStuderriaTelegramHelloCommand(message, studerriaTelegramBotState.botUsername)
+      || didStuderriaTelegramBotJoin(message, studerriaTelegramBotState.botId)
+    ) {
+      await sendStuderriaTelegramWelcome(message.chat);
+      return;
+    }
+  }
+  if (shouldWelcomeStuderriaTelegramBotChatMember(update, studerriaTelegramBotState.botId)) {
+    await sendStuderriaTelegramWelcome(update.my_chat_member.chat);
+  }
+}
+
+async function startStuderriaTelegramBotPolling() {
+  const token = getTelegramMiniBotToken();
+  const enabledRaw = String(process.env.STUDERRIA_TG_BOT_POLLING_ENABLED || 'true').trim().toLowerCase();
+  if (!token || ['0', 'false', 'off', 'no'].includes(enabledRaw)) {
+    return;
+  }
+  if (studerriaTelegramBotState.running) {
+    return;
+  }
+  studerriaTelegramBotState.enabled = true;
+  studerriaTelegramBotState.running = true;
+  const allowedUpdates = ['message', 'my_chat_member'];
+  try {
+    const me = await callStuderriaTelegramBotApi('getMe');
+    studerriaTelegramBotState.botId = Number(me && me.id || 0) || null;
+    studerriaTelegramBotState.botUsername = String(
+      process.env.STUDERRIA_TG_BOT_USERNAME
+      || (me && me.username)
+      || ''
+    ).replace(/^@/, '');
+    if (String(process.env.STUDERRIA_TG_BOT_DROP_PENDING_UPDATES || 'true').trim().toLowerCase() !== 'false') {
+      const pending = await callStuderriaTelegramBotApi('getUpdates', {
+        timeout: 0,
+        allowed_updates: allowedUpdates,
+      });
+      const lastPending = Array.isArray(pending) && pending.length ? pending[pending.length - 1] : null;
+      if (lastPending && Number.isInteger(Number(lastPending.update_id))) {
+        studerriaTelegramBotState.offset = Number(lastPending.update_id) + 1;
+      }
+    }
+    console.log('Studerria Telegram bot polling started', {
+      username: studerriaTelegramBotState.botUsername || null,
+      has_deep_link: Boolean(getStuderriaTelegramMiniAppDeepLink()),
+      has_web_url: Boolean(getStuderriaTelegramMiniAppWebUrl()),
+    });
+  } catch (err) {
+    studerriaTelegramBotState.running = false;
+    console.error('Studerria Telegram bot polling disabled', err && err.message ? err.message : err);
+    return;
+  }
+  const poll = async () => {
+    if (!studerriaTelegramBotState.running) return;
+    try {
+      const updates = await callStuderriaTelegramBotApi('getUpdates', {
+        timeout: 25,
+        offset: studerriaTelegramBotState.offset || undefined,
+        allowed_updates: allowedUpdates,
+      });
+      for (const update of Array.isArray(updates) ? updates : []) {
+        const updateId = Number(update && update.update_id || 0);
+        if (Number.isInteger(updateId) && updateId >= 0) {
+          studerriaTelegramBotState.offset = Math.max(studerriaTelegramBotState.offset || 0, updateId + 1);
+        }
+        try {
+          await handleStuderriaTelegramBotUpdate(update);
+        } catch (handleErr) {
+          console.error('Studerria Telegram bot update failed', handleErr && handleErr.message ? handleErr.message : handleErr);
+        }
+      }
+      setTimeout(poll, 250);
+    } catch (err) {
+      console.error('Studerria Telegram bot polling error', err && err.message ? err.message : err);
+      setTimeout(poll, 5000);
+    }
+  };
+  poll();
+}
+
 const statusAccessToken = String(process.env.STATUS_ACCESS_TOKEN || process.env.BOOTSTRAP_TOKEN || '').trim();
 const canAccessOperationalDetails = (req) => {
   return securityHelpers.canAccessOperationalDetails({
@@ -65191,6 +65408,9 @@ const startServer = async () => {
     console.log(`Listening on ${PORT}`);
     startSessionHealthProbes();
     startScheduler();
+    startStuderriaTelegramBotPolling().catch((err) => {
+      console.error('Studerria Telegram bot polling startup failed', err && err.message ? err.message : err);
+    });
   });
 };
 
