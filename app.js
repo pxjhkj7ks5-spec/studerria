@@ -19758,24 +19758,6 @@ function buildStuderriaTelegramWelcomeKeyboard(chatType = '') {
   return { inline_keyboard: [[button]] };
 }
 
-function buildStuderriaTelegramPersistentKeyboard(chatType = '') {
-  const webUrl = getStuderriaTelegramMiniAppWebUrl();
-  const isPrivateChat = String(chatType || '').toLowerCase() === 'private';
-  const canUseWebAppButton = webUrl.startsWith('https://')
-    && String(process.env.STUDERRIA_TG_USE_WEB_APP_BUTTON || 'true').trim().toLowerCase() !== 'false';
-  if (!isPrivateChat || !canUseWebAppButton) return null;
-  return {
-    keyboard: [[{
-      text: 'відкрити',
-      web_app: { url: webUrl },
-    }]],
-    resize_keyboard: true,
-    is_persistent: true,
-    one_time_keyboard: false,
-    input_field_placeholder: 'Відкрий Studerria',
-  };
-}
-
 const studerriaTelegramBotState = {
   enabled: false,
   running: false,
@@ -19870,14 +19852,6 @@ async function sendStuderriaTelegramWelcome(chat = {}) {
     payload.reply_markup = replyMarkup;
   }
   await callStuderriaTelegramBotApi('sendMessage', payload);
-  const persistentKeyboard = buildStuderriaTelegramPersistentKeyboard(chat.type || '');
-  if (persistentKeyboard) {
-    await callStuderriaTelegramBotApi('sendMessage', {
-      chat_id: chatId,
-      text: 'А ще можна відкривати Studerria кнопкою біля поля вводу.',
-      reply_markup: persistentKeyboard,
-    });
-  }
 }
 
 async function handleStuderriaTelegramBotUpdate(update) {
