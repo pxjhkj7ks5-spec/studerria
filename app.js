@@ -19153,7 +19153,9 @@ async function findUserByTelegramId(telegramId) {
   const normalizedId = normalizeTelegramId(telegramId);
   if (!normalizedId) return null;
   return db.get(
-    `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language, telegram_id, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
+    `SELECT id, full_name, role, password_hash, schedule_group, course_id, group_id, language,
+            admission_id, study_context_id, study_program_id, study_track, telegram_id,
+            ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
      FROM users
      WHERE telegram_id = ?
      LIMIT 1`,
@@ -19304,6 +19306,82 @@ async function establishTelegramMiniSession(req, user, telegramUser = null, last
   await saveRequestSession(req);
 }
 
+async function autoAssignTelegramMiniRequiredSubjects(userId, subjectState) {
+  const normalizedUserId = Number(userId || 0);
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) return false;
+  const requiredAuto = (subjectState && Array.isArray(subjectState.subjects) ? subjectState.subjects : [])
+    .filter((subject) =>
+      subject
+      && (subject.is_required === true || subject.is_required === 1 || subject.is_required === '1')
+      && Number(subject.group_count) === 1
+    );
+  if (!requiredAuto.length) return false;
+  await Promise.all(requiredAuto.map((subject) => db.run(
+    `
+      INSERT INTO student_groups (student_id, subject_id, group_number)
+      VALUES (?, ?, 1)
+      ON CONFLICT(student_id, subject_id) DO NOTHING
+    `,
+    [normalizedUserId, subject.id || subject.subject_id]
+  )));
+  return true;
+}
+
+async function loadTelegramMiniSetupState(userOrId, options = {}) {
+  const userRow = userOrId && typeof userOrId === 'object'
+    ? userOrId
+    : await db.get(
+      `
+        SELECT id, full_name, role, schedule_group, course_id, group_id, language,
+               admission_id, study_context_id, study_program_id, study_track, telegram_id,
+               ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [Number(userOrId || 0)]
+    );
+  if (!userRow || !userRow.id) {
+    return { status: 'missing_user', nextStep: 'course', user: null, subjectState: null, registerSubjectCards: [] };
+  }
+  if (!Number(userRow.group_id || 0)) {
+    return { status: 'missing_course', nextStep: 'course', user: userRow, subjectState: null, registerSubjectCards: [] };
+  }
+
+  let subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+    getAcademicV2Store(),
+    userRow,
+    { selectedOnly: false }
+  );
+  if (!subjectState.scope || String(subjectState.scope.resolved_via || '') !== 'group_id') {
+    return { status: 'missing_course', nextStep: 'course', user: userRow, subjectState, registerSubjectCards: [] };
+  }
+
+  if (options.autoAssignRequired === true) {
+    const assigned = await autoAssignTelegramMiniRequiredSubjects(userRow.id, subjectState);
+    if (assigned) {
+      subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+        getAcademicV2Store(),
+        userRow,
+        { selectedOnly: false }
+      );
+    }
+  }
+
+  const registerSubjectCards = registerSubjectHelpers.buildRegisterSubjectCards(subjectState.subjects || []);
+  const hasPendingChoices = registerSubjectCards.some((subject) => subject && subject.pending);
+  if (!subjectState.term) {
+    return { status: 'missing_term', nextStep: 'subjects', user: userRow, subjectState, registerSubjectCards };
+  }
+  if (!registerSubjectCards.length) {
+    return { status: 'missing_subjects', nextStep: 'subjects', user: userRow, subjectState, registerSubjectCards };
+  }
+  if (hasPendingChoices) {
+    return { status: 'missing_subject_choices', nextStep: 'subjects', user: userRow, subjectState, registerSubjectCards };
+  }
+  return { status: 'complete', nextStep: 'complete', user: userRow, subjectState, registerSubjectCards };
+}
+
 async function loadTelegramMiniRegistrationGroups() {
   const catalogGroups = await academicV2Helpers.listRegistrationCatalogGroups(getAcademicV2Store());
   return (Array.isArray(catalogGroups) ? catalogGroups : [])
@@ -19375,14 +19453,7 @@ async function loadTelegramMiniRegisterState(req) {
     const requiredAuto = (subjectState.subjects || [])
       .filter((subject) => isRequired(subject) && Number(subject.group_count) === 1);
     if (requiredAuto.length) {
-      await Promise.all(requiredAuto.map((subject) => db.run(
-        `
-          INSERT INTO student_groups (student_id, subject_id, group_number)
-          VALUES (?, ?, 1)
-          ON CONFLICT(student_id, subject_id) DO NOTHING
-        `,
-        [pendingUser.id, subject.id || subject.subject_id]
-      )));
+      await autoAssignTelegramMiniRequiredSubjects(pendingUser.id, subjectState);
       subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
         getAcademicV2Store(),
         pendingUser,
@@ -19529,6 +19600,18 @@ app.post('/studerria-tg/auth/init', authLimiter, async (req, res) => {
       await saveRequestSession(req);
       return res.status(403).json({ ok: false, error: 'student_account_required', redirect: '/studerria-tg/register' });
     }
+    const setupState = await loadTelegramMiniSetupState(linkedUser, { autoAssignRequired: true });
+    if (setupState.nextStep !== 'complete') {
+      req.session.pendingUserId = linkedUser.id;
+      req.session.rememberMe = true;
+      await saveRequestSession(req);
+      return res.json({
+        ok: true,
+        status: 'link_required',
+        setup_status: setupState.status,
+        redirect: `/studerria-tg/register?step=${setupState.nextStep}`,
+      });
+    }
     await establishTelegramMiniSession(req, linkedUser, telegramUser, '/studerria-tg/auth/init');
     return res.json({ ok: true, status: 'authenticated', redirect: '/studerria-tg/schedule' });
   } catch (err) {
@@ -19550,10 +19633,15 @@ app.post('/studerria-tg/login', authLimiter, async (req, res) => {
 });
 
 app.get('/studerria-tg/register', async (req, res) => {
-  if (canUseTelegramMiniSession(req)) {
-    return res.redirect('/studerria-tg/schedule');
-  }
   try {
+    if (canUseTelegramMiniSession(req)) {
+      const setupState = await loadTelegramMiniSetupState(Number(req.session.user.id || 0), { autoAssignRequired: true });
+      if (setupState.nextStep === 'complete') {
+        return res.redirect('/studerria-tg/schedule');
+      }
+      req.session.pendingUserId = Number(req.session.user.id || 0);
+      await saveRequestSession(req);
+    }
     const state = await loadTelegramMiniRegisterState(req);
     return renderTelegramMiniPage(req, res, 'register', {
       pageTitle: 'Register',
@@ -19669,6 +19757,12 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
   try {
     await ensureDbReady();
     const userId = Number(req.session.user.id || 0);
+    const setupState = await loadTelegramMiniSetupState(userId, { autoAssignRequired: true });
+    if (setupState.nextStep !== 'complete') {
+      req.session.pendingUserId = userId;
+      await saveRequestSession(req);
+      return res.redirect(`/studerria-tg/register?step=${setupState.nextStep}`);
+    }
     const selectedWeekRaw = Number(req.query.week || 0);
     const baseState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
       getAcademicV2Store(),

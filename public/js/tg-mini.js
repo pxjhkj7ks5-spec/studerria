@@ -47,7 +47,9 @@
         return;
       }
       if (data.status === 'link_required') {
-        if (currentPath === '/studerria-tg' || currentPath === '/studerria-tg/login') {
+        const redirectUrl = new URL(data.redirect, window.location.origin);
+        const currentSearch = window.location.search || '';
+        if (currentPath !== redirectUrl.pathname || currentSearch !== redirectUrl.search) {
           window.location.replace(data.redirect);
           return;
         }
