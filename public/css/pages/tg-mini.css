@@ -12,6 +12,8 @@
 }
 
 html.is-tg-dark {
+  --tg-theme-bg: #0b1220;
+  --tg-theme-text: #f8fafc;
   --tg-card: rgba(18, 27, 38, 0.82);
   --tg-border: rgba(255, 255, 255, 0.11);
   --tg-muted: rgba(229, 235, 244, 0.68);
@@ -283,6 +285,13 @@ html.is-tg-dark .tg-lesson {
   transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
 }
 
+.tg-course-choice {
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  padding: 13px;
+}
+
 .tg-choice:has(input:checked) {
   border-color: color-mix(in srgb, var(--tg-theme-accent) 70%, transparent);
   background: color-mix(in srgb, var(--tg-theme-accent) 10%, white);
@@ -295,11 +304,14 @@ html.is-tg-dark .tg-choice:has(input:checked) {
 .tg-choice input[type="radio"] {
   appearance: none;
   width: 20px;
+  min-height: 20px;
   height: 20px;
-  margin: 0;
+  margin: 2px 0 0;
+  padding: 0;
   border: 2px solid rgba(17, 24, 39, 0.34);
   border-radius: 999px;
   background: #fff;
+  flex: 0 0 auto;
 }
 
 html.is-tg-dark .tg-choice input[type="radio"] {
@@ -316,6 +328,31 @@ html.is-tg-dark .tg-choice input[type="radio"] {
   display: block;
   line-height: 1.18;
   font-size: 0.98rem;
+}
+
+.tg-course-title {
+  color: var(--tg-theme-text);
+  overflow-wrap: anywhere;
+}
+
+.tg-course-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 5px;
+}
+
+.tg-course-meta span {
+  display: inline-grid;
+  min-height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 8px;
+  background: rgba(17, 24, 39, 0.07);
+}
+
+html.is-tg-dark .tg-course-meta span {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .tg-choice small,
@@ -467,6 +504,11 @@ html.is-tg-dark .tg-bottom-nav {
   .tg-choice {
     grid-template-columns: 24px 1fr;
     padding: 11px;
+  }
+
+  .tg-course-choice {
+    grid-template-columns: 22px minmax(0, 1fr);
+    padding: 12px;
   }
 
   .tg-choice strong {

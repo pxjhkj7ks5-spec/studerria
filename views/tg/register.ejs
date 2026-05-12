@@ -42,11 +42,19 @@
       <input type="hidden" name="action" value="course" />
       <div class="tg-choice-list">
         <% (courseOptions || groups || []).forEach(function(group) { %>
-          <label class="tg-choice <%= group.selection_blocked ? 'is-disabled' : '' %>">
+          <%
+            const courseMeta = group.course_meta || (group.track_key + ' · ' + group.campus_key + ' · ' + group.visible_subject_count + ' предметів');
+            const courseMetaParts = String(courseMeta || '').split(' · ').map(function(part) { return part.trim(); }).filter(Boolean);
+          %>
+          <label class="tg-choice tg-course-choice <%= group.selection_blocked ? 'is-disabled' : '' %>">
             <input type="radio" name="group_id" value="<%= group.group_id %>" <%= group.selection_blocked ? 'disabled' : '' %> required />
             <span>
-              <strong><%= group.course_label || group.label || ('Course ' + group.group_id) %></strong>
-              <small><%= group.course_meta || (group.track_key + ' · ' + group.campus_key + ' · ' + group.visible_subject_count + ' предметів') %></small>
+              <strong class="tg-course-title"><%= group.course_label || group.label || ('Course ' + group.group_id) %></strong>
+              <small class="tg-course-meta">
+                <% courseMetaParts.forEach(function(part) { %>
+                  <span><%= part %></span>
+                <% }); %>
+              </small>
             </span>
           </label>
         <% }); %>
