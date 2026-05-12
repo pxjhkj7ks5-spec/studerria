@@ -19827,33 +19827,19 @@ async function callStuderriaTelegramBotApi(method, payload = {}) {
   return data.result;
 }
 
-function isStuderriaTelegramHelloCommand(message, botUsername = '') {
+function isStuderriaTelegramStartCommand(message, botUsername = '') {
   const text = String(message && message.text ? message.text : '').trim();
   if (!text) return false;
   const [commandRaw] = text.split(/\s+/, 1);
   const command = String(commandRaw || '').trim().toLowerCase();
   const username = String(botUsername || '').trim().toLowerCase();
-  return command === '/hello'
-    || command === '/start'
-    || (username && (command === `/hello@${username}` || command === `/start@${username}`));
+  return command === '/start'
+    || (username && command === `/start@${username}`);
 }
 
 function getStuderriaTelegramMessageThreadId(message = {}) {
   const threadId = Number(message && message.message_thread_id || 0);
   return Number.isInteger(threadId) && threadId > 0 ? threadId : null;
-}
-
-async function removeStuderriaTelegramReplyKeyboard(chatId, messageThreadId = null) {
-  const payload = {
-    chat_id: chatId,
-    text: 'Ок, нижню кнопку прибрав.',
-    reply_markup: { remove_keyboard: true },
-    disable_notification: true,
-  };
-  if (messageThreadId) {
-    payload.message_thread_id = messageThreadId;
-  }
-  await callStuderriaTelegramBotApi('sendMessage', payload);
 }
 
 async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
@@ -19889,7 +19875,7 @@ async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
     '',
     String(chat.type || '').toLowerCase() === 'private'
       ? 'Натисни кнопку нижче.'
-      : `Щоб відкрити mini app без браузера, зайди в особистий чат з ботом @${botUsername} і напиши /hello.`,
+      : `Щоб відкрити mini app без браузера, зайди в особистий чат з ботом @${botUsername} і напиши /start.`,
   ].join('\n');
   const payload = {
     chat_id: chatId,
@@ -19902,16 +19888,13 @@ async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
   if (replyMarkup) {
     payload.reply_markup = replyMarkup;
   }
-  await removeStuderriaTelegramReplyKeyboard(chatId, messageThreadId).catch((err) => {
-    console.error('Studerria Telegram reply keyboard cleanup failed', err && err.message ? err.message : err);
-  });
   await callStuderriaTelegramBotApi('sendMessage', payload);
 }
 
 async function handleStuderriaTelegramBotUpdate(update) {
   const message = update && update.message ? update.message : null;
   if (message && message.chat) {
-    if (isStuderriaTelegramHelloCommand(message, studerriaTelegramBotState.botUsername)) {
+    if (isStuderriaTelegramStartCommand(message, studerriaTelegramBotState.botUsername)) {
       await sendStuderriaTelegramWelcome(message.chat, message);
     }
   }
