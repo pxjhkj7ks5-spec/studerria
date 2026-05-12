@@ -2818,7 +2818,7 @@ app.use(async (req, res, next) => {
     '/register/course',
     '/register/teacher-subjects',
     '/register/subjects',
-    '/tg',
+    '/studerria-tg',
   ];
   if (allowedPrefixes.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`))) {
     return next();
@@ -19112,7 +19112,7 @@ function renderTelegramMiniPage(req, res, viewName, locals = {}) {
 
 function requireTelegramMiniStudent(req, res, next) {
   if (!req.session || !req.session.user) {
-    return res.redirect('/tg/register');
+    return res.redirect('/studerria-tg/register');
   }
   if (!canUseTelegramMiniSession(req)) {
     return renderTelegramMiniPage(req, res.status(403), 'denied', {
@@ -19279,7 +19279,7 @@ async function linkTelegramMiniUser(req, userId, telegramUser) {
   return true;
 }
 
-async function establishTelegramMiniSession(req, user, telegramUser = null, lastSeenRoute = '/tg/auth/init') {
+async function establishTelegramMiniSession(req, user, telegramUser = null, lastSeenRoute = '/studerria-tg/auth/init') {
   await establishAuthenticatedSession(req, {
     user: {
       id: user.id,
@@ -19476,9 +19476,9 @@ registerSystemRoutes(app, {
   ensureDbReady,
 });
 
-app.get('/tg', (req, res) => {
+app.get('/studerria-tg', (req, res) => {
   if (canUseTelegramMiniSession(req)) {
-    return res.redirect('/tg/schedule');
+    return res.redirect('/studerria-tg/schedule');
   }
   return renderTelegramMiniPage(req, res, 'start', {
     pageTitle: 'Studerria Telegram',
@@ -19486,7 +19486,7 @@ app.get('/tg', (req, res) => {
   });
 });
 
-app.post('/tg/auth/init', authLimiter, async (req, res) => {
+app.post('/studerria-tg/auth/init', authLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     const telegramUser = await validateTelegramMiniInitData(req);
@@ -19494,15 +19494,15 @@ app.post('/tg/auth/init', authLimiter, async (req, res) => {
     const linkedUser = await findUserByTelegramId(telegramUser.id);
     if (!linkedUser) {
       await saveRequestSession(req);
-      return res.json({ ok: true, status: 'link_required', redirect: '/tg/register' });
+      return res.json({ ok: true, status: 'link_required', redirect: '/studerria-tg/register' });
     }
     const isActive = linkedUser.is_active === true || Number(linkedUser.is_active) === 1;
     if (!isActive || !isTelegramMiniStudentRole(linkedUser.role)) {
       await saveRequestSession(req);
-      return res.status(403).json({ ok: false, error: 'student_account_required', redirect: '/tg/register' });
+      return res.status(403).json({ ok: false, error: 'student_account_required', redirect: '/studerria-tg/register' });
     }
-    await establishTelegramMiniSession(req, linkedUser, telegramUser, '/tg/auth/init');
-    return res.json({ ok: true, status: 'authenticated', redirect: '/tg/schedule' });
+    await establishTelegramMiniSession(req, linkedUser, telegramUser, '/studerria-tg/auth/init');
+    return res.json({ ok: true, status: 'authenticated', redirect: '/studerria-tg/schedule' });
   } catch (err) {
     const code = err && err.message ? err.message : 'telegram_auth_failed';
     const status = code === 'missing_bot_token' ? 503 : 401;
@@ -19510,20 +19510,20 @@ app.post('/tg/auth/init', authLimiter, async (req, res) => {
   }
 });
 
-app.get('/tg/login', (req, res) => {
+app.get('/studerria-tg/login', (req, res) => {
   if (canUseTelegramMiniSession(req)) {
-    return res.redirect('/tg/schedule');
+    return res.redirect('/studerria-tg/schedule');
   }
-  return res.redirect('/tg/register');
+  return res.redirect('/studerria-tg/register');
 });
 
-app.post('/tg/login', authLimiter, async (req, res) => {
-  return res.redirect('/tg/register');
+app.post('/studerria-tg/login', authLimiter, async (req, res) => {
+  return res.redirect('/studerria-tg/register');
 });
 
-app.get('/tg/register', async (req, res) => {
+app.get('/studerria-tg/register', async (req, res) => {
   if (canUseTelegramMiniSession(req)) {
-    return res.redirect('/tg/schedule');
+    return res.redirect('/studerria-tg/schedule');
   }
   try {
     const state = await loadTelegramMiniRegisterState(req);
@@ -19540,14 +19540,14 @@ app.get('/tg/register', async (req, res) => {
   }
 });
 
-app.post('/tg/register', registerLimiter, async (req, res) => {
+app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
   const action = String(req.body.action || 'group').trim().toLowerCase();
   try {
     await ensureDbReady();
     if (action === 'group') {
       const telegramUser = getTelegramMiniPendingUser(req);
       if (!telegramUser) {
-        return res.redirect('/tg/register?step=group&error=telegram-required');
+        return res.redirect('/studerria-tg/register?step=group&error=telegram-required');
       }
       let userId = Number(req.session.pendingUserId || 0);
       const pendingUser = Number.isInteger(userId) && userId > 0
@@ -19568,20 +19568,20 @@ app.post('/tg/register', registerLimiter, async (req, res) => {
       }
       const isActive = user && (user.is_active === true || Number(user.is_active) === 1);
       if (!isActive || !isTelegramMiniStudentRole(user.role)) {
-        return res.redirect('/tg/register?step=group&error=student-only');
+        return res.redirect('/studerria-tg/register?step=group&error=student-only');
       }
       const groupId = Number(req.body.group_id || 0);
-      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=group&error=db');
-      if (!Number.isInteger(groupId) || groupId < 1) return res.redirect('/tg/register?step=group&error=missing-group');
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/studerria-tg/register?step=group&error=db');
+      if (!Number.isInteger(groupId) || groupId < 1) return res.redirect('/studerria-tg/register?step=group&error=missing-group');
       const groups = await loadTelegramMiniRegistrationGroups();
       const selectedGroup = groups.find((group) => Number(group.group_id) === groupId) || null;
       if (!selectedGroup || selectedGroup.selection_blocked) {
-        return res.redirect('/tg/register?step=group&error=invalid-group');
+        return res.redirect('/studerria-tg/register?step=group&error=invalid-group');
       }
       const repairedSelection = await repairRegistrationCatalogGroup(selectedGroup);
       const repairedGroup = repairedSelection.group || null;
       if (!repairedGroup) {
-        return res.redirect(`/tg/register?step=group&error=${encodeURIComponent(repairedSelection.error || 'repair-failed')}`);
+        return res.redirect(`/studerria-tg/register?step=group&error=${encodeURIComponent(repairedSelection.error || 'repair-failed')}`);
       }
       await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
         group_id: groupId,
@@ -19596,29 +19596,29 @@ app.post('/tg/register', registerLimiter, async (req, res) => {
       req.session.pendingUserId = userId;
       req.session.rememberMe = true;
       await saveRequestSession(req);
-      return res.redirect('/tg/register?step=subjects');
+      return res.redirect('/studerria-tg/register?step=subjects');
     }
 
     if (action === 'subjects') {
       const userId = Number(req.session.pendingUserId || 0);
-      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/tg/register?step=group');
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/studerria-tg/register?step=group');
       try {
         await saveTelegramMiniSubjectChoices(req, userId);
       } catch (choiceErr) {
         const code = choiceErr && choiceErr.message ? choiceErr.message : 'db';
-        return res.redirect(`/tg/register?step=subjects&error=${encodeURIComponent(code)}`);
+        return res.redirect(`/studerria-tg/register?step=subjects&error=${encodeURIComponent(code)}`);
       }
       const user = await db.get(
         'SELECT id, full_name, role, schedule_group, course_id, group_id, language, telegram_id FROM users WHERE id = ?',
         [userId]
       );
-      if (!user) return res.redirect('/tg/register');
+      if (!user) return res.redirect('/studerria-tg/register');
       const telegramUser = getTelegramMiniPendingUser(req);
       try {
-        await establishTelegramMiniSession(req, user, telegramUser, '/tg/register');
+        await establishTelegramMiniSession(req, user, telegramUser, '/studerria-tg/register');
       } catch (linkErr) {
         if (linkErr && linkErr.code === 'telegram_link_occupied') {
-          return res.redirect('/tg/register?step=group&error=telegram-occupied');
+          return res.redirect('/studerria-tg/register?step=group&error=telegram-occupied');
         }
         throw linkErr;
       }
@@ -19627,16 +19627,16 @@ app.post('/tg/register', registerLimiter, async (req, res) => {
       logAction(db, req, 'telegram_mini_register_subjects', { user_id: user.id });
       broadcast('users_updated');
       await saveRequestSession(req);
-      return res.redirect('/tg/schedule?welcome=1');
+      return res.redirect('/studerria-tg/schedule?welcome=1');
     }
-    return res.redirect('/tg/register?error=unknown-action');
+    return res.redirect('/studerria-tg/register?error=unknown-action');
   } catch (err) {
     console.error('Telegram mini register failed', err);
-    return res.redirect('/tg/register?error=db');
+    return res.redirect('/studerria-tg/register?error=db');
   }
 });
 
-app.get('/tg/schedule', requireTelegramMiniStudent, async (req, res) => {
+app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) => {
   try {
     await ensureDbReady();
     const userId = Number(req.session.user.id || 0);
@@ -19708,7 +19708,7 @@ app.get('/tg/schedule', requireTelegramMiniStudent, async (req, res) => {
   }
 });
 
-app.get('/tg/subjects', requireTelegramMiniStudent, async (req, res) => {
+app.get('/studerria-tg/subjects', requireTelegramMiniStudent, async (req, res) => {
   try {
     await ensureDbReady();
     const userId = Number(req.session.user.id || 0);
@@ -19732,20 +19732,20 @@ app.get('/tg/subjects', requireTelegramMiniStudent, async (req, res) => {
   }
 });
 
-app.post('/tg/subjects', requireTelegramMiniStudent, registerLimiter, async (req, res) => {
+app.post('/studerria-tg/subjects', requireTelegramMiniStudent, registerLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     await saveTelegramMiniSubjectChoices(req, Number(req.session.user.id || 0));
     logAction(db, req, 'telegram_mini_subjects_update', { user_id: req.session.user.id });
     broadcast('users_updated');
-    return res.redirect('/tg/subjects?ok=1');
+    return res.redirect('/studerria-tg/subjects?ok=1');
   } catch (err) {
     const code = err && err.message ? err.message : 'db';
-    return res.redirect(`/tg/subjects?error=${encodeURIComponent(code)}`);
+    return res.redirect(`/studerria-tg/subjects?error=${encodeURIComponent(code)}`);
   }
 });
 
-app.get('/tg/profile', requireTelegramMiniStudent, async (req, res) => {
+app.get('/studerria-tg/profile', requireTelegramMiniStudent, async (req, res) => {
   try {
     await ensureDbReady();
     const user = await db.get(
@@ -19773,10 +19773,10 @@ app.get('/tg/profile', requireTelegramMiniStudent, async (req, res) => {
   }
 });
 
-app.post('/tg/profile', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
+app.post('/studerria-tg/profile', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
   const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
   const language = String(req.body.language || '').trim();
-  if (!fullName) return res.redirect('/tg/profile?error=missing-name');
+  if (!fullName) return res.redirect('/studerria-tg/profile?error=missing-name');
   try {
     const updates = ['full_name = ?'];
     const params = [fullName];
@@ -19794,23 +19794,23 @@ app.post('/tg/profile', requireTelegramMiniStudent, writeLimiter, async (req, re
     logAction(db, req, 'telegram_mini_profile_update', { user_id: req.session.user.id });
     broadcast('users_updated');
     await saveRequestSession(req);
-    return res.redirect('/tg/profile?ok=1');
+    return res.redirect('/studerria-tg/profile?ok=1');
   } catch (err) {
-    return res.redirect('/tg/profile?error=name-exists');
+    return res.redirect('/studerria-tg/profile?error=name-exists');
   }
 });
 
-app.post('/tg/profile/reset-subjects', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
+app.post('/studerria-tg/profile/reset-subjects', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
   try {
     const userId = Number(req.session.user.id || 0);
     await db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
     await db.run('DELETE FROM user_subject_optouts WHERE user_id = ?', [userId]);
     logAction(db, req, 'telegram_mini_reset_subjects', { user_id: userId });
     broadcast('users_updated');
-    return res.redirect('/tg/subjects');
+    return res.redirect('/studerria-tg/subjects');
   } catch (err) {
     console.error('Telegram mini reset subjects failed', err);
-    return res.redirect('/tg/profile?error=db');
+    return res.redirect('/studerria-tg/profile?error=db');
   }
 });
 

@@ -7,6 +7,8 @@ The repository also vendors three live sidecar services that are proxied through
 - `naradadruk`: `/naradadruk`
 - `slashtg`: `/tg`
 
+Studerria student Telegram mini app is served separately by the main app at `/studerria-tg`.
+
 ## Primary runtime
 
 The current deployment path is Docker Compose from:

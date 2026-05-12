@@ -37,7 +37,7 @@
     <% } else { %>
       <p class="tg-muted">Чекаємо Telegram авторизацію. Якщо сторінка не продовжить автоматично, відкрийте її з кнопки mini app у Telegram.</p>
     <% } %>
-    <form class="tg-form" method="POST" action="/tg/register">
+    <form class="tg-form" method="POST" action="/studerria-tg/register">
       <input type="hidden" name="action" value="group" />
       <div class="tg-choice-list">
         <% (groups || []).forEach(function(group) { %>
@@ -62,7 +62,7 @@
   <section class="tg-card">
     <h2>Вибір предметів</h2>
     <p class="tg-muted">Оберіть свою групу для кожного предмета або пропустіть необовʼязковий предмет.</p>
-    <form class="tg-form" method="POST" action="/tg/register">
+    <form class="tg-form" method="POST" action="/studerria-tg/register">
       <input type="hidden" name="action" value="subjects" />
       <%- include('subject-picker', { registerSubjectCards }) %>
       <button class="tg-primary" type="submit">Завершити</button>

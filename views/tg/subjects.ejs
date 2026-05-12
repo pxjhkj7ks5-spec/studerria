@@ -15,7 +15,7 @@
   <% if (subjectState && subjectState.scope && subjectState.scope.group_label) { %>
     <p class="tg-muted"><%= subjectState.scope.group_label %></p>
   <% } %>
-  <form class="tg-form" method="POST" action="/tg/subjects">
+  <form class="tg-form" method="POST" action="/studerria-tg/subjects">
     <%- include('subject-picker', { registerSubjectCards }) %>
     <button class="tg-primary" type="submit">Зберегти</button>
   </form>

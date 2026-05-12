@@ -20,7 +20,7 @@
   async function syncTelegramSession() {
     if (!tg || !tg.initData) return;
     try {
-      const response = await fetch('/tg/auth/init', {
+      const response = await fetch('/studerria-tg/auth/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -33,7 +33,7 @@
         window.location.replace(data.redirect);
         return;
       }
-      if (data.status === 'link_required' && (currentPath === '/tg' || currentPath === '/tg/login')) {
+      if (data.status === 'link_required' && (currentPath === '/studerria-tg' || currentPath === '/studerria-tg/login')) {
         window.location.replace(data.redirect);
       }
     } catch (_error) {}

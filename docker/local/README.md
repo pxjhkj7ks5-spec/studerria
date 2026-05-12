@@ -7,7 +7,7 @@ This stack runs the current KMA app with PostgreSQL, Redis, and centralized logs
 - `app`: the existing Node.js + Express application from this repository
 - `charredmap`: isolated Next.js memorial-map service mounted under `/charredmap`
 - `naradadruk`: isolated Next.js print/catalog service mounted under `/naradadruk`
-- `slashtg`: isolated legacy Telegram mini-app service mounted under `/slash-tg`
+- `slashtg`: isolated legacy Telegram mini-app service mounted under `/tg`
 - `db`: PostgreSQL 18 with first-start initialization from `docker/local/db/init/*.sql`
 - `redis`: Redis 7 for Studerria session storage
 - `loki`: log storage backend
@@ -37,7 +37,7 @@ App URL:
 - [http://localhost:3000/charredmap/admin](http://localhost:3000/charredmap/admin)
 - [http://localhost:3000/naradadruk](http://localhost:3000/naradadruk)
 - [http://localhost:3000/tg](http://localhost:3000/tg)
-- [http://localhost:3000/slash-tg](http://localhost:3000/slash-tg)
+- [http://localhost:3000/studerria-tg](http://localhost:3000/studerria-tg)
 
 Observability:
 
@@ -103,6 +103,7 @@ Server `.env` baseline:
 NODE_ENV=production
 CHARREDMAP_NODE_ENV=production
 STUDERRIA_TG_BOT_TOKEN=your-telegram-bot-token
+SLASHTG_BASE_PATH=/tg
 ```
 
 If image build inputs changed (`Dockerfile`, `package.json`, `package-lock.json`, or build tooling), use:
@@ -135,7 +136,8 @@ docker compose up --build -d
 - The repository `uploads/` directory is mounted into the app container, so uploaded files stay visible in the workspace.
 - `charredmap` keeps its own SQLite database and uploads in a dedicated Docker volume, so it stays operationally isolated from the Studerria Postgres app.
 - `naradadruk` and `slashtg` also keep their own SQLite data in dedicated Docker volumes.
-- The Studerria student Telegram mini app is served by the main Express app at `/tg`; the legacy isolated Slash TG service is mounted at `/slash-tg`.
+- The legacy isolated Slash TG service is mounted at `/tg`.
+- The Studerria student Telegram mini app is served by the main Express app at `/studerria-tg` and should be configured in a separate Telegram bot.
 - If a sidecar service is unhealthy or stopped, the main Studerria app still starts; only that service route returns a temporary `503` or `404`.
 - If the backup file is missing, PostgreSQL still starts empty and the app will create schema via its built-in migrations.
 

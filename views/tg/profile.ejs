@@ -14,7 +14,7 @@
 <% } %>
 
 <section class="tg-card">
-  <form class="tg-form" method="POST" action="/tg/profile">
+  <form class="tg-form" method="POST" action="/studerria-tg/profile">
     <label>
       <span>Повне імʼя</span>
       <input name="full_name" type="text" value="<%= user && user.full_name ? user.full_name : '' %>" required />
@@ -42,7 +42,7 @@
 <section class="tg-card">
   <h2>Предмети</h2>
   <p class="tg-muted">Скидання вибору предметів відкриє повторне налаштування груп.</p>
-  <form method="POST" action="/tg/profile/reset-subjects">
+  <form method="POST" action="/studerria-tg/profile/reset-subjects">
     <button class="tg-secondary" type="submit">Скинути вибір предметів</button>
   </form>
 </section>
