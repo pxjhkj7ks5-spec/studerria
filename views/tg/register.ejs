@@ -7,6 +7,7 @@
     'student-only': 'Цей mini app доступний тільки для студентського акаунта.',
     'missing-course': 'Оберіть курс.',
     'invalid-course': 'Цей курс недоступний для реєстрації.',
+    'group_required': 'Спочатку оберіть курс, щоб підтягнути предмети.',
     'repair-failed': 'Групу ще не готово для реєстрації.',
     'missing_group': 'Оберіть групи для всіх обовʼязкових предметів.',
     'projection_incomplete': 'Академічне налаштування для групи ще не завершене.',
@@ -65,7 +66,11 @@
     <form class="tg-form" method="POST" action="/studerria-tg/register">
       <input type="hidden" name="action" value="subjects" />
       <%- include('subject-picker', { registerSubjectCards }) %>
-      <button class="tg-primary" type="submit">Завершити</button>
+      <% if (!(registerSubjectCards || []).length) { %>
+        <a class="tg-secondary" href="/studerria-tg/register?step=course">Назад до вибору курсу</a>
+      <% } else { %>
+        <button class="tg-primary" type="submit">Завершити</button>
+      <% } %>
     </form>
   </section>
 <% } %>

@@ -19340,6 +19340,17 @@ function buildTelegramMiniCourseOptions(groups = []) {
   });
 }
 
+function resolveTelegramMiniPendingUserRow(pendingUserRow, pendingTelegramUser) {
+  if (!pendingUserRow || !pendingUserRow.id) return null;
+  const rowTelegramId = normalizeTelegramId(pendingUserRow.telegram_id);
+  if (!rowTelegramId) return null;
+  const pendingTelegramId = pendingTelegramUser && pendingTelegramUser.id
+    ? normalizeTelegramId(pendingTelegramUser.id)
+    : '';
+  if (pendingTelegramId && rowTelegramId !== pendingTelegramId) return null;
+  return pendingUserRow;
+}
+
 async function loadTelegramMiniRegisterState(req) {
   await ensureDbReady();
   const pendingUserId = Number(req.session.pendingUserId || 0);
@@ -19350,11 +19361,7 @@ async function loadTelegramMiniRegisterState(req) {
       [pendingUserId]
     )
     : null;
-  const pendingUser = pendingTelegramUser
-    && pendingUserRow
-    && normalizeTelegramId(pendingUserRow.telegram_id) === normalizeTelegramId(pendingTelegramUser.id)
-    ? pendingUserRow
-    : null;
+  const pendingUser = resolveTelegramMiniPendingUserRow(pendingUserRow, pendingTelegramUser);
   const groups = await loadTelegramMiniRegistrationGroups();
   let subjectState = null;
   let registerSubjectCards = [];
@@ -19386,7 +19393,10 @@ async function loadTelegramMiniRegisterState(req) {
     registerSubjectCards = registerSubjectHelpers.buildRegisterSubjectCards(subjectState.subjects || []);
   }
   const requestedStep = String(req.query.step || '').trim().toLowerCase();
-  const step = requestedStep || (!pendingUser ? 'course' : (pendingUser.group_id ? 'subjects' : 'course'));
+  const fallbackStep = !pendingUser ? 'course' : (pendingUser.group_id ? 'subjects' : 'course');
+  const step = requestedStep === 'subjects' && !(pendingUser && pendingUser.group_id)
+    ? fallbackStep
+    : (requestedStep || fallbackStep);
   return {
     pendingUser,
     groups,
