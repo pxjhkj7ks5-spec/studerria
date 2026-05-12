@@ -385,6 +385,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-schedule-generator', label: 'Генератори' },
   { id: 'admin-homework', label: 'Домашні' },
   { id: 'admin-users', label: 'Користувачі' },
+  { id: 'admin-tg-users', label: 'Telegram users' },
   { id: 'admin-teachers', label: 'Заявки викладачів' },
   { id: 'admin-subjects', label: 'Дисципліни' },
   { id: 'admin-semesters', label: 'Семестри' },
@@ -2713,6 +2714,10 @@ function hasUsersSectionAccess(req) {
   return hasAdminSectionAccess(req, 'admin-users');
 }
 
+function hasTelegramUsersSectionAccess(req) {
+  return hasAdminSectionAccess(req, 'admin-tg-users') || hasUsersSectionAccess(req);
+}
+
 function hasStudentsSectionAccess(req) {
   return hasAdminSectionAccess(req, 'admin-students');
 }
@@ -2749,6 +2754,12 @@ const requireImportExportSectionAccess = requireAdminSectionAccess('admin-import
 const requireScheduleGeneratorSectionAccess = requireAdminSectionAccess('admin-schedule-generator');
 const requireHomeworkSectionAccess = requireAdminSectionAccess('admin-homework');
 const requireUsersSectionAccess = requireAdminSectionAccess('admin-users');
+function requireTelegramUsersSectionAccess(req, res, next) {
+  if (hasTelegramUsersSectionAccess(req)) {
+    return next();
+  }
+  return res.status(403).send('Forbidden (update page)');
+}
 const requireTeachersSectionAccess = requireAdminSectionAccess('admin-teachers');
 const requireSubjectsSectionAccess = requireAdminSectionAccess('admin-subjects');
 const requireSemestersSectionAccess = requireAdminSectionAccess('admin-semesters');
@@ -13259,8 +13270,14 @@ function buildAdminAcademicGroupSummary(group = {}) {
   return [label, [programLabel, cohortLabel, stageLabel, campusLabel].filter(Boolean).join(' / ')].filter(Boolean).join(' - ');
 }
 
-async function listAssignableAdminAcademicGroups(scopeState = {}) {
+async function listAssignableAdminAcademicGroups(scopeState = {}, options = {}) {
   const normalizedScope = scopeState && typeof scopeState === 'object' ? scopeState : {};
+  const useAllowedCourseScope = options && options.allowedCourseScope === true;
+  const allowedCourseIds = Array.from(new Set(
+    (Array.isArray(normalizedScope.allowedCourseIds) ? normalizedScope.allowedCourseIds : [])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
   const studyContextId = parsePositiveIntStrict(normalizedScope.studyContextId || normalizedScope.study_context_id);
   const programId = parsePositiveIntStrict(normalizedScope.programId || normalizedScope.program_id);
   const admissionId = parsePositiveIntStrict(normalizedScope.admissionId || normalizedScope.admission_id);
@@ -13277,7 +13294,12 @@ async function listAssignableAdminAcademicGroups(scopeState = {}) {
     activeProgramFilter,
   ];
   const params = [];
-  if (studyContextId) {
+  if (useAllowedCourseScope) {
+    if (allowedCourseIds.length) {
+      filters.push('g.legacy_course_id = ANY(?::int[])');
+      params.push(allowedCourseIds);
+    }
+  } else if (studyContextId) {
     filters.push('g.legacy_study_context_id = ?');
     params.push(studyContextId);
   } else if (programId || admissionId || stage || campus) {
@@ -13447,11 +13469,14 @@ async function buildAdminAcademicScopeState(req, options = {}) {
     buildStudyContextLabel: (context, lang) => buildStudyContextLabel(context, lang),
     inferTrackFromCourse: (course) => inferRegistrationTrackFromCourse(course),
   });
-  if (options.includeAcademicGroups) {
-    resolvedScopeState.availableAcademicGroups = await listAssignableAdminAcademicGroups(resolvedScopeState);
-  }
   const storedPayload = buildAdminScopeStatePayload(resolvedScopeState);
   storedPayload.allowedCourseIds = Array.from(allowedCourseIdSet || []).sort((a, b) => a - b);
+  if (options.includeAcademicGroups) {
+    resolvedScopeState.availableAcademicGroups = await listAssignableAdminAcademicGroups(
+      { ...resolvedScopeState, allowedCourseIds: storedPayload.allowedCourseIds },
+      { allowedCourseScope: true }
+    );
+  }
   req.session.adminAcademicScope = storedPayload;
   if (storedPayload.courseId) {
     req.session.adminCourse = storedPayload.courseId;
@@ -19553,6 +19578,123 @@ async function saveTelegramMiniSubjectChoices(req, userId) {
   }
 }
 
+function normalizeTelegramMiniAllowedCourseIds(scopeState = {}) {
+  return Array.from(new Set(
+    (Array.isArray(scopeState && scopeState.allowedCourseIds) ? scopeState.allowedCourseIds : [])
+      .map((value) => parsePositiveIntStrict(value))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+}
+
+async function loadTelegramMiniAdminStats(scopeState = {}) {
+  const allowedCourseIds = normalizeTelegramMiniAllowedCourseIds(scopeState);
+  const courseFilter = allowedCourseIds.length
+    ? 'AND COALESCE(v2_group.legacy_course_id, u.course_id) = ANY(?::int[])'
+    : '';
+  const courseParams = allowedCourseIds.length ? [allowedCourseIds] : [];
+  const activeLinkedFilter = usersHasIsActive
+    ? "COALESCE(NULLIF(LOWER(TRIM(CAST(u.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')"
+    : '1 = 1';
+  const [summaryRow, userRows, actionRows] = await Promise.all([
+    db.get(
+      `
+        SELECT
+          COUNT(*)::int AS linked_users,
+          COUNT(*) FILTER (WHERE ${activeLinkedFilter})::int AS active_linked_users,
+          MAX(u.telegram_last_seen_at) AS last_seen_at
+        FROM users u
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        WHERE u.telegram_id IS NOT NULL
+          ${courseFilter}
+      `,
+      courseParams
+    ),
+    db.all(
+      `
+        SELECT
+          u.id,
+          u.full_name,
+          u.role,
+          ${usersHasIsActive ? 'u.is_active,' : '1 AS is_active,'}
+          u.telegram_id,
+          u.telegram_username,
+          u.telegram_first_name,
+          u.telegram_last_name,
+          u.telegram_linked_at,
+          u.telegram_last_seen_at,
+          COALESCE(v2_group.label, '') AS group_label,
+          COALESCE(v2_group.legacy_course_id, u.course_id) AS course_id,
+          COUNT(h.id) FILTER (WHERE h.action LIKE 'telegram_mini_%')::int AS action_count,
+          COUNT(h.id) FILTER (WHERE h.action = 'telegram_mini_open')::int AS open_count,
+          MAX(h.created_at) FILTER (WHERE h.action LIKE 'telegram_mini_%') AS last_action_at
+        FROM users u
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        LEFT JOIN history_log h ON h.actor_id = u.id AND h.action LIKE 'telegram_mini_%'
+        WHERE u.telegram_id IS NOT NULL
+          ${courseFilter}
+        GROUP BY
+          u.id,
+          u.full_name,
+          u.role,
+          ${usersHasIsActive ? 'u.is_active,' : ''}
+          u.telegram_id,
+          u.telegram_username,
+          u.telegram_first_name,
+          u.telegram_last_name,
+          u.telegram_linked_at,
+          u.telegram_last_seen_at,
+          v2_group.label,
+          v2_group.legacy_course_id,
+          u.course_id
+        ORDER BY
+          u.telegram_last_seen_at DESC NULLS LAST,
+          last_action_at DESC NULLS LAST,
+          u.full_name ASC
+        LIMIT 200
+      `,
+      courseParams
+    ),
+    db.all(
+      `
+        SELECT
+          h.id,
+          h.actor_id,
+          h.actor_name,
+          h.action,
+          h.details,
+          h.created_at,
+          h.course_id,
+          u.full_name,
+          u.telegram_username,
+          u.telegram_id,
+          COALESCE(v2_group.label, '') AS group_label
+        FROM history_log h
+        LEFT JOIN users u ON u.id = h.actor_id
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        WHERE h.action LIKE 'telegram_mini_%'
+          ${allowedCourseIds.length ? 'AND COALESCE(v2_group.legacy_course_id, h.course_id, u.course_id) = ANY(?::int[])' : ''}
+        ORDER BY h.created_at DESC
+        LIMIT 80
+      `,
+      courseParams
+    ),
+  ]);
+  const totalActions = (userRows || []).reduce((sum, row) => sum + Number(row.action_count || 0), 0);
+  const totalOpens = (userRows || []).reduce((sum, row) => sum + Number(row.open_count || 0), 0);
+  return {
+    generated_at: new Date().toISOString(),
+    summary: {
+      linked_users: Number(summaryRow && summaryRow.linked_users || 0),
+      active_linked_users: Number(summaryRow && summaryRow.active_linked_users || 0),
+      total_opens: totalOpens,
+      total_actions: totalActions,
+      last_seen_at: summaryRow && summaryRow.last_seen_at ? summaryRow.last_seen_at : null,
+    },
+    users: userRows || [],
+    actions: actionRows || [],
+  };
+}
+
 const statusAccessToken = String(process.env.STATUS_ACCESS_TOKEN || process.env.BOOTSTRAP_TOKEN || '').trim();
 const canAccessOperationalDetails = (req) => {
   return securityHelpers.canAccessOperationalDetails({
@@ -19613,6 +19755,12 @@ app.post('/studerria-tg/auth/init', authLimiter, async (req, res) => {
       });
     }
     await establishTelegramMiniSession(req, linkedUser, telegramUser, '/studerria-tg/auth/init');
+    logAction(db, req, 'telegram_mini_open', {
+      user_id: linkedUser.id,
+      telegram_id: telegramUser.id,
+      route: '/studerria-tg/auth/init',
+      status: 'authenticated',
+    });
     return res.json({ ok: true, status: 'authenticated', redirect: '/studerria-tg/schedule' });
   } catch (err) {
     const code = err && err.message ? err.message : 'telegram_auth_failed';
@@ -19806,11 +19954,25 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
     Object.keys(scheduleByDay).forEach((day) => {
       scheduleByDay[day].sort((a, b) => Number(a.class_number || 0) - Number(b.class_number || 0));
     });
+    const weekDates = fullWeekDays.map((_, index) =>
+      getDateForWeekIndex(selectedWeek, index, baseState && baseState.term ? baseState.term.start_date : null)
+    );
+    const scheduleDayDates = {};
+    Object.keys(scheduleByDay).forEach((day) => {
+      const dayIndex = fullWeekDays.indexOf(day);
+      const iso = dayIndex >= 0 ? weekDates[dayIndex] : null;
+      const parts = iso ? String(iso).split('-') : [];
+      scheduleDayDates[day] = {
+        iso,
+        label: parts.length === 3 ? `${parts[2]}.${parts[1]}` : '',
+      };
+    });
     return renderTelegramMiniPage(req, res, 'schedule', {
       pageTitle: 'Schedule',
       currentTgPage: 'schedule',
       scheduleState,
       scheduleByDay,
+      scheduleDayDates,
       days: Object.keys(scheduleByDay),
       currentWeek: selectedWeek,
       totalWeeks,
@@ -19823,6 +19985,7 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       currentTgPage: 'schedule',
       scheduleState: null,
       scheduleByDay: {},
+      scheduleDayDates: {},
       days: [],
       currentWeek: 1,
       totalWeeks: 1,
@@ -43472,6 +43635,18 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     });
     let supportRequests = [];
     let selectedSupportRequest = null;
+    let telegramMiniAdminStats = {
+      generated_at: new Date().toISOString(),
+      summary: {
+        linked_users: 0,
+        active_linked_users: 0,
+        total_opens: 0,
+        total_actions: 0,
+        last_seen_at: null,
+      },
+      users: [],
+      actions: [],
+    };
     if (isAdminPanelOwner) {
       try {
         supportRequests = await listSupportRequestsForCourse(courseId, 40);
@@ -43490,6 +43665,11 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
       } catch (supportErr) {
         console.error('Database error (admin.supportRequests)', supportErr);
       }
+    }
+    try {
+      telegramMiniAdminStats = await loadTelegramMiniAdminStats(adminAcademicScope || {});
+    } catch (tgStatsErr) {
+      console.error('Database error (admin.telegramMiniStats)', tgStatsErr);
     }
     try {
         const projectionAlert = buildAcademicV2CourseProjectionAlert(req, courseSubjectScope.projectionIssues, 'course');
@@ -43512,6 +43692,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       adminMessages,
                                       supportRequests,
                                       selectedSupportRequest,
+                                      telegramMiniAdminStats,
                                       supportSectionVisible: isAdminPanelOwner,
                                       activeAdminTab: typeof req.query.tab === 'string' ? req.query.tab : '',
                                       courses,
@@ -58444,6 +58625,18 @@ app.get('/admin/users.json', requireUsersSectionAccess, async (req, res) => {
   } catch (err) {
     console.error('Database error (admin.users.json)', err);
     return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/admin/tg-users.json', requireTelegramUsersSectionAccess, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
+    const stats = await loadTelegramMiniAdminStats(adminAcademicScope || {});
+    return res.json({ ok: true, ...stats });
+  } catch (err) {
+    console.error('Database error (admin.tg-users.json)', err);
+    return res.status(500).json({ ok: false, error: 'Database error' });
   }
 });
 

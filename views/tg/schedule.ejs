@@ -18,7 +18,13 @@
 <section class="tg-schedule">
   <% (days || []).forEach(function(day) { %>
     <article class="tg-day">
-      <h2><%= day %></h2>
+      <% const dayDate = scheduleDayDates && scheduleDayDates[day] ? scheduleDayDates[day] : null; %>
+      <h2>
+        <span><%= day %></span>
+        <% if (dayDate && dayDate.label) { %>
+          <time datetime="<%= dayDate.iso || '' %>"><%= dayDate.label %></time>
+        <% } %>
+      </h2>
       <% const rows = scheduleByDay && scheduleByDay[day] ? scheduleByDay[day] : []; %>
       <% if (!rows.length) { %>
         <p class="tg-muted">Немає пар.</p>

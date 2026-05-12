@@ -900,6 +900,7 @@
     <% const allowedSectionsRaw = typeof locals !== 'undefined' && typeof locals.allowedSections !== 'undefined' ? locals.allowedSections : (typeof allowedSections !== 'undefined' ? allowedSections : null); %>
     <% const allowedSectionsList = role === 'admin' ? null : (Array.isArray(allowedSectionsRaw) ? allowedSectionsRaw : null); %>
     <% const sectionAllowed = (id) => !allowedSectionsList || allowedSectionsList.includes(id); %>
+    <% const telegramUsersSectionAllowed = sectionAllowed('admin-tg-users') || sectionAllowed('admin-users'); %>
     <% const courseMap = {}; %>
     <% (courses || []).forEach(function(c) { courseMap[c.id] = c.name; }); %>
     <% const scopeState = adminAcademicScope && typeof adminAcademicScope === 'object' ? adminAcademicScope : {}; %>
@@ -1075,6 +1076,9 @@
             <% if (sectionAllowed('admin-users')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-users">Users</button>
             <% } %>
+            <% if (telegramUsersSectionAllowed) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-tg-users">TG Users</button>
+            <% } %>
           </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Communications</div>
@@ -1171,6 +1175,14 @@
         }
         return acc;
       }, {})); %>
+      <% const telegramMiniStatsData = typeof telegramMiniAdminStats !== 'undefined' && telegramMiniAdminStats ? telegramMiniAdminStats : { summary: {}, users: [], actions: [] }; %>
+      <% const telegramMiniSummary = telegramMiniStatsData.summary || {}; %>
+      <% const formatAdminDateTime = function(value) {
+        if (!value) return '—';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return String(value);
+        return parsed.toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' });
+      }; %>
 
       <% const groupMap = {}; %>
       <% (studentGroups || []).forEach(function(g) { %>
@@ -2413,7 +2425,7 @@
 
         <% } %>
 
-        <% if (sectionAllowed('admin-users')) { %>
+        <% if (telegramUsersSectionAllowed) { %>
         <div id="admin-users" class="admin-panel" data-admin-title="People / Users">
           <% const hasUserFilters = filters && (filters.users_q || filters.users_group); %>
           <div class="accordion admin-filter-accordion mb-3" id="usersFilterAccordion">
@@ -2715,6 +2727,104 @@
             >
               <%= t('admin.deleteAllStudents') %>
             </button>
+          </div>
+        </div>
+
+        <% } %>
+
+        <% if (sectionAllowed('admin-users')) { %>
+        <div id="admin-tg-users" class="admin-panel" data-admin-title="People / Telegram Users">
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                  <h5 class="card-title mb-1">Telegram mini app users</h5>
+                  <div class="small text-muted">Користувачі, відкриття mini app та останні дії з `/studerria-tg`.</div>
+                </div>
+                <button class="btn btn-outline-primary btn-sm" type="button" id="tgUsersRefreshBtn">Оновити</button>
+              </div>
+              <div class="admin-overview-grid mb-3" id="tgUsersSummary">
+                <div class="admin-metric-card">
+                  <div class="small text-muted">Linked</div>
+                  <div class="admin-metric-value" data-tg-summary="linked_users"><%= telegramMiniSummary.linked_users || 0 %></div>
+                </div>
+                <div class="admin-metric-card">
+                  <div class="small text-muted">Active</div>
+                  <div class="admin-metric-value" data-tg-summary="active_linked_users"><%= telegramMiniSummary.active_linked_users || 0 %></div>
+                </div>
+                <div class="admin-metric-card">
+                  <div class="small text-muted">Opens</div>
+                  <div class="admin-metric-value" data-tg-summary="total_opens"><%= telegramMiniSummary.total_opens || 0 %></div>
+                </div>
+                <div class="admin-metric-card">
+                  <div class="small text-muted">Actions</div>
+                  <div class="admin-metric-value" data-tg-summary="total_actions"><%= telegramMiniSummary.total_actions || 0 %></div>
+                </div>
+              </div>
+              <div class="table-responsive mb-4">
+                <table class="table table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Telegram</th>
+                      <th>Course</th>
+                      <th>Opens</th>
+                      <th>Actions</th>
+                      <th>Last seen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tgUsersTableBody">
+                    <% (telegramMiniStatsData.users || []).forEach(function(row) { %>
+                      <tr>
+                        <td>
+                          <%= row.full_name || '—' %>
+                          <div class="small text-muted"><%= row.role || 'student' %></div>
+                        </td>
+                        <td>
+                          <%= row.telegram_username ? '@' + row.telegram_username : (row.telegram_id || '—') %>
+                          <% if (row.telegram_first_name || row.telegram_last_name) { %>
+                            <div class="small text-muted"><%= [row.telegram_first_name, row.telegram_last_name].filter(Boolean).join(' ') %></div>
+                          <% } %>
+                        </td>
+                        <td><%= row.group_label || (row.course_id ? 'Course ' + row.course_id : '—') %></td>
+                        <td><%= row.open_count || 0 %></td>
+                        <td><%= row.action_count || 0 %></td>
+                        <td><%= formatAdminDateTime(row.telegram_last_seen_at || row.last_action_at) %></td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(telegramMiniStatsData.users || []).length) { %>
+                      <tr><td colspan="6" class="text-muted">Telegram users ще немає.</td></tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+              <h6 class="mb-2">Recent mini app activity</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tgUsersActionsBody">
+                    <% (telegramMiniStatsData.actions || []).forEach(function(row) { %>
+                      <tr>
+                        <td><%= formatAdminDateTime(row.created_at) %></td>
+                        <td><%= row.full_name || row.actor_name || '—' %></td>
+                        <td><code><%= row.action || '—' %></code></td>
+                        <td class="small text-muted"><%= row.details || '—' %></td>
+                      </tr>
+                    <% }); %>
+                    <% if (!(telegramMiniStatsData.actions || []).length) { %>
+                      <tr><td colspan="4" class="text-muted">Подій mini app ще немає.</td></tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -7416,6 +7526,86 @@
         } catch (err) {
           return;
         }
+      }
+
+      const tgUsersRefreshBtn = document.getElementById('tgUsersRefreshBtn');
+      const tgUsersTableBody = document.getElementById('tgUsersTableBody');
+      const tgUsersActionsBody = document.getElementById('tgUsersActionsBody');
+
+      function formatClientDateTime(value) {
+        if (!value) return '—';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return String(value);
+        return parsed.toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' });
+      }
+
+      function renderTelegramMiniAdminStats(payload) {
+        const summary = payload && payload.summary ? payload.summary : {};
+        document.querySelectorAll('[data-tg-summary]').forEach((node) => {
+          const key = node.dataset.tgSummary || '';
+          node.textContent = String(summary[key] || 0);
+        });
+        const users = Array.isArray(payload && payload.users) ? payload.users : [];
+        if (tgUsersTableBody) {
+          tgUsersTableBody.innerHTML = users.length
+            ? users.map((row) => {
+                const tgLabel = row.telegram_username ? `@${row.telegram_username}` : (row.telegram_id || '—');
+                const tgName = [row.telegram_first_name, row.telegram_last_name].filter(Boolean).join(' ');
+                const courseLabel = row.group_label || (row.course_id ? `Course ${row.course_id}` : '—');
+                return `
+                  <tr>
+                    <td>
+                      ${escapeHtml(row.full_name || '—')}
+                      <div class="small text-muted">${escapeHtml(row.role || 'student')}</div>
+                    </td>
+                    <td>
+                      ${escapeHtml(tgLabel)}
+                      ${tgName ? `<div class="small text-muted">${escapeHtml(tgName)}</div>` : ''}
+                    </td>
+                    <td>${escapeHtml(courseLabel)}</td>
+                    <td>${escapeHtml(row.open_count || 0)}</td>
+                    <td>${escapeHtml(row.action_count || 0)}</td>
+                    <td>${escapeHtml(formatClientDateTime(row.telegram_last_seen_at || row.last_action_at))}</td>
+                  </tr>
+                `;
+              }).join('')
+            : '<tr><td colspan="6" class="text-muted">Telegram users ще немає.</td></tr>';
+        }
+        const actions = Array.isArray(payload && payload.actions) ? payload.actions : [];
+        if (tgUsersActionsBody) {
+          tgUsersActionsBody.innerHTML = actions.length
+            ? actions.map((row) => `
+                <tr>
+                  <td>${escapeHtml(formatClientDateTime(row.created_at))}</td>
+                  <td>${escapeHtml(row.full_name || row.actor_name || '—')}</td>
+                  <td><code>${escapeHtml(row.action || '—')}</code></td>
+                  <td class="small text-muted">${escapeHtml(row.details || '—')}</td>
+                </tr>
+              `).join('')
+            : '<tr><td colspan="4" class="text-muted">Подій mini app ще немає.</td></tr>';
+        }
+      }
+
+      async function refreshTelegramMiniAdminStats() {
+        if (!tgUsersRefreshBtn) return;
+        tgUsersRefreshBtn.disabled = true;
+        try {
+          const res = await fetch('/admin/tg-users.json', {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : 'tg_users_refresh_failed');
+          renderTelegramMiniAdminStats(data);
+        } catch (err) {
+          showToast('error', err.message || 'Не вдалося оновити Telegram users');
+        } finally {
+          tgUsersRefreshBtn.disabled = false;
+        }
+      }
+
+      if (tgUsersRefreshBtn) {
+        tgUsersRefreshBtn.addEventListener('click', refreshTelegramMiniAdminStats);
       }
 
       function getForensicsConfidenceClass(level) {

@@ -414,6 +414,20 @@ html.is-tg-dark .tg-pill {
   grid-template-columns: 62px 1fr;
 }
 
+.tg-day h2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tg-day h2 time {
+  flex: 0 0 auto;
+  color: var(--tg-muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
 .tg-lesson-time {
   display: grid;
   align-content: center;
