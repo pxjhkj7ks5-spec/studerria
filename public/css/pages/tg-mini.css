@@ -167,6 +167,12 @@ h3 {
   color: #fff;
 }
 
+.tg-primary:disabled,
+.tg-secondary:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .tg-secondary {
   border: 1px solid var(--tg-border);
   background: rgba(255, 255, 255, 0.7);
@@ -227,15 +233,40 @@ h3 {
 .tg-lesson {
   display: grid;
   gap: 10px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid var(--tg-border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.56);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
 }
 
 .tg-choice {
-  grid-template-columns: 24px 1fr;
+  grid-template-columns: 30px 1fr;
   align-items: center;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.tg-choice:has(input:checked) {
+  border-color: color-mix(in srgb, var(--tg-theme-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--tg-theme-accent) 10%, white);
+}
+
+.tg-choice input[type="radio"] {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 2px solid rgba(17, 24, 39, 0.34);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.tg-choice input[type="radio"]:checked {
+  border: 7px solid var(--tg-theme-accent);
+}
+
+.tg-choice strong {
+  display: block;
+  line-height: 1.2;
 }
 
 .tg-choice small,
@@ -258,6 +289,7 @@ h3 {
 
 .tg-group-options label {
   display: inline-grid;
+  min-height: 40px;
 }
 
 .tg-group-options input {
@@ -268,15 +300,16 @@ h3 {
 
 .tg-group-options span,
 .tg-pill {
-  min-width: 42px;
-  min-height: 38px;
+  min-width: 72px;
+  min-height: 40px;
   display: inline-grid;
   place-items: center;
   border: 1px solid var(--tg-border);
-  border-radius: 999px;
-  padding: 0 12px;
+  border-radius: 12px;
+  padding: 0 14px;
   background: rgba(255, 255, 255, 0.72);
   font-weight: 750;
+  font-size: 0.9rem;
 }
 
 .tg-group-options input:checked + span {

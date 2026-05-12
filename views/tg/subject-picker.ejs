@@ -3,22 +3,32 @@
     <article class="tg-subject-card">
       <div>
         <h3><%= subject.name %></h3>
-        <p><%= subject.requiredFlag ? 'Обовʼязковий' : 'Вибірковий' %><%= subject.autoAssigned ? ' · група 1 автоматично' : '' %></p>
+        <p>
+          <%= subject.requiredFlag ? 'Обовʼязковий' : 'Вибірковий' %>
+          <%= subject.autoAssigned ? ' · група 1 автоматично' : (' · ' + subject.groupCount + ' групи') %>
+        </p>
       </div>
       <% if (subject.autoAssigned) { %>
-        <span class="tg-pill">Group 1</span>
+        <input type="hidden" name="subject_<%= subject.id %>" value="<%= subject.selectedGroup || 1 %>" />
+        <span class="tg-pill">Група 1</span>
       <% } else { %>
         <div class="tg-group-options">
           <% for (let groupNumber = 1; groupNumber <= subject.groupCount; groupNumber += 1) { %>
             <label>
-              <input type="radio" name="subject_<%= subject.id %>" value="<%= groupNumber %>" <%= subject.selectedGroup === groupNumber ? 'checked' : '' %> />
-              <span><%= groupNumber %></span>
+              <input
+                type="radio"
+                name="subject_<%= subject.id %>"
+                value="<%= groupNumber %>"
+                <%= subject.selectedGroup === groupNumber ? 'checked' : '' %>
+                <%= subject.requiredFlag ? 'required' : '' %>
+              />
+              <span>Група <%= groupNumber %></span>
             </label>
           <% } %>
           <% if (subject.allowNotTaught) { %>
             <label class="tg-skip">
               <input type="checkbox" name="optout_<%= subject.id %>" value="1" <%= subject.optedOut ? 'checked' : '' %> />
-              <span>Skip</span>
+              <span>Не вивчаю</span>
             </label>
           <% } %>
         </div>

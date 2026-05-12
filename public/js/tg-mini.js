@@ -33,10 +33,22 @@
         window.location.replace(data.redirect);
         return;
       }
-      if (data.status === 'link_required' && (currentPath === '/studerria-tg' || currentPath === '/studerria-tg/login')) {
-        window.location.replace(data.redirect);
+      if (data.status === 'link_required') {
+        if (currentPath === '/studerria-tg' || currentPath === '/studerria-tg/login') {
+          window.location.replace(data.redirect);
+          return;
+        }
+        if (currentPath === '/studerria-tg/register' && !sessionStorage.getItem('studerriaTgRegisterSynced')) {
+          sessionStorage.setItem('studerriaTgRegisterSynced', '1');
+          window.location.reload();
+        }
       }
-    } catch (_error) {}
+      if (data.ok === false && data.error) {
+        document.documentElement.dataset.tgAuthError = data.error;
+      }
+    } catch (_error) {
+      document.documentElement.dataset.tgAuthError = 'network';
+    }
   }
 
   function bindChangelog() {

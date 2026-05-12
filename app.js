@@ -19322,6 +19322,24 @@ async function loadTelegramMiniRegistrationGroups() {
     .filter((group) => group.group_id);
 }
 
+function buildTelegramMiniCourseOptions(groups = []) {
+  return (Array.isArray(groups) ? groups : []).map((group) => {
+    const campusKey = normalizeCourseCampus(group && group.campus_key);
+    const campusLabel = campusKey === 'munich' ? 'Мюнхен' : 'Київ';
+    const trackKey = normalizeRegistrationTrack(group && group.track_key, 'bachelor');
+    const trackLabel = trackKey === 'master' ? 'Магістратура' : (trackKey === 'teacher' ? 'Викладацький' : 'Бакалаврат');
+    const stageNumber = Math.max(1, Number(group && group.stage_number ? group.stage_number : 0) || 1);
+    const programLabel = sanitizeCompactText(group && (group.program_name || group.program_code || group.label), 160);
+    const cohortLabel = sanitizeCompactText(group && (group.cohort_label || group.admission_year), 80);
+    const labelParts = [programLabel, cohortLabel, campusLabel].filter(Boolean);
+    return {
+      ...group,
+      course_label: labelParts.length ? labelParts.join(' · ') : (group.label || `Course ${group.group_id}`),
+      course_meta: `${trackLabel} · ${stageNumber} курс · ${Math.max(0, Number(group.visible_subject_count || 0) || 0)} предметів`,
+    };
+  });
+}
+
 async function loadTelegramMiniRegisterState(req) {
   await ensureDbReady();
   const pendingUserId = Number(req.session.pendingUserId || 0);
@@ -19368,10 +19386,11 @@ async function loadTelegramMiniRegisterState(req) {
     registerSubjectCards = registerSubjectHelpers.buildRegisterSubjectCards(subjectState.subjects || []);
   }
   const requestedStep = String(req.query.step || '').trim().toLowerCase();
-  const step = requestedStep || (!pendingUser ? 'group' : (pendingUser.group_id ? 'subjects' : 'group'));
+  const step = requestedStep || (!pendingUser ? 'course' : (pendingUser.group_id ? 'subjects' : 'course'));
   return {
     pendingUser,
     groups,
+    courseOptions: buildTelegramMiniCourseOptions(groups),
     subjectState,
     registerSubjectCards,
     step,
@@ -19541,13 +19560,14 @@ app.get('/studerria-tg/register', async (req, res) => {
 });
 
 app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
-  const action = String(req.body.action || 'group').trim().toLowerCase();
+  const rawAction = String(req.body.action || 'course').trim().toLowerCase();
+  const action = rawAction === 'group' ? 'course' : rawAction;
   try {
     await ensureDbReady();
-    if (action === 'group') {
+    if (action === 'course') {
       const telegramUser = getTelegramMiniPendingUser(req);
       if (!telegramUser) {
-        return res.redirect('/studerria-tg/register?step=group&error=telegram-required');
+        return res.redirect('/studerria-tg/register?step=course&error=telegram-required');
       }
       let userId = Number(req.session.pendingUserId || 0);
       const pendingUser = Number.isInteger(userId) && userId > 0
@@ -19568,20 +19588,20 @@ app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
       }
       const isActive = user && (user.is_active === true || Number(user.is_active) === 1);
       if (!isActive || !isTelegramMiniStudentRole(user.role)) {
-        return res.redirect('/studerria-tg/register?step=group&error=student-only');
+        return res.redirect('/studerria-tg/register?step=course&error=student-only');
       }
       const groupId = Number(req.body.group_id || 0);
-      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/studerria-tg/register?step=group&error=db');
-      if (!Number.isInteger(groupId) || groupId < 1) return res.redirect('/studerria-tg/register?step=group&error=missing-group');
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/studerria-tg/register?step=course&error=db');
+      if (!Number.isInteger(groupId) || groupId < 1) return res.redirect('/studerria-tg/register?step=course&error=missing-course');
       const groups = await loadTelegramMiniRegistrationGroups();
       const selectedGroup = groups.find((group) => Number(group.group_id) === groupId) || null;
       if (!selectedGroup || selectedGroup.selection_blocked) {
-        return res.redirect('/studerria-tg/register?step=group&error=invalid-group');
+        return res.redirect('/studerria-tg/register?step=course&error=invalid-course');
       }
       const repairedSelection = await repairRegistrationCatalogGroup(selectedGroup);
       const repairedGroup = repairedSelection.group || null;
       if (!repairedGroup) {
-        return res.redirect(`/studerria-tg/register?step=group&error=${encodeURIComponent(repairedSelection.error || 'repair-failed')}`);
+        return res.redirect(`/studerria-tg/register?step=course&error=${encodeURIComponent(repairedSelection.error || 'repair-failed')}`);
       }
       await academicV2Helpers.bulkAssignUsersToGroup(getAcademicV2Store(), {
         group_id: groupId,
@@ -19601,7 +19621,7 @@ app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
 
     if (action === 'subjects') {
       const userId = Number(req.session.pendingUserId || 0);
-      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/studerria-tg/register?step=group');
+      if (!Number.isInteger(userId) || userId < 1) return res.redirect('/studerria-tg/register?step=course');
       try {
         await saveTelegramMiniSubjectChoices(req, userId);
       } catch (choiceErr) {
@@ -19618,7 +19638,7 @@ app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
         await establishTelegramMiniSession(req, user, telegramUser, '/studerria-tg/register');
       } catch (linkErr) {
         if (linkErr && linkErr.code === 'telegram_link_occupied') {
-          return res.redirect('/studerria-tg/register?step=group&error=telegram-occupied');
+          return res.redirect('/studerria-tg/register?step=course&error=telegram-occupied');
         }
         throw linkErr;
       }
