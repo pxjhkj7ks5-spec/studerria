@@ -61,31 +61,7 @@
     }
   }
 
-  function bindChangelog() {
-    document.addEventListener('click', (event) => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target) return;
-      const modal = document.querySelector('[data-tg-changelog]');
-      if (!modal) return;
-      const open = target.closest('[data-tg-changelog-open]');
-      const close = target.closest('[data-tg-changelog-close]');
-      if (open) {
-        event.preventDefault();
-        modal.hidden = false;
-        requestAnimationFrame(() => modal.classList.add('is-open'));
-      }
-      if (close) {
-        event.preventDefault();
-        modal.classList.remove('is-open');
-        setTimeout(() => {
-          modal.hidden = true;
-        }, 160);
-      }
-    });
-  }
-
   window.addEventListener('resize', applyTelegramChrome);
   applyTelegramChrome();
-  bindChangelog();
   syncTelegramSession();
 })();

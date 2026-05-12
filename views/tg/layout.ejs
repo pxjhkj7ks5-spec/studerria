@@ -37,31 +37,6 @@
       </nav>
     <% } %>
 
-    <button class="tg-changelog-button" type="button" data-tg-changelog-open>Changelog</button>
-    <section class="tg-modal" data-tg-changelog hidden>
-      <button class="tg-modal-backdrop" type="button" data-tg-changelog-close aria-label="Close changelog"></button>
-      <article class="tg-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="tgChangelogTitle" tabindex="-1">
-        <header class="tg-modal-head">
-          <div>
-            <p>Studerria</p>
-            <h2 id="tgChangelogTitle">Changelog</h2>
-          </div>
-          <button type="button" data-tg-changelog-close aria-label="Close">&times;</button>
-        </header>
-        <div class="tg-changelog-list">
-          <% (changelog || []).slice(0, 20).forEach(function(item) { %>
-            <article class="tg-changelog-item">
-              <strong><%= item.version || '' %></strong>
-              <p><%= item.title || item.summary || '' %></p>
-            </article>
-          <% }); %>
-          <% if (!(changelog || []).length) { %>
-            <p class="tg-muted">No changelog entries yet.</p>
-          <% } %>
-        </div>
-      </article>
-    </section>
-
     <script src="/js/tg-mini.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>
 </html>
