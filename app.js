@@ -19835,13 +19835,18 @@ async function sendStuderriaTelegramWelcome(chat = {}) {
     });
   }
   const replyMarkup = buildStuderriaTelegramWelcomeKeyboard(chat.type || '');
+  const botUsername = String(
+    process.env.STUDERRIA_TG_BOT_USERNAME
+    || studerriaTelegramBotState.botUsername
+    || 'studerria_bot'
+  ).trim().replace(/^@/, '') || 'studerria_bot';
   const text = [
     'Привіт! Це Studerria.',
-    'Тут можна швидко відкрити розклад і вибір груп.',
+    'Тут можна швидко відкрити розклад.',
     '',
     String(chat.type || '').toLowerCase() === 'private'
       ? 'Натисни кнопку нижче.'
-      : 'Щоб відкрити mini app без браузера, зайди в особистий чат з ботом і напиши /hello.',
+      : `Щоб відкрити mini app без браузера, зайди в особистий чат з ботом @${botUsername} і напиши /hello.`,
   ].join('\n');
   const payload = {
     chat_id: chatId,
