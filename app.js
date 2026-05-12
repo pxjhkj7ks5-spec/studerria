@@ -19814,9 +19814,28 @@ function shouldWelcomeStuderriaTelegramBotChatMember(update, botId) {
   return ['left', 'kicked'].includes(oldStatus) && ['member', 'administrator'].includes(newStatus);
 }
 
-async function sendStuderriaTelegramWelcome(chat = {}) {
+function getStuderriaTelegramMessageThreadId(message = {}) {
+  const threadId = Number(message && message.message_thread_id || 0);
+  return Number.isInteger(threadId) && threadId > 0 ? threadId : null;
+}
+
+async function removeStuderriaTelegramReplyKeyboard(chatId, messageThreadId = null) {
+  const payload = {
+    chat_id: chatId,
+    text: 'Ок, нижню кнопку прибрав.',
+    reply_markup: { remove_keyboard: true },
+    disable_notification: true,
+  };
+  if (messageThreadId) {
+    payload.message_thread_id = messageThreadId;
+  }
+  await callStuderriaTelegramBotApi('sendMessage', payload);
+}
+
+async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
   if (!chatId) return;
+  const messageThreadId = getStuderriaTelegramMessageThreadId(sourceMessage);
   const webUrl = getStuderriaTelegramMiniAppWebUrl();
   if (
     String(chat.type || '').toLowerCase() === 'private'
@@ -19853,9 +19872,15 @@ async function sendStuderriaTelegramWelcome(chat = {}) {
     text,
     disable_web_page_preview: true,
   };
+  if (messageThreadId) {
+    payload.message_thread_id = messageThreadId;
+  }
   if (replyMarkup) {
     payload.reply_markup = replyMarkup;
   }
+  await removeStuderriaTelegramReplyKeyboard(chatId, messageThreadId).catch((err) => {
+    console.error('Studerria Telegram reply keyboard cleanup failed', err && err.message ? err.message : err);
+  });
   await callStuderriaTelegramBotApi('sendMessage', payload);
 }
 
@@ -19866,7 +19891,7 @@ async function handleStuderriaTelegramBotUpdate(update) {
       isStuderriaTelegramHelloCommand(message, studerriaTelegramBotState.botUsername)
       || didStuderriaTelegramBotJoin(message, studerriaTelegramBotState.botId)
     ) {
-      await sendStuderriaTelegramWelcome(message.chat);
+      await sendStuderriaTelegramWelcome(message.chat, message);
       return;
     }
   }
