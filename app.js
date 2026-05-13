@@ -20186,11 +20186,11 @@ async function loadStuderriaTelegramCourseNotificationRecipients(context = {}) {
         AND COALESCE(v2_group.legacy_course_id, u.course_id) = ?
         AND COALESCE(NULLIF(u.is_active::text, ''), '1') NOT IN ('0', 'false', 'f')
         AND u.telegram_notifications_enabled IS DISTINCT FROM false
-        AND (? IS NULL OR u.id <> ?)
+        AND u.id <> COALESCE(?::int, -1)
       ORDER BY u.id ASC
       LIMIT 500
     `,
-    [courseId, actorId || null, actorId || null]
+    [courseId, actorId || null]
   ).catch((err) => {
     console.error('Studerria Telegram notification recipients failed', err && err.message ? err.message : err);
     return [];
