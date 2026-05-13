@@ -1,0 +1,132 @@
+.studerria-db-saving-indicator {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 2147483000;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 132px;
+  min-height: 44px;
+  padding: 8px 13px 8px 9px;
+  border: 1px solid rgba(255, 213, 92, 0.38);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(20, 24, 34, 0.84), rgba(28, 34, 48, 0.72)),
+    rgba(14, 18, 28, 0.74);
+  color: rgba(255, 247, 214, 0.96);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  backdrop-filter: blur(18px) saturate(1.25);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 10px, 0) scale(0.96);
+  transition:
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.studerria-db-saving-indicator[hidden] {
+  display: none;
+}
+
+.studerria-db-saving-indicator.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.studerria-db-saving-indicator__disc {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 246, 186, 0.92) 0 20%, transparent 22%),
+    conic-gradient(from 0deg, #ffe383, #f2b84b, #ffe383, rgba(255, 227, 131, 0.12), #ffe383);
+  box-shadow:
+    0 0 0 1px rgba(255, 229, 142, 0.32),
+    0 0 24px rgba(255, 195, 84, 0.38);
+  animation: studerria-save-disc-spin 820ms linear infinite;
+}
+
+.studerria-db-saving-indicator__disc::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, rgba(39, 42, 54, 0.96), rgba(12, 15, 22, 0.94));
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.16);
+}
+
+.studerria-db-saving-indicator__spark {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: rgba(255, 226, 124, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(255, 245, 194, 0.5),
+    0 0 18px rgba(255, 216, 99, 0.8);
+  animation: studerria-save-spark-pulse 620ms ease-in-out infinite alternate;
+}
+
+.studerria-db-saving-indicator__copy {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+body.theme-light .studerria-db-saving-indicator,
+html[data-theme="light"] .studerria-db-saving-indicator {
+  border-color: rgba(194, 132, 30, 0.3);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(250, 244, 226, 0.8)),
+    rgba(255, 255, 255, 0.78);
+  color: rgba(85, 59, 11, 0.94);
+  box-shadow:
+    0 18px 38px rgba(112, 83, 22, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 0 0 1px rgba(112, 83, 22, 0.04);
+}
+
+@keyframes studerria-save-disc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes studerria-save-spark-pulse {
+  from {
+    transform: scale(0.78);
+    opacity: 0.78;
+  }
+  to {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studerria-db-saving-indicator {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+
+  .studerria-db-saving-indicator__disc,
+  .studerria-db-saving-indicator__spark {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

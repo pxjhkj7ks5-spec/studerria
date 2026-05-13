@@ -2996,6 +2996,7 @@
       crossorigin="anonymous"
       defer
     ></script>
+    <script src="/js/design-system.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
     <script>
       (function academicV2Editors() {
         const workspaceDefaultMode = <%- JSON.stringify(workspaceDefaultMode) %>;

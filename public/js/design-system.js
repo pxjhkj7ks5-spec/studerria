@@ -3,7 +3,10 @@
   const THEME_VALUES = new Set(['dark', 'light']);
   const NAV_TRANSITION_BOOT_FLAG = '__studerriaNavTransitionBound';
   const PREFETCH_BOOT_FLAG = '__studerriaLinkPrefetchBound';
+  const SAVE_INDICATOR_BOOT_FLAG = '__studerriaSaveIndicatorBound';
   let isThemeSyncing = false;
+  let activeSaveRequests = 0;
+  let saveIndicatorHideTimer = 0;
 
   function normalizeText(value) {
     return (value || '').replace(/\s+/g, ' ').trim();
@@ -648,6 +651,148 @@
     window.addEventListener('pageshow', unmarkTransition, { capture: true });
   }
 
+  function ensureSaveIndicator() {
+    let indicator = document.querySelector('[data-studerria-save-indicator]');
+    if (indicator instanceof HTMLElement) {
+      return indicator;
+    }
+
+    indicator = document.createElement('div');
+    indicator.className = 'studerria-db-saving-indicator';
+    indicator.setAttribute('data-studerria-save-indicator', 'true');
+    indicator.setAttribute('role', 'status');
+    indicator.setAttribute('aria-live', 'polite');
+    indicator.innerHTML = [
+      '<span class="studerria-db-saving-indicator__disc" aria-hidden="true">',
+      '  <span class="studerria-db-saving-indicator__spark"></span>',
+      '</span>',
+      '<span class="studerria-db-saving-indicator__copy">Збереження</span>',
+    ].join('');
+    document.body.appendChild(indicator);
+    return indicator;
+  }
+
+  function showSaveIndicator() {
+    if (!document.body) {
+      return;
+    }
+    window.clearTimeout(saveIndicatorHideTimer);
+    const indicator = ensureSaveIndicator();
+    document.documentElement.classList.add('studerria-db-saving');
+    indicator.classList.add('is-visible');
+    indicator.removeAttribute('hidden');
+  }
+
+  function hideSaveIndicatorSoon() {
+    window.clearTimeout(saveIndicatorHideTimer);
+    saveIndicatorHideTimer = window.setTimeout(() => {
+      if (activeSaveRequests > 0) {
+        return;
+      }
+      const indicator = document.querySelector('[data-studerria-save-indicator]');
+      document.documentElement.classList.remove('studerria-db-saving');
+      if (indicator instanceof HTMLElement) {
+        indicator.classList.remove('is-visible');
+        window.setTimeout(() => {
+          if (!indicator.classList.contains('is-visible')) {
+            indicator.setAttribute('hidden', '');
+          }
+        }, 240);
+      }
+    }, 420);
+  }
+
+  function beginSaveIndicator() {
+    activeSaveRequests += 1;
+    showSaveIndicator();
+  }
+
+  function endSaveIndicator() {
+    activeSaveRequests = Math.max(0, activeSaveRequests - 1);
+    if (activeSaveRequests === 0) {
+      hideSaveIndicatorSoon();
+    }
+  }
+
+  function resolveFetchMethod(input, init) {
+    const initMethod = init && init.method ? String(init.method).trim().toUpperCase() : '';
+    if (initMethod) {
+      return initMethod;
+    }
+    if (typeof Request !== 'undefined' && input instanceof Request && input.method) {
+      return String(input.method).trim().toUpperCase();
+    }
+    return 'GET';
+  }
+
+  function shouldTrackFetchSave(input, init) {
+    const method = resolveFetchMethod(input, init);
+    if (!method || method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+      return false;
+    }
+    try {
+      const rawUrl = typeof Request !== 'undefined' && input instanceof Request ? input.url : String(input || '');
+      const url = new URL(rawUrl || window.location.href, window.location.href);
+      return url.origin === window.location.origin;
+    } catch (_error) {
+      return true;
+    }
+  }
+
+  function initSaveIndicator() {
+    if (window[SAVE_INDICATOR_BOOT_FLAG] === true) {
+      return;
+    }
+    window[SAVE_INDICATOR_BOOT_FLAG] = true;
+
+    document.addEventListener('submit', (event) => {
+      const form = event.target instanceof Element ? event.target.closest('form') : null;
+      if (!(form instanceof HTMLFormElement)) {
+        return;
+      }
+      if (form.dataset.noSaveIndicator === 'true' || form.dataset.demoReadonlyForm === 'true') {
+        return;
+      }
+      const method = String(form.getAttribute('method') || 'GET').trim().toUpperCase();
+      if (!method || method === 'GET' || event.defaultPrevented) {
+        return;
+      }
+      beginSaveIndicator();
+    });
+
+    if (typeof window.fetch === 'function') {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = (...args) => {
+        const [input, init] = args;
+        const shouldTrack = shouldTrackFetchSave(input, init);
+        if (shouldTrack) {
+          beginSaveIndicator();
+        }
+        let request;
+        try {
+          request = nativeFetch(...args);
+        } catch (error) {
+          if (shouldTrack) {
+            endSaveIndicator();
+          }
+          throw error;
+        }
+        if (shouldTrack && request && typeof request.finally === 'function') {
+          return request.finally(endSaveIndicator);
+        }
+        if (shouldTrack) {
+          endSaveIndicator();
+        }
+        return request;
+      };
+    }
+
+    window.addEventListener('pageshow', () => {
+      activeSaveRequests = 0;
+      hideSaveIndicatorSoon();
+    }, { capture: true });
+  }
+
   function initLinkPrefetch() {
     if (window[PREFETCH_BOOT_FLAG] === true) {
       return;
@@ -733,6 +878,7 @@
     initModalBehavior();
     applyRegisterCourseTweaks();
     initNavTransitionStabilizer();
+    initSaveIndicator();
     initLinkPrefetch();
 
     document.addEventListener('focusin', (event) => {

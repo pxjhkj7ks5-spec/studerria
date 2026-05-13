@@ -413,7 +413,7 @@ body:is(.page-authenticated, .page-app-shell).studerria-theme :where(
 }
 
 html.studerria-page-transitioning body:is(.page-authenticated, .page-app-shell).studerria-theme,
-html.studerria-page-transitioning body:is(.page-authenticated, .page-app-shell).studerria-theme * {
+html.studerria-page-transitioning body:is(.page-authenticated, .page-app-shell).studerria-theme *:not(.studerria-db-saving-indicator):not(.studerria-db-saving-indicator *) {
   animation: none !important;
   transition: none !important;
   scroll-behavior: auto !important;
