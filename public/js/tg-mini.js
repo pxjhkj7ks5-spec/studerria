@@ -1,6 +1,14 @@
 (function initStuderriaTelegramMini() {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   const state = window.__studerriaTg || {};
+  const fastRoutePaths = new Set([
+    '/studerria-tg/schedule',
+    '/studerria-tg/teamwork',
+    '/studerria-tg/profile',
+    '/studerria-tg/subjects',
+  ]);
+  const pageCache = new Map();
+  let activeNavigationRequest = null;
 
   function colorIsDark(rawColor) {
     const hex = String(rawColor || '').trim().replace('#', '');
@@ -27,8 +35,20 @@
     } catch (_error) {}
   }
 
+  function isEntryPath(pathname) {
+    return pathname === '/studerria-tg'
+      || pathname === '/studerria-tg/login'
+      || pathname === '/studerria-tg/register';
+  }
+
+  function shouldSyncTelegramSession() {
+    if (!tg || !tg.initData) return false;
+    if (!state.authenticated) return true;
+    return isEntryPath(window.location.pathname || state.currentPath || '');
+  }
+
   async function syncTelegramSession() {
-    if (!tg || !tg.initData) return;
+    if (!shouldSyncTelegramSession()) return;
     try {
       const response = await fetch('/studerria-tg/auth/init', {
         method: 'POST',
@@ -39,9 +59,7 @@
       const data = await response.json().catch(() => null);
       if (!data || !data.redirect) return;
       const currentPath = window.location.pathname || '';
-      const shouldEnterApp = currentPath === '/studerria-tg'
-        || currentPath === '/studerria-tg/login'
-        || currentPath === '/studerria-tg/register';
+      const shouldEnterApp = isEntryPath(currentPath);
       if (data.status === 'authenticated' && shouldEnterApp && currentPath !== data.redirect) {
         window.location.replace(data.redirect);
         return;
@@ -66,7 +84,147 @@
     }
   }
 
+  function getFastUrl(href) {
+    if (!href) return null;
+    try {
+      const url = new URL(href, window.location.origin);
+      if (url.origin !== window.location.origin) return null;
+      if (!fastRoutePaths.has(url.pathname)) return null;
+      return url;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function parsePage(html, responseUrl) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const shell = doc.querySelector('.tg-shell');
+    if (!shell) return null;
+    return {
+      url: responseUrl || window.location.href,
+      title: doc.title || document.title,
+      shellHtml: shell.innerHTML,
+      navHtml: doc.querySelector('.tg-bottom-nav') ? doc.querySelector('.tg-bottom-nav').outerHTML : '',
+      bodyClass: doc.body ? doc.body.className : document.body.className,
+      currentPage: doc.body ? doc.body.getAttribute('data-current-page') || '' : '',
+    };
+  }
+
+  async function fetchFastPage(url) {
+    const cacheKey = url.pathname + url.search;
+    if (pageCache.has(cacheKey)) return pageCache.get(cacheKey);
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'StuderriaTelegramMini' },
+    });
+    if (!response.ok) throw new Error('page_load_failed');
+    const finalUrl = new URL(response.url || url.toString(), window.location.origin);
+    if (finalUrl.origin !== window.location.origin || !fastRoutePaths.has(finalUrl.pathname)) {
+      throw new Error('page_redirected');
+    }
+    const page = parsePage(await response.text(), response.url);
+    if (!page) throw new Error('page_parse_failed');
+    pageCache.set(cacheKey, page);
+    return page;
+  }
+
+  function applyFastPage(page, pushUrl) {
+    const shell = document.querySelector('.tg-shell');
+    if (!shell) {
+      window.location.href = pushUrl.toString();
+      return;
+    }
+    shell.innerHTML = page.shellHtml;
+    const currentNav = document.querySelector('.tg-bottom-nav');
+    if (page.navHtml) {
+      if (currentNav) {
+        currentNav.outerHTML = page.navHtml;
+      } else {
+        document.body.insertAdjacentHTML('beforeend', page.navHtml);
+      }
+    } else if (currentNav) {
+      currentNav.remove();
+    }
+    document.title = page.title;
+    document.body.className = page.bodyClass;
+    document.body.setAttribute('data-current-page', page.currentPage);
+    state.currentPath = pushUrl.pathname;
+    state.authenticated = true;
+    window.scrollTo(0, 0);
+    bindFastNavigation();
+    primeFastPages();
+    applyTelegramChrome();
+  }
+
+  async function navigateFast(url, options) {
+    const targetUrl = url instanceof URL ? url : getFastUrl(url);
+    if (!targetUrl) return false;
+    const cacheKey = targetUrl.pathname + targetUrl.search;
+    const requestId = `${Date.now()}:${cacheKey}`;
+    activeNavigationRequest = requestId;
+    document.documentElement.classList.add('is-tg-navigating');
+    try {
+      const page = await fetchFastPage(targetUrl);
+      if (activeNavigationRequest !== requestId) return true;
+      applyFastPage(page, targetUrl);
+      if (!options || options.push !== false) {
+        window.history.pushState({ studerriaTg: true }, page.title, targetUrl.toString());
+      }
+      return true;
+    } catch (_error) {
+      window.location.href = targetUrl.toString();
+      return true;
+    } finally {
+      if (activeNavigationRequest === requestId) activeNavigationRequest = null;
+      document.documentElement.classList.remove('is-tg-navigating');
+    }
+  }
+
+  function bindFastNavigation() {
+    document.querySelectorAll('a[href]').forEach((anchor) => {
+      if (anchor.dataset.tgFastBound === '1') return;
+      const url = getFastUrl(anchor.getAttribute('href'));
+      if (!url) return;
+      anchor.dataset.tgFastBound = '1';
+      anchor.addEventListener('click', (event) => {
+        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (anchor.target || anchor.hasAttribute('download')) return;
+        event.preventDefault();
+        navigateFast(url);
+      });
+    });
+  }
+
+  function primeFastPages() {
+    const urls = new Map();
+    document.querySelectorAll('a[href]').forEach((anchor) => {
+      const url = getFastUrl(anchor.getAttribute('href'));
+      if (url) urls.set(url.pathname + url.search, url);
+    });
+    fastRoutePaths.forEach((pathname) => {
+      urls.set(pathname, new URL(pathname, window.location.origin));
+    });
+    urls.forEach((url, key) => {
+      if (key === `${window.location.pathname}${window.location.search}` || pageCache.has(key)) return;
+      window.setTimeout(() => {
+        fetchFastPage(url).catch(() => {});
+      }, 120);
+    });
+  }
+
   window.addEventListener('resize', applyTelegramChrome);
+  window.addEventListener('popstate', () => {
+    const url = getFastUrl(window.location.href);
+    if (!url) {
+      window.location.reload();
+      return;
+    }
+    navigateFast(url, { push: false });
+  });
   applyTelegramChrome();
+  bindFastNavigation();
+  primeFastPages();
   syncTelegramSession();
 })();

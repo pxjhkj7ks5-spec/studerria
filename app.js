@@ -19191,6 +19191,22 @@ function requireTelegramMiniStudent(req, res, next) {
   return next();
 }
 
+async function ensureTelegramMiniSetupForPage(req, userId) {
+  const normalizedUserId = Number(userId || 0);
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+    return { nextStep: 'course', status: 'missing_user', cached: false };
+  }
+  if (Number(req.session && req.session.telegramMiniSetupCompleteUserId || 0) === normalizedUserId) {
+    return { nextStep: 'complete', status: 'complete', cached: true };
+  }
+  const setupState = await loadTelegramMiniSetupState(normalizedUserId, { autoAssignRequired: true });
+  if (setupState.nextStep === 'complete') {
+    req.session.telegramMiniSetupCompleteUserId = normalizedUserId;
+    await saveRequestSession(req);
+  }
+  return setupState;
+}
+
 async function validateTelegramMiniInitData(req) {
   const initData = String(req.body && req.body.initData ? req.body.initData : '').trim();
   if (initData) {
@@ -19370,6 +19386,7 @@ async function establishTelegramMiniSession(req, user, telegramUser = null, last
   } else if (user.telegram_id) {
     await db.run('UPDATE users SET telegram_last_seen_at = NOW() WHERE id = ?', [user.id]);
   }
+  req.session.telegramMiniSetupCompleteUserId = Number(user.id || 0);
   clearTelegramMiniPending(req);
   await saveRequestSession(req);
 }
@@ -21302,6 +21319,7 @@ app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
       });
       req.session.pendingUserId = userId;
       req.session.rememberMe = true;
+      req.session.telegramMiniSetupCompleteUserId = null;
       await saveRequestSession(req);
       return res.redirect('/studerria-tg/register?step=subjects');
     }
@@ -21347,7 +21365,7 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
   try {
     await ensureDbReady();
     const userId = Number(req.session.user.id || 0);
-    const setupState = await loadTelegramMiniSetupState(userId, { autoAssignRequired: true });
+    const setupState = await ensureTelegramMiniSetupForPage(req, userId);
     if (setupState.nextStep !== 'complete') {
       req.session.pendingUserId = userId;
       await saveRequestSession(req);
@@ -21680,7 +21698,7 @@ app.get('/studerria-tg/teamwork', requireTelegramMiniStudent, async (req, res) =
   try {
     await ensureDbReady();
     const userId = Number(req.session.user.id || 0);
-    const setupState = await loadTelegramMiniSetupState(userId, { autoAssignRequired: true });
+    const setupState = await ensureTelegramMiniSetupForPage(req, userId);
     if (setupState.nextStep !== 'complete') {
       req.session.pendingUserId = userId;
       await saveRequestSession(req);
@@ -21872,9 +21890,12 @@ app.get('/studerria-tg/subjects', requireTelegramMiniStudent, async (req, res) =
 app.post('/studerria-tg/subjects', requireTelegramMiniStudent, registerLimiter, async (req, res) => {
   try {
     await ensureDbReady();
-    await saveTelegramMiniSubjectChoices(req, Number(req.session.user.id || 0));
+    const userId = Number(req.session.user.id || 0);
+    await saveTelegramMiniSubjectChoices(req, userId);
+    req.session.telegramMiniSetupCompleteUserId = userId;
     logAction(db, req, 'telegram_mini_subjects_update', { user_id: req.session.user.id });
     broadcast('users_updated');
+    await saveRequestSession(req);
     return res.redirect('/studerria-tg/subjects?ok=1');
   } catch (err) {
     const code = err && err.message ? err.message : 'db';
@@ -21942,8 +21963,10 @@ app.post('/studerria-tg/profile/reset-subjects', requireTelegramMiniStudent, wri
     const userId = Number(req.session.user.id || 0);
     await db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
     await db.run('DELETE FROM user_subject_optouts WHERE user_id = ?', [userId]);
+    req.session.telegramMiniSetupCompleteUserId = null;
     logAction(db, req, 'telegram_mini_reset_subjects', { user_id: userId });
     broadcast('users_updated');
+    await saveRequestSession(req);
     return res.redirect('/studerria-tg/subjects');
   } catch (err) {
     console.error('Telegram mini reset subjects failed', err);

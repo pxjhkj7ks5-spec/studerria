@@ -53,6 +53,13 @@ a {
 .tg-shell {
   width: min(100%, 460px);
   margin: 0 auto;
+  transition: opacity 120ms ease, transform 120ms ease;
+  will-change: opacity, transform;
+}
+
+html.is-tg-navigating .tg-shell {
+  opacity: 0.68;
+  transform: translateY(2px);
 }
 
 .tg-hero,
@@ -609,6 +616,10 @@ html.is-tg-dark .tg-member-list li {
   background: rgba(255, 255, 255, 0.88);
   box-shadow: var(--tg-shadow);
   backdrop-filter: blur(20px);
+}
+
+html.is-tg-navigating .tg-bottom-nav {
+  pointer-events: none;
 }
 
 .tg-nav-item {
