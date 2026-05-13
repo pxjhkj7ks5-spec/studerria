@@ -19998,10 +19998,22 @@ async function registerStuderriaTelegramBotCommands() {
   }
 }
 
+function getStuderriaTelegramMessageText(message = {}) {
+  return String((message && (message.text || message.caption)) || '')
+    .replace(/^[\u200B-\u200D\uFEFF]+/, '')
+    .trim();
+}
+
+function getStuderriaTelegramCommandEntities(message = {}) {
+  return Array.isArray(message && message.entities)
+    ? message.entities
+    : (Array.isArray(message && message.caption_entities) ? message.caption_entities : []);
+}
+
 function parseStuderriaTelegramCommand(message, botUsername = '') {
-  const text = String(message && message.text ? message.text : '').trim();
+  const text = getStuderriaTelegramMessageText(message);
   if (!text || !text.startsWith('/')) return null;
-  const commandEntity = (Array.isArray(message && message.entities) ? message.entities : [])
+  const commandEntity = getStuderriaTelegramCommandEntities(message)
     .find((entity) =>
       entity
       && entity.type === 'bot_command'
@@ -20019,6 +20031,17 @@ function parseStuderriaTelegramCommand(message, botUsername = '') {
   if (!command) return null;
   if (targetUsername && username && targetUsername !== username) return null;
   return { command, args, text };
+}
+
+function getStuderriaTelegramChatLogContext(message = {}) {
+  const chat = message && message.chat ? message.chat : {};
+  return {
+    chat_id: chat && chat.id ? chat.id : null,
+    chat_type: chat && chat.type ? chat.type : null,
+    chat_title: chat && chat.title ? sanitizeCompactText(chat.title, 120) : null,
+    message_id: message && message.message_id ? message.message_id : null,
+    thread_id: getStuderriaTelegramMessageThreadId(message) || null,
+  };
 }
 
 function isStuderriaTelegramStartCommand(message, botUsername = '') {
@@ -20146,6 +20169,7 @@ async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
 async function sendStuderriaTelegramHelloAbracadabra(message = {}) {
   const chat = message && message.chat ? message.chat : null;
   if (!chat || !chat.id) return;
+  console.log('Studerria Telegram helloabracadabra received', getStuderriaTelegramChatLogContext(message));
   await sendStuderriaTelegramMessage(
     chat.id,
     [
@@ -20156,6 +20180,7 @@ async function sendStuderriaTelegramHelloAbracadabra(message = {}) {
     ].join('\n'),
     { sourceMessage: message }
   );
+  console.log('Studerria Telegram helloabracadabra replied', getStuderriaTelegramChatLogContext(message));
 }
 
 async function editStuderriaTelegramMessage(callbackQuery = {}, text, replyMarkup = null) {
@@ -21188,7 +21213,7 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
 }
 
 async function handleStuderriaTelegramBotUpdate(update) {
-  const message = update && update.message ? update.message : null;
+  const message = update && (update.message || update.channel_post) ? (update.message || update.channel_post) : null;
   if (message && message.chat) {
     const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
     if (!parsedCommand) return;
@@ -21234,7 +21259,7 @@ async function startStuderriaTelegramBotPolling() {
   }
   studerriaTelegramBotState.enabled = true;
   studerriaTelegramBotState.running = true;
-  const allowedUpdates = ['message', 'callback_query'];
+  const allowedUpdates = ['message', 'channel_post', 'callback_query'];
   try {
     const me = await callStuderriaTelegramBotApi('getMe');
     studerriaTelegramBotState.botId = Number(me && me.id || 0) || null;
