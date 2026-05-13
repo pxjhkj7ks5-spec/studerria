@@ -19981,18 +19981,29 @@ async function callStuderriaTelegramBotApi(method, payload = {}) {
   return data.result;
 }
 
+const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
+  { command: 'start', description: 'Відкрити Studerria mini app' },
+  { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
+  { command: 'addpara', description: 'Додати пару' },
+  { command: 'deletepara', description: 'Видалити пару' },
+  { command: 'enablenotification', description: 'Увімкнути сповіщення' },
+  { command: 'disablenotification', description: 'Вимкнути сповіщення' },
+];
+const STUDERRIA_TG_GROUP_BOT_COMMANDS = [
+  { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
+];
+
 async function registerStuderriaTelegramBotCommands() {
   try {
-    await callStuderriaTelegramBotApi('setMyCommands', {
-      commands: [
-        { command: 'start', description: 'Відкрити Studerria mini app' },
-        { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
-        { command: 'addpara', description: 'Додати пару' },
-        { command: 'deletepara', description: 'Видалити пару' },
-        { command: 'enablenotification', description: 'Увімкнути сповіщення' },
-        { command: 'disablenotification', description: 'Вимкнути сповіщення' },
-      ],
-    });
+    const commandRegistrations = [
+      { commands: STUDERRIA_TG_PRIVATE_BOT_COMMANDS },
+      { commands: STUDERRIA_TG_PRIVATE_BOT_COMMANDS, scope: { type: 'all_private_chats' } },
+      { commands: STUDERRIA_TG_GROUP_BOT_COMMANDS, scope: { type: 'all_group_chats' } },
+      { commands: STUDERRIA_TG_GROUP_BOT_COMMANDS, scope: { type: 'all_chat_administrators' } },
+    ];
+    for (const registration of commandRegistrations) {
+      await callStuderriaTelegramBotApi('setMyCommands', registration);
+    }
   } catch (err) {
     console.error('Studerria Telegram bot commands registration failed', err && err.message ? err.message : err);
   }
@@ -20148,6 +20159,14 @@ function getStuderriaTelegramMessageThreadId(message = {}) {
   return Number.isInteger(threadId) && threadId > 0 ? threadId : null;
 }
 
+function isStuderriaTelegramThreadDeliveryError(err) {
+  const message = String(err && err.message ? err.message : err || '').toLowerCase();
+  return message.includes('message thread not found')
+    || message.includes('thread not found')
+    || message.includes('topic')
+    || message.includes('message thread');
+}
+
 async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
   if (!chatId || !text) return null;
   const payload = {
@@ -20163,7 +20182,16 @@ async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
   if (options.replyMarkup) {
     payload.reply_markup = options.replyMarkup;
   }
-  return callStuderriaTelegramBotApi('sendMessage', payload);
+  try {
+    return await callStuderriaTelegramBotApi('sendMessage', payload);
+  } catch (err) {
+    if (payload.message_thread_id && isStuderriaTelegramThreadDeliveryError(err)) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.message_thread_id;
+      return callStuderriaTelegramBotApi('sendMessage', fallbackPayload);
+    }
+    throw err;
+  }
 }
 
 async function sendStuderriaTelegramHelloAbracadabra(message = {}) {
@@ -21264,8 +21292,8 @@ async function startStuderriaTelegramBotPolling() {
     const me = await callStuderriaTelegramBotApi('getMe');
     studerriaTelegramBotState.botId = Number(me && me.id || 0) || null;
     studerriaTelegramBotState.botUsername = String(
-      process.env.STUDERRIA_TG_BOT_USERNAME
-      || (me && me.username)
+      (me && me.username)
+      || process.env.STUDERRIA_TG_BOT_USERNAME
       || ''
     ).replace(/^@/, '');
     await registerStuderriaTelegramBotCommands();
