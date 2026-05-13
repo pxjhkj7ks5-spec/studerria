@@ -20176,15 +20176,14 @@ async function loadStuderriaTelegramCourseNotificationRecipients(context = {}) {
   const courseId = parsePositiveIntStrict(context.courseId);
   const actorId = parsePositiveIntStrict(context.actor && context.actor.id);
   if (!courseId) return [];
-  return db.all(
+  const rows = await db.all(
     `
-      SELECT u.id, u.telegram_id, u.telegram_username, u.full_name
+      SELECT u.id, u.role, u.telegram_id, u.telegram_username, u.full_name
       FROM users u
       LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
       WHERE u.telegram_id IS NOT NULL
         AND u.telegram_id <> ''
         AND COALESCE(v2_group.legacy_course_id, u.course_id) = ?
-        AND LOWER(COALESCE(u.role, 'student')) IN ('student', 'starosta')
         AND COALESCE(NULLIF(u.is_active::text, ''), '1') NOT IN ('0', 'false', 'f')
         AND u.telegram_notifications_enabled IS DISTINCT FROM false
         AND (? IS NULL OR u.id <> ?)
@@ -20196,15 +20195,33 @@ async function loadStuderriaTelegramCourseNotificationRecipients(context = {}) {
     console.error('Studerria Telegram notification recipients failed', err && err.message ? err.message : err);
     return [];
   });
+  const userIds = rows.map((row) => Number(row.id || 0)).filter((value) => Number.isInteger(value) && value > 0);
+  const assignments = userIds.length
+    ? await getUserRoleAssignmentsForUserIds(userIds).catch(() => ({ roleKeysByUser: {} }))
+    : { roleKeysByUser: {} };
+  return rows.filter((row) => {
+    const roleKeys = normalizeRoleList(
+      (assignments.roleKeysByUser && assignments.roleKeysByUser[Number(row.id)])
+        || [row.role || 'student']
+    );
+    const isStaffOnly = roleKeys.some((role) => ['admin', 'deanery', 'teacher'].includes(role))
+      && !roleKeys.some((role) => ['student', 'starosta'].includes(role));
+    return !isStaffOnly;
+  });
 }
 
 async function notifyStuderriaTelegramCourseScheduleChange(context = {}, changeType = 'add', details = {}) {
   if (!canNotifyStuderriaTelegramCourseFromContext(context)) {
-    return { sent: 0, skipped: true };
+    return { sent: 0, skipped: true, reason: 'actor_not_starosta' };
   }
   const recipients = await loadStuderriaTelegramCourseNotificationRecipients(context);
   if (!recipients.length) {
-    return { sent: 0, skipped: false };
+    console.warn('Studerria Telegram notification skipped: no recipients', {
+      courseId: context.courseId,
+      actorId: context.actor && context.actor.id,
+      changeType,
+    });
+    return { sent: 0, skipped: false, reason: 'no_recipients' };
   }
   const text = buildStuderriaTelegramScheduleChangeNotification(changeType, details);
   let sent = 0;
@@ -20222,7 +20239,14 @@ async function notifyStuderriaTelegramCourseScheduleChange(context = {}, changeT
       });
     }
   }
-  return { sent, skipped: false };
+  console.log('Studerria Telegram notification result', {
+    courseId: context.courseId,
+    actorId: context.actor && context.actor.id,
+    changeType,
+    recipients: recipients.length,
+    sent,
+  });
+  return { sent, skipped: false, recipients: recipients.length };
 }
 
 function isStuderriaTelegramPrivateChat(chat = {}) {
@@ -20713,15 +20737,13 @@ async function commitStuderriaTelegramAddPara(callbackQuery = {}, payload = {}, 
     ].join('\n')
   );
   if (Number(result.inserted || 0) > 0) {
-    notifyStuderriaTelegramCourseScheduleChange(context, 'add', {
+    await notifyStuderriaTelegramCourseScheduleChange(context, 'add', {
       subjectName: getStuderriaTelegramSubjectName(subject),
       dayOfWeek: payload.dayOfWeek,
       classNumber: payload.classNumber,
       lessonType: payload.lessonType,
       groupNumber: result.groupNumber,
       weekLabel: payload.weekMode === 'semester' ? `1-${totalWeeks}` : String(context.currentWeek),
-    }).catch((err) => {
-      console.error('Studerria Telegram add notification failed', err && err.message ? err.message : err);
     });
   }
 }
@@ -20863,15 +20885,13 @@ async function handleStuderriaTelegramDeleteCallback(callbackQuery = {}, payload
       callbackQuery,
       `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`
     );
-    notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
+    await notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
       subjectName: row.subject_name,
       dayOfWeek: row.day_of_week,
       classNumber: row.class_number,
       lessonType: row.lesson_type,
       groupNumber: row.group_number,
       weekLabel: row.week_number ? String(row.week_number) : String(context.currentWeek),
-    }).catch((err) => {
-      console.error('Studerria Telegram delete notification failed', err && err.message ? err.message : err);
     });
     return;
   }
@@ -20896,15 +20916,13 @@ async function handleStuderriaTelegramDeleteCallback(callbackQuery = {}, payload
     callbackQuery,
     `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`
   );
-  notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
+  await notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
     subjectName: row.subject_name,
     dayOfWeek: row.day_of_week,
     classNumber: row.class_number,
     lessonType: row.lesson_type,
     groupNumber: row.group_number,
     weekLabel: row.week_number ? String(row.week_number) : String(context.currentWeek),
-  }).catch((err) => {
-    console.error('Studerria Telegram delete notification failed', err && err.message ? err.message : err);
   });
 }
 
