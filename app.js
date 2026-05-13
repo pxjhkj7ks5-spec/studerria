@@ -19931,6 +19931,23 @@ function resolveStuderriaTelegramGroupNumber(user = {}, subject = {}, activityTy
   return Math.max(1, Math.min(maxGroup, numericScheduleGroup || numericDefaultGroup || 1));
 }
 
+function resolveStuderriaTelegramPayloadGroupNumber(context = {}, subject = {}, payload = {}) {
+  const lessonType = normalizeLessonType(payload.lessonType) || 'lecture';
+  if (lessonType === 'lecture') return 1;
+  const maxGroup = parsePositiveIntStrict(subject && subject.group_count) || 3;
+  const requestedGroup = parsePositiveIntStrict(payload.groupNumber);
+  if (requestedGroup) {
+    return Math.max(1, Math.min(maxGroup, requestedGroup));
+  }
+  return resolveStuderriaTelegramGroupNumber(context.actor, subject, lessonType);
+}
+
+function formatStuderriaTelegramGroupScope(lessonType = '', groupNumber = null) {
+  return normalizeLessonType(lessonType) === 'lecture'
+    ? 'усі групи'
+    : `група ${groupNumber || 1}`;
+}
+
 function normalizeStuderriaTelegramIntArray(rawValue = []) {
   if (Array.isArray(rawValue)) {
     return rawValue
@@ -20580,11 +20597,37 @@ async function showStuderriaTelegramAddActivityPicker(callbackQuery = {}, payloa
     return;
   }
   const activity = activities[0] || null;
-  await showStuderriaTelegramAddDayPicker(callbackQuery, {
+  const nextPayload = {
     ...payload,
     activityId: activity ? activity.id : null,
     lessonType: activity ? activity.activity_type : 'lecture',
-  }, context, subject);
+  };
+  if (normalizeLessonType(nextPayload.lessonType) === 'seminar') {
+    await showStuderriaTelegramAddGroupPicker(callbackQuery, nextPayload, subject);
+    return;
+  }
+  await showStuderriaTelegramAddDayPicker(callbackQuery, nextPayload, context, subject);
+}
+
+async function showStuderriaTelegramAddGroupPicker(callbackQuery = {}, payload = {}, subject = {}) {
+  const maxGroup = parsePositiveIntStrict(subject && subject.group_count) || 3;
+  const groupNumbers = Array.from({ length: Math.max(1, maxGroup) }, (_value, index) => index + 1);
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    [
+      `Предмет: ${getStuderriaTelegramSubjectName(subject)}`,
+      `Тип: ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}`,
+      'Обери групу:',
+    ].join('\n'),
+    buildStuderriaTelegramInlineKeyboard(groupNumbers.map((groupNumber) => ({
+      text: `Група ${groupNumber}`,
+      callback_data: createStuderriaTelegramActionToken({
+        ...payload,
+        flow: 'add_group',
+        groupNumber,
+      }),
+    })), 3)
+  );
 }
 
 async function showStuderriaTelegramAddDayPicker(callbackQuery = {}, payload = {}, context = {}, subject = {}) {
@@ -20595,7 +20638,12 @@ async function showStuderriaTelegramAddDayPicker(callbackQuery = {}, payload = {
     : daysOfWeek;
   await editStuderriaTelegramMessage(
     callbackQuery,
-    `Предмет: ${getStuderriaTelegramSubjectName(subject)}\nТип: ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}\nОбери день:`,
+    [
+      `Предмет: ${getStuderriaTelegramSubjectName(subject)}`,
+      `Тип: ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}`,
+      normalizeLessonType(payload.lessonType) === 'seminar' && payload.groupNumber ? `Група: ${payload.groupNumber}` : '',
+      'Обери день:',
+    ].filter(Boolean).join('\n'),
     buildStuderriaTelegramInlineKeyboard(dayNames.map((dayName) => ({
       text: getStuderriaTelegramDayLabel(dayName),
       callback_data: createStuderriaTelegramActionToken({
@@ -20610,7 +20658,12 @@ async function showStuderriaTelegramAddDayPicker(callbackQuery = {}, payload = {
 async function showStuderriaTelegramAddClassPicker(callbackQuery = {}, payload = {}, subject = {}) {
   await editStuderriaTelegramMessage(
     callbackQuery,
-    `Предмет: ${getStuderriaTelegramSubjectName(subject)}\nДень: ${getStuderriaTelegramDayLabel(payload.dayOfWeek)}\nОбери пару:`,
+    [
+      `Предмет: ${getStuderriaTelegramSubjectName(subject)}`,
+      normalizeLessonType(payload.lessonType) === 'seminar' && payload.groupNumber ? `Група: ${payload.groupNumber}` : '',
+      `День: ${getStuderriaTelegramDayLabel(payload.dayOfWeek)}`,
+      'Обери пару:',
+    ].filter(Boolean).join('\n'),
     buildStuderriaTelegramInlineKeyboard(Array.from({ length: 7 }, (_value, index) => {
       const classNumber = index + 1;
       return {
@@ -20630,9 +20683,10 @@ async function showStuderriaTelegramAddWeekPicker(callbackQuery = {}, payload = 
     callbackQuery,
     [
       `Предмет: ${getStuderriaTelegramSubjectName(subject)}`,
+      normalizeLessonType(payload.lessonType) === 'seminar' && payload.groupNumber ? `Група: ${payload.groupNumber}` : '',
       `Слот: ${getStuderriaTelegramDayLabel(payload.dayOfWeek)}, ${payload.classNumber} пара`,
       'На які тижні додати?',
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     buildStuderriaTelegramInlineKeyboard([
       {
         text: `Поточний (${context.currentWeek})`,
@@ -20656,7 +20710,7 @@ async function showStuderriaTelegramAddWeekPicker(callbackQuery = {}, payload = 
 
 async function insertLegacyStuderriaTelegramScheduleEntries(context = {}, subject = {}, payload = {}, weeks = []) {
   const lessonType = normalizeLessonType(payload.lessonType) || 'lecture';
-  const groupNumber = resolveStuderriaTelegramGroupNumber(context.actor, subject, lessonType);
+  const groupNumber = resolveStuderriaTelegramPayloadGroupNumber(context, subject, payload);
   const storageCourseId = parsePositiveIntStrict(subject.owner_course_id || subject.course_id || context.courseId) || context.courseId;
   const semesterId = parsePositiveIntStrict(context.activeSemester && context.activeSemester.id);
   const subjectId = parsePositiveIntStrict(subject.subject_id || subject.id);
@@ -20710,7 +20764,7 @@ async function insertAcademicV2StuderriaTelegramScheduleEntries(context = {}, su
     throw new Error('Немає типу пари для цього предмета.');
   }
   const lessonType = normalizeLessonType(payload.lessonType) || 'lecture';
-  const groupNumber = resolveStuderriaTelegramGroupNumber(context.actor, subject, lessonType);
+  const groupNumber = resolveStuderriaTelegramPayloadGroupNumber(context, subject, payload);
   const termId = parsePositiveIntStrict(context.runtimeTerm && context.runtimeTerm.id);
   const targetGroupNumbers = lessonType === 'lecture' ? [] : [groupNumber];
   const targetGroupKey = targetGroupNumbers.join(',');
@@ -20759,7 +20813,7 @@ async function commitStuderriaTelegramAddPara(callbackQuery = {}, payload = {}, 
       dayOfWeek: payload.dayOfWeek,
       classNumber: payload.classNumber,
       lessonType: payload.lessonType,
-      groupNumber: result.groupNumber,
+      groupNumber: normalizeLessonType(payload.lessonType) === 'lecture' ? null : result.groupNumber,
       weekLabel: payload.weekMode === 'semester' ? `1-${totalWeeks}` : String(context.currentWeek),
     });
   }
@@ -20768,7 +20822,7 @@ async function commitStuderriaTelegramAddPara(callbackQuery = {}, payload = {}, 
     [
       'Готово, додав пару.',
       `${getStuderriaTelegramSubjectName(subject)} · ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}`,
-      `${getStuderriaTelegramDayLabel(payload.dayOfWeek)}, ${payload.classNumber} пара, група ${result.groupNumber}`,
+      `${getStuderriaTelegramDayLabel(payload.dayOfWeek)}, ${payload.classNumber} пара, ${formatStuderriaTelegramGroupScope(payload.lessonType, result.groupNumber)}`,
       payload.weekMode === 'semester' ? `Тижні: 1-${totalWeeks}` : `Тиждень: ${context.currentWeek}`,
       notificationResult ? formatStuderriaTelegramNotificationResult(notificationResult) : 'Розсилка: не надсилалась, пара вже була в розкладі.',
     ].join('\n')
@@ -20797,6 +20851,14 @@ async function handleStuderriaTelegramAddCallback(callbackQuery = {}, payload = 
     return;
   }
   if (payload.flow === 'add_activity') {
+    if (normalizeLessonType(payload.lessonType) === 'seminar') {
+      await showStuderriaTelegramAddGroupPicker(callbackQuery, payload, subject);
+      return;
+    }
+    await showStuderriaTelegramAddDayPicker(callbackQuery, payload, context, subject);
+    return;
+  }
+  if (payload.flow === 'add_group') {
     await showStuderriaTelegramAddDayPicker(callbackQuery, payload, context, subject);
     return;
   }
