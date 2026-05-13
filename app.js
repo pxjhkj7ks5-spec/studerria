@@ -20117,6 +20117,21 @@ async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
   return callStuderriaTelegramBotApi('sendMessage', payload);
 }
 
+async function sendStuderriaTelegramHelloAbracadabra(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  if (!chat || !chat.id) return;
+  await sendStuderriaTelegramMessage(
+    chat.id,
+    [
+      'Абру-кадабру прийнято. Портал не відкрився, бо він, здається, у приватці.',
+      'Тож герой дня, зайди вже в @studerria_bot і натисни /start, а не тикай магічні кнопки по групах.',
+      '',
+      'важко жити, шкода вмерти',
+    ].join('\n'),
+    { sourceMessage: message }
+  );
+}
+
 async function editStuderriaTelegramMessage(callbackQuery = {}, text, replyMarkup = null) {
   const message = callbackQuery && callbackQuery.message ? callbackQuery.message : null;
   if (!message || !text) return null;
@@ -21151,6 +21166,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
   if (message && message.chat) {
     const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
     if (!parsedCommand) return;
+    if (parsedCommand.command === 'helloabracadabra') {
+      await sendStuderriaTelegramHelloAbracadabra(message);
+      return;
+    }
     if (!isStuderriaTelegramPrivateChat(message.chat)) {
       const canUseGroupCommand = await canUseStuderriaTelegramGroupCommand(message.from || {});
       if (!canUseGroupCommand) return;
