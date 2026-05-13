@@ -13807,6 +13807,85 @@ async function getAdminScopedUser(adminAcademicScope = {}, userId, options = {})
   return rows && rows[0] ? rows[0] : null;
 }
 
+async function resolveUserDeletionReassignmentId(client, targetUserId, preferredActorId) {
+  const normalizedTargetId = Number(targetUserId || 0);
+  const normalizedActorId = Number(preferredActorId || 0);
+  if (Number.isInteger(normalizedActorId) && normalizedActorId > 0 && normalizedActorId !== normalizedTargetId) {
+    const actorResult = await client.query(
+      convertPlaceholders('SELECT id FROM users WHERE id = ? LIMIT 1'),
+      [normalizedActorId]
+    );
+    if (actorResult.rows && actorResult.rows[0] && actorResult.rows[0].id) {
+      return Number(actorResult.rows[0].id);
+    }
+  }
+  const fallbackResult = await client.query(
+    convertPlaceholders(`
+      SELECT id
+      FROM users
+      WHERE id <> ?
+        AND LOWER(COALESCE(role, '')) = 'admin'
+      ORDER BY id ASC
+      LIMIT 1
+    `),
+    [normalizedTargetId]
+  );
+  return fallbackResult.rows && fallbackResult.rows[0] && fallbackResult.rows[0].id
+    ? Number(fallbackResult.rows[0].id)
+    : null;
+}
+
+async function deleteUserPermanentlyEverywhere(userId, actorUserId) {
+  const normalizedUserId = Number(userId || 0);
+  if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+    const err = new Error('invalid_user_id');
+    err.code = 'invalid_user_id';
+    throw err;
+  }
+  return withTransaction(async (client) => {
+    const userResult = await client.query(
+      convertPlaceholders(`
+        SELECT id, full_name, role, course_id, group_id, telegram_id, telegram_username
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE
+      `),
+      [normalizedUserId]
+    );
+    const user = userResult.rows && userResult.rows[0] ? userResult.rows[0] : null;
+    if (!user) {
+      return null;
+    }
+    if (normalizeRoleKey(user.role) === 'admin') {
+      const err = new Error('cannot_delete_admin');
+      err.code = 'cannot_delete_admin';
+      throw err;
+    }
+    const reassignmentUserId = await resolveUserDeletionReassignmentId(client, normalizedUserId, actorUserId);
+    if (!reassignmentUserId) {
+      const err = new Error('missing_reassignment_user');
+      err.code = 'missing_reassignment_user';
+      throw err;
+    }
+
+    await txRun(client, 'DELETE FROM student_groups WHERE student_id = ?', [normalizedUserId]);
+    await txRun(client, 'DELETE FROM login_history WHERE user_id = ?', [normalizedUserId]);
+    await txRun(client, 'DELETE FROM message_reads WHERE user_id = ?', [normalizedUserId]);
+    await txRun(client, 'DELETE FROM message_targets WHERE user_id = ?', [normalizedUserId]);
+    await txRun(client, 'DELETE FROM teamwork_members WHERE user_id = ?', [normalizedUserId]);
+    await txRun(client, 'UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [normalizedUserId]);
+    await txRun(client, 'UPDATE messages SET created_by_id = ? WHERE created_by_id = ?', [reassignmentUserId, normalizedUserId]);
+    await txRun(client, 'UPDATE teamwork_tasks SET created_by = ? WHERE created_by = ?', [reassignmentUserId, normalizedUserId]);
+    await txRun(client, 'UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [reassignmentUserId, normalizedUserId]);
+    await txRun(client, 'DELETE FROM users WHERE id = ?', [normalizedUserId]);
+    return {
+      ...user,
+      reassignment_user_id: reassignmentUserId,
+    };
+  });
+}
+
 function getStaffPanelBase(req, courseId) {
   return buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req), {
     courseId: parsePositiveIntStrict(courseId) || parsePositiveIntStrict(getAdminCourse(req)) || null,
@@ -19136,6 +19215,20 @@ function clearTelegramMiniPending(req) {
   }
 }
 
+function clearTelegramMiniAuthenticatedUser(req) {
+  if (!req || !req.session) return;
+  req.session.user = null;
+  req.session.role = null;
+  req.session.roles = [];
+  req.session.role_fingerprint = null;
+  req.session.pendingUserId = null;
+  req.session.telegramMiniSetupCompleteUserId = null;
+  req.session.viewAs = null;
+  req.session.viewAsMode = null;
+  req.session.viewAsCourseId = null;
+  req.session.viewAsGroupNumber = null;
+}
+
 function isTelegramMiniStudentRole(role) {
   return TG_MINI_STUDENT_ROLES.has(normalizeRoleKey(role));
 }
@@ -21192,6 +21285,9 @@ app.post('/studerria-tg/auth/init', authLimiter, async (req, res) => {
     setTelegramMiniPending(req, telegramUser);
     const linkedUser = await findUserByTelegramId(telegramUser.id);
     if (!linkedUser) {
+      if (canUseTelegramMiniSession(req)) {
+        clearTelegramMiniAuthenticatedUser(req);
+      }
       await saveRequestSession(req);
       return res.json({ ok: true, status: 'link_required', redirect: '/studerria-tg/register' });
     }
@@ -66996,7 +67092,6 @@ app.post('/admin/users/activate', requireUsersSectionAccess, (req, res) => {
 app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req, res) => {
   const { user_id } = req.body;
   const userId = Number(user_id);
-  const courseId = getAdminCourse(req);
   const redirectBase = buildStaffPanelScopeUrl(req, getStoredAdminAcademicScope(req));
   const rawUsersStatus = String(req.body.users_status || req.query.users_status || req.query.status || 'active').trim().toLowerCase();
   const usersStatus = rawUsersStatus === 'inactive' || rawUsersStatus === 'all' ? rawUsersStatus : 'active';
@@ -67005,30 +67100,46 @@ app.post('/admin/users/delete-permanent', requireUsersSectionAccess, async (req,
     return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Invalid user'));
   }
   try {
-    const user = await academicSetupHelpers.getLegacyCourseUser(getAcademicSetupStore(), {
-      userId,
-      courseId,
+    await ensureDbReady();
+    const adminAcademicScope = await buildAdminAcademicScopeState(req, { includeAcademicGroups: true });
+    const user = await getAdminScopedUser(adminAcademicScope || {}, userId, {
+      selectClause: `
+        u.id,
+        u.full_name,
+        u.role,
+        u.course_id,
+        u.group_id,
+        u.telegram_id,
+        u.telegram_username
+      `,
     });
     if (!user) {
       return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'User not found'));
     }
-    if (user.role === 'admin') {
+    if (normalizeRoleKey(user.role) === 'admin') {
       return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Cannot delete admin'));
     }
-    await db.run('DELETE FROM student_groups WHERE student_id = ?', [userId]);
-    await db.run('DELETE FROM login_history WHERE user_id = ?', [userId]);
-    await db.run('DELETE FROM message_reads WHERE user_id = ?', [userId]);
-    await db.run('DELETE FROM message_targets WHERE user_id = ?', [userId]);
-    await db.run('DELETE FROM teamwork_members WHERE user_id = ?', [userId]);
-    await db.run('UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [userId]);
-    await db.run('UPDATE messages SET created_by_id = ? WHERE created_by_id = ?', [req.session.user.id, userId]);
-    await db.run('UPDATE teamwork_tasks SET created_by = ? WHERE created_by = ?', [req.session.user.id, userId]);
-    await db.run('UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [req.session.user.id, userId]);
-    await db.run('DELETE FROM users WHERE id = ?', [userId]);
-    logAction(db, req, 'user_delete_permanent', { user_id: userId });
+    const deletedUser = await deleteUserPermanentlyEverywhere(userId, req.session && req.session.user ? req.session.user.id : null);
+    if (!deletedUser) {
+      return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'User not found'));
+    }
+    const revokedSessions = await revokeUserSessions(userId);
+    logAction(db, req, 'user_delete_permanent', {
+      user_id: userId,
+      full_name: user.full_name || '',
+      telegram_id: user.telegram_id || null,
+      revoked_sessions: revokedSessions,
+    });
     broadcast('users_updated');
     return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'ok', 'User deleted'));
   } catch (err) {
+    console.error('Database error (admin.users.deletePermanent)', err);
+    if (err && err.code === 'cannot_delete_admin') {
+      return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Cannot delete admin'));
+    }
+    if (err && err.code === 'missing_reassignment_user') {
+      return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Cannot delete user without fallback owner'));
+    }
     return res.redirect(appendQueryParamToUrl(redirectBaseWithStatus, 'err', 'Database error'));
   }
 });

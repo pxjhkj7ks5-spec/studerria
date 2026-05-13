@@ -2798,7 +2798,7 @@
                             data-tg-user-delete="<%= row.id %>"
                             data-tg-user-label="<%= row.full_name || row.telegram_username || row.telegram_id || 'Telegram user' %>"
                           >
-                            Видалити TG
+                            Відвʼязати TG
                           </button>
                         </td>
                       </tr>
@@ -7584,7 +7584,7 @@
                         data-tg-user-delete="${escapeHtml(row.id || '')}"
                         data-tg-user-label="${escapeHtml(row.full_name || tgLabel || 'Telegram user')}"
                       >
-                        Видалити TG
+                        Відвʼязати TG
                       </button>
                     </td>
                   </tr>
@@ -7639,7 +7639,7 @@
           if (!Number.isFinite(userId) || userId < 1) return;
           const userLabel = button.dataset.tgUserLabel || 'Telegram user';
           const confirmed = await openConfirmModal({
-            title: 'Видалити TG',
+            title: 'Відвʼязати TG',
             message: `Видалити Telegram-привʼязку для ${userLabel}? Основний акаунт Studerria залишиться.`,
             level: 'danger',
           });
