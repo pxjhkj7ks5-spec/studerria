@@ -21387,50 +21387,11 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       : getAcademicWeekForSemester(new Date(), baseState.term);
     if (selectedWeek < 1) selectedWeek = 1;
     if (selectedWeek > totalWeeks) selectedWeek = totalWeeks;
-    const scheduleStatesByWeek = await Promise.all(
-      Array.from({ length: totalWeeks }, (_value, index) => index + 1).map((weekNumber) =>
-        academicV2StudentHelpers.loadStudentScheduleData(
-          getAcademicV2Store(),
-          userId,
-          { weekNumber }
-        ).then((state) => ({
-          weekNumber,
-          state,
-          rowCount: Array.isArray(state && state.scheduleRows) ? state.scheduleRows.length : 0,
-        }))
-      )
+    const scheduleState = await academicV2StudentHelpers.loadStudentScheduleData(
+      getAcademicV2Store(),
+      userId,
+      { weekNumber: selectedWeek }
     );
-    const selectedScheduleRecord = scheduleStatesByWeek.find((item) => item.weekNumber === selectedWeek) || scheduleStatesByWeek[0] || null;
-    const fullestScheduleRecord = scheduleStatesByWeek
-      .slice()
-      .sort((left, right) => {
-        const rowDiff = Number(right.rowCount || 0) - Number(left.rowCount || 0);
-        if (rowDiff !== 0) return rowDiff;
-        return Number(left.weekNumber || 0) - Number(right.weekNumber || 0);
-      })[0] || selectedScheduleRecord;
-    const selectedRowCount = Number(selectedScheduleRecord && selectedScheduleRecord.rowCount || 0);
-    const fullestRowCount = Number(fullestScheduleRecord && fullestScheduleRecord.rowCount || 0);
-    const useTemplateWeek = Boolean(
-      fullestScheduleRecord
-      && selectedScheduleRecord
-      && Number(fullestScheduleRecord.weekNumber || 0) !== Number(selectedWeek || 0)
-      && fullestRowCount > selectedRowCount
-    );
-    const scheduleState = useTemplateWeek
-      ? {
-          ...(fullestScheduleRecord.state || {}),
-          display_week_number: selectedWeek,
-          source_week_number: fullestScheduleRecord.weekNumber,
-          scheduleRows: (fullestScheduleRecord.state && Array.isArray(fullestScheduleRecord.state.scheduleRows)
-            ? fullestScheduleRecord.state.scheduleRows
-            : []
-          ).map((row) => ({
-            ...row,
-            display_week_number: selectedWeek,
-            source_week_number: fullestScheduleRecord.weekNumber,
-          })),
-        }
-      : (selectedScheduleRecord ? selectedScheduleRecord.state : { scheduleRows: [] });
     const activeDays = Array.from(new Set((scheduleState.scheduleRows || []).map((row) => row.day_of_week).filter(Boolean)));
     const orderedDays = fullWeekDays.filter((day) => activeDays.includes(day));
     const fallbackDays = orderedDays.length ? orderedDays : [...daysOfWeek];
