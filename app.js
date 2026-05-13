@@ -20123,10 +20123,10 @@ async function sendStuderriaTelegramHelloAbracadabra(message = {}) {
   await sendStuderriaTelegramMessage(
     chat.id,
     [
-      'Абру-кадабру прийнято. Портал не відкрився, бо він, здається, у приватці.',
+      'Абру-кадабру прийнято. Студерія не відкрився, бо він, здається, в пп з ботом.',
       'Тож герой дня, зайди вже в @studerria_bot і натисни /start, а не тикай магічні кнопки по групах.',
       '',
-      'важко жити, шкода вмерти',
+      '"важко жити, шкода вмерти"',
     ].join('\n'),
     { sourceMessage: message }
   );
