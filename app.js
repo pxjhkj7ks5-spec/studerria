@@ -20212,6 +20212,14 @@ async function loadStuderriaTelegramCourseNotificationRecipients(context = {}) {
 
 async function notifyStuderriaTelegramCourseScheduleChange(context = {}, changeType = 'add', details = {}) {
   if (!canNotifyStuderriaTelegramCourseFromContext(context)) {
+    console.log('Studerria Telegram notification skipped', {
+      courseId: context.courseId,
+      actorId: context.actor && context.actor.id,
+      changeType,
+      reason: 'actor_not_starosta',
+      isDev: Boolean(context.isDev),
+      roleKeys: context.roleKeys || [],
+    });
     return { sent: 0, skipped: true, reason: 'actor_not_starosta' };
   }
   const recipients = await loadStuderriaTelegramCourseNotificationRecipients(context);
@@ -20247,6 +20255,23 @@ async function notifyStuderriaTelegramCourseScheduleChange(context = {}, changeT
     sent,
   });
   return { sent, skipped: false, recipients: recipients.length };
+}
+
+function formatStuderriaTelegramNotificationResult(result = {}) {
+  if (result.reason === 'actor_not_starosta') {
+    return 'Розсилка: не надсилалась, бо дія не від starosta.';
+  }
+  if (result.reason === 'no_recipients') {
+    return 'Розсилка: немає отримувачів.';
+  }
+  const recipients = Number(result.recipients || 0);
+  const sent = Number(result.sent || 0);
+  if (!recipients) {
+    return 'Розсилка: не надсилалась.';
+  }
+  return sent === recipients
+    ? `Розсилка: ${sent}/${recipients} доставлено.`
+    : `Розсилка: ${sent}/${recipients} доставлено, частина не дійшла.`;
 }
 
 function isStuderriaTelegramPrivateChat(chat = {}) {
@@ -20727,17 +20752,9 @@ async function commitStuderriaTelegramAddPara(callbackQuery = {}, payload = {}, 
   const result = context.subjectScope && context.subjectScope.source === 'academic_v2'
     ? await insertAcademicV2StuderriaTelegramScheduleEntries(context, subject, payload, weeks)
     : await insertLegacyStuderriaTelegramScheduleEntries(context, subject, payload, weeks);
-  await editStuderriaTelegramMessage(
-    callbackQuery,
-    [
-      'Готово, додав пару.',
-      `${getStuderriaTelegramSubjectName(subject)} · ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}`,
-      `${getStuderriaTelegramDayLabel(payload.dayOfWeek)}, ${payload.classNumber} пара, група ${result.groupNumber}`,
-      payload.weekMode === 'semester' ? `Тижні: 1-${totalWeeks}` : `Тиждень: ${context.currentWeek}`,
-    ].join('\n')
-  );
+  let notificationResult = null;
   if (Number(result.inserted || 0) > 0) {
-    await notifyStuderriaTelegramCourseScheduleChange(context, 'add', {
+    notificationResult = await notifyStuderriaTelegramCourseScheduleChange(context, 'add', {
       subjectName: getStuderriaTelegramSubjectName(subject),
       dayOfWeek: payload.dayOfWeek,
       classNumber: payload.classNumber,
@@ -20746,6 +20763,16 @@ async function commitStuderriaTelegramAddPara(callbackQuery = {}, payload = {}, 
       weekLabel: payload.weekMode === 'semester' ? `1-${totalWeeks}` : String(context.currentWeek),
     });
   }
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    [
+      'Готово, додав пару.',
+      `${getStuderriaTelegramSubjectName(subject)} · ${getStuderriaTelegramLessonTypeLabel(payload.lessonType)}`,
+      `${getStuderriaTelegramDayLabel(payload.dayOfWeek)}, ${payload.classNumber} пара, група ${result.groupNumber}`,
+      payload.weekMode === 'semester' ? `Тижні: 1-${totalWeeks}` : `Тиждень: ${context.currentWeek}`,
+      notificationResult ? formatStuderriaTelegramNotificationResult(notificationResult) : 'Розсилка: не надсилалась, пара вже була в розкладі.',
+    ].join('\n')
+  );
 }
 
 async function handleStuderriaTelegramAddCallback(callbackQuery = {}, payload = {}) {
@@ -20881,11 +20908,7 @@ async function handleStuderriaTelegramDeleteCallback(callbackQuery = {}, payload
       return;
     }
     await academicV2Helpers.deleteScheduleEntry(getAcademicV2Store(), scheduleEntryId);
-    await editStuderriaTelegramMessage(
-      callbackQuery,
-      `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`
-    );
-    await notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
+    const notificationResult = await notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
       subjectName: row.subject_name,
       dayOfWeek: row.day_of_week,
       classNumber: row.class_number,
@@ -20893,6 +20916,13 @@ async function handleStuderriaTelegramDeleteCallback(callbackQuery = {}, payload
       groupNumber: row.group_number,
       weekLabel: row.week_number ? String(row.week_number) : String(context.currentWeek),
     });
+    await editStuderriaTelegramMessage(
+      callbackQuery,
+      [
+        `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`,
+        formatStuderriaTelegramNotificationResult(notificationResult),
+      ].join('\n')
+    );
     return;
   }
   const row = await db.get(
@@ -20912,11 +20942,7 @@ async function handleStuderriaTelegramDeleteCallback(callbackQuery = {}, payload
     return;
   }
   await db.run('DELETE FROM schedule_entries WHERE id = ? AND course_id = ?', [scheduleEntryId, context.courseId]);
-  await editStuderriaTelegramMessage(
-    callbackQuery,
-    `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`
-  );
-  await notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
+  const notificationResult = await notifyStuderriaTelegramCourseScheduleChange(context, 'delete', {
     subjectName: row.subject_name,
     dayOfWeek: row.day_of_week,
     classNumber: row.class_number,
@@ -20924,6 +20950,13 @@ async function handleStuderriaTelegramDeleteCallback(callbackQuery = {}, payload
     groupNumber: row.group_number,
     weekLabel: row.week_number ? String(row.week_number) : String(context.currentWeek),
   });
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    [
+      `Видалено: ${getStuderriaTelegramDayLabel(row.day_of_week)} ${row.class_number} · ${sanitizeCompactText(row.subject_name || 'Предмет', 80)}`,
+      formatStuderriaTelegramNotificationResult(notificationResult),
+    ].join('\n')
+  );
 }
 
 async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
