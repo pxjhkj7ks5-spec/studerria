@@ -135,6 +135,12 @@ h3 {
   gap: 12px;
 }
 
+.tg-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .tg-form label {
   display: grid;
   gap: 7px;
@@ -257,7 +263,9 @@ html.is-tg-dark .tg-secondary {
 
 .tg-choice-list,
 .tg-subject-list,
-.tg-schedule {
+.tg-schedule,
+.tg-teamwork-list,
+.tg-team-groups {
   display: grid;
   gap: 9px;
 }
@@ -410,6 +418,124 @@ html.is-tg-dark .tg-pill {
   color: #fff;
 }
 
+.tg-subject-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.tg-subject-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tg-subject-tab {
+  flex: 0 0 auto;
+  max-width: 230px;
+  min-height: 38px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--tg-border);
+  border-radius: 999px;
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--tg-muted);
+  font-size: 0.82rem;
+  font-weight: 760;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html.is-tg-dark .tg-subject-tab {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tg-subject-tab.is-active {
+  border-color: transparent;
+  background: var(--tg-theme-accent);
+  color: #fff;
+}
+
+.tg-task {
+  display: grid;
+  gap: 12px;
+}
+
+.tg-task-head,
+.tg-team-group-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tg-task-head h2,
+.tg-team-group-head h3 {
+  margin-bottom: 3px;
+}
+
+.tg-team-group {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--tg-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+html.is-tg-dark .tg-team-group {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.tg-team-group.is-member {
+  border-color: color-mix(in srgb, var(--tg-theme-accent) 60%, var(--tg-border));
+  box-shadow: inset 3px 0 0 var(--tg-theme-accent);
+}
+
+.tg-team-group-head span {
+  flex: 0 0 auto;
+  min-width: 34px;
+  min-height: 26px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.07);
+  color: var(--tg-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+html.is-tg-dark .tg-team-group-head span {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tg-member-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tg-member-list li {
+  min-height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: rgba(17, 24, 39, 0.07);
+  color: var(--tg-theme-text);
+  font-size: 0.8rem;
+  font-weight: 680;
+}
+
+html.is-tg-dark .tg-member-list li {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .tg-lesson {
   grid-template-columns: 62px 1fr;
 }
@@ -537,6 +663,10 @@ html.is-tg-dark .tg-bottom-nav {
 
   .tg-choice strong {
     font-size: 0.94rem;
+  }
+
+  .tg-form-grid {
+    grid-template-columns: 1fr;
   }
 }
 

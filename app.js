@@ -21262,6 +21262,412 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
   }
 });
 
+async function loadTelegramMiniTeamworkState(userId, selectedSubjectId = null) {
+  const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+    getAcademicV2Store(),
+    userId,
+    { selectedOnly: true }
+  );
+  const subjects = (subjectState.subjects || [])
+    .filter((subject) => subject && subject.show_in_teamwork !== false)
+    .map((subject) => ({
+      ...subject,
+      subject_id: Number(subject.subject_id || subject.id || 0),
+      subject_name: sanitizeCompactText(subject.subject_name || subject.name || subject.subject_title || 'Предмет', 140),
+      selected_group: parsePositiveIntStrict(subject.selected_group || (Array.isArray(subject.group_numbers) ? subject.group_numbers[0] : null)),
+      course_id: parsePositiveIntStrict(subject.owner_course_id || subject.course_id),
+      group_count: Math.max(1, Number(subject.group_count || 1) || 1),
+    }))
+    .filter((subject) => subject.subject_id && subject.course_id);
+
+  const selectedSubject = selectedSubjectId
+    ? (subjects.find((subject) => Number(subject.subject_id) === Number(selectedSubjectId)) || subjects[0] || null)
+    : (subjects[0] || null);
+
+  if (!selectedSubject) {
+    return { subjectState, subjects, selectedSubject: null, tasks: [], currentMembershipByTask: {} };
+  }
+
+  const activeSemester = await getActiveSemester(selectedSubject.course_id).catch(() => null);
+  const taskFilters = ['t.subject_id = ?', 't.course_id = ?'];
+  const taskParams = [selectedSubject.subject_id, selectedSubject.course_id];
+  if (activeSemester && activeSemester.id) {
+    taskFilters.push('t.semester_id = ?');
+    taskParams.push(activeSemester.id);
+  } else {
+    taskFilters.push('t.semester_id IS NULL');
+  }
+  const taskRows = await db.all(
+    `
+      SELECT t.*, s.name AS subject_name, COALESCE(u.full_name, '') AS created_by_name
+      FROM teamwork_tasks t
+      JOIN subjects s ON s.id = t.subject_id
+      LEFT JOIN users u ON u.id = t.created_by
+      WHERE ${taskFilters.join(' AND ')}
+      ORDER BY t.created_at DESC, t.id DESC
+      LIMIT 40
+    `,
+    taskParams
+  );
+  if (!taskRows.length) {
+    return { subjectState, subjects, selectedSubject, activeSemester, tasks: [], currentMembershipByTask: {} };
+  }
+
+  const creatorIds = Array.from(new Set(
+    taskRows.map((task) => Number(task.created_by || 0)).filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  let creatorAssignmentRows = [];
+  if (creatorIds.length) {
+    creatorAssignmentRows = await academicV2RuntimeHelpers.listTeacherAssignedSubjectRowsByUsers(getAcademicV2Store(), {
+      userIds: creatorIds,
+      subjectId: selectedSubject.subject_id,
+      includeHidden: true,
+    }).catch(() => []);
+    if (!creatorAssignmentRows.length) {
+      creatorAssignmentRows = await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
+        userIds: creatorIds,
+        subjectId: selectedSubject.subject_id,
+        includeHidden: true,
+      }).catch(() => []);
+    }
+  }
+  const creatorAssignmentsByUser = {};
+  (creatorAssignmentRows || []).forEach((row) => {
+    const creatorId = Number(row.user_id || 0);
+    if (!Number.isInteger(creatorId) || creatorId < 1) return;
+    if (!creatorAssignmentsByUser[creatorId]) creatorAssignmentsByUser[creatorId] = [];
+    creatorAssignmentsByUser[creatorId].push(row);
+  });
+
+  const studentGroup = parsePositiveIntStrict(selectedSubject.selected_group) || 1;
+  const visibleTasks = taskRows.filter((task) => {
+    const teacherRows = creatorAssignmentsByUser[Number(task.created_by || 0)] || [];
+    const audience = buildTeamworkTaskAudience(
+      task,
+      teacherRows.length
+        ? buildTeacherSubjectAccess(teacherRows, selectedSubject.group_count, { courseId: selectedSubject.course_id })
+        : { hasRows: false, allowAll: true, groups: new Set() },
+      selectedSubject.group_count
+    );
+    task.__tgAudience = audience;
+    return audience.allowAll || audience.groups.has(studentGroup);
+  });
+  if (!visibleTasks.length) {
+    return { subjectState, subjects, selectedSubject, activeSemester, tasks: [], currentMembershipByTask: {} };
+  }
+
+  const taskIds = visibleTasks.map((task) => Number(task.id)).filter((id) => Number.isInteger(id) && id > 0);
+  const placeholders = taskIds.map(() => '?').join(',');
+  const [groups, members] = await Promise.all([
+    db.all(
+      `
+        SELECT g.*, COALESCE(u.full_name, '') AS leader_name
+        FROM teamwork_groups g
+        LEFT JOIN users u ON u.id = g.leader_id
+        WHERE g.task_id IN (${placeholders})
+        ORDER BY g.task_id ASC, g.id ASC
+      `,
+      taskIds
+    ),
+    db.all(
+      `
+        SELECT m.*, u.full_name AS member_name
+        FROM teamwork_members m
+        JOIN users u ON u.id = m.user_id
+        WHERE m.task_id IN (${placeholders})
+        ORDER BY u.full_name ASC
+      `,
+      taskIds
+    ),
+  ]);
+
+  const groupsByTask = {};
+  (groups || []).forEach((group) => {
+    const taskId = Number(group.task_id || 0);
+    if (!groupsByTask[taskId]) groupsByTask[taskId] = [];
+    groupsByTask[taskId].push({
+      ...group,
+      members: [],
+      is_member: false,
+      is_full: false,
+    });
+  });
+
+  const currentMembershipByTask = {};
+  (members || []).forEach((member) => {
+    const taskId = Number(member.task_id || 0);
+    const groupId = Number(member.group_id || 0);
+    const taskGroups = groupsByTask[taskId] || [];
+    const group = taskGroups.find((item) => Number(item.id) === groupId);
+    if (!group) return;
+    const normalizedMember = {
+      ...member,
+      member_name: sanitizeCompactText(member.member_name || 'Студент', 120),
+      is_current_user: Number(member.user_id || 0) === Number(userId),
+    };
+    group.members.push(normalizedMember);
+    if (normalizedMember.is_current_user) {
+      group.is_member = true;
+      currentMembershipByTask[taskId] = groupId;
+    }
+  });
+
+  const tasks = visibleTasks.map((task) => {
+    const audience = task.__tgAudience || {};
+    const rawTaskGroups = groupsByTask[Number(task.id)] || [];
+    const taskGroups = audience.lessonScope === 'seminar'
+      ? rawTaskGroups.filter((group) => {
+        const seminarGroupNumber = parsePositiveIntStrict(group.seminar_group_number);
+        return !seminarGroupNumber || seminarGroupNumber === studentGroup;
+      })
+      : rawTaskGroups;
+    taskGroups.forEach((group) => {
+      const maxMembers = parsePositiveIntStrict(group.max_members);
+      group.is_full = Boolean(maxMembers && group.members.length >= maxMembers);
+    });
+    return {
+      ...task,
+      title: sanitizeCompactText(task.title || 'Teamwork', 140),
+      subject_name: sanitizeCompactText(task.subject_name || selectedSubject.subject_name || 'Предмет', 140),
+      created_by_name: sanitizeCompactText(task.created_by_name || 'Студент', 120),
+      group_count: Math.max(1, Number(task.group_count || taskGroups.length || 1) || 1),
+      is_owner: Number(task.created_by || 0) === Number(userId),
+      current_user_group_id: currentMembershipByTask[Number(task.id)] || null,
+      groups: taskGroups,
+    };
+  });
+
+  return { subjectState, subjects, selectedSubject, activeSemester, tasks, currentMembershipByTask };
+}
+
+async function assertTelegramMiniTeamworkAccess(userId, groupId) {
+  const group = await db.get(
+    `
+      SELECT g.*, t.subject_id, t.course_id, t.semester_id, t.created_by, t.group_lock_enabled,
+             t.lesson_scope, t.seminar_group_numbers,
+             s.group_count AS subject_group_count
+      FROM teamwork_groups g
+      JOIN teamwork_tasks t ON t.id = g.task_id
+      JOIN subjects s ON s.id = t.subject_id
+      WHERE g.id = ?
+      LIMIT 1
+    `,
+    [groupId]
+  );
+  if (!group) return { ok: false, reason: 'missing_group', group: null };
+  const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+    getAcademicV2Store(),
+    userId,
+    { selectedOnly: true }
+  );
+  const subject = (subjectState.subjects || []).find((item) => Number(item.subject_id || item.id) === Number(group.subject_id));
+  if (!subject) return { ok: false, reason: 'forbidden', group };
+  const activeSemester = await getActiveSemester(group.course_id).catch(() => null);
+  if (activeSemester && Number(group.semester_id || 0) !== Number(activeSemester.id || 0)) {
+    return { ok: false, reason: 'stale', group };
+  }
+  const subjectGroupCount = Math.max(1, Number(subject.group_count || group.subject_group_count || 1) || 1);
+  const selectedGroup = parsePositiveIntStrict(subject.selected_group || (Array.isArray(subject.group_numbers) ? subject.group_numbers[0] : null)) || 1;
+  let teacherRows = await academicV2RuntimeHelpers.listTeacherAssignedSubjectRowsByUsers(getAcademicV2Store(), {
+    userIds: [Number(group.created_by || 0)].filter((value) => Number.isInteger(value) && value > 0),
+    subjectId: group.subject_id,
+    includeHidden: true,
+  }).catch(() => []);
+  if (!teacherRows.length) {
+    teacherRows = await teacherTemplateHelpers.listTeacherAssignmentRows(getTeacherTemplateStore(), {
+      userIds: [Number(group.created_by || 0)].filter((value) => Number.isInteger(value) && value > 0),
+      subjectId: group.subject_id,
+      includeHidden: true,
+    }).catch(() => []);
+  }
+  const audience = buildTeamworkTaskAudience(
+    group,
+    teacherRows.length
+      ? buildTeacherSubjectAccess(teacherRows, subjectGroupCount, { courseId: group.course_id })
+      : { hasRows: false, allowAll: true, groups: new Set() },
+    subjectGroupCount
+  );
+  if (!audience.allowAll && !audience.groups.has(selectedGroup)) {
+    return { ok: false, reason: 'forbidden', group };
+  }
+  if (audience.lessonScope === 'seminar') {
+    const seminarGroupNumber = parsePositiveIntStrict(group.seminar_group_number);
+    if (seminarGroupNumber && seminarGroupNumber !== selectedGroup) {
+      return { ok: false, reason: 'forbidden', group };
+    }
+  }
+  return { ok: true, group, subject };
+}
+
+app.get('/studerria-tg/teamwork', requireTelegramMiniStudent, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const userId = Number(req.session.user.id || 0);
+    const setupState = await loadTelegramMiniSetupState(userId, { autoAssignRequired: true });
+    if (setupState.nextStep !== 'complete') {
+      req.session.pendingUserId = userId;
+      await saveRequestSession(req);
+      return res.redirect(`/studerria-tg/register?step=${setupState.nextStep}`);
+    }
+    const state = await loadTelegramMiniTeamworkState(userId, parsePositiveIntStrict(req.query.subject_id));
+    return renderTelegramMiniPage(req, res, 'teamwork', {
+      pageTitle: 'Teamwork',
+      currentTgPage: 'teamwork',
+      error: String(req.query.error || ''),
+      success: String(req.query.ok || ''),
+      ...state,
+    });
+  } catch (err) {
+    console.error('Telegram mini teamwork failed', err);
+    return res.status(500).send('Database error');
+  }
+});
+
+app.post('/studerria-tg/teamwork/create', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
+  const userId = Number(req.session.user.id || 0);
+  const subjectId = parsePositiveIntStrict(req.body.subject_id);
+  const title = sanitizeCompactText(req.body.title || '', 140);
+  const groupCount = Math.max(1, Math.min(12, Number(req.body.group_count || 0) || 0));
+  const maxMembers = parsePositiveIntStrict(req.body.max_members);
+  const redirectWithError = (code) => res.redirect(`/studerria-tg/teamwork${subjectId ? `?subject_id=${subjectId}&error=${encodeURIComponent(code)}` : `?error=${encodeURIComponent(code)}`}`);
+  if (!subjectId || !title || !groupCount) {
+    return redirectWithError('missing-fields');
+  }
+  try {
+    await ensureDbReady();
+    const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      userId,
+      { selectedOnly: true }
+    );
+    const subject = (subjectState.subjects || []).find((item) => Number(item.subject_id || item.id) === Number(subjectId));
+    if (!subject || subject.show_in_teamwork === false) {
+      return redirectWithError('subject-denied');
+    }
+    const courseId = parsePositiveIntStrict(subject.owner_course_id || subject.course_id);
+    const activeSemester = courseId ? await getActiveSemester(courseId).catch(() => null) : null;
+    if (!courseId || !activeSemester) {
+      return redirectWithError('missing-term');
+    }
+    const createdAt = new Date().toISOString();
+    const taskRow = await db.get(
+      `
+        INSERT INTO teamwork_tasks
+          (subject_id, title, created_by, created_at, due_date, course_id, semester_id,
+           random_distribution, group_count, member_limits_enabled, min_members, max_members,
+           group_lock_enabled, lesson_scope, seminar_group_numbers, show_in_schedule)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+      `,
+      [
+        subjectId,
+        title,
+        userId,
+        createdAt,
+        null,
+        courseId,
+        activeSemester.id,
+        0,
+        groupCount,
+        maxMembers ? 1 : 0,
+        null,
+        maxMembers || null,
+        0,
+        'lecture',
+        null,
+        0,
+      ]
+    );
+    if (!taskRow || !taskRow.id) {
+      return redirectWithError('db');
+    }
+    for (let index = 0; index < groupCount; index += 1) {
+      const groupRow = await db.get(
+        `
+          INSERT INTO teamwork_groups (task_id, name, leader_id, max_members, created_at, seminar_group_number)
+          VALUES (?, ?, ?, ?, ?, ?)
+          RETURNING id
+        `,
+        [taskRow.id, `Підгрупа ${index + 1}`, userId, maxMembers || null, createdAt, null]
+      );
+      if (groupRow && groupRow.id) {
+        logActivity(db, req, 'teamwork_group_create', 'teamwork_group', groupRow.id, { task_id: taskRow.id }, courseId, activeSemester.id);
+      }
+    }
+    logActivity(
+      db,
+      req,
+      'teamwork_task_create',
+      'teamwork_task',
+      taskRow.id,
+      { subject_id: subjectId, group_count: groupCount, source: 'telegram_mini' },
+      courseId,
+      activeSemester.id
+    );
+    logAction(db, req, 'telegram_mini_teamwork_create', { task_id: taskRow.id, subject_id: subjectId, group_count: groupCount });
+    broadcast('teamwork_updated');
+    return res.redirect(`/studerria-tg/teamwork?subject_id=${subjectId}&ok=created`);
+  } catch (err) {
+    console.error('Telegram mini teamwork create failed', err);
+    return redirectWithError('db');
+  }
+});
+
+app.post('/studerria-tg/teamwork/join', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
+  const userId = Number(req.session.user.id || 0);
+  const groupId = parsePositiveIntStrict(req.body.group_id);
+  const subjectId = parsePositiveIntStrict(req.body.subject_id);
+  const redirectBase = `/studerria-tg/teamwork${subjectId ? `?subject_id=${subjectId}` : ''}`;
+  if (!groupId) return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=invalid-group`);
+  try {
+    const access = await assertTelegramMiniTeamworkAccess(userId, groupId);
+    if (!access.ok) return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=${encodeURIComponent(access.reason)}`);
+    const existing = await db.get(
+      'SELECT id, group_id FROM teamwork_members WHERE task_id = ? AND user_id = ?',
+      [access.group.task_id, userId]
+    );
+    if (existing) {
+      return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=already-in-group`);
+    }
+    const maxMembers = parsePositiveIntStrict(access.group.max_members);
+    if (maxMembers) {
+      const countRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_members WHERE group_id = ?', [groupId]);
+      if (Number(countRow && countRow.cnt || 0) >= maxMembers) {
+        return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=group-full`);
+      }
+    }
+    await db.run(
+      'INSERT INTO teamwork_members (task_id, group_id, user_id, joined_at) VALUES (?, ?, ?, ?)',
+      [access.group.task_id, groupId, userId, new Date().toISOString()]
+    );
+    return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}ok=joined`);
+  } catch (err) {
+    console.error('Telegram mini teamwork join failed', err);
+    return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=db`);
+  }
+});
+
+app.post('/studerria-tg/teamwork/leave', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
+  const userId = Number(req.session.user.id || 0);
+  const groupId = parsePositiveIntStrict(req.body.group_id);
+  const subjectId = parsePositiveIntStrict(req.body.subject_id);
+  const redirectBase = `/studerria-tg/teamwork${subjectId ? `?subject_id=${subjectId}` : ''}`;
+  if (!groupId) return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=invalid-group`);
+  try {
+    const access = await assertTelegramMiniTeamworkAccess(userId, groupId);
+    if (!access.ok) return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=${encodeURIComponent(access.reason)}`);
+    const lockEnabled = Number(access.group.group_lock_enabled) === 1 || access.group.group_lock_enabled === true;
+    if (lockEnabled) {
+      return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=locked`);
+    }
+    await db.run('DELETE FROM teamwork_members WHERE group_id = ? AND user_id = ?', [groupId, userId]);
+    return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}ok=left`);
+  } catch (err) {
+    console.error('Telegram mini teamwork leave failed', err);
+    return res.redirect(`${redirectBase}${subjectId ? '&' : '?'}error=db`);
+  }
+});
+
 app.get('/studerria-tg/subjects', requireTelegramMiniStudent, async (req, res) => {
   try {
     await ensureDbReady();

@@ -1,0 +1,133 @@
+<section class="tg-page-head">
+  <p class="tg-kicker">Studerria</p>
+  <h1>Teamwork</h1>
+  <% if (selectedSubject) { %>
+    <p class="tg-muted"><%= selectedSubject.subject_name %><%= selectedSubject.selected_group ? ' · Group ' + selectedSubject.selected_group : '' %></p>
+  <% } else { %>
+    <p class="tg-muted">Створюйте задачі та підгрупи для своїх предметів.</p>
+  <% } %>
+</section>
+
+<% if (error) { %>
+  <div class="tg-alert">
+    <% if (error === 'missing-fields') { %>
+      Заповніть назву, предмет і кількість підгруп.
+    <% } else if (error === 'already-in-group') { %>
+      Ви вже в підгрупі цього завдання.
+    <% } else if (error === 'group-full') { %>
+      У цій підгрупі вже немає місць.
+    <% } else { %>
+      Не вдалося виконати дію.
+    <% } %>
+  </div>
+<% } %>
+<% if (success) { %>
+  <div class="tg-success">Готово.</div>
+<% } %>
+
+<% if (!subjects || !subjects.length) { %>
+  <section class="tg-card">
+    <h2>Немає предметів</h2>
+    <p class="tg-muted">Спочатку оберіть предмети та групи в профілі.</p>
+    <a class="tg-primary" href="/studerria-tg/subjects">Обрати предмети</a>
+  </section>
+<% } else { %>
+  <section class="tg-card">
+    <div class="tg-subject-tabs" aria-label="Teamwork subjects">
+      <% subjects.forEach((subject) => { %>
+        <a
+          class="tg-subject-tab <%= selectedSubject && Number(selectedSubject.subject_id) === Number(subject.subject_id) ? 'is-active' : '' %>"
+          href="/studerria-tg/teamwork?subject_id=<%= encodeURIComponent(String(subject.subject_id)) %>"
+        >
+          <%= subject.subject_name %>
+        </a>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="tg-card">
+    <h2>Нове завдання</h2>
+    <form class="tg-form" method="POST" action="/studerria-tg/teamwork/create">
+      <input type="hidden" name="subject_id" value="<%= selectedSubject ? selectedSubject.subject_id : '' %>" />
+      <label>
+        <span>Назва</span>
+        <input name="title" type="text" maxlength="140" placeholder="Наприклад: презентація до семінару" required />
+      </label>
+      <div class="tg-form-grid">
+        <label>
+          <span>Підгрупи</span>
+          <input name="group_count" type="number" min="1" max="12" value="3" required />
+        </label>
+        <label>
+          <span>Макс. людей</span>
+          <input name="max_members" type="number" min="1" max="30" placeholder="Без ліміту" />
+        </label>
+      </div>
+      <button class="tg-primary" type="submit">Створити</button>
+    </form>
+  </section>
+
+  <section class="tg-teamwork-list">
+    <% if (!tasks || !tasks.length) { %>
+      <article class="tg-card">
+        <h2>Поки пусто</h2>
+        <p class="tg-muted">Створіть перше завдання для цього предмету.</p>
+      </article>
+    <% } %>
+
+    <% (tasks || []).forEach((task) => { %>
+      <article class="tg-card tg-task">
+        <header class="tg-task-head">
+          <div>
+            <h2><%= task.title %></h2>
+            <p class="tg-muted">
+              <%= task.created_by_name %><%= task.group_count ? ' · ' + task.group_count + ' підгруп' : '' %>
+            </p>
+          </div>
+          <% if (task.is_owner) { %>
+            <span class="tg-pill">моє</span>
+          <% } %>
+        </header>
+
+        <div class="tg-team-groups">
+          <% (task.groups || []).forEach((group) => { %>
+            <section class="tg-team-group <%= group.is_member ? 'is-member' : '' %>">
+              <div class="tg-team-group-head">
+                <h3><%= group.name %></h3>
+                <% if (group.max_members) { %>
+                  <span><%= (group.members || []).length %>/<%= group.max_members %></span>
+                <% } else { %>
+                  <span><%= (group.members || []).length %></span>
+                <% } %>
+              </div>
+
+              <% if (group.members && group.members.length) { %>
+                <ul class="tg-member-list">
+                  <% group.members.forEach((member) => { %>
+                    <li><%= member.member_name %><%= member.is_current_user ? ' · ви' : '' %></li>
+                  <% }) %>
+                </ul>
+              <% } else { %>
+                <p class="tg-muted">Поки нікого.</p>
+              <% } %>
+
+              <% if (group.is_member) { %>
+                <form method="POST" action="/studerria-tg/teamwork/leave">
+                  <input type="hidden" name="group_id" value="<%= group.id %>" />
+                  <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                  <button class="tg-secondary" type="submit">Вийти</button>
+                </form>
+              <% } else if (!task.current_user_group_id && !group.is_full) { %>
+                <form method="POST" action="/studerria-tg/teamwork/join">
+                  <input type="hidden" name="group_id" value="<%= group.id %>" />
+                  <input type="hidden" name="subject_id" value="<%= selectedSubject.subject_id %>" />
+                  <button class="tg-secondary" type="submit">Доєднатись</button>
+                </form>
+              <% } %>
+            </section>
+          <% }) %>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+<% } %>
