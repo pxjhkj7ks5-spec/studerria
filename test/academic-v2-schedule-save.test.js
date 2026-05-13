@@ -205,3 +205,36 @@ test('saveScheduleEntry appends a new week without deleting existing weeks for t
     [2, 3]
   );
 });
+
+test('saveScheduleEntry appends a new day without deleting an existing day for the same activity', async () => {
+  const store = createScheduleStore([
+    {
+      id: 7,
+      group_subject_id: 10,
+      group_subject_activity_id: 20,
+      term_id: 30,
+      group_number: 1,
+      target_group_numbers: [],
+      day_of_week: 'Monday',
+      class_number: 3,
+      week_number: 2,
+      lesson_type: 'lecture',
+    },
+  ]);
+
+  await withMutedProjectionErrors(() => academicV2Helpers.saveScheduleEntry(store, {
+    group_subject_activity_id: 20,
+    term_id: 30,
+    day_of_week: 'Wednesday',
+    class_number: 3,
+    week_number: 2,
+    group_number: 1,
+    target_group_numbers: [],
+  }));
+
+  assert.deepEqual(store.state.deletedIds, []);
+  assert.deepEqual(
+    store.state.entries.map((entry) => `${entry.day_of_week}:${entry.week_number}`).sort(),
+    ['Monday:2', 'Wednesday:2']
+  );
+});

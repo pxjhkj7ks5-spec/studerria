@@ -3801,6 +3801,22 @@
             target_group_numbers: getRequestedValues(scheduleTargetGroups),
           };
         };
+        const clearScheduleEditIdentity = () => {
+          selectedScheduleEntryPayload = null;
+          const scheduleForm = forms.get('schedule');
+          if (!scheduleForm) {
+            return;
+          }
+          const scheduleIdInput = scheduleForm.querySelector('[data-editor-input="schedule.id"]');
+          if (scheduleIdInput) {
+            scheduleIdInput.value = '';
+          }
+        };
+        const selectedScheduleEntryMatchesSlot = () => (
+          selectedScheduleEntryPayload
+          && String(selectedScheduleEntryPayload.day_of_week || '') === String(selectedSlot.dayOfWeek || '')
+          && Number(selectedScheduleEntryPayload.class_number || 0) === Number(selectedSlot.classNumber || 0)
+        );
         const syncSchedulePlacementFromAdvancedFields = () => {
           const payload = buildScheduleFormStatePayload();
           if (schedulePlacementTerm && payload.term_id) {
@@ -4424,7 +4440,7 @@
               updateSubjectDetail(0);
             }
             if (target === 'schedule') {
-              selectedScheduleEntryPayload = null;
+              clearScheduleEditIdentity();
               selectedSlot = { dayOfWeek: '', classNumber: 0 };
               if (schedulePlacementWeek) {
                 schedulePlacementWeek.value = buildWeekNumberValue(activeScheduleWeek || 1, activeScheduleWeek || 1);
@@ -4648,6 +4664,7 @@
             if (scheduleClassNumber) {
               scheduleClassNumber.value = String(selectedSlot.classNumber);
             }
+            clearScheduleEditIdentity();
             syncSchedulePlacementState();
             persistWorkspaceState();
           });
@@ -4720,6 +4737,9 @@
             }
             if (schedulePlacementTerm) {
               scheduleTerm.value = schedulePlacementTerm.value;
+            }
+            if (!selectedScheduleEntryMatchesSlot()) {
+              clearScheduleEditIdentity();
             }
             scheduleActivity.value = schedulePlacementActivity.value;
             scheduleDay.value = selectedSlot.dayOfWeek;
