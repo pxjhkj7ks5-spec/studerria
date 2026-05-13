@@ -20344,6 +20344,67 @@ async function handleStuderriaTelegramGiveRoleCommand(message = {}, parsedComman
   );
 }
 
+async function handleStuderriaTelegramRemoveRoleCommand(message = {}, parsedCommand = {}) {
+  const chatId = message && message.chat ? message.chat.id : null;
+  if (!chatId) return;
+  if (!isStuderriaTelegramDevUser(message.from || {})) {
+    await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
+    return;
+  }
+  const args = String(parsedCommand.args || '').trim().split(/\s+/).filter(Boolean);
+  const roleKey = normalizeRoleKey(args[0] || '');
+  const targetRaw = args.slice(1).join(' ');
+  if (roleKey !== 'starosta' || !targetRaw) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Формат: /removerole starosta @username або /removerole starosta 123456789',
+      { sourceMessage: message }
+    );
+    return;
+  }
+  const targetUser = await resolveStuderriaTelegramRoleTarget(targetRaw);
+  if (!targetUser) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Не знайшов користувача. Найнадійніше: Telegram ID або @username після першого входу в mini app.',
+      { sourceMessage: message }
+    );
+    return;
+  }
+  const assignment = await getUserRoleAssignmentsForUserIds([targetUser.id]);
+  const targetUserId = Number(targetUser.id);
+  const existingRoles = normalizeRoleList(
+    (assignment.roleKeysByUser && assignment.roleKeysByUser[targetUserId])
+      || [targetUser.role || 'student']
+  );
+  if (!existingRoles.includes('starosta')) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      `${sanitizeCompactText(targetUser.full_name || `user ${targetUser.id}`, 120)} і так не має starosta.`,
+      { sourceMessage: message }
+    );
+    return;
+  }
+  const nextRoles = normalizeRoleList(existingRoles.filter((role) => role !== 'starosta'));
+  const safeNextRoles = nextRoles.length ? nextRoles : ['student'];
+  const currentPrimaryRole = normalizeRoleKey(
+    (assignment.primaryRoleByUser && assignment.primaryRoleByUser[targetUserId])
+    || targetUser.role
+    || existingRoles[0]
+    || 'student'
+  );
+  const preferredPrimary = safeNextRoles.includes(currentPrimaryRole)
+    ? currentPrimaryRole
+    : (safeNextRoles.find((role) => LEGACY_SESSION_ROLES.has(role)) || safeNextRoles[0] || 'student');
+  await assignUserRoles(targetUser.id, safeNextRoles, { preferredPrimary });
+  broadcast('users_updated');
+  await sendStuderriaTelegramMessage(
+    chatId,
+    `Готово: ${sanitizeCompactText(targetUser.full_name || `user ${targetUser.id}`, 120)} більше не starosta.`,
+    { sourceMessage: message }
+  );
+}
+
 async function loadStuderriaTelegramScheduleContext(telegramUser = {}) {
   const context = await getStuderriaTelegramActorContext(telegramUser);
   if (!context.actor) {
@@ -20876,6 +20937,8 @@ async function handleStuderriaTelegramBotUpdate(update) {
       await sendStuderriaTelegramWelcome(message.chat, message);
     } else if (parsedCommand.command === 'giverole') {
       await handleStuderriaTelegramGiveRoleCommand(message, parsedCommand);
+    } else if (parsedCommand.command === 'removerole') {
+      await handleStuderriaTelegramRemoveRoleCommand(message, parsedCommand);
     } else if (parsedCommand.command === 'enablenotification') {
       await handleStuderriaTelegramNotificationPreferenceCommand(message, true);
     } else if (parsedCommand.command === 'disablenotification') {
