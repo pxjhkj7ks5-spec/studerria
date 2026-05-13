@@ -21475,7 +21475,8 @@ async function loadTelegramMiniTeamworkState(userId, selectedSubjectId = null) {
   }
   const taskRows = await db.all(
     `
-      SELECT t.*, s.name AS subject_name, COALESCE(u.full_name, '') AS created_by_name
+      SELECT t.*, s.name AS subject_name, COALESCE(u.full_name, '') AS created_by_name,
+             COALESCE(u.role, '') AS created_by_role
       FROM teamwork_tasks t
       JOIN subjects s ON s.id = t.subject_id
       LEFT JOIN users u ON u.id = t.created_by
@@ -21518,12 +21519,11 @@ async function loadTelegramMiniTeamworkState(userId, selectedSubjectId = null) {
   const studentGroup = parsePositiveIntStrict(selectedSubject.selected_group) || 1;
   const visibleTasks = taskRows.filter((task) => {
     const teacherRows = creatorAssignmentsByUser[Number(task.created_by || 0)] || [];
-    const audience = buildTeamworkTaskAudience(
+    const audience = buildTeamworkAudienceForTaskCreator(
       task,
-      teacherRows.length
-        ? buildTeacherSubjectAccess(teacherRows, selectedSubject.group_count, { courseId: selectedSubject.course_id })
-        : { hasRows: false, allowAll: true, groups: new Set() },
-      selectedSubject.group_count
+      teacherRows,
+      selectedSubject.group_count,
+      { courseId: selectedSubject.course_id }
     );
     task.__tgAudience = audience;
     return audience.allowAll || audience.groups.has(studentGroup);
@@ -21621,10 +21621,12 @@ async function assertTelegramMiniTeamworkAccess(userId, groupId) {
     `
       SELECT g.*, t.subject_id, t.course_id, t.semester_id, t.created_by, t.group_lock_enabled,
              t.lesson_scope, t.seminar_group_numbers,
-             s.group_count AS subject_group_count
+             s.group_count AS subject_group_count,
+             COALESCE(creator.role, '') AS created_by_role
       FROM teamwork_groups g
       JOIN teamwork_tasks t ON t.id = g.task_id
       JOIN subjects s ON s.id = t.subject_id
+      LEFT JOIN users creator ON creator.id = t.created_by
       WHERE g.id = ?
       LIMIT 1
     `,
@@ -21656,12 +21658,11 @@ async function assertTelegramMiniTeamworkAccess(userId, groupId) {
       includeHidden: true,
     }).catch(() => []);
   }
-  const audience = buildTeamworkTaskAudience(
+  const audience = buildTeamworkAudienceForTaskCreator(
     group,
-    teacherRows.length
-      ? buildTeacherSubjectAccess(teacherRows, subjectGroupCount, { courseId: group.course_id })
-      : { hasRows: false, allowAll: true, groups: new Set() },
-    subjectGroupCount
+    teacherRows,
+    subjectGroupCount,
+    { courseId: group.course_id }
   );
   if (!audience.allowAll && !audience.groups.has(selectedGroup)) {
     return { ok: false, reason: 'forbidden', group };
@@ -32169,6 +32170,26 @@ const buildTeamworkTaskAudience = (task, teacherAccess, maxGroupCount = 1) => {
   };
 };
 
+const isStudentCreatedTeamworkTask = (task = {}) => {
+  const creatorRole = normalizeRoleKey(task.created_by_role || task.creator_role || task.role || '');
+  return ['student', 'starosta'].includes(creatorRole);
+};
+
+const buildTeamworkAudienceForTaskCreator = (task, teacherRows = [], maxGroupCount = 1, options = {}) => {
+  const safeMaxGroupCount = Math.max(1, Number(maxGroupCount) || 1);
+  if (isStudentCreatedTeamworkTask(task)) {
+    return {
+      lessonScope: 'lecture',
+      allowAll: true,
+      groups: new Set(Array.from({ length: safeMaxGroupCount }, (_value, index) => index + 1)),
+      label: 'Усі групи',
+      studentCreated: true,
+    };
+  }
+  const access = buildTeacherSubjectAccess(teacherRows || [], safeMaxGroupCount, options);
+  return buildTeamworkTaskAudience(task, access, safeMaxGroupCount);
+};
+
 const SUBJECT_MATERIAL_TYPES = new Set(['lecture', 'file', 'link', 'mixed']);
 
 const normalizeSubjectMaterialType = (rawValue) => {
@@ -42610,7 +42631,8 @@ app.get('/teamwork', requireLogin, async (req, res) => {
 
     const taskRows = await db.all(
       `
-        SELECT t.*, s.name AS subject_name, COALESCE(u.full_name, '') AS created_by_name
+        SELECT t.*, s.name AS subject_name, COALESCE(u.full_name, '') AS created_by_name,
+               COALESCE(u.role, '') AS created_by_role
         FROM teamwork_tasks t
         JOIN subjects s ON s.id = t.subject_id
         LEFT JOIN users u ON u.id = t.created_by${activeUserFilter}
@@ -42666,13 +42688,12 @@ app.get('/teamwork', requireLogin, async (req, res) => {
     const audienceByTaskId = {};
     const tasks = (taskRows || []).filter((task) => {
       const teacherRows = creatorAssignmentsByUser[Number(task.created_by || 0)] || [];
-      const access = buildTeacherSubjectAccess(teacherRows, selectedSubjectGroupCount, {
+      const audience = buildTeamworkAudienceForTaskCreator(task, teacherRows, selectedSubjectGroupCount, {
         courseId: task.course_id,
       });
-      const audience = buildTeamworkTaskAudience(task, access, selectedSubjectGroupCount);
       audienceByTaskId[task.id] = audience;
       if (isTeacherMode) return true;
-      if (!teacherRows.length) return false;
+      if (!teacherRows.length && !isStudentCreatedTeamworkTask(task)) return false;
       if (audience.allowAll) return true;
       return studentSubjectGroups.some((groupNum) => audience.groups.has(Number(groupNum)));
     });
@@ -43328,10 +43349,12 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
                t.group_lock_enabled,
                t.lesson_scope,
                t.seminar_group_numbers,
-               s.group_count AS subject_group_count
+               s.group_count AS subject_group_count,
+               COALESCE(creator.role, '') AS created_by_role
         FROM teamwork_groups g
         JOIN teamwork_tasks t ON t.id = g.task_id
         JOIN subjects s ON s.id = t.subject_id
+        LEFT JOIN users creator ON creator.id = t.created_by
         WHERE g.id = ?
       `,
       [groupId]
@@ -43358,14 +43381,13 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
         includeHidden: true,
       }
     );
-    if (!teacherRows || !teacherRows.length) {
+    if ((!teacherRows || !teacherRows.length) && !isStudentCreatedTeamworkTask(grpRow)) {
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
     }
 
-    const teacherAccess = buildTeacherSubjectAccess(teacherRows, grpRow.subject_group_count || 1, {
+    const audience = buildTeamworkAudienceForTaskCreator(grpRow, teacherRows || [], grpRow.subject_group_count || 1, {
       courseId: grpRow.course_id,
     });
-    const audience = buildTeamworkTaskAudience(grpRow, teacherAccess, grpRow.subject_group_count || 1);
     if (!audience.allowAll && !audience.groups.has(Number(sgRow.group_number))) {
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Access%20denied`);
     }
@@ -44223,9 +44245,11 @@ async function getTeamworkReactionAccess(req, taskId) {
         t.created_by,
         t.lesson_scope,
         t.seminar_group_numbers,
-        s.group_count AS subject_group_count
+        s.group_count AS subject_group_count,
+        COALESCE(creator.role, '') AS created_by_role
       FROM teamwork_tasks t
       JOIN subjects s ON s.id = t.subject_id
+      LEFT JOIN users creator ON creator.id = t.created_by
       WHERE t.id = ?
       LIMIT 1
     `,
@@ -44289,13 +44313,12 @@ async function getTeamworkReactionAccess(req, taskId) {
       includeHidden: true,
     }
   );
-  if (!teacherRows || !teacherRows.length) {
+  if ((!teacherRows || !teacherRows.length) && !isStudentCreatedTeamworkTask(task)) {
     return { status: 'forbidden', task: null };
   }
-  const teacherAccess = buildTeacherSubjectAccess(teacherRows, task.subject_group_count || 1, {
+  const audience = buildTeamworkAudienceForTaskCreator(task, teacherRows || [], task.subject_group_count || 1, {
     courseId: task.course_id,
   });
-  const audience = buildTeamworkTaskAudience(task, teacherAccess, task.subject_group_count || 1);
   const canViewTask = audience.allowAll || studentGroups.some((groupNum) => audience.groups.has(Number(groupNum)));
   return canViewTask ? { status: 'ok', task } : { status: 'forbidden', task: null };
 }
