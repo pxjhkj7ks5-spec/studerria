@@ -19981,18 +19981,44 @@ async function callStuderriaTelegramBotApi(method, payload = {}) {
   return data.result;
 }
 
+async function registerStuderriaTelegramBotCommands() {
+  try {
+    await callStuderriaTelegramBotApi('setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Відкрити Studerria mini app' },
+        { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
+        { command: 'addpara', description: 'Додати пару' },
+        { command: 'deletepara', description: 'Видалити пару' },
+        { command: 'enablenotification', description: 'Увімкнути сповіщення' },
+        { command: 'disablenotification', description: 'Вимкнути сповіщення' },
+      ],
+    });
+  } catch (err) {
+    console.error('Studerria Telegram bot commands registration failed', err && err.message ? err.message : err);
+  }
+}
+
 function parseStuderriaTelegramCommand(message, botUsername = '') {
   const text = String(message && message.text ? message.text : '').trim();
   if (!text || !text.startsWith('/')) return null;
-  const parts = text.split(/\s+/);
-  const commandRaw = String(parts.shift() || '').trim();
+  const commandEntity = (Array.isArray(message && message.entities) ? message.entities : [])
+    .find((entity) =>
+      entity
+      && entity.type === 'bot_command'
+      && Number(entity.offset || 0) === 0
+      && Number(entity.length || 0) > 0
+    );
+  const commandRaw = commandEntity
+    ? text.slice(0, Number(commandEntity.length || 0)).trim()
+    : String(text.split(/\s+/)[0] || '').trim();
+  const args = text.slice(commandRaw.length).trim();
   const commandParts = commandRaw.slice(1).split('@');
   const command = String(commandParts[0] || '').trim().toLowerCase();
   const targetUsername = String(commandParts[1] || '').trim().toLowerCase();
   const username = String(botUsername || '').trim().toLowerCase();
   if (!command) return null;
   if (targetUsername && username && targetUsername !== username) return null;
-  return { command, args: parts.join(' ').trim(), text };
+  return { command, args, text };
 }
 
 function isStuderriaTelegramStartCommand(message, botUsername = '') {
@@ -21217,6 +21243,7 @@ async function startStuderriaTelegramBotPolling() {
       || (me && me.username)
       || ''
     ).replace(/^@/, '');
+    await registerStuderriaTelegramBotCommands();
     if (String(process.env.STUDERRIA_TG_BOT_DROP_PENDING_UPDATES || 'true').trim().toLowerCase() !== 'false') {
       const pending = await callStuderriaTelegramBotApi('getUpdates', {
         timeout: 0,
