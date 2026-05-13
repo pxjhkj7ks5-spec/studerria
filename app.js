@@ -19196,13 +19196,12 @@ async function ensureTelegramMiniSetupForPage(req, userId) {
   if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
     return { nextStep: 'course', status: 'missing_user', cached: false };
   }
-  if (Number(req.session && req.session.telegramMiniSetupCompleteUserId || 0) === normalizedUserId) {
-    return { nextStep: 'complete', status: 'complete', cached: true };
-  }
   const setupState = await loadTelegramMiniSetupState(normalizedUserId, { autoAssignRequired: true });
   if (setupState.nextStep === 'complete') {
     req.session.telegramMiniSetupCompleteUserId = normalizedUserId;
     await saveRequestSession(req);
+  } else if (Number(req.session && req.session.telegramMiniSetupCompleteUserId || 0) === normalizedUserId) {
+    req.session.telegramMiniSetupCompleteUserId = null;
   }
   return setupState;
 }
