@@ -6,11 +6,23 @@
   <% } %>
 </section>
 
+<%
+  const profileErrorMessages = {
+    'missing-name': 'Вкажіть повне імʼя.',
+    'telegram-auth-required': 'Telegram не передав дані для привʼязки. Закрийте mini app і відкрийте його з Telegram ще раз.',
+    'telegram-occupied': 'Цей Telegram уже привʼязаний до іншого акаунта.',
+    'telegram-link-failed': 'Не вдалося привʼязати Telegram. Спробуйте ще раз.',
+  };
+  const profileSuccessMessages = {
+    'telegram-linked': 'Telegram привʼязано.',
+  };
+%>
+
 <% if (error) { %>
-  <div class="tg-alert">Не вдалося оновити профіль.</div>
+  <div class="tg-alert"><%= profileErrorMessages[error] || 'Не вдалося оновити профіль.' %></div>
 <% } %>
 <% if (success) { %>
-  <div class="tg-success">Профіль оновлено.</div>
+  <div class="tg-success"><%= profileSuccessMessages[success] || 'Профіль оновлено.' %></div>
 <% } %>
 
 <section class="tg-card">
@@ -36,6 +48,11 @@
     <p class="tg-muted">Привʼязано<%= user.telegram_username ? ': @' + user.telegram_username : '' %></p>
   <% } else { %>
     <p class="tg-muted">Telegram ще не привʼязано.</p>
+    <form class="tg-form tg-link-form" method="POST" action="/studerria-tg/profile/link-telegram" data-tg-link-form>
+      <input type="hidden" name="initData" data-tg-init-data value="" />
+      <button class="tg-secondary" type="submit">Спробувати ще раз привʼязати</button>
+      <p class="tg-muted tg-link-status" data-tg-link-status hidden></p>
+    </form>
   <% } %>
 </section>
 

@@ -154,6 +154,7 @@
     state.authenticated = true;
     window.scrollTo(0, 0);
     bindFastNavigation();
+    bindTelegramLinkForms();
     primeFastPages();
     applyTelegramChrome();
   }
@@ -197,6 +198,25 @@
     });
   }
 
+  function bindTelegramLinkForms() {
+    document.querySelectorAll('[data-tg-link-form]').forEach((form) => {
+      if (form.dataset.tgLinkBound === '1') return;
+      form.dataset.tgLinkBound = '1';
+      form.addEventListener('submit', (event) => {
+        const initDataInput = form.querySelector('[data-tg-init-data]');
+        const status = form.querySelector('[data-tg-link-status]');
+        const initData = tg && tg.initData ? tg.initData : '';
+        if (initDataInput) initDataInput.value = initData;
+        if (initData) return;
+        event.preventDefault();
+        if (status) {
+          status.hidden = false;
+          status.textContent = 'Telegram не передав дані для привʼязки. Закрийте mini app і відкрийте його з Telegram ще раз.';
+        }
+      });
+    });
+  }
+
   function primeFastPages() {
     const urls = new Map();
     document.querySelectorAll('a[href]').forEach((anchor) => {
@@ -225,6 +245,7 @@
   });
   applyTelegramChrome();
   bindFastNavigation();
+  bindTelegramLinkForms();
   primeFastPages();
   syncTelegramSession();
 })();

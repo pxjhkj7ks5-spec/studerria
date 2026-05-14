@@ -23150,6 +23150,30 @@ app.post('/studerria-tg/subjects', requireTelegramMiniStudent, registerLimiter, 
   }
 });
 
+app.post('/studerria-tg/profile/link-telegram', requireTelegramMiniStudent, authLimiter, async (req, res) => {
+  try {
+    await ensureDbReady();
+    const telegramUser = await validateTelegramMiniInitData(req);
+    await linkTelegramMiniUser(req, req.session.user.id, telegramUser);
+    req.session.telegramMiniSetupCompleteUserId = Number(req.session.user.id || 0);
+    logAction(db, req, 'telegram_mini_profile_relink', {
+      user_id: req.session.user.id,
+      telegram_id: telegramUser.id,
+    });
+    broadcast('users_updated');
+    await saveRequestSession(req);
+    return res.redirect('/studerria-tg/profile?ok=telegram-linked');
+  } catch (err) {
+    if (err && err.code === 'telegram_link_occupied') {
+      return res.redirect('/studerria-tg/profile?error=telegram-occupied');
+    }
+    const code = err && err.message === 'telegram_auth_required'
+      ? 'telegram-auth-required'
+      : 'telegram-link-failed';
+    return res.redirect(`/studerria-tg/profile?error=${encodeURIComponent(code)}`);
+  }
+});
+
 app.get('/studerria-tg/profile', requireTelegramMiniStudent, async (req, res) => {
   try {
     await ensureDbReady();
