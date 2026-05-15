@@ -55,6 +55,7 @@ const telegramMiniAppUsers = require('./054_telegram_mini_app_users');
 const telegramNotificationPreferences = require('./055_telegram_notification_preferences');
 const teamworkStrictEditing = require('./056_teamwork_strict_editing');
 const teamworkTelegramMessageRef = require('./057_teamwork_telegram_message_ref');
+const teamworkJoinOpenState = require('./058_teamwork_join_open_state');
 
 module.exports = [
   init,
@@ -114,4 +115,5 @@ module.exports = [
   telegramNotificationPreferences,
   teamworkStrictEditing,
   teamworkTelegramMessageRef,
+  teamworkJoinOpenState,
 ];
