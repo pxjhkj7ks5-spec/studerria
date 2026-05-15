@@ -19984,6 +19984,7 @@ async function callStuderriaTelegramBotApi(method, payload = {}) {
 
 const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'start', description: 'Відкрити Studerria mini app' },
+  { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
   { command: 'addpara', description: 'Додати пару' },
@@ -19997,6 +19998,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'disablenotification', description: 'Вимкнути сповіщення' },
 ];
 const STUDERRIA_TG_GROUP_BOT_COMMANDS = [
+  { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
   { command: 'teamwork', description: 'Створити Teamwork команди' },
   { command: 'openteam', description: 'Відкрити вступ у Teamwork' },
@@ -20327,6 +20329,76 @@ async function sendStuderriaTelegramWelcome(chat = {}, sourceMessage = {}) {
     payload.reply_markup = replyMarkup;
   }
   await callStuderriaTelegramBotApi('sendMessage', payload);
+}
+
+async function sendStuderriaTelegramHelp(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const botUsername = String(
+    process.env.STUDERRIA_TG_BOT_USERNAME
+    || studerriaTelegramBotState.botUsername
+    || 'studerria_bot'
+  ).trim().replace(/^@/, '') || 'studerria_bot';
+  const commandSuffix = isStuderriaTelegramPrivateChat(chat) ? '' : `@${botUsername}`;
+  const lines = [
+    'Studerria bot help',
+    '',
+    'Що вміє бот',
+    'Бот підключає Telegram до Studerria: mini app, розклад, предмети, My Day, профіль, Teamwork, пари й сповіщення.',
+    'У групах частина команд працює через повідомлення з кнопками, частина доступна тільки людям з потрібними правами.',
+    '',
+    'Основні команди',
+    `${`/start${commandSuffix}`} - відкрити Studerria mini app і прив'язати Telegram.`,
+    `${`/help${commandSuffix}`} - показати цю інструкцію.`,
+    `${`/helloabracadabra${commandSuffix}`} - службовий ping/перевірка відповіді бота в групі.`,
+    '',
+    'Mini app',
+    'Відкривається кнопкою Studerria або командою /start.',
+    'У mini app можна подивитись розклад, обрати предмети, відкрити My Day, профіль, Teamwork і налаштування акаунта.',
+    'Якщо ти ще не привʼязаний до Telegram, /start проведе через реєстрацію.',
+    '',
+    'Розклад і пари',
+    `${`/addpara${commandSuffix}`} - додати пару через Telegram.`,
+    `${`/deletepara${commandSuffix}`} - видалити пару через Telegram.`,
+    'У групах ці команди доступні тільки користувачам з правами на групові команди.',
+    '',
+    'Teamwork',
+    `${`/teamwork${commandSuffix}`} - створити Teamwork: обери предмет, кількість команд і, за бажанням, назву.`,
+    'Після створення бот закріплює повідомлення з командами. Натисни кнопку своєї команди, щоб вступити. Якщо ти вже в іншій команді, кнопка перенесе тебе.',
+    'Кнопки під Teamwork: Вийти, Змінити назву, Ліміт команди.',
+    `${`/closeteam${commandSuffix}`} - показати список Teamwork і закрити вступ у вибраний. Після закриття студенти не можуть вступати в жодну команду цього Teamwork.`,
+    `${`/openteam${commandSuffix}`} - відкрити вступ назад.`,
+    'Закривати/відкривати може dev, starosta або автор Teamwork. У закритий Teamwork можуть вступати тільки dev і той, хто його закрив.',
+    `${`/strictteam${commandSuffix}`} - зробити Teamwork жорстким: назви й ліміти команд змінює тільки автор Teamwork.`,
+    `${`/deleteteamwork${commandSuffix}`} - видалити Teamwork.`,
+    'Strict і delete доступні dev або starosta.',
+    '',
+    'Сповіщення',
+    `${`/enablenotification${commandSuffix}`} - увімкнути Telegram-сповіщення.`,
+    `${`/disablenotification${commandSuffix}`} - вимкнути Telegram-сповіщення.`,
+    'Сповіщення працюють для привʼязаного Telegram-акаунта.',
+    '',
+    'Dev-команди',
+    `${`/devusers${commandSuffix}`} - показати зареєстрованих Telegram-користувачів.`,
+    '/giverole <telegram id або username> <role> - видати роль.',
+    '/removerole <telegram id або username> <role> - забрати роль.',
+    'Dev-команди доступні тільки Telegram id з dev-списку.',
+    '',
+    'Ролі',
+    'Студент може відкривати mini app, дивитись розклад і працювати зі своїми командами.',
+    'Starosta має додаткові права для керування Teamwork і груповими діями.',
+    'Dev має службовий доступ для підтримки й діагностики.',
+    '',
+    'Якщо команда не працює',
+    '1. Напиши /start в особистому чаті з ботом.',
+    '2. Перевір, що реєстрація завершена і вибрані предмети.',
+    '3. У групі пиши команду з @username бота, якщо Telegram не підставляє її автоматично.',
+  ];
+  await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3900), {
+    sourceMessage: message,
+    replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || ''),
+  });
 }
 
 async function findStuderriaTelegramUserByActor(telegramUser = {}) {
@@ -22955,6 +23027,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
     }
     const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
     if (!parsedCommand) return;
+    if (parsedCommand.command === 'help') {
+      await sendStuderriaTelegramHelp(message);
+      return;
+    }
     if (parsedCommand.command === 'helloabracadabra') {
       await sendStuderriaTelegramHelloAbracadabra(message);
       return;
