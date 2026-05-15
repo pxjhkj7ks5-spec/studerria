@@ -21343,7 +21343,7 @@ const STUDERRIA_TG_TEAMWORK_RENAME_TTL_MS = 10 * 60 * 1000;
 const studerriaTelegramTeamworkRenameStore = new Map();
 const studerriaTelegramTeamworkLimitStore = new Map();
 const STUDERRIA_TG_TEAMWORK_TITLE_TTL_MS = 10 * 60 * 1000;
-const STUDERRIA_TG_TEAMWORK_INTERACTION_DELETE_DELAY_MS = 15 * 1000;
+const STUDERRIA_TG_TEAMWORK_INTERACTION_DELETE_DELAY_MS = 30 * 1000;
 const studerriaTelegramTeamworkTitleStore = new Map();
 
 function pruneStuderriaTelegramTeamworkRenameStore(now = Date.now()) {
@@ -21384,6 +21384,15 @@ function scheduleStuderriaTelegramTeamworkInteractionCleanup(chatId, messageIds 
     });
   }, STUDERRIA_TG_TEAMWORK_INTERACTION_DELETE_DELAY_MS);
   if (typeof timer.unref === 'function') timer.unref();
+}
+
+async function sendStuderriaTelegramTeamworkTemporaryMessage(chatId, text, options = {}, extraMessageIds = []) {
+  const sent = await sendStuderriaTelegramMessage(chatId, text, options);
+  scheduleStuderriaTelegramTeamworkInteractionCleanup(chatId, [
+    sent && sent.message_id,
+    ...extraMessageIds,
+  ]);
+  return sent;
 }
 
 function parseStuderriaTelegramTeamworkCallbackData(rawValue = '') {
@@ -21711,6 +21720,19 @@ async function createStuderriaTelegramTeamworkTask(context = {}, subject = {}, g
   return { taskId: Number(taskRow.id), groupCount: normalizedGroupCount };
 }
 
+async function rememberStuderriaTelegramTeamworkMessage(taskId = null, chatId = null, messageId = null) {
+  const normalizedTaskId = parsePositiveIntStrict(taskId);
+  const normalizedMessageId = parsePositiveIntStrict(messageId);
+  const normalizedChatId = chatId || null;
+  if (!normalizedTaskId || !normalizedChatId || !normalizedMessageId) return;
+  await db.run(
+    'UPDATE teamwork_tasks SET telegram_chat_id = ?, telegram_message_id = ? WHERE id = ?',
+    [String(normalizedChatId), normalizedMessageId, normalizedTaskId]
+  ).catch((err) => {
+    console.error('Studerria Telegram teamwork message remember failed', err && err.message ? err.message : err);
+  });
+}
+
 async function loadStuderriaTelegramTeamworkTask(taskId) {
   const normalizedTaskId = parsePositiveIntStrict(taskId);
   if (!normalizedTaskId) return null;
@@ -21834,6 +21856,12 @@ async function refreshStuderriaTelegramTeamworkMessage(callbackQuery = {}, taskI
   }
   const view = buildStuderriaTelegramTeamworkTaskView(task);
   await editStuderriaTelegramMessage(callbackQuery, view.text, view.replyMarkup);
+  const message = callbackQuery && callbackQuery.message ? callbackQuery.message : null;
+  await rememberStuderriaTelegramTeamworkMessage(
+    task.id,
+    message && message.chat ? message.chat.id : null,
+    message && message.message_id ? message.message_id : null
+  );
   return task;
 }
 
@@ -21914,7 +21942,7 @@ async function showStuderriaTelegramDeleteTeamworkPicker(message = {}) {
       `   ${sanitizeCompactText(row.subject_name || 'Предмет', 80)} · ${Number(row.group_rows || row.group_count || 0)} команд · ${Number(row.member_rows || 0)} учасників`,
     ].join('\n')),
   ];
-  await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3600), {
+  await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, lines.join('\n').slice(0, 3600), {
     sourceMessage: message,
     replyMarkup: keyboard,
   });
@@ -21995,7 +22023,7 @@ async function showStuderriaTelegramStrictTeamworkPicker(message = {}) {
       `   Створив: ${sanitizeCompactText(row.created_by_name || '—', 80)}`,
     ].join('\n')),
   ];
-  await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3600), {
+  await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, lines.join('\n').slice(0, 3600), {
     sourceMessage: message,
     replyMarkup: keyboard,
   });
@@ -22053,6 +22081,11 @@ async function handleStuderriaTelegramTeamworkCreateCallback(callbackQuery = {},
     const created = await createStuderriaTelegramTeamworkTask(context, subject, action.groupCount, titleRaw);
     await refreshStuderriaTelegramTeamworkMessage(callbackQuery, created.taskId);
     const message = callbackQuery && callbackQuery.message ? callbackQuery.message : null;
+    await rememberStuderriaTelegramTeamworkMessage(
+      created.taskId,
+      message && message.chat ? message.chat.id : null,
+      message && message.message_id ? message.message_id : null
+    );
     await pinStuderriaTelegramMessage(
       message && message.chat ? message.chat.id : null,
       message && message.message_id ? message.message_id : null,
@@ -22088,7 +22121,7 @@ async function handleStuderriaTelegramTeamworkTitleCallback(callbackQuery = {}, 
     return;
   }
   pruneStuderriaTelegramTeamworkTitleStore();
-  const promptMessage = await sendStuderriaTelegramMessage(
+  const promptMessage = await sendStuderriaTelegramTeamworkTemporaryMessage(
     chatId,
     'Напиши назву завдання одним повідомленням. Наприклад: Презентація про медіацію',
     { sourceMessage: callbackQuery.message }
@@ -22235,11 +22268,15 @@ async function handleStuderriaTelegramTeamworkRenameCallback(callbackQuery = {},
     groupId: Number(membership.group_id),
     expiresAt: Date.now() + STUDERRIA_TG_TEAMWORK_RENAME_TTL_MS,
   });
-  await sendStuderriaTelegramMessage(
+  const promptMessage = await sendStuderriaTelegramTeamworkTemporaryMessage(
     chatId,
     'Напиши нову назву своєї команди одним повідомленням. Наприклад: Дизайн презентації',
     { sourceMessage: callbackQuery.message }
   );
+  const pendingRename = studerriaTelegramTeamworkRenameStore.get(actorTelegramId);
+  if (pendingRename) {
+    pendingRename.promptMessageId = promptMessage && promptMessage.message_id ? promptMessage.message_id : null;
+  }
   await answerStuderriaTelegramCallback(callbackQuery, 'Чекаю нову назву.');
 }
 
@@ -22278,11 +22315,15 @@ async function handleStuderriaTelegramTeamworkLimitCallback(callbackQuery = {}, 
     groupId: Number(membership.group_id),
     expiresAt: Date.now() + STUDERRIA_TG_TEAMWORK_RENAME_TTL_MS,
   });
-  await sendStuderriaTelegramMessage(
+  const promptMessage = await sendStuderriaTelegramTeamworkTemporaryMessage(
     chatId,
     'Напиши максимальну кількість людей для своєї команди. Напиши 0 або "без ліміту", щоб зняти обмеження.',
     { sourceMessage: callbackQuery.message }
   );
+  const pendingLimit = studerriaTelegramTeamworkLimitStore.get(actorTelegramId);
+  if (pendingLimit) {
+    pendingLimit.promptMessageId = promptMessage && promptMessage.message_id ? promptMessage.message_id : null;
+  }
   await answerStuderriaTelegramCallback(callbackQuery, 'Чекаю ліміт команди.');
 }
 
@@ -22315,15 +22356,26 @@ async function handleStuderriaTelegramTeamworkDeleteCallback(callbackQuery = {},
     title: access.task.title,
   }, access.task.course_id);
   broadcast('teamwork_updated');
-  await editStuderriaTelegramMessage(
-    callbackQuery,
-    [
-      'Teamwork видалено.',
-      '',
-      sanitizeCompactText(access.task.title || 'Teamwork', 140),
-      sanitizeCompactText(access.task.subject_name || 'Предмет', 100),
-    ].filter(Boolean).join('\n')
-  );
+  const callbackMessage = callbackQuery && callbackQuery.message ? callbackQuery.message : null;
+  const callbackChatId = callbackMessage && callbackMessage.chat ? callbackMessage.chat.id : null;
+  const callbackMessageId = callbackMessage && callbackMessage.message_id ? callbackMessage.message_id : null;
+  const mainChatId = access.task.telegram_chat_id || null;
+  const mainMessageId = parsePositiveIntStrict(access.task.telegram_message_id);
+  if (mainChatId && mainMessageId) {
+    await deleteStuderriaTelegramMessage(mainChatId, mainMessageId, 'teamwork main deleted');
+  }
+  if (String(mainChatId || '') !== String(callbackChatId || '') || Number(mainMessageId || 0) !== Number(callbackMessageId || 0)) {
+    await editStuderriaTelegramMessage(
+      callbackQuery,
+      [
+        'Teamwork видалено.',
+        '',
+        sanitizeCompactText(access.task.title || 'Teamwork', 140),
+        sanitizeCompactText(access.task.subject_name || 'Предмет', 100),
+      ].filter(Boolean).join('\n')
+    );
+    scheduleStuderriaTelegramTeamworkInteractionCleanup(callbackChatId, [callbackMessageId]);
+  }
   await answerStuderriaTelegramCallback(callbackQuery, 'Видалено.');
 }
 
@@ -22358,6 +22410,11 @@ async function handleStuderriaTelegramTeamworkStrictCallback(callbackQuery = {},
       '',
       'Тепер назви команд і ліміти учасників може змінювати тільки автор Teamwork.',
     ].filter(Boolean).join('\n')
+  );
+  const callbackMessage = callbackQuery && callbackQuery.message ? callbackQuery.message : null;
+  scheduleStuderriaTelegramTeamworkInteractionCleanup(
+    callbackMessage && callbackMessage.chat ? callbackMessage.chat.id : null,
+    [callbackMessage && callbackMessage.message_id]
   );
   await answerStuderriaTelegramCallback(callbackQuery, 'Strict-режим увімкнено.');
 }
@@ -22420,19 +22477,27 @@ async function handleStuderriaTelegramTeamworkTitleMessage(message = {}) {
   if (!text || text.startsWith('/')) return false;
   const title = sanitizeCompactText(text, 140);
   if (title.length < 2) {
-    await sendStuderriaTelegramMessage(chatId, 'Назва занадто коротка. Напиши 2-140 символів.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Назва занадто коротка. Напиши 2-140 символів.', { sourceMessage: message }, [
+      message && message.message_id,
+    ]);
     return true;
   }
   const context = await loadStuderriaTelegramTeamworkCommandContext(message.from || {});
   if (context.error) {
     studerriaTelegramTeamworkTitleStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, formatStuderriaTelegramTeamworkAccessReason(context.error), { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, formatStuderriaTelegramTeamworkAccessReason(context.error), { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   const subject = findStuderriaTelegramTeamworkSubject(context, pending.subjectId);
   if (!subject) {
     studerriaTelegramTeamworkTitleStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, 'Предмет уже недоступний. Запусти /teamwork ще раз.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Предмет уже недоступний. Запусти /teamwork ще раз.', { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   try {
@@ -22443,21 +22508,26 @@ async function handleStuderriaTelegramTeamworkTitleMessage(message = {}) {
       await editStuderriaTelegramChatMessage(pending.chatId, pending.messageId, view.text, view.replyMarkup).catch((err) => {
         console.error('Studerria Telegram teamwork titled create refresh failed', err && err.message ? err.message : err);
       });
+      await rememberStuderriaTelegramTeamworkMessage(created.taskId, pending.chatId, pending.messageId);
       await pinStuderriaTelegramMessage(pending.chatId, pending.messageId, 'teamwork titled create');
     }
-    const confirmationMessage = await sendStuderriaTelegramMessage(chatId, `Teamwork створено: ${title}`, { sourceMessage: message })
+    const confirmationMessage = await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, `Teamwork створено: ${title}`, { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ])
       .catch((err) => {
         console.error('Studerria Telegram teamwork create confirmation failed', err && err.message ? err.message : err);
         return null;
       });
-    scheduleStuderriaTelegramTeamworkInteractionCleanup(chatId, [
-      pending.promptMessageId,
-      message && message.message_id,
-      confirmationMessage && confirmationMessage.message_id,
-    ]);
+    if (!confirmationMessage) {
+      scheduleStuderriaTelegramTeamworkInteractionCleanup(chatId, [pending.promptMessageId, message && message.message_id]);
+    }
   } catch (err) {
     console.error('Studerria Telegram teamwork titled create failed', err && err.message ? err.message : err);
-    await sendStuderriaTelegramMessage(chatId, 'Не вдалося створити Teamwork. Спробуй ще раз.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Не вдалося створити Teamwork. Спробуй ще раз.', { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
   } finally {
     studerriaTelegramTeamworkTitleStore.delete(actorTelegramId);
   }
@@ -22476,13 +22546,18 @@ async function handleStuderriaTelegramTeamworkRenameMessage(message = {}) {
   if (!text || text.startsWith('/')) return false;
   const name = sanitizeCompactText(text, 70);
   if (name.length < 2) {
-    await sendStuderriaTelegramMessage(chatId, 'Назва занадто коротка. Напиши 2-70 символів.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Назва занадто коротка. Напиши 2-70 символів.', { sourceMessage: message }, [
+      message && message.message_id,
+    ]);
     return true;
   }
   const access = await assertStuderriaTelegramTeamworkTaskAccess(message.from || {}, pending.taskId);
   if (!access.ok) {
     studerriaTelegramTeamworkRenameStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, formatStuderriaTelegramTeamworkAccessReason(access.reason), { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, formatStuderriaTelegramTeamworkAccessReason(access.reason), { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   const membership = await db.get(
@@ -22491,12 +22566,18 @@ async function handleStuderriaTelegramTeamworkRenameMessage(message = {}) {
   );
   if (!membership) {
     studerriaTelegramTeamworkRenameStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, 'Назву може змінити тільки учасник цієї команди.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Назву може змінити тільки учасник цієї команди.', { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   if (isStuderriaTelegramTeamworkStrict(access.task) && Number(access.task.created_by) !== Number(access.context.actor.id)) {
     studerriaTelegramTeamworkRenameStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, 'Жорсткий Teamwork: назву може змінити тільки автор.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Жорсткий Teamwork: назву може змінити тільки автор.', { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   await db.run('UPDATE teamwork_groups SET name = ? WHERE id = ? AND task_id = ?', [name, pending.groupId, pending.taskId]);
@@ -22514,7 +22595,10 @@ async function handleStuderriaTelegramTeamworkRenameMessage(message = {}) {
     });
   }
   studerriaTelegramTeamworkRenameStore.delete(actorTelegramId);
-  await sendStuderriaTelegramMessage(chatId, `Назву оновлено: ${name}`, { sourceMessage: message });
+  await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, `Назву оновлено: ${name}`, { sourceMessage: message }, [
+    pending.promptMessageId,
+    message && message.message_id,
+  ]);
   return true;
 }
 
@@ -22536,13 +22620,18 @@ async function handleStuderriaTelegramTeamworkLimitMessage(message = {}) {
     || normalizedText === 'no limit';
   const maxMembers = shouldClearLimit ? null : parsePositiveIntStrict(normalizedText);
   if (!shouldClearLimit && (!maxMembers || maxMembers > 99)) {
-    await sendStuderriaTelegramMessage(chatId, 'Напиши число від 1 до 99 або 0, щоб прибрати ліміт.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Напиши число від 1 до 99 або 0, щоб прибрати ліміт.', { sourceMessage: message }, [
+      message && message.message_id,
+    ]);
     return true;
   }
   const access = await assertStuderriaTelegramTeamworkTaskAccess(message.from || {}, pending.taskId);
   if (!access.ok) {
     studerriaTelegramTeamworkLimitStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, formatStuderriaTelegramTeamworkAccessReason(access.reason), { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, formatStuderriaTelegramTeamworkAccessReason(access.reason), { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   const membership = await db.get(
@@ -22551,22 +22640,29 @@ async function handleStuderriaTelegramTeamworkLimitMessage(message = {}) {
   );
   if (!membership) {
     studerriaTelegramTeamworkLimitStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, 'Ліміт може змінити тільки учасник цієї команди.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Ліміт може змінити тільки учасник цієї команди.', { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   if (isStuderriaTelegramTeamworkStrict(access.task) && Number(access.task.created_by) !== Number(access.context.actor.id)) {
     studerriaTelegramTeamworkLimitStore.delete(actorTelegramId);
-    await sendStuderriaTelegramMessage(chatId, 'Жорсткий Teamwork: ліміт може змінити тільки автор.', { sourceMessage: message });
+    await sendStuderriaTelegramTeamworkTemporaryMessage(chatId, 'Жорсткий Teamwork: ліміт може змінити тільки автор.', { sourceMessage: message }, [
+      pending.promptMessageId,
+      message && message.message_id,
+    ]);
     return true;
   }
   if (maxMembers) {
     const countRow = await db.get('SELECT COUNT(*) AS cnt FROM teamwork_members WHERE group_id = ?', [pending.groupId]);
     const currentMembers = Number(countRow && countRow.cnt || 0);
     if (maxMembers < currentMembers) {
-      await sendStuderriaTelegramMessage(
+      await sendStuderriaTelegramTeamworkTemporaryMessage(
         chatId,
         `У команді вже ${currentMembers} учасників. Постав ліміт не менше ${currentMembers} або напиши 0, щоб прибрати ліміт.`,
-        { sourceMessage: message }
+        { sourceMessage: message },
+        [message && message.message_id]
       );
       return true;
     }
@@ -22590,10 +22686,11 @@ async function handleStuderriaTelegramTeamworkLimitMessage(message = {}) {
     });
   }
   studerriaTelegramTeamworkLimitStore.delete(actorTelegramId);
-  await sendStuderriaTelegramMessage(
+  await sendStuderriaTelegramTeamworkTemporaryMessage(
     chatId,
     maxMembers ? `Ліміт команди оновлено: ${maxMembers}` : 'Ліміт команди прибрано.',
-    { sourceMessage: message }
+    { sourceMessage: message },
+    [pending.promptMessageId, message && message.message_id]
   );
   return true;
 }
