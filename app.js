@@ -20421,6 +20421,175 @@ async function sendStuderriaTelegramHelp(message = {}) {
   });
 }
 
+function normalizeStuderriaTelegramFreeText(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[ʼ’`]/g, "'")
+    .replace(/[?？!！.,;:]+/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function isStuderriaTelegramTomorrowScheduleQuestion(message = {}) {
+  const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  if (!text || text.startsWith('/')) return false;
+  return [
+    'що в мене завтра',
+    'що у мене завтра',
+    'шо в мене завтра',
+    'шо у мене завтра',
+    'що завтра',
+    'які пари завтра',
+    'які в мене пари завтра',
+    'які у мене пари завтра',
+    'розклад завтра',
+    'розклад на завтра',
+    'пари завтра',
+    'пари на завтра',
+  ].includes(text);
+}
+
+function getStuderriaTelegramKyivDateWithOffset(offsetDays = 0) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = Number(parts.find((part) => part.type === 'year')?.value || 0);
+  const month = Number(parts.find((part) => part.type === 'month')?.value || 0);
+  const day = Number(parts.find((part) => part.type === 'day')?.value || 0);
+  if (!year || !month || !day) {
+    return formatLocalDate(addDays(new Date(), offsetDays));
+  }
+  const shifted = new Date(Date.UTC(year, month - 1, day) + Number(offsetDays || 0) * 24 * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function formatStuderriaTelegramDateLabel(dateIso = '') {
+  const parts = String(dateIso || '').split('-');
+  return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : String(dateIso || '');
+}
+
+function getStuderriaTelegramFullDayLabel(dayName = '') {
+  const labels = {
+    Monday: 'Понеділок',
+    Tuesday: 'Вівторок',
+    Wednesday: 'Середа',
+    Thursday: 'Четвер',
+    Friday: 'Пʼятниця',
+    Saturday: 'Субота',
+    Sunday: 'Неділя',
+  };
+  return labels[dayName] || getStuderriaTelegramDayLabel(dayName) || dayName;
+}
+
+function buildStuderriaTelegramScheduleRowLine(row = {}, displayBellSchedule = bellSchedule) {
+  const classNumber = Number(row.class_number || 0);
+  const timeLabel = getScheduleTimeLabel(classNumber, displayBellSchedule);
+  const subjectName = sanitizeCompactText(row.subject_name || row.subject_title || row.name || 'Предмет', 120);
+  const lessonType = getStuderriaTelegramLessonTypeLabel(row.lesson_type || row.activity_type);
+  const groupLabel = sanitizeCompactText(row.group_label || '', 40);
+  const roomLabel = sanitizeCompactText(row.room_label || row.room_name || row.room_code || '', 60);
+  const meta = [lessonType, groupLabel, roomLabel].filter(Boolean).join(' · ');
+  const head = `${classNumber || '-'}. ${timeLabel ? `${timeLabel} · ` : ''}${subjectName}`;
+  return meta ? `${head}\n   ${meta}` : head;
+}
+
+async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return false;
+
+  const context = await getStuderriaTelegramActorContext(message.from || {});
+  const replyMarkup = buildStuderriaTelegramWelcomeKeyboard(chat.type || '');
+  if (!context.actor) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      [
+        'Щоб показати твій розклад, мені треба знати, хто ти в Studerria.',
+        'Зайди в особистий чат з ботом, натисни /start і заверши реєстрацію в mini app.',
+      ].join('\n'),
+      { sourceMessage: message, replyMarkup }
+    );
+    return true;
+  }
+
+  const userId = Number(context.actor.id || 0);
+  const tomorrowIso = getStuderriaTelegramKyivDateWithOffset(1);
+  const dayName = getDayNameFromDate(tomorrowIso);
+  const dayLabel = getStuderriaTelegramFullDayLabel(dayName);
+  const dateLabel = formatStuderriaTelegramDateLabel(tomorrowIso);
+
+  try {
+    const baseState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      userId,
+      { selectedOnly: true }
+    );
+    if (!baseState || !baseState.term) {
+      await sendStuderriaTelegramMessage(
+        chatId,
+        [
+          `Розклад на завтра (${dayLabel}, ${dateLabel})`,
+          '',
+          'Не знайшов активний семестр або групу для твого акаунта.',
+          'Відкрий mini app, перевір профіль і вибрані предмети.',
+        ].join('\n'),
+        { sourceMessage: message, replyMarkup }
+      );
+      return true;
+    }
+
+    const totalWeeks = Math.max(1, Number(baseState.term.weeks_count || 0) || 16);
+    let weekNumber = getAcademicWeekForSemester(new Date(`${tomorrowIso}T12:00:00Z`), baseState.term);
+    if (weekNumber < 1) weekNumber = 1;
+    if (weekNumber > totalWeeks) weekNumber = totalWeeks;
+
+    const scheduleState = await academicV2StudentHelpers.loadStudentScheduleData(
+      getAcademicV2Store(),
+      userId,
+      { weekNumber }
+    );
+    const displayBellSchedule = buildDisplayBellSchedule(
+      baseState && baseState.scope ? baseState.scope.campus_key : null
+    );
+    const rows = (scheduleState && Array.isArray(scheduleState.scheduleRows) ? scheduleState.scheduleRows : [])
+      .filter((row) => row && row.day_of_week === dayName)
+      .sort((left, right) =>
+        (Number(left.class_number || 0) - Number(right.class_number || 0))
+        || String(left.subject_name || left.subject_title || '').localeCompare(String(right.subject_name || right.subject_title || ''))
+      );
+
+    const lines = [
+      `Розклад на завтра (${dayLabel}, ${dateLabel})`,
+      `Тиждень ${weekNumber}`,
+      '',
+    ];
+    if (!rows.length) {
+      lines.push('На завтра пар не знайшов.');
+      lines.push('Якщо розклад щойно оновлювали, перевір ще mini app.');
+    } else {
+      rows.forEach((row) => {
+        lines.push(buildStuderriaTelegramScheduleRowLine(row, displayBellSchedule));
+      });
+    }
+    await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3900), {
+      sourceMessage: message,
+      replyMarkup,
+    });
+  } catch (err) {
+    console.error('Studerria Telegram tomorrow schedule failed', err);
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Не зміг зараз підтягнути розклад на завтра. Спробуй ще раз трохи пізніше або відкрий розклад у mini app.',
+      { sourceMessage: message, replyMarkup }
+    );
+  }
+  return true;
+}
+
 async function findStuderriaTelegramUserByActor(telegramUser = {}) {
   const telegramId = normalizeTelegramId(telegramUser && telegramUser.id);
   if (!telegramId) return null;
@@ -23043,6 +23212,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     if (await handleStuderriaTelegramTeamworkRenameMessage(message)) {
+      return;
+    }
+    if (isStuderriaTelegramTomorrowScheduleQuestion(message)) {
+      await sendStuderriaTelegramTomorrowSchedule(message);
       return;
     }
     const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
