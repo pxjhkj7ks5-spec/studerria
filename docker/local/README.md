@@ -67,19 +67,33 @@ For `charredmap`, set dedicated values for:
 
 ## Update an existing server
 
-For a normal application update, keep the existing PostgreSQL volume and run:
+For a normal application update, keep the existing PostgreSQL volume and run the helper from the repository root:
+
+```bash
+cd ~/studerria
+bash scripts/server-update.sh
+```
+
+The helper preserves server-local edits to `docker/local/docker-compose.yml` with `git update-index --skip-worktree`, pulls the latest code, rebuilds the `app` container, and prints the latest app logs.
+
+If this is the first update on a server where `docker/local/docker-compose.yml` is already locally modified and `git pull --rebase` refuses to run, do this once:
+
+```bash
+cd ~/studerria
+git update-index --skip-worktree docker/local/docker-compose.yml
+git pull --rebase
+bash scripts/server-update.sh
+```
+
+Manual equivalent:
 
 ```bash
 cd ~/studerria
 git pull --rebase
 cd docker/local
-docker compose pull naradadruk
-docker compose up -d
+docker compose up -d --build app
 docker compose ps
 docker compose logs --tail=100 app
-docker compose logs --tail=100 charredmap
-docker compose logs --tail=100 naradadruk
-docker compose logs --tail=100 slashtg
 ```
 
 Do not run `docker compose down -v` for a routine update, because that recreates database and cache volumes.
