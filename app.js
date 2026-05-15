@@ -19988,6 +19988,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'addpara', description: 'Додати пару' },
   { command: 'deletepara', description: 'Видалити пару' },
   { command: 'teamwork', description: 'Створити Teamwork команди' },
+  { command: 'strictteam', description: 'Зробити Teamwork жорстким' },
   { command: 'deleteteamwork', description: 'Видалити Teamwork' },
   { command: 'enablenotification', description: 'Увімкнути сповіщення' },
   { command: 'disablenotification', description: 'Вимкнути сповіщення' },
@@ -19995,6 +19996,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
 const STUDERRIA_TG_GROUP_BOT_COMMANDS = [
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
   { command: 'teamwork', description: 'Створити Teamwork команди' },
+  { command: 'strictteam', description: 'Зробити Teamwork жорстким' },
   { command: 'deleteteamwork', description: 'Видалити Teamwork' },
 ];
 
@@ -21426,6 +21428,7 @@ function parseStuderriaTelegramTeamworkCallbackData(rawValue = '') {
   if (action === 'm') return { kind: 'limit', taskId: parsePositiveIntStrict(parts[2]) };
   if (action === 'f') return { kind: 'refresh', taskId: parsePositiveIntStrict(parts[2]) };
   if (action === 'd') return { kind: 'delete', taskId: parsePositiveIntStrict(parts[2]) };
+  if (action === 'x') return { kind: 'strict', taskId: parsePositiveIntStrict(parts[2]) };
   return null;
 }
 
@@ -21771,9 +21774,12 @@ function buildStuderriaTelegramTeamworkTaskView(task = {}) {
     title && title !== header ? title : '',
     '',
     `${Math.max(1, Number(task.group_count || groups.length || 1) || 1)} команд. Натисни свою команду, щоб приєднатись.`,
+    isStuderriaTelegramTeamworkStrict(task)
+      ? 'Жорсткий режим: назви та ліміти команд змінює тільки автор Teamwork.'
+      : '',
     'Якщо ти вже в іншій команді, кнопка перенесе тебе.',
     '',
-  ].filter((line, index) => index !== 1 || line);
+  ].filter((line, index) => (index !== 1 || line) && line !== '');
   groups.forEach((group, index) => {
     const members = Array.isArray(group.members) ? group.members : [];
     const name = sanitizeCompactText(group.name || `Команда ${index + 1}`, 70);
@@ -21784,7 +21790,9 @@ function buildStuderriaTelegramTeamworkTaskView(task = {}) {
     lines.push(memberNames.length ? `   ${memberNames.join(', ')}` : '   поки пусто');
   });
   lines.push('');
-  lines.push('Учасники команди можуть змінити її назву або ліміт кнопками нижче.');
+  lines.push(isStuderriaTelegramTeamworkStrict(task)
+    ? 'Автор Teamwork може змінити назву або ліміт своєї команди кнопками нижче.'
+    : 'Учасники команди можуть змінити її назву або ліміт кнопками нижче.');
   const teamButtons = groups.map((group, index) => ({
     text: `${index + 1}. ${sanitizeCompactText(group.name || `Команда ${index + 1}`, 18)} (${
       parsePositiveIntStrict(group.max_members)
@@ -21827,6 +21835,10 @@ async function refreshStuderriaTelegramTeamworkMessage(callbackQuery = {}, taskI
   const view = buildStuderriaTelegramTeamworkTaskView(task);
   await editStuderriaTelegramMessage(callbackQuery, view.text, view.replyMarkup);
   return task;
+}
+
+function isStuderriaTelegramTeamworkStrict(task = {}) {
+  return Number(task && task.strict_team_editing) === 1 || task.strict_team_editing === true;
 }
 
 async function showStuderriaTelegramDeleteTeamworkPicker(message = {}) {
@@ -21900,6 +21912,87 @@ async function showStuderriaTelegramDeleteTeamworkPicker(message = {}) {
     ...rows.map((row, index) => [
       `${index + 1}. ${sanitizeCompactText(row.title || 'Teamwork', 90)}`,
       `   ${sanitizeCompactText(row.subject_name || 'Предмет', 80)} · ${Number(row.group_rows || row.group_count || 0)} команд · ${Number(row.member_rows || 0)} учасників`,
+    ].join('\n')),
+  ];
+  await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3600), {
+    sourceMessage: message,
+    replyMarkup: keyboard,
+  });
+}
+
+async function showStuderriaTelegramStrictTeamworkPicker(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && chat.id ? chat.id : null;
+  if (!chatId) return;
+  const context = await loadStuderriaTelegramTeamworkCommandContext(message.from || {});
+  if (context.error === 'not_registered') {
+    await sendStuderriaTelegramTeamworkAuthPrompt(chatId, message);
+    return;
+  }
+  if (context.error || !canManageStuderriaTelegramTeamwork(context)) {
+    await sendStuderriaTelegramMessage(chatId, formatStuderriaTelegramTeamworkAccessReason(context.error || 'forbidden'), {
+      sourceMessage: message,
+    });
+    return;
+  }
+  const subjectIds = Array.from(new Set(
+    (context.subjects || [])
+      .map((subject) => parsePositiveIntStrict(subject.subject_id))
+      .filter((value) => Number.isInteger(value) && value > 0)
+  ));
+  if (!subjectIds.length) {
+    await sendStuderriaTelegramMessage(chatId, 'Не бачу предметів з Teamwork для твого курсу.', { sourceMessage: message });
+    return;
+  }
+  const activeSemester = context.courseId ? await getActiveSemester(context.courseId).catch(() => null) : null;
+  const rows = await db.all(
+    `
+      SELECT
+        t.id,
+        t.title,
+        t.group_count,
+        t.created_at,
+        t.strict_team_editing,
+        s.name AS subject_name,
+        COALESCE(u.full_name, '') AS created_by_name,
+        COUNT(DISTINCT g.id)::int AS group_rows,
+        COUNT(DISTINCT m.id)::int AS member_rows
+      FROM teamwork_tasks t
+      JOIN subjects s ON s.id = t.subject_id
+      LEFT JOIN users u ON u.id = t.created_by
+      LEFT JOIN teamwork_groups g ON g.task_id = t.id
+      LEFT JOIN teamwork_members m ON m.task_id = t.id
+      WHERE t.course_id = ?
+        ${activeSemester && activeSemester.id ? 'AND t.semester_id = ?' : ''}
+        AND t.subject_id = ANY(?::int[])
+      GROUP BY t.id, t.title, t.group_count, t.created_at, t.strict_team_editing, s.name, u.full_name
+      ORDER BY t.created_at DESC, t.id DESC
+      LIMIT 20
+    `,
+    activeSemester && activeSemester.id
+      ? [context.courseId, activeSemester.id, subjectIds]
+      : [context.courseId, subjectIds]
+  ).catch((err) => {
+    console.error('Studerria Telegram strict teamwork list failed', err && err.message ? err.message : err);
+    return [];
+  });
+  if (!rows.length) {
+    await sendStuderriaTelegramMessage(chatId, 'Активних Teamwork-завдань для strict-режиму не знайшов.', { sourceMessage: message });
+    return;
+  }
+  const keyboard = buildStuderriaTelegramInlineKeyboard(rows.map((row) => ({
+    text: `${isStuderriaTelegramTeamworkStrict(row) ? '[strict] ' : ''}${sanitizeCompactText(row.subject_name || 'Предмет', 16)} · ${sanitizeCompactText(row.title || 'Teamwork', 24)}`,
+    callback_data: buildStuderriaTelegramTeamworkButtonData('x', [row.id]),
+  })), 1);
+  const lines = [
+    'Strict Teamwork',
+    '',
+    'Обери Teamwork, який треба зробити жорстким:',
+    '',
+    ...rows.map((row, index) => [
+      `${index + 1}. ${sanitizeCompactText(row.title || 'Teamwork', 90)}${isStuderriaTelegramTeamworkStrict(row) ? ' · вже жорсткий' : ''}`,
+      `   ${sanitizeCompactText(row.subject_name || 'Предмет', 80)} · ${Number(row.group_rows || row.group_count || 0)} команд · ${Number(row.member_rows || 0)} учасників`,
+      `   Створив: ${sanitizeCompactText(row.created_by_name || '—', 80)}`,
     ].join('\n')),
   ];
   await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3600), {
@@ -22122,6 +22215,10 @@ async function handleStuderriaTelegramTeamworkRenameCallback(callbackQuery = {},
     await answerStuderriaTelegramCallback(callbackQuery, 'Спершу приєднайся до команди.');
     return;
   }
+  if (isStuderriaTelegramTeamworkStrict(access.task) && Number(access.task.created_by) !== userId) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Жорсткий Teamwork: назву може змінити тільки автор.', { showAlert: true });
+    return;
+  }
   const chatId = callbackQuery.message && callbackQuery.message.chat ? callbackQuery.message.chat.id : null;
   const messageId = callbackQuery.message && callbackQuery.message.message_id ? callbackQuery.message.message_id : null;
   const actorTelegramId = getStuderriaTelegramActorId(callbackQuery.from || {});
@@ -22159,6 +22256,10 @@ async function handleStuderriaTelegramTeamworkLimitCallback(callbackQuery = {}, 
   );
   if (!membership) {
     await answerStuderriaTelegramCallback(callbackQuery, 'Спершу приєднайся до команди.');
+    return;
+  }
+  if (isStuderriaTelegramTeamworkStrict(access.task) && Number(access.task.created_by) !== userId) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Жорсткий Teamwork: ліміт може змінити тільки автор.', { showAlert: true });
     return;
   }
   const chatId = callbackQuery.message && callbackQuery.message.chat ? callbackQuery.message.chat.id : null;
@@ -22226,6 +22327,41 @@ async function handleStuderriaTelegramTeamworkDeleteCallback(callbackQuery = {},
   await answerStuderriaTelegramCallback(callbackQuery, 'Видалено.');
 }
 
+async function handleStuderriaTelegramTeamworkStrictCallback(callbackQuery = {}, action = {}) {
+  const access = await assertStuderriaTelegramTeamworkTaskAccess(callbackQuery.from || {}, action.taskId);
+  if (!access.ok) {
+    await answerStuderriaTelegramCallback(callbackQuery, formatStuderriaTelegramTeamworkAccessReason(access.reason), { showAlert: true });
+    return;
+  }
+  if (!canManageStuderriaTelegramTeamwork(access.context)) {
+    await answerStuderriaTelegramCallback(callbackQuery, formatStuderriaTelegramTeamworkAccessReason('forbidden'), { showAlert: true });
+    return;
+  }
+  if (isStuderriaTelegramTeamworkStrict(access.task)) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Цей Teamwork уже жорсткий.');
+    return;
+  }
+  await db.run('UPDATE teamwork_tasks SET strict_team_editing = 1 WHERE id = ?', [access.task.id]);
+  await insertStuderriaTelegramTeamworkHistory(access.context.actor, 'telegram_teamwork_strict_enable', {
+    task_id: access.task.id,
+    subject_id: access.task.subject_id,
+    title: access.task.title,
+  }, access.task.course_id);
+  broadcast('teamwork_updated');
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    [
+      'Teamwork став жорстким.',
+      '',
+      sanitizeCompactText(access.task.title || 'Teamwork', 140),
+      sanitizeCompactText(access.task.subject_name || 'Предмет', 100),
+      '',
+      'Тепер назви команд і ліміти учасників може змінювати тільки автор Teamwork.',
+    ].filter(Boolean).join('\n')
+  );
+  await answerStuderriaTelegramCallback(callbackQuery, 'Strict-режим увімкнено.');
+}
+
 async function handleStuderriaTelegramTeamworkCallback(callbackQuery = {}, action = {}) {
   if (action.kind === 'subject') {
     await showStuderriaTelegramTeamworkCountPicker(callbackQuery, action);
@@ -22265,6 +22401,10 @@ async function handleStuderriaTelegramTeamworkCallback(callbackQuery = {}, actio
   }
   if (action.kind === 'delete') {
     await handleStuderriaTelegramTeamworkDeleteCallback(callbackQuery, action);
+    return;
+  }
+  if (action.kind === 'strict') {
+    await handleStuderriaTelegramTeamworkStrictCallback(callbackQuery, action);
   }
 }
 
@@ -22354,6 +22494,11 @@ async function handleStuderriaTelegramTeamworkRenameMessage(message = {}) {
     await sendStuderriaTelegramMessage(chatId, 'Назву може змінити тільки учасник цієї команди.', { sourceMessage: message });
     return true;
   }
+  if (isStuderriaTelegramTeamworkStrict(access.task) && Number(access.task.created_by) !== Number(access.context.actor.id)) {
+    studerriaTelegramTeamworkRenameStore.delete(actorTelegramId);
+    await sendStuderriaTelegramMessage(chatId, 'Жорсткий Teamwork: назву може змінити тільки автор.', { sourceMessage: message });
+    return true;
+  }
   await db.run('UPDATE teamwork_groups SET name = ? WHERE id = ? AND task_id = ?', [name, pending.groupId, pending.taskId]);
   await insertStuderriaTelegramTeamworkHistory(access.context.actor, 'telegram_teamwork_rename', {
     task_id: pending.taskId,
@@ -22407,6 +22552,11 @@ async function handleStuderriaTelegramTeamworkLimitMessage(message = {}) {
   if (!membership) {
     studerriaTelegramTeamworkLimitStore.delete(actorTelegramId);
     await sendStuderriaTelegramMessage(chatId, 'Ліміт може змінити тільки учасник цієї команди.', { sourceMessage: message });
+    return true;
+  }
+  if (isStuderriaTelegramTeamworkStrict(access.task) && Number(access.task.created_by) !== Number(access.context.actor.id)) {
+    studerriaTelegramTeamworkLimitStore.delete(actorTelegramId);
+    await sendStuderriaTelegramMessage(chatId, 'Жорсткий Teamwork: ліміт може змінити тільки автор.', { sourceMessage: message });
     return true;
   }
   if (maxMembers) {
@@ -22489,6 +22639,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
     }
     if (parsedCommand.command === 'teamwork') {
       await showStuderriaTelegramTeamworkSubjectPicker(message);
+      return;
+    }
+    if (parsedCommand.command === 'strictteam') {
+      await showStuderriaTelegramStrictTeamworkPicker(message);
       return;
     }
     if (parsedCommand.command === 'deleteteamwork') {
@@ -45067,7 +45221,14 @@ app.post('/teamwork/group/update', requireLogin, writeLimiter, (req, res) => {
   const { id: userId } = req.session.user;
   db.get(
     `
-      SELECT g.task_id, g.leader_id, t.subject_id, t.member_limits_enabled, t.max_members AS task_max_members
+      SELECT
+        g.task_id,
+        g.leader_id,
+        t.subject_id,
+        t.created_by,
+        t.member_limits_enabled,
+        t.max_members AS task_max_members,
+        t.strict_team_editing
       FROM teamwork_groups g
       JOIN teamwork_tasks t ON t.id = g.task_id
       WHERE g.id = ?
@@ -45077,7 +45238,11 @@ app.post('/teamwork/group/update', requireLogin, writeLimiter, (req, res) => {
       if (grpErr || !grpRow) {
         return res.redirect('/teamwork?err=Group%20not%20found');
       }
-      if (grpRow.leader_id !== userId) {
+      const strictEditing = Number(grpRow.strict_team_editing) === 1 || grpRow.strict_team_editing === true;
+      if (strictEditing && Number(grpRow.created_by) !== Number(userId)) {
+        return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Only%20task%20owner%20can%20edit`);
+      }
+      if (!strictEditing && grpRow.leader_id !== userId) {
         return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Only%20leader%20can%20edit`);
       }
       const newName = name && name.trim().length ? name.trim() : null;

@@ -53,6 +53,7 @@ const teamworkScheduleVisibility = require('./052_teamwork_schedule_visibility')
 const visitIpGeoCache = require('./053_visit_ip_geo_cache');
 const telegramMiniAppUsers = require('./054_telegram_mini_app_users');
 const telegramNotificationPreferences = require('./055_telegram_notification_preferences');
+const teamworkStrictEditing = require('./056_teamwork_strict_editing');
 
 module.exports = [
   init,
@@ -110,4 +111,5 @@ module.exports = [
   visitIpGeoCache,
   telegramMiniAppUsers,
   telegramNotificationPreferences,
+  teamworkStrictEditing,
 ];
