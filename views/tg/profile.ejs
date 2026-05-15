@@ -1,5 +1,4 @@
 <section class="tg-page-head">
-  <p class="tg-kicker">Studerria</p>
   <h1>Профіль</h1>
   <% if (placement && placement.group_label) { %>
     <p class="tg-muted"><%= placement.group_label %></p>
@@ -17,6 +16,23 @@
     'telegram-linked': 'Telegram привʼязано.',
   };
 %>
+<%
+  const profileName = user && user.full_name ? String(user.full_name).trim() : 'Andriy';
+  const profileNameParts = profileName
+    .split(/\s+/)
+    .filter(Boolean);
+  const profileUsernameParts = user && user.telegram_username
+    ? String(user.telegram_username).split(/[._-]+/).filter(Boolean)
+    : [];
+  const profileInitialSources = profileNameParts.length > 1
+    ? profileNameParts
+    : [profileNameParts[0], profileUsernameParts[1]].filter(Boolean);
+  const profileInitials = profileInitialSources
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'AS';
+  const profileLanguage = user && user.language === 'en' ? 'English' : 'Українська';
+%>
 
 <% if (error) { %>
   <div class="tg-alert"><%= profileErrorMessages[error] || 'Не вдалося оновити профіль.' %></div>
@@ -25,27 +41,35 @@
   <div class="tg-success"><%= profileSuccessMessages[success] || 'Профіль оновлено.' %></div>
 <% } %>
 
-<section class="tg-card">
-  <form class="tg-form" method="POST" action="/studerria-tg/profile">
-    <label>
-      <span>Повне імʼя</span>
-      <input name="full_name" type="text" value="<%= user && user.full_name ? user.full_name : '' %>" required />
-    </label>
-    <label>
-      <span>Мова</span>
-      <select name="language">
-        <option value="uk" <%= user && user.language === 'uk' ? 'selected' : '' %>>Українська</option>
-        <option value="en" <%= user && user.language === 'en' ? 'selected' : '' %>>English</option>
-      </select>
-    </label>
-    <button class="tg-primary" type="submit">Оновити</button>
+<section class="tg-card tg-profile-card">
+  <form class="tg-profile-form" method="POST" action="/studerria-tg/profile">
+    <div class="tg-avatar" aria-hidden="true"><%= profileInitials %></div>
+    <div class="tg-profile-fields">
+      <label>
+        <span class="tg-sr-only">Повне імʼя</span>
+        <input name="full_name" type="text" value="<%= profileName %>" required />
+      </label>
+      <label>
+        <span class="tg-sr-only">Мова</span>
+        <select name="language" aria-label="Мова">
+          <option value="uk" <%= user && user.language === 'uk' ? 'selected' : '' %>>Українська</option>
+          <option value="en" <%= user && user.language === 'en' ? 'selected' : '' %>>English</option>
+        </select>
+      </label>
+    </div>
+    <button class="tg-icon-submit" type="submit" aria-label="Оновити профіль">
+      <span><%= profileLanguage %></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="m9 5 7 7-7 7" />
+      </svg>
+    </button>
   </form>
 </section>
 
 <section class="tg-card">
   <h2>Telegram</h2>
   <% if (user && user.telegram_id) { %>
-    <p class="tg-muted">Привʼязано<%= user.telegram_username ? ': @' + user.telegram_username : '' %></p>
+    <p class="tg-link-line"><%= user.telegram_username ? '@' + user.telegram_username : 'Привʼязано' %></p>
   <% } else { %>
     <p class="tg-muted">Telegram ще не привʼязано.</p>
     <form class="tg-form tg-link-form" method="POST" action="/studerria-tg/profile/link-telegram" data-tg-link-form>
@@ -59,5 +83,10 @@
 <section class="tg-card">
   <h2>Предмети</h2>
   <p class="tg-muted">Тут можна змінити групи та предмети, які формують розклад і Teamwork.</p>
-  <a class="tg-secondary" href="/studerria-tg/subjects">Налаштувати предмети</a>
+  <a class="tg-disclosure" href="/studerria-tg/subjects">
+    <span>Налаштувати предмети</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="m9 5 7 7-7 7" />
+    </svg>
+  </a>
 </section>

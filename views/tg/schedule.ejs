@@ -1,10 +1,9 @@
 <section class="tg-page-head">
-  <p class="tg-kicker">Studerria</p>
   <h1>Розклад</h1>
   <div class="tg-weekbar">
-    <a href="/studerria-tg/schedule?week=<%= Math.max(1, Number(currentWeek || 1) - 1) %>">Prev</a>
+    <a href="/studerria-tg/schedule?week=<%= Math.max(1, Number(currentWeek || 1) - 1) %>" aria-label="Previous week">Prev</a>
     <strong>Week <%= currentWeek || 1 %> / <%= totalWeeks || 1 %></strong>
-    <a href="/studerria-tg/schedule?week=<%= Math.min(Number(totalWeeks || 1), Number(currentWeek || 1) + 1) %>">Next</a>
+    <a href="/studerria-tg/schedule?week=<%= Math.min(Number(totalWeeks || 1), Number(currentWeek || 1) + 1) %>" aria-label="Next week">Next</a>
   </div>
 </section>
 
@@ -33,7 +32,7 @@
       <% rows.forEach(function(item) { %>
         <div class="tg-lesson">
           <div class="tg-lesson-time">
-            <strong><%= item.class_number || '' %></strong>
+            <strong aria-label="Пара <%= item.class_number || '' %>"><%= item.class_number || '' %></strong>
             <span><%= item.time_label || '' %></span>
           </div>
           <div>

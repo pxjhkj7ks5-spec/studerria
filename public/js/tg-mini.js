@@ -9,6 +9,7 @@
   ]);
   const pageCache = new Map();
   let activeNavigationRequest = null;
+  const systemDarkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
   function colorIsDark(rawColor) {
     const hex = String(rawColor || '').trim().replace('#', '');
@@ -19,19 +20,36 @@
     return ((red * 299 + green * 587 + blue * 114) / 1000) < 145;
   }
 
+  function getPreferredDarkMode() {
+    if (tg && typeof tg.colorScheme === 'string' && tg.colorScheme) {
+      return tg.colorScheme === 'dark';
+    }
+    const bg = tg && tg.themeParams && tg.themeParams.bg_color;
+    if (bg) return colorIsDark(bg);
+    return Boolean(systemDarkQuery && systemDarkQuery.matches);
+  }
+
+  function applyThemeMode() {
+    const isDark = getPreferredDarkMode();
+    document.documentElement.classList.toggle('is-tg-dark', isDark);
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute('content', isDark ? '#111214' : '#f6f4f0');
+  }
+
   function applyTelegramChrome() {
-    if (!tg) return;
     try {
-      tg.ready();
-      tg.expand();
-      document.documentElement.style.setProperty('--tg-viewport-height', `${tg.viewportStableHeight || tg.viewportHeight || window.innerHeight}px`);
-      const bg = tg.themeParams && tg.themeParams.bg_color;
-      const text = tg.themeParams && tg.themeParams.text_color;
-      const button = tg.themeParams && tg.themeParams.button_color;
-      if (bg) document.documentElement.style.setProperty('--tg-theme-bg', bg);
-      if (text) document.documentElement.style.setProperty('--tg-theme-text', text);
-      if (button) document.documentElement.style.setProperty('--tg-theme-accent', button);
-      document.documentElement.classList.toggle('is-tg-dark', colorIsDark(bg));
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        document.documentElement.style.setProperty('--tg-viewport-height', `${tg.viewportStableHeight || tg.viewportHeight || window.innerHeight}px`);
+        const button = tg.themeParams && tg.themeParams.button_color;
+        if (button && /^#[0-9a-f]{6}$/i.test(button)) {
+          document.documentElement.style.setProperty('--tg-theme-accent', button);
+        }
+      } else {
+        document.documentElement.style.setProperty('--tg-viewport-height', `${window.innerHeight}px`);
+      }
+      applyThemeMode();
     } catch (_error) {}
   }
 
@@ -235,6 +253,18 @@
   }
 
   window.addEventListener('resize', applyTelegramChrome);
+  if (systemDarkQuery) {
+    const onSystemThemeChange = () => applyTelegramChrome();
+    if (systemDarkQuery.addEventListener) {
+      systemDarkQuery.addEventListener('change', onSystemThemeChange);
+    } else if (systemDarkQuery.addListener) {
+      systemDarkQuery.addListener(onSystemThemeChange);
+    }
+  }
+  if (tg && tg.onEvent) {
+    tg.onEvent('themeChanged', applyTelegramChrome);
+    tg.onEvent('viewportChanged', applyTelegramChrome);
+  }
   window.addEventListener('popstate', () => {
     const url = getFastUrl(window.location.href);
     if (!url) {
