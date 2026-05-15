@@ -13877,6 +13877,7 @@ async function deleteUserPermanentlyEverywhere(userId, actorUserId) {
     await txRun(client, 'UPDATE homework SET created_by_id = NULL WHERE created_by_id = ?', [normalizedUserId]);
     await txRun(client, 'UPDATE messages SET created_by_id = ? WHERE created_by_id = ?', [reassignmentUserId, normalizedUserId]);
     await txRun(client, 'UPDATE teamwork_tasks SET created_by = ? WHERE created_by = ?', [reassignmentUserId, normalizedUserId]);
+    await txRun(client, 'UPDATE teamwork_tasks SET team_join_closed_by = NULL WHERE team_join_closed_by = ?', [normalizedUserId]);
     await txRun(client, 'UPDATE teamwork_groups SET leader_id = ? WHERE leader_id = ?', [reassignmentUserId, normalizedUserId]);
     await txRun(client, 'DELETE FROM users WHERE id = ?', [normalizedUserId]);
     return {
@@ -20085,6 +20086,15 @@ function isStuderriaTelegramDevUser(telegramUser = {}) {
   return Boolean(actorId && getStuderriaTelegramDevIdSet().has(actorId));
 }
 
+async function isStuderriaTelegramDevLinkedUserId(userId) {
+  const normalizedUserId = parsePositiveIntStrict(userId);
+  if (!normalizedUserId) return false;
+  const devIds = getStuderriaTelegramDevIdSet();
+  if (!devIds.size) return false;
+  const user = await db.get('SELECT telegram_id FROM users WHERE id = ? LIMIT 1', [normalizedUserId]).catch(() => null);
+  return Boolean(user && normalizeTelegramId(user.telegram_id) && devIds.has(normalizeTelegramId(user.telegram_id)));
+}
+
 function normalizeStuderriaTelegramUsername(rawValue) {
   return String(rawValue || '').trim().replace(/^@/, '').toLowerCase();
 }
@@ -21463,6 +21473,17 @@ function isTeamworkJoinOpen(task = {}) {
   return Number(rawValue) !== 0 && rawValue !== false;
 }
 
+function canBypassClosedTeamworkJoin(context = {}, task = {}) {
+  const actorId = Number(context && context.actor && context.actor.id || 0);
+  return Boolean(
+    context
+    && (
+      context.isDev
+      || (actorId > 0 && Number(task && task.team_join_closed_by || 0) === actorId)
+    )
+  );
+}
+
 function buildStuderriaTelegramTeamworkAuthText() {
   const botUsername = String(
     process.env.STUDERRIA_TG_BOT_USERNAME
@@ -22103,6 +22124,7 @@ async function showStuderriaTelegramTeamworkOpenStatePicker(message = {}, should
         t.created_at,
         t.created_by,
         t.team_join_open,
+        t.team_join_closed_by,
         s.name AS subject_name,
         COALESCE(u.full_name, '') AS created_by_name,
         COUNT(DISTINCT g.id)::int AS group_rows,
@@ -22116,7 +22138,7 @@ async function showStuderriaTelegramTeamworkOpenStatePicker(message = {}, should
         ${activeSemester && activeSemester.id ? 'AND t.semester_id = ?' : ''}
         AND t.subject_id = ANY(?::int[])
         ${canManageAll ? '' : 'AND t.created_by = ?'}
-      GROUP BY t.id, t.title, t.group_count, t.created_at, t.created_by, t.team_join_open, s.name, u.full_name
+      GROUP BY t.id, t.title, t.group_count, t.created_at, t.created_by, t.team_join_open, t.team_join_closed_by, s.name, u.full_name
       ORDER BY t.created_at DESC, t.id DESC
       LIMIT 20
     `,
@@ -22270,7 +22292,7 @@ async function handleStuderriaTelegramTeamworkTitleCallback(callbackQuery = {}, 
 async function handleStuderriaTelegramTeamworkJoinCallback(callbackQuery = {}, action = {}) {
   const group = await db.get(
     `
-      SELECT g.id, g.task_id, g.max_members, g.leader_id, t.group_lock_enabled, t.team_join_open
+      SELECT g.id, g.task_id, g.max_members, g.leader_id, t.group_lock_enabled, t.team_join_open, t.team_join_closed_by
       FROM teamwork_groups g
       JOIN teamwork_tasks t ON t.id = g.task_id
       WHERE g.id = ?
@@ -22296,7 +22318,7 @@ async function handleStuderriaTelegramTeamworkJoinCallback(callbackQuery = {}, a
     await answerStuderriaTelegramCallback(callbackQuery, 'Ти вже в цій команді.');
     return;
   }
-  if (!isTeamworkJoinOpen(access.task)) {
+  if (!isTeamworkJoinOpen(access.task) && !canBypassClosedTeamworkJoin(access.context, access.task)) {
     await answerStuderriaTelegramCallback(callbackQuery, 'Вступ у цей Teamwork зараз закрито.', { showAlert: true });
     return;
   }
@@ -22574,7 +22596,10 @@ async function handleStuderriaTelegramTeamworkOpenStateCallback(callbackQuery = 
     );
     return;
   }
-  await db.run('UPDATE teamwork_tasks SET team_join_open = ? WHERE id = ?', [nextValue, access.task.id]);
+  await db.run(
+    'UPDATE teamwork_tasks SET team_join_open = ?, team_join_closed_by = ? WHERE id = ?',
+    [nextValue, shouldOpen ? null : Number(access.context.actor.id), access.task.id]
+  );
   await insertStuderriaTelegramTeamworkHistory(access.context.actor, shouldOpen ? 'telegram_teamwork_open' : 'telegram_teamwork_close', {
     task_id: access.task.id,
     subject_id: access.task.subject_id,
@@ -45296,6 +45321,7 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
                t.course_id,
                t.group_lock_enabled,
                t.team_join_open,
+               t.team_join_closed_by,
                t.lesson_scope,
                t.seminar_group_numbers,
                s.group_count AS subject_group_count,
@@ -45360,7 +45386,9 @@ app.post('/teamwork/group/join', requireLogin, writeLimiter, async (req, res) =>
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Already%20in%20group`);
     }
 
-    if (!isTeamworkJoinOpen(grpRow)) {
+    const canBypassClosedJoin = Number(grpRow.team_join_closed_by || 0) === Number(userId)
+      || await isStuderriaTelegramDevLinkedUserId(userId);
+    if (!isTeamworkJoinOpen(grpRow) && !canBypassClosedJoin) {
       return res.redirect(`/teamwork?subject_id=${grpRow.subject_id}&err=Teamwork%20join%20is%20closed`);
     }
 
