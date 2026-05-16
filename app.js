@@ -19409,6 +19409,11 @@ async function createTelegramMiniUser(req, telegramUser) {
   } catch (eventErr) {
     console.error('Database error (tg.register.registration_event)', eventErr);
   }
+  queueStuderriaTelegramDevNewUserNotification({
+    user: row,
+    telegramUser: normalizedUser,
+    source: 'telegram_mini_auto_register',
+  });
   logAction(db, req, 'telegram_mini_auto_register_user', {
     user_id: row.id,
     telegram_id: normalizedUser.id,
@@ -20074,13 +20079,22 @@ function isStuderriaTelegramStartCommand(message, botUsername = '') {
   return parsed && parsed.command === 'start';
 }
 
-function getStuderriaTelegramDevIdSet() {
-  return new Set(
-    String(process.env.STUDERRIA_TG_DEV_TELEGRAM_ID || process.env.STUDERRIA_TG_DEV_TELEGRAM_IDS || '')
+function getStuderriaTelegramDevIds() {
+  return Array.from(new Set(
+    [
+      process.env.STUDERRIA_TG_DEV_TELEGRAM_ID,
+      process.env.STUDERRIA_TG_DEV_TELEGRAM_IDS,
+    ]
+      .filter(Boolean)
+      .join(',')
       .split(/[\s,;]+/)
       .map((value) => normalizeTelegramId(value))
       .filter(Boolean)
-  );
+  ));
+}
+
+function getStuderriaTelegramDevIdSet() {
+  return new Set(getStuderriaTelegramDevIds());
 }
 
 function isStuderriaTelegramDevUser(telegramUser = {}) {
@@ -20099,6 +20113,73 @@ async function isStuderriaTelegramDevLinkedUserId(userId) {
 
 function normalizeStuderriaTelegramUsername(rawValue) {
   return String(rawValue || '').trim().replace(/^@/, '').toLowerCase();
+}
+
+function formatStuderriaTelegramNewUserSource(source = '') {
+  const normalized = String(source || '').trim().toLowerCase();
+  if (normalized === 'telegram_mini_auto_register') return 'Telegram Mini App';
+  if (normalized === 'register_form') return 'Веб-реєстрація';
+  return sanitizeCompactText(source || 'Реєстрація', 80);
+}
+
+function buildStuderriaTelegramNewUserNotification({ user = {}, telegramUser = null, source = 'register_form' } = {}) {
+  const normalizedTelegramUser = telegramUser
+    ? telegramMiniApp.normalizeTelegramUser(telegramUser)
+    : null;
+  const userId = parsePositiveIntStrict(user.id || user.user_id);
+  const fullName = sanitizeCompactText(user.full_name || user.fullName || `User ${userId || ''}`, 180);
+  const role = sanitizeCompactText(user.role || 'student', 60);
+  const language = sanitizeCompactText(user.language || '', 40);
+  const telegramId = normalizeTelegramId(
+    (normalizedTelegramUser && normalizedTelegramUser.id)
+      || user.telegram_id
+      || user.telegramId
+  );
+  const telegramUsername = sanitizeCompactText(
+    (normalizedTelegramUser && normalizedTelegramUser.username)
+      || user.telegram_username
+      || user.telegramUsername
+      || '',
+    80
+  ).replace(/^@/, '');
+  const lines = [
+    'Новий користувач у Studerria',
+    '',
+    `Джерело: ${formatStuderriaTelegramNewUserSource(source)}`,
+    `ID: ${userId || '-'}`,
+    `Ім'я: ${fullName || '-'}`,
+    `Роль: ${role || '-'}`,
+  ];
+  if (language) {
+    lines.push(`Мова: ${language}`);
+  }
+  if (telegramId) {
+    lines.push(`Telegram ID: ${telegramId}`);
+  }
+  if (telegramUsername) {
+    lines.push(`Telegram: @${telegramUsername}`);
+  }
+  return lines.join('\n').slice(0, 3900);
+}
+
+async function notifyStuderriaTelegramDevNewUser(payload = {}) {
+  if (!getTelegramMiniBotToken()) return;
+  const devIds = getStuderriaTelegramDevIds();
+  if (!devIds.length) return;
+  const text = buildStuderriaTelegramNewUserNotification(payload);
+  await Promise.all(devIds.map(async (chatId) => {
+    try {
+      await sendStuderriaTelegramMessage(chatId, text);
+    } catch (err) {
+      console.error('Studerria Telegram dev new user notification failed', err && err.message ? err.message : err);
+    }
+  }));
+}
+
+function queueStuderriaTelegramDevNewUserNotification(payload = {}) {
+  notifyStuderriaTelegramDevNewUser(payload).catch((err) => {
+    console.error('Studerria Telegram dev new user notification queue failed', err && err.message ? err.message : err);
+  });
 }
 
 function buildStuderriaTelegramInlineKeyboard(items = [], columns = 1) {
@@ -24398,6 +24479,15 @@ app.post('/register', registerLimiter, async (req, res) => {
     } catch (eventErr) {
       console.error('Database error (register.registration_event)', eventErr);
     }
+    queueStuderriaTelegramDevNewUserNotification({
+      user: {
+        id: row.id,
+        full_name: normalizedName,
+        role: 'student',
+        language: preferredLang,
+      },
+      source: 'register_form',
+    });
     try {
       const signalRisk = registrationSignals && registrationSignals.security && registrationSignals.security.risk
         ? registrationSignals.security.risk
