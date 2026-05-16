@@ -9601,7 +9601,7 @@ function logActivity(dbRef, req, actionType, targetType, targetId, details, cour
       targetId,
       details ? JSON.stringify(details) : null,
       createdAt,
-      ...redirectState,
+      courseId,
       semesterId,
     ]
   );
