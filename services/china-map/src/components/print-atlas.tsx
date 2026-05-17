@@ -11,7 +11,7 @@ export function PrintAtlas() {
             <h1 className="print-title">China border transformations</h1>
             <p className="print-subtitle">
               Контурна навчальна мапа у чотирьох зрізах: 1920-ті, 1950-ті, 1990-ті і 2026.
-              Підхід: фактичний контроль як основа, спірні території як окремі approximate layers.
+              Підхід: фактичний контроль як основа, спірні території як окремі disputed/claim layers.
             </p>
           </div>
           <PrintButton />

@@ -1,4 +1,5 @@
-import type { Feature, FeatureCollection, Polygon } from "geojson";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
+import { realBoundaries } from "@/lib/real-boundaries";
 
 export type PeriodId = "1920s" | "1950s" | "1990s" | "2026";
 export type AreaTone = "core" | "separate" | "colonial" | "claim";
@@ -9,7 +10,8 @@ export type AtlasArea = {
   name: string;
   tone: AreaTone;
   summary: string;
-  coordinates: [number, number][][];
+  coordinates?: [number, number][][];
+  geometry?: Geometry;
 };
 
 export type AtlasMarker = {
@@ -46,36 +48,8 @@ const mainlandChina: AtlasArea = {
   id: "mainland-china",
   name: "Mainland China",
   tone: "core",
-  summary: "Approximate classroom outline for the Chinese state core.",
-  coordinates: [[
-    [73.6, 39.5],
-    [76.4, 35.2],
-    [79.8, 31.2],
-    [83.1, 29.0],
-    [88.0, 27.8],
-    [93.2, 27.6],
-    [97.5, 24.6],
-    [101.4, 21.6],
-    [106.3, 20.7],
-    [110.4, 21.5],
-    [114.2, 22.3],
-    [118.8, 24.7],
-    [121.8, 28.4],
-    [122.6, 33.1],
-    [120.7, 37.0],
-    [124.2, 40.1],
-    [128.1, 43.5],
-    [126.4, 47.8],
-    [121.0, 50.3],
-    [114.2, 49.1],
-    [108.7, 47.8],
-    [103.2, 48.6],
-    [96.6, 44.7],
-    [90.3, 45.6],
-    [84.6, 45.0],
-    [79.2, 42.4],
-    [73.6, 39.5],
-  ]],
+  summary: "Open boundary geometry for China's present-day state outline from geo-countries.",
+  geometry: realBoundaries.china,
 };
 
 const republicClaim: AtlasArea = {
@@ -90,18 +64,7 @@ const mongolia: AtlasArea = {
   name: "Outer Mongolia / Mongolian People's Republic",
   tone: "separate",
   summary: "Factually outside Chinese control after the 1921 revolution and 1924 republic.",
-  coordinates: [[
-    [87.8, 49.0],
-    [94.4, 46.1],
-    [103.8, 46.6],
-    [113.2, 44.4],
-    [119.8, 47.1],
-    [116.4, 50.6],
-    [108.8, 52.1],
-    [98.0, 51.8],
-    [90.6, 50.7],
-    [87.8, 49.0],
-  ]],
+  geometry: realBoundaries.mongolia,
 };
 
 const tibet: AtlasArea = {
@@ -109,17 +72,7 @@ const tibet: AtlasArea = {
   name: "Tibet",
   tone: "separate",
   summary: "Presented as de facto autonomous/disputed in the 1920s; integrated into PRC control after 1951.",
-  coordinates: [[
-    [78.2, 34.7],
-    [82.8, 31.0],
-    [88.7, 28.0],
-    [96.0, 27.4],
-    [101.1, 29.4],
-    [99.2, 33.7],
-    [92.4, 35.4],
-    [85.0, 36.0],
-    [78.2, 34.7],
-  ]],
+  geometry: realBoundaries.tibet,
 };
 
 const xinjiang: AtlasArea = {
@@ -127,17 +80,7 @@ const xinjiang: AtlasArea = {
   name: "Xinjiang",
   tone: "claim",
   summary: "Nominally Chinese in the 1920s, with high autonomy under local governors and warlord politics.",
-  coordinates: [[
-    [73.6, 39.7],
-    [79.2, 42.4],
-    [84.6, 45.0],
-    [90.3, 45.6],
-    [96.6, 44.7],
-    [94.1, 39.6],
-    [88.0, 36.8],
-    [80.6, 36.9],
-    [73.6, 39.7],
-  ]],
+  geometry: realBoundaries.xinjiang,
 };
 
 const taiwan: AtlasArea = {
@@ -145,15 +88,7 @@ const taiwan: AtlasArea = {
   name: "Taiwan",
   tone: "separate",
   summary: "Governed separately by the Republic of China since 1949; claimed by the PRC.",
-  coordinates: [[
-    [120.0, 25.4],
-    [121.8, 25.0],
-    [122.2, 23.8],
-    [121.5, 22.0],
-    [120.5, 21.9],
-    [119.7, 23.2],
-    [120.0, 25.4],
-  ]],
+  geometry: realBoundaries.taiwan,
 };
 
 const hongKong: AtlasArea = {
@@ -161,13 +96,7 @@ const hongKong: AtlasArea = {
   name: "Hong Kong",
   tone: "colonial",
   summary: "British-administered until the 1 July 1997 handover.",
-  coordinates: [[
-    [113.82, 22.52],
-    [114.35, 22.5],
-    [114.42, 22.17],
-    [113.86, 22.12],
-    [113.82, 22.52],
-  ]],
+  geometry: realBoundaries.hongKong,
 };
 
 const macao: AtlasArea = {
@@ -175,13 +104,7 @@ const macao: AtlasArea = {
   name: "Macao",
   tone: "colonial",
   summary: "Portuguese-administered until the 20 December 1999 handover.",
-  coordinates: [[
-    [113.48, 22.25],
-    [113.62, 22.24],
-    [113.64, 22.12],
-    [113.5, 22.09],
-    [113.48, 22.25],
-  ]],
+  geometry: realBoundaries.macau,
 };
 
 const aksaiChin: AtlasArea = {
@@ -263,7 +186,17 @@ const southChinaSea: AtlasArea = {
   ]],
 };
 
-function polygonFeature(area: AtlasArea): Feature<Polygon, { id: string; name: string; tone: AreaTone; summary: string }> {
+function resolveAreaGeometry(area: AtlasArea): Geometry {
+  if (area.geometry) {
+    return area.geometry;
+  }
+  return {
+    type: "Polygon",
+    coordinates: area.coordinates || [],
+  };
+}
+
+function polygonFeature(area: AtlasArea): Feature<Geometry, { id: string; name: string; tone: AreaTone; summary: string }> {
   return {
     type: "Feature",
     properties: {
@@ -272,14 +205,11 @@ function polygonFeature(area: AtlasArea): Feature<Polygon, { id: string; name: s
       tone: area.tone,
       summary: area.summary,
     },
-    geometry: {
-      type: "Polygon",
-      coordinates: area.coordinates,
-    },
+    geometry: resolveAreaGeometry(area),
   };
 }
 
-export function toFeatureCollection(areas: AtlasArea[]): FeatureCollection<Polygon> {
+export function toFeatureCollection(areas: AtlasArea[]): FeatureCollection<Geometry> {
   return {
     type: "FeatureCollection",
     features: areas.map(polygonFeature),
@@ -467,12 +397,27 @@ export const atlasPeriods: AtlasPeriod[] = [
     legalActs: [
       "UN General Assembly Resolution 2758, adopted 25 October 1971, restored PRC representation at the UN.",
       "Hong Kong Basic Law and Macao Basic Law remain constitutional frameworks for the SARs.",
-      "No final settlement exists for several highlighted 2026 dispute layers; they are shown as approximate claims.",
+      "No final settlement exists for several highlighted 2026 dispute layers; they are shown as disputed or claimed areas, not settled borders.",
     ],
   },
 ];
 
 export const atlasSources: AtlasSource[] = [
+  {
+    title: "OpenStreetMap",
+    url: "https://www.openstreetmap.org/copyright",
+    note: "Live basemap tiles and present-day map context.",
+  },
+  {
+    title: "geoBoundaries",
+    url: "https://www.geoboundaries.org/",
+    note: "Open administrative boundary geometry for China ADM1 areas including Tibet, Xinjiang, Hong Kong and Macau.",
+  },
+  {
+    title: "geo-countries",
+    url: "https://github.com/datasets/geo-countries",
+    note: "Open ADM0 boundary geometry for China, Taiwan and Mongolia.",
+  },
   {
     title: "National Geographic Map Policy",
     url: "https://www.nationalgeographic.org/society/national-geographic-map-policy/",

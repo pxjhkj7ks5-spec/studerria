@@ -33,13 +33,35 @@ const emptyCollection: FeatureCollection = {
 function buildStyle(): maplibregl.StyleSpecification {
   return {
     version: 8,
-    sources: {},
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    sources: {
+      "osm-raster": {
+        type: "raster",
+        tiles: [
+          "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        ],
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors",
+      },
+    },
     layers: [
       {
         id: "atlas-background",
         type: "background",
         paint: {
           "background-color": "#eeece1",
+        },
+      },
+      {
+        id: "osm-raster",
+        type: "raster",
+        source: "osm-raster",
+        paint: {
+          "raster-opacity": 0.78,
+          "raster-saturation": -0.58,
+          "raster-contrast": 0.08,
         },
       },
     ],
@@ -243,8 +265,10 @@ export function MapCanvas({
       center: [104, 31],
       zoom: 2.75,
       minZoom: 2,
-      maxZoom: 7,
-      attributionControl: false,
+      maxZoom: 10,
+      attributionControl: {
+        compact: true,
+      },
     });
 
     map.addControl(
@@ -316,7 +340,7 @@ export function MapCanvas({
     <>
       <div ref={containerRef} className="atlas-map" aria-label="Interactive China border atlas map" />
       <div className="atlas-map-topline">
-        <div className="atlas-map-pill">Approximate classroom map · de facto + claims</div>
+        <div className="atlas-map-pill">Real basemap · geoBoundaries + OSM</div>
         <div className="atlas-map-pill">{period.label} · {period.range}</div>
       </div>
     </>

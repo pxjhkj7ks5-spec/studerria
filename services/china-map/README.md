@@ -2,7 +2,7 @@
 
 Interactive educational atlas for the Studerria domain, mounted at `/china-map`.
 
-The app is intentionally static: no database, no admin surface, and no external map tiles. MapLibre renders a warm-paper atlas canvas from versioned GeoJSON-like data in `src/lib/atlas-data.ts`.
+The app is intentionally static: no database and no admin surface. MapLibre renders OpenStreetMap raster tiles with open GeoJSON boundary overlays from `src/lib/atlas-data.ts`.
 
 ## Local Development
 
@@ -33,4 +33,4 @@ Production URL:
 
 ## Content Notes
 
-The map uses a de facto + claims stance: controlled territories are shown as the base layer, while disputes and claims are shown separately with dashed or translucent overlays. It is a classroom presentation aid, not an authoritative legal map.
+The map uses a de facto + claims stance: controlled territories are shown on top of real basemap tiles and open boundary geometry, while disputes and claims are shown separately with dashed or translucent overlays. It is a classroom presentation aid, not an authoritative legal map.

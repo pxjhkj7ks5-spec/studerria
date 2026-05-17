@@ -143,7 +143,7 @@ export function ChinaMapApp() {
           <li>
             <span>
               Map stance: <strong>de facto + claims</strong>. Solid layers show control or administration;
-              translucent dashed layers show disputes, claims or approximate zones.
+              translucent dashed layers show disputes or claims rather than settled borders.
             </span>
           </li>
           {atlasSources.map((source) => (
