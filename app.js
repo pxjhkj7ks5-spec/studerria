@@ -20536,6 +20536,11 @@ function isStuderriaTelegramTomorrowScheduleQuestion(message = {}) {
   ].includes(text);
 }
 
+function isStuderriaTelegramSkipClassesPhrase(message = {}) {
+  const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  return text === 'пари не удари';
+}
+
 function getStuderriaTelegramKyivDateWithOffset(offsetDays = 0) {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Kyiv',
@@ -23801,6 +23806,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     if (await handleStuderriaTelegramTeamworkRenameMessage(message)) {
+      return;
+    }
+    if (isStuderriaTelegramSkipClassesPhrase(message)) {
+      await sendStuderriaTelegramMessage(message.chat.id, 'можна пропустити', { sourceMessage: message });
       return;
     }
     if (isStuderriaTelegramTomorrowScheduleQuestion(message)) {
