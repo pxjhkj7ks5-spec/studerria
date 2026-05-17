@@ -74,10 +74,34 @@ For a normal application update, keep the existing PostgreSQL volume and run the
 
 ```bash
 cd ~/studerria
-bash scripts/server-update.sh
+bash scripts/server-update.sh app
 ```
 
-The helper preserves server-local edits to `docker/local/docker-compose.yml` with `git update-index --skip-worktree`, pulls the latest code, rebuilds the `app` container, and prints the latest app logs.
+The helper preserves server-local edits to `docker/local/docker-compose.yml` with `git update-index --skip-worktree`, pulls the latest code, updates only the selected Compose service, and prints that service's latest logs.
+
+Use the service-specific helpers when only one site or service changed:
+
+```bash
+cd ~/studerria
+bash scripts/server-update-app.sh
+bash scripts/server-update-charredmap.sh
+bash scripts/server-update-china-map.sh
+bash scripts/server-update-naradadruk.sh
+bash scripts/server-update-slashtg.sh
+```
+
+Equivalent generic form:
+
+```bash
+cd ~/studerria
+bash scripts/server-update.sh app
+bash scripts/server-update.sh charredmap
+bash scripts/server-update.sh china-map
+bash scripts/server-update.sh naradadruk
+bash scripts/server-update.sh slashtg
+```
+
+The helper rebuilds only the selected service by default, which is the safe path for code updates because the services run from Docker images. Add `--no-build` for runtime-only Compose/env updates. Use `--pull` when updating a service from a pullable image.
 
 If this is the first update on a server where `docker/local/docker-compose.yml` is already locally modified and `git pull --rebase` refuses to run, do this once:
 
@@ -85,7 +109,7 @@ If this is the first update on a server where `docker/local/docker-compose.yml` 
 cd ~/studerria
 git update-index --skip-worktree docker/local/docker-compose.yml
 git pull --rebase
-bash scripts/server-update.sh
+bash scripts/server-update.sh app
 ```
 
 Manual equivalent:
@@ -110,7 +134,7 @@ cd ~/studerria
 git pull --rebase
 cd docker/local
 docker compose pull naradadruk
-docker compose up -d
+docker compose up -d naradadruk
 docker compose ps
 ```
 
