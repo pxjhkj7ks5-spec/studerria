@@ -53,6 +53,8 @@ Postgres host access:
 - database: `student_portal`
 - user: `studerria`
 
+PostgreSQL 18 stores its versioned data directory under `/var/lib/postgresql/18/docker`, so the Compose named volume is mounted at `/var/lib/postgresql`. Do not remount it to `/var/lib/postgresql/data`, because Docker will create an anonymous volume for the real data directory.
+
 Redis host access:
 
 - host: `localhost`
@@ -131,6 +133,8 @@ docker compose logs --tail=100 app
 ```
 
 Do not run `docker compose down -v` for a routine update, because that recreates database and cache volumes.
+
+If `docker inspect kma-local-db-1` shows an anonymous volume mounted at `/var/lib/postgresql`, stop and migrate that data into `kma-local_postgres_data` before recreating the database container.
 
 ### Recover Telegram data
 
