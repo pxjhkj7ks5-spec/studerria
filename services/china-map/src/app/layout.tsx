@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "China Border Atlas | Studerria",
-  description: "Interactive classroom atlas about China's territorial transformations from the 1920s to 2026.",
+  title: "Атлас кордонів Китаю | Studerria",
+  description: "Інтерактивний навчальний атлас про територіальні трансформації Китаю від 1920-х до 2026 року.",
 };
 
 export default function RootLayout({

@@ -9,17 +9,17 @@ import { getBasePath } from "@/lib/base-path";
 const layerToggles = [
   {
     key: "control",
-    title: "De facto control",
+    title: "Фактичний контроль",
     body: "Базовий шар фактичного або адміністративного контролю.",
   },
   {
     key: "claims",
-    title: "Claims / disputes",
+    title: "Претензії / спори",
     body: "Пунктирні або прозорі шари для спірних територій.",
   },
   {
     key: "events",
-    title: "Treaties / events",
+    title: "Договори / події",
     body: "Маркери ключових договорів, рішень і статусних змін.",
   },
 ] as const;
@@ -43,10 +43,10 @@ export function ChinaMapApp() {
   return (
     <main className="china-atlas-shell">
       <div className="atlas-workspace">
-        <section className="atlas-panel atlas-copy-panel" aria-label="China border atlas controls">
-          <div className="atlas-eyebrow">Studerria atlas</div>
+        <section className="atlas-panel atlas-copy-panel" aria-label="Керування атласом кордонів Китаю">
+          <div className="atlas-eyebrow">Studerria атлас</div>
           <div>
-            <h1 className="atlas-title">China border atlas</h1>
+            <h1 className="atlas-title">Атлас кордонів Китаю</h1>
             <p className="atlas-lead">
               Інтерактивна мапа для завдання: чотири часові зрізи показують, як змінювалася
               державна територія, фактичний контроль і спірні простори Китаю.
@@ -60,7 +60,7 @@ export function ChinaMapApp() {
             <p className="atlas-period-summary">{activePeriod.note}</p>
           </div>
 
-          <nav className="atlas-timeline" aria-label="Timeline periods">
+          <nav className="atlas-timeline" aria-label="Часові зрізи">
             <div className="timeline-track">
               {atlasPeriods.map((period) => (
                 <button
@@ -77,7 +77,7 @@ export function ChinaMapApp() {
             </div>
           </nav>
 
-          <div className="atlas-toggle-grid" aria-label="Map layer toggles">
+          <div className="atlas-toggle-grid" aria-label="Перемикачі шарів мапи">
             {layerToggles.map((toggle) => {
               const active =
                 (toggle.key === "control" && showControl)
@@ -102,7 +102,7 @@ export function ChinaMapApp() {
           </div>
 
           <div className="atlas-period-card">
-            <div className="atlas-period-kicker">Key events</div>
+            <div className="atlas-period-kicker">Ключові події</div>
             <ul className="source-list" style={{ padding: 0 }}>
               {activePeriod.keyEvents.map((event) => (
                 <li key={event}>
@@ -114,15 +114,15 @@ export function ChinaMapApp() {
 
           <div className="atlas-actions">
             <a className="atlas-action atlas-action--primary" href={`${basePath}/print`}>
-              Print / Save PDF
+              Друк / зберегти PDF
             </a>
             <button type="button" className="atlas-action" onClick={() => setSourcesOpen(true)}>
-              Sources
+              Джерела
             </button>
           </div>
         </section>
 
-        <section className="atlas-panel atlas-map-panel" aria-label="Interactive map">
+        <section className="atlas-panel atlas-map-panel" aria-label="Інтерактивна мапа">
           <MapCanvas
             period={activePeriod}
             showControl={showControl}
@@ -134,16 +134,17 @@ export function ChinaMapApp() {
 
       <aside className="source-drawer" data-open={sourcesOpen ? "true" : "false"} aria-hidden={!sourcesOpen}>
         <div className="source-drawer__head">
-          <h2>Sources and map stance</h2>
+          <h2>Джерела і позиція мапи</h2>
           <button type="button" className="source-drawer__close" onClick={() => setSourcesOpen(false)}>
-            Close
+            Закрити
           </button>
         </div>
         <ul className="source-list">
           <li>
             <span>
-              Map stance: <strong>de facto + claims</strong>. Solid layers show control or administration;
-              translucent dashed layers show disputes or claims rather than settled borders.
+              Позиція мапи: <strong>фактичний контроль + претензії</strong>. Суцільні шари показують
+              контроль або адміністрацію; прозорі пунктирні шари показують спори чи претензії, а не
+              остаточно встановлені кордони.
             </span>
           </li>
           {atlasSources.map((source) => (

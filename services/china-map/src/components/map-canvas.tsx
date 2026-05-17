@@ -338,9 +338,9 @@ export function MapCanvas({
 
   return (
     <>
-      <div ref={containerRef} className="atlas-map" aria-label="Interactive China border atlas map" />
+      <div ref={containerRef} className="atlas-map" aria-label="Інтерактивна мапа атласу кордонів Китаю" />
       <div className="atlas-map-topline">
-        <div className="atlas-map-pill">Real basemap · geoBoundaries + OSM</div>
+        <div className="atlas-map-pill">Реальна підкладка · geoBoundaries + OSM</div>
         <div className="atlas-map-pill">{period.label} · {period.range}</div>
       </div>
     </>

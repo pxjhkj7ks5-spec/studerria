@@ -1,36 +1,38 @@
 # china-map
 
-Interactive educational atlas for the Studerria domain, mounted at `/china-map`.
+Інтерактивний навчальний атлас для Studerria, змонтований на `/china-map`.
 
-The app is intentionally static: no database and no admin surface. MapLibre renders OpenStreetMap raster tiles with open GeoJSON boundary overlays from `src/lib/atlas-data.ts`.
+Сервіс статичний: без бази даних і без адмін-панелі. MapLibre показує OpenStreetMap-підкладку, а територіальні шари беруться з відкритих GeoJSON-геометрій у `src/lib/atlas-data.ts` і `src/lib/real-boundaries.ts`.
 
-## Local Development
+## Локальний запуск
 
 ```bash
 npm install
 npm run dev
 ```
 
-By default, the app expects `NEXT_PUBLIC_BASE_PATH=/china-map`. To run at the root locally:
+За замовчуванням застосунок очікує `NEXT_PUBLIC_BASE_PATH=/china-map`. Для локального запуску з кореня:
 
 ```bash
 NEXT_PUBLIC_BASE_PATH="" npm run dev
 ```
 
-## Studerria Deployment
+## Деплой Studerria
 
-The root Studerria app proxies `/china-map` to this service through `middleware/serviceProxies.js`.
+Основний застосунок Studerria проксіює `/china-map` у цей сервіс через `middleware/serviceProxies.js`.
 
 ```bash
 cd ../../docker/local
 docker compose up --build -d app china-map
 ```
 
-Production URL:
+Публічні URL:
 
 - `https://studerria.com/china-map`
 - `https://studerria.com/china-map/print`
 
-## Content Notes
+## Примітки до даних
 
-The map uses a de facto + claims stance: controlled territories are shown on top of real basemap tiles and open boundary geometry, while disputes and claims are shown separately with dashed or translucent overlays. It is a classroom presentation aid, not an authoritative legal map.
+Мапа використовує підхід «фактичний контроль + претензії»: контрольовані або адміністровані території показані поверх реальної підкладки й відкритих геометрій меж, а спори та претензії винесені в окремі пунктирні або прозорі шари.
+
+Це навчальна презентаційна мапа, а не юридично авторитетна картографія. Для сучасних кордонів використано реальні відкриті GeoJSON-дані; для морських претензій і частини спірних шарів застосовано приблизні навчальні контури, бо такі претензії не мають єдиного загальновизнаного кордону.

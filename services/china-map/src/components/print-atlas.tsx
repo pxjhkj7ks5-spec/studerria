@@ -1,26 +1,98 @@
-import { atlasPeriods, atlasSources } from "@/lib/atlas-data";
+import type { Geometry, Position } from "geojson";
+import type { ReactNode } from "react";
 import { PrintButton } from "@/components/print-button";
+import { atlasPeriods, atlasSources, type AtlasArea } from "@/lib/atlas-data";
+import { realBoundaries } from "@/lib/real-boundaries";
+
+const mapFrame = {
+  width: 760,
+  height: 560,
+  minLng: 72,
+  maxLng: 134,
+  minLat: 3,
+  maxLat: 54,
+  padding: 34,
+};
+
+function projectPoint(position: Position) {
+  const [lng, lat] = position;
+  const innerWidth = mapFrame.width - mapFrame.padding * 2;
+  const innerHeight = mapFrame.height - mapFrame.padding * 2;
+  const x = mapFrame.padding + ((lng - mapFrame.minLng) / (mapFrame.maxLng - mapFrame.minLng)) * innerWidth;
+  const y = mapFrame.padding + ((mapFrame.maxLat - lat) / (mapFrame.maxLat - mapFrame.minLat)) * innerHeight;
+  return [x, y] as const;
+}
+
+function svgPoint(position: Position) {
+  const [x, y] = projectPoint(position);
+  return `${x.toFixed(1)},${y.toFixed(1)}`;
+}
+
+function ringToPath(ring: Position[]) {
+  if (ring.length === 0) return "";
+  const [firstPoint, ...rest] = ring;
+  return `M ${svgPoint(firstPoint)} ${rest.map((point) => `L ${svgPoint(point)}`).join(" ")} Z`;
+}
+
+function geometryToPath(geometry: Geometry) {
+  if (geometry.type === "Polygon") {
+    return geometry.coordinates.map((ring) => ringToPath(ring)).join(" ");
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.flatMap((polygon) => polygon.map((ring) => ringToPath(ring))).join(" ");
+  }
+
+  return "";
+}
+
+function areaGeometry(area: AtlasArea): Geometry {
+  return area.geometry ?? {
+    type: "Polygon",
+    coordinates: area.coordinates ?? [],
+  };
+}
+
+function Label({
+  at,
+  children,
+  size = 16,
+}: {
+  at: Position;
+  children: ReactNode;
+  size?: number;
+}) {
+  const [x, y] = projectPoint(at);
+  return (
+    <text x={x} y={y} fill="#1f497d" fontSize={size} fontWeight="800">
+      {children}
+    </text>
+  );
+}
 
 export function PrintAtlas() {
+  const currentPeriod = atlasPeriods.find((period) => period.id === "2026");
+  const currentClaims = currentPeriod?.claims.filter((area) => area.id !== "taiwan") ?? [];
+
   return (
     <main className="print-page">
       <article className="print-sheet">
         <header className="print-head">
           <div>
-            <p className="atlas-eyebrow">Studerria atlas · China</p>
-            <h1 className="print-title">China border transformations</h1>
+            <p className="atlas-eyebrow">Studerria атлас · Китай</p>
+            <h1 className="print-title">Трансформації кордонів Китаю</h1>
             <p className="print-subtitle">
-              Контурна навчальна мапа у чотирьох зрізах: 1920-ті, 1950-ті, 1990-ті і 2026.
-              Підхід: фактичний контроль як основа, спірні території як окремі disputed/claim layers.
+              Навчальна мапа у чотирьох зрізах: 1920-ті, 1950-ті, 1990-ті і 2026.
+              Підхід: фактичний контроль як основа, спірні території як окремі прозорі шари.
             </p>
           </div>
           <PrintButton />
         </header>
 
         <div className="print-grid">
-          <section className="print-map-card" aria-label="Compact China border map">
+          <section className="print-map-card" aria-label="Друкована мапа кордонів Китаю">
             <svg viewBox="0 0 760 560" role="img" aria-labelledby="print-map-title">
-              <title id="print-map-title">Compact China border classroom map</title>
+              <title id="print-map-title">Друкована мапа кордонів Китаю на основі реальних GeoJSON-геометрій</title>
               <defs>
                 <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
                   <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(31,73,125,.12)" strokeWidth="1" />
@@ -32,48 +104,66 @@ export function PrintAtlas() {
               <rect width="760" height="560" rx="28" fill="#eeece1" />
               <rect width="760" height="560" rx="28" fill="url(#grid)" />
               <path
-                d="M90 242 L128 294 L175 332 L241 348 L298 388 L378 394 L430 356 L502 340 L570 302 L636 252 L654 190 L614 136 L538 92 L438 104 L356 90 L286 114 L210 112 L142 148 Z"
+                d={geometryToPath(realBoundaries.mongolia)}
+                fill="rgba(155,187,89,.22)"
+                stroke="#9bbb59"
+                strokeWidth="1.8"
+                strokeDasharray="7 7"
+              />
+              <path
+                d={geometryToPath(realBoundaries.china)}
                 fill="rgba(79,129,189,.42)"
                 stroke="#1f497d"
-                strokeWidth="3"
+                strokeWidth="1.8"
                 filter="url(#softShadow)"
               />
               <path
-                d="M150 96 L248 58 L376 62 L500 84 L598 70 L654 110 L594 144 L482 132 L390 126 L286 132 L196 120 Z"
-                fill="rgba(155,187,89,.28)"
-                stroke="#9bbb59"
-                strokeWidth="2"
-                strokeDasharray="8 8"
+                d={geometryToPath(realBoundaries.xinjiang)}
+                fill="rgba(79,129,189,.16)"
+                stroke="#1f497d"
+                strokeWidth=".8"
+                strokeOpacity=".42"
               />
               <path
-                d="M118 244 L190 228 L274 242 L330 288 L292 330 L198 318 L130 284 Z"
-                fill="rgba(192,80,77,.22)"
+                d={geometryToPath(realBoundaries.tibet)}
+                fill="rgba(192,80,77,.14)"
                 stroke="#c0504d"
-                strokeWidth="2"
-                strokeDasharray="7 7"
+                strokeWidth="1"
+                strokeOpacity=".58"
               />
               <path
-                d="M575 360 C650 384 686 438 650 502 C594 488 552 450 548 398 Z"
-                fill="rgba(192,80,77,.18)"
-                stroke="#c0504d"
-                strokeWidth="2"
-                strokeDasharray="7 7"
+                d={geometryToPath(realBoundaries.taiwan)}
+                fill="rgba(155,187,89,.4)"
+                stroke="#1f497d"
+                strokeWidth="1.4"
               />
-              <ellipse cx="640" cy="332" rx="14" ry="30" fill="rgba(155,187,89,.42)" stroke="#1f497d" strokeWidth="2" />
-              <circle cx="602" cy="302" r="5" fill="#c0504d" />
-              <circle cx="594" cy="306" r="4" fill="#c0504d" />
-              <circle cx="626" cy="154" r="5" fill="#c0504d" />
-              <text x="108" y="224" fill="#1f497d" fontSize="18" fontWeight="700">Aksai Chin</text>
-              <text x="252" y="304" fill="#1f497d" fontSize="20" fontWeight="800">Tibet</text>
-              <text x="340" y="232" fill="#1f497d" fontSize="28" fontWeight="800">Mainland China</text>
-              <text x="418" y="84" fill="#1f497d" fontSize="18" fontWeight="700">Mongolia</text>
-              <text x="590" y="404" fill="#1f497d" fontSize="18" fontWeight="700">South China Sea</text>
-              <text x="662" y="337" fill="#1f497d" fontSize="16" fontWeight="700">Taiwan</text>
+              <path
+                d={`${geometryToPath(realBoundaries.hongKong)} ${geometryToPath(realBoundaries.macau)}`}
+                fill="#c0504d"
+                stroke="#1f497d"
+                strokeWidth=".8"
+              />
+              {currentClaims.map((area) => (
+                <path
+                  key={area.id}
+                  d={geometryToPath(areaGeometry(area))}
+                  fill="rgba(192,80,77,.17)"
+                  stroke="#c0504d"
+                  strokeWidth="1.4"
+                  strokeDasharray="6 6"
+                />
+              ))}
+              <Label at={[78.4, 34.2]}>Аксай-Чин</Label>
+              <Label at={[87.2, 31.2]} size={18}>Тибет</Label>
+              <Label at={[103.5, 36.2]} size={24}>Материковий Китай</Label>
+              <Label at={[99.5, 46.8]}>Монголія</Label>
+              <Label at={[112.4, 12.8]}>Південнокитайське море</Label>
+              <Label at={[121.7, 23.9]}>Тайвань</Label>
             </svg>
           </section>
 
           <section className="print-section">
-            <h2>Timeline summary</h2>
+            <h2>Підсумок часових зрізів</h2>
             <div className="print-timeline">
               {atlasPeriods.map((period) => (
                 <div className="print-era" key={period.id}>
@@ -86,7 +176,7 @@ export function PrintAtlas() {
         </div>
 
         <section className="print-section">
-          <h2>Key legal acts and decisions</h2>
+          <h2>Ключові договори, рішення і норми</h2>
           <div className="print-timeline">
             {atlasPeriods.map((period) => (
               <div className="print-era" key={period.id}>
@@ -100,7 +190,7 @@ export function PrintAtlas() {
         </section>
 
         <section className="print-section">
-          <h2>Sources</h2>
+          <h2>Джерела</h2>
           <ol className="print-sources">
             {atlasSources.map((source) => (
               <li key={source.url}>
