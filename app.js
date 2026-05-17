@@ -20540,6 +20540,7 @@ const STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES = new Map([
   ['пари не удари', 'можна пропустити'],
   ['час іде', 'кма про веде'],
   ['недостатньо', 'докрутив'],
+  ['соня з', '67'],
 ]);
 
 function getStuderriaTelegramAuthorizedPhraseReply(message = {}) {
