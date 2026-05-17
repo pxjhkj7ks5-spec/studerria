@@ -37,6 +37,7 @@ const { localizeChangelogItems } = require('./lib/changelogI18n');
 const { publicLegalPages } = require('./lib/legalPages');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
+const studerriaTelegramPresentationTemplateFile = path.join(__dirname, 'assets', 'telegram', 'presentation-template.pptx');
 let appVersion = pkg.version || '0.0.0';
 try {
   const raw = fs.readFileSync(versionFile, 'utf8');
@@ -19987,6 +19988,23 @@ async function callStuderriaTelegramBotApi(method, payload = {}) {
   return data.result;
 }
 
+async function callStuderriaTelegramBotApiMultipart(method, formData) {
+  const token = getTelegramMiniBotToken();
+  if (!token) throw new Error('missing_bot_token');
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data || data.ok !== true) {
+    const description = data && data.description ? String(data.description) : `telegram_${method}_failed`;
+    const err = new Error(description);
+    err.telegramResponse = data;
+    throw err;
+  }
+  return data.result;
+}
+
 const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'start', description: 'Відкрити Studerria mini app' },
   { command: 'help', description: 'Показати інструкцію' },
@@ -20300,6 +20318,40 @@ async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
   }
 }
 
+async function sendStuderriaTelegramDocument(chatId, filePath, options = {}) {
+  if (!chatId || !filePath) return null;
+  const buffer = fs.readFileSync(filePath);
+  const formData = new FormData();
+  formData.append('chat_id', String(chatId));
+  formData.append(
+    'document',
+    new Blob([buffer], {
+      type: options.contentType || 'application/octet-stream',
+    }),
+    options.filename || path.basename(filePath)
+  );
+  if (options.caption) {
+    formData.append('caption', String(options.caption).slice(0, 1024));
+  }
+  const messageThreadId = options.messageThreadId
+    || getStuderriaTelegramMessageThreadId(options.sourceMessage || {});
+  if (messageThreadId) {
+    formData.append('message_thread_id', String(messageThreadId));
+  }
+  try {
+    return await callStuderriaTelegramBotApiMultipart('sendDocument', formData);
+  } catch (err) {
+    if (messageThreadId && isStuderriaTelegramThreadDeliveryError(err)) {
+      return sendStuderriaTelegramDocument(chatId, filePath, {
+        ...options,
+        sourceMessage: null,
+        messageThreadId: null,
+      });
+    }
+    throw err;
+  }
+}
+
 async function pinStuderriaTelegramMessage(chatId, messageId, label = 'message') {
   if (!chatId || !messageId) return null;
   return callStuderriaTelegramBotApi('pinChatMessage', {
@@ -20548,6 +20600,11 @@ function getStuderriaTelegramAuthorizedPhraseReply(message = {}) {
   return STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES.get(text) || '';
 }
 
+function isStuderriaTelegramPresentationTemplatePhrase(message = {}) {
+  const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  return text === 'дай шаблон презентації';
+}
+
 async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyText = '') {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
@@ -20558,6 +20615,27 @@ async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyT
     return;
   }
   await sendStuderriaTelegramMessage(chatId, replyText, { sourceMessage: message });
+}
+
+async function handleStuderriaTelegramPresentationTemplatePhrase(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const context = await getStuderriaTelegramActorContext(message.from || {});
+  if (!context.actor) {
+    await sendStuderriaTelegramRegistrationPrompt(message, 'отримання шаблону презентації');
+    return;
+  }
+  if (!fs.existsSync(studerriaTelegramPresentationTemplateFile)) {
+    await sendStuderriaTelegramMessage(chatId, 'Шаблон презентації зараз недоступний. Спробуй пізніше.', { sourceMessage: message });
+    return;
+  }
+  await sendStuderriaTelegramDocument(chatId, studerriaTelegramPresentationTemplateFile, {
+    sourceMessage: message,
+    filename: 'Studerria presentation template.pptx',
+    contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    caption: 'Шаблон презентації',
+  });
 }
 
 async function sendStuderriaTelegramRegistrationPrompt(message = {}, purpose = 'цієї фрази') {
@@ -23839,6 +23917,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     if (await handleStuderriaTelegramTeamworkRenameMessage(message)) {
+      return;
+    }
+    if (isStuderriaTelegramPresentationTemplatePhrase(message)) {
+      await handleStuderriaTelegramPresentationTemplatePhrase(message);
       return;
     }
     const authorizedPhraseReply = getStuderriaTelegramAuthorizedPhraseReply(message);
