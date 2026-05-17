@@ -20536,21 +20536,27 @@ function isStuderriaTelegramTomorrowScheduleQuestion(message = {}) {
   ].includes(text);
 }
 
-function isStuderriaTelegramSkipClassesPhrase(message = {}) {
+const STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES = new Map([
+  ['пари не удари', 'можна пропустити'],
+  ['час іде', 'кма про веде'],
+  ['недостатньо', 'докрутив'],
+]);
+
+function getStuderriaTelegramAuthorizedPhraseReply(message = {}) {
   const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
-  return text === 'пари не удари';
+  return STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES.get(text) || '';
 }
 
-async function handleStuderriaTelegramSkipClassesPhrase(message = {}) {
+async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyText = '') {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
-  if (!chatId) return;
+  if (!chatId || !replyText) return;
   const context = await getStuderriaTelegramActorContext(message.from || {});
   if (!context.actor) {
     await sendStuderriaTelegramRegistrationPrompt(message, 'цієї фрази');
     return;
   }
-  await sendStuderriaTelegramMessage(chatId, 'можна пропустити', { sourceMessage: message });
+  await sendStuderriaTelegramMessage(chatId, replyText, { sourceMessage: message });
 }
 
 async function sendStuderriaTelegramRegistrationPrompt(message = {}, purpose = 'цієї фрази') {
@@ -23834,8 +23840,9 @@ async function handleStuderriaTelegramBotUpdate(update) {
     if (await handleStuderriaTelegramTeamworkRenameMessage(message)) {
       return;
     }
-    if (isStuderriaTelegramSkipClassesPhrase(message)) {
-      await handleStuderriaTelegramSkipClassesPhrase(message);
+    const authorizedPhraseReply = getStuderriaTelegramAuthorizedPhraseReply(message);
+    if (authorizedPhraseReply) {
+      await handleStuderriaTelegramAuthorizedPhraseReply(message, authorizedPhraseReply);
       return;
     }
     if (isStuderriaTelegramTomorrowScheduleQuestion(message)) {
