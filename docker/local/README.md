@@ -103,6 +103,13 @@ bash scripts/server-update.sh slashtg
 
 The helper rebuilds only the selected service by default, which is the safe path for code updates because the services run from Docker images. Add `--no-build` for runtime-only Compose/env updates. Use `--pull` when updating a service from a pullable image.
 
+Before updating stateful services, the helper writes a local safety backup under `backups/server-update/`:
+
+- `app` or `db`: full PostgreSQL `pg_dump -Fc`
+- `charredmap`, `naradadruk`, `slashtg`: compressed `/data` Docker volume archive
+
+Use `--skip-backup` only when you have already made a fresh manual backup.
+
 If this is the first update on a server where `docker/local/docker-compose.yml` is already locally modified and `git pull --rebase` refuses to run, do this once:
 
 ```bash
@@ -124,6 +131,32 @@ docker compose logs --tail=100 app
 ```
 
 Do not run `docker compose down -v` for a routine update, because that recreates database and cache volumes.
+
+### Recover Telegram data
+
+If Studerria Telegram users disappear after an update, first check whether the current database is empty or just missing Telegram links:
+
+```bash
+cd docker/local
+docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT COUNT(*) AS users, COUNT(*) FILTER (WHERE telegram_id IS NOT NULL AND telegram_id <> '') AS telegram_users FROM users;"
+```
+
+Restore from the latest PostgreSQL backup made by the helper:
+
+```bash
+cd docker/local
+docker compose cp ../../backups/server-update/postgres-YYYYMMDDTHHMMSSZ.dump db:/tmp/studerria.dump
+docker compose exec db pg_restore --clean --if-exists --no-owner -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/studerria.dump
+```
+
+If the legacy `/tg` sidecar data disappears, restore the `slashtg_data` volume archive:
+
+```bash
+cd docker/local
+docker compose stop slashtg
+docker run --rm -v kma-local_slashtg_data:/target -v "$(pwd)/../../backups/server-update:/backup" alpine:3.20 sh -c "cd /target && tar xzf /backup/slashtg-data-YYYYMMDDTHHMMSSZ.tgz"
+docker compose up -d slashtg
+```
 
 ### Deploy Fast (server routine)
 

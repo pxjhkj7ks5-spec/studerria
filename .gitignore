@@ -145,6 +145,7 @@ vite.config.ts.timestamp-*
 .local/
 artifacts/
 output/
+backups/
 uploads/*
 !uploads/.gitkeep
 
