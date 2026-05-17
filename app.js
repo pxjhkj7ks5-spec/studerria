@@ -20541,6 +20541,40 @@ function isStuderriaTelegramSkipClassesPhrase(message = {}) {
   return text === 'пари не удари';
 }
 
+async function handleStuderriaTelegramSkipClassesPhrase(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const context = await getStuderriaTelegramActorContext(message.from || {});
+  if (!context.actor) {
+    await sendStuderriaTelegramRegistrationPrompt(message, 'цієї фрази');
+    return;
+  }
+  await sendStuderriaTelegramMessage(chatId, 'можна пропустити', { sourceMessage: message });
+}
+
+async function sendStuderriaTelegramRegistrationPrompt(message = {}, purpose = 'цієї фрази') {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const botUsername = String(
+    process.env.STUDERRIA_TG_BOT_USERNAME
+    || studerriaTelegramBotState.botUsername
+    || 'studerria_bot'
+  ).trim().replace(/^@/, '') || 'studerria_bot';
+  await sendStuderriaTelegramMessage(
+    chatId,
+    [
+      `Для ${purpose} треба бути зареєстрованим у Studerria.`,
+      `Зайди в особистий чат з ботом @${botUsername}, натисни /start і заверши реєстрацію в mini app.`,
+    ].join('\n'),
+    {
+      sourceMessage: message,
+      replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || ''),
+    }
+  );
+}
+
 function getStuderriaTelegramKyivDateWithOffset(offsetDays = 0) {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Kyiv',
@@ -20595,16 +20629,8 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
   if (!chatId) return false;
 
   const context = await getStuderriaTelegramActorContext(message.from || {});
-  const replyMarkup = buildStuderriaTelegramWelcomeKeyboard(chat.type || '');
   if (!context.actor) {
-    await sendStuderriaTelegramMessage(
-      chatId,
-      [
-        'Щоб показати твій розклад, мені треба знати, хто ти в Studerria.',
-        'Зайди в особистий чат з ботом, натисни /start і заверши реєстрацію в mini app.',
-      ].join('\n'),
-      { sourceMessage: message, replyMarkup }
-    );
+    await sendStuderriaTelegramRegistrationPrompt(message, 'перевірки розкладу');
     return true;
   }
 
@@ -20629,7 +20655,7 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
           'Не знайшов активний семестр або групу для твого акаунта.',
           'Відкрий mini app, перевір профіль і вибрані предмети.',
         ].join('\n'),
-        { sourceMessage: message, replyMarkup }
+        { sourceMessage: message, replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || '') }
       );
       return true;
     }
@@ -20669,14 +20695,14 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
     }
     await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3900), {
       sourceMessage: message,
-      replyMarkup,
+      replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || ''),
     });
   } catch (err) {
     console.error('Studerria Telegram tomorrow schedule failed', err);
     await sendStuderriaTelegramMessage(
       chatId,
       'Не зміг зараз підтягнути розклад на завтра. Спробуй ще раз трохи пізніше або відкрий розклад у mini app.',
-      { sourceMessage: message, replyMarkup }
+      { sourceMessage: message, replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || '') }
     );
   }
   return true;
@@ -23809,7 +23835,7 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     if (isStuderriaTelegramSkipClassesPhrase(message)) {
-      await sendStuderriaTelegramMessage(message.chat.id, 'можна пропустити', { sourceMessage: message });
+      await handleStuderriaTelegramSkipClassesPhrase(message);
       return;
     }
     if (isStuderriaTelegramTomorrowScheduleQuestion(message)) {
