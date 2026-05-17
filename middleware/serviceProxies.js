@@ -1,6 +1,7 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const CHARREDMAP_BASE_PATH = '/charredmap';
+const CHINAMAP_BASE_PATH = '/china-map';
 const NARADADRUK_BASE_PATH = '/naradadruk';
 const DEFAULT_SLASHTG_BASE_PATH = '/tg';
 
@@ -58,6 +59,7 @@ function registerServiceProxies(app, deps = {}) {
   const env = deps.env || process.env;
   const logger = deps.logger || console;
   const charredmapProxyTarget = String(env.CHARREDMAP_PROXY_TARGET || '').trim();
+  const chinaMapProxyTarget = String(env.CHINAMAP_PROXY_TARGET || '').trim();
   const naradadrukProxyTarget = String(env.NARADADRUK_PROXY_TARGET || '').trim();
   const slashtgProxyTarget = String(env.SLASHTG_PROXY_TARGET || '').trim();
   const slashtgBasePath = String(env.SLASHTG_BASE_PATH || DEFAULT_SLASHTG_BASE_PATH).trim() || DEFAULT_SLASHTG_BASE_PATH;
@@ -67,6 +69,13 @@ function registerServiceProxies(app, deps = {}) {
     basePath: CHARREDMAP_BASE_PATH,
     serviceName: 'Charredmap',
     logLabel: 'Charredmap',
+    logger,
+  });
+  const chinaMapProxy = createServiceProxy({
+    target: chinaMapProxyTarget,
+    basePath: CHINAMAP_BASE_PATH,
+    serviceName: 'China Map',
+    logLabel: 'China Map',
     logger,
   });
   const naradadrukProxy = createServiceProxy({
@@ -92,6 +101,16 @@ function registerServiceProxies(app, deps = {}) {
       return respondServiceUnavailable(res, 'Charredmap', 404);
     }
     return charredmapProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (!isServiceRequest(req, CHINAMAP_BASE_PATH)) {
+      return next();
+    }
+    if (!chinaMapProxy) {
+      return respondServiceUnavailable(res, 'China Map', 404);
+    }
+    return chinaMapProxy(req, res, next);
   });
 
   app.use((req, res, next) => {

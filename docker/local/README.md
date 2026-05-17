@@ -6,6 +6,7 @@ This stack runs the current KMA app with PostgreSQL, Redis, and centralized logs
 
 - `app`: the existing Node.js + Express application from this repository
 - `charredmap`: isolated Next.js memorial-map service mounted under `/charredmap`
+- `china-map`: isolated static Next.js classroom atlas mounted under `/china-map`
 - `naradadruk`: isolated Next.js print/catalog service mounted under `/naradadruk`
 - `slashtg`: isolated legacy Telegram mini-app service mounted under `/tg`
 - `db`: PostgreSQL 18 with first-start initialization from `docker/local/db/init/*.sql`
@@ -35,6 +36,8 @@ App URL:
 - [http://localhost:3000](http://localhost:3000)
 - [http://localhost:3000/charredmap](http://localhost:3000/charredmap)
 - [http://localhost:3000/charredmap/admin](http://localhost:3000/charredmap/admin)
+- [http://localhost:3000/china-map](http://localhost:3000/china-map)
+- [http://localhost:3000/china-map/print](http://localhost:3000/china-map/print)
 - [http://localhost:3000/naradadruk](http://localhost:3000/naradadruk)
 - [http://localhost:3000/tg](http://localhost:3000/tg)
 - [http://localhost:3000/studerria-tg](http://localhost:3000/studerria-tg)
@@ -149,6 +152,7 @@ docker compose up --build -d
 - Container logs are centralized into Loki through Promtail; query them from your preferred Grafana/Loki client.
 - The repository `uploads/` directory is mounted into the app container, so uploaded files stay visible in the workspace.
 - `charredmap` keeps its own SQLite database and uploads in a dedicated Docker volume, so it stays operationally isolated from the Studerria Postgres app.
+- `china-map` is static and keeps no database or upload volume.
 - `naradadruk` and `slashtg` also keep their own SQLite data in dedicated Docker volumes.
 - The legacy isolated Slash TG service is mounted at `/tg`.
 - The Studerria student Telegram mini app is served by the main Express app at `/studerria-tg` and should be configured in a separate Telegram bot.
