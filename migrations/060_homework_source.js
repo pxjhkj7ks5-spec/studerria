@@ -4,7 +4,13 @@ const statements = [
   'CREATE INDEX IF NOT EXISTS idx_homework_source ON homework (source)',
 ];
 
+async function up(pool) {
+  for (const statement of statements) {
+    await pool.query(statement);
+  }
+}
+
 module.exports = {
   id: '060_homework_source',
-  statements,
+  up,
 };
