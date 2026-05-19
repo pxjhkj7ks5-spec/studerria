@@ -24724,6 +24724,90 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
     const weekDates = fullWeekDays.map((_, index) =>
       getDateForWeekIndex(selectedWeek, index, baseState && baseState.term ? baseState.term.start_date : null)
     );
+    const weekDateSet = new Set(weekDates.filter((value) => isValidDateString(value)));
+    const selectedSubjects = Array.isArray(baseState && baseState.subjects) ? baseState.subjects : [];
+    const subjectById = new Map();
+    selectedSubjects.forEach((subject) => {
+      const subjectId = parsePositiveIntStrict(subject && (subject.subject_id || subject.id));
+      if (subjectId) subjectById.set(subjectId, subject);
+    });
+    const subjectIds = Array.from(subjectById.keys());
+    let homeworkRows = [];
+    if (subjectIds.length && weekDateSet.size) {
+      homeworkRows = await db.all(
+        `
+          SELECT
+            h.id,
+            h.subject_id,
+            h.course_id,
+            h.semester_id,
+            h.group_number,
+            h.day_of_week,
+            h.class_number,
+            h.class_date,
+            h.description,
+            h.link_url,
+            h.file_path,
+            h.file_name,
+            h.created_by,
+            h.created_at,
+            subj.name AS subject_name,
+            COALESCE(u.full_name, h.created_by, '') AS created_by_name
+          FROM homework h
+          JOIN subjects subj ON subj.id = h.subject_id
+          LEFT JOIN users u ON u.id = h.created_by_id
+          WHERE h.subject_id = ANY(?::int[])
+            AND h.class_date = ANY(?)
+            AND COALESCE(h.status, 'published') = 'published'
+            AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
+            AND ${buildFalsyTextCondition('h.is_custom_deadline')}
+          ORDER BY h.class_date ASC, h.class_number ASC NULLS LAST, h.created_at DESC
+        `,
+        [subjectIds, Array.from(weekDateSet), new Date().toISOString()]
+      );
+    }
+    const homeworkItems = (homeworkRows || []).map((row) => ({
+      id: Number(row.id || 0),
+      subject_id: Number(row.subject_id || 0),
+      course_id: Number(row.course_id || 0) || null,
+      semester_id: Number(row.semester_id || 0) || null,
+      group_number: Number(row.group_number || 0) || null,
+      day_of_week: normalizeWeekdayName(row.day_of_week) || String(row.day_of_week || ''),
+      class_number: Number(row.class_number || 0) || null,
+      class_date: toDateOnly(row.class_date),
+      subject_name: sanitizeCompactText(row.subject_name || 'Предмет', 140),
+      description: sanitizeCompactText(row.description || 'ДЗ без опису', 1200),
+      link_url: String(row.link_url || '').trim(),
+      file_path: String(row.file_path || '').trim(),
+      file_name: normalizeUploadedOriginalName(row.file_name) || '',
+      created_by: sanitizeCompactText(row.created_by_name || row.created_by || '', 140),
+      created_at: row.created_at || '',
+    }));
+    const getHomeworkItemsForScheduleRow = (row, classDate) => {
+      const subjectId = Number(row && row.subject_id || 0);
+      const cardDate = toDateOnly(classDate);
+      const classNumber = Number(row && row.class_number || 0);
+      const cardGroup = parsePositiveIntStrict(row && row.group_number);
+      const cardCourseId = parsePositiveIntStrict(row && (row.course_id || row.owner_course_id));
+      const cardSemesterId = parsePositiveIntStrict(row && (row.legacy_semester_id || row.semester_id), 0) || 0;
+      const cardLessonType = normalizeLessonType(row && (row.lesson_type || row.activity_type));
+      const subject = subjectById.get(subjectId) || {};
+      const subjectGroupCount = Math.max(1, Number(subject.group_count || 1) || 1);
+      const subjectIsGeneral = subject.is_general === true || Number(subject.is_general) === 1 || subjectGroupCount === 1;
+      if (!subjectId || !cardDate || !classNumber) return [];
+      return homeworkItems.filter((item) => {
+        if (Number(item.subject_id || 0) !== subjectId) return false;
+        if (toDateOnly(item.class_date) !== cardDate) return false;
+        if (Number(item.class_number || 0) !== classNumber) return false;
+        const homeworkCourseId = parsePositiveIntStrict(item.course_id);
+        if (cardCourseId && homeworkCourseId && cardCourseId !== homeworkCourseId) return false;
+        const homeworkSemesterId = parsePositiveIntStrict(item.semester_id, 0) || 0;
+        if (cardSemesterId && homeworkSemesterId && cardSemesterId !== homeworkSemesterId) return false;
+        const homeworkGroup = parsePositiveIntStrict(item.group_number);
+        if (subjectIsGeneral || cardLessonType === 'lecture') return true;
+        return !homeworkGroup || !cardGroup || homeworkGroup === cardGroup;
+      });
+    };
     const activeDays = Array.from(new Set((scheduleState.scheduleRows || []).map((row) => row.day_of_week).filter(Boolean)));
     const orderedDays = fullWeekDays.filter((day) => activeDays.includes(day));
     const fallbackDays = orderedDays.length ? orderedDays : [...daysOfWeek];
@@ -24736,14 +24820,16 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       if (!scheduleByDay[day]) scheduleByDay[day] = [];
       const classNumber = Number(row.class_number || 0);
       const dayIndex = fullWeekDays.indexOf(day);
+      const classDate = dayIndex >= 0 ? (weekDates[dayIndex] || '') : '';
       scheduleByDay[day].push({
         ...row,
         class_number: classNumber,
-        class_date: dayIndex >= 0 ? (weekDates[dayIndex] || '') : '',
+        class_date: classDate,
         time_label: getScheduleTimeLabel(classNumber, scheduleDisplayBellSchedule),
         subject_name: row.subject_name || row.subject_title || row.name || 'Предмет',
         room_label: row.room_label || row.room_name || row.room_code || '',
         lesson_type: row.lesson_type || row.activity_type || '',
+        homework_items: getHomeworkItemsForScheduleRow({ ...row, class_number: classNumber }, classDate),
       });
     });
     Object.keys(scheduleByDay).forEach((day) => {

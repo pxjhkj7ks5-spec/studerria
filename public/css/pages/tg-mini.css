@@ -495,6 +495,13 @@ html.is-tg-dark .tg-success {
   color: var(--tg-muted-soft);
 }
 
+.tg-lesson-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .tg-tabs-strip {
   margin-bottom: 12px;
 }
@@ -623,7 +630,6 @@ html.is-tg-dark .tg-form select option {
 .tg-inline-action {
   min-height: 34px;
   width: auto;
-  margin-top: 10px;
   border: 1px solid var(--tg-divider);
   border-radius: 999px;
   padding: 0 12px;
@@ -631,6 +637,25 @@ html.is-tg-dark .tg-form select option {
   color: var(--tg-theme-text);
   font-size: 0.8rem;
   font-weight: 740;
+}
+
+.tg-inline-action--primary {
+  border-color: color-mix(in srgb, var(--tg-theme-accent) 52%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tg-theme-accent) 92%, white 8%), var(--tg-theme-accent));
+  color: #fff;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--tg-theme-accent) 24%, transparent);
+}
+
+.tg-inline-action--primary span {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.72rem;
+  line-height: 1;
 }
 
 .tg-modal[hidden] {
@@ -681,6 +706,57 @@ html.is-tg-dark .tg-form select option {
 
 .tg-modal-head p {
   margin-bottom: 0;
+}
+
+.tg-homework-list {
+  display: grid;
+  gap: 10px;
+}
+
+.tg-homework-card {
+  border: 1px solid var(--tg-divider);
+  border-radius: var(--tg-radius-md);
+  padding: 12px;
+  background: var(--tg-card-strong);
+}
+
+.tg-homework-card h3 {
+  margin: 0 0 6px;
+  font-size: 0.96rem;
+}
+
+.tg-homework-card p {
+  margin: 0;
+  color: var(--tg-theme-text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+.tg-homework-meta {
+  margin-top: 8px;
+  color: var(--tg-muted);
+  font-size: 0.78rem;
+}
+
+.tg-homework-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tg-homework-link {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--tg-theme-accent) 32%, var(--tg-divider));
+  border-radius: 999px;
+  padding: 0 11px;
+  background: var(--tg-soft-control-active);
+  color: var(--tg-theme-accent);
+  font-size: 0.8rem;
+  font-weight: 740;
 }
 
 .tg-icon-button {

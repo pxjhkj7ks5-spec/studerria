@@ -183,6 +183,7 @@
     bindRegisterForms();
     bindSubjectPickers();
     bindScheduleHomeworkModal();
+    bindScheduleHomeworkViewModal();
     primeFastPages();
     applyTelegramChrome();
   }
@@ -320,6 +321,43 @@
     });
   }
 
+  function getCurrentScrollY() {
+    return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+  }
+
+  function restoreScrollY(scrollY) {
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo(0, scrollY);
+    } else {
+      document.documentElement.scrollTop = scrollY;
+      document.body.scrollTop = scrollY;
+    }
+  }
+
+  function lockPageScroll(modal) {
+    const alreadyLocked = document.body.classList.contains('is-tg-modal-open');
+    const scrollY = alreadyLocked
+      ? Number(document.documentElement.dataset.tgLockedScrollY || 0)
+      : getCurrentScrollY();
+    if (modal) modal.dataset.scrollY = String(scrollY);
+    if (!alreadyLocked) {
+      document.documentElement.dataset.tgLockedScrollY = String(scrollY);
+      document.body.style.top = `-${scrollY}px`;
+      document.documentElement.classList.add('is-tg-modal-open');
+      document.body.classList.add('is-tg-modal-open');
+    }
+  }
+
+  function unlockPageScroll(modal) {
+    const scrollY = Number((modal && modal.dataset.scrollY) || document.documentElement.dataset.tgLockedScrollY || 0);
+    document.documentElement.classList.remove('is-tg-modal-open');
+    document.body.classList.remove('is-tg-modal-open');
+    document.body.style.top = '';
+    delete document.documentElement.dataset.tgLockedScrollY;
+    if (modal) delete modal.dataset.scrollY;
+    restoreScrollY(scrollY);
+  }
+
   function bindScheduleHomeworkModal() {
     const modal = document.getElementById('tgHomeworkModal');
     if (!modal || modal.dataset.tgHomeworkModalBound === '1') return;
@@ -335,30 +373,10 @@
       class_date: modal.querySelector('[data-tg-homework-field="class_date"]'),
       time: modal.querySelector('[data-tg-homework-field="time"]'),
     };
-    function lockPageScroll() {
-      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      modal.dataset.scrollY = String(scrollY);
-      document.body.style.top = `-${scrollY}px`;
-      document.documentElement.classList.add('is-tg-modal-open');
-      document.body.classList.add('is-tg-modal-open');
-    }
-    function unlockPageScroll() {
-      const scrollY = Number(modal.dataset.scrollY || 0);
-      document.documentElement.classList.remove('is-tg-modal-open');
-      document.body.classList.remove('is-tg-modal-open');
-      document.body.style.top = '';
-      delete modal.dataset.scrollY;
-      if (typeof window.scrollTo === 'function') {
-        window.scrollTo(0, scrollY);
-      } else {
-        document.documentElement.scrollTop = scrollY;
-        document.body.scrollTop = scrollY;
-      }
-    }
     function closeModal() {
       if (modal.hidden) return;
       modal.hidden = true;
-      unlockPageScroll();
+      unlockPageScroll(modal);
     }
     function openModal(button) {
       if (!button) return;
@@ -386,7 +404,7 @@
         if (submit) submit.disabled = false;
       }
       modal.hidden = false;
-      lockPageScroll();
+      lockPageScroll(modal);
       const textarea = modal.querySelector('textarea[name="description"]');
       if (textarea) window.setTimeout(() => textarea.focus(), 80);
     }
@@ -410,6 +428,137 @@
         if (submit) submit.disabled = true;
       });
     }
+  }
+
+  function formatHomeworkDate(rawValue) {
+    const raw = String(rawValue || '').trim();
+    const parts = raw.slice(0, 10).split('-');
+    if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+      return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    }
+    if (!raw) return '';
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? raw : date.toLocaleDateString('uk-UA');
+  }
+
+  function resolveHomeworkHref(rawHref, { uploadsOnly = false } = {}) {
+    const value = String(rawHref || '').trim();
+    if (!value) return '';
+    try {
+      const url = new URL(value, window.location.origin);
+      if (!['http:', 'https:'].includes(url.protocol)) return '';
+      const sameOrigin = url.origin === window.location.origin;
+      if (uploadsOnly && (!sameOrigin || !url.pathname.startsWith('/uploads/'))) return '';
+      return sameOrigin ? `${url.pathname}${url.search}${url.hash}` : url.href;
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function appendHomeworkLink(container, { href, label, uploadsOnly = false } = {}) {
+    const safeHref = resolveHomeworkHref(href, { uploadsOnly });
+    if (!safeHref || !label) return;
+    const link = document.createElement('a');
+    link.className = 'tg-homework-link';
+    link.href = safeHref;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = label;
+    container.appendChild(link);
+  }
+
+  function renderHomeworkViewItem(item) {
+    const card = document.createElement('article');
+    card.className = 'tg-homework-card';
+
+    const title = document.createElement('h3');
+    title.textContent = item.subject_name || 'ДЗ';
+    card.appendChild(title);
+
+    const description = document.createElement('p');
+    description.textContent = item.description || 'ДЗ без опису';
+    card.appendChild(description);
+
+    const metaParts = [];
+    if (item.created_by) metaParts.push(`Додав: ${item.created_by}`);
+    const dateLabel = formatHomeworkDate(item.class_date);
+    if (dateLabel) metaParts.push(dateLabel);
+    if (item.created_at) {
+      const createdAt = new Date(item.created_at);
+      if (!Number.isNaN(createdAt.getTime())) metaParts.push(createdAt.toLocaleString('uk-UA'));
+    }
+    if (metaParts.length) {
+      const meta = document.createElement('div');
+      meta.className = 'tg-homework-meta';
+      meta.textContent = metaParts.join(' · ');
+      card.appendChild(meta);
+    }
+
+    const links = document.createElement('div');
+    links.className = 'tg-homework-links';
+    appendHomeworkLink(links, { href: item.link_url, label: 'Відкрити лінк' });
+    appendHomeworkLink(links, {
+      href: item.file_path,
+      label: item.file_name ? `Файл: ${item.file_name}` : 'Відкрити файл',
+      uploadsOnly: true,
+    });
+    if (links.children.length) card.appendChild(links);
+
+    return card;
+  }
+
+  function bindScheduleHomeworkViewModal() {
+    const modal = document.getElementById('tgHomeworkViewModal');
+    if (!modal || modal.dataset.tgHomeworkViewModalBound === '1') return;
+    modal.dataset.tgHomeworkViewModalBound = '1';
+    const meta = modal.querySelector('[data-tg-homework-view-meta]');
+    const list = modal.querySelector('[data-tg-homework-view-list]');
+
+    function closeModal() {
+      if (modal.hidden) return;
+      modal.hidden = true;
+      unlockPageScroll(modal);
+    }
+
+    function openModal(button) {
+      if (!button || !list) return;
+      let items = [];
+      try {
+        const parsed = JSON.parse(button.dataset.tgHomeworkItems || '[]');
+        items = Array.isArray(parsed) ? parsed : [];
+      } catch (_error) {
+        items = [];
+      }
+      list.innerHTML = '';
+      if (meta) meta.textContent = button.dataset.tgHomeworkViewMeta || 'Пара';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'tg-muted';
+        empty.textContent = 'ДЗ для цієї пари не знайшов.';
+        list.appendChild(empty);
+      } else {
+        items.forEach((item) => {
+          list.appendChild(renderHomeworkViewItem(item || {}));
+        });
+      }
+      modal.hidden = false;
+      lockPageScroll(modal);
+    }
+
+    document.querySelectorAll('[data-tg-homework-view]').forEach((button) => {
+      if (button.dataset.tgHomeworkViewBound === '1') return;
+      button.dataset.tgHomeworkViewBound = '1';
+      button.addEventListener('click', () => openModal(button));
+    });
+    modal.querySelectorAll('[data-tg-homework-view-close]').forEach((button) => {
+      button.addEventListener('click', closeModal);
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.hidden) closeModal();
+    });
   }
 
   function primeFastPages() {
@@ -456,6 +605,7 @@
   bindRegisterForms();
   bindSubjectPickers();
   bindScheduleHomeworkModal();
+  bindScheduleHomeworkViewModal();
   primeFastPages();
   syncTelegramSession();
 })();

@@ -45,6 +45,8 @@
         <p class="tg-muted">Немає пар.</p>
       <% } %>
       <% rows.forEach(function(item) { %>
+        <% const homeworkItems = Array.isArray(item.homework_items) ? item.homework_items : []; %>
+        <% const lessonMeta = `${item.subject_name || 'Предмет'}${item.class_number ? ` · ${item.class_number} пара` : ''}${item.group_number ? ` · група ${item.group_number}` : ''}${item.class_date ? ` · ${item.class_date}` : ''}`; %>
         <div class="tg-lesson">
           <div class="tg-lesson-time">
             <strong aria-label="Пара <%= item.class_number || '' %>"><%= item.class_number || '' %></strong>
@@ -57,21 +59,34 @@
               <% if (item.group_number) { %><span>Group <%= item.group_number %></span><% } %>
               <% if (item.room_label) { %><span><%= item.room_label %></span><% } %>
             </p>
-            <button
-              class="tg-inline-action"
-              type="button"
-              data-tg-homework-open
-              data-subject-id="<%= item.subject_id || '' %>"
-              data-course-id="<%= item.course_id || item.owner_course_id || '' %>"
-              data-group-number="<%= item.group_number || '' %>"
-              data-day-of-week="<%= item.day_of_week || day %>"
-              data-class-number="<%= item.class_number || '' %>"
-              data-class-date="<%= item.class_date || (dayDate && dayDate.iso ? dayDate.iso : '') %>"
-              data-time="<%= item.time_label || '' %>"
-              data-subject-name="<%= item.subject_name || 'Предмет' %>"
-            >
-              Додати ДЗ
-            </button>
+            <div class="tg-lesson-actions">
+              <% if (homeworkItems.length) { %>
+                <button
+                  class="tg-inline-action tg-inline-action--primary"
+                  type="button"
+                  data-tg-homework-view
+                  data-tg-homework-view-meta="<%= lessonMeta %>"
+                  data-tg-homework-items="<%= JSON.stringify(homeworkItems) %>"
+                >
+                  Подивитись ДЗ <span><%= homeworkItems.length %></span>
+                </button>
+              <% } %>
+              <button
+                class="tg-inline-action"
+                type="button"
+                data-tg-homework-open
+                data-subject-id="<%= item.subject_id || '' %>"
+                data-course-id="<%= item.course_id || item.owner_course_id || '' %>"
+                data-group-number="<%= item.group_number || '' %>"
+                data-day-of-week="<%= item.day_of_week || day %>"
+                data-class-number="<%= item.class_number || '' %>"
+                data-class-date="<%= item.class_date || (dayDate && dayDate.iso ? dayDate.iso : '') %>"
+                data-time="<%= item.time_label || '' %>"
+                data-subject-name="<%= item.subject_name || 'Предмет' %>"
+              >
+                Додати ДЗ
+              </button>
+            </div>
           </div>
         </div>
       <% }); %>
@@ -112,5 +127,19 @@
       </label>
       <button class="tg-primary" type="submit">Зберегти</button>
     </form>
+  </section>
+</div>
+
+<div class="tg-modal" id="tgHomeworkViewModal" hidden>
+  <div class="tg-modal-backdrop" data-tg-homework-view-close></div>
+  <section class="tg-modal-panel" role="dialog" aria-modal="true" aria-labelledby="tgHomeworkViewTitle">
+    <div class="tg-modal-head">
+      <div>
+        <h2 id="tgHomeworkViewTitle">ДЗ на пару</h2>
+        <p class="tg-muted" data-tg-homework-view-meta>Пара</p>
+      </div>
+      <button class="tg-icon-button" type="button" data-tg-homework-view-close aria-label="Закрити">×</button>
+    </div>
+    <div class="tg-homework-list" data-tg-homework-view-list></div>
   </section>
 </div>
