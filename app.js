@@ -38,6 +38,9 @@ const { publicLegalPages } = require('./lib/legalPages');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 const studerriaTelegramPresentationTemplateFile = path.join(__dirname, 'assets', 'telegram', 'presentation-template.pptx');
+const studerriaTelegramMeetingAudioFile = String(
+  process.env.STUDERRIA_TG_MEETING_AUDIO_FILE || path.join(__dirname, 'uploads', 'good-morning-vietnam.mp3')
+).trim();
 let appVersion = pkg.version || '0.0.0';
 try {
   const raw = fs.readFileSync(versionFile, 'utf8');
@@ -20352,6 +20355,43 @@ async function sendStuderriaTelegramDocument(chatId, filePath, options = {}) {
   }
 }
 
+async function sendStuderriaTelegramAudio(chatId, filePath, options = {}) {
+  if (!chatId || !filePath) return null;
+  const buffer = fs.readFileSync(filePath);
+  const formData = new FormData();
+  formData.append('chat_id', String(chatId));
+  formData.append(
+    'audio',
+    new Blob([buffer], {
+      type: options.contentType || 'audio/mpeg',
+    }),
+    options.filename || path.basename(filePath)
+  );
+  if (options.caption) {
+    formData.append('caption', String(options.caption).slice(0, 1024));
+  }
+  if (options.title) {
+    formData.append('title', String(options.title).slice(0, 64));
+  }
+  const messageThreadId = options.messageThreadId
+    || getStuderriaTelegramMessageThreadId(options.sourceMessage || {});
+  if (messageThreadId) {
+    formData.append('message_thread_id', String(messageThreadId));
+  }
+  try {
+    return await callStuderriaTelegramBotApiMultipart('sendAudio', formData);
+  } catch (err) {
+    if (messageThreadId && isStuderriaTelegramThreadDeliveryError(err)) {
+      return sendStuderriaTelegramAudio(chatId, filePath, {
+        ...options,
+        sourceMessage: null,
+        messageThreadId: null,
+      });
+    }
+    throw err;
+  }
+}
+
 async function pinStuderriaTelegramMessage(chatId, messageId, label = 'message') {
   if (!chatId || !messageId) return null;
   return callStuderriaTelegramBotApi('pinChatMessage', {
@@ -20655,6 +20695,11 @@ function isStuderriaTelegramPresentationTemplatePhrase(message = {}) {
   return text === 'дай шаблон презентації';
 }
 
+function isStuderriaTelegramMeetingPhrase(message = {}) {
+  const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  return text === 'нарада';
+}
+
 async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyText = '') {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
@@ -20665,6 +20710,37 @@ async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyT
     return;
   }
   await sendStuderriaTelegramMessage(chatId, replyText, { sourceMessage: message });
+}
+
+async function handleStuderriaTelegramMeetingPhrase(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const context = await getStuderriaTelegramActorContext(message.from || {});
+  if (!context.actor) {
+    await sendStuderriaTelegramRegistrationPrompt(message, 'цієї фрази');
+    return;
+  }
+  const caption = 'час згадати скаутський обхід';
+  if (studerriaTelegramMeetingAudioFile && fs.existsSync(studerriaTelegramMeetingAudioFile)) {
+    await sendStuderriaTelegramAudio(chatId, studerriaTelegramMeetingAudioFile, {
+      sourceMessage: message,
+      filename: path.basename(studerriaTelegramMeetingAudioFile),
+      contentType: 'audio/mpeg',
+      title: 'Good Morning Vietnam',
+      caption,
+    });
+    return;
+  }
+  await sendStuderriaTelegramMessage(
+    chatId,
+    [
+      caption,
+      '',
+      'Файл пісні ще не підключено на сервері.',
+    ].join('\n'),
+    { sourceMessage: message }
+  );
 }
 
 async function handleStuderriaTelegramPresentationTemplatePhrase(message = {}) {
@@ -24060,6 +24136,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
     }
     if (isStuderriaTelegramPresentationTemplatePhrase(message)) {
       await handleStuderriaTelegramPresentationTemplatePhrase(message);
+      return;
+    }
+    if (isStuderriaTelegramMeetingPhrase(message)) {
+      await handleStuderriaTelegramMeetingPhrase(message);
       return;
     }
     const authorizedPhraseReply = getStuderriaTelegramAuthorizedPhraseReply(message);
