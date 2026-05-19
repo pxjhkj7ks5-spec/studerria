@@ -10,8 +10,23 @@
 <% if (typeof welcome !== 'undefined' && welcome) { %>
   <div class="tg-success">Акаунт готовий. Telegram привʼязано.</div>
 <% } %>
+<% if (typeof success !== 'undefined' && success === 'homework-created') { %>
+  <div class="tg-success">ДЗ додано.</div>
+<% } %>
 <% if (typeof error !== 'undefined' && error) { %>
-  <div class="tg-alert">Не вдалося завантажити розклад.</div>
+  <div class="tg-alert">
+    <% if (error === 'missing-fields') { %>
+      Заповніть опис ДЗ.
+    <% } else if (error === 'invalid-link') { %>
+      Лінк має починатися з http або https.
+    <% } else if (error === 'subject-denied' || error === 'group-denied' || error === 'schedule-denied') { %>
+      Не вдалося привʼязати ДЗ до цієї пари.
+    <% } else if (error === 'homework-failed' || error === 'db') { %>
+      Не вдалося додати ДЗ.
+    <% } else { %>
+      Не вдалося завантажити розклад.
+    <% } %>
+  </div>
 <% } %>
 
 <section class="tg-schedule">
@@ -42,9 +57,60 @@
               <% if (item.group_number) { %><span>Group <%= item.group_number %></span><% } %>
               <% if (item.room_label) { %><span><%= item.room_label %></span><% } %>
             </p>
+            <button
+              class="tg-inline-action"
+              type="button"
+              data-tg-homework-open
+              data-subject-id="<%= item.subject_id || '' %>"
+              data-course-id="<%= item.course_id || item.owner_course_id || '' %>"
+              data-group-number="<%= item.group_number || '' %>"
+              data-day-of-week="<%= item.day_of_week || day %>"
+              data-class-number="<%= item.class_number || '' %>"
+              data-class-date="<%= item.class_date || (dayDate && dayDate.iso ? dayDate.iso : '') %>"
+              data-time="<%= item.time_label || '' %>"
+              data-subject-name="<%= item.subject_name || 'Предмет' %>"
+            >
+              Додати ДЗ
+            </button>
           </div>
         </div>
       <% }); %>
     </article>
   <% }); %>
 </section>
+
+<div class="tg-modal" id="tgHomeworkModal" hidden>
+  <div class="tg-modal-backdrop" data-tg-homework-close></div>
+  <section class="tg-modal-panel" role="dialog" aria-modal="true" aria-labelledby="tgHomeworkTitle">
+    <div class="tg-modal-head">
+      <div>
+        <h2 id="tgHomeworkTitle">Додати ДЗ</h2>
+        <p class="tg-muted" data-tg-homework-meta>Пара</p>
+      </div>
+      <button class="tg-icon-button" type="button" data-tg-homework-close aria-label="Закрити">×</button>
+    </div>
+    <form class="tg-form" method="POST" action="/studerria-tg/homework/create" enctype="multipart/form-data" autocomplete="off">
+      <input type="hidden" name="subject_id" data-tg-homework-field="subject_id" />
+      <input type="hidden" name="course_id" data-tg-homework-field="course_id" />
+      <input type="hidden" name="group_number" data-tg-homework-field="group_number" />
+      <input type="hidden" name="day_of_week" data-tg-homework-field="day_of_week" />
+      <input type="hidden" name="class_number" data-tg-homework-field="class_number" />
+      <input type="hidden" name="class_date" data-tg-homework-field="class_date" />
+      <input type="hidden" name="time" data-tg-homework-field="time" />
+      <input type="hidden" name="current_week" value="<%= currentWeek || 1 %>" />
+      <label>
+        <span>Опис ДЗ</span>
+        <textarea name="description" rows="4" maxlength="1200" placeholder="Що треба зробити?" required></textarea>
+      </label>
+      <label>
+        <span>Файл</span>
+        <input name="attachment" type="file" />
+      </label>
+      <label>
+        <span>Лінк</span>
+        <input name="link_url" type="url" inputmode="url" placeholder="https://..." />
+      </label>
+      <button class="tg-primary" type="submit">Зберегти</button>
+    </form>
+  </section>
+</div>

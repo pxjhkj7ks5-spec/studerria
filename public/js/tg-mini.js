@@ -182,6 +182,7 @@
     bindTelegramLinkForms();
     bindRegisterForms();
     bindSubjectPickers();
+    bindScheduleHomeworkModal();
     primeFastPages();
     applyTelegramChrome();
   }
@@ -319,6 +320,77 @@
     });
   }
 
+  function bindScheduleHomeworkModal() {
+    const modal = document.getElementById('tgHomeworkModal');
+    if (!modal || modal.dataset.tgHomeworkModalBound === '1') return;
+    modal.dataset.tgHomeworkModalBound = '1';
+    const form = modal.querySelector('form');
+    const meta = modal.querySelector('[data-tg-homework-meta]');
+    const fields = {
+      subject_id: modal.querySelector('[data-tg-homework-field="subject_id"]'),
+      course_id: modal.querySelector('[data-tg-homework-field="course_id"]'),
+      group_number: modal.querySelector('[data-tg-homework-field="group_number"]'),
+      day_of_week: modal.querySelector('[data-tg-homework-field="day_of_week"]'),
+      class_number: modal.querySelector('[data-tg-homework-field="class_number"]'),
+      class_date: modal.querySelector('[data-tg-homework-field="class_date"]'),
+      time: modal.querySelector('[data-tg-homework-field="time"]'),
+    };
+    function closeModal() {
+      modal.hidden = true;
+      document.documentElement.classList.remove('is-tg-modal-open');
+    }
+    function openModal(button) {
+      if (!button) return;
+      if (fields.subject_id) fields.subject_id.value = button.dataset.subjectId || '';
+      if (fields.course_id) fields.course_id.value = button.dataset.courseId || '';
+      if (fields.group_number) fields.group_number.value = button.dataset.groupNumber || '';
+      if (fields.day_of_week) fields.day_of_week.value = button.dataset.dayOfWeek || '';
+      if (fields.class_number) fields.class_number.value = button.dataset.classNumber || '';
+      if (fields.class_date) fields.class_date.value = button.dataset.classDate || '';
+      if (fields.time) fields.time.value = button.dataset.time || '';
+      if (meta) {
+        const date = button.dataset.classDate || '';
+        const group = button.dataset.groupNumber ? ` · група ${button.dataset.groupNumber}` : '';
+        const classLabel = button.dataset.classNumber ? ` · ${button.dataset.classNumber} пара` : '';
+        meta.textContent = `${button.dataset.subjectName || 'Пара'}${classLabel}${group}${date ? ` · ${date}` : ''}`;
+      }
+      if (form) {
+        form.reset();
+        Object.keys(fields).forEach((key) => {
+          if (!fields[key]) return;
+          const dataKey = key.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+          fields[key].value = button.dataset[dataKey] || fields[key].value || '';
+        });
+        const submit = form.querySelector('button[type="submit"]');
+        if (submit) submit.disabled = false;
+      }
+      modal.hidden = false;
+      document.documentElement.classList.add('is-tg-modal-open');
+      const textarea = modal.querySelector('textarea[name="description"]');
+      if (textarea) window.setTimeout(() => textarea.focus(), 80);
+    }
+    document.querySelectorAll('[data-tg-homework-open]').forEach((button) => {
+      if (button.dataset.tgHomeworkBound === '1') return;
+      button.dataset.tgHomeworkBound = '1';
+      button.addEventListener('click', () => openModal(button));
+    });
+    modal.querySelectorAll('[data-tg-homework-close]').forEach((button) => {
+      button.addEventListener('click', closeModal);
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.hidden) closeModal();
+    });
+    if (form) {
+      form.addEventListener('submit', () => {
+        const submit = form.querySelector('button[type="submit"]');
+        if (submit) submit.disabled = true;
+      });
+    }
+  }
+
   function primeFastPages() {
     const urls = new Map();
     document.querySelectorAll('a[href]').forEach((anchor) => {
@@ -362,6 +434,7 @@
   bindTelegramLinkForms();
   bindRegisterForms();
   bindSubjectPickers();
+  bindScheduleHomeworkModal();
   primeFastPages();
   syncTelegramSession();
 })();

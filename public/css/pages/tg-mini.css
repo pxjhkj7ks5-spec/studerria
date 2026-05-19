@@ -541,7 +541,8 @@ html.is-tg-dark .tg-success {
 }
 
 .tg-form input,
-.tg-form select {
+.tg-form select,
+.tg-form textarea {
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--tg-divider);
@@ -553,12 +554,20 @@ html.is-tg-dark .tg-success {
 }
 
 .tg-form input:focus,
-.tg-form select:focus {
+.tg-form select:focus,
+.tg-form textarea:focus {
   border-color: color-mix(in srgb, var(--tg-theme-accent) 44%, var(--tg-divider));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--tg-theme-accent) 15%, transparent);
 }
 
-.tg-form input::placeholder {
+.tg-form textarea {
+  min-height: 112px;
+  padding: 12px 13px;
+  resize: vertical;
+}
+
+.tg-form input::placeholder,
+.tg-form textarea::placeholder {
   color: var(--tg-muted-soft);
 }
 
@@ -596,6 +605,83 @@ html.is-tg-dark .tg-form select option {
   border: 1px solid var(--tg-divider);
   background: var(--tg-soft-control-bg);
   color: var(--tg-theme-text);
+}
+
+.tg-inline-action {
+  min-height: 34px;
+  width: auto;
+  margin-top: 10px;
+  border: 1px solid var(--tg-divider);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: var(--tg-soft-control-bg);
+  color: var(--tg-theme-text);
+  font-size: 0.8rem;
+  font-weight: 740;
+}
+
+.tg-modal[hidden] {
+  display: none;
+}
+
+.tg-modal {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 16px 14px calc(env(safe-area-inset-bottom) + 14px);
+}
+
+.tg-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(14px);
+}
+
+.tg-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(430px, 100%);
+  max-height: min(86svh, 620px);
+  overflow: auto;
+  border: 1px solid var(--tg-border);
+  border-radius: 24px;
+  padding: 16px;
+  background: var(--tg-card);
+  box-shadow: var(--tg-shadow);
+}
+
+.tg-modal-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tg-modal-head h2 {
+  margin-bottom: 4px;
+}
+
+.tg-modal-head p {
+  margin-bottom: 0;
+}
+
+.tg-icon-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--tg-divider);
+  border-radius: 50%;
+  background: var(--tg-soft-control-bg);
+  color: var(--tg-theme-text);
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
 .tg-disclosure {

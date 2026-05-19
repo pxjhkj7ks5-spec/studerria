@@ -388,6 +388,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-import-export', label: 'Імпорт/Експорт' },
   { id: 'admin-schedule-generator', label: 'Генератори' },
   { id: 'admin-homework', label: 'Домашні' },
+  { id: 'admin-tg-homework', label: 'TG ДЗ' },
   { id: 'admin-users', label: 'Користувачі' },
   { id: 'admin-tg-users', label: 'Telegram users' },
   { id: 'admin-teachers', label: 'Заявки викладачів' },
@@ -402,7 +403,7 @@ const ADMIN_SECTION_OPTIONS = [
 ];
 
 const DEFAULT_ROLE_PERMISSIONS = {
-  starosta: ['admin-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
+  starosta: ['admin-homework', 'admin-tg-homework', 'admin-teamwork', 'admin-messages', 'admin-overview'],
   deanery: ['admin-schedule', 'admin-subjects', 'admin-semesters', 'admin-courses', 'admin-overview'],
   teacher: [],
   student: [],
@@ -17232,6 +17233,7 @@ async function insertHomeworkRecord(payload = {}) {
   pushColumn('is_credit', payload.is_credit ?? 0);
   pushColumn('room_id', payload.room_id ?? null);
   pushColumn('source_template_id', payload.source_template_id ?? null);
+  pushColumn('source', payload.source ?? 'web');
 
   if (!columnList.length) {
     return null;
@@ -20639,6 +20641,11 @@ const STUDERRIA_TG_SCHEDULE_QUESTION_PATTERNS = [
   new RegExp(`^розклад(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
   new RegExp(`^пари(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
 ];
+const STUDERRIA_TG_HOMEWORK_QUESTION_PATTERNS = [
+  new RegExp(`^(?:що|шо) по (?:дз|д\\/з|домашці|домашке|домашка)(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
+  new RegExp(`^(?:дз|д\\/з|домашка|домашка|домашці|домашке)(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
+  new RegExp(`^які(?: (?:в|у) мене)? (?:дз|д\\/з|домашки|домашні)(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
+];
 
 function getStuderriaTelegramNextWeekdayDate(dayName = '') {
   const todayIso = getStuderriaTelegramKyivDateWithOffset(0);
@@ -20668,6 +20675,19 @@ function parseStuderriaTelegramScheduleQuestionTarget(message = {}) {
   const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
   if (!text || text.startsWith('/')) return null;
   for (const pattern of STUDERRIA_TG_SCHEDULE_QUESTION_PATTERNS) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    return buildStuderriaTelegramScheduleQuestionTarget(
+      STUDERRIA_TG_SCHEDULE_TARGET_BY_ALIAS.get(match[1])
+    );
+  }
+  return null;
+}
+
+function parseStuderriaTelegramHomeworkQuestionTarget(message = {}) {
+  const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  if (!text || text.startsWith('/')) return null;
+  for (const pattern of STUDERRIA_TG_HOMEWORK_QUESTION_PATTERNS) {
     const match = text.match(pattern);
     if (!match) continue;
     return buildStuderriaTelegramScheduleQuestionTarget(
@@ -20915,6 +20935,148 @@ async function sendStuderriaTelegramScheduleForQuestion(message = {}, target = n
     await sendStuderriaTelegramMessage(
       chatId,
       `Не зміг зараз підтягнути розклад на ${targetLabel}. Спробуй ще раз трохи пізніше або відкрий розклад у mini app.`,
+      { sourceMessage: message, replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || '') }
+    );
+  }
+  return true;
+}
+
+function getStuderriaTelegramSelectedSubjectGroup(subject = {}, actor = {}) {
+  return parsePositiveIntStrict(
+    subject.selected_group
+      || (Array.isArray(subject.group_numbers) ? subject.group_numbers[0] : null)
+      || actor.schedule_group
+  ) || 1;
+}
+
+function canStuderriaTelegramHomeworkRowShowForSubject(row = {}, subject = {}, actor = {}) {
+  const rowGroup = parsePositiveIntStrict(row.group_number);
+  const selectedGroup = getStuderriaTelegramSelectedSubjectGroup(subject, actor);
+  const subjectGroupCount = Math.max(1, Number(subject.group_count || 1) || 1);
+  const isGeneral = subject.is_general === true || Number(subject.is_general) === 1 || subjectGroupCount === 1;
+  return isGeneral || !rowGroup || rowGroup === selectedGroup;
+}
+
+function buildStuderriaTelegramHomeworkRowLine(row = {}) {
+  const classNumber = Number(row.class_number || 0);
+  const subjectName = sanitizeCompactText(row.subject_name || row.subject || 'Предмет', 120);
+  const description = sanitizeCompactText(row.description || 'ДЗ без опису', 420);
+  const author = sanitizeCompactText(row.created_by || row.created_by_name || '', 120);
+  const dayLabel = getStuderriaTelegramFullDayLabel(normalizeWeekdayName(row.day_of_week || row.day));
+  const dateLabel = formatStuderriaTelegramDateLabel(toDateOnly(row.class_date));
+  const meta = [
+    classNumber ? `${classNumber} пара` : '',
+    dayLabel || '',
+    dateLabel || '',
+  ].filter(Boolean).join(' · ');
+  const lines = [
+    `${subjectName}${meta ? ` (${meta})` : ''}`,
+    description,
+  ];
+  if (author) {
+    lines.push(`Додав: ${author}`);
+  }
+  if (row.file_path || row.link_url) {
+    lines.push('Файл або лінк можна переглянути в mini app бота.');
+  }
+  return lines.join('\n');
+}
+
+async function sendStuderriaTelegramHomeworkForQuestion(message = {}, target = null) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return false;
+  if (!target || !target.dateIso) return false;
+
+  const context = await getStuderriaTelegramActorContext(message.from || {});
+  if (!context.actor) {
+    await sendStuderriaTelegramRegistrationPrompt(message, 'перевірки ДЗ');
+    return true;
+  }
+
+  const userId = Number(context.actor.id || 0);
+  const targetIso = target.dateIso;
+  const targetLabel = target.titleLabel || 'день';
+  const dayLabel = getStuderriaTelegramFullDayLabel(getDayNameFromDate(targetIso));
+  const dateLabel = formatStuderriaTelegramDateLabel(targetIso);
+
+  try {
+    const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      userId,
+      { selectedOnly: true }
+    );
+    const subjects = (subjectState && Array.isArray(subjectState.subjects) ? subjectState.subjects : [])
+      .map((subject) => ({
+        ...subject,
+        subject_id: Number(subject.subject_id || subject.id || 0),
+        subject_name: sanitizeCompactText(subject.subject_name || subject.name || subject.subject_title || 'Предмет', 140),
+      }))
+      .filter((subject) => subject.subject_id);
+    if (!subjects.length) {
+      await sendStuderriaTelegramMessage(
+        chatId,
+        [
+          `ДЗ на ${targetLabel} (${dayLabel}, ${dateLabel})`,
+          '',
+          'Не бачу вибраних предметів у твоєму mini app.',
+          'Відкрий mini app і перевір профіль та предмети.',
+        ].join('\n'),
+        { sourceMessage: message, replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || '') }
+      );
+      return true;
+    }
+    const subjectById = new Map(subjects.map((subject) => [Number(subject.subject_id), subject]));
+    const subjectIds = subjects.map((subject) => Number(subject.subject_id));
+    const nowIso = new Date().toISOString();
+    const rows = await db.all(
+      `
+        SELECT h.*, subj.name AS subject_name, COALESCE(u.full_name, h.created_by, '') AS created_by_name
+        FROM homework h
+        JOIN subjects subj ON subj.id = h.subject_id
+        LEFT JOIN users u ON u.id = h.created_by_id
+        WHERE h.subject_id = ANY(?::int[])
+          AND h.class_date = ?
+          AND COALESCE(h.status, 'published') = 'published'
+          AND ${buildScheduledAtVisibleCondition('h.scheduled_at')}
+          AND ${buildFalsyTextCondition('h.is_custom_deadline')}
+        ORDER BY h.class_number ASC NULLS LAST, h.created_at DESC
+        LIMIT 80
+      `,
+      [subjectIds, targetIso, nowIso]
+    );
+    const visibleRows = (rows || [])
+      .filter((row) => {
+        const subject = subjectById.get(Number(row.subject_id || 0));
+        return subject && canStuderriaTelegramHomeworkRowShowForSubject(row, subject, context.actor);
+      })
+      .slice(0, 12);
+    const lines = [
+      `ДЗ на ${targetLabel} (${dayLabel}, ${dateLabel})`,
+      '',
+    ];
+    if (!visibleRows.length) {
+      lines.push(`На ${targetLabel} ДЗ не знайшов.`);
+      lines.push('Якщо ДЗ щойно додали, перевір mini app.');
+    } else {
+      visibleRows.forEach((row, index) => {
+        if (index > 0) lines.push('');
+        lines.push(buildStuderriaTelegramHomeworkRowLine(row));
+      });
+      if ((rows || []).length > visibleRows.length) {
+        lines.push('');
+        lines.push('Більше ДЗ можна переглянути в mini app бота.');
+      }
+    }
+    await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3900), {
+      sourceMessage: message,
+      replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || ''),
+    });
+  } catch (err) {
+    console.error('Studerria Telegram homework question failed', err);
+    await sendStuderriaTelegramMessage(
+      chatId,
+      `Не зміг зараз підтягнути ДЗ на ${targetLabel}. Спробуй ще раз трохи пізніше або відкрий mini app.`,
       { sourceMessage: message, replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || '') }
     );
   }
@@ -24147,6 +24309,11 @@ async function handleStuderriaTelegramBotUpdate(update) {
       await handleStuderriaTelegramAuthorizedPhraseReply(message, authorizedPhraseReply);
       return;
     }
+    const homeworkQuestionTarget = parseStuderriaTelegramHomeworkQuestionTarget(message);
+    if (homeworkQuestionTarget) {
+      await sendStuderriaTelegramHomeworkForQuestion(message, homeworkQuestionTarget);
+      return;
+    }
     const scheduleQuestionTarget = parseStuderriaTelegramScheduleQuestionTarget(message);
     if (scheduleQuestionTarget) {
       await sendStuderriaTelegramScheduleForQuestion(message, scheduleQuestionTarget);
@@ -24554,6 +24721,9 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       userId,
       { weekNumber: selectedWeek }
     );
+    const weekDates = fullWeekDays.map((_, index) =>
+      getDateForWeekIndex(selectedWeek, index, baseState && baseState.term ? baseState.term.start_date : null)
+    );
     const activeDays = Array.from(new Set((scheduleState.scheduleRows || []).map((row) => row.day_of_week).filter(Boolean)));
     const orderedDays = fullWeekDays.filter((day) => activeDays.includes(day));
     const fallbackDays = orderedDays.length ? orderedDays : [...daysOfWeek];
@@ -24565,9 +24735,11 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       const day = row.day_of_week;
       if (!scheduleByDay[day]) scheduleByDay[day] = [];
       const classNumber = Number(row.class_number || 0);
+      const dayIndex = fullWeekDays.indexOf(day);
       scheduleByDay[day].push({
         ...row,
         class_number: classNumber,
+        class_date: dayIndex >= 0 ? (weekDates[dayIndex] || '') : '',
         time_label: getScheduleTimeLabel(classNumber, scheduleDisplayBellSchedule),
         subject_name: row.subject_name || row.subject_title || row.name || 'Предмет',
         room_label: row.room_label || row.room_name || row.room_code || '',
@@ -24577,9 +24749,6 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
     Object.keys(scheduleByDay).forEach((day) => {
       scheduleByDay[day].sort((a, b) => Number(a.class_number || 0) - Number(b.class_number || 0));
     });
-    const weekDates = fullWeekDays.map((_, index) =>
-      getDateForWeekIndex(selectedWeek, index, baseState && baseState.term ? baseState.term.start_date : null)
-    );
     const scheduleDayDates = {};
     Object.keys(scheduleByDay).forEach((day) => {
       const dayIndex = fullWeekDays.indexOf(day);
@@ -24600,6 +24769,8 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       currentWeek: selectedWeek,
       totalWeeks,
       welcome: String(req.query.welcome || '') === '1',
+      success: String(req.query.ok || ''),
+      error: String(req.query.error || ''),
     });
   } catch (err) {
     console.error('Telegram mini schedule failed', err);
@@ -24614,6 +24785,152 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       totalWeeks: 1,
       error: 'db',
     });
+  }
+});
+
+app.post('/studerria-tg/homework/create', requireTelegramMiniStudent, writeLimiter, uploadLimiter, upload.single('attachment'), async (req, res) => {
+  const userId = Number(req.session.user.id || 0);
+  const currentWeek = parsePositiveIntStrict(req.body.current_week || req.query.week) || 1;
+  const redirectBase = `/studerria-tg/schedule?week=${encodeURIComponent(String(currentWeek || 1))}`;
+  const fail = (code) => {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.redirect(`${redirectBase}&error=${encodeURIComponent(code || 'homework-failed')}`);
+  };
+
+  const subjectId = parsePositiveIntStrict(req.body.subject_id);
+  const courseIdInput = parsePositiveIntStrict(req.body.course_id);
+  const groupNumber = parsePositiveIntStrict(req.body.group_number);
+  const dayOfWeek = normalizeWeekdayName(req.body.day_of_week);
+  const classNumber = parsePositiveIntStrict(req.body.class_number);
+  const classDate = String(req.body.class_date || '').slice(0, 10);
+  const timeLabel = sanitizeCompactText(req.body.time || '', 80) || 'Telegram mini app';
+  const description = sanitizeCompactText(req.body.description || '', 1200);
+  let linkUrl = String(req.body.link_url || '').trim();
+  if (linkUrl) {
+    try {
+      const parsedUrl = new URL(linkUrl);
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        return fail('invalid-link');
+      }
+      linkUrl = parsedUrl.toString();
+    } catch (_err) {
+      return fail('invalid-link');
+    }
+  }
+  if (!subjectId || !groupNumber || !dayOfWeek || !classNumber || !/^\d{4}-\d{2}-\d{2}$/.test(classDate) || !description) {
+    return fail('missing-fields');
+  }
+
+  try {
+    await ensureDbReady();
+    const setupState = await ensureTelegramMiniSetupForPage(req, userId);
+    if (setupState.nextStep !== 'complete') {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      req.session.pendingUserId = userId;
+      await saveRequestSession(req);
+      return res.redirect(`/studerria-tg/register?step=${setupState.nextStep}`);
+    }
+    const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+      getAcademicV2Store(),
+      userId,
+      { selectedOnly: true }
+    );
+    const subject = (subjectState.subjects || []).find((item) => Number(item.subject_id || item.id) === subjectId);
+    if (!subject) return fail('subject-denied');
+    const courseId = parsePositiveIntStrict(subject.owner_course_id || subject.course_id);
+    if (!courseId || (courseIdInput && courseIdInput !== courseId)) {
+      return fail('course-denied');
+    }
+    const selectedGroup = getStuderriaTelegramSelectedSubjectGroup(subject, req.session.user || {});
+    const subjectGroupCount = Math.max(1, Number(subject.group_count || 1) || 1);
+    const isGeneral = subject.is_general === true || Number(subject.is_general) === 1 || subjectGroupCount === 1;
+    if (!isGeneral && selectedGroup !== groupNumber) {
+      return fail('group-denied');
+    }
+    const activeSemester = await getActiveSemester(courseId).catch(() => null);
+    if (!activeSemester) return fail('missing-term');
+    const totalWeeks = Math.max(1, Number(activeSemester.weeks_count || 0) || 16);
+    let weekNumber = getAcademicWeekForSemester(new Date(`${classDate}T12:00:00Z`), activeSemester);
+    if (weekNumber < 1) weekNumber = 1;
+    if (weekNumber > totalWeeks) weekNumber = totalWeeks;
+    const scheduleState = await academicV2StudentHelpers.loadStudentScheduleData(
+      getAcademicV2Store(),
+      userId,
+      { weekNumber }
+    );
+    const scheduleRow = (scheduleState.scheduleRows || []).find((row) => {
+      const rowSubjectId = Number(row.subject_id || row.id || 0);
+      const rowGroup = parsePositiveIntStrict(row.group_number);
+      return rowSubjectId === subjectId
+        && normalizeWeekdayName(row.day_of_week) === dayOfWeek
+        && Number(row.class_number || 0) === classNumber
+        && (!rowGroup || rowGroup === groupNumber || isGeneral);
+    });
+    if (!scheduleRow) {
+      return fail('schedule-denied');
+    }
+    const createdAt = new Date().toISOString();
+    const subjectName = normalizeSubjectDraftName(
+      subject.subject_name || subject.name || subject.subject_title || 'Предмет',
+      160
+    ) || 'Предмет';
+    const creatorName = sanitizeCompactText(
+      req.session.user.full_name || req.session.user.username || req.session.user.name || 'Telegram mini app',
+      180
+    );
+    const row = await insertHomeworkRecord({
+      group_name: req.session.user.schedule_group || String(groupNumber),
+      subject: subjectName,
+      day: dayOfWeek,
+      time: timeLabel,
+      week_number: weekNumber,
+      class_number: classNumber,
+      subject_id: subjectId,
+      group_number: groupNumber,
+      day_of_week: dayOfWeek,
+      created_by_id: userId,
+      description,
+      class_date: classDate,
+      meeting_url: null,
+      link_url: linkUrl || null,
+      file_path: req.file ? `/uploads/${req.file.filename}` : null,
+      file_name: req.file ? req.file.originalname : null,
+      created_by: creatorName,
+      created_at: createdAt,
+      course_id: courseId,
+      semester_id: activeSemester.id,
+      status: 'published',
+      scheduled_at: null,
+      published_at: createdAt,
+      is_custom_deadline: 0,
+      custom_due_date: null,
+      is_control: 0,
+      is_teacher_homework: 0,
+      is_credit: 0,
+      room_id: null,
+      source_template_id: null,
+      source: 'telegram_mini',
+    });
+    if (!row || !row.id) {
+      return fail('db');
+    }
+    logActivity(
+      db,
+      req,
+      'homework_create',
+      'homework',
+      row.id,
+      { subject_id: subjectId, group_number: groupNumber, source: 'telegram_mini' },
+      courseId,
+      activeSemester.id
+    );
+    logAction(db, req, 'telegram_mini_homework_create', { homework_id: row.id, subject_id: subjectId, group_number: groupNumber });
+    return res.redirect(`${redirectBase}&ok=homework-created`);
+  } catch (err) {
+    console.error('Telegram mini homework create failed', err);
+    return fail('db');
   }
 });
 

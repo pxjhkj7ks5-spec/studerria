@@ -1063,6 +1063,7 @@
             <% } %>
             <% if (sectionAllowed('admin-homework')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-tg-homework">TG ДЗ</button>
             <% } %>
             <% if (sectionAllowed('admin-teamwork')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-teamwork">Teamwork</button>
@@ -2420,6 +2421,78 @@
                 <% }); %>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div id="admin-tg-homework" class="admin-panel" data-admin-title="Academics / TG ДЗ">
+          <% const tgHomeworkItems = (homework || []).filter(function(item) { return String(item.source || '') === 'telegram_mini'; }); %>
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                  <h5 class="card-title mb-1">TG ДЗ</h5>
+                  <div class="text-muted small">Домашні завдання, додані через Telegram mini app.</div>
+                </div>
+                <span class="badge bg-secondary"><%= tgHomeworkItems.length %></span>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-striped align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Предмет</th>
+                      <th>Група</th>
+                      <th>Дата / пара</th>
+                      <th>Автор</th>
+                      <th>Опис</th>
+                      <th>Файл / лінк</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (!tgHomeworkItems.length) { %>
+                      <tr>
+                        <td colspan="8" class="text-muted">Поки немає TG ДЗ.</td>
+                      </tr>
+                    <% } %>
+                    <% tgHomeworkItems.forEach(function(item) { %>
+                      <tr>
+                        <td><%= item.id %></td>
+                        <td><%= item.subject_name || item.subject %></td>
+                        <td><%= item.group_number || '—' %></td>
+                        <td>
+                          <%= item.class_date || item.day_of_week || item.day || '—' %>
+                          <% if (item.class_number) { %> · #<%= item.class_number %><% } %>
+                        </td>
+                        <td><%= item.created_by || '—' %></td>
+                        <td><%= item.description %></td>
+                        <td>
+                          <% if (item.file_path) { %>
+                            <a href="<%= item.file_path %>"><%= item.file_name || 'Download' %></a>
+                          <% } else if (item.link_url) { %>
+                            <a href="<%= item.link_url %>" target="_blank" rel="noopener">Link</a>
+                          <% } else { %>
+                            <span class="text-muted">—</span>
+                          <% } %>
+                        </td>
+                        <td>
+                          <form method="POST" action="/admin/homework/delete/<%= item.id %>">
+                            <button
+                              class="btn btn-sm btn-outline-danger"
+                              type="submit"
+                              data-confirm="Delete this TG homework item?"
+                              data-confirm-level="danger"
+                            >
+                              <%= t('admin.delete') %>
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
