@@ -335,9 +335,30 @@
       class_date: modal.querySelector('[data-tg-homework-field="class_date"]'),
       time: modal.querySelector('[data-tg-homework-field="time"]'),
     };
-    function closeModal() {
-      modal.hidden = true;
+    function lockPageScroll() {
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      modal.dataset.scrollY = String(scrollY);
+      document.body.style.top = `-${scrollY}px`;
+      document.documentElement.classList.add('is-tg-modal-open');
+      document.body.classList.add('is-tg-modal-open');
+    }
+    function unlockPageScroll() {
+      const scrollY = Number(modal.dataset.scrollY || 0);
       document.documentElement.classList.remove('is-tg-modal-open');
+      document.body.classList.remove('is-tg-modal-open');
+      document.body.style.top = '';
+      delete modal.dataset.scrollY;
+      if (typeof window.scrollTo === 'function') {
+        window.scrollTo(0, scrollY);
+      } else {
+        document.documentElement.scrollTop = scrollY;
+        document.body.scrollTop = scrollY;
+      }
+    }
+    function closeModal() {
+      if (modal.hidden) return;
+      modal.hidden = true;
+      unlockPageScroll();
     }
     function openModal(button) {
       if (!button) return;
@@ -365,7 +386,7 @@
         if (submit) submit.disabled = false;
       }
       modal.hidden = false;
-      document.documentElement.classList.add('is-tg-modal-open');
+      lockPageScroll();
       const textarea = modal.querySelector('textarea[name="description"]');
       if (textarea) window.setTimeout(() => textarea.focus(), 80);
     }
