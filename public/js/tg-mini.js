@@ -173,6 +173,7 @@
     window.scrollTo(0, 0);
     bindFastNavigation();
     bindTelegramLinkForms();
+    bindSubjectPickers();
     primeFastPages();
     applyTelegramChrome();
   }
@@ -235,6 +236,52 @@
     });
   }
 
+  function isSubjectCardReady(card) {
+    if (!card) return false;
+    if (card.querySelector('input[type="hidden"][name^="subject_"]')) return true;
+    if (card.querySelector('input[type="radio"][name^="subject_"]:checked')) return true;
+    if (card.querySelector('input[type="checkbox"][name^="optout_"]:checked')) return true;
+    return false;
+  }
+
+  function updateSubjectPickerState(form) {
+    const cards = Array.from(form.querySelectorAll('[data-tg-subject-card]'));
+    const total = cards.length;
+    const readyCount = cards.filter((card) => {
+      const ready = isSubjectCardReady(card);
+      card.classList.toggle('is-ready', ready);
+      card.classList.toggle('is-pending', !ready);
+      const status = card.querySelector('[data-tg-subject-status]');
+      if (status) {
+        status.classList.toggle('is-ready', ready);
+        status.classList.toggle('is-pending', !ready);
+        status.textContent = ready ? 'Готово' : 'Обрати';
+      }
+      return ready;
+    }).length;
+    const count = document.querySelector('[data-tg-subject-count]');
+    if (count && total) count.textContent = `${readyCount}/${total}`;
+    const progress = document.querySelector('[data-tg-subject-progress] span');
+    if (progress && total) progress.style.width = `${Math.round((readyCount / total) * 100)}%`;
+    const remaining = document.querySelector('[data-tg-subject-remaining]');
+    if (remaining && total) {
+      const missing = Math.max(0, total - readyCount);
+      remaining.textContent = missing ? `Залишилось обрати: ${missing}` : 'Усе готово.';
+    }
+  }
+
+  function bindSubjectPickers() {
+    document.querySelectorAll('[data-tg-subject-picker]').forEach((form) => {
+      if (form.dataset.tgSubjectPickerBound === '1') return;
+      form.dataset.tgSubjectPickerBound = '1';
+      form.addEventListener('change', (event) => {
+        if (!event.target || !event.target.matches('input[type="radio"], input[type="checkbox"]')) return;
+        updateSubjectPickerState(form);
+      });
+      updateSubjectPickerState(form);
+    });
+  }
+
   function primeFastPages() {
     const urls = new Map();
     document.querySelectorAll('a[href]').forEach((anchor) => {
@@ -276,6 +323,7 @@
   applyTelegramChrome();
   bindFastNavigation();
   bindTelegramLinkForms();
+  bindSubjectPickers();
   primeFastPages();
   syncTelegramSession();
 })();

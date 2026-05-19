@@ -1,12 +1,17 @@
 <div class="tg-subject-list">
   <% (registerSubjectCards || []).forEach(function(subject) { %>
-    <article class="tg-subject-card">
-      <div>
-        <h3><%= subject.name %></h3>
-        <p>
-          <%= subject.requiredFlag ? 'Обовʼязковий' : 'Вибірковий' %>
-          <%= subject.autoAssigned ? ' · група 1 автоматично' : (' · ' + subject.groupCount + ' групи') %>
-        </p>
+    <article class="tg-subject-card <%= subject.ready ? 'is-ready' : 'is-pending' %>" data-tg-subject-card>
+      <div class="tg-subject-card-head">
+        <div>
+          <h3><%= subject.name %></h3>
+          <p>
+            <%= subject.requiredFlag ? 'Обовʼязковий' : 'Вибірковий' %>
+            <%= subject.autoAssigned ? ' · автоматично' : (' · ' + subject.groupCount + ' групи') %>
+          </p>
+        </div>
+        <span class="tg-subject-status <%= subject.ready ? 'is-ready' : 'is-pending' %>" data-tg-subject-status>
+          <%= subject.ready ? 'Готово' : 'Обрати' %>
+        </span>
       </div>
       <% if (subject.autoAssigned) { %>
         <input type="hidden" name="subject_<%= subject.id %>" value="<%= subject.selectedGroup || 1 %>" />
@@ -36,6 +41,9 @@
     </article>
   <% }); %>
   <% if (!(registerSubjectCards || []).length) { %>
-    <p class="tg-muted">Предмети для цього курсу ще не підтягнулись. Поверніться до вибору курсу або спробуйте відкрити mini app ще раз.</p>
+    <div class="tg-empty-state">
+      <strong>Предмети ще не підтягнулись</strong>
+      <span>Поверніться до вибору курсу або відкрийте mini app ще раз.</span>
+    </div>
   <% } %>
 </div>

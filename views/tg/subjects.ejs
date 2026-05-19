@@ -1,5 +1,4 @@
 <section class="tg-page-head">
-  <p class="tg-kicker">Studerria</p>
   <h1>Предмети</h1>
   <p class="tg-muted">Оновіть групи для предметів, які формують ваш персональний розклад.</p>
 </section>
@@ -11,12 +10,33 @@
   <div class="tg-success">Вибір збережено.</div>
 <% } %>
 
-<section class="tg-card">
+<%
+  const subjectCards = registerSubjectCards || [];
+  const selectedSubjectsCount = subjectCards.filter(function(subject) { return subject && subject.ready; }).length;
+  const pendingSubjectsCount = subjectCards.filter(function(subject) { return subject && subject.pending; }).length;
+%>
+
+<section class="tg-card tg-register-card">
+  <div class="tg-card-head">
+    <div>
+      <h2>Групи предметів</h2>
+      <p class="tg-muted">Ці налаштування формують розклад і Teamwork.</p>
+    </div>
+    <% if (subjectCards.length) { %>
+      <span class="tg-count-badge" data-tg-subject-count><%= selectedSubjectsCount %>/<%= subjectCards.length %></span>
+    <% } %>
+  </div>
   <% if (subjectState && subjectState.scope && subjectState.scope.group_label) { %>
-    <p class="tg-muted"><%= subjectState.scope.group_label %></p>
+    <p class="tg-section-note"><%= subjectState.scope.group_label %></p>
   <% } %>
-  <form class="tg-form" method="POST" action="/studerria-tg/subjects">
-    <%- include('subject-picker', { registerSubjectCards }) %>
+  <% if (subjectCards.length) { %>
+    <div class="tg-progress-line" aria-label="Прогрес вибору предметів" data-tg-subject-progress>
+      <span style="width: <%= Math.round((selectedSubjectsCount / Math.max(1, subjectCards.length)) * 100) %>%"></span>
+    </div>
+    <p class="tg-inline-note" data-tg-subject-remaining><%= pendingSubjectsCount ? ('Залишилось обрати: ' + pendingSubjectsCount) : 'Усе готово.' %></p>
+  <% } %>
+  <form class="tg-form" method="POST" action="/studerria-tg/subjects" data-tg-subject-picker>
+    <%- include('subject-picker', { registerSubjectCards: subjectCards }) %>
     <button class="tg-primary" type="submit">Зберегти</button>
   </form>
 </section>

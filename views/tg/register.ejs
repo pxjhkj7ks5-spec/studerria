@@ -14,10 +14,29 @@
     db: 'Тимчасова помилка реєстрації.',
   };
   const registerError = errorMap[String(error || '')] || String(error || '');
+  const registerSubjects = registerSubjectCards || [];
+  const selectedSubjectsCount = registerSubjects.filter(function(subject) { return subject && subject.ready; }).length;
+  const pendingSubjectsCount = registerSubjects.filter(function(subject) { return subject && subject.pending; }).length;
+  const courseList = courseOptions || groups || [];
+  const actorLabel = pendingUser
+    ? pendingUser.full_name
+    : (telegramUser && telegramUser.id ? (suggestedName || ('Telegram ' + telegramUser.id)) : '');
+  const actorParts = String(actorLabel || 'Studerria')
+    .split(/\s+/)
+    .filter(Boolean);
+  const actorInitials = actorParts
+    .slice(0, 2)
+    .map(function(part) { return part.charAt(0).toUpperCase(); })
+    .join('') || 'S';
 %>
-<section class="tg-page-head">
+<section class="tg-page-head tg-register-head">
   <p class="tg-kicker">Studerria</p>
-  <h1>Старт у Telegram</h1>
+  <h1>Реєстрація</h1>
+  <p class="tg-muted">Підключаємо Telegram до студентського простору.</p>
+  <div class="tg-stepper" aria-label="Кроки реєстрації">
+    <span class="<%= currentStep === 'course' ? 'is-active' : '' %>">Курс</span>
+    <span class="<%= currentStep === 'subjects' ? 'is-active' : '' %>">Предмети</span>
+  </div>
 </section>
 
 <% if (registerError) { %>
@@ -25,19 +44,32 @@
 <% } %>
 
 <% if (currentStep === 'course') { %>
-  <section class="tg-card">
-    <h2>Оберіть курс</h2>
-    <% if (pendingUser) { %>
-      <p class="tg-muted"><%= pendingUser.full_name %></p>
-    <% } else if (telegramUser && telegramUser.id) { %>
-      <p class="tg-muted">Акаунт буде створено для <%= suggestedName || ('Telegram ' + telegramUser.id) %><%= telegramUser.username ? ' (@' + telegramUser.username + ')' : '' %>.</p>
-    <% } else { %>
-      <p class="tg-muted">Чекаємо Telegram авторизацію. Якщо сторінка не продовжить автоматично, відкрийте її з кнопки mini app у Telegram.</p>
-    <% } %>
+  <section class="tg-card tg-register-card">
+    <div class="tg-card-head">
+      <div>
+        <h2>Оберіть курс</h2>
+        <p class="tg-muted">Вибір визначить ваш розклад, предмети й Teamwork.</p>
+      </div>
+    </div>
+    <div class="tg-account-chip">
+      <div class="tg-account-avatar" aria-hidden="true"><%= actorInitials %></div>
+      <div>
+        <% if (pendingUser) { %>
+          <strong><%= pendingUser.full_name %></strong>
+          <span>Профіль уже створено</span>
+        <% } else if (telegramUser && telegramUser.id) { %>
+          <strong><%= suggestedName || ('Telegram ' + telegramUser.id) %></strong>
+          <span><%= telegramUser.username ? '@' + telegramUser.username : 'Telegram авторизовано' %></span>
+        <% } else { %>
+          <strong>Очікуємо Telegram</strong>
+          <span>Відкрийте сторінку через кнопку mini app у Telegram.</span>
+        <% } %>
+      </div>
+    </div>
     <form class="tg-form" method="POST" action="/studerria-tg/register">
       <input type="hidden" name="action" value="course" />
       <div class="tg-choice-list">
-        <% (courseOptions || groups || []).forEach(function(group) { %>
+        <% courseList.forEach(function(group) { %>
           <%
             const courseMeta = group.course_meta || (group.track_key + ' · ' + group.campus_key + ' · ' + group.visible_subject_count + ' предметів');
             const courseMetaParts = String(courseMeta || '').split(' · ').map(function(part) { return part.trim(); }).filter(Boolean);
@@ -55,22 +87,41 @@
           </label>
         <% }); %>
       </div>
-      <% if (!((courseOptions || groups || []).length)) { %>
-        <p class="tg-muted">Курси для реєстрації ще не налаштовані.</p>
+      <% if (!courseList.length) { %>
+        <div class="tg-empty-state">
+          <strong>Курси ще не налаштовані</strong>
+          <span>Спробуйте відкрити mini app пізніше.</span>
+        </div>
       <% } %>
-      <button class="tg-primary" type="submit" <%= !((courseOptions || groups || []).length) ? 'disabled' : '' %>>Продовжити</button>
+      <button class="tg-primary" type="submit" <%= !courseList.length ? 'disabled' : '' %>>Продовжити</button>
     </form>
   </section>
 <% } %>
 
 <% if (currentStep === 'subjects') { %>
-  <section class="tg-card">
-    <h2>Групи предметів</h2>
-    <p class="tg-muted">Оберіть групу окремо для кожного предмета, як у звичайній реєстрації Studerria.</p>
-    <form class="tg-form" method="POST" action="/studerria-tg/register">
+  <section class="tg-card tg-register-card">
+    <div class="tg-card-head">
+      <div>
+        <h2>Групи предметів</h2>
+        <p class="tg-muted">Оберіть групу окремо для кожного предмета.</p>
+      </div>
+      <% if (registerSubjects.length) { %>
+        <span class="tg-count-badge" data-tg-subject-count><%= selectedSubjectsCount %>/<%= registerSubjects.length %></span>
+      <% } %>
+    </div>
+    <% if (subjectState && subjectState.scope && subjectState.scope.group_label) { %>
+      <p class="tg-section-note"><%= subjectState.scope.group_label %></p>
+    <% } %>
+    <% if (registerSubjects.length) { %>
+      <div class="tg-progress-line" aria-label="Прогрес вибору предметів" data-tg-subject-progress>
+        <span style="width: <%= Math.round((selectedSubjectsCount / Math.max(1, registerSubjects.length)) * 100) %>%"></span>
+      </div>
+      <p class="tg-inline-note" data-tg-subject-remaining><%= pendingSubjectsCount ? ('Залишилось обрати: ' + pendingSubjectsCount) : 'Усе готово.' %></p>
+    <% } %>
+    <form class="tg-form" method="POST" action="/studerria-tg/register" data-tg-subject-picker>
       <input type="hidden" name="action" value="subjects" />
-      <%- include('subject-picker', { registerSubjectCards }) %>
-      <% if (!(registerSubjectCards || []).length) { %>
+      <%- include('subject-picker', { registerSubjectCards: registerSubjects }) %>
+      <% if (!registerSubjects.length) { %>
         <a class="tg-secondary" href="/studerria-tg/register?step=course">Назад до вибору курсу</a>
       <% } else { %>
         <button class="tg-primary" type="submit">Завершити</button>
