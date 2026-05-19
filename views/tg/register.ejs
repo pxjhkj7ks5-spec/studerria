@@ -66,8 +66,9 @@
         <% } %>
       </div>
     </div>
-    <form class="tg-form" method="POST" action="/studerria-tg/register">
+    <form class="tg-form" method="POST" action="/studerria-tg/register" data-tg-register-form>
       <input type="hidden" name="action" value="course" />
+      <input type="hidden" name="initData" data-tg-init-data value="" />
       <div class="tg-choice-list">
         <% courseList.forEach(function(group) { %>
           <%
@@ -118,8 +119,9 @@
       </div>
       <p class="tg-inline-note" data-tg-subject-remaining><%= pendingSubjectsCount ? ('Залишилось обрати: ' + pendingSubjectsCount) : 'Усе готово.' %></p>
     <% } %>
-    <form class="tg-form" method="POST" action="/studerria-tg/register" data-tg-subject-picker>
+    <form class="tg-form" method="POST" action="/studerria-tg/register" data-tg-subject-picker data-tg-register-form>
       <input type="hidden" name="action" value="subjects" />
+      <input type="hidden" name="initData" data-tg-init-data value="" />
       <%- include('subject-picker', { registerSubjectCards: registerSubjects }) %>
       <% if (!registerSubjects.length) { %>
         <a class="tg-secondary" href="/studerria-tg/register?step=course">Назад до вибору курсу</a>

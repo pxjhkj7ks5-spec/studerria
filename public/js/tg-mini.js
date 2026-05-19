@@ -9,6 +9,7 @@
   ]);
   const pageCache = new Map();
   let activeNavigationRequest = null;
+  let telegramSessionSyncPromise = null;
   const systemDarkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
   function colorIsDark(rawColor) {
@@ -65,8 +66,10 @@
     return isEntryPath(window.location.pathname || state.currentPath || '');
   }
 
-  async function syncTelegramSession() {
-    if (!shouldSyncTelegramSession()) return;
+  function syncTelegramSession() {
+    if (!shouldSyncTelegramSession()) return Promise.resolve(null);
+    if (telegramSessionSyncPromise) return telegramSessionSyncPromise;
+    telegramSessionSyncPromise = (async () => {
     try {
       const response = await fetch('/studerria-tg/auth/init', {
         method: 'POST',
@@ -75,31 +78,35 @@
         body: JSON.stringify({ initData: tg.initData }),
       });
       const data = await response.json().catch(() => null);
-      if (!data || !data.redirect) return;
+      if (!data || !data.redirect) return data;
       const currentPath = window.location.pathname || '';
       const shouldEnterApp = isEntryPath(currentPath);
       if (data.status === 'authenticated' && shouldEnterApp && currentPath !== data.redirect) {
+        data.redirecting = true;
         window.location.replace(data.redirect);
-        return;
+        return data;
       }
       if (data.status === 'link_required') {
         const redirectUrl = new URL(data.redirect, window.location.origin);
         const currentSearch = window.location.search || '';
         if (currentPath !== redirectUrl.pathname || currentSearch !== redirectUrl.search) {
+          data.redirecting = true;
           window.location.replace(data.redirect);
-          return;
-        }
-        if (currentPath === '/studerria-tg/register' && !sessionStorage.getItem('studerriaTgRegisterSynced')) {
-          sessionStorage.setItem('studerriaTgRegisterSynced', '1');
-          window.location.reload();
+          return data;
         }
       }
       if (data.ok === false && data.error) {
         document.documentElement.dataset.tgAuthError = data.error;
       }
+      return data;
     } catch (_error) {
       document.documentElement.dataset.tgAuthError = 'network';
+      return null;
+    } finally {
+      telegramSessionSyncPromise = null;
     }
+    })();
+    return telegramSessionSyncPromise;
   }
 
   function getFastUrl(href) {
@@ -173,6 +180,7 @@
     window.scrollTo(0, 0);
     bindFastNavigation();
     bindTelegramLinkForms();
+    bindRegisterForms();
     bindSubjectPickers();
     primeFastPages();
     applyTelegramChrome();
@@ -231,6 +239,35 @@
         if (status) {
           status.hidden = false;
           status.textContent = 'Telegram не передав дані для привʼязки. Закрийте mini app і відкрийте його з Telegram ще раз.';
+        }
+      });
+    });
+  }
+
+  function fillTelegramInitData(form) {
+    const initDataInput = form.querySelector('[data-tg-init-data]');
+    if (initDataInput && tg && tg.initData) initDataInput.value = tg.initData;
+  }
+
+  function bindRegisterForms() {
+    document.querySelectorAll('[data-tg-register-form]').forEach((form) => {
+      if (form.dataset.tgRegisterBound === '1') return;
+      form.dataset.tgRegisterBound = '1';
+      form.addEventListener('submit', async (event) => {
+        fillTelegramInitData(form);
+        if (!shouldSyncTelegramSession() || form.dataset.tgRegisterSynced === '1') return;
+        event.preventDefault();
+        const submitter = event.submitter || form.querySelector('button[type="submit"]');
+        if (submitter) submitter.disabled = true;
+        const syncResult = await syncTelegramSession();
+        if (syncResult && syncResult.redirecting) return;
+        fillTelegramInitData(form);
+        form.dataset.tgRegisterSynced = '1';
+        if (submitter) submitter.disabled = false;
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit(submitter || undefined);
+        } else {
+          form.submit();
         }
       });
     });
@@ -323,6 +360,7 @@
   applyTelegramChrome();
   bindFastNavigation();
   bindTelegramLinkForms();
+  bindRegisterForms();
   bindSubjectPickers();
   primeFastPages();
   syncTelegramSession();

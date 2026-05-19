@@ -24322,11 +24322,26 @@ app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     if (action === 'course') {
-      const telegramUser = getTelegramMiniPendingUser(req);
+      let telegramUser = getTelegramMiniPendingUser(req);
+      if (!telegramUser && req.body && req.body.initData) {
+        try {
+          telegramUser = await validateTelegramMiniInitData(req);
+          setTelegramMiniPending(req, telegramUser);
+        } catch (_telegramErr) {
+          telegramUser = null;
+        }
+      }
       if (!telegramUser) {
         return res.redirect('/studerria-tg/register?step=course&error=telegram-required');
       }
       let userId = Number(req.session.pendingUserId || 0);
+      if (!userId) {
+        const linkedUser = await findUserByTelegramId(telegramUser.id);
+        if (linkedUser && linkedUser.id) {
+          req.session.pendingUserId = Number(linkedUser.id || 0);
+          userId = Number(linkedUser.id || 0);
+        }
+      }
       const pendingUser = Number.isInteger(userId) && userId > 0
         ? await db.get(
           `SELECT id, full_name, role, schedule_group, course_id, group_id, language, telegram_id, ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
@@ -24378,7 +24393,20 @@ app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
     }
 
     if (action === 'subjects') {
-      const userId = Number(req.session.pendingUserId || 0);
+      let userId = Number(req.session.pendingUserId || 0);
+      if ((!Number.isInteger(userId) || userId < 1) && req.body && req.body.initData) {
+        try {
+          const telegramUser = await validateTelegramMiniInitData(req);
+          setTelegramMiniPending(req, telegramUser);
+          const linkedUser = await findUserByTelegramId(telegramUser.id);
+          if (linkedUser && linkedUser.id) {
+            req.session.pendingUserId = Number(linkedUser.id || 0);
+            userId = Number(linkedUser.id || 0);
+          }
+        } catch (_telegramErr) {
+          userId = 0;
+        }
+      }
       if (!Number.isInteger(userId) || userId < 1) return res.redirect('/studerria-tg/register?step=course');
       try {
         await saveTelegramMiniSubjectChoices(req, userId);
