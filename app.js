@@ -20569,23 +20569,72 @@ function normalizeStuderriaTelegramFreeText(value = '') {
     .replace(/\s+/g, ' ');
 }
 
-function isStuderriaTelegramTomorrowScheduleQuestion(message = {}) {
+const STUDERRIA_TG_SCHEDULE_TARGETS = [
+  { aliases: ['сьогодні'], kind: 'offset', offsetDays: 0, titleLabel: 'сьогодні', emptyLabel: 'На сьогодні пар не знайшов.' },
+  { aliases: ['завтра'], kind: 'offset', offsetDays: 1, titleLabel: 'завтра', emptyLabel: 'На завтра пар не знайшов.' },
+  { aliases: ['понеділок', 'понеділка'], kind: 'weekday', dayName: 'Monday', titleLabel: 'понеділок', emptyLabel: 'На понеділок пар не знайшов.' },
+  { aliases: ['вівторок', 'вівторка'], kind: 'weekday', dayName: 'Tuesday', titleLabel: 'вівторок', emptyLabel: 'На вівторок пар не знайшов.' },
+  { aliases: ['середа', 'середу', 'середи'], kind: 'weekday', dayName: 'Wednesday', titleLabel: 'середу', emptyLabel: 'На середу пар не знайшов.' },
+  { aliases: ['четвер', 'четверга'], kind: 'weekday', dayName: 'Thursday', titleLabel: 'четвер', emptyLabel: 'На четвер пар не знайшов.' },
+  {
+    aliases: ['п\'ятниця', 'п\'ятницю', 'п\'ятниці', 'пятниця', 'пятницю', 'пятниці'],
+    kind: 'weekday',
+    dayName: 'Friday',
+    titleLabel: 'пʼятницю',
+    emptyLabel: 'На пʼятницю пар не знайшов.',
+  },
+  { aliases: ['субота', 'суботу', 'суботи'], kind: 'weekday', dayName: 'Saturday', titleLabel: 'суботу', emptyLabel: 'На суботу пар не знайшов.' },
+  { aliases: ['неділя', 'неділю', 'неділі'], kind: 'weekday', dayName: 'Sunday', titleLabel: 'неділю', emptyLabel: 'На неділю пар не знайшов.' },
+];
+const STUDERRIA_TG_SCHEDULE_TARGET_BY_ALIAS = new Map(
+  STUDERRIA_TG_SCHEDULE_TARGETS.flatMap((target) => target.aliases.map((alias) => [alias, target]))
+);
+const STUDERRIA_TG_SCHEDULE_TARGET_PATTERN = Array.from(STUDERRIA_TG_SCHEDULE_TARGET_BY_ALIAS.keys())
+  .sort((left, right) => right.length - left.length)
+  .map((alias) => alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  .join('|');
+const STUDERRIA_TG_SCHEDULE_QUESTION_PATTERNS = [
+  new RegExp(`^(?:що|шо)(?: (?:в|у) мене)?(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
+  new RegExp(`^які(?: (?:в|у) мене)? пари(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
+  new RegExp(`^розклад(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
+  new RegExp(`^пари(?: (?:на|в|у))? (${STUDERRIA_TG_SCHEDULE_TARGET_PATTERN})$`),
+];
+
+function getStuderriaTelegramNextWeekdayDate(dayName = '') {
+  const todayIso = getStuderriaTelegramKyivDateWithOffset(0);
+  const todayDayName = getDayNameFromDate(todayIso);
+  const todayIndex = fullWeekDays.indexOf(todayDayName);
+  const targetIndex = fullWeekDays.indexOf(dayName);
+  if (todayIndex === -1 || targetIndex === -1) return null;
+  let offsetDays = (targetIndex - todayIndex + 7) % 7;
+  if (offsetDays === 0) offsetDays = 7;
+  return getStuderriaTelegramKyivDateWithOffset(offsetDays);
+}
+
+function buildStuderriaTelegramScheduleQuestionTarget(target = null) {
+  if (!target) return null;
+  const dateIso = target.kind === 'weekday'
+    ? getStuderriaTelegramNextWeekdayDate(target.dayName)
+    : getStuderriaTelegramKyivDateWithOffset(target.offsetDays);
+  if (!dateIso) return null;
+  return {
+    dateIso,
+    titleLabel: target.titleLabel,
+    emptyLabel: target.emptyLabel,
+  };
+}
+
+function parseStuderriaTelegramScheduleQuestionTarget(message = {}) {
   const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
-  if (!text || text.startsWith('/')) return false;
-  return [
-    'що в мене завтра',
-    'що у мене завтра',
-    'шо в мене завтра',
-    'шо у мене завтра',
-    'що завтра',
-    'які пари завтра',
-    'які в мене пари завтра',
-    'які у мене пари завтра',
-    'розклад завтра',
-    'розклад на завтра',
-    'пари завтра',
-    'пари на завтра',
-  ].includes(text);
+  if (!text || text.startsWith('/')) return null;
+  for (const pattern of STUDERRIA_TG_SCHEDULE_QUESTION_PATTERNS) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    return buildStuderriaTelegramScheduleQuestionTarget(
+      STUDERRIA_TG_SCHEDULE_TARGET_BY_ALIAS.get(match[1])
+    );
+  }
+  return null;
 }
 
 const STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES = new Map([
@@ -20709,10 +20758,11 @@ function buildStuderriaTelegramScheduleRowLine(row = {}, displayBellSchedule = b
   return meta ? `${head}\n   ${meta}` : head;
 }
 
-async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
+async function sendStuderriaTelegramScheduleForQuestion(message = {}, target = null) {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
   if (!chatId) return false;
+  if (!target || !target.dateIso) return false;
 
   const context = await getStuderriaTelegramActorContext(message.from || {});
   if (!context.actor) {
@@ -20721,10 +20771,11 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
   }
 
   const userId = Number(context.actor.id || 0);
-  const tomorrowIso = getStuderriaTelegramKyivDateWithOffset(1);
-  const dayName = getDayNameFromDate(tomorrowIso);
+  const targetIso = target.dateIso;
+  const targetLabel = target.titleLabel || 'день';
+  const dayName = getDayNameFromDate(targetIso);
   const dayLabel = getStuderriaTelegramFullDayLabel(dayName);
-  const dateLabel = formatStuderriaTelegramDateLabel(tomorrowIso);
+  const dateLabel = formatStuderriaTelegramDateLabel(targetIso);
 
   try {
     const baseState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
@@ -20736,7 +20787,7 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
       await sendStuderriaTelegramMessage(
         chatId,
         [
-          `Розклад на завтра (${dayLabel}, ${dateLabel})`,
+          `Розклад на ${targetLabel} (${dayLabel}, ${dateLabel})`,
           '',
           'Не знайшов активний семестр або групу для твого акаунта.',
           'Відкрий mini app, перевір профіль і вибрані предмети.',
@@ -20747,7 +20798,7 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
     }
 
     const totalWeeks = Math.max(1, Number(baseState.term.weeks_count || 0) || 16);
-    let weekNumber = getAcademicWeekForSemester(new Date(`${tomorrowIso}T12:00:00Z`), baseState.term);
+    let weekNumber = getAcademicWeekForSemester(new Date(`${targetIso}T12:00:00Z`), baseState.term);
     if (weekNumber < 1) weekNumber = 1;
     if (weekNumber > totalWeeks) weekNumber = totalWeeks;
 
@@ -20767,12 +20818,12 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
       );
 
     const lines = [
-      `Розклад на завтра (${dayLabel}, ${dateLabel})`,
+      `Розклад на ${targetLabel} (${dayLabel}, ${dateLabel})`,
       `Тиждень ${weekNumber}`,
       '',
     ];
     if (!rows.length) {
-      lines.push('На завтра пар не знайшов.');
+      lines.push(target.emptyLabel || `На ${targetLabel} пар не знайшов.`);
       lines.push('Якщо розклад щойно оновлювали, перевір ще mini app.');
     } else {
       rows.forEach((row) => {
@@ -20784,10 +20835,10 @@ async function sendStuderriaTelegramTomorrowSchedule(message = {}) {
       replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || ''),
     });
   } catch (err) {
-    console.error('Studerria Telegram tomorrow schedule failed', err);
+    console.error('Studerria Telegram schedule question failed', err);
     await sendStuderriaTelegramMessage(
       chatId,
-      'Не зміг зараз підтягнути розклад на завтра. Спробуй ще раз трохи пізніше або відкрий розклад у mini app.',
+      `Не зміг зараз підтягнути розклад на ${targetLabel}. Спробуй ще раз трохи пізніше або відкрий розклад у mini app.`,
       { sourceMessage: message, replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || '') }
     );
   }
@@ -23929,8 +23980,9 @@ async function handleStuderriaTelegramBotUpdate(update) {
       await handleStuderriaTelegramAuthorizedPhraseReply(message, authorizedPhraseReply);
       return;
     }
-    if (isStuderriaTelegramTomorrowScheduleQuestion(message)) {
-      await sendStuderriaTelegramTomorrowSchedule(message);
+    const scheduleQuestionTarget = parseStuderriaTelegramScheduleQuestionTarget(message);
+    if (scheduleQuestionTarget) {
+      await sendStuderriaTelegramScheduleForQuestion(message, scheduleQuestionTarget);
       return;
     }
     const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
