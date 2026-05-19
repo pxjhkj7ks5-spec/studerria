@@ -182,6 +182,7 @@
     bindTelegramLinkForms();
     bindRegisterForms();
     bindSubjectPickers();
+    bindFileInputs();
     bindScheduleHomeworkModal();
     bindScheduleHomeworkViewModal();
     primeFastPages();
@@ -321,6 +322,27 @@
     });
   }
 
+  function updateFileInputLabel(input) {
+    if (!input) return;
+    const label = input.closest('.tg-file-label');
+    const name = label ? label.querySelector('[data-tg-file-name]') : null;
+    if (!name) return;
+    const file = input.files && input.files.length ? input.files[0] : null;
+    name.textContent = file && file.name ? file.name : 'Файл не вибрано';
+  }
+
+  function bindFileInputs() {
+    document.querySelectorAll('[data-tg-file-input]').forEach((input) => {
+      if (input.dataset.tgFileInputBound === '1') {
+        updateFileInputLabel(input);
+        return;
+      }
+      input.dataset.tgFileInputBound = '1';
+      input.addEventListener('change', () => updateFileInputLabel(input));
+      updateFileInputLabel(input);
+    });
+  }
+
   function getCurrentScrollY() {
     return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
   }
@@ -395,6 +417,7 @@
       }
       if (form) {
         form.reset();
+        form.querySelectorAll('[data-tg-file-input]').forEach((input) => updateFileInputLabel(input));
         Object.keys(fields).forEach((key) => {
           if (!fields[key]) return;
           const dataKey = key.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
@@ -604,6 +627,7 @@
   bindTelegramLinkForms();
   bindRegisterForms();
   bindSubjectPickers();
+  bindFileInputs();
   bindScheduleHomeworkModal();
   bindScheduleHomeworkViewModal();
   primeFastPages();

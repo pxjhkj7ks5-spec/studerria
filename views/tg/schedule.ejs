@@ -117,9 +117,13 @@
         <span>Опис ДЗ</span>
         <textarea name="description" rows="4" maxlength="1200" placeholder="Що треба зробити?" required></textarea>
       </label>
-      <label>
+      <label class="tg-file-label">
         <span>Файл</span>
-        <input name="attachment" type="file" />
+        <span class="tg-file-control">
+          <input class="tg-file-input" name="attachment" type="file" data-tg-file-input />
+          <span class="tg-file-button">Завантажити файл</span>
+          <span class="tg-file-name" data-tg-file-name>Файл не вибрано</span>
+        </span>
       </label>
       <label>
         <span>Лінк</span>
