@@ -20311,6 +20311,9 @@ async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
   if (options.replyMarkup) {
     payload.reply_markup = options.replyMarkup;
   }
+  if (options.parseMode) {
+    payload.parse_mode = String(options.parseMode);
+  }
   try {
     return await callStuderriaTelegramBotApi('sendMessage', payload);
   } catch (err) {
@@ -20957,10 +20960,17 @@ function canStuderriaTelegramHomeworkRowShowForSubject(row = {}, subject = {}, a
   return isGeneral || !rowGroup || rowGroup === selectedGroup;
 }
 
+function escapeStuderriaTelegramHtml(text = '') {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function buildStuderriaTelegramHomeworkRowLine(row = {}) {
   const classNumber = Number(row.class_number || 0);
   const subjectName = sanitizeCompactText(row.subject_name || row.subject || 'Предмет', 120);
-  const description = sanitizeCompactText(row.description || 'ДЗ без опису', 420);
+  const description = sanitizeCompactText(row.description || 'ДЗ без опису', 360);
   const author = sanitizeCompactText(row.created_by || row.created_by_name || '', 120);
   const dayLabel = getStuderriaTelegramFullDayLabel(normalizeWeekdayName(row.day_of_week || row.day));
   const dateLabel = formatStuderriaTelegramDateLabel(toDateOnly(row.class_date));
@@ -20970,16 +20980,34 @@ function buildStuderriaTelegramHomeworkRowLine(row = {}) {
     dateLabel || '',
   ].filter(Boolean).join(' · ');
   const lines = [
-    `${subjectName}${meta ? ` (${meta})` : ''}`,
-    description,
+    `📚 <b>Предмет:</b> <b>${escapeStuderriaTelegramHtml(subjectName)}</b>`,
+    meta ? `   ${escapeStuderriaTelegramHtml(meta)}` : '',
+    `📝 <b>Домашнє завдання:</b>`,
+    `<b>${escapeStuderriaTelegramHtml(description)}</b>`,
   ];
   if (author) {
-    lines.push(`Додав: ${author}`);
+    lines.push(`Додав: ${escapeStuderriaTelegramHtml(author)}`);
   }
   if (row.file_path || row.link_url) {
     lines.push('Файл або лінк можна переглянути в mini app бота.');
   }
-  return lines.join('\n');
+  return lines.filter(Boolean).join('\n');
+}
+
+function appendStuderriaTelegramHomeworkRows(lines = [], rows = [], maxLength = 3800) {
+  let visibleCount = 0;
+  for (const row of rows) {
+    const rowText = buildStuderriaTelegramHomeworkRowLine(row);
+    const nextLines = [
+      ...lines,
+      visibleCount > 0 ? '' : null,
+      rowText,
+    ].filter((line) => line !== null);
+    if (nextLines.join('\n').length > maxLength) break;
+    lines.splice(0, lines.length, ...nextLines);
+    visibleCount += 1;
+  }
+  return visibleCount;
 }
 
 async function sendStuderriaTelegramHomeworkForQuestion(message = {}, target = null) {
@@ -21052,24 +21080,22 @@ async function sendStuderriaTelegramHomeworkForQuestion(message = {}, target = n
       })
       .slice(0, 12);
     const lines = [
-      `ДЗ на ${targetLabel} (${dayLabel}, ${dateLabel})`,
+      `<b>ДЗ на ${escapeStuderriaTelegramHtml(targetLabel)} (${escapeStuderriaTelegramHtml(dayLabel)}, ${escapeStuderriaTelegramHtml(dateLabel)})</b>`,
       '',
     ];
     if (!visibleRows.length) {
       lines.push(`На ${targetLabel} ДЗ не знайшов.`);
       lines.push('Якщо ДЗ щойно додали, перевір mini app.');
     } else {
-      visibleRows.forEach((row, index) => {
-        if (index > 0) lines.push('');
-        lines.push(buildStuderriaTelegramHomeworkRowLine(row));
-      });
-      if ((rows || []).length > visibleRows.length) {
+      const renderedCount = appendStuderriaTelegramHomeworkRows(lines, visibleRows);
+      if ((rows || []).length > renderedCount || visibleRows.length > renderedCount) {
         lines.push('');
         lines.push('Більше ДЗ можна переглянути в mini app бота.');
       }
     }
-    await sendStuderriaTelegramMessage(chatId, lines.join('\n').slice(0, 3900), {
+    await sendStuderriaTelegramMessage(chatId, lines.join('\n'), {
       sourceMessage: message,
+      parseMode: 'HTML',
       replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || ''),
     });
   } catch (err) {
