@@ -21294,7 +21294,9 @@ function formatStuderriaTelegramNotificationResult(result = {}) {
 }
 
 const STUDERRIA_TG_MANUAL_NOTIFICATION_TTL_MS = 10 * 60 * 1000;
+const STUDERRIA_TG_STAROSTA_NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000;
 const studerriaTelegramManualNotificationStore = new Map();
+const studerriaTelegramStarostaNotificationCooldownStore = new Map();
 
 function pruneStuderriaTelegramManualNotificationStore(now = Date.now()) {
   for (const [key, item] of studerriaTelegramManualNotificationStore.entries()) {
@@ -21304,8 +21306,65 @@ function pruneStuderriaTelegramManualNotificationStore(now = Date.now()) {
   }
 }
 
+function pruneStuderriaTelegramStarostaNotificationCooldownStore(now = Date.now()) {
+  for (const [key, expiresAt] of studerriaTelegramStarostaNotificationCooldownStore.entries()) {
+    if (Number(expiresAt || 0) <= now) {
+      studerriaTelegramStarostaNotificationCooldownStore.delete(key);
+    }
+  }
+}
+
 function canUseStuderriaTelegramManualNotification(context = {}) {
   return Boolean(context && (context.isDev || (context.roleKeys || []).includes('starosta')));
+}
+
+function getStuderriaTelegramStarostaNotificationCooldownKey(context = {}) {
+  const actorId = parsePositiveIntStrict(context.actor && context.actor.id);
+  return actorId ? `starosta:${actorId}` : '';
+}
+
+function getStuderriaTelegramStarostaNotificationCooldown(context = {}, now = Date.now()) {
+  if (context.isDev || !Array.isArray(context.roleKeys) || !context.roleKeys.includes('starosta')) {
+    return { limited: false, retryAfterMs: 0 };
+  }
+  pruneStuderriaTelegramStarostaNotificationCooldownStore(now);
+  const key = getStuderriaTelegramStarostaNotificationCooldownKey(context);
+  const expiresAt = key ? Number(studerriaTelegramStarostaNotificationCooldownStore.get(key) || 0) : 0;
+  const retryAfterMs = expiresAt > now ? expiresAt - now : 0;
+  return { limited: retryAfterMs > 0, retryAfterMs };
+}
+
+function markStuderriaTelegramStarostaNotificationCooldown(context = {}, now = Date.now()) {
+  if (context.isDev || !Array.isArray(context.roleKeys) || !context.roleKeys.includes('starosta')) return;
+  const key = getStuderriaTelegramStarostaNotificationCooldownKey(context);
+  if (!key) return;
+  pruneStuderriaTelegramStarostaNotificationCooldownStore(now);
+  studerriaTelegramStarostaNotificationCooldownStore.set(
+    key,
+    now + STUDERRIA_TG_STAROSTA_NOTIFICATION_COOLDOWN_MS
+  );
+}
+
+async function refreshStuderriaTelegramManualNotificationContext(message = {}, pending = {}) {
+  const currentContext = await loadStuderriaTelegramManualNotificationContext(message.from || {});
+  if (currentContext.error) {
+    return { ok: false, context: currentContext, reason: currentContext.error };
+  }
+  const pendingActorTelegramId = pending.context && pending.context.actorTelegramId
+    ? pending.context.actorTelegramId
+    : '';
+  if (pendingActorTelegramId && pendingActorTelegramId !== currentContext.actorTelegramId) {
+    return { ok: false, context: currentContext, reason: 'Це сповіщення почав інший користувач.' };
+  }
+  const target = pending.target || {};
+  if (target.type === 'all_global' && !currentContext.isDev) {
+    return { ok: false, context: currentContext, reason: 'Глобальна розсилка доступна тільки dev.' };
+  }
+  const targetCourseId = parsePositiveIntStrict(target.courseId);
+  if (!currentContext.isDev && targetCourseId && targetCourseId !== currentContext.courseId) {
+    return { ok: false, context: currentContext, reason: 'Starosta може надсилати тільки в межах свого курсу.' };
+  }
+  return { ok: true, context: currentContext, reason: '' };
 }
 
 async function loadStuderriaTelegramManualNotificationContext(telegramUser = {}) {
@@ -21769,7 +21828,23 @@ async function handleStuderriaTelegramManualNotificationMessage(message = {}) {
     return true;
   }
   try {
-    const result = await sendStuderriaTelegramManualNotification(pending.target, pending.context, notificationText);
+    const refreshed = await refreshStuderriaTelegramManualNotificationContext(message, pending);
+    if (!refreshed.ok) {
+      await sendStuderriaTelegramMessage(chatId, refreshed.reason || 'Недостатньо прав для цієї розсилки.', { sourceMessage: message });
+      return true;
+    }
+    const cooldown = getStuderriaTelegramStarostaNotificationCooldown(refreshed.context);
+    if (cooldown.limited) {
+      const retrySeconds = Math.max(1, Math.ceil(Number(cooldown.retryAfterMs || 0) / 1000));
+      await sendStuderriaTelegramMessage(
+        chatId,
+        `Для starosta розсилки мають паузу. Спробуй ще раз приблизно через ${retrySeconds} с.`,
+        { sourceMessage: message }
+      );
+      return true;
+    }
+    const result = await sendStuderriaTelegramManualNotification(pending.target, refreshed.context, notificationText);
+    markStuderriaTelegramStarostaNotificationCooldown(refreshed.context);
     const confirmation = result.reason === 'no_recipients'
       ? 'Сповіщення не надіслано: немає отримувачів з привʼязаним Telegram.'
       : `Сповіщення надіслано в особисті: ${result.sent}/${result.recipients}.`;
@@ -21939,10 +22014,19 @@ async function handleStuderriaTelegramDevUsersCommand(message = {}) {
 }
 
 async function handleStuderriaTelegramGiveRoleCommand(message = {}, parsedCommand = {}) {
+  const chat = message && message.chat ? message.chat : null;
   const chatId = message && message.chat ? message.chat.id : null;
   if (!chatId) return;
   if (!isStuderriaTelegramDevUser(message.from || {})) {
     await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
+    return;
+  }
+  if (!isStuderriaTelegramPrivateChat(chat)) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Це dev-команда. Для зміни ролей напиши її в приватному чаті з ботом.',
+      { sourceMessage: message }
+    );
     return;
   }
   const args = String(parsedCommand.args || '').trim().split(/\s+/).filter(Boolean);
@@ -21991,10 +22075,19 @@ async function handleStuderriaTelegramGiveRoleCommand(message = {}, parsedComman
 }
 
 async function handleStuderriaTelegramRemoveRoleCommand(message = {}, parsedCommand = {}) {
+  const chat = message && message.chat ? message.chat : null;
   const chatId = message && message.chat ? message.chat.id : null;
   if (!chatId) return;
   if (!isStuderriaTelegramDevUser(message.from || {})) {
     await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
+    return;
+  }
+  if (!isStuderriaTelegramPrivateChat(chat)) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Це dev-команда. Для зміни ролей напиши її в приватному чаті з ботом.',
+      { sourceMessage: message }
+    );
     return;
   }
   const args = String(parsedCommand.args || '').trim().split(/\s+/).filter(Boolean);
@@ -22786,15 +22879,6 @@ function parseStuderriaTelegramTeamworkCallbackData(rawValue = '') {
   if (action === 'r') return { kind: 'rename', taskId: parsePositiveIntStrict(parts[2]) };
   if (action === 'm') return { kind: 'limit', taskId: parsePositiveIntStrict(parts[2]) };
   if (action === 'f') return { kind: 'refresh', taskId: parsePositiveIntStrict(parts[2]) };
-  if (action === 'd') return { kind: 'delete', taskId: parsePositiveIntStrict(parts[2]) };
-  if (action === 'x') return { kind: 'strict', taskId: parsePositiveIntStrict(parts[2]) };
-  if (action === 'o') {
-    return {
-      kind: 'open_state',
-      taskId: parsePositiveIntStrict(parts[2]),
-      open: String(parts[3] || '') === '1',
-    };
-  }
   return null;
 }
 
@@ -23308,7 +23392,12 @@ async function showStuderriaTelegramDeleteTeamworkPicker(message = {}) {
   }
   const keyboard = buildStuderriaTelegramInlineKeyboard(rows.map((row) => ({
     text: `${sanitizeCompactText(row.subject_name || 'Предмет', 18)} · ${sanitizeCompactText(row.title || 'Teamwork', 26)}`,
-    callback_data: buildStuderriaTelegramTeamworkButtonData('d', [row.id]),
+    callback_data: createStuderriaTelegramActionToken({
+      flow: 'teamwork_privileged',
+      kind: 'delete',
+      actorTelegramId: context.actorTelegramId,
+      taskId: parsePositiveIntStrict(row.id),
+    }),
   })), 1);
   const lines = [
     'Delete Teamwork',
@@ -23388,7 +23477,12 @@ async function showStuderriaTelegramStrictTeamworkPicker(message = {}) {
   }
   const keyboard = buildStuderriaTelegramInlineKeyboard(rows.map((row) => ({
     text: `${isStuderriaTelegramTeamworkStrict(row) ? '[strict] ' : ''}${sanitizeCompactText(row.subject_name || 'Предмет', 16)} · ${sanitizeCompactText(row.title || 'Teamwork', 24)}`,
-    callback_data: buildStuderriaTelegramTeamworkButtonData('x', [row.id]),
+    callback_data: createStuderriaTelegramActionToken({
+      flow: 'teamwork_privileged',
+      kind: 'strict',
+      actorTelegramId: context.actorTelegramId,
+      taskId: parsePositiveIntStrict(row.id),
+    }),
   })), 1);
   const lines = [
     'Strict Teamwork',
@@ -23496,7 +23590,13 @@ async function showStuderriaTelegramTeamworkOpenStatePicker(message = {}, should
   }
   const keyboard = buildStuderriaTelegramInlineKeyboard(manageableRows.map((row) => ({
     text: `${isTeamworkJoinOpen(row) ? '[open] ' : '[closed] '}${sanitizeCompactText(row.subject_name || 'Предмет', 16)} · ${sanitizeCompactText(row.title || 'Teamwork', 24)}`,
-    callback_data: buildStuderriaTelegramTeamworkButtonData('o', [row.id, shouldOpen ? 1 : 0]),
+    callback_data: createStuderriaTelegramActionToken({
+      flow: 'teamwork_privileged',
+      kind: 'open_state',
+      actorTelegramId: context.actorTelegramId,
+      taskId: parsePositiveIntStrict(row.id),
+      open: shouldOpen ? true : false,
+    }),
   })), 1);
   const lines = [
     shouldOpen ? 'Open Teamwork' : 'Close Teamwork',
@@ -24270,6 +24370,15 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
   }
   if (String(payload.flow || '').startsWith('notification_')) {
     await handleStuderriaTelegramManualNotificationCallback(callbackQuery, payload);
+    return;
+  }
+  if (String(payload.flow || '').startsWith('teamwork_')) {
+    const actorTelegramId = getStuderriaTelegramActorId(callbackQuery.from || {});
+    if (payload.actorTelegramId && payload.actorTelegramId !== actorTelegramId) {
+      await answerStuderriaTelegramCallback(callbackQuery, 'Це меню відкрив інший користувач.');
+      return;
+    }
+    await handleStuderriaTelegramTeamworkCallback(callbackQuery, payload);
     return;
   }
   if (String(payload.flow || '').startsWith('add_')) {
