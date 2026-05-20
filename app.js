@@ -9542,6 +9542,26 @@ const registerLimiter = createRateLimiter({
   onLimit: (req, res) => res.redirect('/register?error=too-many-requests'),
 });
 
+const telegramMiniAuthLimiter = createRateLimiter({
+  pool,
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: (req) => `tg-auth:${getTelegramMiniRateLimitSubject(req)}`,
+  onLimit: (req, res) => res.status(429).json({ ok: false, error: 'too_many_requests' }),
+});
+
+const telegramMiniRegisterLimiter = createRateLimiter({
+  pool,
+  windowMs: 60 * 1000,
+  max: 40,
+  keyFn: (req) => `tg-register:${getTelegramMiniRateLimitSubject(req)}`,
+  onLimit: (req, res) => {
+    const action = String(req.body && req.body.action || '').trim().toLowerCase();
+    const step = action === 'subjects' ? 'subjects' : 'course';
+    return res.redirect(`/studerria-tg/register?step=${step}&error=too-many-requests`);
+  },
+});
+
 const writeLimiter = createRateLimiter({
   pool,
   windowMs: 30 * 1000,
@@ -10579,7 +10599,7 @@ async function recordUserRegistrationEvent({ userId, fullName, ip, userAgent, se
   const normalizedIp = normalizeForensicsIp(ip);
   const normalizedAgent = normalizeForensicsAgent(userAgent);
   const normalizedSessionId = String(sessionId || '').trim() || null;
-  const normalizedSource = ['register_form', 'import', 'admin_create'].includes(String(source))
+  const normalizedSource = ['register_form', 'import', 'admin_create', 'telegram_mini_auto_register'].includes(String(source))
     ? String(source)
     : 'register_form';
   await db.run(
@@ -19216,6 +19236,50 @@ function getTelegramMiniPendingUser(req) {
   return user && user.id ? user : null;
 }
 
+function getTelegramMiniRateLimitTelegramId(req) {
+  const pendingUser = getTelegramMiniPendingUser(req);
+  if (pendingUser && pendingUser.id) {
+    return normalizeTelegramId(pendingUser.id);
+  }
+  const sessionTelegramId = req && req.session && req.session.user
+    ? normalizeTelegramId(req.session.user.telegram_id)
+    : '';
+  if (sessionTelegramId) {
+    return sessionTelegramId;
+  }
+  const initData = String(req && req.body && req.body.initData ? req.body.initData : '').trim();
+  if (initData) {
+    try {
+      const rawUser = new URLSearchParams(initData).get('user') || '';
+      const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+      const telegramId = normalizeTelegramId(parsedUser && parsedUser.id);
+      if (telegramId) return telegramId;
+    } catch (_err) {
+      // Rate limit identity is best-effort; real auth still validates signed initData.
+    }
+  }
+  if (isTelegramMiniDevAuthAllowed()) {
+    return normalizeTelegramId(
+      req && req.body && (req.body.devTelegramId || req.body.devTelegramUserId)
+        ? (req.body.devTelegramId || req.body.devTelegramUserId)
+        : process.env.STUDERRIA_TG_DEV_TELEGRAM_ID
+    );
+  }
+  return '';
+}
+
+function getTelegramMiniRateLimitSubject(req) {
+  const telegramId = getTelegramMiniRateLimitTelegramId(req);
+  if (telegramId) return `id:${telegramId}`;
+  const sessionUserId = req && req.session && req.session.user
+    ? Number(req.session.user.id || 0)
+    : 0;
+  if (Number.isInteger(sessionUserId) && sessionUserId > 0) {
+    return `user:${sessionUserId}`;
+  }
+  return `ip:${getClientIp(req)}`;
+}
+
 function clearTelegramMiniPending(req) {
   if (req && req.session) {
     req.session.telegramMiniPending = null;
@@ -19477,6 +19541,7 @@ async function establishTelegramMiniSession(req, user, telegramUser = null, last
       course_id: user.course_id || 1,
       group_id: user.group_id || null,
       language: user.language || getPreferredLang(req),
+      telegram_id: user.telegram_id || (telegramUser && telegramUser.id) || null,
     },
     role: normalizeRoleKey(user.role || 'student'),
     remember: true,
@@ -19759,12 +19824,33 @@ async function loadTelegramMiniAdminStats(scopeState = {}) {
   const activeLinkedFilter = usersHasIsActive
     ? "COALESCE(NULLIF(LOWER(TRIM(CAST(u.is_active AS TEXT))), ''), '1') IN ('1', 'true', 't', 'yes', 'on')"
     : '1 = 1';
-  const [summaryRow, userRows, actionRows] = await Promise.all([
+  const inactiveLinkedFilter = usersHasIsActive
+    ? `NOT (${activeLinkedFilter})`
+    : 'false';
+  const sensitiveTelegramActions = [
+    'telegram_manual_notification_send',
+    'telegram_teamwork_delete',
+    'telegram_teamwork_strict_enable',
+    'telegram_teamwork_open',
+    'telegram_teamwork_close',
+    'telegram_mini_admin_unlink_user',
+    'telegram_mini_profile_relink',
+    'telegram_mini_reset_subjects',
+  ];
+  const sensitiveCourseFilter = allowedCourseIds.length
+    ? 'AND COALESCE(v2_group.legacy_course_id, h.course_id, u.course_id) = ANY(?::int[])'
+    : '';
+  const registrationCourseFilter = allowedCourseIds.length
+    ? 'AND COALESCE(v2_group.legacy_course_id, re.course_id, u.course_id) = ANY(?::int[])'
+    : '';
+  const [summaryRow, userRows, actionRows, registrationSummaryRow, registrationSourceRows, sensitiveSummaryRow, sensitiveActionRows, attentionUserRows] = await Promise.all([
     db.get(
       `
         SELECT
           COUNT(*)::int AS linked_users,
           COUNT(*) FILTER (WHERE ${activeLinkedFilter})::int AS active_linked_users,
+          COUNT(*) FILTER (WHERE ${inactiveLinkedFilter})::int AS inactive_linked_users,
+          COUNT(*) FILTER (WHERE u.group_id IS NULL)::int AS incomplete_setup_users,
           MAX(u.telegram_last_seen_at) AS last_seen_at
         FROM users u
         LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
@@ -19842,6 +19928,107 @@ async function loadTelegramMiniAdminStats(scopeState = {}) {
       `,
       courseParams
     ),
+    db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE re.created_at::timestamptz >= NOW() - INTERVAL '24 hours')::int AS tg_registrations_24h,
+          COUNT(*) FILTER (WHERE re.created_at::timestamptz >= NOW() - INTERVAL '7 days')::int AS tg_registrations_7d
+        FROM user_registration_events re
+        LEFT JOIN users u ON u.id = re.user_id
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        WHERE re.source = 'telegram_mini_auto_register'
+          ${registrationCourseFilter}
+      `,
+      courseParams
+    ),
+    db.all(
+      `
+        SELECT
+          COALESCE(NULLIF(re.ip, ''), 'unknown') AS source_key,
+          COUNT(*)::int AS registrations,
+          COUNT(DISTINCT re.user_id)::int AS users_count,
+          MAX(re.created_at) AS last_seen_at
+        FROM user_registration_events re
+        LEFT JOIN users u ON u.id = re.user_id
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        WHERE re.source = 'telegram_mini_auto_register'
+          AND re.created_at::timestamptz >= NOW() - INTERVAL '7 days'
+          ${registrationCourseFilter}
+        GROUP BY COALESCE(NULLIF(re.ip, ''), 'unknown')
+        HAVING COUNT(*) > 1
+        ORDER BY registrations DESC, users_count DESC, last_seen_at DESC
+        LIMIT 8
+      `,
+      courseParams
+    ),
+    db.get(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE h.created_at::timestamptz >= NOW() - INTERVAL '24 hours')::int AS sensitive_actions_24h
+        FROM history_log h
+        LEFT JOIN users u ON u.id = h.actor_id
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        WHERE h.action = ANY(?::text[])
+          ${sensitiveCourseFilter}
+      `,
+      [sensitiveTelegramActions, ...courseParams]
+    ),
+    db.all(
+      `
+        SELECT
+          h.id,
+          h.actor_id,
+          h.actor_name,
+          h.action,
+          h.details,
+          h.created_at,
+          h.course_id,
+          u.full_name,
+          u.telegram_username,
+          u.telegram_id,
+          COALESCE(v2_group.label, '') AS group_label
+        FROM history_log h
+        LEFT JOIN users u ON u.id = h.actor_id
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        WHERE h.action = ANY(?::text[])
+          ${sensitiveCourseFilter}
+        ORDER BY h.created_at DESC
+        LIMIT 40
+      `,
+      [sensitiveTelegramActions, ...courseParams]
+    ),
+    db.all(
+      `
+        SELECT
+          u.id,
+          u.full_name,
+          u.role,
+          u.telegram_id,
+          u.telegram_username,
+          u.telegram_first_name,
+          u.telegram_last_name,
+          u.telegram_last_seen_at,
+          COALESCE(v2_group.label, '') AS group_label,
+          COALESCE(v2_group.legacy_course_id, u.course_id) AS course_id,
+          CASE
+            WHEN ${inactiveLinkedFilter} AND u.group_id IS NULL THEN 'Неактивний акаунт без групи'
+            WHEN ${inactiveLinkedFilter} THEN 'Неактивний акаунт'
+            WHEN u.group_id IS NULL THEN 'Не завершено вибір групи'
+            ELSE 'Потребує перевірки'
+          END AS reason
+        FROM users u
+        LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+        WHERE u.telegram_id IS NOT NULL
+          AND (u.group_id IS NULL OR ${inactiveLinkedFilter})
+          ${courseFilter}
+        ORDER BY
+          CASE WHEN u.group_id IS NULL THEN 1 ELSE 2 END,
+          u.telegram_last_seen_at DESC NULLS LAST,
+          u.full_name ASC
+        LIMIT 30
+      `,
+      courseParams
+    ),
   ]);
   const totalActions = (userRows || []).reduce((sum, row) => sum + Number(row.action_count || 0), 0);
   const totalOpens = (userRows || []).reduce((sum, row) => sum + Number(row.open_count || 0), 0);
@@ -19856,6 +20043,18 @@ async function loadTelegramMiniAdminStats(scopeState = {}) {
     },
     users: userRows || [],
     actions: actionRows || [],
+    security: {
+      summary: {
+        inactive_linked_users: Number(summaryRow && summaryRow.inactive_linked_users || 0),
+        incomplete_setup_users: Number(summaryRow && summaryRow.incomplete_setup_users || 0),
+        tg_registrations_24h: Number(registrationSummaryRow && registrationSummaryRow.tg_registrations_24h || 0),
+        tg_registrations_7d: Number(registrationSummaryRow && registrationSummaryRow.tg_registrations_7d || 0),
+        sensitive_actions_24h: Number(sensitiveSummaryRow && sensitiveSummaryRow.sensitive_actions_24h || 0),
+      },
+      attention_users: attentionUserRows || [],
+      registration_sources: registrationSourceRows || [],
+      sensitive_actions: sensitiveActionRows || [],
+    },
   };
 }
 
@@ -21555,6 +21754,14 @@ async function sendStuderriaTelegramManualNotification(target = {}, context = {}
       });
     }
   }
+  await insertStuderriaTelegramTeamworkHistory(context.actor, 'telegram_manual_notification_send', {
+    target_type: target.type || 'unknown',
+    course_id: target.courseId || null,
+    subject_id: target.subjectId || null,
+    group_number: target.groupNumber || null,
+    recipients: recipients.length,
+    sent,
+  }, target.courseId || (context.actor && context.actor.course_id) || null);
   return { sent, recipients: recipients.length };
 }
 
@@ -24618,7 +24825,7 @@ app.get('/studerria-tg', (req, res) => {
   });
 });
 
-app.post('/studerria-tg/auth/init', authLimiter, async (req, res) => {
+app.post('/studerria-tg/auth/init', telegramMiniAuthLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     const telegramUser = await validateTelegramMiniInitData(req);
@@ -24698,7 +24905,7 @@ app.get('/studerria-tg/register', async (req, res) => {
   }
 });
 
-app.post('/studerria-tg/register', registerLimiter, async (req, res) => {
+app.post('/studerria-tg/register', telegramMiniRegisterLimiter, async (req, res) => {
   const rawAction = String(req.body.action || 'course').trim().toLowerCase();
   const action = rawAction === 'group' ? 'course' : rawAction;
   try {
@@ -25586,7 +25793,7 @@ app.get('/studerria-tg/subjects', requireTelegramMiniStudent, async (req, res) =
   }
 });
 
-app.post('/studerria-tg/subjects', requireTelegramMiniStudent, registerLimiter, async (req, res) => {
+app.post('/studerria-tg/subjects', requireTelegramMiniStudent, telegramMiniRegisterLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     const userId = Number(req.session.user.id || 0);
@@ -25602,7 +25809,7 @@ app.post('/studerria-tg/subjects', requireTelegramMiniStudent, registerLimiter, 
   }
 });
 
-app.post('/studerria-tg/profile/link-telegram', requireTelegramMiniStudent, authLimiter, async (req, res) => {
+app.post('/studerria-tg/profile/link-telegram', requireTelegramMiniStudent, telegramMiniAuthLimiter, async (req, res) => {
   try {
     await ensureDbReady();
     const telegramUser = await validateTelegramMiniInitData(req);

@@ -58,6 +58,7 @@ const teamworkTelegramMessageRef = require('./057_teamwork_telegram_message_ref'
 const teamworkJoinOpenState = require('./058_teamwork_join_open_state');
 const teamworkJoinClosedBy = require('./059_teamwork_join_closed_by');
 const homeworkSource = require('./060_homework_source');
+const telegramRegistrationEventSource = require('./061_telegram_registration_event_source');
 
 module.exports = [
   init,
@@ -120,4 +121,5 @@ module.exports = [
   teamworkJoinOpenState,
   teamworkJoinClosedBy,
   homeworkSource,
+  telegramRegistrationEventSource,
 ];

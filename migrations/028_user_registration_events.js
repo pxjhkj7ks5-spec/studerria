@@ -11,7 +11,7 @@ const ddl = [
       source TEXT NOT NULL DEFAULT 'register_form',
       course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      CHECK (source IN ('register_form', 'import', 'admin_create'))
+      CHECK (source IN ('register_form', 'import', 'admin_create', 'telegram_mini_auto_register'))
     )
   `,
   `

@@ -1178,6 +1178,8 @@
       }, {})); %>
       <% const telegramMiniStatsData = typeof telegramMiniAdminStats !== 'undefined' && telegramMiniAdminStats ? telegramMiniAdminStats : { summary: {}, users: [], actions: [] }; %>
       <% const telegramMiniSummary = telegramMiniStatsData.summary || {}; %>
+      <% const telegramMiniSecurity = telegramMiniStatsData.security || {}; %>
+      <% const telegramMiniSecuritySummary = telegramMiniSecurity.summary || {}; %>
       <% const formatAdminDateTime = function(value) {
         if (!value) return '—';
         const parsed = new Date(value);
@@ -2832,6 +2834,121 @@
                 <div class="admin-metric-card">
                   <div class="small text-muted">Actions</div>
                   <div class="admin-metric-value" data-tg-summary="total_actions"><%= telegramMiniSummary.total_actions || 0 %></div>
+                </div>
+              </div>
+              <div class="border rounded-3 p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="mb-1">TG security</h6>
+                    <div class="small text-muted">Тільки практичні сигнали: незавершена привʼязка, чутливі дії та кластери TG-реєстрацій.</div>
+                  </div>
+                </div>
+                <div class="admin-overview-grid mb-3">
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Setup issues</div>
+                    <div class="admin-metric-value" data-tg-security-summary="incomplete_setup_users"><%= telegramMiniSecuritySummary.incomplete_setup_users || 0 %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Inactive linked</div>
+                    <div class="admin-metric-value" data-tg-security-summary="inactive_linked_users"><%= telegramMiniSecuritySummary.inactive_linked_users || 0 %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">TG regs 24h</div>
+                    <div class="admin-metric-value" data-tg-security-summary="tg_registrations_24h"><%= telegramMiniSecuritySummary.tg_registrations_24h || 0 %></div>
+                  </div>
+                  <div class="admin-metric-card">
+                    <div class="small text-muted">Sensitive 24h</div>
+                    <div class="admin-metric-value" data-tg-security-summary="sensitive_actions_24h"><%= telegramMiniSecuritySummary.sensitive_actions_24h || 0 %></div>
+                  </div>
+                </div>
+                <div class="row g-3">
+                  <div class="col-lg-6">
+                    <h6 class="mb-2">Needs attention</h6>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-striped align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>User</th>
+                            <th>Telegram</th>
+                            <th>Signal</th>
+                            <th>Last seen</th>
+                          </tr>
+                        </thead>
+                        <tbody id="tgSecurityAttentionBody">
+                          <% (telegramMiniSecurity.attention_users || []).forEach(function(row) { %>
+                            <tr>
+                              <td>
+                                <%= row.full_name || '—' %>
+                                <div class="small text-muted"><%= row.group_label || (row.course_id ? 'Course ' + row.course_id : row.role || 'student') %></div>
+                              </td>
+                              <td><%= row.telegram_username ? '@' + row.telegram_username : (row.telegram_id || '—') %></td>
+                              <td><%= row.reason || 'Потребує перевірки' %></td>
+                              <td><%= formatAdminDateTime(row.telegram_last_seen_at) %></td>
+                            </tr>
+                          <% }); %>
+                          <% if (!(telegramMiniSecurity.attention_users || []).length) { %>
+                            <tr><td colspan="4" class="text-muted">Критичних TG-сигналів зараз немає.</td></tr>
+                          <% } %>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="col-lg-6">
+                    <h6 class="mb-2">Sensitive actions</h6>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-striped align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>When</th>
+                            <th>Action</th>
+                            <th>User</th>
+                            <th>Details</th>
+                          </tr>
+                        </thead>
+                        <tbody id="tgSecurityActionsBody">
+                          <% (telegramMiniSecurity.sensitive_actions || []).forEach(function(row) { %>
+                            <tr>
+                              <td><%= formatAdminDateTime(row.created_at) %></td>
+                              <td><code><%= row.action || '—' %></code></td>
+                              <td><%= row.full_name || row.actor_name || '—' %></td>
+                              <td class="small text-muted"><%= row.details || '—' %></td>
+                            </tr>
+                          <% }); %>
+                          <% if (!(telegramMiniSecurity.sensitive_actions || []).length) { %>
+                            <tr><td colspan="4" class="text-muted">Чутливих TG-дій ще немає.</td></tr>
+                          <% } %>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <h6 class="mb-2">Registration sources</h6>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-striped align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Source</th>
+                            <th>Registrations</th>
+                            <th>Users</th>
+                            <th>Last seen</th>
+                          </tr>
+                        </thead>
+                        <tbody id="tgSecuritySourcesBody">
+                          <% (telegramMiniSecurity.registration_sources || []).forEach(function(row) { %>
+                            <tr>
+                              <td><code><%= row.source_key || 'unknown' %></code></td>
+                              <td><%= row.registrations || 0 %></td>
+                              <td><%= row.users_count || 0 %></td>
+                              <td><%= formatAdminDateTime(row.last_seen_at) %></td>
+                            </tr>
+                          <% }); %>
+                          <% if (!(telegramMiniSecurity.registration_sources || []).length) { %>
+                            <tr><td colspan="4" class="text-muted">Повторюваних TG-джерел за 7 днів немає.</td></tr>
+                          <% } %>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="table-responsive mb-4">
@@ -7615,6 +7732,9 @@
       const tgUsersRefreshBtn = document.getElementById('tgUsersRefreshBtn');
       const tgUsersTableBody = document.getElementById('tgUsersTableBody');
       const tgUsersActionsBody = document.getElementById('tgUsersActionsBody');
+      const tgSecurityAttentionBody = document.getElementById('tgSecurityAttentionBody');
+      const tgSecurityActionsBody = document.getElementById('tgSecurityActionsBody');
+      const tgSecuritySourcesBody = document.getElementById('tgSecuritySourcesBody');
 
       function formatClientDateTime(value) {
         if (!value) return '—';
@@ -7628,6 +7748,12 @@
         document.querySelectorAll('[data-tg-summary]').forEach((node) => {
           const key = node.dataset.tgSummary || '';
           node.textContent = String(summary[key] || 0);
+        });
+        const security = payload && payload.security ? payload.security : {};
+        const securitySummary = security.summary || {};
+        document.querySelectorAll('[data-tg-security-summary]').forEach((node) => {
+          const key = node.dataset.tgSecuritySummary || '';
+          node.textContent = String(securitySummary[key] || 0);
         });
         const users = Array.isArray(payload && payload.users) ? payload.users : [];
         if (tgUsersTableBody) {
@@ -7677,6 +7803,52 @@
                 </tr>
               `).join('')
             : '<tr><td colspan="4" class="text-muted">Подій mini app ще немає.</td></tr>';
+        }
+        const attentionUsers = Array.isArray(security.attention_users) ? security.attention_users : [];
+        if (tgSecurityAttentionBody) {
+          tgSecurityAttentionBody.innerHTML = attentionUsers.length
+            ? attentionUsers.map((row) => {
+                const tgLabel = row.telegram_username ? `@${row.telegram_username}` : (row.telegram_id || '—');
+                const groupLabel = row.group_label || (row.course_id ? `Course ${row.course_id}` : (row.role || 'student'));
+                return `
+                  <tr>
+                    <td>
+                      ${escapeHtml(row.full_name || '—')}
+                      <div class="small text-muted">${escapeHtml(groupLabel)}</div>
+                    </td>
+                    <td>${escapeHtml(tgLabel)}</td>
+                    <td>${escapeHtml(row.reason || 'Потребує перевірки')}</td>
+                    <td>${escapeHtml(formatClientDateTime(row.telegram_last_seen_at))}</td>
+                  </tr>
+                `;
+              }).join('')
+            : '<tr><td colspan="4" class="text-muted">Критичних TG-сигналів зараз немає.</td></tr>';
+        }
+        const sensitiveActions = Array.isArray(security.sensitive_actions) ? security.sensitive_actions : [];
+        if (tgSecurityActionsBody) {
+          tgSecurityActionsBody.innerHTML = sensitiveActions.length
+            ? sensitiveActions.map((row) => `
+                <tr>
+                  <td>${escapeHtml(formatClientDateTime(row.created_at))}</td>
+                  <td><code>${escapeHtml(row.action || '—')}</code></td>
+                  <td>${escapeHtml(row.full_name || row.actor_name || '—')}</td>
+                  <td class="small text-muted">${escapeHtml(row.details || '—')}</td>
+                </tr>
+              `).join('')
+            : '<tr><td colspan="4" class="text-muted">Чутливих TG-дій ще немає.</td></tr>';
+        }
+        const registrationSources = Array.isArray(security.registration_sources) ? security.registration_sources : [];
+        if (tgSecuritySourcesBody) {
+          tgSecuritySourcesBody.innerHTML = registrationSources.length
+            ? registrationSources.map((row) => `
+                <tr>
+                  <td><code>${escapeHtml(row.source_key || 'unknown')}</code></td>
+                  <td>${escapeHtml(row.registrations || 0)}</td>
+                  <td>${escapeHtml(row.users_count || 0)}</td>
+                  <td>${escapeHtml(formatClientDateTime(row.last_seen_at))}</td>
+                </tr>
+              `).join('')
+            : '<tr><td colspan="4" class="text-muted">Повторюваних TG-джерел за 7 днів немає.</td></tr>';
         }
       }
 
