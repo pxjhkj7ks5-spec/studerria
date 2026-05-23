@@ -31,6 +31,10 @@ const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
 const sessionGeneratorHelpers = require('./lib/sessionGenerator');
+const {
+  normalizeScheduleGeneratorOperationId,
+  resolveScheduleGeneratorBackupPath,
+} = require('./lib/scheduleGeneratorBackups');
 const demoMode = require('./lib/demoMode');
 const telegramMiniApp = require('./lib/telegramMiniApp');
 const { localizeChangelogItems } = require('./lib/changelogI18n');
@@ -9466,9 +9470,13 @@ const buildScheduleDiff = async (entries) => {
 
 const writeGeneratorBackupCsv = (rows, operationId) => {
   if (!rows || !rows.length) return null;
-  const backupDir = path.join(uploadsDir, 'generator-backups');
+  const backup = resolveScheduleGeneratorBackupPath({ uploadsDir, operationId });
+  if (!backup) {
+    console.error('Refusing to write schedule generator backup for invalid operation id');
+    return null;
+  }
   try {
-    fs.mkdirSync(backupDir, { recursive: true });
+    fs.mkdirSync(backup.backupDir, { recursive: true });
   } catch (err) {
     console.error('Failed to ensure backup directory', err);
   }
@@ -9488,11 +9496,9 @@ const writeGeneratorBackupCsv = (rows, operationId) => {
       .join(',')
   );
   const csv = [header, ...lines].join('\n');
-  const filename = `schedule-backup-${operationId}.csv`;
-  const filePath = path.join(backupDir, filename);
   try {
-    fs.writeFileSync(filePath, csv, 'utf8');
-    return { filename, path: filePath };
+    fs.writeFileSync(backup.path, csv, 'utf8');
+    return { filename: backup.filename, path: backup.path };
   } catch (err) {
     console.error('Failed to write backup CSV', err);
     return null;
@@ -61700,17 +61706,20 @@ app.get('/admin/schedule-generator/:runId/preview', requireScheduleGeneratorSect
 });
 
 app.get('/admin/schedule-generator/backup.csv', requireScheduleGeneratorSectionAccess, (req, res) => {
-  const operationId = String(req.query.op || '').trim();
-  if (!operationId) {
+  const operationIdRaw = String(req.query.op || '').trim();
+  if (!operationIdRaw) {
     return res.status(400).send('Missing operation id');
   }
-  const backupPath = path.join(uploadsDir, 'generator-backups', `schedule-backup-${operationId}.csv`);
-  if (!fs.existsSync(backupPath)) {
+  const backup = resolveScheduleGeneratorBackupPath({ uploadsDir, operationId: operationIdRaw });
+  if (!backup) {
+    return res.status(400).send('Invalid operation id');
+  }
+  if (!fs.existsSync(backup.path)) {
     return res.status(404).send('Backup not found');
   }
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="schedule-backup-${operationId}.csv"`);
-  return res.sendFile(backupPath);
+  res.setHeader('Content-Disposition', `attachment; filename="${backup.filename}"`);
+  return res.sendFile(backup.path);
 });
 
 app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSectionAccess, async (req, res) => {
@@ -61744,8 +61753,12 @@ app.post('/admin/schedule-generator/:runId/publish', requireScheduleGeneratorSec
     const run = await db.get('SELECT * FROM schedule_generator_runs WHERE id = ?', [runId]);
     if (!run) return res.redirect(buildScheduleGeneratorNoticeUrl(req, 'err', 'Run not found'));
     const config = parseGeneratorConfig(run.config);
-    const lastOperationId = config && config.last_stats ? config.last_stats.operation_id : null;
-    const requestedOperationId = String(req.body.operation_id || '').trim();
+    const lastOperationId = normalizeScheduleGeneratorOperationId(config && config.last_stats ? config.last_stats.operation_id : '');
+    const requestedOperationIdRaw = String(req.body.operation_id || '').trim();
+    const requestedOperationId = normalizeScheduleGeneratorOperationId(requestedOperationIdRaw);
+    if (requestedOperationIdRaw && !requestedOperationId) {
+      return res.redirect(buildPreviewRedirect('Invalid operation id'));
+    }
     if (lastOperationId && requestedOperationId && lastOperationId !== requestedOperationId) {
       return res.redirect(buildPreviewRedirect('Preview outdated'));
     }
