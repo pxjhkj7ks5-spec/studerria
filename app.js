@@ -19453,7 +19453,7 @@ async function createTelegramMiniUser(req, telegramUser) {
         telegram_photo_url, telegram_linked_at, telegram_last_seen_at
       )
       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      RETURNING id, full_name, role, schedule_group, course_id, group_id, language, telegram_id
+      RETURNING id, full_name, role, is_active, schedule_group, course_id, group_id, language, telegram_id
     `,
     [
       fullName,

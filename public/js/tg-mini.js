@@ -89,7 +89,10 @@
       if (data.status === 'link_required') {
         const redirectUrl = new URL(data.redirect, window.location.origin);
         const currentSearch = window.location.search || '';
-        if (currentPath !== redirectUrl.pathname || currentSearch !== redirectUrl.search) {
+        const isRegisterHandshake = currentPath === '/studerria-tg/register'
+          && redirectUrl.pathname === '/studerria-tg/register'
+          && !data.setup_status;
+        if (!isRegisterHandshake && (currentPath !== redirectUrl.pathname || currentSearch !== redirectUrl.search)) {
           data.redirecting = true;
           window.location.replace(data.redirect);
           return data;
