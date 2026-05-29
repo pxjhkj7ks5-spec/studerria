@@ -1,6 +1,6 @@
 Правила для воркспейсу KMA
 
-Ці правила застосовуються тільки в `C:\Users\andri\OneDrive\Desktop\proj\kma`.
+Ці правила застосовуються тільки в `/Users/andriimarchenko/Desktop/proj/kma`.
 
 - Після будь-яких змін піднімай версію на `+0.0.01` через `version.js patch` у форматі на кшталт `0.7.00 -> 0.7.01`.
 - Дотримуйся стилю `macOS Tahoe / Apple Liquid Glass / iOS 26`.
@@ -24,6 +24,18 @@
 - Локальні тести запускай за потреби на власний розсуд для ризикових або інфраструктурних змін; не чекай окремого запиту, якщо перевірка справді потрібна.
 - `docker compose down -v` використовуй тільки для повного перестворення Postgres volume або повторного імпорту SQL-дампу, а не для звичайного апдейту.
 - Після змін автоматично виконуй `git add`, `git commit`, `git push`.
+
+## Global Codex Rituals
+
+- На початку нової Codex-сесії запусти `/Users/andriimarchenko/.codex/scripts/codex-vibe.sh`, якщо користувач не просив тишу або швидкий режим без відволікань.
+- Якщо скрипт не може відтворити трек автоматично, коротко скажи про це і продовжуй роботу без блокування.
+
+## DigestDock Triggers
+
+- Якщо користувач пише `джест` як короткий запит на дайджест, запусти `/Users/andriimarchenko/.codex/bin/digestctl open today`.
+- Якщо користувач пише `новини` як короткий запит на новини, запусти `/Users/andriimarchenko/.codex/bin/digestctl open world`.
+- Якщо користувач пише `tech` або `тех дайджест` як короткий запит на технічний дайджест, запусти `/Users/andriimarchenko/.codex/bin/digestctl open tech`.
+- Якщо користувач пише `війна`, `україна` або `новини війни` як короткий запит на новини про війну Росії проти України, запусти `/Users/andriimarchenko/.codex/bin/digestctl open ukraine`.
 
 ## Parallel Work In One Repository
 

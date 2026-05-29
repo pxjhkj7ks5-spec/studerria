@@ -9,7 +9,7 @@ const versionPath = path.join(rootDir, "version.json");
 const versionInfo = JSON.parse(readFileSync(versionPath, "utf8"));
 
 function loadGitLog() {
-  const raw = execSync("git log --pretty=format:%H%x1f%s%x1f%cI", {
+  const raw = execSync("git log --pretty=format:%H%x1f%s%x1f%cI -- .", {
     cwd: rootDir,
     encoding: "utf8",
   });
