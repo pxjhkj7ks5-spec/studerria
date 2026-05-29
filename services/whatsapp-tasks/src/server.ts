@@ -5,7 +5,7 @@ import { loadConfig, withBasePath } from "./config.js";
 import { createPool } from "./db.js";
 import { migrate, seedDevUser } from "./migrations.js";
 import { authenticate, canManageTasks, canManageUsers, clearSessionCookie, loadSessionUser, setSessionCookie, type SessionUser } from "./auth.js";
-import { createTask, createUser, findTeacherTaskForInbound, linkInviteCode, parseDoneCommand, updateTaskStatus, completeTask } from "./domain.js";
+import { createOpenTeacherInvite, createTask, createUser, findTeacherTaskForInbound, linkInviteCode, parseDoneCommand, updateTaskStatus, completeTask } from "./domain.js";
 import { renderDashboard, renderLogin, type DashboardData } from "./render.js";
 import { logOutboundMessage, redactWhatsAppPayload, sendTextMessage, verifyWhatsAppSignature } from "./whatsapp.js";
 import { startReminderWorker } from "./reminders.js";
@@ -39,7 +39,7 @@ async function loadDashboardData(req: Request): Promise<DashboardData> {
   const status = String(req.query.status || "").trim();
   const where = status ? "WHERE t.status = $1" : "";
   const params = status ? [status] : [];
-  const [stats, failed, teachers, tasks, users] = await Promise.all([
+  const [stats, failed, teachers, tasks, users, invites] = await Promise.all([
     pool.query("SELECT status, COUNT(*)::int AS count FROM wa_tasks GROUP BY status"),
     pool.query("SELECT COUNT(*)::int AS count FROM wa_message_logs WHERE direction = 'outbound' AND status = 'failed'"),
     pool.query("SELECT id, display_name, email, phone_e164, whatsapp_wa_id FROM wa_users WHERE role = 'teacher' AND is_active = true ORDER BY display_name ASC"),
@@ -57,6 +57,17 @@ async function loadDashboardData(req: Request): Promise<DashboardData> {
       params,
     ),
     pool.query("SELECT id, display_name, email, role, phone_e164, whatsapp_wa_id FROM wa_users ORDER BY role, display_name"),
+    pool.query(
+      `
+        SELECT code, label, max_uses, use_count, expires_at
+        FROM wa_teacher_invites
+        WHERE invite_type = 'open_teacher'
+          AND expires_at > NOW()
+          AND use_count < max_uses
+        ORDER BY created_at DESC
+        LIMIT 10
+      `,
+    ),
   ]);
 
   const statMap: Record<string, number> = { open: 0, done: 0, overdue: 0, failed: Number(failed.rows[0]?.count || 0) };
@@ -74,6 +85,7 @@ async function loadDashboardData(req: Request): Promise<DashboardData> {
     teachers: teachers.rows,
     tasks: tasks.rows,
     users: users.rows,
+    invites: invites.rows,
     events: events.rows,
     logs: logs.rows,
     flash: String(req.query.flash || ""),
@@ -118,6 +130,10 @@ router.post("/api/whatsapp/webhook", express.raw({ type: "application/json", lim
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       const value = change.value || {};
+      const contactsByWaId = new Map<string, string>();
+      for (const contact of value.contacts || []) {
+        if (contact.wa_id) contactsByWaId.set(String(contact.wa_id), String(contact.profile?.name || ""));
+      }
       for (const status of value.statuses || []) {
         await pool.query(
           `
@@ -148,9 +164,10 @@ router.post("/api/whatsapp/webhook", express.raw({ type: "application/json", lim
         if (!inserted.rows[0] || !text) continue;
 
         const inviteCode = /[A-Z2-9]{4}-[A-Z2-9]{4}/i.exec(text)?.[0] || text;
-        const linked = await linkInviteCode(pool, inviteCode, from);
+        const linked = await linkInviteCode(pool, inviteCode, from, contactsByWaId.get(from) || "");
         if (linked) {
-          await sendTextMessage(config, from, `Вітаємо, ${linked.displayName}. WhatsApp підключено до WA Tasks.`);
+          const prefix = linked.created ? "Реєстрацію завершено" : linked.alreadyLinked ? "WhatsApp уже підключено" : "WhatsApp підключено";
+          await sendTextMessage(config, from, `${prefix}, ${linked.displayName}.`);
           continue;
         }
 
@@ -218,6 +235,19 @@ router.post("/admin/users", requireUser(async (req, res, user) => {
     ? `Викладача створено. Invite code: ${created.inviteCode}`
     : `Користувача створено. Temporary password: ${created.password}`;
   redirect(res, `/admin?flash=${encodeURIComponent(flash)}#teachers`);
+}));
+
+router.post("/admin/invites/open-teacher", requireUser(async (req, res, user) => {
+  if (!canManageTasks(user)) {
+    res.status(403).send("Forbidden");
+    return;
+  }
+  const invite = await createOpenTeacherInvite(pool, {
+    actor: user,
+    label: String(req.body.label || ""),
+    maxUses: Number(req.body.maxUses || 200),
+  });
+  redirect(res, `/admin?flash=${encodeURIComponent(`Open invite створено: ${invite.code}`)}#teachers`);
 }));
 
 router.post("/admin/tasks", requireUser(async (req, res, user) => {

@@ -9,6 +9,7 @@ export type DashboardData = {
   events: Array<Record<string, unknown>>;
   logs: Array<Record<string, unknown>>;
   users: Array<Record<string, unknown>>;
+  invites: Array<Record<string, unknown>>;
   flash?: string;
 };
 
@@ -116,6 +117,14 @@ export function renderDashboard(config: AppConfig, user: SessionUser, data: Dash
   const users = data.users.map((row) => `
     <tr><td>${esc(row.display_name)}</td><td>${esc(row.email)}</td><td>${esc(row.role)}</td><td>${esc(row.phone_e164 || "—")}</td><td>${row.whatsapp_wa_id ? "Linked" : "Pending"}</td></tr>
   `).join("");
+  const invites = data.invites.map((row) => `
+    <tr>
+      <td><code>${esc(row.code)}</code></td>
+      <td>${esc(row.label || "—")}</td>
+      <td>${esc(row.use_count)} / ${esc(row.max_uses)}</td>
+      <td>${esc(formatKyivDateTime(row.expires_at as string))}</td>
+    </tr>
+  `).join("");
 
   return layout(config, user, `
     <header class="topbar">
@@ -161,6 +170,11 @@ export function renderDashboard(config: AppConfig, user: SessionUser, data: Dash
         </section>
         <section class="form-band" id="teachers">
           <h2>Користувачі та інвайти</h2>
+          <form method="post" action="${href(config, "/admin/invites/open-teacher")}" class="invite-form">
+            <label>Open invite label<input name="label" value="Самореєстрація викладачів" /></label>
+            <label>Ліміт використань<input name="maxUses" type="number" min="1" max="500" value="200" /></label>
+            <button class="primary">Створити open invite</button>
+          </form>
           <form method="post" action="${href(config, "/admin/users")}" class="form-grid">
             <label>Імʼя<input name="displayName" required /></label>
             <label>Email<input name="email" type="email" required /></label>
@@ -169,6 +183,8 @@ export function renderDashboard(config: AppConfig, user: SessionUser, data: Dash
             <label>Пароль<input name="password" type="password" placeholder="для деканату" /></label>
             <button class="primary">Створити</button>
           </form>
+          <h3 class="subhead">Open invites</h3>
+          <table class="compact-table"><thead><tr><th>Код</th><th>Label</th><th>Uses</th><th>До</th></tr></thead><tbody>${invites || `<tr><td colspan="4" class="empty">Open invite ще немає.</td></tr>`}</tbody></table>
           <table class="compact-table"><thead><tr><th>Імʼя</th><th>Email</th><th>Role</th><th>Phone</th><th>WhatsApp</th></tr></thead><tbody>${users}</tbody></table>
         </section>
       </div>

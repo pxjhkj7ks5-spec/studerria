@@ -81,30 +81,115 @@ export async function createUser(pool: Db, input: {
   });
 }
 
-export async function linkInviteCode(pool: Db, code: string, waId: string) {
+export async function createOpenTeacherInvite(pool: Db, input: {
+  actor: SessionUser;
+  label?: string;
+  maxUses?: number;
+}) {
+  const code = generateInviteCode();
+  const maxUses = Math.max(1, Math.min(500, Math.trunc(input.maxUses || 200)));
+  const label = (input.label || "Teacher self-registration").trim().slice(0, 140);
+  await pool.query(
+    `
+      INSERT INTO wa_teacher_invites (teacher_user_id, code, created_by_user_id, invite_type, label, max_uses, expires_at)
+      VALUES (NULL, $1, $2, 'open_teacher', $3, $4, NOW() + INTERVAL '90 days')
+    `,
+    [code, input.actor.id, label, maxUses],
+  );
+  return { code, label, maxUses };
+}
+
+function buildSelfRegisteredTeacher(waId: string, profileName?: string) {
+  const digits = waId.replace(/\D/g, "");
+  const suffix = digits.slice(-6) || crypto.randomBytes(3).toString("hex");
+  const displayName = (profileName || "").trim().slice(0, 120) || `WhatsApp ${suffix}`;
+  return {
+    displayName,
+    email: `wa-${digits || suffix}@whatsapp.local`,
+    phone: digits ? `+${digits}` : null,
+  };
+}
+
+export async function linkInviteCode(pool: Db, code: string, waId: string, profileName = "") {
   const normalizedCode = code.trim().toUpperCase();
   return withTransaction(pool, async (client) => {
+    const existing = await client.query(
+      "SELECT id, display_name FROM wa_users WHERE whatsapp_wa_id = $1 AND role = 'teacher' AND is_active = true",
+      [waId],
+    );
+    if (existing.rows[0]) {
+      return {
+        teacherUserId: Number(existing.rows[0].id),
+        displayName: existing.rows[0].display_name as string,
+        alreadyLinked: true,
+        created: false,
+      };
+    }
+
     const result = await client.query(
       `
-        SELECT i.id AS invite_id, i.teacher_user_id, u.display_name
+        SELECT
+          i.id AS invite_id,
+          i.teacher_user_id,
+          i.invite_type,
+          i.use_count,
+          i.max_uses,
+          u.display_name
         FROM wa_teacher_invites i
-        JOIN wa_users u ON u.id = i.teacher_user_id
+        LEFT JOIN wa_users u ON u.id = i.teacher_user_id
         WHERE i.code = $1
-          AND i.used_at IS NULL
           AND i.expires_at > NOW()
-          AND u.role = 'teacher'
-          AND u.is_active = true
+          AND (
+            (i.invite_type = 'direct' AND i.used_at IS NULL AND u.role = 'teacher' AND u.is_active = true)
+            OR
+            (i.invite_type = 'open_teacher' AND i.use_count < i.max_uses)
+          )
         FOR UPDATE
       `,
       [normalizedCode],
     );
     const row = result.rows[0];
     if (!row) return null;
+    if (row.invite_type === "open_teacher") {
+      const teacher = buildSelfRegisteredTeacher(waId, profileName);
+      const created = await client.query(
+        `
+          INSERT INTO wa_users (email, password_hash, display_name, role, phone_e164, whatsapp_wa_id)
+          VALUES ($1, '', $2, 'teacher', $3, $4)
+          ON CONFLICT (email) DO UPDATE
+          SET display_name = EXCLUDED.display_name,
+              phone_e164 = EXCLUDED.phone_e164,
+              whatsapp_wa_id = EXCLUDED.whatsapp_wa_id,
+              is_active = true,
+              updated_at = NOW()
+          RETURNING id, display_name
+        `,
+        [teacher.email, teacher.displayName, teacher.phone, waId],
+      );
+      await client.query(
+        `
+          UPDATE wa_teacher_invites
+          SET use_count = use_count + 1,
+              used_at = CASE WHEN use_count + 1 >= max_uses THEN NOW() ELSE used_at END
+          WHERE id = $1
+        `,
+        [row.invite_id],
+      );
+      return {
+        teacherUserId: Number(created.rows[0].id),
+        displayName: created.rows[0].display_name as string,
+        alreadyLinked: false,
+        created: true,
+      };
+    }
+
     await client.query("UPDATE wa_users SET whatsapp_wa_id = $1, updated_at = NOW() WHERE id = $2", [waId, row.teacher_user_id]);
-    await client.query("UPDATE wa_teacher_invites SET used_at = NOW() WHERE id = $1", [row.invite_id]);
+    await client.query("UPDATE wa_teacher_invites SET used_at = NOW(), use_count = 1 WHERE id = $1", [row.invite_id]);
     return {
       teacherUserId: Number(row.teacher_user_id),
       displayName: row.display_name as string,
+      alreadyLinked: false,
+      created: false,
     };
   });
 }

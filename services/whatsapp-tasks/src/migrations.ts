@@ -23,15 +23,25 @@ const ddl = [
   `
     CREATE TABLE IF NOT EXISTS wa_teacher_invites (
       id SERIAL PRIMARY KEY,
-      teacher_user_id INTEGER NOT NULL REFERENCES wa_users(id) ON DELETE CASCADE,
+      teacher_user_id INTEGER REFERENCES wa_users(id) ON DELETE CASCADE,
       code TEXT NOT NULL UNIQUE,
       created_by_user_id INTEGER REFERENCES wa_users(id) ON DELETE SET NULL,
+      invite_type TEXT NOT NULL DEFAULT 'direct' CHECK (invite_type IN ('direct', 'open_teacher')),
+      label TEXT NOT NULL DEFAULT '',
+      max_uses INTEGER NOT NULL DEFAULT 1,
+      use_count INTEGER NOT NULL DEFAULT 0,
       expires_at TIMESTAMPTZ NOT NULL,
       used_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE wa_teacher_invites ALTER COLUMN teacher_user_id DROP NOT NULL",
+  "ALTER TABLE wa_teacher_invites ADD COLUMN IF NOT EXISTS invite_type TEXT NOT NULL DEFAULT 'direct'",
+  "ALTER TABLE wa_teacher_invites ADD COLUMN IF NOT EXISTS label TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE wa_teacher_invites ADD COLUMN IF NOT EXISTS max_uses INTEGER NOT NULL DEFAULT 1",
+  "ALTER TABLE wa_teacher_invites ADD COLUMN IF NOT EXISTS use_count INTEGER NOT NULL DEFAULT 0",
   "CREATE INDEX IF NOT EXISTS wa_teacher_invites_teacher_idx ON wa_teacher_invites(teacher_user_id)",
+  "CREATE INDEX IF NOT EXISTS wa_teacher_invites_code_idx ON wa_teacher_invites(code)",
   `
     CREATE TABLE IF NOT EXISTS wa_tasks (
       id SERIAL PRIMARY KEY,
