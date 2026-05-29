@@ -248,7 +248,11 @@ services:
       PORT: 8080
       WA_TASKS_BASE_PATH: /wa-tasks
       WA_TASKS_PUBLIC_URL: ${WA_TASKS_PUBLIC_URL:-https://studerria.com/wa-tasks}
-      WA_TASKS_DATABASE_URL: postgres://${WA_TASKS_POSTGRES_USER:-wa_tasks}:${WA_TASKS_POSTGRES_PASSWORD:-wa_tasks_local}@whatsapp-tasks-db:5432/${WA_TASKS_POSTGRES_DB:-wa_tasks}
+      WA_TASKS_DB_HOST: whatsapp-tasks-db
+      WA_TASKS_DB_PORT: 5432
+      WA_TASKS_DB_USER: ${WA_TASKS_POSTGRES_USER:-wa_tasks}
+      WA_TASKS_DB_PASSWORD: ${WA_TASKS_POSTGRES_PASSWORD:-wa_tasks_local}
+      WA_TASKS_DB_NAME: ${WA_TASKS_POSTGRES_DB:-wa_tasks}
       WA_TASKS_SESSION_SECRET: ${WA_TASKS_SESSION_SECRET:-change-me-wa-tasks-session-secret-change-this}
       WA_TASKS_DEV_EMAIL: ${WA_TASKS_DEV_EMAIL:-dev@studerria.local}
       WA_TASKS_DEV_PASSWORD: ${WA_TASKS_DEV_PASSWORD:-change-me-wa-tasks-dev}

@@ -3,7 +3,14 @@ export type AppConfig = {
   port: number;
   basePath: string;
   publicUrl: string;
-  databaseUrl: string;
+  database: {
+    connectionString: string;
+    host: string;
+    port: number;
+    user: string;
+    password: string;
+    database: string;
+  };
   sessionSecret: string;
   devEmail: string;
   devPassword: string;
@@ -41,7 +48,14 @@ export function loadConfig(): AppConfig {
     port: envNumber("PORT", 8080),
     basePath,
     publicUrl: envString("WA_TASKS_PUBLIC_URL", "https://studerria.com/wa-tasks").replace(/\/+$/g, ""),
-    databaseUrl: envString("WA_TASKS_DATABASE_URL", envString("DATABASE_URL", "postgres://wa_tasks:wa_tasks_local@127.0.0.1:5432/wa_tasks")),
+    database: {
+      connectionString: envString("WA_TASKS_DATABASE_URL", envString("DATABASE_URL")),
+      host: envString("WA_TASKS_DB_HOST", "127.0.0.1"),
+      port: envNumber("WA_TASKS_DB_PORT", 5432),
+      user: envString("WA_TASKS_DB_USER", "wa_tasks"),
+      password: envString("WA_TASKS_DB_PASSWORD", "wa_tasks_local"),
+      database: envString("WA_TASKS_DB_NAME", "wa_tasks"),
+    },
     sessionSecret: envString("WA_TASKS_SESSION_SECRET", "change-me-wa-tasks-session-secret-change-this"),
     devEmail: envString("WA_TASKS_DEV_EMAIL", "dev@studerria.local").toLowerCase(),
     devPassword: envString("WA_TASKS_DEV_PASSWORD", "change-me-wa-tasks-dev"),
