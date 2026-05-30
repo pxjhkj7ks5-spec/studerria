@@ -20907,7 +20907,7 @@ function parseStuderriaTelegramHomeworkQuestionTarget(message = {}) {
 
 const STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES = new Map([
   ['пари не удари', 'можна пропустити'],
-  ['час іде', 'кма про веде'],
+  ['час іде', 'а пари не закінчуються🫠'],
   ['недостатньо', 'докрутив'],
   ['соня з', '67'],
   ['марія', 'Б'],
