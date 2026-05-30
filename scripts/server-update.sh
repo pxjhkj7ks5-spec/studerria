@@ -22,9 +22,7 @@ Services:
   china-map    /china-map sidecar
   naradadruk   /naradadruk sidecar
   slashtg      /tg sidecar
-  whatsapp-tasks /wa-tasks sidecar
   db           PostgreSQL
-  whatsapp-tasks-db WhatsApp Tasks PostgreSQL
   redis        Redis
   loki         Loki
   promtail     Promtail
@@ -43,8 +41,6 @@ normalize_service() {
     china-map|chinamap|china) echo "china-map" ;;
     naradadruk|narada-druk) echo "naradadruk" ;;
     slashtg|slash-tg|tg) echo "slashtg" ;;
-    whatsapp-tasks|wa-tasks|watasks|wa) echo "whatsapp-tasks" ;;
-    whatsapp-tasks-db|wa-tasks-db|watasks-db) echo "whatsapp-tasks-db" ;;
     db|postgres|postgresql) echo "db" ;;
     redis) echo "redis" ;;
     loki) echo "loki" ;;
@@ -183,9 +179,6 @@ backup_stateful_data() {
       ;;
     slashtg)
       backup_compose_volume_mount slashtg /data slashtg-data
-      ;;
-    whatsapp-tasks|whatsapp-tasks-db)
-      backup_compose_volume_mount whatsapp-tasks-db /var/lib/postgresql whatsapp-tasks-postgres
       ;;
     *)
       ;;

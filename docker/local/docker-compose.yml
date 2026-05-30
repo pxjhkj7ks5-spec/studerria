@@ -35,24 +35,6 @@ services:
       retries: 20
       start_period: 10s
 
-  whatsapp-tasks-db:
-    image: postgres:18-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${WA_TASKS_POSTGRES_DB:-wa_tasks}
-      POSTGRES_USER: ${WA_TASKS_POSTGRES_USER:-wa_tasks}
-      POSTGRES_PASSWORD: ${WA_TASKS_POSTGRES_PASSWORD:-wa_tasks_local}
-    ports:
-      - "${WA_TASKS_POSTGRES_PORT_FORWARD:-5434}:5432"
-    volumes:
-      - whatsapp_tasks_postgres_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-
   loki:
     image: grafana/loki:3.1.1
     restart: unless-stopped
@@ -234,52 +216,6 @@ services:
       retries: 20
       start_period: 30s
 
-  whatsapp-tasks:
-    build:
-      context: ../../services/whatsapp-tasks
-      dockerfile: Dockerfile
-    init: true
-    restart: unless-stopped
-    depends_on:
-      whatsapp-tasks-db:
-        condition: service_healthy
-    environment:
-      NODE_ENV: ${WA_TASKS_NODE_ENV:-development}
-      PORT: 8080
-      WA_TASKS_BASE_PATH: /wa-tasks
-      WA_TASKS_PUBLIC_URL: ${WA_TASKS_PUBLIC_URL:-https://studerria.com/wa-tasks}
-      WA_TASKS_DB_HOST: whatsapp-tasks-db
-      WA_TASKS_DB_PORT: 5432
-      WA_TASKS_DB_USER: ${WA_TASKS_POSTGRES_USER:-wa_tasks}
-      WA_TASKS_DB_PASSWORD: ${WA_TASKS_POSTGRES_PASSWORD:-wa_tasks_local}
-      WA_TASKS_DB_NAME: ${WA_TASKS_POSTGRES_DB:-wa_tasks}
-      WA_TASKS_SESSION_SECRET: ${WA_TASKS_SESSION_SECRET:-change-me-wa-tasks-session-secret-change-this}
-      WA_TASKS_DEV_EMAIL: ${WA_TASKS_DEV_EMAIL:-dev@studerria.local}
-      WA_TASKS_DEV_PASSWORD: ${WA_TASKS_DEV_PASSWORD:-change-me-wa-tasks-dev}
-      WA_TASKS_WORKER_ENABLED: ${WA_TASKS_WORKER_ENABLED:-true}
-      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
-      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
-      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
-      WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-v24.0}
-    read_only: true
-    tmpfs:
-      - /tmp:size=64m,mode=1777
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:8080/wa-tasks/_health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-
   app:
     build:
       context: ../..
@@ -314,7 +250,6 @@ services:
       NARADADRUK_PROXY_TARGET: http://naradadruk:8080
       SLASHTG_PROXY_TARGET: http://slashtg:8080
       SLASHTG_BASE_PATH: ${SLASHTG_BASE_PATH:-/tg}
-      WHATSAPP_TASKS_PROXY_TARGET: http://whatsapp-tasks:8080
       STUDERRIA_TG_BOT_TOKEN: ${STUDERRIA_TG_BOT_TOKEN:-}
       STUDERRIA_TG_BOT_USERNAME: ${STUDERRIA_TG_BOT_USERNAME:-}
       STUDERRIA_TG_APP_SHORT_NAME: ${STUDERRIA_TG_APP_SHORT_NAME:-}
@@ -347,6 +282,5 @@ volumes:
   charredmap_data:
   naradadruk_data:
   slashtg_data:
-  whatsapp_tasks_postgres_data:
   loki_data:
   promtail_positions:

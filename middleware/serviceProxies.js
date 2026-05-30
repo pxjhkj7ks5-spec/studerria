@@ -4,7 +4,6 @@ const CHARREDMAP_BASE_PATH = '/charredmap';
 const CHINAMAP_BASE_PATH = '/china-map';
 const NARADADRUK_BASE_PATH = '/naradadruk';
 const DEFAULT_SLASHTG_BASE_PATH = '/tg';
-const WHATSAPP_TASKS_BASE_PATH = '/wa-tasks';
 
 function isServiceRequest(req, basePath) {
   const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
@@ -63,7 +62,6 @@ function registerServiceProxies(app, deps = {}) {
   const chinaMapProxyTarget = String(env.CHINAMAP_PROXY_TARGET || '').trim();
   const naradadrukProxyTarget = String(env.NARADADRUK_PROXY_TARGET || '').trim();
   const slashtgProxyTarget = String(env.SLASHTG_PROXY_TARGET || '').trim();
-  const whatsappTasksProxyTarget = String(env.WHATSAPP_TASKS_PROXY_TARGET || '').trim();
   const slashtgBasePath = String(env.SLASHTG_BASE_PATH || DEFAULT_SLASHTG_BASE_PATH).trim() || DEFAULT_SLASHTG_BASE_PATH;
 
   const charredmapProxy = createServiceProxy({
@@ -94,14 +92,6 @@ function registerServiceProxies(app, deps = {}) {
     logLabel: 'Slash TG',
     logger,
   });
-  const whatsappTasksProxy = createServiceProxy({
-    target: whatsappTasksProxyTarget,
-    basePath: WHATSAPP_TASKS_BASE_PATH,
-    serviceName: 'WA Tasks',
-    logLabel: 'WA Tasks',
-    logger,
-  });
-
   app.use((req, res, next) => {
     if (!isServiceRequest(req, CHARREDMAP_BASE_PATH)) {
       return next();
@@ -142,15 +132,6 @@ function registerServiceProxies(app, deps = {}) {
     return slashtgProxy(req, res, next);
   });
 
-  app.use((req, res, next) => {
-    if (!isServiceRequest(req, WHATSAPP_TASKS_BASE_PATH)) {
-      return next();
-    }
-    if (!whatsappTasksProxy) {
-      return respondServiceUnavailable(res, 'WA Tasks', 404);
-    }
-    return whatsappTasksProxy(req, res, next);
-  });
 }
 
 module.exports = {
