@@ -20963,15 +20963,7 @@ async function handleStuderriaTelegramMeetingPhrase(message = {}) {
     });
     return;
   }
-  await sendStuderriaTelegramMessage(
-    chatId,
-    [
-      caption,
-      '',
-      'Файл пісні ще не підключено на сервері.',
-    ].join('\n'),
-    { sourceMessage: message }
-  );
+  await sendStuderriaTelegramMessage(chatId, caption, { sourceMessage: message });
 }
 
 async function handleStuderriaTelegramPresentationTemplatePhrase(message = {}) {
