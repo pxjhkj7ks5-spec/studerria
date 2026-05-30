@@ -20949,7 +20949,10 @@ async function handleStuderriaTelegramMeetingPhrase(message = {}) {
     await sendStuderriaTelegramRegistrationPrompt(message, 'цієї фрази');
     return;
   }
-  const caption = 'час згадати скаутський обхід';
+  const caption = [
+    'час згадати скаутський обхід',
+    'https://www.tiktok.com/@andromedafogovec/video/7406324489560149254?is_from_webapp=1&sender_device=pc&web_id=7603489677706315280',
+  ].join('\n');
   if (studerriaTelegramMeetingAudioFile && fs.existsSync(studerriaTelegramMeetingAudioFile)) {
     await sendStuderriaTelegramAudio(chatId, studerriaTelegramMeetingAudioFile, {
       sourceMessage: message,
