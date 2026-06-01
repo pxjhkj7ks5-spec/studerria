@@ -20220,6 +20220,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
+  { command: 'showpari', description: 'Показати пари за тиждень' },
   { command: 'addpara', description: 'Додати пару' },
   { command: 'deletepara', description: 'Видалити пару' },
   { command: 'teamwork', description: 'Створити Teamwork команди' },
@@ -20234,6 +20235,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
 const STUDERRIA_TG_GROUP_BOT_COMMANDS = [
   { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
+  { command: 'showpari', description: 'Показати пари за тиждень' },
   { command: 'teamwork', description: 'Створити Teamwork команди' },
   { command: 'openteam', description: 'Відкрити вступ у Teamwork' },
   { command: 'closeteam', description: 'Закрити вступ у Teamwork' },
@@ -20735,6 +20737,7 @@ async function sendStuderriaTelegramHelp(message = {}) {
   const strictTeamCommand = `/strictteam${commandSuffix}`;
   const deleteTeamworkCommand = `/deleteteamwork${commandSuffix}`;
   const notificationCommand = `/notification${commandSuffix}`;
+  const showParaCommand = `/showpari${commandSuffix}`;
   const addParaCommand = `/addpara${commandSuffix}`;
   const deleteParaCommand = `/deletepara${commandSuffix}`;
   const enableNotificationCommand = `/enablenotification${commandSuffix}`;
@@ -20776,10 +20779,12 @@ async function sendStuderriaTelegramHelp(message = {}) {
     'Особисті налаштування сповіщень працюють тільки в приватному чаті з ботом.',
     '',
     '5. Розклад і пари',
+    `${showParaCommand} - показати список пар за вибраний тиждень.`,
     `${addParaCommand} - додати пару через Telegram.`,
     `${deleteParaCommand} - видалити пару через Telegram.`,
-    'У приватному чаті ці команди доступні starosta, admin, deanery або dev.',
-    'У групі ці команди проходять тільки для starosta або dev.',
+    'Перегляд пар доступний зареєстрованим користувачам з привʼязаним Telegram.',
+    'Додавати й видаляти пари в приватному чаті можуть starosta, admin, deanery або dev.',
+    'У групі додавання й видалення проходять тільки для starosta або dev.',
     '',
     '6. Службові dev-команди',
     `${devUsersCommand} - список привʼязаних Telegram-користувачів. Тільки dev, тільки в особистому чаті.`,
@@ -21055,6 +21060,159 @@ function buildStuderriaTelegramScheduleRowLine(row = {}, displayBellSchedule = b
   const meta = [lessonType, groupLabel, roomLabel].filter(Boolean).join(' · ');
   const head = `${classNumber || '-'}. ${timeLabel ? `${timeLabel} · ` : ''}${subjectName}`;
   return meta ? `${head}\n   ${meta}` : head;
+}
+
+async function loadStuderriaTelegramShowScheduleContext(telegramUser = {}) {
+  const context = await getStuderriaTelegramActorContext(telegramUser);
+  if (!context.actor) {
+    return { ...context, error: 'not_registered' };
+  }
+  const userId = Number(context.actor.id || 0);
+  const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
+    getAcademicV2Store(),
+    userId,
+    { selectedOnly: true }
+  ).catch((err) => {
+    console.error('Studerria Telegram showpari subject state failed', err && err.message ? err.message : err);
+    return null;
+  });
+  if (!subjectState || !subjectState.term) {
+    return {
+      ...context,
+      subjectState,
+      error: 'Не знайшов активний семестр або групу для твого акаунта. Відкрий mini app і перевір профіль та предмети.',
+    };
+  }
+  const totalWeeks = Math.max(1, Number(subjectState.term.weeks_count || 0) || 16);
+  const currentWeek = clampStuderriaTelegramWeekNumber(
+    getAcademicWeekForSemester(new Date(), subjectState.term),
+    subjectState.term
+  );
+  return {
+    ...context,
+    subjectState,
+    currentWeek,
+    totalWeeks,
+    displayBellSchedule: buildDisplayBellSchedule(
+      subjectState && subjectState.scope ? subjectState.scope.campus_key : null
+    ),
+  };
+}
+
+function getStuderriaTelegramAllWeekNumbers(context = {}) {
+  const totalWeeks = Math.max(1, Number(context.totalWeeks || 0) || 16);
+  return Array.from({ length: totalWeeks }, (_value, index) => index + 1);
+}
+
+function buildStuderriaTelegramShowWeekKeyboard(context = {}) {
+  const weekNumbers = getStuderriaTelegramAllWeekNumbers(context);
+  const rows = [];
+  for (let index = 0; index < weekNumbers.length; index += 2) {
+    rows.push(weekNumbers.slice(index, index + 2).map((weekNumber) => ({
+      text: weekNumber === Number(context.currentWeek || 0) ? `Поточний (${weekNumber})` : `Тиждень ${weekNumber}`,
+      callback_data: createStuderriaTelegramActionToken({
+        flow: 'show_week',
+        actorTelegramId: context.actorTelegramId,
+        weekNumber,
+      }),
+    })));
+  }
+  return { inline_keyboard: rows };
+}
+
+async function showStuderriaTelegramWeekSchedulePicker(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const context = await loadStuderriaTelegramShowScheduleContext(message.from || {});
+  if (context.error === 'not_registered') {
+    await sendStuderriaTelegramRegistrationPrompt(message, 'перегляду пар');
+    return;
+  }
+  if (context.error) {
+    await sendStuderriaTelegramMessage(chatId, context.error, {
+      sourceMessage: message,
+      replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || ''),
+    });
+    return;
+  }
+  await sendStuderriaTelegramMessage(chatId, 'За який тиждень показати пари?', {
+    sourceMessage: message,
+    replyMarkup: buildStuderriaTelegramShowWeekKeyboard(context),
+  });
+}
+
+async function loadStuderriaTelegramWeeklyScheduleRows(context = {}, weekNumber = 1) {
+  const scheduleState = await academicV2StudentHelpers.loadStudentScheduleData(
+    getAcademicV2Store(),
+    Number(context.actor && context.actor.id || 0),
+    { weekNumber }
+  );
+  return (scheduleState && Array.isArray(scheduleState.scheduleRows) ? scheduleState.scheduleRows : [])
+    .sort((left, right) =>
+      (fullWeekDays.indexOf(left.day_of_week) - fullWeekDays.indexOf(right.day_of_week))
+      || (Number(left.class_number || 0) - Number(right.class_number || 0))
+      || String(left.subject_name || left.subject_title || '').localeCompare(String(right.subject_name || right.subject_title || ''))
+    );
+}
+
+function buildStuderriaTelegramWeeklyScheduleText(context = {}, weekNumber = 1, rows = []) {
+  const lines = [`Пари на ${weekNumber} тиждень`, ''];
+  if (!rows.length) {
+    lines.push('На цей тиждень пар не знайшов.');
+    lines.push('Якщо розклад щойно оновлювали, перевір ще mini app.');
+    return lines.join('\n');
+  }
+
+  let visibleCount = 0;
+  for (const dayName of fullWeekDays) {
+    const dayRows = rows.filter((row) => row && row.day_of_week === dayName);
+    if (!dayRows.length) continue;
+    let dayHeaderAdded = false;
+    for (const row of dayRows) {
+      const nextLines = [
+        ...lines,
+        !dayHeaderAdded && lines.length > 2 ? '' : null,
+        !dayHeaderAdded ? `${getStuderriaTelegramFullDayLabel(dayName)}:` : null,
+        buildStuderriaTelegramScheduleRowLine(row, context.displayBellSchedule),
+      ].filter((line) => line !== null);
+      if (nextLines.join('\n').length > 3800) {
+        break;
+      }
+      lines.splice(0, lines.length, ...nextLines);
+      visibleCount += 1;
+      dayHeaderAdded = true;
+    }
+  }
+
+  if (visibleCount < rows.length) {
+    lines.push('');
+    lines.push('Частину пар не вмістив у повідомлення. Повний список є в mini app.');
+  }
+  return lines.join('\n').slice(0, 3900);
+}
+
+async function handleStuderriaTelegramShowCallback(callbackQuery = {}, payload = {}) {
+  const context = await loadStuderriaTelegramShowScheduleContext(callbackQuery.from || {});
+  if (context.error === 'not_registered') {
+    await editStuderriaTelegramMessage(callbackQuery, 'Для перегляду пар спершу зайди в mini app через /start і привʼяжи Telegram.');
+    return;
+  }
+  if (context.error) {
+    await editStuderriaTelegramMessage(callbackQuery, context.error);
+    return;
+  }
+  if (payload.actorTelegramId && payload.actorTelegramId !== context.actorTelegramId) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Це меню відкрив інший користувач.');
+    return;
+  }
+  const totalWeeks = Math.max(1, Number(context.totalWeeks || 0) || 16);
+  const weekNumber = Math.max(1, Math.min(totalWeeks, parsePositiveIntStrict(payload.weekNumber) || context.currentWeek || 1));
+  const rows = await loadStuderriaTelegramWeeklyScheduleRows(context, weekNumber);
+  await editStuderriaTelegramMessage(
+    callbackQuery,
+    buildStuderriaTelegramWeeklyScheduleText(context, weekNumber, rows)
+  );
 }
 
 async function sendStuderriaTelegramScheduleForQuestion(message = {}, target = null) {
@@ -24615,6 +24773,10 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
     await handleStuderriaTelegramTeamworkCallback(callbackQuery, payload);
     return;
   }
+  if (String(payload.flow || '').startsWith('show_')) {
+    await handleStuderriaTelegramShowCallback(callbackQuery, payload);
+    return;
+  }
   if (String(payload.flow || '').startsWith('add_')) {
     await handleStuderriaTelegramAddCallback(callbackQuery, payload);
     return;
@@ -24694,6 +24856,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
     }
     if (parsedCommand.command === 'notification') {
       await showStuderriaTelegramManualNotificationTargetPicker(message);
+      return;
+    }
+    if (parsedCommand.command === 'showpari') {
+      await showStuderriaTelegramWeekSchedulePicker(message);
       return;
     }
     if (!isStuderriaTelegramPrivateChat(message.chat)) {
