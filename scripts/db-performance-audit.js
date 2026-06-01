@@ -148,15 +148,44 @@ async function loadAudit(pool, options) {
     `,
     [tableNames],
   );
+  const indexStatsResult = await pool.query(
+    `
+      SELECT
+        relname AS tablename,
+        indexrelname AS indexname,
+        idx_scan,
+        idx_tup_read,
+        idx_tup_fetch,
+        pg_relation_size(indexrelid) AS index_bytes
+      FROM pg_stat_user_indexes
+      WHERE relname = ANY($1::text[])
+      ORDER BY relname ASC, indexrelname ASC
+    `,
+    [tableNames],
+  );
 
+  const indexStatsByKey = new Map();
+  for (const row of indexStatsResult.rows || []) {
+    indexStatsByKey.set(`${row.tablename}|${row.indexname}`, {
+      idx_scan: Number(row.idx_scan || 0),
+      idx_tup_read: Number(row.idx_tup_read || 0),
+      idx_tup_fetch: Number(row.idx_tup_fetch || 0),
+      index_bytes: Number(row.index_bytes || 0),
+    });
+  }
   const indexesByTable = new Map();
   for (const row of indexesResult.rows || []) {
     if (!indexesByTable.has(row.tablename)) {
       indexesByTable.set(row.tablename, []);
     }
+    const stats = indexStatsByKey.get(`${row.tablename}|${row.indexname}`) || {};
     indexesByTable.get(row.tablename).push({
       name: row.indexname,
       definition: row.indexdef,
+      idx_scan: Number(stats.idx_scan || 0),
+      idx_tup_read: Number(stats.idx_tup_read || 0),
+      idx_tup_fetch: Number(stats.idx_tup_fetch || 0),
+      index_bytes: Number(stats.index_bytes || 0),
     });
   }
 
@@ -201,7 +230,7 @@ function printText(audit) {
     }
     console.log('  indexes:');
     for (const index of table.indexes) {
-      console.log(`    - ${index.name}`);
+      console.log(`    - ${index.name} (${formatBytes(index.index_bytes)}, scans=${index.idx_scan})`);
     }
   }
 }

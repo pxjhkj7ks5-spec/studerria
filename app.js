@@ -30,6 +30,7 @@ const registerSubjectHelpers = require('./lib/registerSubjects');
 const roomHelpers = require('./lib/rooms');
 const pathwayHelpers = require('./lib/pathways');
 const securityHelpers = require('./lib/security');
+const dbPerformance = require('./lib/dbPerformance');
 const sessionGeneratorHelpers = require('./lib/sessionGenerator');
 const {
   normalizeScheduleGeneratorOperationId,
@@ -1031,6 +1032,9 @@ const pool = new Pool({
     enabled: dbSslEnabled,
     ca: process.env.DB_SSL_CA || '',
   }),
+});
+dbPerformance.instrumentPgPool(pool, {
+  thresholdMs: dbPerformance.parseSlowQueryThreshold(process.env.DB_SLOW_QUERY_MS || 750),
 });
 
 const sessionSecretState = securityHelpers.resolveSessionSecret(process.env.SESSION_SECRET || '', { isProd });
