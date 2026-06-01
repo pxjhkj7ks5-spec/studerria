@@ -21027,12 +21027,27 @@ function getStuderriaTelegramFullDayLabel(dayName = '') {
   return labels[dayName] || getStuderriaTelegramDayLabel(dayName) || dayName;
 }
 
+function normalizeStuderriaTelegramScheduleGroupLabel(row = {}) {
+  const rawLabel = sanitizeCompactText(row.group_label || '', 40);
+  if (/^all groups$/i.test(rawLabel)) return 'Усі групи';
+  const singleMatch = rawLabel.match(/^group\s+(\d+)$/i);
+  if (singleMatch) return `Група ${singleMatch[1]}`;
+  const multiMatch = rawLabel.match(/^groups\s+([\d,\s]+)$/i);
+  if (multiMatch) return `Групи ${multiMatch[1].replace(/\s+/g, ' ').trim()}`;
+  if (rawLabel) return rawLabel;
+
+  const lessonType = normalizeLessonType(row.lesson_type || row.activity_type);
+  const groupNumber = parsePositiveIntStrict(row.group_number);
+  if (lessonType === 'lecture') return 'Усі групи';
+  return groupNumber ? `Група ${groupNumber}` : '';
+}
+
 function buildStuderriaTelegramScheduleRowLine(row = {}, displayBellSchedule = bellSchedule) {
   const classNumber = Number(row.class_number || 0);
   const timeLabel = getScheduleTimeLabel(classNumber, displayBellSchedule);
   const subjectName = sanitizeCompactText(row.subject_name || row.subject_title || row.name || 'Предмет', 120);
   const lessonType = getStuderriaTelegramLessonTypeLabel(row.lesson_type || row.activity_type);
-  const groupLabel = sanitizeCompactText(row.group_label || '', 40);
+  const groupLabel = normalizeStuderriaTelegramScheduleGroupLabel(row);
   const roomLabel = sanitizeCompactText(row.room_label || row.room_name || row.room_code || '', 60);
   const meta = [lessonType, groupLabel, roomLabel].filter(Boolean).join(' · ');
   const head = `${classNumber || '-'}. ${timeLabel ? `${timeLabel} · ` : ''}${subjectName}`;
@@ -21043,6 +21058,49 @@ async function loadStuderriaTelegramShowScheduleContext(telegramUser = {}) {
   const context = await getStuderriaTelegramActorContext(telegramUser);
   if (!context.actor) {
     return { ...context, error: 'not_registered' };
+  }
+  const courseWideCourseId = parsePositiveIntStrict(context.actor.schedule_course_id || context.actor.course_id);
+  if (context.canUseStarosta && courseWideCourseId) {
+    const subjectScope = await getCourseSubjectAccessScope(courseWideCourseId, { visibleOnly: true }).catch(() => null);
+    const activeSemester = await getActiveSemester(courseWideCourseId).catch(() => null);
+    const runtimeTerm = subjectScope && subjectScope.source === 'academic_v2'
+      ? await academicV2RuntimeHelpers.loadCourseProjectionState(getAcademicV2Store(), courseWideCourseId)
+        .then((state) => state.term)
+        .catch(() => null)
+      : null;
+    const runtimeSemester = runtimeTerm ? {
+      id: runtimeTerm.legacy_semester_id || runtimeTerm.id,
+      start_date: runtimeTerm.start_date,
+      weeks_count: runtimeTerm.weeks_count,
+    } : null;
+    const semester = subjectScope && subjectScope.source === 'academic_v2'
+      ? (runtimeSemester || activeSemester)
+      : (activeSemester || runtimeSemester);
+    if (!semester) {
+      return {
+        ...context,
+        courseId: courseWideCourseId,
+        subjectScope,
+        error: 'Для курсу не знайдено активний семестр.',
+      };
+    }
+    const currentWeek = clampStuderriaTelegramWeekNumber(
+      getAcademicWeekForSemester(new Date(), semester),
+      semester
+    );
+    return {
+      ...context,
+      courseId: courseWideCourseId,
+      subjectScope,
+      runtimeTerm,
+      activeSemester: semester,
+      currentWeek,
+      totalWeeks: Math.max(1, Number(semester.weeks_count || 0) || 16),
+      showCourseWideSchedule: true,
+      displayBellSchedule: buildDisplayBellSchedule(
+        subjectScope && subjectScope.scope ? subjectScope.scope.campus_key : null
+      ),
+    };
   }
   const userId = Number(context.actor.id || 0);
   const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
@@ -21120,6 +21178,44 @@ async function showStuderriaTelegramWeekSchedulePicker(message = {}) {
 }
 
 async function loadStuderriaTelegramWeeklyScheduleRows(context = {}, weekNumber = 1) {
+  if (context.showCourseWideSchedule && parsePositiveIntStrict(context.courseId)) {
+    if (context.subjectScope && context.subjectScope.source === 'academic_v2') {
+      const scheduleState = await academicV2RuntimeHelpers.loadCourseScheduleRows(
+        getAcademicV2Store(),
+        context.courseId,
+        { weekNumber, visibleOnly: true }
+      );
+      return (scheduleState && Array.isArray(scheduleState.scheduleRows) ? scheduleState.scheduleRows : [])
+        .sort((left, right) =>
+          (fullWeekDays.indexOf(left.day_of_week) - fullWeekDays.indexOf(right.day_of_week))
+          || (Number(left.class_number || 0) - Number(right.class_number || 0))
+          || (Number(left.group_number || 0) - Number(right.group_number || 0))
+          || String(left.subject_name || left.subject_title || '').localeCompare(String(right.subject_name || right.subject_title || ''))
+        );
+    }
+    const rows = await db.all(
+      `
+        SELECT se.id AS schedule_entry_id, se.subject_id, se.group_number, se.day_of_week,
+               se.class_number, se.week_number, se.lesson_type, s.name AS subject_name,
+               CASE
+                 WHEN LOWER(COALESCE(se.lesson_type, '')) = 'lecture' THEN 'Усі групи'
+                 ELSE 'Група ' || COALESCE(se.group_number, 1)::text
+               END AS group_label
+        FROM schedule_entries se
+        JOIN subjects s ON s.id = se.subject_id
+        WHERE se.course_id = ?
+          AND se.semester_id = ?
+          AND se.week_number = ?
+        ORDER BY se.day_of_week ASC, se.class_number ASC, se.group_number ASC, se.id ASC
+      `,
+      [
+        context.courseId,
+        context.activeSemester && context.activeSemester.id,
+        weekNumber,
+      ]
+    );
+    return Array.isArray(rows) ? rows : [];
+  }
   const scheduleState = await academicV2StudentHelpers.loadStudentScheduleData(
     getAcademicV2Store(),
     Number(context.actor && context.actor.id || 0),
