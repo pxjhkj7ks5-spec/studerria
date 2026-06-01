@@ -59,6 +59,7 @@ const teamworkJoinOpenState = require('./058_teamwork_join_open_state');
 const teamworkJoinClosedBy = require('./059_teamwork_join_closed_by');
 const homeworkSource = require('./060_homework_source');
 const telegramRegistrationEventSource = require('./061_telegram_registration_event_source');
+const dbPerformanceIndexes = require('./062_db_performance_indexes');
 
 module.exports = [
   init,
@@ -122,4 +123,5 @@ module.exports = [
   teamworkJoinClosedBy,
   homeworkSource,
   telegramRegistrationEventSource,
+  dbPerformanceIndexes,
 ];
