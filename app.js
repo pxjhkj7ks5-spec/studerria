@@ -37,6 +37,12 @@ const {
 } = require('./lib/scheduleGeneratorBackups');
 const demoMode = require('./lib/demoMode');
 const telegramMiniApp = require('./lib/telegramMiniApp');
+const {
+  createStuderriaTelegramActionToken,
+  getStuderriaTelegramActionPayload,
+  consumeStuderriaTelegramActionPayload,
+  wasStuderriaTelegramActionConsumed,
+} = require('./lib/telegramActionTokens');
 const { localizeChangelogItems } = require('./lib/changelogI18n');
 const { publicLegalPages } = require('./lib/legalPages');
 const versionFile = path.join(__dirname, 'version.json');
@@ -20135,10 +20141,6 @@ const studerriaTelegramBotState = {
   botUsername: '',
 };
 
-const STUDERRIA_TG_ACTION_TTL_MS = 10 * 60 * 1000;
-const STUDERRIA_TG_CONSUMED_ACTION_TTL_MS = 2 * 60 * 1000;
-const studerriaTelegramActionStore = new Map();
-const studerriaTelegramConsumedActionStore = new Map();
 const studerriaTelegramDayLabels = {
   Monday: 'Пн',
   Tuesday: 'Вт',
@@ -20154,59 +20156,6 @@ const studerriaTelegramLessonTypeLabels = {
   practice: 'Практика',
   lab: 'Лаба',
 };
-
-function pruneStuderriaTelegramActionStore(now = Date.now()) {
-  for (const [token, item] of studerriaTelegramActionStore.entries()) {
-    if (!item || Number(item.expiresAt || 0) <= now) {
-      studerriaTelegramActionStore.delete(token);
-    }
-  }
-  for (const [token, item] of studerriaTelegramConsumedActionStore.entries()) {
-    if (!item || Number(item.expiresAt || 0) <= now) {
-      studerriaTelegramConsumedActionStore.delete(token);
-    }
-  }
-}
-
-function createStuderriaTelegramActionToken(payload = {}) {
-  pruneStuderriaTelegramActionStore();
-  const token = randomUUID().replace(/-/g, '').slice(0, 24);
-  studerriaTelegramActionStore.set(token, {
-    payload,
-    expiresAt: Date.now() + STUDERRIA_TG_ACTION_TTL_MS,
-  });
-  return `stb:${token}`;
-}
-
-function getStuderriaTelegramActionPayload(callbackData = '') {
-  const raw = String(callbackData || '').trim();
-  if (!raw.startsWith('stb:')) return null;
-  pruneStuderriaTelegramActionStore();
-  const token = raw.slice(4);
-  const item = studerriaTelegramActionStore.get(token);
-  return item && item.payload ? item.payload : null;
-}
-
-function consumeStuderriaTelegramActionPayload(callbackData = '') {
-  const raw = String(callbackData || '').trim();
-  if (!raw.startsWith('stb:')) return null;
-  pruneStuderriaTelegramActionStore();
-  const token = raw.slice(4);
-  const item = studerriaTelegramActionStore.get(token);
-  if (!item || !item.payload) return null;
-  studerriaTelegramActionStore.delete(token);
-  studerriaTelegramConsumedActionStore.set(token, {
-    expiresAt: Date.now() + STUDERRIA_TG_CONSUMED_ACTION_TTL_MS,
-  });
-  return item.payload;
-}
-
-function wasStuderriaTelegramActionConsumed(callbackData = '') {
-  const raw = String(callbackData || '').trim();
-  if (!raw.startsWith('stb:')) return false;
-  pruneStuderriaTelegramActionStore();
-  return studerriaTelegramConsumedActionStore.has(raw.slice(4));
-}
 
 async function callStuderriaTelegramBotApi(method, payload = {}) {
   const token = getTelegramMiniBotToken();
