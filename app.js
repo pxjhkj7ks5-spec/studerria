@@ -21427,8 +21427,9 @@ function buildStuderriaTelegramHomeworkRowLine(row = {}) {
   if (author) {
     lines.push(`Додав: ${escapeStuderriaTelegramHtml(author)}`);
   }
-  if (row.file_path || row.link_url) {
-    lines.push('Файл або лінк можна переглянути в mini app бота.');
+  const hasAssets = Array.isArray(row.assets) && row.assets.length > 0;
+  if (row.file_path || row.link_url || hasAssets) {
+    lines.push('<b>Файл або лінк можна переглянути в mini app бота.</b>');
   }
   return lines.filter(Boolean).join('\n');
 }
@@ -21518,6 +21519,18 @@ async function sendStuderriaTelegramHomeworkForQuestion(message = {}, target = n
         return subject && canStuderriaTelegramHomeworkRowShowForSubject(row, subject, context.actor);
       })
       .slice(0, 12);
+    if (visibleRows.length) {
+      try {
+        const homeworkAssetMap = await listHomeworkAssetsByHomeworkIds(visibleRows.map((row) => row && row.id));
+        visibleRows.forEach((row) => {
+          row.assets = homeworkAssetMap.get(Number(row.id || 0)) || [];
+        });
+      } catch (assetErr) {
+        if (!isDbSchemaCompatibilityError(assetErr)) {
+          console.error('Telegram homework asset map load failed', assetErr);
+        }
+      }
+    }
     const lines = [
       `<b>ДЗ на ${escapeStuderriaTelegramHtml(targetLabel)} (${escapeStuderriaTelegramHtml(dayLabel)}, ${escapeStuderriaTelegramHtml(dateLabel)})</b>`,
       '',
