@@ -37417,10 +37417,11 @@ app.get(/^\/uploads\/(.+)$/, requireLogin, async (req, res) => {
     }
     const absolutePath = access.absolutePath;
     const extension = path.extname(absolutePath).toLowerCase();
+    const downloadRequested = String(req.query.download || '') === '1';
     res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (DANGEROUS_UPLOAD_EXTENSIONS.has(extension)) {
+    if (downloadRequested || DANGEROUS_UPLOAD_EXTENSIONS.has(extension)) {
       res.setHeader('Content-Disposition', `attachment; filename="${path.basename(absolutePath).replace(/"/g, '')}"`);
       res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
     }

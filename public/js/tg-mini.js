@@ -10,6 +10,7 @@
   const pageCache = new Map();
   let activeNavigationRequest = null;
   let telegramSessionSyncPromise = null;
+  const maxTgHomeworkFiles = 8;
   const systemDarkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
   function colorIsDark(rawColor) {
@@ -188,6 +189,7 @@
     bindFileInputs();
     bindScheduleHomeworkModal();
     bindScheduleHomeworkViewModal();
+    bindScheduleFilePreviewModal();
     primeFastPages();
     applyTelegramChrome();
   }
@@ -325,12 +327,53 @@
     });
   }
 
-  function updateFileInputLabel(input) {
-    if (!input) return;
-    const label = input.closest('.tg-file-label');
+  function getTgFileLabel(element) {
+    return element ? element.closest('[data-tg-file-label], .tg-file-label') : null;
+  }
+
+  function getTgFileInputs(label) {
+    return label ? Array.from(label.querySelectorAll('[data-tg-file-input]')) : [];
+  }
+
+  function getTgSelectedFiles(label) {
+    return getTgFileInputs(label).flatMap((input) => (
+      input.files ? Array.from(input.files).filter(Boolean) : []
+    ));
+  }
+
+  function formatTgFileCount(count) {
+    if (count === 1) return '1 файл';
+    if (count >= 5) return `${count} файлів`;
+    return `${count} файли`;
+  }
+
+  function renderTgFileList(label, files) {
+    const list = label ? label.querySelector('[data-tg-file-list]') : null;
+    if (!list) return;
+    list.innerHTML = '';
+    list.hidden = !files.length;
+    files.forEach((file) => {
+      const chip = document.createElement('span');
+      chip.className = 'tg-file-chip';
+      chip.textContent = file && file.name ? file.name : 'Файл';
+      list.appendChild(chip);
+    });
+  }
+
+  function updateFileInputLabel(inputOrLabel) {
+    if (!inputOrLabel) return;
+    const label = inputOrLabel.matches && inputOrLabel.matches('[data-tg-file-label], .tg-file-label')
+      ? inputOrLabel
+      : getTgFileLabel(inputOrLabel);
     const name = label ? label.querySelector('[data-tg-file-name]') : null;
     if (!name) return;
-    const files = input.files ? Array.from(input.files).filter(Boolean) : [];
+    const files = getTgSelectedFiles(label);
+    const addMore = label ? label.querySelector('[data-tg-file-add-more]') : null;
+    getTgFileInputs(label).forEach((input) => {
+      input.classList.toggle('is-filled', Boolean(input.files && input.files.length));
+    });
+    renderTgFileList(label, files);
+    if (addMore) addMore.hidden = !files.length || files.length >= maxTgHomeworkFiles;
     if (!files.length) {
       name.textContent = 'Файли не вибрано';
       return;
@@ -339,13 +382,42 @@
       name.textContent = files[0] && files[0].name ? files[0].name : '1 файл';
       return;
     }
-    const fileCountLabel = files.length >= 5 ? `${files.length} файлів` : `${files.length} файли`;
     const firstNames = files
       .slice(0, 2)
       .map((file) => file && file.name)
       .filter(Boolean);
     const extraCount = files.length - firstNames.length;
-    name.textContent = `${fileCountLabel}: ${firstNames.join(', ')}${extraCount > 0 ? ` +${extraCount}` : ''}`;
+    name.textContent = `${formatTgFileCount(files.length)}: ${firstNames.join(', ')}${extraCount > 0 ? ` +${extraCount}` : ''}`;
+  }
+
+  function bindSingleFileInput(input) {
+    if (!input || input.dataset.tgFileInputBound === '1') return;
+    input.dataset.tgFileInputBound = '1';
+    input.addEventListener('change', () => {
+      const label = getTgFileLabel(input);
+      const files = getTgSelectedFiles(label);
+      if (files.length > maxTgHomeworkFiles) {
+        input.value = '';
+        updateFileInputLabel(label);
+        window.alert(`Можна додати до ${maxTgHomeworkFiles} файлів.`);
+        return;
+      }
+      updateFileInputLabel(label);
+    });
+    updateFileInputLabel(input);
+  }
+
+  function createTgExtraFileInput(label) {
+    if (!label) return null;
+    const input = document.createElement('input');
+    input.className = 'tg-file-input tg-file-input--extra';
+    input.name = 'attachment';
+    input.type = 'file';
+    input.multiple = true;
+    input.setAttribute('data-tg-file-input', '');
+    label.appendChild(input);
+    bindSingleFileInput(input);
+    return input;
   }
 
   function bindFileInputs() {
@@ -354,9 +426,17 @@
         updateFileInputLabel(input);
         return;
       }
-      input.dataset.tgFileInputBound = '1';
-      input.addEventListener('change', () => updateFileInputLabel(input));
-      updateFileInputLabel(input);
+      bindSingleFileInput(input);
+    });
+    document.querySelectorAll('[data-tg-file-add-more]').forEach((button) => {
+      if (button.dataset.tgFileAddMoreBound === '1') return;
+      button.dataset.tgFileAddMoreBound = '1';
+      button.addEventListener('click', () => {
+        const label = getTgFileLabel(button);
+        if (getTgSelectedFiles(label).length >= maxTgHomeworkFiles) return;
+        const input = createTgExtraFileInput(label);
+        if (input) input.click();
+      });
     });
   }
 
@@ -371,6 +451,12 @@
       document.documentElement.scrollTop = scrollY;
       document.body.scrollTop = scrollY;
     }
+  }
+
+  function hasOpenTgModal(exceptModal = null) {
+    return Array.from(document.querySelectorAll('.tg-modal')).some((modal) => (
+      modal !== exceptModal && !modal.hidden
+    ));
   }
 
   function lockPageScroll(modal) {
@@ -434,6 +520,7 @@
       }
       if (form) {
         form.reset();
+        form.querySelectorAll('[data-tg-file-input].tg-file-input--extra').forEach((input) => input.remove());
         form.querySelectorAll('[data-tg-file-input]').forEach((input) => updateFileInputLabel(input));
         Object.keys(fields).forEach((key) => {
           if (!fields[key]) return;
@@ -495,6 +582,18 @@
     }
   }
 
+  function buildHomeworkUrl(rawHref, params = {}) {
+    const safeHref = resolveHomeworkHref(rawHref, { uploadsOnly: true });
+    if (!safeHref) return '';
+    const url = new URL(safeHref, window.location.origin);
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== null && typeof params[key] !== 'undefined') {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    return `${url.pathname}${url.search}${url.hash}`;
+  }
+
   function appendHomeworkLink(container, { href, label, uploadsOnly = false } = {}) {
     const safeHref = resolveHomeworkHref(href, { uploadsOnly });
     if (!safeHref || !label) return;
@@ -505,6 +604,19 @@
     link.rel = 'noopener noreferrer';
     link.textContent = label;
     container.appendChild(link);
+  }
+
+  function appendHomeworkFileButton(container, { href, label } = {}) {
+    const safeHref = resolveHomeworkHref(href, { uploadsOnly: true });
+    if (!safeHref || !label) return;
+    const button = document.createElement('button');
+    button.className = 'tg-homework-link';
+    button.type = 'button';
+    button.dataset.tgFilePreviewOpen = '1';
+    button.dataset.tgFileHref = safeHref;
+    button.dataset.tgFileLabel = label;
+    button.textContent = label;
+    container.appendChild(button);
   }
 
   function renderHomeworkViewItem(item) {
@@ -537,18 +649,16 @@
     const links = document.createElement('div');
     links.className = 'tg-homework-links';
     appendHomeworkLink(links, { href: item.link_url, label: 'Відкрити лінк' });
-    appendHomeworkLink(links, {
+    appendHomeworkFileButton(links, {
       href: item.file_path,
       label: item.file_name ? `Файл: ${item.file_name}` : 'Відкрити файл',
-      uploadsOnly: true,
     });
     if (Array.isArray(item.assets)) {
       item.assets.forEach((asset) => {
         if (!asset) return;
-        appendHomeworkLink(links, {
+        appendHomeworkFileButton(links, {
           href: asset.file_path,
           label: asset.name || asset.original_name || 'Відкрити файл',
-          uploadsOnly: true,
         });
       });
     }
@@ -611,6 +721,94 @@
     });
   }
 
+  function getPreviewKind(href, label) {
+    const value = `${href || ''} ${label || ''}`.toLowerCase();
+    if (/\.(?:png|jpe?g|gif)(?:[?#]|$)/.test(value)) return 'image';
+    if (/\.pdf(?:[?#]|$)/.test(value)) return 'pdf';
+    return 'download';
+  }
+
+  function bindScheduleFilePreviewModal() {
+    const modal = document.getElementById('tgFilePreviewModal');
+    if (!modal || modal.dataset.tgFilePreviewModalBound === '1') return;
+    modal.dataset.tgFilePreviewModalBound = '1';
+    const title = modal.querySelector('[data-tg-file-preview-title]');
+    const meta = modal.querySelector('[data-tg-file-preview-meta]');
+    const body = modal.querySelector('[data-tg-file-preview-body]');
+    const download = modal.querySelector('[data-tg-file-preview-download]');
+
+    function closeModal() {
+      if (modal.hidden) return;
+      modal.hidden = true;
+      if (body) body.innerHTML = '';
+      if (hasOpenTgModal(modal)) return;
+      unlockPageScroll(modal);
+    }
+
+    function openModal(button) {
+      const href = button && button.dataset ? button.dataset.tgFileHref : '';
+      const safeHref = resolveHomeworkHref(href, { uploadsOnly: true });
+      if (!safeHref || !body) return;
+      const label = button.dataset.tgFileLabel || 'Файл';
+      const previewHref = buildHomeworkUrl(safeHref, { preview: '1' });
+      const downloadHref = buildHomeworkUrl(safeHref, { download: '1' }) || safeHref;
+      const previewKind = getPreviewKind(safeHref, label);
+      if (title) title.textContent = label.replace(/^Файл:\s*/i, '') || 'Файл';
+      if (meta) {
+        meta.textContent = previewKind === 'download'
+          ? 'Для цього формату доступне завантаження.'
+          : 'Предперегляд без виходу з Telegram.';
+      }
+      if (download) {
+        download.href = downloadHref;
+        download.setAttribute('download', '');
+      }
+      body.innerHTML = '';
+      if (previewKind === 'image') {
+        const image = document.createElement('img');
+        image.className = 'tg-file-preview-image';
+        image.src = previewHref;
+        image.alt = label;
+        body.appendChild(image);
+      } else if (previewKind === 'pdf') {
+        const frame = document.createElement('iframe');
+        frame.className = 'tg-file-preview-frame';
+        frame.src = previewHref;
+        frame.title = label;
+        body.appendChild(frame);
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'tg-file-preview-empty';
+        empty.textContent = 'Предперегляд цього файлу недоступний у mini app. Його можна завантажити кнопкою нижче.';
+        body.appendChild(empty);
+      }
+      modal.hidden = false;
+      lockPageScroll(modal);
+    }
+
+    modal._tgOpenFilePreview = openModal;
+    if (document.documentElement.dataset.tgFilePreviewClickBound !== '1') {
+      document.documentElement.dataset.tgFilePreviewClickBound = '1';
+      document.addEventListener('click', (event) => {
+        const button = event.target && event.target.closest ? event.target.closest('[data-tg-file-preview-open]') : null;
+        if (!button) return;
+        const currentModal = document.getElementById('tgFilePreviewModal');
+        if (!currentModal || typeof currentModal._tgOpenFilePreview !== 'function') return;
+        event.preventDefault();
+        currentModal._tgOpenFilePreview(button);
+      });
+    }
+    modal.querySelectorAll('[data-tg-file-preview-close]').forEach((button) => {
+      button.addEventListener('click', closeModal);
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.hidden) closeModal();
+    });
+  }
+
   function primeFastPages() {
     const urls = new Map();
     document.querySelectorAll('a[href]').forEach((anchor) => {
@@ -657,6 +855,7 @@
   bindFileInputs();
   bindScheduleHomeworkModal();
   bindScheduleHomeworkViewModal();
+  bindScheduleFilePreviewModal();
   primeFastPages();
   syncTelegramSession();
 })();

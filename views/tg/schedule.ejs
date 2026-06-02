@@ -117,13 +117,15 @@
         <span>Опис ДЗ</span>
         <textarea name="description" rows="4" maxlength="1200" placeholder="Що треба зробити?" required></textarea>
       </label>
-      <label class="tg-file-label">
-        <span>Файл</span>
+      <label class="tg-file-label" data-tg-file-label>
+        <span>Файли</span>
         <span class="tg-file-control">
           <input class="tg-file-input" name="attachment" type="file" multiple data-tg-file-input />
           <span class="tg-file-button">Завантажити файли</span>
           <span class="tg-file-name" data-tg-file-name>Файли не вибрано</span>
         </span>
+        <span class="tg-file-list" data-tg-file-list hidden></span>
+        <button class="tg-file-add" type="button" data-tg-file-add-more hidden>Додати ще файли</button>
       </label>
       <label>
         <span>Лінк</span>
@@ -145,5 +147,22 @@
       <button class="tg-icon-button" type="button" data-tg-homework-view-close aria-label="Закрити">×</button>
     </div>
     <div class="tg-homework-list" data-tg-homework-view-list></div>
+  </section>
+</div>
+
+<div class="tg-modal tg-file-preview-modal" id="tgFilePreviewModal" hidden>
+  <div class="tg-modal-backdrop" data-tg-file-preview-close></div>
+  <section class="tg-modal-panel tg-file-preview-panel" role="dialog" aria-modal="true" aria-labelledby="tgFilePreviewTitle">
+    <div class="tg-modal-head">
+      <div>
+        <h2 id="tgFilePreviewTitle" data-tg-file-preview-title>Файл</h2>
+        <p class="tg-muted" data-tg-file-preview-meta>Перегляд у Telegram</p>
+      </div>
+      <button class="tg-icon-button" type="button" data-tg-file-preview-close aria-label="Закрити">×</button>
+    </div>
+    <div class="tg-file-preview-body" data-tg-file-preview-body></div>
+    <div class="tg-file-preview-actions">
+      <a class="tg-secondary" href="#" download data-tg-file-preview-download>Завантажити</a>
+    </div>
   </section>
 </div>
