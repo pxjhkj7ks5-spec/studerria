@@ -20897,6 +20897,10 @@ const STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES = new Map([
   ['недостатньо', 'докрутив'],
   ['соня з', '67'],
   ['марія', 'Б'],
+  ['монако', [
+    'десь у князівстві досі памʼятають неділю, коли червона машина нарешті доїхала додому першою',
+    'https://www.tiktok.com/@f1edits.ae/video/7645338215599131926?is_from_webapp=1&sender_device=pc&web_id=7603489677706315280',
+  ].join('\n')],
 ]);
 
 function getStuderriaTelegramAuthorizedPhraseReply(message = {}) {
