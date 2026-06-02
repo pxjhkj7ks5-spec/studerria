@@ -642,6 +642,7 @@ html.is-tg-dark .tg-form select option {
 
 .tg-file-name {
   min-width: 0;
+  flex: 1 1 auto;
   color: var(--tg-muted);
   font-size: 0.84rem;
   font-weight: 650;

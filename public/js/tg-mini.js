@@ -330,8 +330,22 @@
     const label = input.closest('.tg-file-label');
     const name = label ? label.querySelector('[data-tg-file-name]') : null;
     if (!name) return;
-    const file = input.files && input.files.length ? input.files[0] : null;
-    name.textContent = file && file.name ? file.name : 'Файл не вибрано';
+    const files = input.files ? Array.from(input.files).filter(Boolean) : [];
+    if (!files.length) {
+      name.textContent = 'Файли не вибрано';
+      return;
+    }
+    if (files.length === 1) {
+      name.textContent = files[0] && files[0].name ? files[0].name : '1 файл';
+      return;
+    }
+    const fileCountLabel = files.length >= 5 ? `${files.length} файлів` : `${files.length} файли`;
+    const firstNames = files
+      .slice(0, 2)
+      .map((file) => file && file.name)
+      .filter(Boolean);
+    const extraCount = files.length - firstNames.length;
+    name.textContent = `${fileCountLabel}: ${firstNames.join(', ')}${extraCount > 0 ? ` +${extraCount}` : ''}`;
   }
 
   function bindFileInputs() {
@@ -528,6 +542,16 @@
       label: item.file_name ? `Файл: ${item.file_name}` : 'Відкрити файл',
       uploadsOnly: true,
     });
+    if (Array.isArray(item.assets)) {
+      item.assets.forEach((asset) => {
+        if (!asset) return;
+        appendHomeworkLink(links, {
+          href: asset.file_path,
+          label: asset.name || asset.original_name || 'Відкрити файл',
+          uploadsOnly: true,
+        });
+      });
+    }
     if (links.children.length) card.appendChild(links);
 
     return card;

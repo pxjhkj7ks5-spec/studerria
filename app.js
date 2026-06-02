@@ -25370,6 +25370,7 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
         [subjectIds, Array.from(weekDateSet), new Date().toISOString()]
       );
     }
+    const homeworkAssetMap = await listHomeworkAssetsByHomeworkIds((homeworkRows || []).map((row) => row && row.id));
     const homeworkItems = (homeworkRows || []).map((row) => ({
       id: Number(row.id || 0),
       subject_id: Number(row.subject_id || 0),
@@ -25384,6 +25385,12 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
       link_url: String(row.link_url || '').trim(),
       file_path: String(row.file_path || '').trim(),
       file_name: normalizeUploadedOriginalName(row.file_name) || '',
+      assets: (homeworkAssetMap.get(Number(row.id || 0)) || []).map((asset) => ({
+        id: Number(asset.id || 0),
+        name: sanitizeCompactText(asset.name || asset.original_name || '', 255),
+        original_name: normalizeUploadedOriginalName(asset.original_name) || '',
+        file_path: String(asset.file_path || '').trim(),
+      })),
       created_by: sanitizeCompactText(row.created_by_name || row.created_by || '', 140),
       created_at: row.created_at || '',
     }));
@@ -25478,14 +25485,14 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
   }
 });
 
-app.post('/studerria-tg/homework/create', requireTelegramMiniStudent, writeLimiter, uploadLimiter, upload.single('attachment'), async (req, res) => {
+app.post('/studerria-tg/homework/create', requireTelegramMiniStudent, writeLimiter, uploadLimiter, upload.array('attachment', 8), async (req, res) => {
   const userId = Number(req.session.user.id || 0);
   const currentWeek = parsePositiveIntStrict(req.body.current_week || req.query.week) || 1;
   const redirectBase = `/studerria-tg/schedule?week=${encodeURIComponent(String(currentWeek || 1))}`;
+  const uploadedFiles = Array.isArray(req.files) ? req.files.filter(Boolean) : [];
+  const primaryFile = uploadedFiles[0] || null;
   const fail = (code) => {
-    if (req.file) {
-      fs.unlink(req.file.path, () => {});
-    }
+    unlinkUploadedFiles(uploadedFiles);
     return res.redirect(`${redirectBase}&error=${encodeURIComponent(code || 'homework-failed')}`);
   };
 
@@ -25517,7 +25524,7 @@ app.post('/studerria-tg/homework/create', requireTelegramMiniStudent, writeLimit
     await ensureDbReady();
     const setupState = await ensureTelegramMiniSetupForPage(req, userId);
     if (setupState.nextStep !== 'complete') {
-      if (req.file) fs.unlink(req.file.path, () => {});
+      unlinkUploadedFiles(uploadedFiles);
       req.session.pendingUserId = userId;
       await saveRequestSession(req);
       return res.redirect(`/studerria-tg/register?step=${setupState.nextStep}`);
@@ -25570,6 +25577,24 @@ app.post('/studerria-tg/homework/create', requireTelegramMiniStudent, writeLimit
       req.session.user.full_name || req.session.user.username || req.session.user.name || 'Telegram mini app',
       180
     );
+    let uploadedAssetIds = [];
+    const extraFiles = uploadedFiles.slice(1);
+    if (extraFiles.length) {
+      try {
+        uploadedAssetIds = await createAssetsFromUploads({
+          files: extraFiles,
+          userId,
+          courseId,
+          kind: 'telegram_homework',
+        });
+      } catch (assetErr) {
+        await cleanupFailedUploadedAssets({
+          files: uploadedFiles,
+          assetIds: assetErr && Array.isArray(assetErr.assetIds) ? assetErr.assetIds : [],
+        });
+        throw assetErr;
+      }
+    }
     const row = await insertHomeworkRecord({
       group_name: req.session.user.schedule_group || String(groupNumber),
       subject: subjectName,
@@ -25585,8 +25610,8 @@ app.post('/studerria-tg/homework/create', requireTelegramMiniStudent, writeLimit
       class_date: classDate,
       meeting_url: null,
       link_url: linkUrl || null,
-      file_path: req.file ? `/uploads/${req.file.filename}` : null,
-      file_name: req.file ? req.file.originalname : null,
+      file_path: primaryFile ? `/uploads/${primaryFile.filename}` : null,
+      file_name: primaryFile ? primaryFile.originalname : null,
       created_by: creatorName,
       created_at: createdAt,
       course_id: courseId,
@@ -25604,7 +25629,11 @@ app.post('/studerria-tg/homework/create', requireTelegramMiniStudent, writeLimit
       source: 'telegram_mini',
     });
     if (!row || !row.id) {
+      await cleanupFailedUploadedAssets({ files: uploadedFiles, assetIds: uploadedAssetIds });
       return fail('db');
+    }
+    if (uploadedAssetIds.length) {
+      await copyTemplateAssetsToHomework(0, [row.id], uploadedAssetIds);
     }
     logActivity(
       db,
