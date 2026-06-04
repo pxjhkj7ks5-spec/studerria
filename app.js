@@ -19330,6 +19330,50 @@ function canUseTelegramMiniSession(req) {
     || TG_MINI_STUDENT_ROLES.has(normalizeRoleKey(req.session.role));
 }
 
+async function validateTelegramMiniSession(req) {
+  if (!canUseTelegramMiniSession(req)) return null;
+  const sessionUserId = Number(req.session.user.id || 0);
+  if (!Number.isInteger(sessionUserId) || sessionUserId < 1) {
+    clearTelegramMiniAuthenticatedUser(req);
+    await saveRequestSession(req);
+    return null;
+  }
+  const user = await db.get(
+    `
+      SELECT id, full_name, role, schedule_group, course_id, group_id, language, telegram_id,
+             ${usersHasIsActive ? 'is_active' : '1 AS is_active'}
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [sessionUserId]
+  );
+  const isActive = user && (user.is_active === true || Number(user.is_active) === 1);
+  if (!user || !isActive || !isTelegramMiniStudentRole(user.role)) {
+    clearTelegramMiniAuthenticatedUser(req);
+    await saveRequestSession(req);
+    return null;
+  }
+  const nextRole = normalizeRoleKey(user.role || 'student');
+  const existingRoles = normalizeRoleList(getSessionRoleList(req))
+    .filter((role) => !TG_MINI_BLOCKED_ROLES.has(normalizeRoleKey(role)));
+  const nextRoles = existingRoles.length ? existingRoles : normalizeRoleList([nextRole]);
+  req.session.user = {
+    ...req.session.user,
+    id: user.id,
+    username: user.full_name,
+    schedule_group: user.schedule_group,
+    course_id: user.course_id || 1,
+    group_id: user.group_id || null,
+    language: user.language || getPreferredLang(req),
+    telegram_id: user.telegram_id || null,
+  };
+  req.session.role = nextRole;
+  req.session.roles = nextRoles;
+  await saveRequestSession(req);
+  return user;
+}
+
 function renderTelegramMiniPage(req, res, viewName, locals = {}) {
   const lang = getPreferredLang(req);
   const baseLocals = {
@@ -19357,18 +19401,27 @@ function renderTelegramMiniPage(req, res, viewName, locals = {}) {
   });
 }
 
-function requireTelegramMiniStudent(req, res, next) {
-  if (!req.session || !req.session.user) {
-    return res.redirect('/studerria-tg/register');
+async function requireTelegramMiniStudent(req, res, next) {
+  try {
+    await ensureDbReady();
+    if (!req.session || !req.session.user) {
+      return res.redirect('/studerria-tg/register');
+    }
+    if (!canUseTelegramMiniSession(req)) {
+      return renderTelegramMiniPage(req, res.status(403), 'denied', {
+        pageTitle: 'Studerria',
+        currentTgPage: '',
+        reason: 'student_only',
+      });
+    }
+    const sessionUser = await validateTelegramMiniSession(req);
+    if (!sessionUser) {
+      return res.redirect('/studerria-tg/register');
+    }
+    return next();
+  } catch (err) {
+    return next(err);
   }
-  if (!canUseTelegramMiniSession(req)) {
-    return renderTelegramMiniPage(req, res.status(403), 'denied', {
-      pageTitle: 'Studerria',
-      currentTgPage: '',
-      reason: 'student_only',
-    });
-  }
-  return next();
 }
 
 async function ensureTelegramMiniSetupForPage(req, userId) {
@@ -25242,9 +25295,15 @@ registerSystemRoutes(app, {
   ensureDbReady,
 });
 
-app.get('/studerria-tg', (req, res) => {
-  if (canUseTelegramMiniSession(req)) {
-    return res.redirect('/studerria-tg/schedule');
+app.get('/studerria-tg', async (req, res) => {
+  try {
+    await ensureDbReady();
+    const sessionUser = await validateTelegramMiniSession(req);
+    if (sessionUser) {
+      return res.redirect('/studerria-tg/schedule');
+    }
+  } catch (err) {
+    console.error('Telegram mini entry session validation failed', err);
   }
   return renderTelegramMiniPage(req, res, 'start', {
     pageTitle: 'Studerria Telegram',
@@ -25276,7 +25335,7 @@ app.post('/studerria-tg/auth/init', telegramMiniAuthLimiter, async (req, res) =>
       }
     }
     if (!linkedUser) {
-      if (canUseTelegramMiniSession(req)) {
+      if (req.session && req.session.user) {
         clearTelegramMiniAuthenticatedUser(req);
       }
       await saveRequestSession(req);
@@ -25314,9 +25373,15 @@ app.post('/studerria-tg/auth/init', telegramMiniAuthLimiter, async (req, res) =>
   }
 });
 
-app.get('/studerria-tg/login', (req, res) => {
-  if (canUseTelegramMiniSession(req)) {
-    return res.redirect('/studerria-tg/schedule');
+app.get('/studerria-tg/login', async (req, res) => {
+  try {
+    await ensureDbReady();
+    const sessionUser = await validateTelegramMiniSession(req);
+    if (sessionUser) {
+      return res.redirect('/studerria-tg/schedule');
+    }
+  } catch (err) {
+    console.error('Telegram mini login session validation failed', err);
   }
   return res.redirect('/studerria-tg/register');
 });
@@ -25327,7 +25392,8 @@ app.post('/studerria-tg/login', authLimiter, async (req, res) => {
 
 app.get('/studerria-tg/register', async (req, res) => {
   try {
-    if (canUseTelegramMiniSession(req)) {
+    const sessionUser = await validateTelegramMiniSession(req);
+    if (sessionUser) {
       const setupState = await loadTelegramMiniSetupState(Number(req.session.user.id || 0), { autoAssignRequired: true });
       if (setupState.nextStep === 'complete') {
         return res.redirect('/studerria-tg/schedule');
