@@ -19310,6 +19310,7 @@ function clearTelegramMiniAuthenticatedUser(req) {
   req.session.role_fingerprint = null;
   req.session.pendingUserId = null;
   req.session.telegramMiniSetupCompleteUserId = null;
+  req.session.telegramMiniNewUserNotifiedId = null;
   req.session.viewAs = null;
   req.session.viewAsMode = null;
   req.session.viewAsCourseId = null;
