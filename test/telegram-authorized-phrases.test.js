@@ -14,10 +14,11 @@ function extractBlock(startPattern, nextPattern) {
   return rest.slice(0, next + 1);
 }
 
-test('telegram authorized phrase replies include Romanenko prompt', () => {
+test('telegram authorized phrase replies include custom prompts', () => {
   const phraseBlock = extractBlock(
     /const STUDERRIA_TG_AUTHORIZED_PHRASE_REPLIES = new Map\(\[/,
     /function getStuderriaTelegramAuthorizedPhraseReply/
   );
   assert.match(phraseBlock, /\['романенко', 'хто саме\?'\]/);
+  assert.match(phraseBlock, /\['денис', 'посол україни в ізраїлі'\]/);
 });
