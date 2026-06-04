@@ -49,6 +49,7 @@ const { publicLegalPages } = require('./lib/legalPages');
 const versionFile = path.join(__dirname, 'version.json');
 const changelogFile = path.join(__dirname, 'changelog.json');
 const studerriaTelegramPresentationTemplateFile = path.join(__dirname, 'assets', 'telegram', 'presentation-template.pptx');
+const studerriaTelegramStarostaSeatPhotoFile = path.join(__dirname, 'assets', 'telegram', 'starosta-seat.jpg');
 const studerriaTelegramMeetingAudioFile = String(
   process.env.STUDERRIA_TG_MEETING_AUDIO_FILE || path.join(__dirname, 'uploads', 'good-morning-vietnam.mp3')
 ).trim();
@@ -20701,6 +20702,40 @@ async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
   }
 }
 
+async function sendStuderriaTelegramPhoto(chatId, filePath, options = {}) {
+  if (!chatId || !filePath) return null;
+  const buffer = fs.readFileSync(filePath);
+  const formData = new FormData();
+  formData.append('chat_id', String(chatId));
+  formData.append(
+    'photo',
+    new Blob([buffer], {
+      type: options.contentType || 'image/jpeg',
+    }),
+    options.filename || path.basename(filePath)
+  );
+  if (options.caption) {
+    formData.append('caption', String(options.caption).slice(0, 1024));
+  }
+  const messageThreadId = options.messageThreadId
+    || getStuderriaTelegramMessageThreadId(options.sourceMessage || {});
+  if (messageThreadId) {
+    formData.append('message_thread_id', String(messageThreadId));
+  }
+  try {
+    return await callStuderriaTelegramBotApiMultipart('sendPhoto', formData);
+  } catch (err) {
+    if (messageThreadId && isStuderriaTelegramThreadDeliveryError(err)) {
+      return sendStuderriaTelegramPhoto(chatId, filePath, {
+        ...options,
+        sourceMessage: null,
+        messageThreadId: null,
+      });
+    }
+    throw err;
+  }
+}
+
 async function sendStuderriaTelegramDocument(chatId, filePath, options = {}) {
   if (!chatId || !filePath) return null;
   const buffer = fs.readFileSync(filePath);
@@ -21106,6 +21141,27 @@ function isStuderriaTelegramMeetingPhrase(message = {}) {
   return text === 'нарада';
 }
 
+const STUDERRIA_TG_STAROSTA_SEAT_PHRASES = [
+  'де староста',
+  'а де староста',
+  'де наш староста',
+  'де наша староста',
+  'де староста групи',
+  'де староста курсу',
+  'хто староста',
+  'хто у нас староста',
+  'хто в нас староста',
+  'староста де',
+  'де старосту',
+  'старосту бачили',
+];
+const STUDERRIA_TG_STAROSTA_SEAT_PHRASE_SET = new Set(STUDERRIA_TG_STAROSTA_SEAT_PHRASES);
+
+function isStuderriaTelegramStarostaSeatPhrase(message = {}) {
+  const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  return STUDERRIA_TG_STAROSTA_SEAT_PHRASE_SET.has(text);
+}
+
 async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyText = '') {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
@@ -21116,6 +21172,28 @@ async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyT
     return;
   }
   await sendStuderriaTelegramMessage(chatId, replyText, { sourceMessage: message });
+}
+
+async function handleStuderriaTelegramStarostaSeatPhrase(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  if (!chatId) return;
+  const context = await getStuderriaTelegramActorContext(message.from || {});
+  if (!context.actor) {
+    await sendStuderriaTelegramRegistrationPrompt(message, 'цієї фрази');
+    return;
+  }
+  const caption = 'пачотне місце старости';
+  if (fs.existsSync(studerriaTelegramStarostaSeatPhotoFile)) {
+    await sendStuderriaTelegramPhoto(chatId, studerriaTelegramStarostaSeatPhotoFile, {
+      sourceMessage: message,
+      filename: path.basename(studerriaTelegramStarostaSeatPhotoFile),
+      contentType: 'image/jpeg',
+      caption,
+    });
+    return;
+  }
+  await sendStuderriaTelegramMessage(chatId, caption, { sourceMessage: message });
 }
 
 async function handleStuderriaTelegramMeetingPhrase(message = {}) {
@@ -25184,6 +25262,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
     }
     if (isStuderriaTelegramMeetingPhrase(message)) {
       await handleStuderriaTelegramMeetingPhrase(message);
+      return;
+    }
+    if (isStuderriaTelegramStarostaSeatPhrase(message)) {
+      await handleStuderriaTelegramStarostaSeatPhrase(message);
       return;
     }
     const authorizedPhraseReply = getStuderriaTelegramAuthorizedPhraseReply(message);
