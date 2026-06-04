@@ -21162,6 +21162,20 @@ function isStuderriaTelegramStarostaSeatPhrase(message = {}) {
   return STUDERRIA_TG_STAROSTA_SEAT_PHRASE_SET.has(text);
 }
 
+function getStuderriaTelegramStarostaSeatCaption(message = {}) {
+  const text = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  if (text.startsWith('хто ')) {
+    return 'староста - той, хто сидить на цьому пачотному місці';
+  }
+  if (text === 'старосту бачили') {
+    return 'бачили: на своєму пачотному місці';
+  }
+  if (text.startsWith('де ') || text.startsWith('а де ') || text === 'староста де') {
+    return 'староста на своєму пачотному місці';
+  }
+  return 'пачотне місце старости';
+}
+
 async function handleStuderriaTelegramAuthorizedPhraseReply(message = {}, replyText = '') {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
@@ -21183,7 +21197,7 @@ async function handleStuderriaTelegramStarostaSeatPhrase(message = {}) {
     await sendStuderriaTelegramRegistrationPrompt(message, 'цієї фрази');
     return;
   }
-  const caption = 'пачотне місце старости';
+  const caption = getStuderriaTelegramStarostaSeatCaption(message);
   if (fs.existsSync(studerriaTelegramStarostaSeatPhotoFile)) {
     await sendStuderriaTelegramPhoto(chatId, studerriaTelegramStarostaSeatPhotoFile, {
       sourceMessage: message,

@@ -30,9 +30,22 @@ test('telegram starosta seat phrase sends the photo caption response', () => {
     /async function handleStuderriaTelegramStarostaSeatPhrase/,
     /async function handleStuderriaTelegramMeetingPhrase/
   );
-  assert.match(handlerBlock, /const caption = 'пачотне місце старости'/);
+  assert.match(handlerBlock, /const caption = getStuderriaTelegramStarostaSeatCaption\(message\)/);
   assert.match(handlerBlock, /sendStuderriaTelegramPhoto/);
   assert.match(handlerBlock, /studerriaTelegramStarostaSeatPhotoFile/);
+});
+
+test('telegram starosta seat caption varies by question intent', () => {
+  const captionBlock = extractBlock(
+    /function getStuderriaTelegramStarostaSeatCaption/,
+    /async function handleStuderriaTelegramAuthorizedPhraseReply/
+  );
+  assert.match(captionBlock, /text\.startsWith\('хто '\)/);
+  assert.match(captionBlock, /староста - той, хто сидить на цьому пачотному місці/);
+  assert.match(captionBlock, /text\.startsWith\('де '\)/);
+  assert.match(captionBlock, /староста на своєму пачотному місці/);
+  assert.match(captionBlock, /text === 'старосту бачили'/);
+  assert.match(captionBlock, /бачили: на своєму пачотному місці/);
 });
 
 test('telegram starosta seat phrase is handled before generic authorized replies', () => {
