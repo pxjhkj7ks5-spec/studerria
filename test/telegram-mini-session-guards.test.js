@@ -4,6 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const tgProfileSource = fs.readFileSync(path.join(__dirname, '..', 'views', 'tg', 'profile.ejs'), 'utf8');
 
 function extractBlock(startPattern, nextPattern) {
   const start = appSource.search(startPattern);
@@ -58,4 +59,17 @@ test('telegram mini auth init clears any stale authenticated user when telegram 
   );
   assert.match(block, /if \(req\.session && req\.session\.user\)/);
   assert.match(block, /clearTelegramMiniAuthenticatedUser\(req\)/);
+});
+
+test('telegram mini profile cannot change the Studerria username', () => {
+  const routeBlock = extractBlock(
+    /app\.post\('\/studerria-tg\/profile'/,
+    /app\.post\('\/studerria-tg\/profile\/reset-subjects'/
+  );
+  assert.doesNotMatch(routeBlock, /full_name\s*=/);
+  assert.doesNotMatch(routeBlock, /req\.session\.user\.username\s*=/);
+  assert.match(routeBlock, /language = \?/);
+
+  assert.doesNotMatch(tgProfileSource, /name="full_name"/);
+  assert.match(tgProfileSource, /tg-profile-name/);
 });

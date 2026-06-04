@@ -1216,6 +1216,16 @@ html.is-tg-dark .tg-subject-status.is-pending {
   display: block;
 }
 
+.tg-profile-name {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--tg-theme-text);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
 .tg-profile-fields input,
 .tg-profile-fields select {
   width: 100%;

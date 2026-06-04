@@ -7,13 +7,15 @@
 
 <%
   const profileErrorMessages = {
-    'missing-name': 'Вкажіть повне імʼя.',
     'telegram-auth-required': 'Telegram не передав дані для привʼязки. Закрийте mini app і відкрийте його з Telegram ще раз.',
     'telegram-occupied': 'Цей Telegram уже привʼязаний до іншого акаунта.',
     'telegram-link-failed': 'Не вдалося привʼязати Telegram. Спробуйте ще раз.',
+    'invalid-language': 'Оберіть доступну мову.',
+    db: 'Не вдалося оновити профіль.',
   };
   const profileSuccessMessages = {
     'telegram-linked': 'Telegram привʼязано.',
+    1: 'Профіль оновлено.',
   };
 %>
 <%
@@ -45,10 +47,7 @@
   <form class="tg-profile-form" method="POST" action="/studerria-tg/profile">
     <div class="tg-avatar" aria-hidden="true"><%= profileInitials %></div>
     <div class="tg-profile-fields">
-      <label>
-        <span class="tg-sr-only">Повне імʼя</span>
-        <input name="full_name" type="text" value="<%= profileName %>" required />
-      </label>
+      <strong class="tg-profile-name"><%= profileName %></strong>
       <label>
         <span class="tg-sr-only">Мова</span>
         <select name="language" aria-label="Мова">

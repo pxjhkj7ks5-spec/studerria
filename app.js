@@ -26556,29 +26556,23 @@ app.get('/studerria-tg/profile', requireTelegramMiniStudent, async (req, res) =>
 });
 
 app.post('/studerria-tg/profile', requireTelegramMiniStudent, writeLimiter, async (req, res) => {
-  const fullName = String(req.body.full_name || '').trim().replace(/\s+/g, ' ');
   const language = String(req.body.language || '').trim();
-  if (!fullName) return res.redirect('/studerria-tg/profile?error=missing-name');
+  if (!['uk', 'en'].includes(language)) {
+    return res.redirect('/studerria-tg/profile?error=invalid-language');
+  }
   try {
-    const updates = ['full_name = ?'];
-    const params = [fullName];
-    if (['uk', 'en'].includes(language)) {
-      updates.push('language = ?');
-      params.push(language);
-    }
+    const updates = ['language = ?'];
+    const params = [language];
     params.push(req.session.user.id);
     await db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
-    req.session.user.username = fullName;
-    if (['uk', 'en'].includes(language)) {
-      req.session.user.language = language;
-      req.session.lang = language;
-    }
+    req.session.user.language = language;
+    req.session.lang = language;
     logAction(db, req, 'telegram_mini_profile_update', { user_id: req.session.user.id });
     broadcast('users_updated');
     await saveRequestSession(req);
     return res.redirect('/studerria-tg/profile?ok=1');
   } catch (err) {
-    return res.redirect('/studerria-tg/profile?error=name-exists');
+    return res.redirect('/studerria-tg/profile?error=db');
   }
 });
 
