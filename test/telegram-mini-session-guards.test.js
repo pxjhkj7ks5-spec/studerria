@@ -24,6 +24,17 @@ test('telegram mini protected middleware validates session against database', ()
   assert.match(block, /return res\.redirect\('\/studerria-tg\/register'\)/);
 });
 
+test('telegram mini session resets emit diagnostics', () => {
+  const block = extractBlock(
+    /function logTelegramMiniDiagnostic/,
+    /function renderTelegramMiniPage/
+  );
+  assert.match(block, /console\.warn\('Telegram mini diagnostic'/);
+  assert.match(block, /INSERT INTO history_log/);
+  assert.match(block, /telegram_mini_/);
+  assert.match(block, /session_reset/);
+});
+
 test('telegram mini entry routes do not trust stale cookie sessions', () => {
   const entryBlock = extractBlock(
     /app\.get\('\/studerria-tg'/,
