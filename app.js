@@ -19455,7 +19455,7 @@ async function findRecoverableTelegramMiniUser(telegramUser = {}) {
       LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
       WHERE (telegram_id IS NULL OR telegram_id = '')
         AND LOWER(COALESCE(u.role, 'student')) IN ('student', 'starosta')
-        AND ${usersHasIsActive ? '(u.is_active = TRUE OR u.is_active = 1)' : '1 = 1'}
+        AND ${usersHasIsActive ? 'u.is_active = 1' : '1 = 1'}
         AND (${clauses.join(' OR ')})
       ORDER BY u.id ASC
       LIMIT 2
