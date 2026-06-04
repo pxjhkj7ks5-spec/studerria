@@ -715,10 +715,36 @@ html.is-tg-dark .tg-form select option {
   box-shadow: 0 6px 16px rgba(0, 122, 255, 0.22);
 }
 
+.tg-primary.is-loading {
+  grid-auto-flow: column;
+  gap: 9px;
+  opacity: 0.82;
+}
+
+.tg-primary.is-loading::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #fff;
+  animation: tgPrimarySpin 760ms linear infinite;
+}
+
+@keyframes tgPrimarySpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tg-primary:disabled,
 .tg-secondary:disabled {
   opacity: 0.48;
   cursor: not-allowed;
+}
+
+.tg-primary.is-loading:disabled {
+  opacity: 0.82;
 }
 
 .tg-secondary,

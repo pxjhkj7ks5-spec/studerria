@@ -3,7 +3,9 @@ const test = require('node:test');
 
 const {
   buildDataCheckString,
+  buildTelegramRecoveryIdentityCandidates,
   buildTelegramDisplayName,
+  normalizeTelegramIdentityCandidate,
   signTelegramInitDataForTest,
   validateTelegramInitData,
 } = require('../lib/telegramMiniApp');
@@ -16,6 +18,19 @@ test('buildDataCheckString sorts init data and ignores hash', () => {
 test('buildTelegramDisplayName tolerates missing Telegram user', () => {
   assert.equal(buildTelegramDisplayName(null), '');
   assert.equal(buildTelegramDisplayName({ username: 'ada' }), '@ada');
+});
+
+test('telegram recovery identity candidates normalize names and usernames', () => {
+  assert.equal(normalizeTelegramIdentityCandidate('  Ada   Lovelace  '), 'ada lovelace');
+  assert.deepEqual(
+    buildTelegramRecoveryIdentityCandidates({
+      id: 42,
+      first_name: 'Ada',
+      last_name: 'Lovelace',
+      username: 'ada_l',
+    }),
+    ['ada lovelace', 'ada_l', '@ada_l', 'telegram 42']
+  );
 });
 
 test('validateTelegramInitData accepts signed init data', () => {

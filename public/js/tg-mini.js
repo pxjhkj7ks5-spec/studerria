@@ -257,25 +257,44 @@
     if (initDataInput && tg && tg.initData) initDataInput.value = tg.initData;
   }
 
+  function setRegisterSubmitPending(form, submitter, pending) {
+    const button = submitter || (form ? form.querySelector('button[type="submit"]') : null);
+    if (!button) return;
+    if (!button.dataset.tgIdleLabel) {
+      button.dataset.tgIdleLabel = button.textContent || '';
+    }
+    button.disabled = Boolean(pending);
+    button.classList.toggle('is-loading', Boolean(pending));
+    button.setAttribute('aria-busy', pending ? 'true' : 'false');
+    button.textContent = pending ? 'Завантаження' : button.dataset.tgIdleLabel;
+  }
+
   function bindRegisterForms() {
     document.querySelectorAll('[data-tg-register-form]').forEach((form) => {
       if (form.dataset.tgRegisterBound === '1') return;
       form.dataset.tgRegisterBound = '1';
       form.addEventListener('submit', async (event) => {
-        fillTelegramInitData(form);
-        if (!shouldSyncTelegramSession() || form.dataset.tgRegisterSynced === '1') return;
-        event.preventDefault();
         const submitter = event.submitter || form.querySelector('button[type="submit"]');
-        if (submitter) submitter.disabled = true;
+        if (form.dataset.tgRegisterSubmitting === '1') {
+          event.preventDefault();
+          return;
+        }
+        fillTelegramInitData(form);
+        setRegisterSubmitPending(form, submitter, true);
+        if (!shouldSyncTelegramSession() || form.dataset.tgRegisterSynced === '1') {
+          form.dataset.tgRegisterSubmitting = '1';
+          return;
+        }
+        event.preventDefault();
         const syncResult = await syncTelegramSession();
         if (syncResult && syncResult.redirecting) return;
         fillTelegramInitData(form);
         form.dataset.tgRegisterSynced = '1';
-        if (submitter) submitter.disabled = false;
-        if (typeof form.requestSubmit === 'function') {
-          form.requestSubmit(submitter || undefined);
-        } else {
+        form.dataset.tgRegisterSubmitting = '1';
+        if (typeof form.submit === 'function') {
           form.submit();
+        } else if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
         }
       });
     });

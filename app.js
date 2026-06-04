@@ -19426,6 +19426,45 @@ async function findUserByTelegramId(telegramId) {
   );
 }
 
+async function findRecoverableTelegramMiniUser(telegramUser = {}) {
+  const normalizedUser = telegramMiniApp.normalizeTelegramUser(telegramUser || {});
+  if (!normalizedUser.id) return null;
+  const candidates = telegramMiniApp.buildTelegramRecoveryIdentityCandidates(normalizedUser);
+  const username = normalizeStuderriaTelegramUsername(normalizedUser.username);
+  if (!candidates.length && !username) return null;
+
+  const clauses = [];
+  const params = [];
+  if (username) {
+    clauses.push('LOWER(TRIM(COALESCE(u.telegram_username, \'\'))) = ?');
+    params.push(username);
+  }
+  candidates.forEach((candidate) => {
+    clauses.push('LOWER(TRIM(COALESCE(u.full_name, \'\'))) = ?');
+    params.push(candidate);
+  });
+  const rows = await db.all(
+    `
+      SELECT u.id, u.full_name, u.role, u.password_hash, u.schedule_group, u.course_id, u.group_id, u.language,
+             u.admission_id, u.study_context_id, u.study_program_id, u.study_track, u.telegram_id,
+             u.telegram_username, ${usersHasIsActive ? 'u.is_active' : '1 AS is_active'},
+             COALESCE(v2_group.legacy_course_id, u.course_id) AS schedule_course_id,
+             v2_group.id AS academic_group_id,
+             v2_group.label AS academic_group_label
+      FROM users u
+      LEFT JOIN academic_v2_groups v2_group ON v2_group.id = u.group_id
+      WHERE (telegram_id IS NULL OR telegram_id = '')
+        AND LOWER(COALESCE(u.role, 'student')) IN ('student', 'starosta')
+        AND ${usersHasIsActive ? '(u.is_active = TRUE OR u.is_active = 1)' : '1 = 1'}
+        AND (${clauses.join(' OR ')})
+      ORDER BY u.id ASC
+      LIMIT 2
+    `,
+    params
+  );
+  return Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
+}
+
 async function buildTelegramMiniFullName(telegramUser) {
   const normalizedUser = telegramMiniApp.normalizeTelegramUser(telegramUser || {});
   const displayName = telegramMiniApp.buildTelegramDisplayName(normalizedUser);
@@ -19452,6 +19491,25 @@ async function createTelegramMiniUser(req, telegramUser) {
   const existingByTelegram = await findUserByTelegramId(normalizedUser.id);
   if (existingByTelegram) {
     return existingByTelegram;
+  }
+  const recoverableUser = await findRecoverableTelegramMiniUser(normalizedUser);
+  if (recoverableUser && recoverableUser.id) {
+    await linkTelegramMiniUser(req, recoverableUser.id, normalizedUser);
+    queueStuderriaTelegramDevNewUserNotification({
+      user: {
+        ...recoverableUser,
+        telegram_id: normalizedUser.id,
+        telegram_username: normalizedUser.username || recoverableUser.telegram_username || '',
+      },
+      telegramUser: normalizedUser,
+      source: 'telegram_mini_relink',
+    });
+    broadcast('users_updated');
+    return {
+      ...recoverableUser,
+      telegram_id: normalizedUser.id,
+      telegram_username: normalizedUser.username || recoverableUser.telegram_username || null,
+    };
   }
   const fullName = await buildTelegramMiniFullName(normalizedUser);
   const preferredLang = getPreferredLang(req);
@@ -19500,6 +19558,9 @@ async function createTelegramMiniUser(req, telegramUser) {
     telegramUser: normalizedUser,
     source: 'telegram_mini_auto_register',
   });
+  if (req && req.session) {
+    req.session.telegramMiniNewUserNotifiedId = Number(row.id || 0) || null;
+  }
   logAction(db, req, 'telegram_mini_auto_register_user', {
     user_id: row.id,
     telegram_id: normalizedUser.id,
@@ -19508,7 +19569,7 @@ async function createTelegramMiniUser(req, telegramUser) {
   return row;
 }
 
-async function linkTelegramMiniUser(req, userId, telegramUser) {
+async function applyTelegramMiniUserLink(userId, telegramUser) {
   const normalizedUserId = Number(userId || 0);
   const normalizedTelegramUser = telegramMiniApp.normalizeTelegramUser(telegramUser || {});
   if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1 || !normalizedTelegramUser.id) {
@@ -19544,6 +19605,14 @@ async function linkTelegramMiniUser(req, userId, telegramUser) {
       normalizedUserId,
     ]
   );
+  return true;
+}
+
+async function linkTelegramMiniUser(req, userId, telegramUser) {
+  const normalizedUserId = Number(userId || 0);
+  const normalizedTelegramUser = telegramMiniApp.normalizeTelegramUser(telegramUser || {});
+  const linked = await applyTelegramMiniUserLink(normalizedUserId, normalizedTelegramUser);
+  if (!linked) return false;
   logAction(db, req, 'telegram_mini_link', { user_id: normalizedUserId, telegram_id: normalizedTelegramUser.id });
   return true;
 }
@@ -20331,6 +20400,8 @@ function normalizeStuderriaTelegramUsername(rawValue) {
 function formatStuderriaTelegramNewUserSource(source = '') {
   const normalized = String(source || '').trim().toLowerCase();
   if (normalized === 'telegram_mini_auto_register') return 'Telegram Mini App';
+  if (normalized === 'telegram_mini_relink') return 'Telegram Mini App: відновлення привʼязки';
+  if (normalized === 'telegram_mini_setup_completed') return 'Telegram Mini App: повторне завершення реєстрації';
   if (normalized === 'register_form') return 'Веб-реєстрація';
   return sanitizeCompactText(source || 'Реєстрація', 80);
 }
@@ -20355,8 +20426,10 @@ function buildStuderriaTelegramNewUserNotification({ user = {}, telegramUser = n
       || '',
     80
   ).replace(/^@/, '');
+  const normalizedSource = String(source || '').trim().toLowerCase();
+  const isNewUserSource = normalizedSource === 'register_form' || normalizedSource === 'telegram_mini_auto_register';
   const lines = [
-    'Новий користувач у Studerria',
+    isNewUserSource ? 'Новий користувач у Studerria' : 'Оновлення користувача у Studerria',
     '',
     `Джерело: ${formatStuderriaTelegramNewUserSource(source)}`,
     `ID: ${userId || '-'}`,
@@ -21111,6 +21184,17 @@ async function loadStuderriaTelegramShowScheduleContext(telegramUser = {}) {
     };
   }
   const userId = Number(context.actor.id || 0);
+  const setupState = await loadTelegramMiniSetupState(userId, { autoAssignRequired: true }).catch((err) => {
+    console.error('Studerria Telegram showpari setup state failed', err && err.message ? err.message : err);
+    return null;
+  });
+  if (setupState && setupState.nextStep !== 'complete') {
+    return {
+      ...context,
+      setupState,
+      error: buildStuderriaTelegramSetupRequiredText('Пари', setupState),
+    };
+  }
   const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
     getAcademicV2Store(),
     userId,
@@ -21296,6 +21380,39 @@ async function handleStuderriaTelegramShowCallback(callbackQuery = {}, payload =
   );
 }
 
+function buildStuderriaTelegramSetupRequiredText(title = 'Studerria', setupState = {}) {
+  const status = String(setupState && setupState.status || '').trim();
+  const detail = status === 'missing_course'
+    ? 'Треба заново підтвердити курс.'
+    : (status === 'missing_subject_choices'
+      ? 'Треба підтвердити групи предметів.'
+      : 'Треба завершити коротке налаштування профілю.');
+  return [
+    title,
+    '',
+    detail,
+    'Відкрий mini app через /start і заверши реєстрацію, щоб бот знову бачив твій розклад.',
+  ].join('\n');
+}
+
+async function sendStuderriaTelegramSetupRequiredIfNeeded(message = {}, userId = 0, title = 'Studerria') {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
+  const normalizedUserId = Number(userId || 0);
+  if (!chatId || !Number.isInteger(normalizedUserId) || normalizedUserId < 1) return false;
+  const setupState = await loadTelegramMiniSetupState(normalizedUserId, { autoAssignRequired: true }).catch((err) => {
+    console.error('Studerria Telegram setup state check failed', err && err.message ? err.message : err);
+    return null;
+  });
+  if (!setupState || setupState.nextStep === 'complete') return false;
+  await sendStuderriaTelegramMessage(
+    chatId,
+    buildStuderriaTelegramSetupRequiredText(title, setupState),
+    { sourceMessage: message, replyMarkup: buildStuderriaTelegramWelcomeKeyboard(chat.type || '') }
+  );
+  return true;
+}
+
 async function sendStuderriaTelegramScheduleForQuestion(message = {}, target = null) {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && typeof chat.id !== 'undefined' ? chat.id : null;
@@ -21314,8 +21431,12 @@ async function sendStuderriaTelegramScheduleForQuestion(message = {}, target = n
   const dayName = getDayNameFromDate(targetIso);
   const dayLabel = getStuderriaTelegramFullDayLabel(dayName);
   const dateLabel = formatStuderriaTelegramDateLabel(targetIso);
+  const title = `Розклад на ${targetLabel} (${dayLabel}, ${dateLabel})`;
 
   try {
+    if (await sendStuderriaTelegramSetupRequiredIfNeeded(message, userId, title)) {
+      return true;
+    }
     const baseState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
       getAcademicV2Store(),
       userId,
@@ -21356,7 +21477,7 @@ async function sendStuderriaTelegramScheduleForQuestion(message = {}, target = n
       );
 
     const lines = [
-      `Розклад на ${targetLabel} (${dayLabel}, ${dateLabel})`,
+      title,
       `Тиждень ${weekNumber}`,
       '',
     ];
@@ -21467,8 +21588,12 @@ async function sendStuderriaTelegramHomeworkForQuestion(message = {}, target = n
   const targetLabel = target.titleLabel || 'день';
   const dayLabel = getStuderriaTelegramFullDayLabel(getDayNameFromDate(targetIso));
   const dateLabel = formatStuderriaTelegramDateLabel(targetIso);
+  const title = `ДЗ на ${targetLabel} (${dayLabel}, ${dateLabel})`;
 
   try {
+    if (await sendStuderriaTelegramSetupRequiredIfNeeded(message, userId, title)) {
+      return true;
+    }
     const subjectState = await academicV2StudentHelpers.loadStudentSubjectCatalog(
       getAcademicV2Store(),
       userId,
@@ -21485,7 +21610,7 @@ async function sendStuderriaTelegramHomeworkForQuestion(message = {}, target = n
       await sendStuderriaTelegramMessage(
         chatId,
         [
-          `ДЗ на ${targetLabel} (${dayLabel}, ${dateLabel})`,
+          title,
           '',
           'Не бачу вибраних предметів у твоєму mini app.',
           'Відкрий mini app і перевір профіль та предмети.',
@@ -21564,7 +21689,7 @@ async function sendStuderriaTelegramHomeworkForQuestion(message = {}, target = n
 async function findStuderriaTelegramUserByActor(telegramUser = {}) {
   const telegramId = normalizeTelegramId(telegramUser && telegramUser.id);
   if (!telegramId) return null;
-  return db.get(
+  const linkedUser = await db.get(
     `
       SELECT
         u.id,
@@ -21585,6 +21710,29 @@ async function findStuderriaTelegramUserByActor(telegramUser = {}) {
     `,
     [telegramId]
   );
+  if (linkedUser) return linkedUser;
+
+  const recoverableUser = await findRecoverableTelegramMiniUser(telegramUser);
+  if (!recoverableUser || !recoverableUser.id) return null;
+  await applyTelegramMiniUserLink(recoverableUser.id, telegramUser);
+  queueStuderriaTelegramDevNewUserNotification({
+    user: {
+      ...recoverableUser,
+      telegram_id: telegramId,
+      telegram_username: telegramUser && telegramUser.username ? telegramUser.username : recoverableUser.telegram_username,
+    },
+    telegramUser,
+    source: 'telegram_mini_relink',
+  });
+  broadcast('users_updated');
+  return {
+    ...recoverableUser,
+    telegram_id: telegramId,
+    telegram_username: telegramUser && telegramUser.username ? telegramUser.username : recoverableUser.telegram_username,
+    schedule_course_id: recoverableUser.schedule_course_id || recoverableUser.course_id,
+    academic_group_id: recoverableUser.academic_group_id || recoverableUser.group_id,
+    academic_group_label: recoverableUser.academic_group_label || '',
+  };
 }
 
 async function getStuderriaTelegramUserRoleKeys(userId, fallbackRole = 'student') {
@@ -25109,7 +25257,24 @@ app.post('/studerria-tg/auth/init', telegramMiniAuthLimiter, async (req, res) =>
     await ensureDbReady();
     const telegramUser = await validateTelegramMiniInitData(req);
     setTelegramMiniPending(req, telegramUser);
-    const linkedUser = await findUserByTelegramId(telegramUser.id);
+    let linkedUser = await findUserByTelegramId(telegramUser.id);
+    if (!linkedUser) {
+      const recoverableUser = await findRecoverableTelegramMiniUser(telegramUser);
+      if (recoverableUser && recoverableUser.id) {
+        await linkTelegramMiniUser(req, recoverableUser.id, telegramUser);
+        linkedUser = {
+          ...recoverableUser,
+          telegram_id: telegramUser.id,
+          telegram_username: telegramUser.username || recoverableUser.telegram_username || null,
+        };
+        queueStuderriaTelegramDevNewUserNotification({
+          user: linkedUser,
+          telegramUser,
+          source: 'telegram_mini_relink',
+        });
+        broadcast('users_updated');
+      }
+    }
     if (!linkedUser) {
       if (canUseTelegramMiniSession(req)) {
         clearTelegramMiniAuthenticatedUser(req);
@@ -25299,6 +25464,14 @@ app.post('/studerria-tg/register', telegramMiniRegisterLimiter, async (req, res)
       req.session.pendingUserId = null;
       req.session.rememberMe = true;
       logAction(db, req, 'telegram_mini_register_subjects', { user_id: user.id });
+      if (Number(req.session.telegramMiniNewUserNotifiedId || 0) !== Number(user.id || 0)) {
+        queueStuderriaTelegramDevNewUserNotification({
+          user,
+          telegramUser,
+          source: 'telegram_mini_setup_completed',
+        });
+      }
+      req.session.telegramMiniNewUserNotifiedId = null;
       broadcast('users_updated');
       await saveRequestSession(req);
       return res.redirect('/studerria-tg/schedule?welcome=1');
