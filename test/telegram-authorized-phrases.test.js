@@ -21,5 +21,5 @@ test('telegram authorized phrase replies include custom prompts', () => {
   );
   assert.match(phraseBlock, /\['романенко', 'хто саме\?'\]/);
   assert.match(phraseBlock, /\['денис', 'посол україни в ізраїлі'\]/);
-  assert.match(phraseBlock, /\['юля', '🍓💅'\]/);
+  assert.match(phraseBlock, /\['юля', 'тігруля🍓💅'\]/);
 });
