@@ -201,6 +201,47 @@ test('telegram dev photo cleaner converts HEIC documents to cleaned JPEG', async
   }
 });
 
+test('telegram dev photo cleaner downloads generic documents without filenames for path detection', async () => {
+  const { calls, deps, cleanup } = createDeps();
+  try {
+    const handled = await handleStuderriaTelegramDevPhotoCleanerMessage(createDocumentMessage({
+      messageId: 58,
+      fileId: 'heic-file',
+      fileName: '',
+      mimeType: 'application/octet-stream',
+      fileSize: 6439456,
+    }), deps);
+    assert.equal(handled, true);
+    assert.deepEqual(
+      calls.map((entry) => entry[0]),
+      ['callBotApi', 'fetch', 'clean', 'sendDocument', 'deleteMessage', 'log']
+    );
+    assert.deepEqual(calls[2], ['clean', true, 'jpg']);
+  } finally {
+    cleanup();
+  }
+});
+
+test('telegram dev photo cleaner logs unsupported documents in allowed dev chat', async () => {
+  const { calls, deps, cleanup } = createDeps();
+  try {
+    const handled = await handleStuderriaTelegramDevPhotoCleanerMessage(createDocumentMessage({
+      messageId: 59,
+      fileId: 'pdf-file',
+      fileName: 'notes.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 12000,
+    }), deps);
+    assert.equal(handled, false);
+    assert.deepEqual(calls.map((entry) => entry[0]), ['warn']);
+    assert.equal(calls[0][2].reason, 'unsupported_media');
+    assert.equal(calls[0][2].content_type, 'application/pdf');
+    assert.equal(calls[0][2].file_ext, 'pdf');
+  } finally {
+    cleanup();
+  }
+});
+
 test('telegram dev photo cleaner accepts popular raster document formats', async () => {
   const cases = [
     ['avif', 'image/avif', 'avif'],
