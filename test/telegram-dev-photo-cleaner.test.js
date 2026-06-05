@@ -5,6 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const {
+  getImageTypeFromBuffer,
   handleStuderriaTelegramDevPhotoCleanerMessage,
 } = require('../lib/studerriaTelegramPhotoCleaner');
 
@@ -20,14 +21,45 @@ function createPhotoMessage(chatId = '-100123') {
 }
 
 function createImageDocumentMessage(chatId = '-100123') {
+  return createDocumentMessage({
+    chatId,
+    messageId: 56,
+    fileId: 'document-file',
+    fileName: 'photo_without_mime.webp',
+    mimeType: 'application/octet-stream',
+    fileSize: 8000,
+  });
+}
+
+function createDocumentMessage({
+  chatId = '-100123',
+  messageId = 56,
+  fileId = 'document-file',
+  fileName = 'photo.webp',
+  mimeType = 'application/octet-stream',
+  fileSize = 8000,
+} = {}) {
   return {
-    message_id: 56,
+    message_id: messageId,
     chat: { id: chatId, type: 'supergroup' },
     document: {
-      file_id: 'document-file',
-      file_name: 'photo_without_mime.webp',
+      file_id: fileId,
+      file_name: fileName,
+      mime_type: mimeType,
+      file_size: fileSize,
+    },
+  };
+}
+
+function createHeicDocumentMessage(chatId = '-100123') {
+  return {
+    message_id: 57,
+    chat: { id: chatId, type: 'supergroup' },
+    document: {
+      file_id: 'heic-file',
+      file_name: 'iphone_photo.HEIC',
       mime_type: 'application/octet-stream',
-      file_size: 8000,
+      file_size: 6439456,
     },
   };
 }
@@ -49,8 +81,14 @@ function createDeps(overrides = {}) {
     callBotApi: async (method, payload) => {
       calls.push(['callBotApi', method, payload]);
       assert.equal(method, 'getFile');
-      assert.ok(['large-file', 'document-file'].includes(payload.file_id));
-      return { file_path: payload.file_id === 'document-file' ? 'documents/source.webp' : 'photos/source.jpg' };
+      assert.match(payload.file_id, /^(large-file|document-file|heic-file|format-file-|magic-file)/);
+      if (payload.file_id === 'document-file') return { file_path: 'documents/source.webp' };
+      if (payload.file_id === 'heic-file') return { file_path: 'documents/source.heic' };
+      if (String(payload.file_id).startsWith('format-file-')) {
+        return { file_path: `documents/source.${String(payload.file_id).replace('format-file-', '')}` };
+      }
+      if (payload.file_id === 'magic-file') return { file_path: 'documents/source' };
+      return { file_path: 'photos/source.jpg' };
     },
     fetch: async (url) => {
       calls.push(['fetch', url.includes('test-token')]);
@@ -144,6 +182,67 @@ test('telegram dev photo cleaner accepts image documents by filename when MIME i
     assert.deepEqual(calls[4], ['deleteMessage', '-100123', 56, 'dev photo cleaner original']);
   } finally {
     cleanup();
+  }
+});
+
+test('telegram dev photo cleaner converts HEIC documents to cleaned JPEG', async () => {
+  const { calls, deps, cleanup } = createDeps();
+  try {
+    const handled = await handleStuderriaTelegramDevPhotoCleanerMessage(createHeicDocumentMessage(), deps);
+    assert.equal(handled, true);
+    assert.deepEqual(
+      calls.map((entry) => entry[0]),
+      ['callBotApi', 'fetch', 'clean', 'sendDocument', 'deleteMessage', 'log']
+    );
+    assert.deepEqual(calls[2], ['clean', true, 'jpg']);
+    assert.deepEqual(calls[4], ['deleteMessage', '-100123', 57, 'dev photo cleaner original']);
+  } finally {
+    cleanup();
+  }
+});
+
+test('telegram dev photo cleaner accepts popular raster document formats', async () => {
+  const cases = [
+    ['avif', 'image/avif', 'avif'],
+    ['tif', 'image/tiff', 'tiff'],
+    ['tiff', 'application/octet-stream', 'tiff'],
+    ['gif', 'image/gif', 'gif'],
+    ['bmp', 'application/octet-stream', 'png'],
+    ['jfif', 'application/octet-stream', 'jpg'],
+  ];
+
+  for (const [extension, mimeType, outputExtension] of cases) {
+    const { calls, deps, cleanup } = createDeps();
+    try {
+      const handled = await handleStuderriaTelegramDevPhotoCleanerMessage(createDocumentMessage({
+        messageId: 70,
+        fileId: `format-file-${extension}`,
+        fileName: `sample.${extension}`,
+        mimeType,
+      }), deps);
+      assert.equal(handled, true, extension);
+      assert.deepEqual(calls[2], ['clean', true, outputExtension]);
+      assert.ok(calls.some((entry) => entry[0] === 'deleteMessage'), extension);
+    } finally {
+      cleanup();
+    }
+  }
+});
+
+test('telegram dev photo cleaner can infer common formats from downloaded bytes', () => {
+  const samples = [
+    [Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]), 'jpg'],
+    [Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00]), 'png'],
+    [Buffer.from('RIFF0000WEBPVP8 ', 'ascii'), 'webp'],
+    [Buffer.from('GIF89a000000', 'ascii'), 'gif'],
+    [Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]), 'tiff'],
+    [Buffer.from('BM0000000000', 'ascii'), 'png'],
+    [Buffer.from('\x00\x00\x00\x18ftypavif0000', 'binary'), 'avif'],
+    [Buffer.from('\x00\x00\x00\x18ftypheic0000', 'binary'), 'jpg'],
+  ];
+
+  for (const [buffer, outputExtension] of samples) {
+    assert.equal(getImageTypeFromBuffer(buffer).extension, outputExtension);
   }
 });
 
