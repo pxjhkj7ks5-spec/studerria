@@ -20,7 +20,11 @@ test('telegram private bot commands register stable role command names', () => {
     /const STUDERRIA_TG_GROUP_BOT_COMMANDS = \[/
   );
   assert.match(commandsBlock, /command: 'addrole'/);
+  assert.match(commandsBlock, /command: 'giverole'/);
+  assert.match(commandsBlock, /command: 'give'/);
   assert.match(commandsBlock, /command: 'deleterole'/);
+  assert.match(commandsBlock, /command: 'removerole'/);
+  assert.match(commandsBlock, /command: 'remove'/);
 });
 
 test('telegram role handlers keep legacy aliases working', () => {
@@ -28,8 +32,8 @@ test('telegram role handlers keep legacy aliases working', () => {
     /const parsedCommand = parseStuderriaTelegramCommand/,
     /const callbackQuery = update && update\.callback_query/
   );
-  assert.match(handlerBlock, /parsedCommand\.command === 'addrole' \|\| parsedCommand\.command === 'giverole'/);
-  assert.match(handlerBlock, /parsedCommand\.command === 'deleterole' \|\| parsedCommand\.command === 'removerole'/);
+  assert.match(handlerBlock, /\['addrole', 'giverole', 'give'\]\.includes\(parsedCommand\.command\)/);
+  assert.match(handlerBlock, /\['deleterole', 'removerole', 'remove'\]\.includes\(parsedCommand\.command\)/);
 });
 
 test('telegram help presents addrole and deleterole as primary commands', () => {
@@ -41,5 +45,5 @@ test('telegram help presents addrole and deleterole as primary commands', () => 
   assert.match(helpBlock, /\/addrole starosta 123456789/);
   assert.match(helpBlock, /\/deleterole starosta @username/);
   assert.match(helpBlock, /\/deleterole starosta 123456789/);
-  assert.match(helpBlock, /Старі aliases: \/giverole і \/removerole теж працюють\./);
+  assert.match(helpBlock, /Aliases: \/giverole, \/give, \/removerole і \/remove теж працюють\./);
 });

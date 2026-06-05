@@ -20388,7 +20388,11 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
   { command: 'addrole', description: 'Dev: видати роль' },
+  { command: 'giverole', description: 'Dev: видати роль' },
+  { command: 'give', description: 'Dev: видати роль' },
   { command: 'deleterole', description: 'Dev: забрати роль' },
+  { command: 'removerole', description: 'Dev: забрати роль' },
+  { command: 'remove', description: 'Dev: забрати роль' },
   { command: 'showpari', description: 'Показати пари за тиждень' },
   { command: 'addpara', description: 'Додати пару' },
   { command: 'deletepara', description: 'Видалити пару' },
@@ -20999,7 +21003,7 @@ async function sendStuderriaTelegramHelp(message = {}) {
     '/addrole starosta 123456789 - видати роль по Telegram ID.',
     '/deleterole starosta @username - забрати роль starosta.',
     '/deleterole starosta 123456789 - забрати роль по Telegram ID.',
-    'Старі aliases: /giverole і /removerole теж працюють.',
+    'Aliases: /giverole, /give, /removerole і /remove теж працюють.',
     'Видавати й забирати ролі може тільки dev.',
     '',
     '7. Права коротко',
@@ -22881,7 +22885,7 @@ async function handleStuderriaTelegramGiveRoleCommand(message = {}, parsedComman
   const args = String(parsedCommand.args || '').trim().split(/\s+/).filter(Boolean);
   const roleKey = normalizeRoleKey(args[0] || '');
   const targetRaw = args.slice(1).join(' ');
-  const commandName = parsedCommand.command === 'giverole' ? 'giverole' : 'addrole';
+  const commandName = ['giverole', 'give'].includes(parsedCommand.command) ? parsedCommand.command : 'addrole';
   if (roleKey !== 'starosta' || !targetRaw) {
     await sendStuderriaTelegramMessage(
       chatId,
@@ -22943,7 +22947,7 @@ async function handleStuderriaTelegramRemoveRoleCommand(message = {}, parsedComm
   const args = String(parsedCommand.args || '').trim().split(/\s+/).filter(Boolean);
   const roleKey = normalizeRoleKey(args[0] || '');
   const targetRaw = args.slice(1).join(' ');
-  const commandName = parsedCommand.command === 'removerole' ? 'removerole' : 'deleterole';
+  const commandName = ['removerole', 'remove'].includes(parsedCommand.command) ? parsedCommand.command : 'deleterole';
   if (roleKey !== 'starosta' || !targetRaw) {
     await sendStuderriaTelegramMessage(
       chatId,
@@ -25367,9 +25371,9 @@ async function handleStuderriaTelegramBotUpdate(update) {
       await sendStuderriaTelegramWelcome(message.chat, message);
     } else if (parsedCommand.command === 'devusers') {
       await handleStuderriaTelegramDevUsersCommand(message);
-    } else if (parsedCommand.command === 'addrole' || parsedCommand.command === 'giverole') {
+    } else if (['addrole', 'giverole', 'give'].includes(parsedCommand.command)) {
       await handleStuderriaTelegramGiveRoleCommand(message, parsedCommand);
-    } else if (parsedCommand.command === 'deleterole' || parsedCommand.command === 'removerole') {
+    } else if (['deleterole', 'removerole', 'remove'].includes(parsedCommand.command)) {
       await handleStuderriaTelegramRemoveRoleCommand(message, parsedCommand);
     } else if (parsedCommand.command === 'enablenotification') {
       await handleStuderriaTelegramNotificationPreferenceCommand(message, true);
