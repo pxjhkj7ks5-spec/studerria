@@ -39,6 +39,9 @@ const {
 const demoMode = require('./lib/demoMode');
 const telegramMiniApp = require('./lib/telegramMiniApp');
 const {
+  handleStuderriaTelegramDevPhotoCleanerMessage,
+} = require('./lib/studerriaTelegramPhotoCleaner');
+const {
   createStuderriaTelegramActionToken,
   getStuderriaTelegramActionPayload,
   consumeStuderriaTelegramActionPayload,
@@ -25262,6 +25265,18 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
 async function handleStuderriaTelegramBotUpdate(update) {
   const message = update && (update.message || update.channel_post) ? (update.message || update.channel_post) : null;
   if (message && message.chat) {
+    if (await handleStuderriaTelegramDevPhotoCleanerMessage(message, {
+      env: process.env,
+      getBotToken: getTelegramMiniBotToken,
+      callBotApi: callStuderriaTelegramBotApi,
+      sendPhoto: sendStuderriaTelegramPhoto,
+      sendDocument: sendStuderriaTelegramDocument,
+      deleteMessage: deleteStuderriaTelegramMessage,
+      getMessageThreadId: getStuderriaTelegramMessageThreadId,
+      logger: console,
+    })) {
+      return;
+    }
     if (await handleStuderriaTelegramManualNotificationMessage(message)) {
       return;
     }
