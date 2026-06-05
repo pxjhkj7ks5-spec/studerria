@@ -19,6 +19,19 @@ function createPhotoMessage(chatId = '-100123') {
   };
 }
 
+function createImageDocumentMessage(chatId = '-100123') {
+  return {
+    message_id: 56,
+    chat: { id: chatId, type: 'supergroup' },
+    document: {
+      file_id: 'document-file',
+      file_name: 'photo_without_mime.webp',
+      mime_type: 'application/octet-stream',
+      file_size: 8000,
+    },
+  };
+}
+
 function createDeps(overrides = {}) {
   const calls = [];
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'studerria-cleaner-test-'));
@@ -36,8 +49,8 @@ function createDeps(overrides = {}) {
     callBotApi: async (method, payload) => {
       calls.push(['callBotApi', method, payload]);
       assert.equal(method, 'getFile');
-      assert.equal(payload.file_id, 'large-file');
-      return { file_path: 'photos/source.jpg' };
+      assert.ok(['large-file', 'document-file'].includes(payload.file_id));
+      return { file_path: payload.file_id === 'document-file' ? 'documents/source.webp' : 'photos/source.jpg' };
     },
     fetch: async (url) => {
       calls.push(['fetch', url.includes('test-token')]);
@@ -113,6 +126,22 @@ test('telegram dev photo cleaner downloads, cleans, sends, then deletes allowed 
     assert.deepEqual(calls[3], ['sendPhoto', '-100123', true, 'cleaned.jpg']);
     assert.deepEqual(calls[4], ['deleteMessage', '-100123', 55, 'dev photo cleaner original']);
     assert.equal(calls[5][2].reason, null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('telegram dev photo cleaner accepts image documents by filename when MIME is generic', async () => {
+  const { calls, deps, cleanup } = createDeps();
+  try {
+    const handled = await handleStuderriaTelegramDevPhotoCleanerMessage(createImageDocumentMessage(), deps);
+    assert.equal(handled, true);
+    assert.deepEqual(
+      calls.map((entry) => entry[0]),
+      ['callBotApi', 'fetch', 'clean', 'sendDocument', 'deleteMessage', 'log']
+    );
+    assert.deepEqual(calls[2], ['clean', true, 'webp']);
+    assert.deepEqual(calls[4], ['deleteMessage', '-100123', 56, 'dev photo cleaner original']);
   } finally {
     cleanup();
   }
