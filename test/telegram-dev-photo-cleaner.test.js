@@ -7,6 +7,7 @@ const test = require('node:test');
 const {
   getImageTypeFromBuffer,
   handleStuderriaTelegramDevPhotoCleanerMessage,
+  logStuderriaTelegramDevPhotoCleanerIngress,
 } = require('../lib/studerriaTelegramPhotoCleaner');
 
 function createPhotoMessage(chatId = '-100123') {
@@ -146,6 +147,30 @@ test('telegram dev photo cleaner ignores photos from chats outside allowlist', a
     assert.equal(handled, false);
     assert.deepEqual(calls.map((entry) => entry[0]), ['warn']);
     assert.equal(calls[0][2].reason, 'not_allowed_chat');
+  } finally {
+    cleanup();
+  }
+});
+
+test('telegram dev photo cleaner ingress logs media and commands in allowed dev chat', () => {
+  const { calls, deps, cleanup } = createDeps();
+  try {
+    assert.equal(logStuderriaTelegramDevPhotoCleanerIngress({
+      message_id: 60,
+      chat: { id: '-100123', type: 'supergroup' },
+      text: '/help',
+    }, deps), true);
+    assert.equal(calls[0][0], 'log');
+    assert.equal(calls[0][1], 'Studerria Telegram dev photo cleaner ingress');
+    assert.equal(calls[0][2].media_kind, 'command');
+    assert.equal(calls[0][2].chat_id, '-100123');
+
+    assert.equal(logStuderriaTelegramDevPhotoCleanerIngress({
+      message_id: 61,
+      chat: { id: '-100999', type: 'supergroup' },
+      text: '/help',
+    }, deps), false);
+    assert.equal(calls.length, 1);
   } finally {
     cleanup();
   }

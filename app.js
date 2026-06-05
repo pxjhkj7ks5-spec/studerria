@@ -40,6 +40,7 @@ const demoMode = require('./lib/demoMode');
 const telegramMiniApp = require('./lib/telegramMiniApp');
 const {
   handleStuderriaTelegramDevPhotoCleanerMessage,
+  logStuderriaTelegramDevPhotoCleanerIngress,
 } = require('./lib/studerriaTelegramPhotoCleaner');
 const {
   createStuderriaTelegramActionToken,
@@ -25265,6 +25266,10 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
 async function handleStuderriaTelegramBotUpdate(update) {
   const message = update && (update.message || update.channel_post) ? (update.message || update.channel_post) : null;
   if (message && message.chat) {
+    logStuderriaTelegramDevPhotoCleanerIngress(message, {
+      env: process.env,
+      logger: console,
+    });
     if (await handleStuderriaTelegramDevPhotoCleanerMessage(message, {
       env: process.env,
       getBotToken: getTelegramMiniBotToken,
