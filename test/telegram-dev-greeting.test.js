@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 
 const {
@@ -7,6 +9,8 @@ const {
   getStuderriaTelegramGreetingTarget,
   parseStuderriaTelegramGreetingCommand,
 } = require('../lib/studerriaTelegramGreeting');
+
+const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
 test('telegram dev greeting parses one or several names after trigger', () => {
   assert.deepEqual(
@@ -53,4 +57,11 @@ test('telegram dev greeting target comes from explicit env guard', () => {
     chatId: '-100123',
     threadId: null,
   });
+});
+
+test('telegram dev greeting uses preview confirmation before sending', () => {
+  assert.match(appSource, /Попередній перегляд привітання/);
+  assert.match(appSource, /flow: 'greeting_confirm'/);
+  assert.match(appSource, /text: 'Надіслати'/);
+  assert.match(appSource, /handleStuderriaTelegramGreetingConfirmCallback/);
 });

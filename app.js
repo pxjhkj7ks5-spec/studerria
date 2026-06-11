@@ -22883,15 +22883,89 @@ async function handleStuderriaTelegramDevGreetingCommand(message = {}) {
     return true;
   }
   const greetingText = buildStuderriaTelegramGreeting(parsedGreeting.names);
-  await sendStuderriaTelegramMessage(target.chatId, greetingText, {
-    messageThreadId: target.threadId,
-  });
   await sendStuderriaTelegramMessage(
     chatId,
-    `Готово, відправив привітання для: ${parsedGreeting.names.join(', ')}`,
-    { sourceMessage: message }
+    [
+      'Попередній перегляд привітання:',
+      '',
+      greetingText,
+      '',
+      `Куди: ${target.chatId}${target.threadId ? ` / topic ${target.threadId}` : ''}`,
+    ].join('\n'),
+    {
+      sourceMessage: message,
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            {
+              text: 'Надіслати',
+              callback_data: createStuderriaTelegramActionToken({
+                flow: 'greeting_confirm',
+                action: 'send',
+                actorTelegramId: normalizeTelegramId(message.from && message.from.id),
+                targetChatId: target.chatId,
+                targetThreadId: target.threadId,
+                text: greetingText,
+                names: parsedGreeting.names,
+              }),
+            },
+            {
+              text: 'Скасувати',
+              callback_data: createStuderriaTelegramActionToken({
+                flow: 'greeting_confirm',
+                action: 'cancel',
+                actorTelegramId: normalizeTelegramId(message.from && message.from.id),
+              }),
+            },
+          ],
+        ],
+      },
+    }
   );
   return true;
+}
+
+async function handleStuderriaTelegramGreetingConfirmCallback(callbackQuery = {}, payload = {}) {
+  const actorTelegramId = getStuderriaTelegramActorId(callbackQuery.from || {});
+  if (payload.actorTelegramId && payload.actorTelegramId !== actorTelegramId) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Це підтвердження відкрив інший користувач.');
+    return;
+  }
+  const consumed = consumeStuderriaTelegramActionPayload(callbackQuery.data);
+  if (!consumed) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Цю дію вже обробляю.');
+    return;
+  }
+  if (String(consumed.action || '') === 'cancel') {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Скасовано.');
+    await editStuderriaTelegramMessage(callbackQuery, 'Привітання скасовано.');
+    return;
+  }
+  const targetChatId = String(consumed.targetChatId || '').trim();
+  const text = String(consumed.text || '').trim();
+  if (!targetChatId || !text) {
+    await answerStuderriaTelegramCallback(callbackQuery, 'Не вистачає даних для відправки.');
+    await editStuderriaTelegramMessage(callbackQuery, 'Не вдалося відправити привітання: бракує цілі або тексту.');
+    return;
+  }
+  try {
+    await sendStuderriaTelegramMessage(targetChatId, text, {
+      messageThreadId: consumed.targetThreadId || null,
+    });
+    await answerStuderriaTelegramCallback(callbackQuery, 'Надіслано.');
+    await editStuderriaTelegramMessage(
+      callbackQuery,
+      [
+        'Привітання надіслано:',
+        '',
+        text,
+      ].join('\n')
+    );
+  } catch (err) {
+    console.error('Studerria Telegram greeting send failed', err && err.message ? err.message : err);
+    await answerStuderriaTelegramCallback(callbackQuery, 'Не вдалося надіслати.', { showAlert: true });
+    await editStuderriaTelegramMessage(callbackQuery, 'Не вдалося надіслати привітання. Перевір target chat ID і доступ бота до каналу.');
+  }
 }
 
 async function handleStuderriaTelegramDevUsersCommand(message = {}) {
@@ -25337,6 +25411,10 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
       await answerStuderriaTelegramCallback(callbackQuery, 'Цю дію вже обробляю.');
       return;
     }
+  }
+  if (String(payload.flow || '') === 'greeting_confirm') {
+    await handleStuderriaTelegramGreetingConfirmCallback(callbackQuery, payload);
+    return;
   }
   await answerStuderriaTelegramCallback(callbackQuery);
   if (String(payload.flow || '').startsWith('notification_')) {
