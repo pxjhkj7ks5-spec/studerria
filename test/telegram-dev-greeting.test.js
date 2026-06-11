@@ -11,6 +11,7 @@ const {
 } = require('../lib/studerriaTelegramGreeting');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const dockerComposeSource = fs.readFileSync(path.join(__dirname, '..', 'docker', 'local', 'docker-compose.yml'), 'utf8');
 
 test('telegram dev greeting parses one or several names after trigger', () => {
   assert.deepEqual(
@@ -64,4 +65,10 @@ test('telegram dev greeting uses preview confirmation before sending', () => {
   assert.match(appSource, /flow: 'greeting_confirm'/);
   assert.match(appSource, /text: 'Надіслати'/);
   assert.match(appSource, /handleStuderriaTelegramGreetingConfirmCallback/);
+});
+
+test('telegram dev greeting env is passed into the local app container', () => {
+  assert.match(dockerComposeSource, /STUDERRIA_TG_DEV_GREETING_ENABLED: \$\{STUDERRIA_TG_DEV_GREETING_ENABLED:-false\}/);
+  assert.match(dockerComposeSource, /STUDERRIA_TG_DEV_GREETING_TARGET_CHAT_ID: \$\{STUDERRIA_TG_DEV_GREETING_TARGET_CHAT_ID:-\}/);
+  assert.match(dockerComposeSource, /STUDERRIA_TG_DEV_GREETING_TARGET_THREAD_ID: \$\{STUDERRIA_TG_DEV_GREETING_TARGET_THREAD_ID:-\}/);
 });
