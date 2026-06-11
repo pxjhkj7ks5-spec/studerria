@@ -43,6 +43,11 @@ const {
   logStuderriaTelegramDevPhotoCleanerIngress,
 } = require('./lib/studerriaTelegramPhotoCleaner');
 const {
+  buildStuderriaTelegramGreeting,
+  getStuderriaTelegramGreetingTarget,
+  parseStuderriaTelegramGreetingCommand,
+} = require('./lib/studerriaTelegramGreeting');
+const {
   createStuderriaTelegramActionToken,
   getStuderriaTelegramActionPayload,
   consumeStuderriaTelegramActionPayload,
@@ -20386,6 +20391,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'start', description: 'Відкрити Studerria mini app' },
   { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
+  { command: 'chatid', description: 'Dev: показати ID чату' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
   { command: 'addrole', description: 'Dev: видати роль' },
   { command: 'giverole', description: 'Dev: видати роль' },
@@ -20408,6 +20414,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
 const STUDERRIA_TG_GROUP_BOT_COMMANDS = [
   { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
+  { command: 'chatid', description: 'Dev: показати ID чату' },
   { command: 'showpari', description: 'Показати пари за тиждень' },
   { command: 'teamwork', description: 'Створити Teamwork команди' },
   { command: 'openteam', description: 'Відкрити вступ у Teamwork' },
@@ -22794,6 +22801,97 @@ function formatStuderriaTelegramDevUserRow(row = {}, index = 0) {
     ? `@${sanitizeCompactText(row.telegram_username, 60)}`
     : (row.telegram_id ? `tg:${sanitizeCompactText(row.telegram_id, 24)}` : 'no tg');
   return `${index + 1}. #${row.id} ${sanitizeCompactText(row.full_name || 'Без імені', 90)} | ${roleLabel}${activeLabel} | ${courseLabel} | ${telegramLabel}`;
+}
+
+function isStuderriaTelegramChatIdTextRequest(message = {}) {
+  const normalized = normalizeStuderriaTelegramFreeText(getStuderriaTelegramMessageText(message));
+  return [
+    'id',
+    'chat id',
+    'chatid',
+    'чат id',
+    'чат айді',
+    'айді чату',
+    'ід чату',
+    'id чату',
+  ].includes(normalized);
+}
+
+function canShowStuderriaTelegramChatId(message = {}) {
+  const chatType = String(message && message.chat && message.chat.type || '').toLowerCase();
+  if (chatType === 'channel') return true;
+  return isStuderriaTelegramDevUser(message.from || {});
+}
+
+async function handleStuderriaTelegramChatIdCommand(message = {}) {
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && chat.id ? chat.id : null;
+  if (!chatId) return true;
+  if (!canShowStuderriaTelegramChatId(message)) {
+    await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
+    return true;
+  }
+  const threadId = getStuderriaTelegramMessageThreadId(message);
+  const fromId = message && message.from && message.from.id ? normalizeTelegramId(message.from.id) : '';
+  const lines = [
+    `chat_id: ${chatId}`,
+    `chat_type: ${sanitizeCompactText(chat.type || 'unknown', 40)}`,
+  ];
+  if (chat.title) {
+    lines.push(`chat_title: ${sanitizeCompactText(chat.title, 120)}`);
+  }
+  lines.push(`thread_id: ${threadId || '-'}`);
+  if (fromId) {
+    lines.push(`from_id: ${fromId}`);
+  }
+  await sendStuderriaTelegramMessage(chatId, lines.join('\n'), { sourceMessage: message });
+  return true;
+}
+
+async function handleStuderriaTelegramDevGreetingCommand(message = {}) {
+  const parsedGreeting = parseStuderriaTelegramGreetingCommand(getStuderriaTelegramMessageText(message));
+  if (!parsedGreeting) return false;
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && chat.id ? chat.id : null;
+  if (!chatId) return true;
+  if (!isStuderriaTelegramDevUser(message.from || {})) {
+    await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
+    return true;
+  }
+  if (!isStuderriaTelegramPrivateChat(chat)) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Це dev-команда. Напиши її в приватному чаті з ботом: Привітай: Гліб, Артем, Нестор',
+      { sourceMessage: message }
+    );
+    return true;
+  }
+  const target = getStuderriaTelegramGreetingTarget(process.env);
+  if (!target.enabled || !target.chatId) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      [
+        'Привітання не налаштовані.',
+        'Потрібно задати:',
+        'STUDERRIA_TG_DEV_GREETING_ENABLED=true',
+        'STUDERRIA_TG_DEV_GREETING_TARGET_CHAT_ID=-100... або @channelusername',
+        'Опційно для topic: STUDERRIA_TG_DEV_GREETING_TARGET_THREAD_ID=123',
+        'Щоб дізнатись ID, напиши /chatid або "id" у потрібному чаті/каналі.',
+      ].join('\n'),
+      { sourceMessage: message }
+    );
+    return true;
+  }
+  const greetingText = buildStuderriaTelegramGreeting(parsedGreeting.names);
+  await sendStuderriaTelegramMessage(target.chatId, greetingText, {
+    messageThreadId: target.threadId,
+  });
+  await sendStuderriaTelegramMessage(
+    chatId,
+    `Готово, відправив привітання для: ${parsedGreeting.names.join(', ')}`,
+    { sourceMessage: message }
+  );
+  return true;
 }
 
 async function handleStuderriaTelegramDevUsersCommand(message = {}) {
@@ -25286,6 +25384,14 @@ async function handleStuderriaTelegramBotUpdate(update) {
     })) {
       return;
     }
+    const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
+    if ((parsedCommand && parsedCommand.command === 'chatid') || isStuderriaTelegramChatIdTextRequest(message)) {
+      await handleStuderriaTelegramChatIdCommand(message);
+      return;
+    }
+    if (await handleStuderriaTelegramDevGreetingCommand(message)) {
+      return;
+    }
     if (await handleStuderriaTelegramManualNotificationMessage(message)) {
       return;
     }
@@ -25325,7 +25431,6 @@ async function handleStuderriaTelegramBotUpdate(update) {
       await sendStuderriaTelegramScheduleForQuestion(message, scheduleQuestionTarget);
       return;
     }
-    const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
     if (!parsedCommand) return;
     if (parsedCommand.command === 'help') {
       await sendStuderriaTelegramHelp(message);
