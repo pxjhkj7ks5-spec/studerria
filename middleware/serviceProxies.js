@@ -3,6 +3,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const CHARREDMAP_BASE_PATH = '/charredmap';
 const CHINAMAP_BASE_PATH = '/china-map';
 const NARADADRUK_BASE_PATH = '/naradadruk';
+const WITHLFORL_BASE_PATH = '/withlforl';
 const DEFAULT_SLASHTG_BASE_PATH = '/tg';
 
 function isServiceRequest(req, basePath) {
@@ -61,6 +62,7 @@ function registerServiceProxies(app, deps = {}) {
   const charredmapProxyTarget = String(env.CHARREDMAP_PROXY_TARGET || '').trim();
   const chinaMapProxyTarget = String(env.CHINAMAP_PROXY_TARGET || '').trim();
   const naradadrukProxyTarget = String(env.NARADADRUK_PROXY_TARGET || '').trim();
+  const withlforlProxyTarget = String(env.WITHLFORL_PROXY_TARGET || '').trim();
   const slashtgProxyTarget = String(env.SLASHTG_PROXY_TARGET || '').trim();
   const slashtgBasePath = String(env.SLASHTG_BASE_PATH || DEFAULT_SLASHTG_BASE_PATH).trim() || DEFAULT_SLASHTG_BASE_PATH;
 
@@ -83,6 +85,13 @@ function registerServiceProxies(app, deps = {}) {
     basePath: NARADADRUK_BASE_PATH,
     serviceName: 'Narada Druk',
     logLabel: 'Narada Druk',
+    logger,
+  });
+  const withlforlProxy = createServiceProxy({
+    target: withlforlProxyTarget,
+    basePath: WITHLFORL_BASE_PATH,
+    serviceName: 'Withlforl',
+    logLabel: 'Withlforl',
     logger,
   });
   const slashtgProxy = createServiceProxy({
@@ -120,6 +129,16 @@ function registerServiceProxies(app, deps = {}) {
       return respondServiceUnavailable(res, 'Narada Druk', 404);
     }
     return naradadrukProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (!isServiceRequest(req, WITHLFORL_BASE_PATH)) {
+      return next();
+    }
+    if (!withlforlProxy) {
+      return respondServiceUnavailable(res, 'Withlforl', 404);
+    }
+    return withlforlProxy(req, res, next);
   });
 
   app.use((req, res, next) => {

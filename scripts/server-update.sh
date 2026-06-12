@@ -22,6 +22,7 @@ Services:
   china-map    /china-map sidecar
   naradadruk   /naradadruk sidecar
   slashtg      /tg sidecar
+  withlforl    /withlforl sidecar
   db           PostgreSQL
   redis        Redis
   loki         Loki
@@ -31,6 +32,7 @@ Examples:
   bash scripts/server-update.sh app
   bash scripts/server-update.sh charredmap
   bash scripts/server-update.sh naradadruk --pull
+  bash scripts/server-update.sh withlforl
 USAGE
 }
 
@@ -41,6 +43,7 @@ normalize_service() {
     china-map|chinamap|china) echo "china-map" ;;
     naradadruk|narada-druk) echo "naradadruk" ;;
     slashtg|slash-tg|tg) echo "slashtg" ;;
+    withlforl|with-l-for-l) echo "withlforl" ;;
     db|postgres|postgresql) echo "db" ;;
     redis) echo "redis" ;;
     loki) echo "loki" ;;

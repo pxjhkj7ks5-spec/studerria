@@ -216,6 +216,37 @@ services:
       retries: 20
       start_period: 30s
 
+  withlforl:
+    build:
+      context: ../../services/withlforl
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_PATH: /withlforl
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${WITHLFORL_NODE_ENV:-development}
+      HOSTNAME: 0.0.0.0
+      PORT: 8080
+      NEXT_PUBLIC_BASE_PATH: /withlforl
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8080/withlforl').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   app:
     build:
       context: ../..
@@ -250,6 +281,7 @@ services:
       NARADADRUK_PROXY_TARGET: http://naradadruk:8080
       SLASHTG_PROXY_TARGET: http://slashtg:8080
       SLASHTG_BASE_PATH: ${SLASHTG_BASE_PATH:-/tg}
+      WITHLFORL_PROXY_TARGET: http://withlforl:8080
       STUDERRIA_TG_BOT_TOKEN: ${STUDERRIA_TG_BOT_TOKEN:-}
       STUDERRIA_TG_BOT_USERNAME: ${STUDERRIA_TG_BOT_USERNAME:-}
       STUDERRIA_TG_APP_SHORT_NAME: ${STUDERRIA_TG_APP_SHORT_NAME:-}

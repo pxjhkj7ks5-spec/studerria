@@ -90,6 +90,7 @@ bash scripts/server-update-charredmap.sh
 bash scripts/server-update-china-map.sh
 bash scripts/server-update-naradadruk.sh
 bash scripts/server-update-slashtg.sh
+bash scripts/server-update-withlforl.sh
 ```
 
 Equivalent generic form:
@@ -101,6 +102,7 @@ bash scripts/server-update.sh charredmap
 bash scripts/server-update.sh china-map
 bash scripts/server-update.sh naradadruk
 bash scripts/server-update.sh slashtg
+bash scripts/server-update.sh withlforl
 ```
 
 The helper rebuilds only the selected service by default, which is the safe path for code updates because the services run from Docker images. Add `--no-build` for runtime-only Compose/env updates. Use `--pull` when updating a service from a pullable image.

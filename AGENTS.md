@@ -13,8 +13,8 @@
 - Відображай `changelog.json` через модалку, яка відкривається кнопкою `Changelog` у футері.
 - Актуальний сценарій деплою та оновлення: `Docker Compose` із `docker/local`; `Cloud Run` більше не є робочим цільовим середовищем.
 - Серверні оновлення запускай сервісно, тільки для того сайту/сервісу, який змінювався, а не всім стеком одразу.
-- Основний сценарій: у корені репозиторію `bash scripts/server-update.sh <service>`, де `<service>` це `app`, `charredmap`, `china-map`, `naradadruk` або `slashtg`.
-- Для зручності можна використовувати wrapper-и: `bash scripts/server-update-app.sh`, `bash scripts/server-update-charredmap.sh`, `bash scripts/server-update-china-map.sh`, `bash scripts/server-update-naradadruk.sh`, `bash scripts/server-update-slashtg.sh`.
+- Основний сценарій: у корені репозиторію `bash scripts/server-update.sh <service>`, де `<service>` це `app`, `charredmap`, `china-map`, `naradadruk`, `slashtg` або `withlforl`.
+- Для зручності можна використовувати wrapper-и: `bash scripts/server-update-app.sh`, `bash scripts/server-update-charredmap.sh`, `bash scripts/server-update-china-map.sh`, `bash scripts/server-update-naradadruk.sh`, `bash scripts/server-update-slashtg.sh`, `bash scripts/server-update-withlforl.sh`.
 - Для кодових змін скрипт за замовчуванням перебудовує тільки вибраний сервіс через `docker compose up -d --build <service>`.
 - Для runtime-only оновлень без зміни коду/збірки додавай `--no-build`, наприклад `bash scripts/server-update.sh app --no-build`.
 - Для сервісів, які оновлюються з готового image, можна додавати `--pull`, наприклад `bash scripts/server-update.sh naradadruk --pull`.
