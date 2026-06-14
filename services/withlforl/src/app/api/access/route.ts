@@ -43,13 +43,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "denied" }, { status: 401 });
   }
 
-  const response = expectsRedirect ? NextResponse.redirect(new URL(getAccessCookiePath(), request.url), 303) : NextResponse.json({ ok: true });
+  const response = expectsRedirect ? redirectToAccessPath() : NextResponse.json({ ok: true });
   response.cookies.set({
     name: ACCESS_COOKIE_NAME,
     value: createAccessToken(configuredPassword),
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureRequest(request),
     maxAge: COOKIE_MAX_AGE_SECONDS,
     path: getAccessCookiePath(),
   });
@@ -57,8 +57,25 @@ export async function POST(request: Request) {
   return response;
 }
 
-function redirectWithStatus(request: Request, status: "denied") {
-  const url = new URL(getAccessCookiePath(), request.url);
-  url.searchParams.set(status, "1");
-  return NextResponse.redirect(url, 303);
+function redirectToAccessPath() {
+  return new NextResponse(null, {
+    status: 303,
+    headers: {
+      Location: getAccessCookiePath(),
+    },
+  });
+}
+
+function redirectWithStatus(_request: Request, status: "denied") {
+  return new NextResponse(null, {
+    status: 303,
+    headers: {
+      Location: `${getAccessCookiePath()}?${status}=1`,
+    },
+  });
+}
+
+function isSecureRequest(request: Request) {
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  return forwardedProto === "https" || request.url.startsWith("https://");
 }
