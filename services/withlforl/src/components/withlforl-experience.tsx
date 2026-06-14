@@ -97,7 +97,7 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
         <div className="silk-frame" aria-hidden="true">
           <span className="silk-line silk-line-a" />
           <span className="silk-line silk-line-b" />
-          <span className="mocha-drop" />
+          <span className="wine-drop" />
           <span className="milk-shine" />
         </div>
 

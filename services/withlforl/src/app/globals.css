@@ -1,14 +1,16 @@
 :root {
-  --silk: #f6f0e8;
-  --silk-bright: #fffaf3;
+  --silk: #f8f5f1;
+  --silk-bright: #fffdf9;
   --milk-strong: rgba(255, 252, 246, 0.88);
-  --mocha: #6b584b;
-  --espresso: #241915;
-  --cocoa: #9a806c;
-  --line: rgba(76, 55, 43, 0.14);
-  --line-strong: rgba(76, 55, 43, 0.22);
-  --shadow: 0 28px 80px rgba(55, 37, 26, 0.18);
-  --soft-shadow: 0 18px 48px rgba(55, 37, 26, 0.12);
+  --wine: #5f2637;
+  --wine-deep: #3f1825;
+  --wine-soft: #8f6973;
+  --espresso: #221417;
+  --cocoa: #8a6570;
+  --line: rgba(74, 29, 43, 0.13);
+  --line-strong: rgba(74, 29, 43, 0.22);
+  --shadow: 0 28px 80px rgba(53, 20, 31, 0.16);
+  --soft-shadow: 0 18px 48px rgba(53, 20, 31, 0.1);
 }
 
 * {
@@ -27,7 +29,7 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    linear-gradient(140deg, rgba(255, 250, 243, 0.96), rgba(237, 226, 214, 0.92)),
+    linear-gradient(140deg, rgba(255, 253, 250, 0.98), rgba(247, 244, 243, 0.92)),
     var(--silk);
   color: var(--espresso);
   font-family: "SF Pro Text", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
@@ -69,8 +71,8 @@ p {
     linear-gradient(115deg, rgba(255, 255, 255, 0.78), transparent 31%),
     repeating-linear-gradient(
       100deg,
-      rgba(91, 67, 52, 0.035) 0,
-      rgba(91, 67, 52, 0.035) 1px,
+      rgba(84, 32, 48, 0.03) 0,
+      rgba(84, 32, 48, 0.03) 1px,
       transparent 1px,
       transparent 9px
     ),
@@ -83,7 +85,7 @@ p {
   z-index: -2;
   background:
     linear-gradient(180deg, rgba(255, 250, 242, 0.4), transparent 52%),
-    radial-gradient(ellipse at 50% 100%, rgba(130, 97, 73, 0.18), transparent 32rem);
+    radial-gradient(ellipse at 50% 100%, rgba(95, 38, 55, 0.08), transparent 32rem);
   mask-image: linear-gradient(180deg, black, rgba(0, 0, 0, 0.82));
 }
 
@@ -96,12 +98,12 @@ p {
 
 .logout-control button {
   min-height: 2.35rem;
-  border: 1px solid rgba(76, 55, 43, 0.16);
+  border: 1px solid rgba(74, 29, 43, 0.16);
   border-radius: 999px;
   padding: 0 0.9rem;
   background: rgba(255, 252, 246, 0.62);
-  box-shadow: 0 10px 28px rgba(55, 37, 26, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.58);
-  color: rgba(36, 25, 21, 0.72);
+  box-shadow: 0 10px 28px rgba(53, 20, 31, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  color: rgba(74, 29, 43, 0.72);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 760;
@@ -132,7 +134,7 @@ p {
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 38% 62% 46% 54% / 48% 42% 58% 52%;
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.1));
-  box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.58), 0 32px 90px rgba(76, 52, 37, 0.14);
+  box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.58), 0 32px 90px rgba(74, 29, 43, 0.12);
   transform: translateY(-2.3rem) rotate(-8deg);
   backdrop-filter: blur(18px) saturate(140%);
 }
@@ -158,7 +160,7 @@ p {
   border: 1px solid var(--line-strong);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.56);
-  color: var(--mocha);
+  color: var(--wine);
   font-size: 0.78rem;
   font-weight: 760;
   letter-spacing: 0.02em;
@@ -166,7 +168,7 @@ p {
 }
 
 .gate-label {
-  color: var(--mocha);
+  color: var(--wine);
   font-size: 0.88rem;
   font-weight: 680;
   letter-spacing: 0;
@@ -188,20 +190,20 @@ p {
 }
 
 .gate-input:focus {
-  border-color: rgba(99, 70, 50, 0.42);
-  box-shadow: 0 0 0 4px rgba(158, 125, 98, 0.14);
+  border-color: rgba(111, 47, 67, 0.42);
+  box-shadow: 0 0 0 4px rgba(111, 47, 67, 0.12);
 }
 
 .gate-button {
   min-height: 3.35rem;
-  border: 1px solid rgba(58, 40, 29, 0.12);
+  border: 1px solid rgba(74, 29, 43, 0.12);
   border-radius: 999px;
-  background: linear-gradient(180deg, #7a6252, #4b382d);
+  background: linear-gradient(180deg, #6b2c40, var(--wine-deep));
   color: var(--silk-bright);
   cursor: pointer;
   font-size: 0.98rem;
   font-weight: 760;
-  box-shadow: 0 14px 32px rgba(55, 38, 28, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: 0 14px 32px rgba(63, 24, 37, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
@@ -295,7 +297,7 @@ p {
   border-radius: 50%;
   background:
     radial-gradient(circle at 35% 26%, rgba(255, 255, 255, 0.92), transparent 30%),
-    linear-gradient(145deg, #d9c3ad, #7c6250);
+    linear-gradient(145deg, #d8c9cc, #642a3d);
   color: #fffaf4;
   font-size: 0.78rem;
   font-weight: 820;
@@ -333,7 +335,7 @@ p {
 }
 
 .post-muted {
-  color: var(--mocha);
+  color: var(--wine);
   font-size: 1rem;
   font-weight: 610;
   line-height: 1.45;
@@ -342,12 +344,12 @@ p {
 .silk-frame {
   position: relative;
   min-height: 15.5rem;
-  border: 1px solid rgba(84, 61, 45, 0.13);
+  border: 1px solid rgba(74, 29, 43, 0.13);
   border-radius: 1.55rem;
   overflow: hidden;
   background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.1)),
-    linear-gradient(130deg, #f6efe5 0%, #ded0c0 47%, #ad927b 100%);
+    linear-gradient(150deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.14)),
+    linear-gradient(130deg, #f9f5f2 0%, #e8e0e0 51%, #8f6973 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), var(--soft-shadow);
 }
 
@@ -371,7 +373,7 @@ p {
   position: absolute;
   height: 1px;
   transform-origin: left center;
-  background: rgba(65, 45, 34, 0.2);
+  background: rgba(74, 29, 43, 0.2);
 }
 
 .silk-line-a {
@@ -388,7 +390,7 @@ p {
   transform: rotate(8deg);
 }
 
-.mocha-drop {
+.wine-drop {
   position: absolute;
   right: 1.35rem;
   bottom: 1.25rem;
@@ -396,7 +398,7 @@ p {
   height: 4.8rem;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 50%;
-  background: rgba(73, 52, 39, 0.22);
+  background: rgba(95, 38, 55, 0.2);
   box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.26);
   backdrop-filter: blur(12px);
 }
@@ -420,9 +422,9 @@ p {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid rgba(76, 55, 43, 0.1);
+  border-top: 1px solid rgba(74, 29, 43, 0.1);
   padding-top: 0.9rem;
-  color: var(--mocha);
+  color: var(--wine);
 }
 
 .action {
@@ -430,7 +432,7 @@ p {
   align-items: center;
   gap: 0.4rem;
   min-width: 3.8rem;
-  color: rgba(88, 65, 50, 0.72);
+  color: rgba(95, 38, 55, 0.72);
   font-size: 0.82rem;
   font-weight: 720;
   opacity: 0;
@@ -462,7 +464,7 @@ p {
 
 .under-note {
   min-height: 1rem;
-  color: rgba(82, 60, 45, 0.48);
+  color: rgba(95, 38, 55, 0.38);
   font-size: 0.78rem;
   font-weight: 680;
   text-align: center;
