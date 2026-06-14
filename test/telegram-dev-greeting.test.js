@@ -4,6 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const {
+  STUDERRIA_TG_GREETING_TEMPLATES,
   buildStuderriaTelegramGreeting,
   formatGreetingNameList,
   getStuderriaTelegramGreetingTarget,
@@ -35,8 +36,12 @@ test('telegram dev greeting formats name list naturally', () => {
 test('telegram dev greeting builds deterministic template when random is injected', () => {
   const greeting = buildStuderriaTelegramGreeting(['Гліб', 'Артем', 'Нестор'], () => 0);
   assert.match(greeting, /^Гліб, Артем і Нестор, з днем народження легенди!!!/);
-  assert.match(greeting, /від Марченка/);
-  assert.match(greeting, /мінімум стресу, максимум смішних історій/);
+  assert.match(greeting, /Студерія передає/);
+  assert.match(greeting, /без зайвого стресу/);
+});
+
+test('telegram dev greeting keeps a broad random template pool', () => {
+  assert.ok(STUDERRIA_TG_GREETING_TEMPLATES.length >= 20);
 });
 
 test('telegram dev greeting target comes from explicit env guard', () => {
