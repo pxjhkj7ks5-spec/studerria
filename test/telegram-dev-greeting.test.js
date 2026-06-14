@@ -34,8 +34,9 @@ test('telegram dev greeting formats name list naturally', () => {
 
 test('telegram dev greeting builds deterministic template when random is injected', () => {
   const greeting = buildStuderriaTelegramGreeting(['Гліб', 'Артем', 'Нестор'], () => 0);
-  assert.match(greeting, /^Гліб, Артем і Нестор, з днем народження!/);
-  assert.match(greeting, /дедлайни обходили стороною/);
+  assert.match(greeting, /^Гліб, Артем і Нестор, з днем народження легенди!!!/);
+  assert.match(greeting, /від Марченка/);
+  assert.match(greeting, /мінімум стресу, максимум смішних історій/);
 });
 
 test('telegram dev greeting target comes from explicit env guard', () => {
