@@ -130,6 +130,11 @@ export function WithlforlExperience({ initialDenied, initialUnlocked }: Withlfor
   return (
     <main className={initialUnlocked ? "experience-shell unlocked" : "experience-shell"}>
       <div className="ambient-layer" aria-hidden="true" />
+      {initialUnlocked ? (
+        <form action={`${basePath}/api/logout`} className="logout-control" method="post">
+          <button type="submit">вийти</button>
+        </form>
+      ) : null}
       {initialUnlocked ? <PrivatePost revealed={revealed} /> : <AccessGate initialDenied={initialDenied} />}
     </main>
   );
