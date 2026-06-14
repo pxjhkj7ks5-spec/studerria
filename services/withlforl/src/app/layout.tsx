@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "З днем народження",
-  description: "A private birthday greeting page.",
+  title: "для тебе",
+  description: "A private greeting page.",
   applicationName: "Withlforl",
   icons: {
     icon: "/withlforl/icon.svg",
@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#fff0ea",
+  themeColor: "#f6f0e8",
 };
 
 export default function RootLayout({

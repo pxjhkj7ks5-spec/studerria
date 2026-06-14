@@ -73,7 +73,7 @@ test('withlforl child paths are claimed by service middleware', async () => {
   });
 
   const res = createFakeResponse();
-  await runHandlers(app.handlers, { path: '/withlforl/images/hero-still-life.png', url: '/withlforl/images/hero-still-life.png' }, res);
+  await runHandlers(app.handlers, { path: '/withlforl/api/access', url: '/withlforl/api/access' }, res);
 
   assert.equal(res.statusCode, 404);
   assert.equal(res.body, 'Not found');

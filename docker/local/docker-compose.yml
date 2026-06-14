@@ -229,6 +229,7 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 8080
       NEXT_PUBLIC_BASE_PATH: /withlforl
+      WITHLFORL_PASSWORD: ${WITHLFORL_PASSWORD:-change-me-withlforl-password}
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
