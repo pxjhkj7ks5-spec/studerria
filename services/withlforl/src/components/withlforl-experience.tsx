@@ -39,7 +39,7 @@ function AccessGate({ initialDenied }: { initialDenied: boolean }) {
     <section className="gate-screen" aria-label="Private access">
       <div className="gate-glass" aria-hidden="true" />
       <form action={`${basePath}/api/access`} className="gate-panel" method="post">
-        <span className="gate-mark">wl</span>
+        <span className="gate-mark">L</span>
         <label className="gate-label" htmlFor="withlforl-password">
           код
         </label>
@@ -81,7 +81,7 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
       <article className="post-shell">
         <header className="post-header">
           <div className="avatar" aria-hidden="true">
-            wl
+            L
           </div>
           <div>
             <p className="display-name">для тебе</p>
