@@ -631,7 +631,11 @@ p {
   border: 1px solid rgba(74, 29, 43, 0.12);
   border-radius: 2rem;
   padding: 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.88), rgba(255, 252, 246, 0.58)),
+    rgba(255, 255, 255, 0.42);
   box-shadow: var(--shadow);
+  backdrop-filter: blur(30px) saturate(145%);
 }
 
 .letter-view {
@@ -642,15 +646,6 @@ p {
   min-height: min(43rem, calc(100svh - 2rem));
 }
 
-.letter-background {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .letter-view::after,
 .date-invite-view::after {
   content: "";
@@ -658,8 +653,8 @@ p {
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(180deg, rgba(255, 252, 246, 0.22), rgba(255, 252, 246, 0.58)),
-    radial-gradient(circle at 50% 38%, rgba(255, 253, 249, 0.52), transparent 13rem);
+    linear-gradient(115deg, rgba(255, 255, 255, 0.36), transparent 38%),
+    radial-gradient(circle at 50% 38%, rgba(255, 253, 249, 0.34), transparent 13rem);
 }
 
 .letter-topbar,

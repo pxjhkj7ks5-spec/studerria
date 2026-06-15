@@ -8,7 +8,6 @@ type WithlforlExperienceProps = {
 };
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const letterBackgroundSrc = `${basePath}/images/letter-background.png`;
 
 type ThreadPost = {
   id: number;
@@ -328,7 +327,6 @@ function ThreadView({
 function LetterView({ onBack, onRead }: { onBack: () => void; onRead: () => void }) {
   return (
     <section className="letter-view" aria-label="Birthday letter">
-      <img alt="" className="letter-background" src={letterBackgroundSrc} />
       <div className="thread-topbar letter-topbar">
         <button className="thread-back" onClick={onBack} type="button">
           назад
@@ -356,7 +354,6 @@ function DateInviteView({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="date-invite-view" aria-label="Date invitation">
-      <img alt="" className="letter-background" src={letterBackgroundSrc} />
       <div className="thread-topbar letter-topbar">
         <button className="thread-back" onClick={onBack} type="button">
           назад
