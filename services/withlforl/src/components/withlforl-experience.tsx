@@ -9,6 +9,46 @@ type WithlforlExperienceProps = {
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
+type ThreadPost = {
+  id: number;
+  title: string;
+  body: string;
+  muted: string;
+  replyCount: string;
+  likeCount: string;
+  shareCount: string;
+};
+
+const threadPosts: ThreadPost[] = [
+  {
+    id: 1,
+    title: "ти знаєш.",
+    body: "тут буде кілька слів.",
+    muted: "і вони почнуться з найпростішого.",
+    replyCount: "12",
+    likeCount: "∞",
+    shareCount: "1",
+  },
+  {
+    id: 2,
+    title: "я пам'ятаю.",
+    body: "маленькі речі, які чомусь тримаються найдовше.",
+    muted: "світло, голос, паузи між словами.",
+    replyCount: "7",
+    likeCount: "24",
+    shareCount: "2",
+  },
+  {
+    id: 3,
+    title: "і ще.",
+    body: "це тільки початок цієї стрічки.",
+    muted: "далі буде більше, але не все одразу.",
+    replyCount: "3",
+    likeCount: "18",
+    shareCount: "1",
+  },
+];
+
 function ReplyIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -68,53 +108,159 @@ function AccessGate({ initialDenied }: { initialDenied: boolean }) {
   );
 }
 
-function PrivatePost({ revealed }: { revealed: boolean }) {
+function PostHeader() {
+  return (
+    <header className="post-header">
+      <div className="avatar" aria-hidden="true">
+        L
+      </div>
+      <div>
+        <p className="display-name">для тебе</p>
+        <p className="handle">@andriimrch · сьогодні</p>
+      </div>
+    </header>
+  );
+}
+
+function PostActions({ post }: { post: ThreadPost }) {
   const reactions = useMemo(
     () => [
-      { icon: <ReplyIcon />, label: "12" },
-      { icon: <HeartIcon />, label: "∞" },
-      { icon: <ShareIcon />, label: "1" },
+      { icon: <ReplyIcon />, label: post.replyCount },
+      { icon: <HeartIcon />, label: post.likeCount },
+      { icon: <ShareIcon />, label: post.shareCount },
     ],
-    [],
+    [post],
   );
+
+  return (
+    <footer className="post-actions" aria-label="Post actions">
+      {reactions.map((reaction) => (
+        <span className="action" key={`${post.id}-${reaction.label}`}>
+          {reaction.icon}
+          <span>{reaction.label}</span>
+        </span>
+      ))}
+    </footer>
+  );
+}
+
+function PostMedia() {
+  return (
+    <div className="silk-frame" aria-hidden="true">
+      <span className="silk-line silk-line-a" />
+      <span className="silk-line silk-line-b" />
+      <span className="wine-drop" />
+      <span className="milk-shine" />
+    </div>
+  );
+}
+
+function PostBody({ post }: { post: ThreadPost }) {
+  return (
+    <>
+      <div className="post-copy">
+        <p>{post.title}</p>
+        <p className="post-muted">{post.body}</p>
+        <p className="post-soft">{post.muted}</p>
+      </div>
+      <PostMedia />
+    </>
+  );
+}
+
+function FeedPostCard({
+  isLocked,
+  onOpen,
+  post,
+}: {
+  isLocked: boolean;
+  onOpen: () => void;
+  post: ThreadPost;
+}) {
+  return (
+    <article className={isLocked ? "post-shell feed-post is-locked" : "post-shell feed-post"}>
+      <button
+        aria-label={isLocked ? "Пост заблоковано" : `Відкрити пост ${post.id}`}
+        className="post-hit-target"
+        disabled={isLocked}
+        onClick={onOpen}
+        type="button"
+      />
+      <span className="post-index">пост {post.id}</span>
+      <div className="post-content">
+        <PostHeader />
+        <PostBody post={post} />
+        <PostActions post={post} />
+      </div>
+      {isLocked ? <p className="locked-note">прочитай попередній щоб відкрити цей</p> : null}
+    </article>
+  );
+}
+
+function ThreadView({
+  onBack,
+  posts,
+}: {
+  onBack: () => void;
+  posts: ThreadPost[];
+}) {
+  return (
+    <section className="thread-view" aria-label="Thread">
+      <div className="thread-topbar">
+        <button className="thread-back" onClick={onBack} type="button">
+          назад
+        </button>
+        <p>{posts.length} у треді</p>
+      </div>
+      <div className="thread-stack">
+        {posts.map((post, index) => (
+          <article className="post-shell thread-post" key={post.id}>
+            <PostHeader />
+            <PostBody post={post} />
+            <PostActions post={post} />
+            {index < posts.length - 1 ? <span className="thread-line" aria-hidden="true" /> : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PrivatePost({ revealed }: { revealed: boolean }) {
+  const [unlockedCount, setUnlockedCount] = useState(1);
+  const [activePostId, setActivePostId] = useState<number | null>(null);
+  const visibleThreadPosts = threadPosts.slice(0, Math.max(activePostId ?? 1, unlockedCount));
+
+  function openPost(post: ThreadPost) {
+    setActivePostId(post.id);
+    setUnlockedCount((current) => Math.min(threadPosts.length, Math.max(current, post.id + 1)));
+  }
 
   return (
     <section className={revealed ? "feed-screen is-revealed" : "feed-screen"} aria-label="Private greeting">
       <div className="phone-topline" aria-hidden="true">
         <span />
       </div>
-      <article className="post-shell">
-        <header className="post-header">
-          <div className="avatar" aria-hidden="true">
-            L
+      {activePostId ? (
+        <ThreadView onBack={() => setActivePostId(null)} posts={visibleThreadPosts} />
+      ) : (
+        <>
+          <div className="feed-count" aria-live="polite">
+            <span>{threadPosts.length} пости</span>
+            <span>{unlockedCount} відкрито</span>
           </div>
-          <div>
-            <p className="display-name">для тебе</p>
-            <p className="handle">@andriimrch · сьогодні</p>
+          <div className="feed-list">
+            {threadPosts.map((post) => (
+              <FeedPostCard
+                isLocked={post.id > unlockedCount}
+                key={post.id}
+                onOpen={() => openPost(post)}
+                post={post}
+              />
+            ))}
           </div>
-        </header>
-
-        <div className="post-copy">
-          <p>ти знаєш.</p>
-          <p className="post-muted">тут буде кілька слів.</p>
-        </div>
-
-        <div className="silk-frame" aria-hidden="true">
-          <span className="silk-line silk-line-a" />
-          <span className="silk-line silk-line-b" />
-          <span className="wine-drop" />
-          <span className="milk-shine" />
-        </div>
-
-        <footer className="post-actions" aria-label="Post actions">
-          {reactions.map((reaction) => (
-            <span className="action" key={reaction.label}>
-              {reaction.icon}
-              <span>{reaction.label}</span>
-            </span>
-          ))}
-        </footer>
-      </article>
+        </>
+      )}
       <p className="under-note">поки що тихо.</p>
     </section>
   );
