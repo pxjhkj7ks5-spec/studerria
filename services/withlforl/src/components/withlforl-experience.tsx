@@ -13,10 +13,18 @@ type ThreadPost = {
   id: number;
   title: string;
   body: string;
+  fullBody: string[];
   muted: string;
   replyCount: string;
+  replies: ThreadReply[];
   likeCount: string;
   shareCount: string;
+};
+
+type ThreadReply = {
+  author: string;
+  handle: string;
+  text: string;
 };
 
 const threadPosts: ThreadPost[] = [
@@ -24,8 +32,24 @@ const threadPosts: ThreadPost[] = [
     id: 1,
     title: "ти знаєш.",
     body: "тут буде кілька слів.",
+    fullBody: [
+      "тут буде кілька слів, але не всі одразу.",
+      "ніби пост, який можна перечитати ще раз і знайти там щось між рядками.",
+    ],
     muted: "і вони почнуться з найпростішого.",
     replyCount: "12",
+    replies: [
+      {
+        author: "ти",
+        handle: "@thread",
+        text: "а якщо коротко: це починається з того, як я тебе називаю.",
+      },
+      {
+        author: "ще думка",
+        handle: "@quiet",
+        text: "цей пост відкрив наступний, але сам лишився окремою маленькою розмовою.",
+      },
+    ],
     likeCount: "∞",
     shareCount: "1",
   },
@@ -33,8 +57,24 @@ const threadPosts: ThreadPost[] = [
     id: 2,
     title: "я пам'ятаю.",
     body: "маленькі речі, які чомусь тримаються найдовше.",
+    fullBody: [
+      "пам'ятаю деталі, які легко пропустити, якщо дивитись поспіхом.",
+      "вони не кричать, але саме через це і залишаються.",
+    ],
     muted: "світло, голос, паузи між словами.",
     replyCount: "7",
+    replies: [
+      {
+        author: "пауза",
+        handle: "@between",
+        text: "іноді найважливіше сидить не в словах, а поруч із ними.",
+      },
+      {
+        author: "деталь",
+        handle: "@soft",
+        text: "це як маленький reply, який не хочеться видаляти.",
+      },
+    ],
     likeCount: "24",
     shareCount: "2",
   },
@@ -42,8 +82,19 @@ const threadPosts: ThreadPost[] = [
     id: 3,
     title: "і ще.",
     body: "це тільки початок цієї стрічки.",
+    fullBody: [
+      "третій пост поки що філерний, але він уже знає своє місце.",
+      "тут може бути фінальна частина, маленький жарт або щось дуже просте.",
+    ],
     muted: "далі буде більше, але не все одразу.",
     replyCount: "3",
+    replies: [
+      {
+        author: "післямова",
+        handle: "@after",
+        text: "тред може продовжитись, але зараз достатньо цього.",
+      },
+    ],
     likeCount: "18",
     shareCount: "1",
   },
@@ -199,10 +250,10 @@ function FeedPostCard({
 
 function ThreadView({
   onBack,
-  posts,
+  post,
 }: {
   onBack: () => void;
-  posts: ThreadPost[];
+  post: ThreadPost;
 }) {
   return (
     <section className="thread-view" aria-label="Thread">
@@ -210,17 +261,35 @@ function ThreadView({
         <button className="thread-back" onClick={onBack} type="button">
           назад
         </button>
-        <p>{posts.length} у треді</p>
+        <p>сабтред</p>
       </div>
       <div className="thread-stack">
-        {posts.map((post, index) => (
-          <article className="post-shell thread-post" key={post.id}>
-            <PostHeader />
-            <PostBody post={post} />
-            <PostActions post={post} />
-            {index < posts.length - 1 ? <span className="thread-line" aria-hidden="true" /> : null}
-          </article>
-        ))}
+        <article className="post-shell thread-post">
+          <PostHeader />
+          <PostBody post={post} />
+          <div className="thread-full-copy">
+            {post.fullBody.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+          <PostActions post={post} />
+        </article>
+        <section className="thread-replies" aria-label="Replies">
+          {post.replies.map((reply) => (
+            <article className="reply-shell" key={`${reply.handle}-${reply.text}`}>
+              <div className="reply-avatar" aria-hidden="true">
+                {reply.author.charAt(0)}
+              </div>
+              <div className="reply-copy">
+                <p className="reply-meta">
+                  <span>{reply.author}</span>
+                  <span>{reply.handle}</span>
+                </p>
+                <p>{reply.text}</p>
+              </div>
+            </article>
+          ))}
+        </section>
       </div>
     </section>
   );
@@ -229,7 +298,7 @@ function ThreadView({
 function PrivatePost({ revealed }: { revealed: boolean }) {
   const [unlockedCount, setUnlockedCount] = useState(1);
   const [activePostId, setActivePostId] = useState<number | null>(null);
-  const visibleThreadPosts = threadPosts.slice(0, Math.max(activePostId ?? 1, unlockedCount));
+  const activePost = threadPosts.find((post) => post.id === activePostId) ?? null;
 
   function openPost(post: ThreadPost) {
     setActivePostId(post.id);
@@ -241,8 +310,8 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
       <div className="phone-topline" aria-hidden="true">
         <span />
       </div>
-      {activePostId ? (
-        <ThreadView onBack={() => setActivePostId(null)} posts={visibleThreadPosts} />
+      {activePost ? (
+        <ThreadView onBack={() => setActivePostId(null)} post={activePost} />
       ) : (
         <>
           <div className="feed-list">
