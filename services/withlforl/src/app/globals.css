@@ -438,11 +438,11 @@ p {
 
 .post-copy p:first-child {
   color: var(--espresso);
-  font-family: "New York", "Iowan Old Style", Georgia, serif;
-  font-size: clamp(2.9rem, 15vw, 4.5rem);
-  font-weight: 540;
+  font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(2.75rem, 13vw, 4.25rem);
+  font-weight: 780;
   letter-spacing: 0;
-  line-height: 0.92;
+  line-height: 0.94;
 }
 
 .post-muted {
