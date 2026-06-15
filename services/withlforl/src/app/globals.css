@@ -800,6 +800,21 @@ p {
   text-align: center;
 }
 
+.date-result.is-win {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--wine);
+  font-size: 0.92rem;
+  animation: victory-pop 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.party-emoji {
+  display: inline-block;
+  font-size: 1.25rem;
+  line-height: 1;
+  animation: emoji-bounce 720ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .reply-shell {
   position: relative;
   display: grid;
@@ -947,6 +962,40 @@ p {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes victory-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(0.45rem) scale(0.96);
+  }
+
+  70% {
+    opacity: 1;
+    transform: translateY(-0.08rem) scale(1.03);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes emoji-bounce {
+  0% {
+    opacity: 0;
+    transform: translateY(0.35rem) scale(0.78) rotate(-6deg);
+  }
+
+  62% {
+    opacity: 1;
+    transform: translateY(-0.12rem) scale(1.12) rotate(4deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
   }
 }
 
