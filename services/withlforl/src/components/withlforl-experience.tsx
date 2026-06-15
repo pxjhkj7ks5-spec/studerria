@@ -41,12 +41,12 @@ const threadPosts: ThreadPost[] = [
     replies: [
       {
         author: "ти",
-        handle: "@thread",
+        handle: "@andriimrch",
         text: "Золото - це та дорогоцінність що стає дорожчою з кожним днем, кожен день ти стаєш кращою. Але зберігаєш свої ідеї і ізначальну цінність.",
       },
       {
         author: "ще думка",
-        handle: "@quiet",
+        handle: "@andriimrch",
         text: "Твоє волося немов покрито золотом, а твоя посмішка сяє яскравіше за нього. Можеш повертатись назад і відкривати наступний.",
       },
     ],
@@ -65,12 +65,12 @@ const threadPosts: ThreadPost[] = [
     replies: [
       {
         author: "пауза",
-        handle: "@between",
+        handle: "@andriimrch",
         text: "хочу і бажаю тобі лишатись собою.",
       },
       {
         author: "деталь",
-        handle: "@soft",
+        handle: "@andriimrch",
         text: "Бо ти супер крута вумен.",
       },
     ],
@@ -89,12 +89,12 @@ const threadPosts: ThreadPost[] = [
     replies: [
       {
         author: "баланс",
-        handle: "@bright",
+        handle: "@andriimrch",
         text: "Ти можеш бути веселою, можеш бути серйозною, і в тобі точно є баланс. З тобою можна дискутувати, сперечатись і все одно відчувати, що поруч дуже розумна дівчинка.",
       },
       {
         author: "вдячність",
-        handle: "@warm",
+        handle: "@andriimrch",
         text: "Ти глибока людина, з якою теми не закінчуються. З тобою навіть мовчки поруч тепло, і за цей рік ти зробила мене набагато щасливішим.",
       },
     ],
@@ -180,7 +180,7 @@ function PostHeader() {
       </div>
       <div>
         <p className="display-name">для тебе</p>
-        <p className="handle">@andriimrch · сьогодні</p>
+        <p className="handle">@andriimrch</p>
       </div>
     </header>
   );
