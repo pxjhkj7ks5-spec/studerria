@@ -44,13 +44,18 @@ function AccessGate({ initialDenied }: { initialDenied: boolean }) {
           код
         </label>
         <input
-          autoComplete="current-password"
+          autoCapitalize="none"
+          autoComplete="off"
+          autoCorrect="off"
           autoFocus
           className="gate-input"
           id="withlforl-password"
+          inputMode="text"
+          lang="uk"
           name="password"
           placeholder="••••"
-          type="password"
+          spellCheck={false}
+          type="text"
         />
         <button className="gate-button" type="submit">
           відкрити
