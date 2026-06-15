@@ -18,6 +18,8 @@ type ThreadPost = {
   replyCount: string;
   replies: ThreadReply[];
   likeCount: string;
+  mediaAlt?: string;
+  mediaSrc?: string;
   shareCount: string;
 };
 
@@ -30,27 +32,26 @@ type ThreadReply = {
 const threadPosts: ThreadPost[] = [
   {
     id: 1,
-    title: "ти знаєш.",
-    body: "тут буде кілька слів.",
-    fullBody: [
-      "тут буде кілька слів, але не всі одразу.",
-      "ніби пост, який можна перечитати ще раз і знайти там щось між рядками.",
-    ],
-    muted: "і вони почнуться з найпростішого.",
+    title: "Ти - золото",
+    body: "чому? а тицяй і поясню тобі",
+    fullBody: [],
+    muted: "і почну з простого",
     replyCount: "12",
     replies: [
       {
         author: "ти",
         handle: "@thread",
-        text: "а якщо коротко: це починається з того, як я тебе називаю.",
+        text: "Золото - це та дорогоцінність що стає дорожчою з кожним днем, кожен день ти стаєш кращою. Але зберігаєш свої ідеї і ізначальну цінність.",
       },
       {
         author: "ще думка",
         handle: "@quiet",
-        text: "цей пост відкрив наступний, але сам лишився окремою маленькою розмовою.",
+        text: "Твоє волося немов покрито золотом, а твоя посмішка сяє яскравіше за нього. Можеш повертатись назад і відкривати наступний.",
       },
     ],
     likeCount: "∞",
+    mediaAlt: "дзеркальне фото пари",
+    mediaSrc: `${basePath}/images/first-post-gold.png`,
     shareCount: "1",
   },
   {
@@ -195,7 +196,15 @@ function PostActions({ post }: { post: ThreadPost }) {
   );
 }
 
-function PostMedia() {
+function PostMedia({ alt, src }: { alt?: string; src?: string }) {
+  if (src) {
+    return (
+      <div className="silk-frame has-photo">
+        <img alt={alt ?? ""} className="post-photo" src={src} />
+      </div>
+    );
+  }
+
   return (
     <div className="silk-frame" aria-hidden="true">
       <span className="silk-line silk-line-a" />
@@ -214,7 +223,7 @@ function PostBody({ post }: { post: ThreadPost }) {
         <p className="post-muted">{post.body}</p>
         <p className="post-soft">{post.muted}</p>
       </div>
-      <PostMedia />
+      <PostMedia alt={post.mediaAlt} src={post.mediaSrc} />
     </>
   );
 }
@@ -267,11 +276,13 @@ function ThreadView({
         <article className="post-shell thread-post">
           <PostHeader />
           <PostBody post={post} />
-          <div className="thread-full-copy">
-            {post.fullBody.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-          </div>
+          {post.fullBody.length > 0 ? (
+            <div className="thread-full-copy">
+              {post.fullBody.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+          ) : null}
           <PostActions post={post} />
         </article>
         <section className="thread-replies" aria-label="Replies">
