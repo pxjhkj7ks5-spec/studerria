@@ -245,9 +245,6 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
         <ThreadView onBack={() => setActivePostId(null)} posts={visibleThreadPosts} />
       ) : (
         <>
-          <div className="feed-count" aria-live="polite">
-            <span>{unlockedCount} відкрито</span>
-          </div>
           <div className="feed-list">
             {threadPosts.map((post) => (
               <FeedPostCard
