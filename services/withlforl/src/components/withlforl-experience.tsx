@@ -41,7 +41,7 @@ function AccessGate({ initialDenied }: { initialDenied: boolean }) {
       <form action={`${basePath}/api/access`} className="gate-panel" method="post">
         <span className="gate-mark">L</span>
         <label className="gate-label" htmlFor="withlforl-password">
-          код
+          те як тебе називаю
         </label>
         <input
           autoCapitalize="none"
