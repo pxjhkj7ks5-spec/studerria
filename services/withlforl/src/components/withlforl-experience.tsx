@@ -90,7 +90,7 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
           </div>
           <div>
             <p className="display-name">для тебе</p>
-            <p className="handle">@withlforl · сьогодні</p>
+            <p className="handle">@andriimrch · сьогодні</p>
           </div>
         </header>
 
