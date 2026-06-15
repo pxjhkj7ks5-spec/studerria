@@ -291,7 +291,7 @@ p {
 .feed-count {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   min-height: 1.8rem;
   color: rgba(95, 38, 55, 0.58);
   font-size: 0.78rem;

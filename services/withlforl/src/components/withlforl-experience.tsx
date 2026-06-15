@@ -246,7 +246,6 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
       ) : (
         <>
           <div className="feed-count" aria-live="polite">
-            <span>{threadPosts.length} пости</span>
             <span>{unlockedCount} відкрито</span>
           </div>
           <div className="feed-list">
