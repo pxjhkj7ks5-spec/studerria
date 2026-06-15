@@ -325,7 +325,7 @@ function ThreadView({
   );
 }
 
-function LetterView({ onBack }: { onBack: () => void }) {
+function LetterView({ onBack, onRead }: { onBack: () => void; onRead: () => void }) {
   return (
     <section className="letter-view" aria-label="Birthday letter">
       <img alt="" className="letter-background" src={letterBackgroundSrc} />
@@ -343,6 +343,57 @@ function LetterView({ onBack }: { onBack: () => void }) {
             <p key={paragraph}>{paragraph}</p>
           ))}
         </div>
+        <button className="letter-read-button" onClick={onRead} type="button">
+          я прочитала
+        </button>
+      </article>
+    </section>
+  );
+}
+
+function DateInviteView({ onBack }: { onBack: () => void }) {
+  const [answer, setAnswer] = useState<"yes" | "no" | null>(null);
+
+  return (
+    <section className="date-invite-view" aria-label="Date invitation">
+      <img alt="" className="letter-background" src={letterBackgroundSrc} />
+      <div className="thread-topbar letter-topbar">
+        <button className="thread-back" onClick={onBack} type="button">
+          назад
+        </button>
+        <p>питання</p>
+      </div>
+      <article className="date-card">
+        <p className="letter-kicker">післямова</p>
+        <h1>тепер ще одне</h1>
+        <div className="date-copy">
+          <p>
+            якщо ти вже дочитала аж сюди, то я маю маленьке офіційне запрошення.
+          </p>
+          <p>
+            пропоную побачення: без зайвого пафосу, але з нормальним настроєм,
+            чимось смачним і часом тільки для нас.
+          </p>
+          <p>
+            формат можна узгодити, але сама ідея поки така: ти, я і вечір, який
+            має стати дуже приємним.
+          </p>
+        </div>
+        <div className="date-actions" aria-label="Date answer">
+          <button className="date-answer is-yes" onClick={() => setAnswer("yes")} type="button">
+            згода
+          </button>
+          <button className="date-answer is-no" onClick={() => setAnswer("no")} type="button">
+            ні
+          </button>
+        </div>
+        <p className="date-result" aria-live="polite">
+          {answer === "yes"
+            ? "так і запишемо. деталі за мною."
+            : answer === "no"
+              ? "я зроблю вигляд, що це була кнопка для перевірки."
+              : " "}
+        </p>
       </article>
     </section>
   );
@@ -352,10 +403,12 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
   const [unlockedCount, setUnlockedCount] = useState(1);
   const [activePostId, setActivePostId] = useState<number | null>(null);
   const [isLetterOpen, setIsLetterOpen] = useState(false);
+  const [isDateInviteOpen, setIsDateInviteOpen] = useState(false);
   const activePost = threadPosts.find((post) => post.id === activePostId) ?? null;
 
   function openPost(post: ThreadPost) {
     setIsLetterOpen(false);
+    setIsDateInviteOpen(false);
     setActivePostId(post.id);
     setUnlockedCount((current) => Math.min(threadPosts.length, Math.max(current, post.id + 1)));
   }
@@ -365,8 +418,21 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
       <div className="phone-topline" aria-hidden="true">
         <span />
       </div>
-      {isLetterOpen ? (
-        <LetterView onBack={() => setIsLetterOpen(false)} />
+      {isDateInviteOpen ? (
+        <DateInviteView
+          onBack={() => {
+            setIsDateInviteOpen(false);
+            setIsLetterOpen(true);
+          }}
+        />
+      ) : isLetterOpen ? (
+        <LetterView
+          onBack={() => setIsLetterOpen(false)}
+          onRead={() => {
+            setIsLetterOpen(false);
+            setIsDateInviteOpen(true);
+          }}
+        />
       ) : activePost ? (
         <ThreadView onBack={() => setActivePostId(null)} onOpenLetter={() => setIsLetterOpen(true)} post={activePost} />
       ) : (
