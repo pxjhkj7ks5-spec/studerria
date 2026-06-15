@@ -8,6 +8,7 @@ type WithlforlExperienceProps = {
 };
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const letterBackgroundSrc = `${basePath}/images/letter-background.png`;
 
 type ThreadPost = {
   id: number;
@@ -102,6 +103,14 @@ const threadPosts: ThreadPost[] = [
     mediaSrc: `${basePath}/images/third-post-birthday.png`,
     shareCount: "1",
   },
+];
+
+const letterParagraphs = [
+  `я тебе вітаю з твоїм днем, днем коли тобі виповнюється 18 років, день коли офіційно стаєш дорослою. але можу сказати що ти ну дууже цікава людина, можеш бути веселою, можеш бути серйозною, в тобі точно є баланс. ти така розумна що з тобою можна і по дискутувати і поспорити, у мене при інтелектуальних спорах з тобою не виникає думки що нє якусь діч несеш, я  не відкидаю одразу те що ти кажеш, бо знаю що дуже розумна дівчинка у якої немає проблем з побудовою причинно-наслідкових зв'язків. і це випливає в впевненність що в тебе все буде чудово в житті, ти точно не будеш просижувати життя в пусту, ти знайдеш способи як заробити на порш мені) я тобі майбах ти мені поршик, ніби норм тема ахпхахпахп. але якщо повертатись до серйозного то ти дуже глибока людина з якою теми не закінчаться, ти та комфортна людина з якою і сидячи поруч мовчки будеш відчувати тепло, ти та яка буде дарувати посмішку іншим, ти та яка зробила мене за цей рік набагато щасливішим. за це все я тобі вдячен`,
+  `і ще хочу щоб ти в цей день не думала, що 18 це якась різка межа після якої треба одразу ставати супер серйозною дорослою людиною. так, тепер можна офіційно більше, але я дуже хочу щоб ти не загубила в собі ту Люду, яка сміється з тупих жартів, може раптово сказати щось дуже розумне, а потім знову зробити вигляд ніби нічого такого не було.`,
+  `мені подобається що ти не плоска людина, не один настрій і не одна роль. у тобі є і ніжність, і характер, і та впертість, яка іноді може бісити, але без неї це була б вже не ти. і я правда вірю, що ти зможеш зробити собі життя таким, щоб самій було кайфово в ньому жити, а не просто "нормально".`,
+  `тому бажаю тобі багато сил, багато приводів посміхатись, людей поруч які будуть бачити тебе справжню, і ще трохи удачі, бо навіть дуже розумним дівчаткам вона теж не заважає. а я зі свого боку буду дуже радий бачити як ти ростеш, як стаєш ще впевненішою, ще щасливішою, ще більше собою.`,
+  `з днем народження, моя золота Людачка. 18 тобі дуже пасує.`,
 ];
 
 function ReplyIcon() {
@@ -262,9 +271,11 @@ function FeedPostCard({
 
 function ThreadView({
   onBack,
+  onOpenLetter,
   post,
 }: {
   onBack: () => void;
+  onOpenLetter: () => void;
   post: ThreadPost;
 }) {
   return (
@@ -285,6 +296,11 @@ function ThreadView({
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
+          ) : null}
+          {post.id === 3 ? (
+            <button className="letter-link" onClick={onOpenLetter} type="button">
+              відкрити лист
+            </button>
           ) : null}
           <PostActions post={post} />
         </article>
@@ -309,12 +325,37 @@ function ThreadView({
   );
 }
 
+function LetterView({ onBack }: { onBack: () => void }) {
+  return (
+    <section className="letter-view" aria-label="Birthday letter">
+      <img alt="" className="letter-background" src={letterBackgroundSrc} />
+      <div className="thread-topbar letter-topbar">
+        <button className="thread-back" onClick={onBack} type="button">
+          назад
+        </button>
+        <p>лист</p>
+      </div>
+      <article className="letter-paper">
+        <p className="letter-kicker">18</p>
+        <h1>Людачка</h1>
+        <div className="letter-copy">
+          {letterParagraphs.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </div>
+      </article>
+    </section>
+  );
+}
+
 function PrivatePost({ revealed }: { revealed: boolean }) {
   const [unlockedCount, setUnlockedCount] = useState(1);
   const [activePostId, setActivePostId] = useState<number | null>(null);
+  const [isLetterOpen, setIsLetterOpen] = useState(false);
   const activePost = threadPosts.find((post) => post.id === activePostId) ?? null;
 
   function openPost(post: ThreadPost) {
+    setIsLetterOpen(false);
     setActivePostId(post.id);
     setUnlockedCount((current) => Math.min(threadPosts.length, Math.max(current, post.id + 1)));
   }
@@ -324,8 +365,10 @@ function PrivatePost({ revealed }: { revealed: boolean }) {
       <div className="phone-topline" aria-hidden="true">
         <span />
       </div>
-      {activePost ? (
-        <ThreadView onBack={() => setActivePostId(null)} post={activePost} />
+      {isLetterOpen ? (
+        <LetterView onBack={() => setIsLetterOpen(false)} />
+      ) : activePost ? (
+        <ThreadView onBack={() => setActivePostId(null)} onOpenLetter={() => setIsLetterOpen(true)} post={activePost} />
       ) : (
         <>
           <div className="feed-list">

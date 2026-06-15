@@ -601,6 +601,110 @@ p {
   padding-left: 0.68rem;
 }
 
+.letter-link {
+  min-height: 3.1rem;
+  border: 1px solid rgba(53, 19, 31, 0.18);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent),
+    linear-gradient(180deg, var(--wine-bright), var(--wine) 58%, var(--wine-deep));
+  box-shadow:
+    0 18px 42px rgba(53, 19, 31, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  color: var(--silk-bright);
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 780;
+  letter-spacing: 0;
+}
+
+.letter-link:active {
+  transform: translateY(1px);
+}
+
+.letter-view {
+  position: relative;
+  display: grid;
+  gap: 0.9rem;
+  min-height: min(55rem, calc(100svh - 2rem));
+  overflow: hidden;
+  border: 1px solid rgba(74, 29, 43, 0.12);
+  border-radius: 2rem;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.letter-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.letter-view::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.22), rgba(255, 252, 246, 0.58)),
+    radial-gradient(circle at 50% 38%, rgba(255, 253, 249, 0.52), transparent 13rem);
+}
+
+.letter-topbar,
+.letter-paper {
+  position: relative;
+  z-index: 2;
+}
+
+.letter-paper {
+  display: grid;
+  gap: 1rem;
+  align-self: start;
+  max-height: calc(100svh - 8rem);
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  border-radius: 1.45rem;
+  padding: 1.1rem;
+  background: rgba(255, 252, 246, 0.72);
+  box-shadow:
+    0 24px 64px rgba(53, 20, 31, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.letter-kicker {
+  justify-self: start;
+  border: 1px solid rgba(103, 36, 58, 0.16);
+  border-radius: 999px;
+  padding: 0.24rem 0.55rem;
+  color: rgba(95, 38, 55, 0.58);
+  font-size: 0.68rem;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.letter-paper h1 {
+  margin: 0;
+  color: var(--espresso);
+  font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(2.35rem, 10vw, 3.35rem);
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 0.98;
+}
+
+.letter-copy {
+  display: grid;
+  gap: 0.85rem;
+  color: rgba(34, 20, 23, 0.82);
+  font-size: 0.95rem;
+  font-weight: 560;
+  line-height: 1.58;
+}
+
 .reply-shell {
   position: relative;
   display: grid;
