@@ -1,6 +1,6 @@
 # Local Docker Stack
 
-This stack runs the current KMA app with PostgreSQL, Redis, and centralized logs through Docker Compose.
+This stack runs the current KMA app with PostgreSQL, Redis, ClickHouse, and centralized logs through Docker Compose.
 
 ## What is included
 
@@ -9,8 +9,10 @@ This stack runs the current KMA app with PostgreSQL, Redis, and centralized logs
 - `china-map`: isolated static Next.js classroom atlas mounted under `/china-map`
 - `naradadruk`: isolated Next.js print/catalog service mounted under `/naradadruk`
 - `slashtg`: isolated legacy Telegram mini-app service mounted under `/tg`
+- `osix`: isolated official statistics monitoring service mounted under `/osix`
 - `db`: PostgreSQL 18 with first-start initialization from `docker/local/db/init/*.sql`
 - `redis`: Redis 7 for Studerria session storage
+- `clickhouse`: ClickHouse storage for OSIX normalized time-series and service metadata
 - `loki`: log storage backend
 - `promtail`: Docker log collector that forwards container logs to Loki
 
@@ -40,6 +42,7 @@ App URL:
 - [http://localhost:3000/china-map/print](http://localhost:3000/china-map/print)
 - [http://localhost:3000/naradadruk](http://localhost:3000/naradadruk)
 - [http://localhost:3000/tg](http://localhost:3000/tg)
+- [http://localhost:3000/osix](http://localhost:3000/osix)
 - [http://localhost:3000/studerria-tg](http://localhost:3000/studerria-tg)
 
 Observability:
@@ -60,6 +63,12 @@ Redis host access:
 - host: `localhost`
 - port: `6379`
 
+ClickHouse host access:
+
+- host: `localhost`
+- port: `8123`
+- database: `osix`
+
 ## Optional env overrides
 
 If you want custom ports or credentials, copy `.env.example` to `.env` in this folder and adjust the values.
@@ -69,6 +78,14 @@ For `charredmap`, set dedicated values for:
 - `CHARREDMAP_ADMIN_PASSWORD`
 - `CHARREDMAP_SESSION_SECRET`
 - `CHARREDMAP_NODE_ENV=production` on the server behind HTTPS
+
+For `osix`, production admin login is disabled until these are set:
+
+- `OSIX_ADMIN_USERNAME`
+- `OSIX_ADMIN_PASSWORD_HASH` in `pbkdf2_sha256$iterations$salt$hex_digest` format
+- `OSIX_JWT_SECRET`
+
+OSIX only polls allowlisted official sources configured by `OSIX_SOURCE_*` variables. Do not add Telegram, private channels, social networks, or unofficial OSINT URLs to this MVP service.
 
 ## Update an existing server
 
@@ -91,6 +108,7 @@ bash scripts/server-update-china-map.sh
 bash scripts/server-update-naradadruk.sh
 bash scripts/server-update-slashtg.sh
 bash scripts/server-update-withlforl.sh
+bash scripts/server-update-osix.sh
 ```
 
 Equivalent generic form:
@@ -103,6 +121,7 @@ bash scripts/server-update.sh china-map
 bash scripts/server-update.sh naradadruk
 bash scripts/server-update.sh slashtg
 bash scripts/server-update.sh withlforl
+bash scripts/server-update.sh osix
 ```
 
 The helper rebuilds only the selected service by default, which is the safe path for code updates because the services run from Docker images. Add `--no-build` for runtime-only Compose/env updates. Use `--pull` when updating a service from a pullable image.
@@ -110,7 +129,7 @@ The helper rebuilds only the selected service by default, which is the safe path
 Before updating stateful services, the helper writes a local safety backup under `backups/server-update/`:
 
 - `app` or `db`: full PostgreSQL `pg_dump -Fc`
-- `charredmap`, `naradadruk`, `slashtg`: compressed `/data` Docker volume archive
+- `charredmap`, `naradadruk`, `slashtg`, `osix`: compressed `/data` Docker volume archive
 
 Use `--skip-backup` only when you have already made a fresh manual backup.
 
@@ -187,6 +206,9 @@ STUDERRIA_TG_DEV_GREETING_ENABLED=false
 STUDERRIA_TG_DEV_GREETING_TARGET_CHAT_ID=
 STUDERRIA_TG_DEV_GREETING_TARGET_THREAD_ID=
 SLASHTG_BASE_PATH=/tg
+OSIX_ADMIN_USERNAME=admin
+OSIX_ADMIN_PASSWORD_HASH='pbkdf2_sha256$260000$replace-salt$replace-digest'
+OSIX_JWT_SECRET=replace-with-long-random-secret
 ```
 
 If image build inputs changed (`Dockerfile`, `package.json`, `package-lock.json`, or build tooling), use:
@@ -218,6 +240,7 @@ docker compose up --build -d
 - Container logs are centralized into Loki through Promtail; query them from your preferred Grafana/Loki client.
 - The repository `uploads/` directory is mounted into the app container, so uploaded files stay visible in the workspace.
 - `charredmap` keeps its own SQLite database and uploads in a dedicated Docker volume, so it stays operationally isolated from the Studerria Postgres app.
+- `osix` keeps raw snapshots in its own Docker volume and normalized metrics in ClickHouse, so it stays operationally isolated from the Studerria Postgres app.
 - `china-map` is static and keeps no database or upload volume.
 - `naradadruk` and `slashtg` also keep their own SQLite data in dedicated Docker volumes.
 - The legacy isolated Slash TG service is mounted at `/tg`.

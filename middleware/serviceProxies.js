@@ -4,6 +4,7 @@ const CHARREDMAP_BASE_PATH = '/charredmap';
 const CHINAMAP_BASE_PATH = '/china-map';
 const NARADADRUK_BASE_PATH = '/naradadruk';
 const WITHLFORL_BASE_PATH = '/withlforl';
+const OSIX_BASE_PATH = '/osix';
 const DEFAULT_SLASHTG_BASE_PATH = '/tg';
 
 function isServiceRequest(req, basePath) {
@@ -63,6 +64,7 @@ function registerServiceProxies(app, deps = {}) {
   const chinaMapProxyTarget = String(env.CHINAMAP_PROXY_TARGET || '').trim();
   const naradadrukProxyTarget = String(env.NARADADRUK_PROXY_TARGET || '').trim();
   const withlforlProxyTarget = String(env.WITHLFORL_PROXY_TARGET || '').trim();
+  const osixProxyTarget = String(env.OSIX_PROXY_TARGET || '').trim();
   const slashtgProxyTarget = String(env.SLASHTG_PROXY_TARGET || '').trim();
   const slashtgBasePath = String(env.SLASHTG_BASE_PATH || DEFAULT_SLASHTG_BASE_PATH).trim() || DEFAULT_SLASHTG_BASE_PATH;
 
@@ -92,6 +94,13 @@ function registerServiceProxies(app, deps = {}) {
     basePath: WITHLFORL_BASE_PATH,
     serviceName: 'Withlforl',
     logLabel: 'Withlforl',
+    logger,
+  });
+  const osixProxy = createServiceProxy({
+    target: osixProxyTarget,
+    basePath: OSIX_BASE_PATH,
+    serviceName: 'OSIX',
+    logLabel: 'OSIX',
     logger,
   });
   const slashtgProxy = createServiceProxy({
@@ -139,6 +148,16 @@ function registerServiceProxies(app, deps = {}) {
       return respondServiceUnavailable(res, 'Withlforl', 404);
     }
     return withlforlProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (!isServiceRequest(req, OSIX_BASE_PATH)) {
+      return next();
+    }
+    if (!osixProxy) {
+      return respondServiceUnavailable(res, 'OSIX', 404);
+    }
+    return osixProxy(req, res, next);
   });
 
   app.use((req, res, next) => {

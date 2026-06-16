@@ -23,6 +23,7 @@ Services:
   naradadruk   /naradadruk sidecar
   slashtg      /tg sidecar
   withlforl    /withlforl sidecar
+  osix         /osix sidecar
   db           PostgreSQL
   redis        Redis
   loki         Loki
@@ -33,6 +34,7 @@ Examples:
   bash scripts/server-update.sh charredmap
   bash scripts/server-update.sh naradadruk --pull
   bash scripts/server-update.sh withlforl
+  bash scripts/server-update.sh osix
 USAGE
 }
 
@@ -44,6 +46,7 @@ normalize_service() {
     naradadruk|narada-druk) echo "naradadruk" ;;
     slashtg|slash-tg|tg) echo "slashtg" ;;
     withlforl|with-l-for-l) echo "withlforl" ;;
+    osix) echo "osix" ;;
     db|postgres|postgresql) echo "db" ;;
     redis) echo "redis" ;;
     loki) echo "loki" ;;
@@ -182,6 +185,9 @@ backup_stateful_data() {
       ;;
     slashtg)
       backup_compose_volume_mount slashtg /data slashtg-data
+      ;;
+    osix)
+      backup_compose_volume_mount osix /data osix-data
       ;;
     *)
       ;;

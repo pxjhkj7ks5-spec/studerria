@@ -78,3 +78,31 @@ test('withlforl child paths are claimed by service middleware', async () => {
   assert.equal(res.statusCode, 404);
   assert.equal(res.body, 'Not found');
 });
+
+test('osix proxy path is claimed by service middleware', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, {
+    env: {},
+    logger: { error() {} },
+  });
+
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/osix', url: '/osix' }, res);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body, 'Not found');
+});
+
+test('osix child paths are claimed by service middleware', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, {
+    env: {},
+    logger: { error() {} },
+  });
+
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/osix/api/v1/health/live', url: '/osix/api/v1/health/live' }, res);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body, 'Not found');
+});

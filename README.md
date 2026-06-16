@@ -1,11 +1,14 @@
 # studerria
 Student portal (`Node.js + Express + EJS + Postgres`) with Docker Compose as the primary runtime.
 
-The repository also vendors three live sidecar services that are proxied through Studerria:
+The repository also vendors live sidecar services that are proxied through Studerria:
 
 - `charredmap`: `/charredmap`, `/charredmap/admin`
+- `china-map`: `/china-map`, `/china-map/print`
 - `naradadruk`: `/naradadruk`
 - `slashtg`: `/tg`
+- `withlforl`: `/withlforl`
+- `osix`: `/osix`
 
 Studerria student Telegram mini app is served separately by the main app at `/studerria-tg`.
 
@@ -32,11 +35,7 @@ Run this on the server from the repository root:
 
 ```bash
 cd ~/studerria
-git pull --rebase
-cd docker/local
-docker compose up -d
-docker compose ps
-docker compose logs --tail=100 app
+bash scripts/server-update.sh app
 ```
 
 Use `docker compose down -v` only when you intentionally want to recreate the PostgreSQL volume or re-import the SQL dump from scratch.

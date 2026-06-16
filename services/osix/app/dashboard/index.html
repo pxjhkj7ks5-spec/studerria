@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OSIX</title>
+    <link rel="stylesheet" href="/osix/static/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+    <script src="/osix/static/app.js" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">OSIX</p>
+          <h1>Офіційна статистика втрат</h1>
+        </div>
+        <div class="toolbar">
+          <select id="dataset">
+            <option value="general_losses">General losses</option>
+            <option value="sbs_stats">SBS</option>
+          </select>
+          <select id="metric">
+            <option value="personnel">Personnel</option>
+            <option value="tanks">Tanks</option>
+            <option value="armored_vehicles">Armored vehicles</option>
+            <option value="artillery_systems">Artillery</option>
+            <option value="uav">UAV</option>
+          </select>
+          <select id="period">
+            <option value="all">Весь час</option>
+            <option value="year">Рік</option>
+            <option value="3m">3 місяці</option>
+            <option value="month" selected>Місяць</option>
+            <option value="week">Тиждень</option>
+            <option value="custom">Період</option>
+          </select>
+          <input id="start" type="date" />
+          <input id="end" type="date" />
+          <button id="refresh" type="button">Оновити</button>
+        </div>
+      </header>
+
+      <section class="summary" id="summary"></section>
+
+      <section class="grid">
+        <article class="panel chart-panel">
+          <h2>Total value over time</h2>
+          <canvas id="totalChart" height="120"></canvas>
+        </article>
+        <article class="panel chart-panel">
+          <h2>Daily delta bars</h2>
+          <canvas id="deltaChart" height="120"></canvas>
+        </article>
+        <article class="panel chart-panel">
+          <h2>Metric comparison</h2>
+          <canvas id="comparisonChart" height="120"></canvas>
+        </article>
+        <article class="panel">
+          <h2>Source health</h2>
+          <div id="health" class="table"></div>
+        </article>
+        <article class="panel">
+          <h2>Parser errors</h2>
+          <div id="errors" class="table"></div>
+        </article>
+      </section>
+
+      <section class="panel admin">
+        <h2>Admin</h2>
+        <form id="loginForm" class="login">
+          <input name="username" autocomplete="username" placeholder="Username" />
+          <input name="password" type="password" autocomplete="current-password" placeholder="Password" />
+          <button type="submit">Login</button>
+          <button id="reingest" type="button">Reingest</button>
+        </form>
+        <p id="adminStatus" class="muted"></p>
+        <div id="sourceConfig" class="source-config"></div>
+      </section>
+    </main>
+  </body>
+</html>
