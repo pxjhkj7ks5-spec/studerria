@@ -296,6 +296,7 @@ services:
       OSIX_DASHBOARD_AUTH_REQUIRED: ${OSIX_DASHBOARD_AUTH_REQUIRED:-true}
       OSIX_SOURCE_GENERAL_URL: ${OSIX_SOURCE_GENERAL_URL:-https://www.zsu.gov.ua/oriientovni-vtraty-protyvnyka}
       OSIX_SOURCE_MOD_LISTING_URL: ${OSIX_SOURCE_MOD_LISTING_URL:-https://mod.gov.ua/news/tag-vidsich-agresoru}
+      OSIX_SOURCE_MOD_LOOKUP_URL: ${OSIX_SOURCE_MOD_LOOKUP_URL:-https://mod.gov.ua/lookup/search?search_type=dfs_query_then_fetch}
       OSIX_SOURCE_MOD_ARTICLE_PREFIX: ${OSIX_SOURCE_MOD_ARTICLE_PREFIX:-https://mod.gov.ua/news/bojovi-vtrati-voroga-na-}
       OSIX_SOURCE_SBS_URL: ${OSIX_SOURCE_SBS_URL:-https://sbs-group.army/}
     volumes:

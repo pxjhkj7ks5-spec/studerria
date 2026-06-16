@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 DEFAULT_GENERAL_SOURCE_URL = "https://www.zsu.gov.ua/oriientovni-vtraty-protyvnyka"
 DEFAULT_MOD_LISTING_URL = "https://mod.gov.ua/news/tag-vidsich-agresoru"
+DEFAULT_MOD_LOOKUP_URL = "https://mod.gov.ua/lookup/search?search_type=dfs_query_then_fetch"
 DEFAULT_MOD_ARTICLE_PREFIX = "https://mod.gov.ua/news/bojovi-vtrati-voroga-na-"
 DEFAULT_SBS_SOURCE_URL = "https://sbs-group.army/"
 
@@ -46,6 +47,7 @@ class Settings:
     dashboard_auth_required: bool
     source_general_url: str
     source_mod_listing_url: str
+    source_mod_lookup_url: str
     source_mod_article_prefix: str
     source_sbs_url: str
 
@@ -58,6 +60,7 @@ class Settings:
         return (
             self.source_general_url,
             self.source_mod_listing_url,
+            self.source_mod_lookup_url,
             self.source_mod_article_prefix,
             self.source_sbs_url,
         )
@@ -125,6 +128,7 @@ def load_settings() -> Settings:
         dashboard_auth_required=_bool_env("OSIX_DASHBOARD_AUTH_REQUIRED", True),
         source_general_url=_env("OSIX_SOURCE_GENERAL_URL", DEFAULT_GENERAL_SOURCE_URL),
         source_mod_listing_url=_env("OSIX_SOURCE_MOD_LISTING_URL", DEFAULT_MOD_LISTING_URL),
+        source_mod_lookup_url=_env("OSIX_SOURCE_MOD_LOOKUP_URL", DEFAULT_MOD_LOOKUP_URL),
         source_mod_article_prefix=_env("OSIX_SOURCE_MOD_ARTICLE_PREFIX", DEFAULT_MOD_ARTICLE_PREFIX),
         source_sbs_url=_env("OSIX_SOURCE_SBS_URL", DEFAULT_SBS_SOURCE_URL),
     )

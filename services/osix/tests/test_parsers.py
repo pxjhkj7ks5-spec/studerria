@@ -5,7 +5,7 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
 
-from app.core.config import DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_LISTING_URL, is_allowlisted_url
+from app.core.config import DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, is_allowlisted_url
 from app.parsers.general_losses import parse_general_losses
 from app.parsers.sbs import parse_sbs
 
@@ -34,10 +34,23 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(by_metric["personnel"].value, 12500)
         self.assertEqual(by_metric["uav"].value, 930)
 
+    def test_mod_general_losses_parser_extracts_short_dates_and_single_digit_values(self):
+        html = (FIXTURES / "mod_general_losses.html").read_text(encoding="utf-8")
+        result = parse_general_losses("mod-general-losses", "general_losses", html)
+        by_metric = {metric.metric: metric for metric in result.metrics}
+
+        self.assertEqual(result.observed_date.isoformat(), "2026-06-16")
+        self.assertEqual(by_metric["personnel"].value, 1385420)
+        self.assertEqual(by_metric["personnel"].daily_delta, 1230)
+        self.assertEqual(by_metric["uav"].value, 353541)
+        self.assertEqual(by_metric["uav"].daily_delta, 2062)
+        self.assertEqual(by_metric["submarines"].value, 2)
+
     def test_allowlist_accepts_mod_listing_and_article_prefix(self):
-        allowed = (DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_ARTICLE_PREFIX)
+        allowed = (DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_ARTICLE_PREFIX)
 
         self.assertTrue(is_allowlisted_url(DEFAULT_MOD_LISTING_URL, allowed))
+        self.assertTrue(is_allowlisted_url(DEFAULT_MOD_LOOKUP_URL, allowed))
         self.assertTrue(is_allowlisted_url(f"{DEFAULT_MOD_ARTICLE_PREFIX}16-06-2026", allowed))
         self.assertFalse(is_allowlisted_url("https://example.com/news/bojovi-vtrati-voroga-na-16-06-2026", allowed))
 

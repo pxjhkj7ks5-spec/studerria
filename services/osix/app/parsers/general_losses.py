@@ -24,25 +24,31 @@ GENERAL_METRIC_PATTERNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 )
 
 DATE_PATTERNS = (
-    re.compile(r"(\d{1,2})[./-](\d{1,2})[./-](20\d{2})"),
-    re.compile(r"(20\d{2})[./-](\d{1,2})[./-](\d{1,2})"),
+    ("dmy", re.compile(r"(\d{1,2})[./-](\d{1,2})[./-](20\d{2})")),
+    ("ymd", re.compile(r"(20\d{2})[./-](\d{1,2})[./-](\d{1,2})")),
+    ("dmy_short", re.compile(r"(?<!\d)(\d{1,2})[./-](\d{1,2})[./-](\d{2})(?!\d)")),
 )
 
 
 def parse_observed_date(text: str) -> date:
-    for pattern in DATE_PATTERNS:
-        match = pattern.search(text)
-        if not match:
-            continue
-        parts = [int(part) for part in match.groups()]
-        if len(str(parts[0])) == 4:
-            return date(parts[0], parts[1], parts[2])
-        return date(parts[2], parts[1], parts[0])
+    candidates: list[tuple[int, date]] = []
+    for kind, pattern in DATE_PATTERNS:
+        for match in pattern.finditer(text):
+            parts = [int(part) for part in match.groups()]
+            if kind == "ymd":
+                parsed = date(parts[0], parts[1], parts[2])
+            elif kind == "dmy_short":
+                parsed = date(2000 + parts[2], parts[1], parts[0])
+            else:
+                parsed = date(parts[2], parts[1], parts[0])
+            candidates.append((match.start(), parsed))
+    if candidates:
+        return sorted(candidates, key=lambda item: item[0])[-1][1]
     return datetime.now(timezone.utc).date()
 
 
 def _line_value(line: str) -> tuple[int, int | None] | None:
-    match = re.search(r"(\d[\d\s\u00a0,]{1,})\s*(?:[+＋]\s*(\d[\d\s\u00a0,]*))?", line)
+    match = re.search(r"(\d[\d\s\u00a0,]{0,})(?:\s*(?:\(\s*)?[+＋]\s*(\d[\d\s\u00a0,]*)\)?)?", line)
     if not match:
         return None
     value = clean_int(match.group(1))
@@ -78,4 +84,3 @@ def parse_general_losses(source_id: str, dataset: str, html: str) -> ParseResult
             break
 
     return ParseResult(metrics=tuple(metrics), observed_date=observed_date)
-

@@ -8,6 +8,7 @@ OSIX is an isolated sidecar service for public, deterministic monitoring of offi
 - Official allowlisted sources only:
   - `https://www.zsu.gov.ua/oriientovni-vtraty-protyvnyka`
   - `https://mod.gov.ua/news/tag-vidsich-agresoru`
+  - `https://mod.gov.ua/lookup/search?search_type=dfs_query_then_fetch`
   - `https://mod.gov.ua/news/bojovi-vtrati-voroga-na-*`
   - `https://sbs-group.army/`
 - No Telegram ingestion in MVP. `TelegramSourceAdapter` is a stub for future work.
@@ -36,4 +37,3 @@ When routed through the main Studerria app:
 ```text
 http://localhost:3000/osix
 ```
-
