@@ -7,12 +7,12 @@ from .base import ParseResult, ParsedMetric, clean_int, html_to_text
 
 
 GENERAL_METRIC_PATTERNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("personnel", "Personnel", (r"особового складу", r"personnel")),
+    ("personnel", "Personnel", (r"особового складу", r"військовослужбовц", r"personnel")),
     ("tanks", "Tanks", (r"танк", r"tanks?")),
-    ("armored_vehicles", "Armored vehicles", (r"бойових броньованих машин", r"armou?red")),
-    ("artillery_systems", "Artillery systems", (r"артилерійських систем", r"artillery")),
+    ("armored_vehicles", "Armored vehicles", (r"бойов[а-яіїєґ]+ броньован[а-яіїєґ]+ машин", r"armou?red")),
+    ("artillery_systems", "Artillery systems", (r"артилерійськ[а-яіїєґ]+ систем", r"artillery")),
     ("mlrs", "MLRS", (r"рсзв", r"mlrs")),
-    ("air_defense_systems", "Air defense systems", (r"засобів ппо", r"air defense")),
+    ("air_defense_systems", "Air defense systems", (r"засоб[а-яіїєґ]+ ппо", r"air defense")),
     ("aircraft", "Aircraft", (r"літак", r"aircraft")),
     ("helicopters", "Helicopters", (r"гелікоптер", r"helicopters?")),
     ("uav", "UAV", (r"бпла", r"uav", r"безпілот")),
@@ -20,7 +20,7 @@ GENERAL_METRIC_PATTERNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("ships_boats", "Ships and boats", (r"корабл", r"катер", r"ships?")),
     ("submarines", "Submarines", (r"підводн", r"submarines?")),
     ("vehicles_fuel_tanks", "Vehicles and fuel tanks", (r"автомобільної техніки", r"автоцистерн", r"vehicles?")),
-    ("special_equipment", "Special equipment", (r"спеціальної техніки", r"special equipment")),
+    ("special_equipment", "Special equipment", (r"спеціальн[а-яіїєґ]+ технік", r"special equipment")),
 )
 
 DATE_PATTERNS = (
@@ -48,7 +48,7 @@ def parse_observed_date(text: str) -> date:
 
 
 def _line_value(line: str) -> tuple[int, int | None] | None:
-    match = re.search(r"(\d[\d\s\u00a0,]{0,})(?:\s*(?:\(\s*)?[+＋]\s*(\d[\d\s\u00a0,]*)\)?)?", line)
+    match = re.search(r"[‒–—:-]\s*(?:близько\s*)?(\d[\d\s\u00a0,]{0,})(?:\s*(?:\(\s*)?[+＋]\s*(\d[\d\s\u00a0,]*)\)?)?", line)
     if not match:
         return None
     value = clean_int(match.group(1))

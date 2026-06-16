@@ -185,10 +185,14 @@ class ClickHouseStore:
         result = self.client.query(
             f"""
             SELECT dataset, metric, metric_label, source_id, observed_date, value, daily_delta, timestamp
-            FROM metrics_time_series
-            {where}
-            ORDER BY observed_date DESC, metric
-            LIMIT 500
+            FROM (
+                SELECT dataset, metric, metric_label, source_id, observed_date, value, daily_delta, timestamp
+                FROM metrics_time_series
+                {where}
+                ORDER BY observed_date DESC, timestamp DESC
+                LIMIT 1 BY dataset, metric
+            )
+            ORDER BY metric
             """,
             parameters=params,
         )
@@ -205,10 +209,15 @@ class ClickHouseStore:
             params["end"] = end
         result = self.client.query(
             f"""
-            SELECT observed_date, source_id, value, daily_delta
+            SELECT
+                observed_date,
+                argMax(source_id, timestamp) AS source_id,
+                argMax(value, timestamp) AS value,
+                argMax(daily_delta, timestamp) AS daily_delta
             FROM metrics_time_series
             WHERE {" AND ".join(conditions)}
-            ORDER BY observed_date ASC, source_id ASC
+            GROUP BY observed_date
+            ORDER BY observed_date ASC
             """,
             parameters=params,
         )

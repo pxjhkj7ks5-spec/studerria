@@ -42,9 +42,13 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(result.observed_date.isoformat(), "2026-06-16")
         self.assertEqual(by_metric["personnel"].value, 1385420)
         self.assertEqual(by_metric["personnel"].daily_delta, 1230)
+        self.assertEqual(by_metric["armored_vehicles"].value, 24768)
+        self.assertEqual(by_metric["artillery_systems"].value, 44118)
         self.assertEqual(by_metric["uav"].value, 353541)
         self.assertEqual(by_metric["uav"].daily_delta, 2062)
+        self.assertEqual(by_metric["air_defense_systems"].value, 1427)
         self.assertEqual(by_metric["submarines"].value, 2)
+        self.assertEqual(by_metric["special_equipment"].value, 4300)
 
     def test_allowlist_accepts_mod_listing_and_article_prefix(self):
         allowed = (DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_ARTICLE_PREFIX)

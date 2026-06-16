@@ -4,6 +4,23 @@ let totalChart;
 let deltaChart;
 let comparisonChart;
 
+const metricPriority = [
+  "personnel",
+  "tanks",
+  "armored_vehicles",
+  "artillery_systems",
+  "mlrs",
+  "air_defense_systems",
+  "aircraft",
+  "helicopters",
+  "uav",
+  "cruise_missiles",
+  "vehicles_fuel_tanks",
+  "special_equipment",
+  "ships_boats",
+  "submarines",
+];
+
 function serializeDate(value) {
   return value ? `&${value.name}=${encodeURIComponent(value.value)}` : "";
 }
@@ -29,6 +46,16 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function orderedMetrics(metrics) {
+  return [...metrics].sort((left, right) => {
+    const leftIndex = metricPriority.indexOf(left.metric);
+    const rightIndex = metricPriority.indexOf(right.metric);
+    const leftRank = leftIndex === -1 ? metricPriority.length : leftIndex;
+    const rightRank = rightIndex === -1 ? metricPriority.length : rightIndex;
+    return leftRank - rightRank || String(left.metric).localeCompare(String(right.metric));
+  });
 }
 
 function drawChart(existing, canvasId, labels, values, type, label) {
@@ -80,7 +107,8 @@ async function loadDashboard() {
   const labels = series.map((point) => String(point.observed_date));
   totalChart = drawChart(totalChart, "totalChart", labels, series.map((point) => point.value), "line", metric);
   deltaChart = drawChart(deltaChart, "deltaChart", labels, series.map((point) => point.daily_delta || 0), "bar", `${metric} delta`);
-  const comparison = (latestData.metrics || []).slice(0, 10);
+  const latestMetrics = orderedMetrics(latestData.metrics || []);
+  const comparison = latestMetrics.slice(0, 10);
   comparisonChart = drawChart(
     comparisonChart,
     "comparisonChart",
@@ -93,7 +121,7 @@ async function loadDashboard() {
   if (!hasSeries && !(latestData.metrics || []).length) {
     document.getElementById("summary").innerHTML = '<article class="metric wide"><span>Дані ще не зібрані</span><strong>0</strong><small>Перевір source health і parser errors.</small></article>';
   } else {
-    document.getElementById("summary").innerHTML = (latestData.metrics || [])
+    document.getElementById("summary").innerHTML = latestMetrics
       .slice(0, 8)
       .map(
         (item) => `
