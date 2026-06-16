@@ -50,10 +50,12 @@ function drawChart(existing, canvasId, labels, values, type, label) {
       ],
     },
     options: {
+      animation: false,
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 120,
       plugins: { legend: { display: false } },
-      scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: false } },
+      scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: true } },
     },
   });
 }
@@ -74,6 +76,7 @@ async function loadDashboard() {
   ]);
 
   const series = seriesData.series || [];
+  const hasSeries = series.length > 0;
   const labels = series.map((point) => String(point.observed_date));
   totalChart = drawChart(totalChart, "totalChart", labels, series.map((point) => point.value), "line", metric);
   deltaChart = drawChart(deltaChart, "deltaChart", labels, series.map((point) => point.daily_delta || 0), "bar", `${metric} delta`);
@@ -87,18 +90,22 @@ async function loadDashboard() {
     "Latest values",
   );
 
-  document.getElementById("summary").innerHTML = (latestData.metrics || [])
-    .slice(0, 8)
-    .map(
-      (item) => `
-        <article class="metric">
-          <span>${escapeHtml(item.metric_label || item.metric)}</span>
-          <strong>${Number(item.value || 0).toLocaleString("uk-UA")}</strong>
-          <small>${escapeHtml(item.observed_date || "")}${item.daily_delta ? ` +${Number(item.daily_delta).toLocaleString("uk-UA")}` : ""}</small>
-        </article>
-      `,
-    )
-    .join("");
+  if (!hasSeries && !(latestData.metrics || []).length) {
+    document.getElementById("summary").innerHTML = '<article class="metric wide"><span>Дані ще не зібрані</span><strong>0</strong><small>Перевір source health і parser errors.</small></article>';
+  } else {
+    document.getElementById("summary").innerHTML = (latestData.metrics || [])
+      .slice(0, 8)
+      .map(
+        (item) => `
+          <article class="metric">
+            <span>${escapeHtml(item.metric_label || item.metric)}</span>
+            <strong>${Number(item.value || 0).toLocaleString("uk-UA")}</strong>
+            <small>${escapeHtml(item.observed_date || "")}${item.daily_delta ? ` +${Number(item.daily_delta).toLocaleString("uk-UA")}` : ""}</small>
+          </article>
+        `,
+      )
+      .join("");
+  }
 
   document.getElementById("health").innerHTML = rows(healthData.health || [], [
     { key: "source_id", label: "Source" },

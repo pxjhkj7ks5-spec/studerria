@@ -3,12 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import create_router
 from app.core.config import load_settings
 from app.core.logging import configure_logging
+from app.core.security import parse_session_token
 from app.db.clickhouse import ClickHouseStore
 from app.workers.poller import Poller
 
@@ -51,8 +52,20 @@ app.include_router(create_router(settings, store, poller), prefix=settings.base_
 app.mount(f"{settings.base_path}/static", StaticFiles(directory=dashboard_dir / "static"), name="osix-static")
 
 
+@app.head(settings.base_path)
+@app.head(f"{settings.base_path}/")
+async def dashboard_head() -> Response:
+    return Response(status_code=200)
+
+
 @app.get(settings.base_path, response_class=HTMLResponse)
 @app.get(f"{settings.base_path}/", response_class=HTMLResponse)
-async def dashboard() -> FileResponse:
+async def dashboard(request: Request) -> FileResponse:
+    if settings.dashboard_auth_required and not _has_dashboard_session(request):
+        return FileResponse(dashboard_dir / "login.html")
     return FileResponse(dashboard_dir / "index.html")
 
+
+def _has_dashboard_session(request: Request) -> bool:
+    token = request.cookies.get(settings.admin_cookie_name)
+    return parse_session_token(token or "", settings.jwt_secret) is not None if settings.jwt_secret else False

@@ -25,6 +25,11 @@ def create_router(settings: Settings, store: ClickHouseStore, poller: Poller) ->
             raise HTTPException(status_code=403, detail="Admin role required")
         return claims
 
+    def read_access(request: Request):
+        if not settings.dashboard_auth_required:
+            return None
+        return current_claims(request)
+
     @router.get("/health/live")
     async def health_live():
         return {"status": "ok"}
@@ -38,24 +43,24 @@ def create_router(settings: Settings, store: ClickHouseStore, poller: Poller) ->
         return {"status": "ok"}
 
     @router.get("/sources")
-    async def list_sources():
+    async def list_sources(_=Depends(read_access)):
         return {"sources": store.list_sources()}
 
     @router.get("/metrics/latest")
-    async def latest_metrics(dataset: str | None = None):
+    async def latest_metrics(dataset: str | None = None, _=Depends(read_access)):
         return {"metrics": store.latest_metrics(dataset)}
 
     @router.get("/metrics/series")
-    async def metric_series(metric: str = "personnel", dataset: str = "general_losses", period: str = "month", start: str | None = None, end: str | None = None):
+    async def metric_series(metric: str = "personnel", dataset: str = "general_losses", period: str = "month", start: str | None = None, end: str | None = None, _=Depends(read_access)):
         start_date, end_date = _range_for(period, start, end)
         return {"series": store.metric_series(metric, dataset, start_date, end_date)}
 
     @router.get("/source-health")
-    async def source_health():
+    async def source_health(_=Depends(read_access)):
         return {"health": store.health()}
 
     @router.get("/parser-errors")
-    async def parser_errors():
+    async def parser_errors(_=Depends(read_access)):
         return {"errors": store.parser_errors()}
 
     @router.post("/admin/login")

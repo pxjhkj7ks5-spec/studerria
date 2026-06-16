@@ -43,6 +43,7 @@ class Settings:
     admin_cookie_name: str
     admin_cookie_secure: bool
     admin_session_ttl_seconds: int
+    dashboard_auth_required: bool
     source_general_url: str
     source_mod_listing_url: str
     source_mod_article_prefix: str
@@ -121,6 +122,7 @@ def load_settings() -> Settings:
         admin_cookie_name=_env("OSIX_ADMIN_COOKIE_NAME", "osix_admin"),
         admin_cookie_secure=_bool_env("OSIX_ADMIN_COOKIE_SECURE", True),
         admin_session_ttl_seconds=int(_env("OSIX_ADMIN_SESSION_TTL_SECONDS", "28800")),
+        dashboard_auth_required=_bool_env("OSIX_DASHBOARD_AUTH_REQUIRED", True),
         source_general_url=_env("OSIX_SOURCE_GENERAL_URL", DEFAULT_GENERAL_SOURCE_URL),
         source_mod_listing_url=_env("OSIX_SOURCE_MOD_LISTING_URL", DEFAULT_MOD_LISTING_URL),
         source_mod_article_prefix=_env("OSIX_SOURCE_MOD_ARTICLE_PREFIX", DEFAULT_MOD_ARTICLE_PREFIX),

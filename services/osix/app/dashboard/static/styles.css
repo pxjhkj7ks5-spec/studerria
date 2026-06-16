@@ -13,6 +13,35 @@ body {
   margin: 0;
 }
 
+.login-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-panel {
+  width: min(420px, 100%);
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fff;
+  padding: 22px;
+}
+
+.login-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.login-form label {
+  display: grid;
+  gap: 6px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .shell {
   max-width: 1440px;
   margin: 0 auto;
@@ -97,6 +126,10 @@ button {
   padding: 12px;
 }
 
+.metric.wide {
+  grid-column: 1 / -1;
+}
+
 .metric span,
 .metric small,
 .muted {
@@ -121,7 +154,22 @@ button {
 }
 
 .chart-panel {
-  min-height: 330px;
+  min-height: 0;
+}
+
+.chart-box {
+  position: relative;
+  height: 260px;
+  min-height: 260px;
+  max-height: 260px;
+  overflow: hidden;
+}
+
+.chart-box canvas {
+  display: block;
+  width: 100% !important;
+  height: 260px !important;
+  max-height: 260px !important;
 }
 
 .table {

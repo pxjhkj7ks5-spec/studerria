@@ -85,7 +85,12 @@ class HttpSourceIngestor:
     async def _fetch(self, url: str) -> httpx.Response:
         if not is_allowlisted_url(url, self.settings.allowlisted_prefixes):
             raise ValueError("URL is not allowlisted")
-        headers = {"User-Agent": "Studerria-OSIX/0.1 (+https://studerria.com/osix)"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; Studerria-OSIX/0.1; +https://studerria.com/osix)",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "uk-UA,uk;q=0.9,en;q=0.5",
+            "Cache-Control": "no-cache",
+        }
         async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             response.raise_for_status()

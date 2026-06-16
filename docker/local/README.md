@@ -209,6 +209,7 @@ SLASHTG_BASE_PATH=/tg
 OSIX_ADMIN_USERNAME=admin
 OSIX_ADMIN_PASSWORD_HASH='pbkdf2_sha256$260000$replace-salt$replace-digest'
 OSIX_JWT_SECRET=replace-with-long-random-secret
+OSIX_DASHBOARD_AUTH_REQUIRED=true
 ```
 
 If image build inputs changed (`Dockerfile`, `package.json`, `package-lock.json`, or build tooling), use:

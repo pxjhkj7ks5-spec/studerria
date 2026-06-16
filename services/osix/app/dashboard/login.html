@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OSIX Login</title>
+    <link rel="stylesheet" href="/osix/static/styles.css" />
+    <script src="/osix/static/login.js" defer></script>
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="login-panel">
+        <p class="eyebrow">OSIX</p>
+        <h1>Вхід</h1>
+        <form id="osixLogin" class="login-form">
+          <label>
+            Username
+            <input name="username" autocomplete="username" autofocus />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" autocomplete="current-password" />
+          </label>
+          <button type="submit">Login</button>
+          <p id="loginStatus" class="muted"></p>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>
+
