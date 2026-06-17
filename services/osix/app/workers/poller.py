@@ -36,6 +36,13 @@ class Poller:
             results.append(await self.ingestor.ingest_source(source))
         return results
 
+    async def backfill_mod_losses(self) -> IngestResult:
+        cleanup_old_snapshots(self.settings.raw_snapshot_dir, self.settings.raw_retention_days)
+        source = next((item for item in self._configured_sources() if item.parser == "mod_listing"), None)
+        if source is None:
+            return IngestResult("mod-general-losses-listing", "skipped", False, 0, "MOD listing source is disabled")
+        return await self.ingestor.backfill_mod_losses(source)
+
     def _configured_sources(self) -> tuple[SourceDefinition, ...]:
         try:
             sources = self.store.list_source_definitions()

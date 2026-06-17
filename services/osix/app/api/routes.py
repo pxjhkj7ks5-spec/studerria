@@ -103,6 +103,12 @@ def create_router(settings: Settings, store: ClickHouseStore, poller: Poller) ->
         store.insert_audit(claims.subject, claims.role, "reingest", "all_sources")
         return {"results": [result.__dict__ for result in results]}
 
+    @router.post("/admin/backfill/mod-losses")
+    async def admin_backfill_mod_losses(claims=Depends(require_admin)):
+        result = await poller.backfill_mod_losses()
+        store.insert_audit(claims.subject, claims.role, "backfill", "mod-general-losses")
+        return {"result": result.__dict__}
+
     @router.patch("/admin/sources/{source_id}")
     async def admin_update_source(source_id: str, request: Request, claims=Depends(require_admin)):
         payload = await request.json()

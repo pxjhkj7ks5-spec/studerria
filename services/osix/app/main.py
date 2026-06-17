@@ -27,6 +27,7 @@ async def startup() -> None:
     settings.raw_snapshot_dir.mkdir(parents=True, exist_ok=True)
     store.initialize()
     store.upsert_sources(settings.default_sources())
+    store.retire_sources(("zsu-general-losses",))
     poller.start()
 
 

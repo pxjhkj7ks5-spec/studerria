@@ -58,6 +58,26 @@ class ClickHouseStore:
             column_names=["id", "name", "url", "source_type", "dataset", "parser", "enabled", "updated_at"],
         )
 
+    def retire_sources(self, source_ids: tuple[str, ...]) -> None:
+        if not source_ids:
+            return
+        existing = {source.id: source for source in self.list_source_definitions()}
+        retired = [
+            SourceDefinition(
+                id=source.id,
+                name=source.name,
+                url=source.url,
+                source_type=source.source_type,
+                dataset=source.dataset,
+                parser=source.parser,
+                enabled=False,
+            )
+            for source_id in source_ids
+            if (source := existing.get(source_id)) is not None
+        ]
+        if retired:
+            self.upsert_sources(tuple(retired))
+
     def list_sources(self) -> list[dict[str, Any]]:
         result = self.client.query(
             """
@@ -224,6 +244,7 @@ class ClickHouseStore:
         return [dict(zip(result.column_names, row, strict=False)) for row in result.result_rows]
 
     def health(self) -> list[dict[str, Any]]:
+        active_source_ids = {str(source["id"]) for source in self.list_sources() if bool(source["enabled"])}
         result = self.client.query(
             """
             SELECT source_id, checked_at, status, status_code, latency_ms, last_success_at, message
@@ -232,9 +253,14 @@ class ClickHouseStore:
             ORDER BY source_id
             """
         )
-        return [dict(zip(result.column_names, row, strict=False)) for row in result.result_rows]
+        return [
+            dict(zip(result.column_names, row, strict=False))
+            for row in result.result_rows
+            if str(row[0]) in active_source_ids
+        ]
 
     def parser_errors(self) -> list[dict[str, Any]]:
+        active_source_ids = {str(source["id"]) for source in self.list_sources() if bool(source["enabled"])}
         result = self.client.query(
             """
             SELECT source_id, url, occurred_at, error_type, message
@@ -243,4 +269,8 @@ class ClickHouseStore:
             LIMIT 100
             """
         )
-        return [dict(zip(result.column_names, row, strict=False)) for row in result.result_rows]
+        return [
+            dict(zip(result.column_names, row, strict=False))
+            for row in result.result_rows
+            if str(row[0]) in active_source_ids
+        ]

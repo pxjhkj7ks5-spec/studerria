@@ -5,11 +5,25 @@ let deltaChart;
 let comparisonChart;
 
 const metricPriority = [
+  "total_hit",
+  "total_destroyed",
   "personnel",
+  "personnel_killed",
+  "personnel_wounded",
+  "flights_strike",
+  "flights_recon",
   "tanks",
+  "tanks_hit",
+  "tanks_destroyed",
   "armored_vehicles",
+  "armored_vehicles_hit",
+  "armored_vehicles_destroyed",
   "artillery_systems",
+  "guns_howitzers_hit",
+  "guns_howitzers_destroyed",
   "mlrs",
+  "mlrs_air_defense_hit",
+  "mlrs_air_defense_destroyed",
   "air_defense_systems",
   "aircraft",
   "helicopters",
@@ -21,8 +35,8 @@ const metricPriority = [
   "submarines",
 ];
 
-function serializeDate(value) {
-  return value ? `&${value.name}=${encodeURIComponent(value.value)}` : "";
+function serializeDate(name, element) {
+  return element.value ? `&${name}=${encodeURIComponent(element.value)}` : "";
 }
 
 async function getJson(path) {
@@ -58,6 +72,18 @@ function orderedMetrics(metrics) {
   });
 }
 
+function updateMetricOptions(metrics) {
+  const select = document.getElementById("metric");
+  const current = select.value;
+  const available = orderedMetrics(metrics);
+  if (!available.length) return current;
+  select.innerHTML = available
+    .map((item) => `<option value="${escapeHtml(item.metric)}">${escapeHtml(item.metric_label || item.metric)}</option>`)
+    .join("");
+  select.value = available.some((item) => item.metric === current) ? current : available[0].metric;
+  return select.value;
+}
+
 function drawChart(existing, canvasId, labels, values, type, label) {
   if (existing) existing.destroy();
   const context = document.getElementById(canvasId);
@@ -89,15 +115,16 @@ function drawChart(existing, canvasId, labels, values, type, label) {
 
 async function loadDashboard() {
   const dataset = document.getElementById("dataset").value;
-  const metric = document.getElementById("metric").value;
   const period = document.getElementById("period").value;
   const start = document.getElementById("start");
   const end = document.getElementById("end");
-  const custom = period === "custom" ? `${serializeDate(start)}${serializeDate(end)}` : "";
+  const custom = period === "custom" ? `${serializeDate("start", start)}${serializeDate("end", end)}` : "";
+  const latestData = await getJson(`/metrics/latest?dataset=${encodeURIComponent(dataset)}`);
+  const latestMetrics = orderedMetrics(latestData.metrics || []);
+  const metric = updateMetricOptions(latestMetrics);
 
-  const [seriesData, latestData, healthData, errorsData] = await Promise.all([
+  const [seriesData, healthData, errorsData] = await Promise.all([
     getJson(`/metrics/series?dataset=${encodeURIComponent(dataset)}&metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${custom}`),
-    getJson(`/metrics/latest?dataset=${encodeURIComponent(dataset)}`),
     getJson("/source-health"),
     getJson("/parser-errors"),
   ]);
@@ -107,7 +134,6 @@ async function loadDashboard() {
   const labels = series.map((point) => String(point.observed_date));
   totalChart = drawChart(totalChart, "totalChart", labels, series.map((point) => point.value), "line", metric);
   deltaChart = drawChart(deltaChart, "deltaChart", labels, series.map((point) => point.daily_delta || 0), "bar", `${metric} delta`);
-  const latestMetrics = orderedMetrics(latestData.metrics || []);
   const comparison = latestMetrics.slice(0, 10);
   comparisonChart = drawChart(
     comparisonChart,
@@ -174,6 +200,12 @@ document.getElementById("refresh").addEventListener("click", () => {
   });
 });
 
+document.getElementById("dataset").addEventListener("change", () => {
+  loadDashboard().catch((error) => {
+    document.getElementById("adminStatus").textContent = error.message;
+  });
+});
+
 document.getElementById("loginForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -189,6 +221,13 @@ document.getElementById("loginForm").addEventListener("submit", async (event) =>
 document.getElementById("reingest").addEventListener("click", async () => {
   const response = await fetch(api("/admin/reingest"), { method: "POST", credentials: "same-origin" });
   document.getElementById("adminStatus").textContent = response.ok ? "Reingest started" : "Reingest denied";
+  if (response.ok) await loadDashboard();
+});
+
+document.getElementById("backfillMod").addEventListener("click", async () => {
+  document.getElementById("adminStatus").textContent = "Backfill started";
+  const response = await fetch(api("/admin/backfill/mod-losses"), { method: "POST", credentials: "same-origin" });
+  document.getElementById("adminStatus").textContent = response.ok ? "MOD backfill completed" : "Backfill denied";
   if (response.ok) await loadDashboard();
 });
 

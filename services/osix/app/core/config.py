@@ -12,6 +12,7 @@ DEFAULT_MOD_LISTING_URL = "https://mod.gov.ua/news/tag-vidsich-agresoru"
 DEFAULT_MOD_LOOKUP_URL = "https://mod.gov.ua/lookup/search?search_type=dfs_query_then_fetch"
 DEFAULT_MOD_ARTICLE_PREFIX = "https://mod.gov.ua/news/bojovi-vtrati-voroga-na-"
 DEFAULT_SBS_SOURCE_URL = "https://sbs-group.army/"
+DEFAULT_SBS_API_URL = "https://sbs-group.army/api/public"
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,9 @@ class Settings:
     source_mod_lookup_url: str
     source_mod_article_prefix: str
     source_sbs_url: str
+    source_sbs_api_url: str
+    mod_backfill_page_size: int
+    mod_backfill_max_pages: int
 
     @property
     def admin_enabled(self) -> bool:
@@ -57,24 +61,19 @@ class Settings:
 
     @property
     def allowlisted_prefixes(self) -> tuple[str, ...]:
+        sbs_api_prefix = f"{self.source_sbs_api_url.rstrip('/')}/*"
         return (
             self.source_general_url,
             self.source_mod_listing_url,
             self.source_mod_lookup_url,
             self.source_mod_article_prefix,
             self.source_sbs_url,
+            self.source_sbs_api_url,
+            sbs_api_prefix,
         )
 
     def default_sources(self) -> tuple[SourceDefinition, ...]:
         return (
-            SourceDefinition(
-                id="zsu-general-losses",
-                name="General Staff / ZSU enemy losses",
-                url=self.source_general_url,
-                source_type="website",
-                dataset="general_losses",
-                parser="general_losses",
-            ),
             SourceDefinition(
                 id="mod-general-losses-listing",
                 name="Ministry of Defence enemy losses listing",
@@ -131,6 +130,9 @@ def load_settings() -> Settings:
         source_mod_lookup_url=_env("OSIX_SOURCE_MOD_LOOKUP_URL", DEFAULT_MOD_LOOKUP_URL),
         source_mod_article_prefix=_env("OSIX_SOURCE_MOD_ARTICLE_PREFIX", DEFAULT_MOD_ARTICLE_PREFIX),
         source_sbs_url=_env("OSIX_SOURCE_SBS_URL", DEFAULT_SBS_SOURCE_URL),
+        source_sbs_api_url=_env("OSIX_SOURCE_SBS_API_URL", DEFAULT_SBS_API_URL),
+        mod_backfill_page_size=int(_env("OSIX_MOD_BACKFILL_PAGE_SIZE", "50")),
+        mod_backfill_max_pages=int(_env("OSIX_MOD_BACKFILL_MAX_PAGES", "100")),
     )
 
 
