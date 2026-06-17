@@ -84,3 +84,12 @@ def parse_general_losses(source_id: str, dataset: str, html: str) -> ParseResult
             break
 
     return ParseResult(metrics=tuple(metrics), observed_date=observed_date)
+
+
+def is_general_losses_article(article: dict) -> bool:
+    slug = str(article.get("slug") or "").lower()
+    title = str(article.get("title") or "").lower()
+    content = str(article.get("content") or "").lower()
+    has_losses_marker = "бойові втрати" in title or "bojovi-vtrati" in slug or "загальні бойові втрати" in content
+    has_metrics_body = "загальні бойові втрати" in content and "особов" in content
+    return has_losses_marker and has_metrics_body

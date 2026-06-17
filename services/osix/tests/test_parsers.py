@@ -5,8 +5,8 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
 
-from app.core.config import DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_SBS_API_URL, load_settings, is_allowlisted_url
-from app.parsers.general_losses import parse_general_losses
+from app.core.config import DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_NEWS_PREFIX, DEFAULT_SBS_API_URL, load_settings, is_allowlisted_url
+from app.parsers.general_losses import is_general_losses_article, parse_general_losses
 from app.parsers.sbs import parse_sbs, parse_sbs_statistics
 
 
@@ -78,12 +78,22 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(by_metric["special_equipment"].value, 4300)
 
     def test_allowlist_accepts_mod_listing_and_article_prefix(self):
-        allowed = (DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_ARTICLE_PREFIX)
+        allowed = (DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_NEWS_PREFIX)
 
         self.assertTrue(is_allowlisted_url(DEFAULT_MOD_LISTING_URL, allowed))
         self.assertTrue(is_allowlisted_url(DEFAULT_MOD_LOOKUP_URL, allowed))
         self.assertTrue(is_allowlisted_url(f"{DEFAULT_MOD_ARTICLE_PREFIX}16-06-2026", allowed))
+        self.assertTrue(is_allowlisted_url("https://mod.gov.ua/news/zagalni-bojovi-vtrati-rosiyan-za-dobu-860-okupantiv", allowed))
         self.assertFalse(is_allowlisted_url("https://example.com/news/bojovi-vtrati-voroga-na-16-06-2026", allowed))
+
+    def test_mod_losses_article_accepts_2025_daily_losses_titles(self):
+        article = {
+            "slug": "zagalni-bojovi-vtrati-rosiyan-za-dobu-860-okupantiv",
+            "title": "Загальні бойові втрати росіян за добу: 860 окупантів",
+            "content": "Загальні бойові втрати противника з 24.02.22 по 25.12.25 орієнтовно склали: особового складу",
+        }
+
+        self.assertTrue(is_general_losses_article(article))
 
     def test_default_sources_retire_zsu_general_losses(self):
         source_ids = {source.id for source in load_settings().default_sources()}

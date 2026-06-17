@@ -11,6 +11,7 @@ DEFAULT_GENERAL_SOURCE_URL = "https://www.zsu.gov.ua/oriientovni-vtraty-protyvny
 DEFAULT_MOD_LISTING_URL = "https://mod.gov.ua/news/tag-vidsich-agresoru"
 DEFAULT_MOD_LOOKUP_URL = "https://mod.gov.ua/lookup/search?search_type=dfs_query_then_fetch"
 DEFAULT_MOD_ARTICLE_PREFIX = "https://mod.gov.ua/news/bojovi-vtrati-voroga-na-"
+DEFAULT_MOD_NEWS_PREFIX = "https://mod.gov.ua/news/*"
 DEFAULT_SBS_SOURCE_URL = "https://sbs-group.army/"
 DEFAULT_SBS_API_URL = "https://sbs-group.army/api/public"
 
@@ -54,6 +55,8 @@ class Settings:
     source_sbs_api_url: str
     mod_backfill_page_size: int
     mod_backfill_max_pages: int
+    mod_backfill_start_date: str
+    mod_backfill_end_date: str
 
     @property
     def admin_enabled(self) -> bool:
@@ -67,6 +70,7 @@ class Settings:
             self.source_mod_listing_url,
             self.source_mod_lookup_url,
             self.source_mod_article_prefix,
+            DEFAULT_MOD_NEWS_PREFIX,
             self.source_sbs_url,
             self.source_sbs_api_url,
             sbs_api_prefix,
@@ -133,6 +137,8 @@ def load_settings() -> Settings:
         source_sbs_api_url=_env("OSIX_SOURCE_SBS_API_URL", DEFAULT_SBS_API_URL),
         mod_backfill_page_size=int(_env("OSIX_MOD_BACKFILL_PAGE_SIZE", "50")),
         mod_backfill_max_pages=int(_env("OSIX_MOD_BACKFILL_MAX_PAGES", "100")),
+        mod_backfill_start_date=_env("OSIX_MOD_BACKFILL_START_DATE", "2025-01-01"),
+        mod_backfill_end_date=_env("OSIX_MOD_BACKFILL_END_DATE", ""),
     )
 
 

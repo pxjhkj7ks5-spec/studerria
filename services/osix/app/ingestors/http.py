@@ -5,14 +5,14 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from urllib.parse import urljoin
 
 import httpx
 
 from app.core.config import Settings, SourceDefinition, is_allowlisted_url
 from app.db.clickhouse import ClickHouseStore
-from app.parsers.general_losses import parse_general_losses
+from app.parsers.general_losses import is_general_losses_article, parse_general_losses
 from app.parsers.sbs import parse_sbs, parse_sbs_statistics
 from app.storage.raw_snapshots import content_hash, store_snapshot
 
@@ -87,6 +87,8 @@ class HttpSourceIngestor:
             if not articles:
                 self.store.insert_parser_error(source.id, source.url, digest, "no_articles", "No allowed MOD article records found")
                 return IngestResult(source.id, "error", True, 0, "No allowed MOD article records found")
+            if not backfill:
+                articles = articles[:1]
 
             if not backfill and previous_hash == digest:
                 return IngestResult(source.id, "ok", False, 0, "Snapshot unchanged")
@@ -128,10 +130,21 @@ class HttpSourceIngestor:
             self.store.insert_snapshot(source.id, self.settings.source_mod_lookup_url, fetched_at, snapshot.content_hash, str(snapshot.path), snapshot.size_bytes, response.status_code)
             articles = self._select_mod_articles(response.json())
             if not articles:
+                oldest_date = self._oldest_mod_hit_date(response.json())
+                if oldest_date and oldest_date >= self._mod_backfill_start_date():
+                    pages_read += 1
+                    offset += page_size
+                    continue
+                if oldest_date and oldest_date < self._mod_backfill_start_date():
+                    break
                 break
             total_metrics += self._insert_mod_articles(source, articles, digest)
             pages_read += 1
             if len(articles) < page_size:
+                oldest_date = self._oldest_mod_hit_date(response.json())
+                if oldest_date and oldest_date >= self._mod_backfill_start_date():
+                    offset += page_size
+                    continue
                 break
             offset += page_size
         return total_metrics
@@ -302,11 +315,46 @@ class HttpSourceIngestor:
         articles: list[dict] = []
         for hit in hits:
             article = hit.get("_source", {}) if isinstance(hit, dict) else {}
-            slug = str(article.get("slug") or "")
-            title = str(article.get("title") or "").lower()
-            if slug.startswith("bojovi-vtrati-voroga-na-") or title.startswith("бойові втрати ворога"):
+            published_date = self._published_date(article)
+            if published_date and not self._is_in_mod_backfill_range(published_date):
+                continue
+            if is_general_losses_article(article):
                 articles.append(article)
         return articles
+
+    def _oldest_mod_hit_date(self, payload: dict) -> date | None:
+        dates = [
+            parsed
+            for hit in payload.get("hits", {}).get("hits", [])
+            if isinstance(hit, dict)
+            for parsed in [self._published_date(hit.get("_source", {}))]
+            if parsed is not None
+        ]
+        return min(dates) if dates else None
+
+    def _published_date(self, article: dict) -> date | None:
+        raw = str(article.get("publishedAt") or "")[:10]
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    def _mod_backfill_start_date(self) -> date:
+        try:
+            return date.fromisoformat(self.settings.mod_backfill_start_date)
+        except ValueError:
+            return date(2025, 1, 1)
+
+    def _mod_backfill_end_date(self) -> date:
+        if not self.settings.mod_backfill_end_date:
+            return date.today()
+        try:
+            return date.fromisoformat(self.settings.mod_backfill_end_date)
+        except ValueError:
+            return date.today()
+
+    def _is_in_mod_backfill_range(self, published_date: date) -> bool:
+        return self._mod_backfill_start_date() <= published_date <= self._mod_backfill_end_date()
 
     def _select_sbs_period(self, payload: dict) -> dict | None:
         periods = payload.get("data", {}).get("subdivision", {}).get("periods", [])
