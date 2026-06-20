@@ -56,9 +56,9 @@ def _line_value(line: str) -> tuple[int, int | None] | None:
     return value, delta
 
 
-def parse_general_losses(source_id: str, dataset: str, html: str) -> ParseResult:
+def parse_general_losses(source_id: str, dataset: str, html: str, expected_date: date | None = None) -> ParseResult:
     text = html_to_text(html)
-    observed_date = parse_observed_date(text)
+    observed_date = expected_date or parse_observed_date(text)
     lines = [line.strip().lower() for line in text.splitlines() if line.strip()]
     metrics: list[ParsedMetric] = []
 

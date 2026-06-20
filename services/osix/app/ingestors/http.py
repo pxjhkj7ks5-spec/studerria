@@ -43,6 +43,7 @@ MOD_LOSSES_QUERY = {
 }
 
 SBS_GROUPING_DIVISION_ID = "0"
+MOD_METRICS_SOURCE_ID = "mod-general-losses"
 
 
 @dataclass(frozen=True)
@@ -98,7 +99,7 @@ class HttpSourceIngestor:
 
             total_metrics = self._insert_mod_articles(source, articles, digest)
             if backfill:
-                total_metrics += await self._backfill_mod_pages(source, first_page_count=len(articles))
+                total_metrics += await self._backfill_mod_pages(source, first_page=payload)
             if total_metrics == 0:
                 return IngestResult(source.id, "error", True, 0, "No metrics parsed")
             return IngestResult(source.id, "ok", True, total_metrics)
@@ -114,12 +115,12 @@ class HttpSourceIngestor:
             self.store.update_health(source.id, "error", 0, latency_ms, str(exc))
             return IngestResult(source.id, "error", False, 0, str(exc))
 
-    async def _backfill_mod_pages(self, source: SourceDefinition, first_page_count: int) -> int:
+    async def _backfill_mod_pages(self, source: SourceDefinition, first_page: dict) -> int:
         total_metrics = 0
         page_size = max(1, self.settings.mod_backfill_page_size)
         offset = page_size
         pages_read = 1
-        if first_page_count < page_size:
+        if not self._should_fetch_next_mod_page(first_page, page_size):
             return 0
 
         while pages_read < self.settings.mod_backfill_max_pages:
@@ -128,23 +129,12 @@ class HttpSourceIngestor:
             digest = content_hash(response.content)
             snapshot = store_snapshot(self.settings.raw_snapshot_dir, source.id, fetched_at, response.content)
             self.store.insert_snapshot(source.id, self.settings.source_mod_lookup_url, fetched_at, snapshot.content_hash, str(snapshot.path), snapshot.size_bytes, response.status_code)
-            articles = self._select_mod_articles(response.json())
-            if not articles:
-                oldest_date = self._oldest_mod_hit_date(response.json())
-                if oldest_date and oldest_date >= self._mod_backfill_start_date():
-                    pages_read += 1
-                    offset += page_size
-                    continue
-                if oldest_date and oldest_date < self._mod_backfill_start_date():
-                    break
-                break
-            total_metrics += self._insert_mod_articles(source, articles, digest)
+            payload = response.json()
+            articles = self._select_mod_articles(payload)
+            if articles:
+                total_metrics += self._insert_mod_articles(source, articles, digest)
             pages_read += 1
-            if len(articles) < page_size:
-                oldest_date = self._oldest_mod_hit_date(response.json())
-                if oldest_date and oldest_date >= self._mod_backfill_start_date():
-                    offset += page_size
-                    continue
+            if not self._should_fetch_next_mod_page(payload, page_size):
                 break
             offset += page_size
         return total_metrics
@@ -159,7 +149,8 @@ class HttpSourceIngestor:
                 continue
             article_digest = content_hash(json.dumps(article, sort_keys=True, ensure_ascii=False).encode("utf-8"))
             html = f"<h1>{article.get('title') or ''}</h1>{article.get('content') or ''}"
-            parsed = parse_general_losses("mod-general-losses", source.dataset, html)
+            published_date = self._published_date(article)
+            parsed = parse_general_losses(MOD_METRICS_SOURCE_ID, source.dataset, html, expected_date=published_date)
             if not parsed.metrics:
                 self.store.insert_parser_error(source.id, article_url, article_digest, "empty_parse", "No metrics parsed from MOD article")
                 continue
@@ -331,6 +322,13 @@ class HttpSourceIngestor:
             if parsed is not None
         ]
         return min(dates) if dates else None
+
+    def _should_fetch_next_mod_page(self, payload: dict, page_size: int) -> bool:
+        hits = payload.get("hits", {}).get("hits", [])
+        if not isinstance(hits, list) or len(hits) < page_size:
+            return False
+        oldest_date = self._oldest_mod_hit_date(payload)
+        return oldest_date is None or oldest_date >= self._mod_backfill_start_date()
 
     def _published_date(self, article: dict) -> date | None:
         raw = str(article.get("publishedAt") or "")[:10]

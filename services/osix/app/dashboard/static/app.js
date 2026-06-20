@@ -3,6 +3,7 @@ const api = (path) => `/osix/api/v1${path}`;
 let totalChart;
 let deltaChart;
 let comparisonChart;
+let dashboardRequestId = 0;
 
 const metricPriority = [
   "total_hit",
@@ -114,12 +115,14 @@ function drawChart(existing, canvasId, labels, values, type, label) {
 }
 
 async function loadDashboard() {
+  const requestId = ++dashboardRequestId;
   const dataset = document.getElementById("dataset").value;
   const period = document.getElementById("period").value;
   const start = document.getElementById("start");
   const end = document.getElementById("end");
   const custom = period === "custom" ? `${serializeDate("start", start)}${serializeDate("end", end)}` : "";
   const latestData = await getJson(`/metrics/latest?dataset=${encodeURIComponent(dataset)}`);
+  if (requestId !== dashboardRequestId) return;
   const latestMetrics = orderedMetrics(latestData.metrics || []);
   const metric = updateMetricOptions(latestMetrics);
 
@@ -128,6 +131,7 @@ async function loadDashboard() {
     getJson("/source-health"),
     getJson("/parser-errors"),
   ]);
+  if (requestId !== dashboardRequestId) return;
 
   const series = seriesData.series || [];
   const hasSeries = series.length > 0;
@@ -194,16 +198,16 @@ async function loadSourceConfig() {
     .join("");
 }
 
-document.getElementById("refresh").addEventListener("click", () => {
-  loadDashboard().catch((error) => {
+function refreshDashboard() {
+  return loadDashboard().catch((error) => {
     document.getElementById("adminStatus").textContent = error.message;
   });
-});
+}
 
-document.getElementById("dataset").addEventListener("change", () => {
-  loadDashboard().catch((error) => {
-    document.getElementById("adminStatus").textContent = error.message;
-  });
+document.getElementById("refresh").addEventListener("click", refreshDashboard);
+
+["dataset", "metric", "period", "start", "end"].forEach((controlId) => {
+  document.getElementById(controlId).addEventListener("change", refreshDashboard);
 });
 
 document.getElementById("loginForm").addEventListener("submit", async (event) => {
@@ -249,6 +253,4 @@ document.getElementById("sourceConfig").addEventListener("submit", async (event)
   if (response.ok) await loadSourceConfig();
 });
 
-loadDashboard().catch((error) => {
-  document.getElementById("adminStatus").textContent = error.message;
-});
+refreshDashboard();

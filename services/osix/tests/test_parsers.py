@@ -1,11 +1,13 @@
 import unittest
 import sys
+from datetime import date
 from pathlib import Path
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
 
 from app.core.config import DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_NEWS_PREFIX, DEFAULT_SBS_API_URL, load_settings, is_allowlisted_url
+from app.ingestors.http import HttpSourceIngestor
 from app.parsers.general_losses import is_general_losses_article, parse_general_losses
 from app.parsers.sbs import parse_sbs, parse_sbs_statistics
 
@@ -77,6 +79,23 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(by_metric["submarines"].value, 2)
         self.assertEqual(by_metric["special_equipment"].value, 4300)
 
+    def test_mod_general_losses_uses_published_date_over_typo_in_content(self):
+        html = """
+        <h1>Бойові втрати ворога на 1 червня 2026 року</h1>
+        <p>Загальні бойові втрати противника з 24.02.22 по 01.06.20 орієнтовно склали:</p>
+        <p>особового складу ‒ близько 1 365 470 (+1 410) осіб</p>
+        """
+
+        result = parse_general_losses(
+            "mod-general-losses",
+            "general_losses",
+            html,
+            expected_date=date(2026, 6, 1),
+        )
+
+        self.assertEqual(result.observed_date.isoformat(), "2026-06-01")
+        self.assertEqual(result.metrics[0].observed_date.isoformat(), "2026-06-01")
+
     def test_allowlist_accepts_mod_listing_and_article_prefix(self):
         allowed = (DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_NEWS_PREFIX)
 
@@ -106,6 +125,36 @@ class ParserTests(unittest.TestCase):
         allowed = (DEFAULT_SBS_API_URL, f"{DEFAULT_SBS_API_URL}/*")
 
         self.assertTrue(is_allowlisted_url(f"{DEFAULT_SBS_API_URL}/statistics/0/period", allowed))
+
+    def test_mod_backfill_continues_when_raw_page_is_full(self):
+        ingestor = HttpSourceIngestor(load_settings(), None)
+        hits = [
+            {
+                "_source": {
+                    "publishedAt": f"2026-05-{day:02d}",
+                    "title": "Інша публікація",
+                    "content": "",
+                }
+            }
+            for day in range(1, 26)
+        ] * 2
+        payload = {"hits": {"hits": hits}}
+
+        self.assertEqual(len(ingestor._select_mod_articles(payload)), 0)
+        self.assertTrue(ingestor._should_fetch_next_mod_page(payload, 50))
+
+    def test_mod_backfill_stops_after_partial_raw_page(self):
+        ingestor = HttpSourceIngestor(load_settings(), None)
+        payload = {
+            "hits": {
+                "hits": [
+                    {"_source": {"publishedAt": "2026-05-01"}}
+                    for _ in range(49)
+                ]
+            }
+        }
+
+        self.assertFalse(ingestor._should_fetch_next_mod_page(payload, 50))
 
 
 if __name__ == "__main__":

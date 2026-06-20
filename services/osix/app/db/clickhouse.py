@@ -176,6 +176,19 @@ class ClickHouseStore:
             ],
         )
 
+    def delete_metrics_outside_range(self, dataset: str, source_id: str, start: str, end: str) -> None:
+        self.client.command(
+            """
+            ALTER TABLE metrics_time_series
+            DELETE WHERE
+                dataset = {dataset:String}
+                AND source_id = {source_id:String}
+                AND (observed_date < {start:Date} OR observed_date > {end:Date})
+            SETTINGS mutations_sync = 1
+            """,
+            parameters={"dataset": dataset, "source_id": source_id, "start": start, "end": end},
+        )
+
     def insert_parser_error(self, source_id: str, url: str, content_hash: str, error_type: str, message: str) -> None:
         self.client.insert(
             "parser_errors",

@@ -5,7 +5,7 @@ import logging
 
 from app.core.config import Settings, SourceDefinition
 from app.db.clickhouse import ClickHouseStore
-from app.ingestors.http import HttpSourceIngestor, IngestResult
+from app.ingestors.http import MOD_METRICS_SOURCE_ID, HttpSourceIngestor, IngestResult
 from app.storage.raw_snapshots import cleanup_old_snapshots
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,12 @@ class Poller:
         source = next((item for item in self._configured_sources() if item.parser == "mod_listing"), None)
         if source is None:
             return IngestResult("mod-general-losses-listing", "skipped", False, 0, "MOD listing source is disabled")
+        self.store.delete_metrics_outside_range(
+            source.dataset,
+            MOD_METRICS_SOURCE_ID,
+            self.ingestor._mod_backfill_start_date().isoformat(),
+            self.ingestor._mod_backfill_end_date().isoformat(),
+        )
         return await self.ingestor.backfill_mod_losses(source)
 
     def _configured_sources(self) -> tuple[SourceDefinition, ...]:
