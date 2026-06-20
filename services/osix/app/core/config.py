@@ -14,6 +14,9 @@ DEFAULT_MOD_ARTICLE_PREFIX = "https://mod.gov.ua/news/bojovi-vtrati-voroga-na-"
 DEFAULT_MOD_NEWS_PREFIX = "https://mod.gov.ua/news/*"
 DEFAULT_SBS_SOURCE_URL = "https://sbs-group.army/"
 DEFAULT_SBS_API_URL = "https://sbs-group.army/api/public"
+DEFAULT_HISTORY_PERSONNEL_URL = "https://raw.githubusercontent.com/PetroIvaniuk/2022-Ukraine-Russia-War-Dataset/main/data/russia_losses_personnel.json"
+DEFAULT_HISTORY_EQUIPMENT_URL = "https://raw.githubusercontent.com/PetroIvaniuk/2022-Ukraine-Russia-War-Dataset/main/data/russia_losses_equipment.json"
+DEFAULT_CREA_COUNTER_URL = "https://api.russiafossiltracker.com/v0/counter"
 
 
 @dataclass(frozen=True)
@@ -53,10 +56,15 @@ class Settings:
     source_mod_article_prefix: str
     source_sbs_url: str
     source_sbs_api_url: str
+    source_history_personnel_url: str
+    source_history_equipment_url: str
+    source_crea_counter_url: str
     mod_backfill_page_size: int
     mod_backfill_max_pages: int
     mod_backfill_start_date: str
     mod_backfill_end_date: str
+    crea_backfill_start_date: str
+    crea_recent_days: int
 
     @property
     def admin_enabled(self) -> bool:
@@ -74,10 +82,21 @@ class Settings:
             self.source_sbs_url,
             self.source_sbs_api_url,
             sbs_api_prefix,
+            self.source_history_personnel_url,
+            self.source_history_equipment_url,
+            self.source_crea_counter_url,
         )
 
     def default_sources(self) -> tuple[SourceDefinition, ...]:
         return (
+            SourceDefinition(
+                id="general-staff-history",
+                name="General Staff daily losses history (curated mirror)",
+                url=self.source_history_personnel_url,
+                source_type="json_api",
+                dataset="general_losses",
+                parser="general_staff_history",
+            ),
             SourceDefinition(
                 id="mod-general-losses-listing",
                 name="Ministry of Defence enemy losses listing",
@@ -85,6 +104,14 @@ class Settings:
                 source_type="website_listing",
                 dataset="general_losses",
                 parser="mod_listing",
+            ),
+            SourceDefinition(
+                id="crea-russia-fossil-tracker",
+                name="CREA Russia Fossil Tracker",
+                url=self.source_crea_counter_url,
+                source_type="json_api",
+                dataset="russia_oil_exports",
+                parser="crea_counter",
             ),
             SourceDefinition(
                 id="sbs-pidrahuyka",
@@ -135,10 +162,15 @@ def load_settings() -> Settings:
         source_mod_article_prefix=_env("OSIX_SOURCE_MOD_ARTICLE_PREFIX", DEFAULT_MOD_ARTICLE_PREFIX),
         source_sbs_url=_env("OSIX_SOURCE_SBS_URL", DEFAULT_SBS_SOURCE_URL),
         source_sbs_api_url=_env("OSIX_SOURCE_SBS_API_URL", DEFAULT_SBS_API_URL),
+        source_history_personnel_url=_env("OSIX_SOURCE_HISTORY_PERSONNEL_URL", DEFAULT_HISTORY_PERSONNEL_URL),
+        source_history_equipment_url=_env("OSIX_SOURCE_HISTORY_EQUIPMENT_URL", DEFAULT_HISTORY_EQUIPMENT_URL),
+        source_crea_counter_url=_env("OSIX_SOURCE_CREA_COUNTER_URL", DEFAULT_CREA_COUNTER_URL),
         mod_backfill_page_size=int(_env("OSIX_MOD_BACKFILL_PAGE_SIZE", "50")),
         mod_backfill_max_pages=int(_env("OSIX_MOD_BACKFILL_MAX_PAGES", "100")),
-        mod_backfill_start_date=_env("OSIX_MOD_BACKFILL_START_DATE", "2025-01-01"),
+        mod_backfill_start_date=_env("OSIX_MOD_BACKFILL_START_DATE", "2022-02-24"),
         mod_backfill_end_date=_env("OSIX_MOD_BACKFILL_END_DATE", ""),
+        crea_backfill_start_date=_env("OSIX_CREA_BACKFILL_START_DATE", "2022-02-24"),
+        crea_recent_days=int(_env("OSIX_CREA_RECENT_DAYS", "35")),
     )
 
 

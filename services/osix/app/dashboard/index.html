@@ -13,20 +13,24 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">OSIX</p>
-          <h1>Офіційна статистика втрат</h1>
+          <h1>Статистика війни та економіки</h1>
         </div>
         <div class="toolbar">
           <select id="dataset">
             <option value="general_losses">General losses</option>
+            <option value="russia_oil_exports">Russian oil exports</option>
             <option value="sbs_stats">SBS</option>
           </select>
-          <select id="metric">
-            <option value="personnel">Personnel</option>
-            <option value="tanks">Tanks</option>
-            <option value="armored_vehicles">Armored vehicles</option>
-            <option value="artillery_systems">Artillery</option>
-            <option value="uav">UAV</option>
-          </select>
+          <div class="metric-picker">
+            <button id="metricPickerToggle" class="secondary-button" type="button" aria-expanded="false">
+              Показники <span id="metricCount">1</span>
+            </button>
+            <div id="metricMenu" class="metric-menu" hidden></div>
+          </div>
+          <label class="normalize-control">
+            <input id="normalize" type="checkbox" />
+            Індекс 100
+          </label>
           <select id="period">
             <option value="all">Весь час</option>
             <option value="year">Рік</option>
@@ -41,23 +45,25 @@
         </div>
       </header>
 
+      <p id="datasetNote" class="dataset-note"></p>
+
       <section class="summary" id="summary"></section>
 
       <section class="grid">
         <article class="panel chart-panel">
-          <h2>Total value over time</h2>
+          <h2>Динаміка показників</h2>
           <div class="chart-box">
             <canvas id="totalChart"></canvas>
           </div>
         </article>
         <article class="panel chart-panel">
-          <h2>Daily delta bars</h2>
+          <h2>Добова зміна</h2>
           <div class="chart-box">
             <canvas id="deltaChart"></canvas>
           </div>
         </article>
         <article class="panel chart-panel">
-          <h2>Metric comparison</h2>
+          <h2>Останні значення</h2>
           <div class="chart-box">
             <canvas id="comparisonChart"></canvas>
           </div>

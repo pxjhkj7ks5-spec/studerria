@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urljoin
 
 import httpx
 
 from app.core.config import Settings, SourceDefinition, is_allowlisted_url
 from app.db.clickhouse import ClickHouseStore
+from app.parsers.energy_exports import parse_crea_counter
 from app.parsers.general_losses import is_general_losses_article, parse_general_losses
+from app.parsers.general_staff_history import parse_general_staff_history
 from app.parsers.sbs import parse_sbs, parse_sbs_statistics
 from app.storage.raw_snapshots import content_hash, store_snapshot
 
@@ -61,14 +64,103 @@ class HttpSourceIngestor:
         self.store = store
 
     async def ingest_source(self, source: SourceDefinition) -> IngestResult:
+        if source.parser == "general_staff_history":
+            return await self._ingest_general_staff_history(source)
         if source.parser == "mod_listing":
             return await self._ingest_mod_listing(source)
+        if source.parser == "crea_counter":
+            return await self._ingest_crea_counter(source)
         if source.parser == "sbs":
             return await self._ingest_sbs(source)
         return await self._ingest_page(source)
 
     async def backfill_mod_losses(self, source: SourceDefinition) -> IngestResult:
         return await self._ingest_mod_listing(source, backfill=True)
+
+    async def _ingest_general_staff_history(self, source: SourceDefinition) -> IngestResult:
+        started = time.monotonic()
+        try:
+            personnel_response, equipment_response = await asyncio.gather(
+                self._fetch_json_response(source.url),
+                self._fetch_json_response(self.settings.source_history_equipment_url),
+            )
+            latency_ms = int((time.monotonic() - started) * 1000)
+            fetched_at = datetime.now(timezone.utc)
+            combined = personnel_response.content + b"\n" + equipment_response.content
+            digest = content_hash(combined)
+            self.store.update_health(source.id, "ok", 200, latency_ms)
+            if self.store.last_snapshot_hash(source.id) == digest:
+                return IngestResult(source.id, "ok", False, 0, "Snapshot unchanged")
+
+            snapshot = store_snapshot(self.settings.raw_snapshot_dir, source.id, fetched_at, combined)
+            self.store.insert_snapshot(source.id, source.url, fetched_at, snapshot.content_hash, str(snapshot.path), snapshot.size_bytes, 200)
+            parsed = parse_general_staff_history(
+                source.id,
+                source.dataset,
+                personnel_response.json(),
+                equipment_response.json(),
+            )
+            if not parsed.metrics:
+                self.store.insert_parser_error(source.id, source.url, digest, "empty_parse", "No historical loss metrics parsed")
+                return IngestResult(source.id, "error", True, 0, "No historical loss metrics parsed")
+            self.store.insert_metrics(parsed.metrics, digest)
+            return IngestResult(source.id, "ok", True, len(parsed.metrics))
+        except httpx.HTTPStatusError as exc:
+            latency_ms = int((time.monotonic() - started) * 1000)
+            message = f"HTTP {exc.response.status_code} while fetching loss history"
+            self.store.update_health(source.id, "error", exc.response.status_code, latency_ms, message)
+            self.store.insert_parser_error(source.id, source.url, "", "http_error", message)
+            return IngestResult(source.id, "error", False, 0, message)
+        except Exception as exc:
+            latency_ms = int((time.monotonic() - started) * 1000)
+            logger.exception("historical loss ingest failed")
+            self.store.update_health(source.id, "error", 0, latency_ms, str(exc))
+            return IngestResult(source.id, "error", False, 0, str(exc))
+
+    async def _ingest_crea_counter(self, source: SourceDefinition) -> IngestResult:
+        started = time.monotonic()
+        try:
+            configured_start = self._crea_backfill_start_date()
+            latest = self.store.latest_observed_date(source.dataset, source.id)
+            date_from = configured_start
+            if latest is not None:
+                date_from = max(configured_start, latest - timedelta(days=max(1, self.settings.crea_recent_days)))
+            params = {
+                "aggregate_by": "date,commodity,destination_region",
+                "commodity": "crude_oil,oil_products,pipeline_oil",
+                "currency": "EUR",
+                "date_from": date_from.isoformat(),
+                "date_to": date.today().isoformat(),
+                "version": "v2",
+                "nest_in_data": "true",
+            }
+            response = await self._fetch_json_response(source.url, params=params)
+            latency_ms = int((time.monotonic() - started) * 1000)
+            fetched_at = datetime.now(timezone.utc)
+            digest = content_hash(response.content)
+            self.store.update_health(source.id, "ok", response.status_code, latency_ms)
+            if self.store.last_snapshot_hash(source.id) == digest:
+                return IngestResult(source.id, "ok", False, 0, "Snapshot unchanged")
+
+            snapshot = store_snapshot(self.settings.raw_snapshot_dir, source.id, fetched_at, response.content)
+            self.store.insert_snapshot(source.id, str(response.url), fetched_at, snapshot.content_hash, str(snapshot.path), snapshot.size_bytes, response.status_code)
+            parsed = parse_crea_counter(source.id, source.dataset, response.json())
+            if not parsed.metrics:
+                self.store.insert_parser_error(source.id, source.url, digest, "empty_parse", "No CREA oil export metrics parsed")
+                return IngestResult(source.id, "error", True, 0, "No CREA oil export metrics parsed")
+            self.store.insert_metrics(parsed.metrics, digest)
+            return IngestResult(source.id, "ok", True, len(parsed.metrics))
+        except httpx.HTTPStatusError as exc:
+            latency_ms = int((time.monotonic() - started) * 1000)
+            message = f"HTTP {exc.response.status_code} while fetching CREA counter"
+            self.store.update_health(source.id, "error", exc.response.status_code, latency_ms, message)
+            self.store.insert_parser_error(source.id, source.url, "", "http_error", message)
+            return IngestResult(source.id, "error", False, 0, message)
+        except Exception as exc:
+            latency_ms = int((time.monotonic() - started) * 1000)
+            logger.exception("CREA counter ingest failed")
+            self.store.update_health(source.id, "error", 0, latency_ms, str(exc))
+            return IngestResult(source.id, "error", False, 0, str(exc))
 
     async def _ingest_mod_listing(self, source: SourceDefinition, backfill: bool = False) -> IngestResult:
         if not is_allowlisted_url(self.settings.source_mod_lookup_url, self.settings.allowlisted_prefixes):
@@ -245,6 +337,20 @@ class HttpSourceIngestor:
             response.raise_for_status()
             return response
 
+    async def _fetch_json_response(self, url: str, params: dict[str, str] | None = None) -> httpx.Response:
+        if not is_allowlisted_url(url, self.settings.allowlisted_prefixes):
+            raise ValueError("JSON API URL is not allowlisted")
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; Studerria-OSIX/0.1; +https://studerria.com/osix)",
+            "Accept": "application/json,text/plain,*/*",
+            "Accept-Language": "uk-UA,uk;q=0.9,en;q=0.5",
+            "Cache-Control": "no-cache",
+        }
+        async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds, follow_redirects=True, headers=headers) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            return response
+
     async def _fetch_mod_lookup(self, offset: int = 0, size: int = 20) -> httpx.Response:
         if not is_allowlisted_url(self.settings.source_mod_lookup_url, self.settings.allowlisted_prefixes):
             raise ValueError("MOD lookup URL is not allowlisted")
@@ -341,7 +447,13 @@ class HttpSourceIngestor:
         try:
             return date.fromisoformat(self.settings.mod_backfill_start_date)
         except ValueError:
-            return date(2025, 1, 1)
+            return date(2022, 2, 24)
+
+    def _crea_backfill_start_date(self) -> date:
+        try:
+            return date.fromisoformat(self.settings.crea_backfill_start_date)
+        except ValueError:
+            return date(2022, 2, 24)
 
     def _mod_backfill_end_date(self) -> date:
         if not self.settings.mod_backfill_end_date:

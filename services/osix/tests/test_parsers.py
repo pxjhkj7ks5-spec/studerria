@@ -6,7 +6,7 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
 
-from app.core.config import DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_NEWS_PREFIX, DEFAULT_SBS_API_URL, load_settings, is_allowlisted_url
+from app.core.config import DEFAULT_CREA_COUNTER_URL, DEFAULT_HISTORY_EQUIPMENT_URL, DEFAULT_HISTORY_PERSONNEL_URL, DEFAULT_MOD_ARTICLE_PREFIX, DEFAULT_MOD_LISTING_URL, DEFAULT_MOD_LOOKUP_URL, DEFAULT_MOD_NEWS_PREFIX, DEFAULT_SBS_API_URL, load_settings, is_allowlisted_url
 from app.ingestors.http import HttpSourceIngestor
 from app.parsers.general_losses import is_general_losses_article, parse_general_losses
 from app.parsers.sbs import parse_sbs, parse_sbs_statistics
@@ -118,6 +118,8 @@ class ParserTests(unittest.TestCase):
         source_ids = {source.id for source in load_settings().default_sources()}
 
         self.assertNotIn("zsu-general-losses", source_ids)
+        self.assertIn("general-staff-history", source_ids)
+        self.assertIn("crea-russia-fossil-tracker", source_ids)
         self.assertIn("mod-general-losses-listing", source_ids)
         self.assertIn("sbs-pidrahuyka", source_ids)
 
@@ -125,6 +127,13 @@ class ParserTests(unittest.TestCase):
         allowed = (DEFAULT_SBS_API_URL, f"{DEFAULT_SBS_API_URL}/*")
 
         self.assertTrue(is_allowlisted_url(f"{DEFAULT_SBS_API_URL}/statistics/0/period", allowed))
+
+    def test_allowlist_accepts_history_and_crea_sources(self):
+        settings = load_settings()
+
+        self.assertTrue(is_allowlisted_url(DEFAULT_HISTORY_PERSONNEL_URL, settings.allowlisted_prefixes))
+        self.assertTrue(is_allowlisted_url(DEFAULT_HISTORY_EQUIPMENT_URL, settings.allowlisted_prefixes))
+        self.assertTrue(is_allowlisted_url(DEFAULT_CREA_COUNTER_URL, settings.allowlisted_prefixes))
 
     def test_mod_backfill_continues_when_raw_page_is_full(self):
         ingestor = HttpSourceIngestor(load_settings(), None)

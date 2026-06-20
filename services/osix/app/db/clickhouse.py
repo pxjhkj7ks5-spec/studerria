@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from app.core.config import Settings, SourceDefinition
@@ -230,6 +230,19 @@ class ClickHouseStore:
             parameters=params,
         )
         return [dict(zip(result.column_names, row, strict=False)) for row in result.result_rows]
+
+    def latest_observed_date(self, dataset: str, source_id: str) -> date | None:
+        result = self.client.query(
+            """
+            SELECT maxOrNull(observed_date)
+            FROM metrics_time_series
+            WHERE dataset = {dataset:String} AND source_id = {source_id:String}
+            """,
+            parameters={"dataset": dataset, "source_id": source_id},
+        )
+        if not result.result_rows or result.result_rows[0][0] is None:
+            return None
+        return result.result_rows[0][0]
 
     def metric_series(self, metric: str, dataset: str, start: str | None, end: str | None) -> list[dict[str, Any]]:
         conditions = ["dataset = {dataset:String}", "metric = {metric:String}"]

@@ -85,7 +85,7 @@ For `osix`, production admin login is disabled until these are set:
 - `OSIX_ADMIN_PASSWORD_HASH` in `pbkdf2_sha256$iterations$salt$hex_digest` format
 - `OSIX_JWT_SECRET`
 
-OSIX only polls allowlisted official sources configured by `OSIX_SOURCE_*` variables. Do not add Telegram, private channels, social networks, or unofficial OSINT URLs to this MVP service.
+OSIX only polls explicitly allowlisted public sources configured by `OSIX_SOURCE_*` variables. The military-loss history mirror must remain attributable to General Staff reports, and the oil dataset must remain attributable to CREA. Do not add Telegram, private channels, or anonymous OSINT feeds.
 
 ## Update an existing server
 
