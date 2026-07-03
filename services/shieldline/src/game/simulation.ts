@@ -32,7 +32,7 @@ function cloneState(state: GameState): GameState {
 function pushLog(entries: IntelEntry[], day: number, title: string, body: string, tone: IntelEntry["tone"]) {
   entries.unshift({
     id: `${day}-${entries.length}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-    day,
+    time: `Day ${day}`,
     title,
     body,
     tone,

@@ -1,6 +1,6 @@
 import { initialCities, initialInfrastructure } from "../data/mapData";
 import { unitDefinitions } from "../data/units";
-import type { DailyForecast, DeployedUnit, GameState, IntelEntry } from "../types/game";
+import type { DailyForecast, DeployedUnit, GameState, IntelEntry, LiveThreat } from "../types/game";
 
 const initialUnits: DeployedUnit[] = [
   { id: "seed-radar-kyiv", kind: "radar", cityId: "kyiv", readiness: 86 },
@@ -14,19 +14,38 @@ const initialUnits: DeployedUnit[] = [
 const openingLog: IntelEntry[] = [
   {
     id: "briefing-1",
-    day: 1,
+    time: "T+00:00",
     title: "Intel Briefing",
     body: "Multiple disruptions are possible this week. Preserve energy, morale, and repair capacity.",
     tone: "info",
   },
   {
     id: "safety-1",
-    day: 1,
+    time: "T+00:00",
     title: "Simulation Scope",
     body: "Shieldline uses fictional, abstract mechanics. It does not model real deployments or ranges.",
     tone: "info",
   },
 ];
+
+function createOpeningThreat(): LiveThreat {
+  const targetNode = initialInfrastructure.find((node) => node.id === "grid-kyiv") || initialInfrastructure[0];
+  return {
+    id: "opening-track-1",
+    kind: "drone",
+    status: "inbound",
+    origin: { lat: 51.8, lng: 40.0 },
+    target: targetNode.coordinates,
+    targetNodeId: targetNode.id,
+    targetCityId: targetNode.cityId,
+    progress: 0.08,
+    speed: 0.000045,
+    difficulty: 28,
+    damage: 12,
+    detected: false,
+    saturation: 1,
+  };
+}
 
 export function createForecast(day: number, random: () => number): DailyForecast {
   const roll = random();
@@ -52,6 +71,8 @@ export function createForecast(day: number, random: () => number): DailyForecast
 export function createInitialState(random: () => number = Math.random): GameState {
   return {
     day: 1,
+    elapsedMs: 0,
+    wavePressure: 18,
     status: "active",
     statusReason: "",
     resources: {
@@ -64,6 +85,12 @@ export function createInitialState(random: () => number = Math.random): GameStat
     cities: initialCities.map((city) => ({ ...city })),
     infrastructure: initialInfrastructure.map((node) => ({ ...node })),
     units: initialUnits.map((unit) => ({ ...unit })),
+    batteries: [],
+    liveThreats: [createOpeningThreat()],
+    interceptorShots: [],
+    impactMarkers: [],
+    interceptions: 0,
+    impacts: 0,
     log: openingLog,
     forecast: createForecast(1, random),
   };

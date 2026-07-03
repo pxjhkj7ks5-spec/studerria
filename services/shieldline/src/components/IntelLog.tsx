@@ -18,17 +18,17 @@ export function IntelLog({ game }: IntelLogProps) {
       <div className="intel-heading">
         <Radio size={21} />
         <div>
-          <span>Intel Log</span>
+          <span>Live Log</span>
           <strong>{game.forecast.weather} weather</strong>
         </div>
       </div>
       <article className="briefing-card">
-        <strong>Intel Briefing</strong>
-        <p>{game.forecast.vagueWarning}</p>
-        <span>Political pressure index {Math.round(game.forecast.pressure)}</span>
+        <strong>Live Briefing</strong>
+        <p>Uncertain tracks will appear continuously. Place ППО manually and watch abstract coverage.</p>
+        <span>Pressure index {Math.round(game.wavePressure)}</span>
       </article>
       <div className="log-list">
-        {game.log.slice(0, 12).map((entry) => {
+        {game.log.slice(0, 14).map((entry) => {
           const Icon = toneIcon[entry.tone];
           return (
             <article className={`log-entry log-entry--${entry.tone}`} key={entry.id}>
@@ -37,7 +37,7 @@ export function IntelLog({ game }: IntelLogProps) {
                 <strong>{entry.title}</strong>
                 <p>{entry.body}</p>
               </div>
-              <span>Day {entry.day}</span>
+              <span>{entry.time}</span>
             </article>
           );
         })}

@@ -7,7 +7,7 @@ interface CityPanelProps {
 }
 
 export function CityPanel({ city, game }: CityPanelProps) {
-  const cityUnits = game.units.filter((unit) => unit.cityId === city.id);
+  const cityUnits = game.batteries.filter((unit) => unit.assignedCityId === city.id);
   const nodeCount = game.infrastructure.filter((node) => node.cityId === city.id).length;
 
   return (
@@ -23,8 +23,8 @@ export function CityPanel({ city, game }: CityPanelProps) {
         <Metric icon={Radio} label="Nodes" value={nodeCount} raw />
       </div>
       <div className="assigned-row">
-        <span>{cityUnits.length} units assigned</span>
-        <small>click unit below, then redeploy here</small>
+        <span>{cityUnits.length} ППО units nearby</span>
+        <small>placement clicks are abstracted</small>
       </div>
     </section>
   );
