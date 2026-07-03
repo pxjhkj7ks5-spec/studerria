@@ -9,6 +9,7 @@ The repository also vendors live sidecar services that are proxied through Stude
 - `slashtg`: `/tg`
 - `withlforl`: `/withlforl`
 - `osix`: `/osix`
+- `shieldline`: `/shieldline`
 
 Studerria student Telegram mini app is served separately by the main app at `/studerria-tg`.
 
@@ -39,6 +40,12 @@ bash scripts/server-update.sh app
 ```
 
 Use `docker compose down -v` only when you intentionally want to recreate the PostgreSQL volume or re-import the SQL dump from scratch.
+
+Shieldline is deployed as an isolated sidecar and served through the main app proxy at `/shieldline`:
+
+```bash
+bash scripts/server-update.sh shieldline
+```
 
 ## Cleanup and legacy archive workflow
 

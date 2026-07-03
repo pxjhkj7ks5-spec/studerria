@@ -24,6 +24,7 @@ Services:
   slashtg      /tg sidecar
   withlforl    /withlforl sidecar
   osix         /osix sidecar
+  shieldline   /shieldline sidecar
   db           PostgreSQL
   redis        Redis
   loki         Loki
@@ -35,6 +36,7 @@ Examples:
   bash scripts/server-update.sh naradadruk --pull
   bash scripts/server-update.sh withlforl
   bash scripts/server-update.sh osix
+  bash scripts/server-update.sh shieldline
 USAGE
 }
 
@@ -47,6 +49,7 @@ normalize_service() {
     slashtg|slash-tg|tg) echo "slashtg" ;;
     withlforl|with-l-for-l) echo "withlforl" ;;
     osix) echo "osix" ;;
+    shieldline|shield-line) echo "shieldline" ;;
     db|postgres|postgresql) echo "db" ;;
     redis) echo "redis" ;;
     loki) echo "loki" ;;

@@ -106,3 +106,31 @@ test('osix child paths are claimed by service middleware', async () => {
   assert.equal(res.statusCode, 404);
   assert.equal(res.body, 'Not found');
 });
+
+test('shieldline proxy path is claimed by service middleware', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, {
+    env: {},
+    logger: { error() {} },
+  });
+
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/shieldline', url: '/shieldline' }, res);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body, 'Not found');
+});
+
+test('shieldline child paths are claimed by service middleware', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, {
+    env: {},
+    logger: { error() {} },
+  });
+
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/shieldline/day/1', url: '/shieldline/day/1' }, res);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body, 'Not found');
+});

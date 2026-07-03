@@ -329,6 +329,37 @@ services:
       retries: 20
       start_period: 30s
 
+  shieldline:
+    build:
+      context: ../../services/shieldline
+      dockerfile: Dockerfile
+      args:
+        SHIELDLINE_BASE_PATH: /shieldline
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${SHIELDLINE_NODE_ENV:-development}
+      HOSTNAME: 0.0.0.0
+      PORT: 8080
+      SHIELDLINE_BASE_PATH: /shieldline
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8080/shieldline').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   app:
     build:
       context: ../..
@@ -365,6 +396,7 @@ services:
       SLASHTG_BASE_PATH: ${SLASHTG_BASE_PATH:-/tg}
       WITHLFORL_PROXY_TARGET: http://withlforl:8080
       OSIX_PROXY_TARGET: http://osix:8080
+      SHIELDLINE_PROXY_TARGET: http://shieldline:8080
       STUDERRIA_TG_BOT_TOKEN: ${STUDERRIA_TG_BOT_TOKEN:-}
       STUDERRIA_TG_BOT_USERNAME: ${STUDERRIA_TG_BOT_USERNAME:-}
       STUDERRIA_TG_APP_SHORT_NAME: ${STUDERRIA_TG_APP_SHORT_NAME:-}
