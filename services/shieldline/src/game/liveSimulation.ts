@@ -227,7 +227,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     currentAmmo: unit.ammoCapacity,
     assignedCityId: nearestCityId(next, quantized),
     sweepAngleDeg: unit.engagementMode === "detect" ? random() * 360 : undefined,
-    sweepSpeedDegPerMs: unit.engagementMode === "detect" ? 0.022 : undefined,
+    sweepSpeedDegPerMs: unit.engagementMode === "detect" ? 0.075 : undefined,
   };
   if (next.planningActions.selected.includes("rapid-redeployment")) {
     applyRedeployFatigue(battery);
@@ -712,7 +712,7 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
       battery.currentAmmo = unit.ammoCapacity;
     }
     if (unit.engagementMode === "detect") {
-      const speed = battery.sweepSpeedDegPerMs ?? 0.022;
+      const speed = Math.max(battery.sweepSpeedDegPerMs ?? 0, 0.075);
       battery.sweepSpeedDegPerMs = speed;
       battery.sweepAngleDeg = ((battery.sweepAngleDeg ?? 0) + deltaMs * speed) % 360;
     }
