@@ -219,6 +219,7 @@ button {
 .intel-card,
 .next-day,
 .live-card,
+.selected-unit-card,
 .planning-card,
 .reset-button,
 .unit-card,
@@ -623,7 +624,8 @@ button {
 }
 
 .map-marker--unit-maintenance,
-.map-marker--unit-redeploying {
+.map-marker--unit-redeploying,
+.map-marker--unit-reloading {
   opacity: 0.72;
 }
 
@@ -1028,6 +1030,88 @@ button {
   cursor: pointer;
 }
 
+.selected-unit-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.selected-unit-card__head {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.selected-unit-card__head svg {
+  color: var(--amber);
+}
+
+.selected-unit-card__head strong,
+.selected-unit-card__head span {
+  display: block;
+}
+
+.selected-unit-card__head span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-unit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.selected-unit-grid span,
+.chance-grid span {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(137, 211, 255, 0.13);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.selected-unit-grid b,
+.chance-grid b {
+  display: block;
+  color: #f6fbff;
+  font-size: 14px;
+}
+
+.chance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.selected-unit-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.selected-unit-card__actions button {
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #f6fbff;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.selected-unit-card__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .live-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1195,16 +1279,19 @@ button {
 
 .unit-list {
   display: grid;
-  grid-template-columns: repeat(8, minmax(122px, 1fr));
+  grid-template-columns: repeat(11, minmax(118px, 1fr));
   gap: 9px;
   min-width: 0;
   min-height: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 4px;
 }
 
 .unit-card {
   position: relative;
   display: grid;
-  grid-template-rows: auto auto 1fr auto auto auto;
+  grid-template-rows: auto auto 1fr auto auto auto auto;
   min-width: 0;
   padding: 10px;
   border-radius: 8px;
@@ -1279,6 +1366,11 @@ button {
   font-weight: 800;
 }
 
+.ammo-badge {
+  padding: 0 7px;
+  font-size: 11px;
+}
+
 .unit-sprite {
   display: block;
   width: 40px;
@@ -1309,6 +1401,35 @@ button {
   margin-bottom: 7px;
   color: var(--amber);
   font-size: 11px;
+}
+
+.unit-chance-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.unit-chance-row span {
+  overflow: hidden;
+  padding: 4px 3px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 9px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.unit-chance-row b {
+  display: block;
+  color: #ffdd8a;
+  font-size: 10px;
+}
+
+.unit-chance--muted {
+  opacity: 0.38;
 }
 
 .readiness-track {
@@ -1516,7 +1637,7 @@ button {
   }
 
   .unit-list {
-    grid-template-columns: repeat(8, minmax(150px, 1fr));
+    grid-template-columns: repeat(11, minmax(132px, 1fr));
   }
 
   .map-legend {
@@ -1610,6 +1731,11 @@ button {
   }
 
   .unit-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .selected-unit-grid,
+  .chance-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

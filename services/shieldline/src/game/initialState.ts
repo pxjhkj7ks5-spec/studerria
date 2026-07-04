@@ -8,11 +8,9 @@ import type { CampaignMode, City, DailyForecast, DeployedUnit, GameState, IntelE
 
 const initialUnits: DeployedUnit[] = [
   { id: "seed-radar-kyiv", kind: "radar", cityId: "kyiv", readiness: 86 },
-  { id: "seed-short-kyiv", kind: "short", cityId: "kyiv", readiness: 84 },
-  { id: "seed-mobile-dnipro", kind: "mobile", cityId: "dnipro", readiness: 82 },
-  { id: "seed-repair-lviv", kind: "repair", cityId: "lviv", readiness: 88 },
-  { id: "seed-logistics-odesa", kind: "logistics", cityId: "odesa", readiness: 84 },
-  { id: "seed-intel-kharkiv", kind: "intel", cityId: "kharkiv", readiness: 86 },
+  { id: "seed-mvg-dnipro", kind: "mvg", cityId: "dnipro", readiness: 82 },
+  { id: "seed-ew-odesa", kind: "ew", cityId: "odesa", readiness: 84 },
+  { id: "seed-manpads-kharkiv", kind: "manpads", cityId: "kharkiv", readiness: 84 },
 ];
 
 const openingLog: IntelEntry[] = [

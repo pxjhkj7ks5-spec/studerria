@@ -1,5 +1,5 @@
 import { getScenario } from "../data/scenarios";
-import { unitDefinitions } from "../data/units";
+import { getUnitDefinition } from "../data/units";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
 import { buildLogisticsState } from "./logistics";
 import { clamp, createId, pick, weightedChance } from "./math";
@@ -17,7 +17,6 @@ import type {
   LaunchSector,
   LiveThreat,
   ThreatKind,
-  UnitDefinition,
   UnitKind,
 } from "../types/game";
 
@@ -32,11 +31,15 @@ const UKRAINE_BOUNDS = {
 };
 
 const fallbackThreatKinds: ThreatKind[] = ["drone", "ballistic", "cruise", "decoy", "combined", "saturation"];
+const ABSTRACT_KM_PER_DEGREE = 85;
 
-const rangeByTier: Record<DefenseBattery["coverageTier"], number> = {
-  I: 0.85,
-  II: 1.35,
-  III: 1.9,
+const threatFlightDurationMs: Record<ThreatKind, [number, number]> = {
+  drone: [120000, 180000],
+  ballistic: [20000, 40000],
+  cruise: [70000, 110000],
+  decoy: [120000, 180000],
+  combined: [70000, 110000],
+  saturation: [130000, 190000],
 };
 
 function cloneState(state: GameState): GameState {
@@ -103,12 +106,6 @@ function pushLog(entries: IntelEntry[], elapsedMs: number, title: string, body: 
   entries.splice(30);
 }
 
-function getUnitDefinition(kind: UnitKind): UnitDefinition {
-  const unit = unitDefinitions.find((item) => item.kind === kind);
-  if (!unit) throw new Error(`Unknown unit kind: ${kind}`);
-  return unit;
-}
-
 function nearestCityId(state: GameState, position: Coordinates): CityId {
   return state.cities
     .map((city) => ({
@@ -125,10 +122,14 @@ export function quantizePlacement(position: Coordinates): Coordinates {
   };
 }
 
-function batteryTier(unit: UnitDefinition): DefenseBattery["coverageTier"] {
-  if (unit.rangeLevel >= 3) return "III";
-  if (unit.rangeLevel >= 2) return "II";
+function batteryTier(unit: ReturnType<typeof getUnitDefinition>): DefenseBattery["coverageTier"] {
+  if (unit.outerRangeKm >= 75) return "III";
+  if (unit.outerRangeKm >= 35) return "II";
   return "I";
+}
+
+function coverageRadiusFromUnit(unit: ReturnType<typeof getUnitDefinition>) {
+  return clamp(unit.outerRangeKm / ABSTRACT_KM_PER_DEGREE, 0.1, 2.1);
 }
 
 export function placeBattery(state: GameState, kind: UnitKind, position: Coordinates, random: () => number = Math.random): GameState {
@@ -145,14 +146,17 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     kind,
     position: quantized,
     coverageTier: tier,
-    coverageRadius: rangeByTier[tier],
+    coverageRadius: coverageRadiusFromUnit(unit),
     readiness: unit.readiness,
     fatigue: 8,
     daysSinceMaintenance: 0,
     lastAction: "placed",
+    lastEngagementResult: unit.engagementMode === "detect" ? "tracking only" : "ready",
     status: "ready",
     supplyStatus: "strained",
     cooldownMs: next.planningActions.selected.includes("rapid-redeployment") ? 900 : 0,
+    reloadRemainingMs: 0,
+    currentAmmo: unit.ammoCapacity,
     assignedCityId: nearestCityId(next, quantized),
   };
   if (next.planningActions.selected.includes("rapid-redeployment")) {
@@ -198,6 +202,10 @@ function abstractDistance(left: Coordinates, right: Coordinates) {
   return Math.sqrt(lat * lat + lng * lng);
 }
 
+function abstractDistanceKm(left: Coordinates, right: Coordinates) {
+  return abstractDistance(left, right) * ABSTRACT_KM_PER_DEGREE;
+}
+
 function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () => number): LaunchSector {
   const matching = sectors.filter((sector) => sector.supports.includes(kind));
   if (matching.length) return pick(matching, random);
@@ -233,14 +241,8 @@ function spawnThreat(state: GameState, random: () => number): LiveThreat {
     combined: 56,
     saturation: 48,
   };
-  const speed: Record<ThreatKind, number> = {
-    drone: 0.0000049,
-    ballistic: 0.0000076,
-    cruise: 0.0000061,
-    decoy: 0.0000054,
-    combined: 0.0000064,
-    saturation: 0.0000048,
-  };
+  const durationWindow = threatFlightDurationMs[kind];
+  const flightDurationMs = durationWindow[0] + random() * (durationWindow[1] - durationWindow[0]);
   const falseTrack = kind === "decoy" || random() < (plan?.deception || 0) * 0.045;
   return {
     id: createId("live-threat", Math.floor(state.elapsedMs), random),
@@ -253,7 +255,7 @@ function spawnThreat(state: GameState, random: () => number): LiveThreat {
     launchSectorId: launchSector.id,
     launchSectorName: launchSector.name,
     progress: 0,
-    speed: speed[kind] * (0.9 + random() * 0.2),
+    speed: 1 / flightDurationMs,
     difficulty: difficulty[kind] * launchSector.pressure + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
     damage: falseTrack ? 0 : 9 + random() * 17 + (plan?.intensity || 1),
     detected: false,
@@ -285,11 +287,12 @@ function detectThreats(state: GameState, random: () => number) {
     const position = threatPosition(threat);
     const detectionScore = state.batteries.reduce((score, battery) => {
       const unit = getUnitDefinition(battery.kind);
-      if (battery.status === "maintenance") return score;
-      const distance = abstractDistance(position, battery.position);
-      if (distance > battery.coverageRadius * 1.25) return score;
+      if (battery.status === "maintenance" || battery.status === "reloading") return score;
+      const distanceKm = abstractDistanceKm(position, battery.position);
+      if (distanceKm > unit.outerRangeKm * 1.15) return score;
       const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
-      return score + unit.detectionBonus * (battery.readiness / 100) * statusPenalty * (1 - distance / (battery.coverageRadius * 1.35));
+      const rangeFactor = 1 - distanceKm / (unit.outerRangeKm * 1.25);
+      return score + unit.detectionBonus * (battery.readiness / 100) * statusPenalty * Math.max(0.12, rangeFactor);
     }, highAlert ? 28 : 16);
     const confidenceBoost = (highAlert ? 0.028 : 0.018) + (intelFocus ? 0.012 : 0);
     threat.confidence = clamp(threat.confidence + Math.max(0.2, detectionScore * confidenceBoost), 0, 100);
@@ -331,41 +334,108 @@ function updateShots(state: GameState, deltaMs: number) {
   }
 }
 
+function hasLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery) {
+  if (unit.engagementMode === "detect") return false;
+  if (unit.ammoCapacity === "infinite") return true;
+  return typeof battery.currentAmmo === "number" && battery.currentAmmo > 0;
+}
+
+function consumeLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery) {
+  if (unit.ammoCapacity === "infinite") {
+    battery.currentAmmo = "infinite";
+    return;
+  }
+  if (typeof battery.currentAmmo !== "number") {
+    battery.currentAmmo = unit.ammoCapacity;
+  }
+  battery.currentAmmo = Math.max(0, battery.currentAmmo - Math.max(1, unit.salvoSize));
+  if (battery.currentAmmo === 0) {
+    battery.status = "reloading";
+    battery.reloadRemainingMs = unit.reloadMs;
+    battery.lastAction = "reloading";
+    battery.lastEngagementResult = "empty - reloading";
+  }
+}
+
+function setShotCooldown(battery: DefenseBattery, unit: ReturnType<typeof getUnitDefinition>, random: () => number, outerBand: boolean) {
+  const bandMultiplier = outerBand ? 1.32 : 1;
+  const jitter = 0.86 + random() * 0.28;
+  battery.cooldownMs = Math.max(750, unit.shotCooldownMs * bandMultiplier * jitter);
+}
+
+function threatPriority(kind: ThreatKind) {
+  if (kind === "ballistic") return 30;
+  if (kind === "cruise" || kind === "combined") return 22;
+  if (kind === "saturation") return 18;
+  if (kind === "drone") return 14;
+  return 8;
+}
+
+function engagementChance(
+  unit: ReturnType<typeof getUnitDefinition>,
+  battery: DefenseBattery,
+  threat: LiveThreat,
+  distanceKm: number,
+  conserveAmmo: boolean,
+) {
+  const base = unit.engagementChanceByThreat[threat.kind] || 0;
+  if (base <= 0 || distanceKm > unit.outerRangeKm) return 0;
+  const inPrimaryBand = distanceKm <= unit.primaryRangeKm;
+  const bandAccuracy = inPrimaryBand ? unit.primaryAccuracy : unit.outerAccuracy;
+  const statusPenalty = battery.status === "exhausted" ? 0.46 : battery.status === "strained" ? 0.74 : 1;
+  const readinessFactor = 0.42 + (battery.readiness / 100) * 0.58;
+  const fatiguePenalty = clamp(battery.fatigue * 0.18, 0, 18);
+  const confidenceFactor = threat.confidence < 35 ? 0.72 : threat.confidence < 58 ? 0.86 : 1;
+  const saturationPenalty = Math.max(0, threat.saturation - 1) * 8;
+  const conservePenalty = conserveAmmo ? 7 : 0;
+  return clamp(
+    (base * 0.68 + bandAccuracy * 0.32) * readinessFactor * statusPenalty * confidenceFactor
+      - fatiguePenalty
+      - saturationPenalty
+      - conservePenalty,
+    0,
+    98,
+  );
+}
+
 function engageThreats(state: GameState, random: () => number) {
   const conserveAmmo = state.planningActions.selected.includes("conserve-ammo");
   for (const battery of state.batteries) {
     const unit = getUnitDefinition(battery.kind);
-    const ammoUse = Math.max(1, Math.round(unit.ammoUse * (conserveAmmo ? 0.62 : 1)));
     if (
-      unit.interceptionPower <= 0
+      unit.engagementMode === "detect"
       || battery.cooldownMs > 0
       || battery.status === "maintenance"
-      || state.resources.ammo < ammoUse
+      || battery.status === "reloading"
+      || !hasLocalAmmo(unit, battery)
     ) continue;
     const candidate = state.liveThreats
       .filter((threat) => threat.detected && threat.status !== "engaged")
-      .map((threat) => ({ threat, distance: abstractDistance(threatPosition(threat), battery.position) }))
-      .filter((entry) => entry.distance <= battery.coverageRadius)
-      .sort((left, right) => right.threat.progress - left.threat.progress)[0];
+      .map((threat) => {
+        const distanceKm = abstractDistanceKm(threatPosition(threat), battery.position);
+        const chance = engagementChance(unit, battery, threat, distanceKm, conserveAmmo);
+        return { threat, distanceKm, chance, outerBand: distanceKm > unit.primaryRangeKm };
+      })
+      .filter((entry) => entry.chance > 0)
+      .sort((left, right) => {
+        const leftScore = threatPriority(left.threat.kind) + left.threat.progress * 42 + left.chance * 0.18;
+        const rightScore = threatPriority(right.threat.kind) + right.threat.progress * 42 + right.chance * 0.18;
+        return rightScore - leftScore;
+      })[0];
     if (!candidate) continue;
 
-    const statusPenalty = battery.status === "exhausted" ? 0.44 : battery.status === "strained" ? 0.72 : 1;
-    const chance = unit.interceptionPower * (battery.readiness / 100) * statusPenalty
-      - candidate.threat.difficulty * 0.24
-      - candidate.threat.saturation * 4
-      + (1 - candidate.distance / battery.coverageRadius) * 18
-      - (conserveAmmo ? 8 : 0);
-    if (!weightedChance(chance, random)) {
-      battery.cooldownMs = 1100;
-      applyEngagementFatigue(battery, ammoUse, false);
+    consumeLocalAmmo(unit, battery);
+    setShotCooldown(battery, unit, random, candidate.outerBand);
+    if (!weightedChance(candidate.chance, random)) {
+      battery.lastEngagementResult = `missed ${candidate.threat.kind} (${Math.round(candidate.chance)}%)`;
+      applyEngagementFatigue(battery, unit.engagementMode === "disrupt" ? 0 : unit.salvoSize, false);
       continue;
     }
 
     candidate.threat.status = "engaged";
     candidate.threat.confidence = clamp(candidate.threat.confidence + 18, 0, 100);
-    state.resources.ammo = clamp(state.resources.ammo - ammoUse, 0, 999);
-    battery.cooldownMs = 2600 + ammoUse * 180;
-    applyEngagementFatigue(battery, ammoUse, true);
+    battery.lastEngagementResult = `${unit.engagementMode === "disrupt" ? "suppressed" : "hit"} ${candidate.threat.kind} (${Math.round(candidate.chance)}%)`;
+    applyEngagementFatigue(battery, unit.engagementMode === "disrupt" ? 0 : unit.salvoSize, true);
     state.interceptorShots.push({
       id: createId("shot", Math.floor(state.elapsedMs), random),
       batteryId: battery.id,
@@ -375,7 +445,7 @@ function engageThreats(state: GameState, random: () => number) {
       progress: 0,
       speed: 0.0017,
     });
-    pushLog(state.log, state.elapsedMs, "Engagement", `${unit.shortName} fired inside Coverage ${battery.coverageTier}.`, "info");
+    pushLog(state.log, state.elapsedMs, "Engagement", `${unit.shortName} engaged a ${candidate.threat.kind} track at ${Math.round(candidate.chance)}% confidence-adjusted chance.`, "info");
   }
 }
 
@@ -411,11 +481,26 @@ function updateThreats(state: GameState, deltaMs: number) {
 
 function updateResourcesAndTimers(state: GameState, deltaMs: number) {
   state.logistics = buildLogisticsState(state);
-  const repairKinds = new Set(state.batteries.filter((battery) => battery.kind === "repair").map((battery) => battery.assignedCityId));
   for (const battery of state.batteries) {
+    const unit = getUnitDefinition(battery.kind);
+    if (battery.currentAmmo === undefined || battery.currentAmmo === null) {
+      battery.currentAmmo = unit.ammoCapacity;
+    }
+    if (battery.reloadRemainingMs === undefined || battery.reloadRemainingMs === null) {
+      battery.reloadRemainingMs = 0;
+    }
     battery.cooldownMs = Math.max(0, battery.cooldownMs - deltaMs);
+    if (battery.status === "reloading") {
+      battery.reloadRemainingMs = Math.max(0, battery.reloadRemainingMs - deltaMs);
+      if (battery.reloadRemainingMs <= 0) {
+        battery.currentAmmo = unit.ammoCapacity;
+        battery.lastAction = "reload complete";
+        battery.lastEngagementResult = "reloaded";
+        battery.status = "ready";
+      }
+    }
     battery.supplyStatus = state.logistics.unitSupply[battery.id] || "strained";
-    recoverReadiness(battery, deltaMs, repairKinds.has(battery.assignedCityId), battery.supplyStatus);
+    recoverReadiness(battery, deltaMs, false, battery.supplyStatus);
     if (state.planningActions.selected.includes("high-alert")) {
       battery.fatigue = clamp(battery.fatigue + deltaMs * 0.00009, 0, 100);
     }

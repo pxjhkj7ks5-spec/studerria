@@ -2,7 +2,7 @@ import type { DefenseBattery, SupplyStatus, UnitKind, UnitStatus } from "../type
 import { clamp } from "./math";
 
 export function deriveUnitStatus(battery: Pick<DefenseBattery, "readiness" | "fatigue" | "status">): UnitStatus {
-  if (battery.status === "maintenance" || battery.status === "redeploying") return battery.status;
+  if (battery.status === "maintenance" || battery.status === "redeploying" || battery.status === "reloading") return battery.status;
   if (battery.fatigue >= 82 || battery.readiness < 38) return "exhausted";
   if (battery.fatigue >= 58 || battery.readiness < 62) return "strained";
   return "ready";
@@ -36,6 +36,9 @@ export function recoverReadiness(battery: DefenseBattery, deltaMs: number, nearb
   const fatigueDrop = deltaMs * (maintenance ? 0.0012 : 0.00024) * supplyBonus * repairBonus;
   battery.readiness = clamp(battery.readiness + readinessGain, 8, 100);
   battery.fatigue = clamp(battery.fatigue - fatigueDrop, 0, 100);
+  if (battery.status === "reloading") {
+    return;
+  }
   if (battery.status === "redeploying" && battery.cooldownMs <= 0) {
     battery.status = deriveUnitStatus({ ...battery, status: "ready" });
   } else if (!maintenance) {
@@ -51,5 +54,5 @@ export function enterMaintenance(battery: DefenseBattery) {
 }
 
 export function isMobileKind(kind: UnitKind) {
-  return kind === "mobile" || kind === "short" || kind === "repair" || kind === "decoy";
+  return kind === "mvg" || kind === "boat" || kind === "ew" || kind === "manpads" || kind === "gepard";
 }

@@ -11,13 +11,16 @@ export type InfrastructureKind = "energy" | "logistics" | "industry" | "communic
 
 export type UnitKind =
   | "radar"
-  | "mobile"
-  | "short"
-  | "medium"
-  | "repair"
-  | "logistics"
-  | "intel"
-  | "decoy";
+  | "mvg"
+  | "boat"
+  | "ew"
+  | "manpads"
+  | "gepard"
+  | "buk"
+  | "s300"
+  | "iris-t"
+  | "nasams"
+  | "patriot";
 
 export type ThreatKind = "drone" | "ballistic" | "cruise" | "decoy" | "combined" | "saturation";
 
@@ -54,7 +57,7 @@ export type PlanningActionId =
   | "rapid-redeployment"
   | "intelligence-focus";
 
-export type UnitStatus = "ready" | "strained" | "exhausted" | "maintenance" | "redeploying";
+export type UnitStatus = "ready" | "strained" | "exhausted" | "maintenance" | "redeploying" | "reloading";
 
 export type SupplyStatus = "well-supplied" | "strained" | "undersupplied";
 
@@ -89,11 +92,22 @@ export interface UnitDefinition {
   name: string;
   shortName: string;
   cost: number;
+  costLabel: string;
   upkeep: number;
   rangeLevel: number;
   detectionBonus: number;
   interceptionPower: number;
   ammoUse: number;
+  ammoCapacity: number | "infinite";
+  reloadMs: number;
+  shotCooldownMs: number;
+  salvoSize: number;
+  primaryRangeKm: number;
+  outerRangeKm: number;
+  primaryAccuracy: number;
+  outerAccuracy: number;
+  engagementMode: "detect" | "kinetic" | "disrupt";
+  engagementChanceByThreat: Record<ThreatKind, number>;
   mobility: number;
   readiness: number;
   repairEffect?: number;
@@ -118,9 +132,12 @@ export interface DefenseBattery {
   fatigue: number;
   daysSinceMaintenance: number;
   lastAction: string;
+  lastEngagementResult: string;
   status: UnitStatus;
   supplyStatus: SupplyStatus;
   cooldownMs: number;
+  reloadRemainingMs: number;
+  currentAmmo: number | "infinite";
   assignedCityId: CityId;
 }
 

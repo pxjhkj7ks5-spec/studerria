@@ -129,7 +129,7 @@ function resolveThreat(state: GameState, threat: Threat, random: () => number) {
     const definition = getUnitDefinition(unit.kind);
     return score + definition.interceptionPower * (unit.readiness / 100);
   }, 0);
-  const decoyBuffer = cityUnits.some((unit) => unit.kind === "decoy") ? 8 : 0;
+  const decoyBuffer = cityUnits.some((unit) => unit.kind === "ew") ? 8 : 0;
   const interceptionChance = detected
     ? interceptionPower * ammoRatio + decoyBuffer - threat.difficulty - (threat.saturation - 1) * 18
     : decoyBuffer - threat.difficulty * 0.6;
@@ -178,20 +178,12 @@ function resolveThreat(state: GameState, threat: Threat, random: () => number) {
 }
 
 function applyRepairs(state: GameState) {
-  for (const unit of state.units) {
-    if (unit.kind !== "repair") continue;
-    const definition = getUnitDefinition(unit.kind);
-    const targetCity = getCity(state, unit.cityId);
-    const localNodes = state.infrastructure.filter((node) => node.cityId === unit.cityId);
-    const weakestNode = localNodes.sort((left, right) => left.integrity - right.integrity)[0];
-    const repairAmount = (definition.repairEffect || 0) * (unit.readiness / 100);
-
-    targetCity.damage = clamp(targetCity.damage - repairAmount * 0.4);
-    targetCity.infrastructure = clamp(targetCity.infrastructure + repairAmount * 0.25);
-    targetCity.energy = clamp(targetCity.energy + repairAmount * 0.2);
-    if (weakestNode) {
-      weakestNode.integrity = clamp(weakestNode.integrity + repairAmount);
-    }
+  for (const city of state.cities) {
+    const localLogistics = state.infrastructure.find((node) => node.cityId === city.id && node.kind === "logistics");
+    const repairAmount = localLogistics ? Math.max(0, localLogistics.integrity - 45) * 0.025 : 0.6;
+    city.damage = clamp(city.damage - repairAmount * 0.4);
+    city.infrastructure = clamp(city.infrastructure + repairAmount * 0.2);
+    city.energy = clamp(city.energy + repairAmount * 0.16);
   }
 }
 
@@ -210,11 +202,10 @@ function applyRandomEvent(state: GameState, random: () => number) {
 function applyResourceProduction(state: GameState) {
   const averageNodeIntegrity = state.infrastructure.reduce((sum, node) => sum + node.integrity, 0)
     / state.infrastructure.length;
-  const logisticsBonus = state.units.reduce((sum, unit) => {
-    if (unit.kind !== "logistics") return sum;
-    const definition = getUnitDefinition(unit.kind);
-    return sum + (definition.logisticsEffect || 0) * (unit.readiness / 100);
-  }, 0);
+  const logisticsNodes = state.infrastructure.filter((node) => node.kind === "logistics");
+  const logisticsBonus = logisticsNodes.length
+    ? logisticsNodes.reduce((sum, node) => sum + node.integrity, 0) / logisticsNodes.length / 12
+    : 0;
   const upkeep = state.units.reduce((sum, unit) => sum + getUnitDefinition(unit.kind).upkeep, 0);
 
   state.resources.budget = clamp(state.resources.budget + 20 + averageNodeIntegrity / 12 + logisticsBonus - upkeep, 0, 999);
@@ -226,7 +217,7 @@ function applyResourceProduction(state: GameState) {
 
 function updateReadiness(state: GameState) {
   state.units = state.units.map((unit) => {
-    const localLogistics = state.units.some((candidate) => candidate.cityId === unit.cityId && candidate.kind === "logistics");
+    const localLogistics = state.infrastructure.some((node) => node.cityId === unit.cityId && node.kind === "logistics" && node.integrity > 55);
     const recovery = localLogistics ? 5 : 2;
     return { ...unit, readiness: clamp(unit.readiness + recovery, 35, 100) };
   });

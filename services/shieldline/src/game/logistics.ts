@@ -25,16 +25,6 @@ export function buildLogisticsState(state: GameState): LogisticsState {
         cityId: node.cityId,
         source: "infrastructure" as const,
       })),
-    ...state.batteries
-      .filter((battery) => battery.kind === "logistics")
-      .map((battery) => ({
-        id: battery.id,
-        name: "Field Logistics Hub",
-        position: battery.position,
-        strength: battery.readiness,
-        cityId: battery.assignedCityId,
-        source: "battery" as const,
-      })),
   ];
 
   const citySupply: LogisticsState["citySupply"] = {};

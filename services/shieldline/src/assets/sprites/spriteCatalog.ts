@@ -9,16 +9,17 @@ import impactEvent from "./icons/impact-event.png";
 import interceptedThreat from "./icons/intercepted-threat.png";
 import interceptorShot from "./icons/interceptor-shot.png";
 import unknownTrack from "./icons/unknown-track.png";
-import decoyUnit from "./units/decoy.png";
-import gunUnit from "./units/gun.png";
-import intelUnit from "./units/intel.png";
-import logisticsUnit from "./units/logistics.png";
-import logisticsHub from "./units/logistics-hub.png";
-import mediumUnit from "./units/medium.png";
-import mobileUnit from "./units/mobile.png";
+import boatUnit from "./units/boat.png";
+import bukUnit from "./units/buk.png";
+import ewUnit from "./units/ew.png";
+import gepardUnit from "./units/gepard.png";
+import irisTUnit from "./units/iris-t.png";
+import manpadsUnit from "./units/manpads.png";
+import mvgUnit from "./units/mvg.png";
+import nasamsUnit from "./units/nasams.png";
+import patriotUnit from "./units/patriot.png";
 import radarUnit from "./units/radar.png";
-import repairUnit from "./units/repair.png";
-import shortUnit from "./units/short.png";
+import s300Unit from "./units/s300.png";
 import type { ThreatKind, UnitKind } from "../../types/game";
 
 export const threatSprites: Record<ThreatKind, string> = {
@@ -32,18 +33,16 @@ export const threatSprites: Record<ThreatKind, string> = {
 
 export const unitSprites: Record<UnitKind, string> = {
   radar: radarUnit,
-  mobile: mobileUnit,
-  short: shortUnit,
-  medium: mediumUnit,
-  repair: repairUnit,
-  logistics: logisticsHub,
-  intel: intelUnit,
-  decoy: decoyUnit,
-};
-
-export const supportUnitSprites = {
-  gun: gunUnit,
-  logisticsVehicle: logisticsUnit,
+  mvg: mvgUnit,
+  boat: boatUnit,
+  ew: ewUnit,
+  manpads: manpadsUnit,
+  gepard: gepardUnit,
+  buk: bukUnit,
+  s300: s300Unit,
+  "iris-t": irisTUnit,
+  nasams: nasamsUnit,
+  patriot: patriotUnit,
 };
 
 export const markerSprites = {

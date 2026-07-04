@@ -2,6 +2,7 @@ import L from "leaflet";
 import { Circle, Marker, Polyline, TileLayer, Tooltip, MapContainer, useMapEvents } from "react-leaflet";
 import { useMemo } from "react";
 import { markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
+import { getUnitDefinition } from "../data/units";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -127,7 +128,7 @@ function makeLaunchIcon(sector: LaunchSector) {
 function makeSupplyNodeIcon(node: SupplyNode) {
   return L.divIcon({
     className: "",
-    html: imageMarkerHtml(unitSprites.logistics, `map-marker--supply map-marker--supply-${node.source}`),
+    html: imageMarkerHtml(markerSprites.detectedTrack, `map-marker--supply map-marker--supply-${node.source}`),
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   });
@@ -276,7 +277,12 @@ export function TacticalMap() {
           eventHandlers={{ click: () => setSelectedBattery(battery.id) }}
         >
           <Tooltip direction="top" offset={[0, -14]}>
-            Coverage {battery.coverageTier} - readiness {Math.round(battery.readiness)}% - {battery.status}
+            {(() => {
+              const unit = getUnitDefinition(battery.kind);
+              const ammo = battery.currentAmmo === "infinite" ? "∞" : `${battery.currentAmmo}/${unit.ammoCapacity}`;
+              const reload = battery.reloadRemainingMs > 0 ? ` - reload ${Math.ceil(battery.reloadRemainingMs / 1000)}s` : "";
+              return `${unit.shortName} - ${unit.primaryRangeKm}/${unit.outerRangeKm} км - БК ${ammo} - ${Math.round(battery.readiness)}% - ${battery.status}${reload}`;
+            })()}
           </Tooltip>
         </Marker>
       ))}

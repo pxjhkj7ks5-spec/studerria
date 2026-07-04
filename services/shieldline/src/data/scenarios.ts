@@ -1,4 +1,5 @@
 import type { ScenarioDefinition } from "../types/game";
+import { unitKinds } from "./units";
 
 export const scenarios: ScenarioDefinition[] = [
   {
@@ -9,7 +10,7 @@ export const scenarios: ScenarioDefinition[] = [
     difficulty: "training",
     startingResources: { budget: 170, ammo: 125, energy: 88, morale: 84, political: 64 },
     initialCityStateModifiers: {},
-    allowedUnits: ["radar", "mobile", "short", "repair", "logistics", "intel", "decoy"],
+    allowedUnits: unitKinds,
     threatDirectorBias: { probe: 1.35, "decoy-screen": 0.8, combined: 0.45 },
     specialRules: ["Slower escalation", "Higher intelligence confidence"],
     winConditions: ["Keep morale and energy stable through the operation window."],
@@ -27,7 +28,7 @@ export const scenarios: ScenarioDefinition[] = [
       zaporizhzhia: { energy: 68 },
       kharkiv: { energy: 64 },
     },
-    allowedUnits: ["radar", "mobile", "short", "medium", "repair", "logistics", "intel", "decoy"],
+    allowedUnits: unitKinds,
     threatDirectorBias: { infrastructure: 1.45, pressure: 1.15 },
     specialRules: ["Energy repairs have increased value", "Infrastructure strikes are more common"],
     winConditions: ["Prevent national energy stability from collapsing."],
@@ -41,7 +42,7 @@ export const scenarios: ScenarioDefinition[] = [
     difficulty: "standard",
     startingResources: { budget: 140, ammo: 105, energy: 80, morale: 76, political: 48 },
     initialCityStateModifiers: {},
-    allowedUnits: ["radar", "mobile", "short", "medium", "repair", "logistics", "intel", "decoy"],
+    allowedUnits: unitKinds,
     threatDirectorBias: { "decoy-screen": 1.65, probe: 1.15, saturation: 1.1 },
     specialRules: ["More low-confidence tracks", "Intelligence Focus has stronger value"],
     winConditions: ["Maintain confidence and avoid wasting all ammunition."],
@@ -58,7 +59,7 @@ export const scenarios: ScenarioDefinition[] = [
       odesa: { infrastructure: 66 },
       mykolaiv: { infrastructure: 64 },
     },
-    allowedUnits: ["radar", "mobile", "short", "medium", "repair", "logistics", "intel", "decoy"],
+    allowedUnits: unitKinds,
     threatDirectorBias: { infrastructure: 1.2, saturation: 1.25, pressure: 1.2 },
     specialRules: ["Supply delays are more punishing", "Logistics hubs are high value"],
     winConditions: ["Keep supply routes functional through the campaign."],
@@ -72,7 +73,7 @@ export const scenarios: ScenarioDefinition[] = [
     difficulty: "endurance",
     startingResources: { budget: 125, ammo: 88, energy: 78, morale: 72, political: 46 },
     initialCityStateModifiers: {},
-    allowedUnits: ["radar", "mobile", "short", "medium", "repair", "logistics", "intel", "decoy"],
+    allowedUnits: unitKinds,
     threatDirectorBias: { pressure: 1.2, combined: 1.15, saturation: 1.1 },
     specialRules: ["Late-cycle combined attacks unlock sooner", "Fatigue management is decisive"],
     winConditions: ["Survive all operation cycles with morale, energy, and critical systems intact."],

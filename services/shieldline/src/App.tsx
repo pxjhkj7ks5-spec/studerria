@@ -13,8 +13,9 @@ import { TutorialOverlay } from "./components/TutorialOverlay";
 import { UnitRail } from "./components/UnitRail";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { getScenario } from "./data/scenarios";
+import { getUnitDefinition } from "./data/units";
 import { useGameStore } from "./store/useGameStore";
-import type { MapMode } from "./types/game";
+import type { MapMode, ThreatKind } from "./types/game";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "live", label: "Live" },
@@ -22,6 +23,23 @@ const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "coverage", label: "Coverage" },
   { id: "logistics", label: "Logistics" },
 ];
+
+const threatLabels: Array<{ kind: ThreatKind; label: string }> = [
+  { kind: "drone", label: "Drone" },
+  { kind: "cruise", label: "Cruise" },
+  { kind: "ballistic", label: "Ballistic" },
+  { kind: "decoy", label: "Decoy" },
+];
+
+function formatAmmo(current: number | "infinite", capacity: number | "infinite") {
+  if (capacity === "infinite" || current === "infinite") return "∞";
+  return `${current}/${capacity}`;
+}
+
+function formatSeconds(ms: number) {
+  if (ms <= 0) return "ready";
+  return `${Math.ceil(ms / 1000)}s`;
+}
 
 export default function App() {
   const game = useGameStore((state) => state.game);
@@ -45,6 +63,7 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false);
   const selectedCity = game.cities.find((city) => city.id === selectedCityId) || game.cities[0];
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
+  const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
   const scenario = getScenario(game.scenarioId);
   const lastTickRef = useRef<number | null>(null);
@@ -126,18 +145,41 @@ export default function App() {
           </div>
         ) : null}
         {selectedBattery ? (
-          <section className="live-card" aria-label="Selected defense unit">
-            <Crosshair size={22} />
-            <div>
-              <strong>Selected ППО</strong>
-              <span>
-                Coverage {selectedBattery.coverageTier} · readiness {Math.round(selectedBattery.readiness)}%
-                {" · "}fatigue {Math.round(selectedBattery.fatigue)}% · {selectedBattery.status}
-                {" · "}{selectedBattery.supplyStatus}
-              </span>
+          <section className="selected-unit-card" aria-label="Selected defense unit">
+            <div className="selected-unit-card__head">
+              <Crosshair size={22} />
+              <div>
+                <strong>{selectedUnit?.name || "Selected ППО"}</strong>
+                <span>{selectedBattery.status} · {selectedBattery.supplyStatus} · last: {selectedBattery.lastEngagementResult}</span>
+              </div>
             </div>
-            <button type="button" onClick={startSelectedBatteryMaintenance} disabled={selectedBattery.status === "maintenance"}>Maintain</button>
-            <button type="button" onClick={removeSelectedBattery}>Recall</button>
+            {selectedUnit ? (
+              <>
+                <div className="selected-unit-grid">
+                  <span><b>{selectedUnit.primaryRangeKm} км</b> primary</span>
+                  <span><b>{selectedUnit.outerRangeKm} км</b> outer</span>
+                  <span><b>{formatAmmo(selectedBattery.currentAmmo, selectedUnit.ammoCapacity)}</b> БК</span>
+                  <span><b>{formatSeconds(selectedBattery.reloadRemainingMs)}</b> reload</span>
+                  <span><b>{formatSeconds(selectedBattery.cooldownMs)}</b> cooldown</span>
+                  <span><b>{Math.round(selectedBattery.readiness)}%</b> readiness</span>
+                  <span><b>{Math.round(selectedBattery.fatigue)}%</b> fatigue</span>
+                  <span><b>{selectedUnit.primaryAccuracy}%</b> primary acc</span>
+                  <span><b>{selectedUnit.outerAccuracy}%</b> outer acc</span>
+                </div>
+                <div className="chance-grid" aria-label="Threat-specific hit chances">
+                  {threatLabels.map(({ kind, label }) => (
+                    <span key={kind}>
+                      <b>{Math.round(selectedUnit.engagementChanceByThreat[kind])}%</b>
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            <div className="selected-unit-card__actions">
+              <button type="button" onClick={startSelectedBatteryMaintenance} disabled={selectedBattery.status === "maintenance" || selectedBattery.status === "reloading"}>Maintain</button>
+              <button type="button" onClick={removeSelectedBattery}>Recall</button>
+            </div>
           </section>
         ) : (
           <section className="live-card" aria-label="Live simulation status">
