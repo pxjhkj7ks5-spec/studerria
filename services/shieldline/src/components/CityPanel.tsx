@@ -1,4 +1,4 @@
-import { Factory, Radio, ShieldAlert, Zap } from "lucide-react";
+import { Factory, Radio, ShieldAlert, Truck, Users, Wrench, Zap } from "lucide-react";
 import type { City, GameState } from "../types/game";
 
 interface CityPanelProps {
@@ -8,7 +8,11 @@ interface CityPanelProps {
 
 export function CityPanel({ city, game }: CityPanelProps) {
   const cityUnits = game.batteries.filter((unit) => unit.assignedCityId === city.id);
-  const nodeCount = game.infrastructure.filter((node) => node.cityId === city.id).length;
+  const cityNodes = game.infrastructure.filter((node) => node.cityId === city.id);
+  const communications = averageKind(cityNodes, "communications", city.infrastructure);
+  const logistics = averageKind(cityNodes, "logistics", city.infrastructure);
+  const repairCapacity = Math.max(12, Math.round((city.infrastructure + logistics - city.damage) / 2));
+  const risk = city.damage > 55 ? "Critical" : city.energy < 45 || city.infrastructure < 50 ? "Stressed" : "Stable";
 
   return (
     <section className="city-panel" aria-label={`${city.name} status`}>
@@ -16,36 +20,48 @@ export function CityPanel({ city, game }: CityPanelProps) {
         <span>Selected City</span>
         <strong>{city.name}</strong>
       </div>
-      <div className="city-grid">
-        <Metric icon={Factory} label="Infra" value={city.infrastructure} />
+      <div className={`city-posture city-posture--${risk.toLowerCase()}`}>
+        <ShieldAlert size={17} />
+        <span>{risk} posture</span>
+        <strong>{cityUnits.length} ППО nearby</strong>
+      </div>
+      <div className="city-systems">
+        <Metric icon={Factory} label="Infrastructure" value={city.infrastructure} />
         <Metric icon={Zap} label="Energy" value={city.energy} />
-        <Metric icon={ShieldAlert} label="Damage" value={city.damage} invert />
-        <Metric icon={Radio} label="Nodes" value={nodeCount} raw />
+        <Metric icon={Radio} label="Comms" value={communications} />
+        <Metric icon={Truck} label="Logistics" value={logistics} />
+        <Metric icon={Users} label="Civil morale" value={city.morale} />
+        <Metric icon={Wrench} label="Repair cap" value={repairCapacity} />
       </div>
       <div className="assigned-row">
-        <span>{cityUnits.length} ППО units nearby</span>
-        <small>placement clicks are abstracted</small>
+        <span>{cityNodes.length} infrastructure nodes</span>
+        <small>abstract sector placement</small>
       </div>
     </section>
   );
+}
+
+function averageKind(nodes: GameState["infrastructure"], kind: GameState["infrastructure"][number]["kind"], fallback: number) {
+  const matching = nodes.filter((node) => node.kind === kind);
+  if (!matching.length) return fallback;
+  return matching.reduce((sum, node) => sum + node.integrity, 0) / matching.length;
 }
 
 interface MetricProps {
   icon: typeof Factory;
   label: string;
   value: number;
-  raw?: boolean;
-  invert?: boolean;
 }
 
-function Metric({ icon: Icon, label, value, raw = false, invert = false }: MetricProps) {
-  const level = invert ? 100 - value : value;
+function Metric({ icon: Icon, label, value }: MetricProps) {
+  const rounded = Math.round(value);
+  const tone = rounded < 40 ? "danger" : rounded < 65 ? "warning" : "stable";
   return (
-    <div className="city-metric">
-      <Icon size={16} />
+    <div className={`city-metric city-metric--${tone}`}>
+      <Icon size={15} />
       <span>{label}</span>
-      <strong>{raw ? value : `${Math.round(value)}%`}</strong>
-      {!raw ? <i style={{ width: `${Math.max(4, Math.min(100, level))}%` }} /> : null}
+      <strong>{rounded}%</strong>
+      <i style={{ width: `${Math.max(4, Math.min(100, rounded))}%` }} />
     </div>
   );
 }

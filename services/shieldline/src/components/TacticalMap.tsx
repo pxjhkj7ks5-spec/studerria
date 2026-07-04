@@ -90,6 +90,19 @@ function imageMarkerHtml(src: string, className: string) {
   return `<span class="map-marker map-marker--image ${className}"><img src="${src}" alt="" draggable="false" /></span>`;
 }
 
+function threatTone(threat: LiveThreat) {
+  if (threat.kind === "decoy") return "decoy";
+  if (threat.status === "engaged") return "confirmed";
+  if (threat.detected || threat.confidence >= 55) return "detected";
+  return "uncertain";
+}
+
+function threatLabel(threat: LiveThreat) {
+  const tone = threatTone(threat);
+  const label = tone === "confirmed" ? "confirmed" : tone === "detected" ? "detected" : tone === "decoy" ? "possible decoy" : "uncertain";
+  return `<span class="threat-confidence threat-confidence--${tone}">${label} ${Math.round(threat.confidence)}%</span>`;
+}
+
 function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
   return L.divIcon({
     className: "",
@@ -100,10 +113,11 @@ function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
 }
 
 function makeThreatIcon(threat: LiveThreat) {
+  const tone = threatTone(threat);
   return L.divIcon({
     className: "",
-    html: imageMarkerHtml(threatIcon[threat.kind], `map-marker--threat map-marker--threat-${threat.status}`),
-    iconSize: [34, 34],
+    html: `<span class="threat-marker-wrap">${imageMarkerHtml(threatIcon[threat.kind], `map-marker--threat map-marker--threat-${tone} map-marker--threat-${threat.status}`)}${threatLabel(threat)}</span>`,
+    iconSize: [104, 52],
     iconAnchor: [17, 17],
   });
 }
@@ -154,6 +168,7 @@ export function TacticalMap() {
   const game = useGameStore((state) => state.game);
   const selectedCityId = useGameStore((state) => state.selectedCityId);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
+  const mapMode = useGameStore((state) => state.mapMode);
   const setSelectedCity = useGameStore((state) => state.setSelectedCity);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
 
@@ -194,15 +209,21 @@ export function TacticalMap() {
       ))}
       {game.liveThreats.map((threat) => {
         const current = threatPosition(threat);
+        const tone = threatTone(threat);
         return (
           <Polyline
             key={`route-${threat.id}`}
             positions={[[current.lat, current.lng], [threat.target.lat, threat.target.lng]]}
-            pathOptions={{ color: threat.detected ? "#ff7777" : "#f2c865", weight: 1, opacity: 0.42, dashArray: "5 7" }}
+            pathOptions={{
+              color: tone === "confirmed" ? "#ff6e6e" : tone === "detected" ? "#f2c865" : tone === "decoy" ? "#a38cff" : "#55d7ff",
+              weight: mapMode === "threats" ? 2 : 1,
+              opacity: mapMode === "coverage" ? 0.18 : 0.48,
+              dashArray: tone === "confirmed" ? "8 4" : "5 7",
+            }}
           />
         );
       })}
-      {game.batteries.map((battery) => (
+      {mapMode !== "threats" ? game.batteries.map((battery) => (
         <Circle
           key={`coverage-${battery.id}`}
           center={[battery.position.lat, battery.position.lng]}
@@ -215,7 +236,20 @@ export function TacticalMap() {
             weight: battery.id === selectedBatteryId ? 2 : 1,
           }}
         />
-      ))}
+      )) : null}
+      {mapMode === "logistics" ? game.infrastructure
+        .filter((node) => node.kind === "logistics")
+        .map((node) => {
+          const city = game.cities.find((item) => item.id === node.cityId);
+          if (!city) return null;
+          return (
+            <Polyline
+              key={`logistics-${node.id}`}
+              positions={[[node.coordinates.lat, node.coordinates.lng], [city.coordinates.lat, city.coordinates.lng]]}
+              pathOptions={{ color: "#78dd9a", weight: 2, opacity: 0.56, dashArray: "2 8" }}
+            />
+          );
+        }) : null}
       {nodeMarkers.map(({ node, icon }) => (
         <Marker
           key={node.id}

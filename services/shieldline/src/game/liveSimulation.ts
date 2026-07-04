@@ -186,6 +186,7 @@ function spawnThreat(state: GameState, random: () => number): LiveThreat {
     difficulty: difficulty[kind] * launchSector.pressure + state.wavePressure * 0.18,
     damage: kind === "decoy" ? 0 : 10 + random() * 18,
     detected: false,
+    confidence: 18 + random() * 24,
     saturation: kind === "saturation" ? 1.7 : kind === "combined" ? 1.25 : 1,
   };
 }
@@ -210,9 +211,11 @@ function detectThreats(state: GameState, random: () => number) {
       if (distance > battery.coverageRadius * 1.25) return score;
       return score + unit.detectionBonus * (battery.readiness / 100) * (1 - distance / (battery.coverageRadius * 1.35));
     }, 16);
+    threat.confidence = clamp(threat.confidence + Math.max(0.25, detectionScore * 0.018), 0, 100);
     if (weightedChance(detectionScore - threat.difficulty * 0.25, random)) {
       threat.detected = true;
       threat.status = "detected";
+      threat.confidence = clamp(threat.confidence + 16 + random() * 16, 0, 100);
       pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.kind} track classified with low-confidence intelligence.`, "info");
     }
   }
@@ -269,6 +272,7 @@ function engageThreats(state: GameState, random: () => number) {
     }
 
     candidate.threat.status = "engaged";
+    candidate.threat.confidence = clamp(candidate.threat.confidence + 18, 0, 100);
     state.resources.ammo = clamp(state.resources.ammo - unit.ammoUse, 0, 999);
     battery.cooldownMs = 2600 + unit.ammoUse * 180;
     battery.readiness = clamp(battery.readiness - 3.5, 35, 100);

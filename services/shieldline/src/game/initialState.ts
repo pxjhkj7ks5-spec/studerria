@@ -1,7 +1,8 @@
 import { initialCities, initialInfrastructure } from "../data/mapData";
 import { initialLaunchSectors } from "../data/launchSectors";
+import { getCampaignModeDefinition } from "../data/campaignModes";
 import { unitDefinitions } from "../data/units";
-import type { DailyForecast, DeployedUnit, GameState, IntelEntry, LiveThreat } from "../types/game";
+import type { CampaignMode, DailyForecast, DeployedUnit, GameState, IntelEntry, LiveThreat } from "../types/game";
 
 const initialUnits: DeployedUnit[] = [
   { id: "seed-radar-kyiv", kind: "radar", cityId: "kyiv", readiness: 86 },
@@ -46,6 +47,7 @@ function createOpeningThreat(): LiveThreat {
     difficulty: 28,
     damage: 12,
     detected: false,
+    confidence: 32,
     saturation: 1,
   };
 }
@@ -71,20 +73,15 @@ export function createForecast(day: number, random: () => number): DailyForecast
   };
 }
 
-export function createInitialState(random: () => number = Math.random): GameState {
+export function createInitialState(random: () => number = Math.random, mode: CampaignMode = "crisis"): GameState {
+  const modeDefinition = getCampaignModeDefinition(mode);
   return {
     day: 1,
     elapsedMs: 0,
     wavePressure: 18,
     status: "active",
     statusReason: "",
-    resources: {
-      budget: 120,
-      ammo: 86,
-      energy: 78,
-      morale: 72,
-      political: 45,
-    },
+    resources: { ...modeDefinition.resources },
     cities: initialCities.map((city) => ({ ...city })),
     infrastructure: initialInfrastructure.map((node) => ({ ...node })),
     launchSectors: initialLaunchSectors.map((sector) => ({

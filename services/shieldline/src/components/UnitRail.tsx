@@ -29,6 +29,12 @@ function coverageLabel(rangeLevel: number) {
   return "I";
 }
 
+function maintenanceRisk(readiness: number) {
+  if (readiness < 70) return "Elevated";
+  if (readiness < 84) return "Moderate";
+  return "Low";
+}
+
 export function UnitRail() {
   const game = useGameStore((state) => state.game);
   const placementKind = useGameStore((state) => state.placementKind);
@@ -55,7 +61,7 @@ export function UnitRail() {
           const readiness = localBattery ? localBattery.readiness : unit.readiness;
 
           return (
-            <article className={`unit-card ${selected ? "unit-card--selected" : ""}`} key={unit.kind}>
+            <article className={`unit-card ${selected ? "unit-card--selected" : ""}`} key={unit.kind} tabIndex={0}>
               <div className="unit-card__top">
                 <Icon size={28} />
                 <span>{owned}</span>
@@ -63,6 +69,12 @@ export function UnitRail() {
               <strong>{unit.name}</strong>
               <p>{unit.description}</p>
               <small>Coverage {coverageLabel(unit.rangeLevel)}</small>
+              <div className="unit-hover-card" role="tooltip">
+                <strong>{unit.shortName} detail</strong>
+                <span>Detection +{unit.detectionBonus} · Intercept {unit.interceptionPower}</span>
+                <span>Ammo use {unit.ammoUse} · Upkeep {unit.upkeep}</span>
+                <span>Mobility {unit.mobility}/4 · Maintenance risk {maintenanceRisk(readiness)}</span>
+              </div>
               <div className="readiness-track" aria-label={`${unit.name} readiness`}>
                 <i style={{ width: `${Math.round(readiness)}%` }} />
               </div>

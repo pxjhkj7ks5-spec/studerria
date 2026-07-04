@@ -29,6 +29,10 @@ export type CoverageTier = "I" | "II" | "III";
 
 export type ThreatStatus = "inbound" | "detected" | "engaged" | "intercepted" | "impact";
 
+export type CampaignMode = "training" | "seven-day" | "crisis" | "sandbox";
+
+export type MapMode = "live" | "threats" | "coverage" | "logistics";
+
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -139,6 +143,7 @@ export interface LiveThreat {
   difficulty: number;
   damage: number;
   detected: boolean;
+  confidence: number;
   saturation: number;
 }
 
