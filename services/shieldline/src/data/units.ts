@@ -7,13 +7,29 @@ const none: Record<ThreatKind, number> = {
   decoy: 0,
   combined: 0,
   saturation: 0,
+  geran2: 0,
+  gerbera: 0,
+  parodiya: 0,
+  kh101: 0,
+  kalibr: 0,
+  iskander: 0,
 };
 
 function chances(values: Partial<Record<ThreatKind, number>>): Record<ThreatKind, number> {
+  const drone = values.drone || 0;
+  const cruise = values.cruise || 0;
+  const ballistic = values.ballistic || 0;
+  const decoy = values.decoy || 0;
   return {
     ...none,
-    combined: values.cruise || 0,
-    saturation: values.drone || 0,
+    combined: cruise,
+    saturation: drone,
+    geran2: drone,
+    gerbera: Math.min(98, drone + (drone ? 5 : 0)),
+    parodiya: decoy || drone,
+    kh101: cruise,
+    kalibr: cruise,
+    iskander: ballistic,
     ...values,
   };
 }
@@ -30,6 +46,7 @@ export const unitKinds: UnitKind[] = [
   "iris-t",
   "nasams",
   "patriot",
+  "drone-operators",
 ];
 
 export const unitDefinitions: UnitDefinition[] = [
@@ -49,7 +66,7 @@ export const unitDefinitions: UnitDefinition[] = [
     shotCooldownMs: 0,
     salvoSize: 0,
     primaryRangeKm: 100,
-    outerRangeKm: 150,
+    outerRangeKm: 100,
     primaryAccuracy: 0,
     outerAccuracy: 0,
     engagementMode: "detect",
@@ -307,6 +324,37 @@ export const unitDefinitions: UnitDefinition[] = [
     mobility: 1,
     readiness: 76,
     description: "Strategic high-cost battery with the best ballistic interception profile.",
+  },
+  {
+    kind: "drone-operators",
+    name: "Interceptor Drone Operators",
+    shortName: "Drone Ops",
+    cost: 30,
+    costLabel: "30 mln UAH",
+    upkeep: 5,
+    rangeLevel: 1,
+    detectionBonus: 5,
+    interceptionPower: 30,
+    ammoUse: 1,
+    ammoCapacity: 6,
+    reloadMs: 35000,
+    shotCooldownMs: 3000,
+    salvoSize: 1,
+    primaryRangeKm: 18,
+    outerRangeKm: 30,
+    primaryAccuracy: 82,
+    outerAccuracy: 44,
+    engagementMode: "kinetic",
+    engagementChanceByThreat: chances({
+      drone: 80,
+      geran2: 78,
+      gerbera: 86,
+      parodiya: 92,
+      decoy: 82,
+    }),
+    mobility: 4,
+    readiness: 82,
+    description: "Small interceptor-drone team for drone-class threats only.",
   },
 ];
 

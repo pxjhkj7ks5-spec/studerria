@@ -25,14 +25,14 @@ const mapModes: Array<{ id: MapMode; label: string }> = [
 ];
 
 const threatLabels: Array<{ kind: ThreatKind; label: string }> = [
-  { kind: "drone", label: "Drone" },
-  { kind: "cruise", label: "Cruise" },
-  { kind: "ballistic", label: "Ballistic" },
-  { kind: "decoy", label: "Decoy" },
+  { kind: "geran2", label: "Geran" },
+  { kind: "gerbera", label: "Gerbera" },
+  { kind: "kh101", label: "X-101" },
+  { kind: "iskander", label: "OTRK" },
 ];
 
 function formatAmmo(current: number | "infinite", capacity: number | "infinite") {
-  if (capacity === "infinite" || current === "infinite") return "∞";
+  if (capacity === "infinite" || current === "infinite") return "inf";
   return `${current}/${capacity}`;
 }
 
@@ -68,6 +68,7 @@ export default function App() {
   const scenario = getScenario(game.scenarioId);
   const lastTickRef = useRef<number | null>(null);
   const accumulatorRef = useRef(0);
+  const revealedThreats = game.liveThreats.filter((threat) => threat.revealed).length;
 
   useEffect(() => {
     if (!campaignMode) return undefined;
@@ -149,16 +150,16 @@ export default function App() {
             <div className="selected-unit-card__head">
               <Crosshair size={22} />
               <div>
-                <strong>{selectedUnit?.name || "Selected ППО"}</strong>
+                <strong>{selectedUnit?.name || "Selected PPO"}</strong>
                 <span>{selectedBattery.status} · {selectedBattery.supplyStatus} · last: {selectedBattery.lastEngagementResult}</span>
               </div>
             </div>
             {selectedUnit ? (
               <>
                 <div className="selected-unit-grid">
-                  <span><b>{selectedUnit.primaryRangeKm} км</b> primary</span>
-                  <span><b>{selectedUnit.outerRangeKm} км</b> outer</span>
-                  <span><b>{formatAmmo(selectedBattery.currentAmmo, selectedUnit.ammoCapacity)}</b> БК</span>
+                  <span><b>{selectedUnit.primaryRangeKm} km</b> primary</span>
+                  <span><b>{selectedUnit.outerRangeKm} km</b> outer</span>
+                  <span><b>{formatAmmo(selectedBattery.currentAmmo, selectedUnit.ammoCapacity)}</b> ammo</span>
                   <span><b>{formatSeconds(selectedBattery.reloadRemainingMs)}</b> reload</span>
                   <span><b>{formatSeconds(selectedBattery.cooldownMs)}</b> cooldown</span>
                   <span><b>{Math.round(selectedBattery.readiness)}%</b> readiness</span>
@@ -185,14 +186,14 @@ export default function App() {
           <section className="live-card" aria-label="Live simulation status">
             <Zap size={22} />
             <div>
-              <strong>{placementKind ? "Click map to place ППО" : "Live Defense Active"}</strong>
-              <span>Targets move continuously. ППО auto-engages inside abstract coverage.</span>
+              <strong>{placementKind ? "Click controlled map area to place PPO" : "Live Defense Active"}</strong>
+              <span>{game.placementWarning || "Targets stay hidden until radar sweep reveals them."}</span>
             </div>
           </section>
         )}
         <div className="live-stats" aria-label="Live defense telemetry">
           <span><strong>{game.day}</strong> Cycle</span>
-          <span><strong>{game.liveThreats.length}</strong> Threats</span>
+          <span><strong>{revealedThreats}</strong> Revealed</span>
           <span><strong>{game.interceptions}</strong> Interceptions</span>
           <span><strong>{game.impacts}</strong> Impacts</span>
           <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>

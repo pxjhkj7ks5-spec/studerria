@@ -14,6 +14,8 @@ export function CityPanel({ city, game }: CityPanelProps) {
   const supplyStatus = game.logistics.citySupply[city.id] || "strained";
   const repairCapacity = Math.max(12, Math.round((city.infrastructure + logistics - city.damage) / 2));
   const risk = city.damage > 55 ? "Critical" : city.energy < 45 || city.infrastructure < 50 ? "Stressed" : "Stable";
+  const alertState = city.alertState || "calm";
+  const alertLabel = alertState === "air-raid" ? "Air raid" : alertState === "probable-target" ? "Probable target" : "Calm";
 
   return (
     <section className="city-panel" aria-label={`${city.name} status`}>
@@ -24,7 +26,11 @@ export function CityPanel({ city, game }: CityPanelProps) {
       <div className={`city-posture city-posture--${risk.toLowerCase()}`}>
         <ShieldAlert size={17} />
         <span>{risk} posture</span>
-        <strong>{cityUnits.length} ППО nearby</strong>
+        <strong>{cityUnits.length} PPO nearby</strong>
+      </div>
+      <div className={`city-alert-state city-alert-state--${alertState}`}>
+        <span>{alertLabel}</span>
+        <strong>{alertState === "calm" ? "No active track nearby" : "Command alert active"}</strong>
       </div>
       <div className="city-systems">
         <Metric icon={Factory} label="Infrastructure" value={city.infrastructure} />

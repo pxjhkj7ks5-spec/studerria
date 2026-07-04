@@ -4,6 +4,7 @@ import { createCycleSnapshot, generateAfterActionReport } from "./afterActionRep
 import { buildLogisticsState } from "./logistics";
 import { clamp, createId, pick, weightedChance } from "./math";
 import { applyPlanningActionCosts, applyPlanningRecoveryEffects, closePlanningDay } from "./planningActions";
+import { distanceKm, validateBatteryPlacement } from "./placementRules";
 import { chooseAttackPlan, createThreatDirectorContext, pickThreatKindForPlan } from "./threatDirector";
 import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recoverReadiness } from "./unitReadiness";
 import type {
@@ -16,6 +17,7 @@ import type {
   InterceptorShot,
   LaunchSector,
   LiveThreat,
+  PendingLaunch,
   ThreatKind,
   UnitKind,
 } from "../types/game";
@@ -30,7 +32,7 @@ const UKRAINE_BOUNDS = {
   maxLng: 40.6,
 };
 
-const fallbackThreatKinds: ThreatKind[] = ["drone", "ballistic", "cruise", "decoy", "combined", "saturation"];
+const fallbackThreatKinds: ThreatKind[] = ["geran2", "gerbera", "parodiya", "kh101", "kalibr", "iskander"];
 const ABSTRACT_KM_PER_DEGREE = 85;
 
 const threatFlightDurationMs: Record<ThreatKind, [number, number]> = {
@@ -40,6 +42,57 @@ const threatFlightDurationMs: Record<ThreatKind, [number, number]> = {
   decoy: [120000, 180000],
   combined: [70000, 110000],
   saturation: [130000, 190000],
+  geran2: [120000, 180000],
+  gerbera: [120000, 180000],
+  parodiya: [120000, 180000],
+  kh101: [70000, 110000],
+  kalibr: [70000, 110000],
+  iskander: [20000, 40000],
+};
+
+const threatBaseDifficulty: Record<ThreatKind, number> = {
+  drone: 24,
+  ballistic: 54,
+  cruise: 42,
+  decoy: 18,
+  combined: 56,
+  saturation: 48,
+  geran2: 26,
+  gerbera: 18,
+  parodiya: 14,
+  kh101: 44,
+  kalibr: 42,
+  iskander: 58,
+};
+
+const threatDamage: Record<ThreatKind, number> = {
+  drone: 3,
+  ballistic: 9,
+  cruise: 7,
+  decoy: 0,
+  combined: 7,
+  saturation: 3,
+  geran2: 3,
+  gerbera: 1,
+  parodiya: 0,
+  kh101: 7,
+  kalibr: 7,
+  iskander: 9,
+};
+
+const threatReward: Record<ThreatKind, number> = {
+  drone: 2,
+  ballistic: 15,
+  cruise: 10,
+  decoy: 1,
+  combined: 10,
+  saturation: 2,
+  geran2: 2,
+  gerbera: 1,
+  parodiya: 1,
+  kh101: 10,
+  kalibr: 10,
+  iskander: 15,
 };
 
 function cloneState(state: GameState): GameState {
@@ -55,7 +108,14 @@ function cloneState(state: GameState): GameState {
     })),
     units: state.units.map((unit) => ({ ...unit })),
     batteries: state.batteries.map((battery) => ({ ...battery, position: { ...battery.position } })),
-    liveThreats: state.liveThreats.map((threat) => ({ ...threat, origin: { ...threat.origin }, target: { ...threat.target } })),
+    carriers: state.carriers.map((carrier) => ({ ...carrier, position: { ...carrier.position } })),
+    pendingLaunches: state.pendingLaunches.map((launch) => ({ ...launch })),
+    liveThreats: state.liveThreats.map((threat) => ({
+      ...threat,
+      origin: { ...threat.origin },
+      target: { ...threat.target },
+      lastKnownPosition: threat.lastKnownPosition ? { ...threat.lastKnownPosition } : undefined,
+    })),
     interceptorShots: state.interceptorShots.map((shot) => ({ ...shot, from: { ...shot.from }, to: { ...shot.to } })),
     impactMarkers: state.impactMarkers.map((marker) => ({ ...marker, position: { ...marker.position } })),
     log: state.log.map((entry) => ({ ...entry })),
@@ -85,6 +145,7 @@ function cloneState(state: GameState): GameState {
       ammoRecoveryMultiplier: state.logistics.ammoRecoveryMultiplier,
       repairRecoveryMultiplier: state.logistics.repairRecoveryMultiplier,
     },
+    placementWarning: state.placementWarning,
   };
 }
 
@@ -129,6 +190,7 @@ function batteryTier(unit: ReturnType<typeof getUnitDefinition>): DefenseBattery
 }
 
 function coverageRadiusFromUnit(unit: ReturnType<typeof getUnitDefinition>) {
+  if (unit.kind === "radar") return 100 / ABSTRACT_KM_PER_DEGREE;
   return clamp(unit.outerRangeKm / ABSTRACT_KM_PER_DEGREE, 0.1, 2.1);
 }
 
@@ -139,6 +201,12 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
 
   const next = cloneState(state);
   const quantized = quantizePlacement(position);
+  const placement = validateBatteryPlacement(quantized);
+  if (!placement.allowed) {
+    next.placementWarning = placement.reason || "Placement blocked by control constraints.";
+    pushLog(next.log, next.elapsedMs, "Placement Blocked", next.placementWarning, "warning");
+    return next;
+  }
   const tier = batteryTier(unit);
   next.resources.budget = clamp(next.resources.budget - unit.cost, 0, 999);
   const battery: DefenseBattery = {
@@ -158,11 +226,14 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     reloadRemainingMs: 0,
     currentAmmo: unit.ammoCapacity,
     assignedCityId: nearestCityId(next, quantized),
+    sweepAngleDeg: unit.engagementMode === "detect" ? random() * 360 : undefined,
+    sweepSpeedDegPerMs: unit.engagementMode === "detect" ? 0.022 : undefined,
   };
   if (next.planningActions.selected.includes("rapid-redeployment")) {
     applyRedeployFatigue(battery);
   }
   next.batteries.push(battery);
+  next.placementWarning = null;
   next.logistics = buildLogisticsState(next);
   pushLog(next.log, next.elapsedMs, `${unit.name} Placed`, `${unit.name} is active in Coverage ${tier}.`, "success");
   return next;
@@ -206,6 +277,28 @@ function abstractDistanceKm(left: Coordinates, right: Coordinates) {
   return abstractDistance(left, right) * ABSTRACT_KM_PER_DEGREE;
 }
 
+function bearingDeg(from: Coordinates, to: Coordinates) {
+  const lat1 = (from.lat * Math.PI) / 180;
+  const lat2 = (to.lat * Math.PI) / 180;
+  const dLng = ((to.lng - from.lng) * Math.PI) / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function angleDeltaDeg(left: number, right: number) {
+  const delta = Math.abs(((left - right + 540) % 360) - 180);
+  return delta;
+}
+
+function isDroneClass(kind: ThreatKind) {
+  return kind === "drone" || kind === "decoy" || kind === "saturation" || kind === "geran2" || kind === "gerbera" || kind === "parodiya";
+}
+
+function isMissileClass(kind: ThreatKind) {
+  return kind === "ballistic" || kind === "cruise" || kind === "combined" || kind === "kh101" || kind === "kalibr" || kind === "iskander";
+}
+
 function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () => number): LaunchSector {
   const matching = sectors.filter((sector) => sector.supports.includes(kind));
   if (matching.length) return pick(matching, random);
@@ -218,7 +311,7 @@ function pickTargetNode(state: GameState, kind: ThreatKind, random: () => number
     ? state.infrastructure.filter((node) => plan.targetPriorities.includes(node.kind))
     : [];
   const pool = preferred.length ? preferred : state.infrastructure;
-  if (kind === "decoy") return pick(pool, random);
+  if (kind === "decoy" || kind === "parodiya") return pick(pool, random);
   return [...pool].sort((left, right) => {
     const leftCity = state.cities.find((city) => city.id === left.cityId);
     const rightCity = state.cities.find((city) => city.id === right.cityId);
@@ -228,27 +321,40 @@ function pickTargetNode(state: GameState, kind: ThreatKind, random: () => number
   })[0];
 }
 
-function spawnThreat(state: GameState, random: () => number): LiveThreat {
-  const plan = state.currentAttackPlan;
-  const kind = plan ? pickThreatKindForPlan(plan, random) : pick(fallbackThreatKinds, random);
-  const node = pickTargetNode(state, kind, random);
-  const launchSector = pickLaunchSector(state.launchSectors, kind, random);
-  const difficulty: Record<ThreatKind, number> = {
-    drone: 24,
-    ballistic: 54,
-    cruise: 42,
-    decoy: 18,
-    combined: 56,
-    saturation: 48,
+function createCarrierForThreat(state: GameState, kind: ThreatKind, launchSector: LaunchSector, random: () => number) {
+  if (kind !== "kh101" && kind !== "kalibr") return undefined;
+  const carrier = {
+    id: createId("carrier", Math.floor(state.elapsedMs), random),
+    kind: kind === "kh101" ? "tu95" as const : "black-sea-ship" as const,
+    position: launchSector.coordinates,
+    launchSectorId: launchSector.id,
+    headingDeg: kind === "kh101" ? 275 : 330,
+    ttlMs: 32000,
   };
+  state.carriers.push(carrier);
+  return carrier.id;
+}
+
+function spawnThreat(state: GameState, random: () => number, forcedKind?: ThreatKind, forcedTargetNodeId?: string, forcedSectorId?: string): LiveThreat {
+  const plan = state.currentAttackPlan;
+  const kind = forcedKind || (plan ? pickThreatKindForPlan(plan, random) : pick(fallbackThreatKinds, random));
+  const node = forcedTargetNodeId
+    ? state.infrastructure.find((item) => item.id === forcedTargetNodeId) || pickTargetNode(state, kind, random)
+    : pickTargetNode(state, kind, random);
+  const launchSector = forcedSectorId
+    ? state.launchSectors.find((sector) => sector.id === forcedSectorId) || pickLaunchSector(state.launchSectors, kind, random)
+    : pickLaunchSector(state.launchSectors, kind, random);
+  const carrierId = createCarrierForThreat(state, kind, launchSector, random);
   const durationWindow = threatFlightDurationMs[kind];
   const flightDurationMs = durationWindow[0] + random() * (durationWindow[1] - durationWindow[0]);
-  const falseTrack = kind === "decoy" || random() < (plan?.deception || 0) * 0.045;
+  const falseTrack = kind === "decoy" || kind === "parodiya" || random() < (plan?.deception || 0) * 0.045;
+  const origin = launchSector.coordinates;
+  const heading = bearingDeg(origin, node.coordinates);
   return {
     id: createId("live-threat", Math.floor(state.elapsedMs), random),
     kind,
     status: "inbound",
-    origin: launchSector.coordinates,
+    origin,
     target: node.coordinates,
     targetNodeId: node.id,
     targetCityId: node.cityId,
@@ -256,16 +362,78 @@ function spawnThreat(state: GameState, random: () => number): LiveThreat {
     launchSectorName: launchSector.name,
     progress: 0,
     speed: 1 / flightDurationMs,
-    difficulty: difficulty[kind] * launchSector.pressure + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
-    damage: falseTrack ? 0 : 9 + random() * 17 + (plan?.intensity || 1),
+    difficulty: threatBaseDifficulty[kind] * launchSector.pressure + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
+    damage: falseTrack ? 0 : threatDamage[kind],
     detected: false,
     confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,
-    saturation: kind === "saturation" ? 1.7 : kind === "combined" ? 1.25 : 1,
+    saturation: kind === "saturation" || kind === "geran2" ? 1.25 : kind === "combined" ? 1.35 : 1,
     attackPlanId: plan?.id,
     archetype: plan?.archetype,
     isFalseTrack: falseTrack,
     plannedTargetPriority: node.kind,
+    headingDeg: heading,
+    revealed: false,
+    trackQuality: 0,
+    reward: threatReward[kind],
+    carrierId,
   };
+}
+
+function markLaunchSector(state: GameState, sectorId: string, status: NonNullable<LaunchSector["state"]>, durationMs: number) {
+  const sector = state.launchSectors.find((item) => item.id === sectorId);
+  if (!sector) return;
+  sector.state = status;
+  sector.stateUntilMs = state.elapsedMs + durationMs;
+  if (status === "warning") sector.warningStartedAtMs = state.elapsedMs;
+}
+
+function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () => number) {
+  const node = pickTargetNode(state, kind, random);
+  const launchSector = pickLaunchSector(state.launchSectors, kind, random);
+  const warningMs = kind === "iskander" ? 15000 : 0;
+  if (warningMs > 0) {
+    const pending: PendingLaunch = {
+      id: createId("pending-launch", Math.floor(state.elapsedMs), random),
+      kind,
+      sectorId: launchSector.id,
+      targetNodeId: node.id,
+      launchesAtMs: state.elapsedMs + warningMs,
+    };
+    state.pendingLaunches.push(pending);
+    markLaunchSector(state, launchSector.id, "warning", warningMs);
+    pushLog(state.log, state.elapsedMs, "Launch Warning", `${launchSector.name} shows abstract OTRK launch preparation.`, "warning");
+    return;
+  }
+  markLaunchSector(state, launchSector.id, "launching", 8000);
+  state.liveThreats.push(spawnThreat(state, random, kind, node.id, launchSector.id));
+}
+
+function resolvePendingLaunches(state: GameState, random: () => number) {
+  const remaining: PendingLaunch[] = [];
+  for (const launch of state.pendingLaunches) {
+    if (launch.launchesAtMs > state.elapsedMs) {
+      remaining.push(launch);
+      continue;
+    }
+    markLaunchSector(state, launch.sectorId, "launching", 9000);
+    state.liveThreats.push(spawnThreat(state, random, launch.kind, launch.targetNodeId, launch.sectorId));
+    pushLog(state.log, state.elapsedMs, "Missile Launch", "A prepared ballistic launch entered the battlespace.", "danger");
+  }
+  state.pendingLaunches = remaining;
+}
+
+function updateLaunchSectors(state: GameState) {
+  for (const sector of state.launchSectors) {
+    if (sector.state && sector.state !== "idle" && sector.stateUntilMs && sector.stateUntilMs <= state.elapsedMs) {
+      if (sector.state === "launching") {
+        sector.state = "cooldown";
+        sector.stateUntilMs = state.elapsedMs + 12000;
+      } else {
+        sector.state = "idle";
+        sector.stateUntilMs = undefined;
+      }
+    }
+  }
 }
 
 function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => number) {
@@ -273,8 +441,8 @@ function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => numbe
   const plan = state.currentAttackPlan;
   const pressure = 0.000035 + state.wavePressure * 0.00000055 + (plan?.intensity || 1) * 0.000018;
   if (random() < pressure * deltaMs) {
-    const threat = spawnThreat(state, random);
-    state.liveThreats.push(threat);
+    const kind = plan ? pickThreatKindForPlan(plan, random) : pick(fallbackThreatKinds, random);
+    schedulePendingLaunch(state, kind, random);
     pushLog(state.log, state.elapsedMs, "Track Warning", `${plan?.eventText || "Uncertain inbound track appeared on the tactical map."}`, "warning");
   }
 }
@@ -283,24 +451,37 @@ function detectThreats(state: GameState, random: () => number) {
   const highAlert = state.planningActions.selected.includes("high-alert");
   const intelFocus = state.planningActions.selected.includes("intelligence-focus");
   for (const threat of state.liveThreats) {
-    if (threat.detected) continue;
     const position = threatPosition(threat);
-    const detectionScore = state.batteries.reduce((score, battery) => {
+    for (const battery of state.batteries) {
       const unit = getUnitDefinition(battery.kind);
-      if (battery.status === "maintenance" || battery.status === "reloading") return score;
-      const distanceKm = abstractDistanceKm(position, battery.position);
-      if (distanceKm > unit.outerRangeKm * 1.15) return score;
+      if (unit.engagementMode !== "detect" || battery.status === "maintenance") continue;
+      const sweep = battery.sweepAngleDeg ?? 0;
+      const targetBearing = bearingDeg(battery.position, position);
+      const beamWidth = highAlert ? 28 : 22;
+      if (angleDeltaDeg(sweep, targetBearing) > beamWidth) continue;
+      const rangeKm = distanceKm(position, battery.position);
+      if (rangeKm > 100) continue;
+      const bandChance = rangeKm <= 50 ? 95 : rangeKm <= 75 ? 75 : 40;
       const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
-      const rangeFactor = 1 - distanceKm / (unit.outerRangeKm * 1.25);
-      return score + unit.detectionBonus * (battery.readiness / 100) * statusPenalty * Math.max(0.12, rangeFactor);
-    }, highAlert ? 28 : 16);
-    const confidenceBoost = (highAlert ? 0.028 : 0.018) + (intelFocus ? 0.012 : 0);
-    threat.confidence = clamp(threat.confidence + Math.max(0.2, detectionScore * confidenceBoost), 0, 100);
-    if (weightedChance(detectionScore - threat.difficulty * 0.22 + (intelFocus ? 8 : 0), random)) {
+      const readinessFactor = 0.58 + (battery.readiness / 100) * 0.42;
+      const planningBoost = (highAlert ? 8 : 0) + (intelFocus ? 6 : 0);
+      const chance = clamp(bandChance * statusPenalty * readinessFactor + planningBoost - threat.difficulty * 0.08, 5, 98);
+      threat.confidence = clamp(threat.confidence + (chance / 100) * 8, 0, 100);
+      if (!weightedChance(chance, random)) continue;
       threat.detected = true;
       threat.status = "detected";
-      threat.confidence = clamp(threat.confidence + 16 + random() * 18 + (intelFocus ? 10 : 0), 0, 100);
-      pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track classified by abstract intelligence.`, "info");
+      threat.revealed = true;
+      threat.lastKnownPosition = position;
+      threat.headingDeg = bearingDeg(threat.origin, threat.target);
+      threat.trackQuality = clamp(chance + (intelFocus ? 8 : 0), 0, 100);
+      threat.confidence = clamp(threat.confidence + 18 + random() * 12 + (intelFocus ? 10 : 0), 0, 100);
+      pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track revealed by radar sweep.`, "info");
+      break;
+    }
+    if (threat.revealed) {
+      threat.lastKnownPosition = position;
+      threat.headingDeg = bearingDeg(threat.origin, threat.target);
+      threat.trackQuality = clamp(threat.trackQuality - 0.06, 18, 100);
     }
   }
 }
@@ -316,13 +497,14 @@ function updateShots(state: GameState, deltaMs: number) {
         threat.status = "intercepted";
         resolvedThreatIds.add(threat.id);
         state.interceptions += 1;
+        state.resources.budget = clamp(state.resources.budget + threat.reward, 0, 999);
         state.impactMarkers.push({
           id: createId("intercept", Math.floor(state.elapsedMs), Math.random),
           position: threatPosition(threat),
           tone: "intercept",
           ttlMs: 1800,
         });
-        pushLog(state.log, state.elapsedMs, "Intercept Confirmed", "A defense unit neutralized a tracked target inside abstract coverage.", "success");
+        pushLog(state.log, state.elapsedMs, "Intercept Confirmed", `A defense unit neutralized ${threat.kind}. Reward +${threat.reward} mln UAH.`, "success");
       }
     } else {
       nextShots.push({ ...shot, progress: nextProgress });
@@ -364,11 +546,20 @@ function setShotCooldown(battery: DefenseBattery, unit: ReturnType<typeof getUni
 }
 
 function threatPriority(kind: ThreatKind) {
+  if (kind === "iskander") return 36;
+  if (kind === "kh101" || kind === "kalibr") return 24;
   if (kind === "ballistic") return 30;
   if (kind === "cruise" || kind === "combined") return 22;
-  if (kind === "saturation") return 18;
-  if (kind === "drone") return 14;
+  if (kind === "saturation" || kind === "geran2") return 18;
+  if (kind === "drone" || kind === "gerbera") return 14;
   return 8;
+}
+
+function shotStyleForUnit(kind: UnitKind) {
+  if (kind === "mvg" || kind === "boat" || kind === "gepard") return "gun" as const;
+  if (kind === "drone-operators") return "drone" as const;
+  if (kind === "ew") return "ew" as const;
+  return "missile" as const;
 }
 
 function engagementChance(
@@ -410,7 +601,8 @@ function engageThreats(state: GameState, random: () => number) {
       || !hasLocalAmmo(unit, battery)
     ) continue;
     const candidate = state.liveThreats
-      .filter((threat) => threat.detected && threat.status !== "engaged")
+      .filter((threat) => threat.revealed && threat.status !== "engaged")
+      .filter((threat) => battery.kind !== "drone-operators" || isDroneClass(threat.kind))
       .map((threat) => {
         const distanceKm = abstractDistanceKm(threatPosition(threat), battery.position);
         const chance = engagementChance(unit, battery, threat, distanceKm, conserveAmmo);
@@ -444,6 +636,7 @@ function engageThreats(state: GameState, random: () => number) {
       to: threatPosition(candidate.threat),
       progress: 0,
       speed: 0.0017,
+      style: shotStyleForUnit(battery.kind),
     });
     pushLog(state.log, state.elapsedMs, "Engagement", `${unit.shortName} engaged a ${candidate.threat.kind} track at ${Math.round(candidate.chance)}% confidence-adjusted chance.`, "info");
   }
@@ -454,7 +647,7 @@ function applyImpact(state: GameState, threat: LiveThreat) {
   const city = state.cities.find((item) => item.id === threat.targetCityId);
   if (!node || !city) return;
 
-  const damage = threat.isFalseTrack || threat.kind === "decoy" ? 1.5 : threat.damage;
+  const damage = threat.isFalseTrack ? 0 : threat.damage;
   node.integrity = clamp(node.integrity - damage);
   city.damage = clamp(city.damage + damage * 0.35);
   city.infrastructure = clamp(city.infrastructure - damage * 0.25);
@@ -470,6 +663,10 @@ function updateThreats(state: GameState, deltaMs: number) {
   const remaining: LiveThreat[] = [];
   for (const threat of state.liveThreats) {
     const next = { ...threat, progress: threat.progress + threat.speed * deltaMs };
+    if (next.revealed) {
+      next.lastKnownPosition = threatPosition(next);
+      next.headingDeg = bearingDeg(next.origin, next.target);
+    }
     if (next.progress >= 1) {
       applyImpact(state, next);
     } else {
@@ -479,12 +676,45 @@ function updateThreats(state: GameState, deltaMs: number) {
   state.liveThreats = remaining;
 }
 
+function updateCityAlerts(state: GameState) {
+  const missileLaunchActive = state.launchSectors.some((sector) =>
+    (sector.state === "warning" || sector.state === "launching")
+      && (sector.category === "ballistic" || sector.category === "carrier" || sector.category === "cruise")
+  );
+  for (const city of state.cities) {
+    let alert: NonNullable<typeof city.alertState> = "calm";
+    for (const threat of state.liveThreats) {
+      if (!threat.revealed) continue;
+      const position = threatPosition(threat);
+      const cityDistance = distanceKm(city.coordinates, position);
+      if ((isDroneClass(threat.kind) && cityDistance <= 50) || (isMissileClass(threat.kind) && missileLaunchActive)) {
+        alert = "air-raid";
+        break;
+      }
+      const targetDistance = distanceKm(city.coordinates, threat.target);
+      const trackDistance = distanceKm(city.coordinates, position);
+      if (targetDistance <= 70 || trackDistance <= 70) {
+        alert = "probable-target";
+      }
+    }
+    if (missileLaunchActive && alert === "calm") {
+      alert = "probable-target";
+    }
+    city.alertState = alert;
+  }
+}
+
 function updateResourcesAndTimers(state: GameState, deltaMs: number) {
   state.logistics = buildLogisticsState(state);
   for (const battery of state.batteries) {
     const unit = getUnitDefinition(battery.kind);
     if (battery.currentAmmo === undefined || battery.currentAmmo === null) {
       battery.currentAmmo = unit.ammoCapacity;
+    }
+    if (unit.engagementMode === "detect") {
+      const speed = battery.sweepSpeedDegPerMs ?? 0.022;
+      battery.sweepSpeedDegPerMs = speed;
+      battery.sweepAngleDeg = ((battery.sweepAngleDeg ?? 0) + deltaMs * speed) % 360;
     }
     if (battery.reloadRemainingMs === undefined || battery.reloadRemainingMs === null) {
       battery.reloadRemainingMs = 0;
@@ -508,6 +738,9 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
   state.impactMarkers = state.impactMarkers
     .map((marker) => ({ ...marker, ttlMs: marker.ttlMs - deltaMs }))
     .filter((marker) => marker.ttlMs > 0);
+  state.carriers = state.carriers
+    .map((carrier) => ({ ...carrier, ttlMs: carrier.ttlMs - deltaMs }))
+    .filter((carrier) => carrier.ttlMs > 0);
   state.wavePressure = clamp(state.wavePressure + deltaMs * 0.00018, 10, 100);
   state.resources.budget = clamp(state.resources.budget + deltaMs * 0.00036 * state.logistics.repairRecoveryMultiplier, 0, 999);
   state.resources.ammo = clamp(state.resources.ammo + deltaMs * 0.0002 * state.logistics.ammoRecoveryMultiplier, 0, 999);
@@ -588,12 +821,15 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   const safeDelta = clamp(deltaMs, 0, 1000);
   state.elapsedMs += safeDelta;
   updateResourcesAndTimers(state, safeDelta);
+  updateLaunchSectors(state);
   updateCycle(state, random);
+  resolvePendingLaunches(state, random);
   maybeSpawnThreat(state, safeDelta, random);
   detectThreats(state, random);
   engageThreats(state, random);
   updateShots(state, safeDelta);
   updateThreats(state, safeDelta);
+  updateCityAlerts(state);
   evaluateLiveStatus(state);
   return state;
 }

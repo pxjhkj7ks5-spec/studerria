@@ -5,7 +5,22 @@ export type CityId =
   | "dnipro"
   | "kharkiv"
   | "zaporizhzhia"
-  | "mykolaiv";
+  | "mykolaiv"
+  | "chernihiv"
+  | "sumy"
+  | "poltava"
+  | "cherkasy"
+  | "kropyvnytskyi"
+  | "kryvyi-rih"
+  | "zhytomyr"
+  | "vinnytsia"
+  | "khmelnytskyi"
+  | "ternopil"
+  | "rivne"
+  | "lutsk"
+  | "ivano-frankivsk"
+  | "uzhhorod"
+  | "chernivtsi";
 
 export type InfrastructureKind = "energy" | "logistics" | "industry" | "communications";
 
@@ -20,9 +35,28 @@ export type UnitKind =
   | "s300"
   | "iris-t"
   | "nasams"
-  | "patriot";
+  | "patriot"
+  | "drone-operators";
 
-export type ThreatKind = "drone" | "ballistic" | "cruise" | "decoy" | "combined" | "saturation";
+export type ThreatKind =
+  | "drone"
+  | "ballistic"
+  | "cruise"
+  | "decoy"
+  | "combined"
+  | "saturation"
+  | "geran2"
+  | "gerbera"
+  | "parodiya"
+  | "kh101"
+  | "kalibr"
+  | "iskander";
+
+export type CarrierKind = "tu95" | "black-sea-ship";
+
+export type LaunchAreaState = "idle" | "warning" | "launching" | "cooldown";
+
+export type CityAlertState = "calm" | "probable-target" | "air-raid";
 
 export type IntelTone = "info" | "success" | "warning" | "danger";
 
@@ -61,6 +95,8 @@ export type UnitStatus = "ready" | "strained" | "exhausted" | "maintenance" | "r
 
 export type SupplyStatus = "well-supplied" | "strained" | "undersupplied";
 
+export type ShotStyle = "missile" | "gun" | "drone" | "ew";
+
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -75,6 +111,7 @@ export interface City {
   energy: number;
   importance: number;
   damage: number;
+  alertState?: CityAlertState;
 }
 
 export interface InfrastructureNode {
@@ -139,6 +176,8 @@ export interface DefenseBattery {
   reloadRemainingMs: number;
   currentAmmo: number | "infinite";
   assignedCityId: CityId;
+  sweepAngleDeg?: number;
+  sweepSpeedDegPerMs?: number;
 }
 
 export interface LaunchSector {
@@ -147,6 +186,10 @@ export interface LaunchSector {
   coordinates: Coordinates;
   supports: ThreatKind[];
   pressure: number;
+  category?: "drone" | "ballistic" | "cruise" | "carrier";
+  state?: LaunchAreaState;
+  stateUntilMs?: number;
+  warningStartedAtMs?: number;
 }
 
 export interface Resources {
@@ -196,6 +239,12 @@ export interface LiveThreat {
   archetype?: AttackArchetype;
   isFalseTrack?: boolean;
   plannedTargetPriority?: string;
+  headingDeg: number;
+  lastKnownPosition?: Coordinates;
+  revealed: boolean;
+  trackQuality: number;
+  reward: number;
+  carrierId?: string;
 }
 
 export interface InterceptorShot {
@@ -206,6 +255,7 @@ export interface InterceptorShot {
   to: Coordinates;
   progress: number;
   speed: number;
+  style?: ShotStyle;
 }
 
 export interface ImpactMarker {
@@ -272,6 +322,23 @@ export interface SupplyRoute {
   status: SupplyStatus;
   delayDays: number;
   label: string;
+}
+
+export interface CarrierTrack {
+  id: string;
+  kind: CarrierKind;
+  position: Coordinates;
+  launchSectorId: string;
+  headingDeg: number;
+  ttlMs: number;
+}
+
+export interface PendingLaunch {
+  id: string;
+  kind: ThreatKind;
+  sectorId: string;
+  targetNodeId: string;
+  launchesAtMs: number;
 }
 
 export interface LogisticsState {
@@ -376,6 +443,8 @@ export interface GameState {
   cities: City[];
   infrastructure: InfrastructureNode[];
   launchSectors: LaunchSector[];
+  carriers: CarrierTrack[];
+  pendingLaunches: PendingLaunch[];
   units: DeployedUnit[];
   batteries: DefenseBattery[];
   liveThreats: LiveThreat[];
@@ -385,4 +454,5 @@ export interface GameState {
   impacts: number;
   log: IntelEntry[];
   forecast: DailyForecast;
+  placementWarning: string | null;
 }

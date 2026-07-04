@@ -34,21 +34,25 @@ function createOpeningThreat(): LiveThreat {
   const targetNode = initialInfrastructure.find((node) => node.id === "grid-kyiv") || initialInfrastructure[0];
   return {
     id: "opening-track-1",
-    kind: "drone",
+    kind: "geran2",
     status: "inbound",
     origin: { lat: 51.8, lng: 40.0 },
     target: targetNode.coordinates,
     targetNodeId: targetNode.id,
     targetCityId: targetNode.cityId,
-    launchSectorId: "rf-northwest-uav",
-    launchSectorName: "Northwest UAV Sector",
+    launchSectorId: "drone-northwest",
+    launchSectorName: "Northwest Drone Launch Area",
     progress: 0.02,
     speed: 0.0000055,
     difficulty: 28,
-    damage: 12,
+    damage: 3,
     detected: false,
     confidence: 32,
     saturation: 1,
+    headingDeg: 240,
+    revealed: false,
+    trackQuality: 0,
+    reward: 2,
   };
 }
 
@@ -116,6 +120,8 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
       coordinates: { ...sector.coordinates },
       supports: [...sector.supports],
     })),
+    carriers: [],
+    pendingLaunches: [],
     units: initialUnits.map((unit) => ({ ...unit })),
     batteries: [],
     liveThreats: [createOpeningThreat()],
@@ -125,6 +131,7 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
     impacts: 0,
     log: openingLog,
     forecast: createForecast(1, random),
+    placementWarning: null,
   };
   state.logistics = buildLogisticsState(state);
   return state;

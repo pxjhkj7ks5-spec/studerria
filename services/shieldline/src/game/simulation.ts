@@ -81,6 +81,12 @@ function generateThreats(state: GameState, random: () => number): Threat[] {
       decoy: 22,
       combined: 52,
       saturation: 60,
+      geran2: 28,
+      gerbera: 22,
+      parodiya: 18,
+      kh101: 42,
+      kalibr: 42,
+      iskander: 50,
     };
 
     threats.push({

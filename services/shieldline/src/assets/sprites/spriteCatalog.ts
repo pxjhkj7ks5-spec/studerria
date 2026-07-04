@@ -20,7 +20,13 @@ import nasamsUnit from "./units/nasams.png";
 import patriotUnit from "./units/patriot.png";
 import radarUnit from "./units/radar.png";
 import s300Unit from "./units/s300.png";
-import type { ThreatKind, UnitKind } from "../../types/game";
+import droneOperatorsUnit from "./units/drone-operators.png";
+import tu95Carrier from "./carriers/tu95.png";
+import blackSeaShipCarrier from "./carriers/black-sea-ship.png";
+import droneLaunch from "./launch/drone-launch.png";
+import ballisticLaunch from "./launch/ballistic-launch.png";
+import cruiseLaunch from "./launch/cruise-launch.png";
+import type { CarrierKind, ThreatKind, UnitKind } from "../../types/game";
 
 export const threatSprites: Record<ThreatKind, string> = {
   drone: threatDrone,
@@ -29,6 +35,12 @@ export const threatSprites: Record<ThreatKind, string> = {
   decoy: threatDecoy,
   combined: threatCruise,
   saturation: threatSaturation,
+  geran2: threatDrone,
+  gerbera: threatDrone,
+  parodiya: threatDecoy,
+  kh101: threatCruise,
+  kalibr: threatCruise,
+  iskander: threatBallistic,
 };
 
 export const unitSprites: Record<UnitKind, string> = {
@@ -43,6 +55,19 @@ export const unitSprites: Record<UnitKind, string> = {
   "iris-t": irisTUnit,
   nasams: nasamsUnit,
   patriot: patriotUnit,
+  "drone-operators": droneOperatorsUnit,
+};
+
+export const carrierSprites: Record<CarrierKind, string> = {
+  tu95: tu95Carrier,
+  "black-sea-ship": blackSeaShipCarrier,
+};
+
+export const launchSprites = {
+  drone: droneLaunch,
+  ballistic: ballisticLaunch,
+  cruise: cruiseLaunch,
+  carrier: cruiseLaunch,
 };
 
 export const markerSprites = {

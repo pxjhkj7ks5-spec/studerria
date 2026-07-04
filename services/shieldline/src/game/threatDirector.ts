@@ -10,12 +10,12 @@ import type {
 import { createId, pick } from "./math";
 
 const archetypeThreats: Record<AttackArchetype, ThreatKind[]> = {
-  probe: ["drone", "decoy"],
-  saturation: ["drone", "saturation", "decoy"],
-  infrastructure: ["cruise", "drone", "ballistic"],
-  "decoy-screen": ["decoy", "drone"],
-  pressure: ["drone", "cruise", "decoy"],
-  combined: ["drone", "cruise", "ballistic", "decoy", "combined"],
+  probe: ["gerbera", "parodiya", "geran2"],
+  saturation: ["geran2", "gerbera", "parodiya", "geran2"],
+  infrastructure: ["kh101", "kalibr", "geran2", "iskander"],
+  "decoy-screen": ["parodiya", "gerbera", "parodiya"],
+  pressure: ["geran2", "kh101", "parodiya"],
+  combined: ["geran2", "kh101", "kalibr", "iskander", "parodiya"],
 };
 
 const archetypeTargets: Record<AttackArchetype, InfrastructureKind[]> = {

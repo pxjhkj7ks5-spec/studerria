@@ -81,7 +81,8 @@ export const useGameStore = create<GameStore>()(
       placeSelectedBattery: (position) => {
         const { game, placementKind } = get();
         if (!placementKind) return;
-        set({ game: placeBattery(game, placementKind, position), placementKind: null });
+        const nextGame = placeBattery(game, placementKind, position);
+        set({ game: nextGame, placementKind: nextGame.placementWarning ? placementKind : null });
       },
       removeSelectedBattery: () => {
         const { game, selectedBatteryId } = get();
@@ -103,8 +104,8 @@ export const useGameStore = create<GameStore>()(
       }),
     }),
     {
-      name: "shieldline-live-v5",
-      version: 6,
+      name: "shieldline-live-v6",
+      version: 7,
       partialize: (state) => ({
         game: state.game,
         campaignMode: state.campaignMode,
