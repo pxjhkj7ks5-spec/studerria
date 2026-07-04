@@ -19,7 +19,7 @@ export type UnitKind =
   | "intel"
   | "decoy";
 
-export type ThreatKind = "drone" | "missile" | "decoy" | "combined" | "saturation";
+export type ThreatKind = "drone" | "ballistic" | "cruise" | "decoy" | "combined" | "saturation";
 
 export type IntelTone = "info" | "success" | "warning" | "danger";
 
@@ -90,6 +90,14 @@ export interface DefenseBattery {
   assignedCityId: CityId;
 }
 
+export interface LaunchSector {
+  id: string;
+  name: string;
+  coordinates: Coordinates;
+  supports: ThreatKind[];
+  pressure: number;
+}
+
 export interface Resources {
   budget: number;
   ammo: number;
@@ -124,6 +132,8 @@ export interface LiveThreat {
   target: Coordinates;
   targetNodeId: string;
   targetCityId: CityId;
+  launchSectorId: string;
+  launchSectorName: string;
   progress: number;
   speed: number;
   difficulty: number;
@@ -166,6 +176,7 @@ export interface GameState {
   resources: Resources;
   cities: City[];
   infrastructure: InfrastructureNode[];
+  launchSectors: LaunchSector[];
   units: DeployedUnit[];
   batteries: DefenseBattery[];
   liveThreats: LiveThreat[];

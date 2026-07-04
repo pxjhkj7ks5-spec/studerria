@@ -1,4 +1,5 @@
 import { initialCities, initialInfrastructure } from "../data/mapData";
+import { initialLaunchSectors } from "../data/launchSectors";
 import { unitDefinitions } from "../data/units";
 import type { DailyForecast, DeployedUnit, GameState, IntelEntry, LiveThreat } from "../types/game";
 
@@ -38,8 +39,10 @@ function createOpeningThreat(): LiveThreat {
     target: targetNode.coordinates,
     targetNodeId: targetNode.id,
     targetCityId: targetNode.cityId,
-    progress: 0.08,
-    speed: 0.000045,
+    launchSectorId: "rf-northwest-uav",
+    launchSectorName: "Northwest UAV Sector",
+    progress: 0.02,
+    speed: 0.0000055,
     difficulty: 28,
     damage: 12,
     detected: false,
@@ -84,6 +87,11 @@ export function createInitialState(random: () => number = Math.random): GameStat
     },
     cities: initialCities.map((city) => ({ ...city })),
     infrastructure: initialInfrastructure.map((node) => ({ ...node })),
+    launchSectors: initialLaunchSectors.map((sector) => ({
+      ...sector,
+      coordinates: { ...sector.coordinates },
+      supports: [...sector.supports],
+    })),
     units: initialUnits.map((unit) => ({ ...unit })),
     batteries: [],
     liveThreats: [createOpeningThreat()],

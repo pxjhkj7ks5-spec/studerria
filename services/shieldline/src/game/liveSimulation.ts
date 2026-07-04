@@ -7,6 +7,7 @@ import type {
   ImpactMarker,
   IntelEntry,
   InterceptorShot,
+  LaunchSector,
   LiveThreat,
   ThreatKind,
   UnitDefinition,
@@ -23,15 +24,7 @@ const UKRAINE_BOUNDS = {
   maxLng: 40.6,
 };
 
-const originSectors: Coordinates[] = [
-  { lat: 51.8, lng: 40.0 },
-  { lat: 49.7, lng: 41.0 },
-  { lat: 46.0, lng: 39.6 },
-  { lat: 45.4, lng: 28.0 },
-  { lat: 52.0, lng: 25.0 },
-];
-
-const threatKinds: ThreatKind[] = ["drone", "missile", "decoy", "combined", "saturation"];
+const threatKinds: ThreatKind[] = ["drone", "ballistic", "cruise", "decoy", "combined", "saturation"];
 
 const rangeByTier: Record<DefenseBattery["coverageTier"], number> = {
   I: 0.85,
@@ -45,6 +38,11 @@ function cloneState(state: GameState): GameState {
     resources: { ...state.resources },
     cities: state.cities.map((city) => ({ ...city })),
     infrastructure: state.infrastructure.map((node) => ({ ...node })),
+    launchSectors: state.launchSectors.map((sector) => ({
+      ...sector,
+      coordinates: { ...sector.coordinates },
+      supports: [...sector.supports],
+    })),
     units: state.units.map((unit) => ({ ...unit })),
     batteries: state.batteries.map((battery) => ({ ...battery })),
     liveThreats: state.liveThreats.map((threat) => ({ ...threat })),
@@ -147,34 +145,45 @@ function abstractDistance(left: Coordinates, right: Coordinates) {
   return Math.sqrt(lat * lat + lng * lng);
 }
 
+function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () => number): LaunchSector {
+  const matching = sectors.filter((sector) => sector.supports.includes(kind));
+  if (matching.length) return pick(matching, random);
+  return pick(sectors, random);
+}
+
 function spawnThreat(state: GameState, random: () => number): LiveThreat {
   const node = pick(state.infrastructure, random);
   const kind = pick(threatKinds, random);
+  const launchSector = pickLaunchSector(state.launchSectors, kind, random);
   const difficulty: Record<ThreatKind, number> = {
     drone: 26,
-    missile: 46,
+    ballistic: 52,
+    cruise: 42,
     decoy: 20,
     combined: 54,
     saturation: 62,
   };
   const speed: Record<ThreatKind, number> = {
-    drone: 0.000045,
-    missile: 0.000085,
-    decoy: 0.000055,
-    combined: 0.000065,
-    saturation: 0.00005,
+    drone: 0.0000055,
+    ballistic: 0.0000081,
+    cruise: 0.0000066,
+    decoy: 0.0000062,
+    combined: 0.000007,
+    saturation: 0.0000058,
   };
   return {
     id: createId("live-threat", Math.floor(state.elapsedMs), random),
     kind,
     status: "inbound",
-    origin: pick(originSectors, random),
+    origin: launchSector.coordinates,
     target: node.coordinates,
     targetNodeId: node.id,
     targetCityId: node.cityId,
+    launchSectorId: launchSector.id,
+    launchSectorName: launchSector.name,
     progress: 0,
-    speed: speed[kind] * (0.8 + random() * 0.55),
-    difficulty: difficulty[kind] + state.wavePressure * 0.18,
+    speed: speed[kind] * (0.92 + random() * 0.16),
+    difficulty: difficulty[kind] * launchSector.pressure + state.wavePressure * 0.18,
     damage: kind === "decoy" ? 0 : 10 + random() * 18,
     detected: false,
     saturation: kind === "saturation" ? 1.7 : kind === "combined" ? 1.25 : 1,
@@ -183,7 +192,7 @@ function spawnThreat(state: GameState, random: () => number): LiveThreat {
 
 function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => number) {
   if (state.liveThreats.length >= MAX_LIVE_THREATS) return;
-  const pressure = 0.00018 + state.wavePressure * 0.000003;
+  const pressure = 0.000045 + state.wavePressure * 0.000001;
   if (random() < pressure * deltaMs) {
     const threat = spawnThreat(state, random);
     state.liveThreats.push(threat);

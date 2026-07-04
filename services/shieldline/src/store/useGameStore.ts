@@ -49,8 +49,8 @@ export const useGameStore = create<GameStore>()(
       }),
     }),
     {
-      name: "shieldline-live-v1",
-      version: 2,
+      name: "shieldline-live-v2",
+      version: 3,
       partialize: (state) => ({
         game: state.game,
         selectedCityId: state.selectedCityId,

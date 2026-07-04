@@ -15,7 +15,7 @@ import type {
 import { createForecast, getUnitDefinition } from "./initialState";
 import { clamp, createId, pick, weightedChance } from "./math";
 
-const threatKinds: ThreatKind[] = ["drone", "missile", "decoy", "combined", "saturation"];
+const threatKinds: ThreatKind[] = ["drone", "ballistic", "cruise", "decoy", "combined", "saturation"];
 
 function cloneState(state: GameState): GameState {
   return {
@@ -76,7 +76,8 @@ function generateThreats(state: GameState, random: () => number): Threat[] {
     const pressureBonus = state.forecast.pressure / 12;
     const difficultyByKind: Record<ThreatKind, number> = {
       drone: 28,
-      missile: 44,
+      ballistic: 50,
+      cruise: 42,
       decoy: 22,
       combined: 52,
       saturation: 60,

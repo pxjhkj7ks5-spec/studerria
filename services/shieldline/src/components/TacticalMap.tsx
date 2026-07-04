@@ -1,6 +1,14 @@
 import L from "leaflet";
 import { Circle, Marker, Polyline, TileLayer, Tooltip, MapContainer, useMapEvents } from "react-leaflet";
 import { useMemo } from "react";
+import batteryDefenseIcon from "../assets/icons/battery-defense.png";
+import batteryRadarIcon from "../assets/icons/battery-radar.png";
+import impactMarkerIcon from "../assets/icons/impact-marker.png";
+import interceptorShotIcon from "../assets/icons/interceptor-shot.png";
+import threatBallisticIcon from "../assets/icons/threat-ballistic.png";
+import threatCruiseIcon from "../assets/icons/threat-cruise.png";
+import threatDecoyIcon from "../assets/icons/threat-decoy.png";
+import threatDroneIcon from "../assets/icons/threat-drone.png";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -9,6 +17,7 @@ import type {
   InfrastructureKind,
   InfrastructureNode,
   InterceptorShot,
+  LaunchSector,
   LiveThreat,
   ThreatKind,
   UnitKind,
@@ -23,23 +32,24 @@ const nodeGlyph: Record<InfrastructureKind, string> = {
   communications: "C",
 };
 
-const batteryGlyph: Record<UnitKind, string> = {
-  radar: "R",
-  mobile: "M",
-  short: "S",
-  medium: "X",
-  repair: "W",
-  logistics: "L",
-  intel: "I",
-  decoy: "D",
+const batteryIcon: Record<UnitKind, string> = {
+  radar: batteryRadarIcon,
+  mobile: batteryDefenseIcon,
+  short: batteryDefenseIcon,
+  medium: batteryDefenseIcon,
+  repair: batteryDefenseIcon,
+  logistics: batteryDefenseIcon,
+  intel: batteryRadarIcon,
+  decoy: threatDecoyIcon,
 };
 
-const threatGlyph: Record<ThreatKind, string> = {
-  drone: "D",
-  missile: "M",
-  decoy: "?",
-  combined: "C",
-  saturation: "S",
+const threatIcon: Record<ThreatKind, string> = {
+  drone: threatDroneIcon,
+  ballistic: threatBallisticIcon,
+  cruise: threatCruiseIcon,
+  decoy: threatDecoyIcon,
+  combined: threatCruiseIcon,
+  saturation: threatDroneIcon,
 };
 
 function threatPosition(threat: LiveThreat) {
@@ -76,37 +86,51 @@ function makeNodeIcon(node: InfrastructureNode) {
   });
 }
 
+function imageMarkerHtml(src: string, className: string) {
+  return `<span class="map-marker map-marker--image ${className}"><img src="${src}" alt="" draggable="false" /></span>`;
+}
+
 function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
   return L.divIcon({
     className: "",
-    html: `<span class="map-marker map-marker--battery ${selected ? "map-marker--selected" : ""}">${batteryGlyph[battery.kind]}</span>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
+    html: imageMarkerHtml(batteryIcon[battery.kind], `map-marker--battery ${selected ? "map-marker--selected" : ""}`),
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
   });
 }
 
 function makeThreatIcon(threat: LiveThreat) {
   return L.divIcon({
     className: "",
-    html: `<span class="map-marker map-marker--threat map-marker--threat-${threat.status}">${threatGlyph[threat.kind]}</span>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    html: imageMarkerHtml(threatIcon[threat.kind], `map-marker--threat map-marker--threat-${threat.status}`),
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
   });
 }
 
 function makeShotIcon() {
   return L.divIcon({
     className: "",
-    html: `<span class="map-marker map-marker--shot"></span>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    html: imageMarkerHtml(interceptorShotIcon, "map-marker--shot"),
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
   });
 }
 
 function makeImpactIcon(marker: ImpactMarker) {
   return L.divIcon({
     className: "",
-    html: `<span class="map-marker map-marker--${marker.tone}">${marker.tone === "impact" ? "!" : "*"}</span>`,
+    html: imageMarkerHtml(marker.tone === "impact" ? impactMarkerIcon : interceptorShotIcon, `map-marker--${marker.tone}`),
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+}
+
+function makeLaunchIcon(sector: LaunchSector) {
+  const primary = sector.supports[0] || "drone";
+  return L.divIcon({
+    className: "",
+    html: imageMarkerHtml(threatIcon[primary], "map-marker--launch"),
     iconSize: [30, 30],
     iconAnchor: [15, 15],
   });
@@ -161,6 +185,13 @@ export function TacticalMap() {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="&copy; OpenStreetMap contributors"
       />
+      {game.launchSectors.map((sector) => (
+        <Marker key={sector.id} position={[sector.coordinates.lat, sector.coordinates.lng]} icon={makeLaunchIcon(sector)}>
+          <Tooltip direction="left" offset={[-8, 0]}>
+            Fictional launch sector - {sector.name}
+          </Tooltip>
+        </Marker>
+      ))}
       {game.liveThreats.map((threat) => {
         const current = threatPosition(threat);
         return (
@@ -226,7 +257,7 @@ export function TacticalMap() {
         return (
           <Marker key={threat.id} position={[current.lat, current.lng]} icon={makeThreatIcon(threat)}>
             <Tooltip direction="top" offset={[0, -14]}>
-              {threat.detected ? threat.kind : "unknown track"} - {threat.status}
+              {threat.detected ? threat.kind : "unknown track"} - {threat.status} from fictional sector
             </Tooltip>
           </Marker>
         );
