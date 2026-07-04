@@ -1,14 +1,7 @@
 import L from "leaflet";
 import { Circle, Marker, Polyline, TileLayer, Tooltip, MapContainer, useMapEvents } from "react-leaflet";
 import { useMemo } from "react";
-import batteryDefenseIcon from "../assets/icons/battery-defense.png";
-import batteryRadarIcon from "../assets/icons/battery-radar.png";
-import impactMarkerIcon from "../assets/icons/impact-marker.png";
-import interceptorShotIcon from "../assets/icons/interceptor-shot.png";
-import threatBallisticIcon from "../assets/icons/threat-ballistic.png";
-import threatCruiseIcon from "../assets/icons/threat-cruise.png";
-import threatDecoyIcon from "../assets/icons/threat-decoy.png";
-import threatDroneIcon from "../assets/icons/threat-drone.png";
+import { markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -19,8 +12,9 @@ import type {
   InterceptorShot,
   LaunchSector,
   LiveThreat,
+  SupplyNode,
+  SupplyRoute,
   ThreatKind,
-  UnitKind,
 } from "../types/game";
 
 const mapCenter: [number, number] = [48.7, 31.4];
@@ -30,26 +24,6 @@ const nodeGlyph: Record<InfrastructureKind, string> = {
   logistics: "L",
   industry: "I",
   communications: "C",
-};
-
-const batteryIcon: Record<UnitKind, string> = {
-  radar: batteryRadarIcon,
-  mobile: batteryDefenseIcon,
-  short: batteryDefenseIcon,
-  medium: batteryDefenseIcon,
-  repair: batteryDefenseIcon,
-  logistics: batteryDefenseIcon,
-  intel: batteryRadarIcon,
-  decoy: threatDecoyIcon,
-};
-
-const threatIcon: Record<ThreatKind, string> = {
-  drone: threatDroneIcon,
-  ballistic: threatBallisticIcon,
-  cruise: threatCruiseIcon,
-  decoy: threatDecoyIcon,
-  combined: threatCruiseIcon,
-  saturation: threatDroneIcon,
 };
 
 function threatPosition(threat: LiveThreat) {
@@ -106,7 +80,7 @@ function threatLabel(threat: LiveThreat) {
 function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
   return L.divIcon({
     className: "",
-    html: imageMarkerHtml(batteryIcon[battery.kind], `map-marker--battery ${selected ? "map-marker--selected" : ""}`),
+    html: imageMarkerHtml(unitSprites[battery.kind], `map-marker--battery map-marker--unit-${battery.status} ${selected ? "map-marker--selected" : ""}`),
     iconSize: [38, 38],
     iconAnchor: [19, 19],
   });
@@ -116,7 +90,7 @@ function makeThreatIcon(threat: LiveThreat) {
   const tone = threatTone(threat);
   return L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap">${imageMarkerHtml(threatIcon[threat.kind], `map-marker--threat map-marker--threat-${tone} map-marker--threat-${threat.status}`)}${threatLabel(threat)}</span>`,
+    html: `<span class="threat-marker-wrap">${imageMarkerHtml(threatSprites[threat.kind], `map-marker--threat map-marker--threat-${tone} map-marker--threat-${threat.status}`)}${threatLabel(threat)}</span>`,
     iconSize: [104, 52],
     iconAnchor: [17, 17],
   });
@@ -125,7 +99,7 @@ function makeThreatIcon(threat: LiveThreat) {
 function makeShotIcon() {
   return L.divIcon({
     className: "",
-    html: imageMarkerHtml(interceptorShotIcon, "map-marker--shot"),
+    html: imageMarkerHtml(markerSprites.interceptorShot, "map-marker--shot"),
     iconSize: [24, 24],
     iconAnchor: [12, 12],
   });
@@ -134,7 +108,7 @@ function makeShotIcon() {
 function makeImpactIcon(marker: ImpactMarker) {
   return L.divIcon({
     className: "",
-    html: imageMarkerHtml(marker.tone === "impact" ? impactMarkerIcon : interceptorShotIcon, `map-marker--${marker.tone}`),
+    html: imageMarkerHtml(marker.tone === "impact" ? markerSprites.impactEvent : markerSprites.interceptedThreat, `map-marker--${marker.tone}`),
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   });
@@ -144,10 +118,25 @@ function makeLaunchIcon(sector: LaunchSector) {
   const primary = sector.supports[0] || "drone";
   return L.divIcon({
     className: "",
-    html: imageMarkerHtml(threatIcon[primary], "map-marker--launch"),
+    html: imageMarkerHtml(threatSprites[primary], "map-marker--launch"),
     iconSize: [30, 30],
     iconAnchor: [15, 15],
   });
+}
+
+function makeSupplyNodeIcon(node: SupplyNode) {
+  return L.divIcon({
+    className: "",
+    html: imageMarkerHtml(unitSprites.logistics, `map-marker--supply map-marker--supply-${node.source}`),
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+}
+
+function routeColor(route: SupplyRoute) {
+  if (route.status === "well-supplied") return "#78dd9a";
+  if (route.status === "undersupplied") return "#ff6e6e";
+  return "#f2c865";
 }
 
 function MapClickPlacement() {
@@ -237,19 +226,24 @@ export function TacticalMap() {
           }}
         />
       )) : null}
-      {mapMode === "logistics" ? game.infrastructure
-        .filter((node) => node.kind === "logistics")
-        .map((node) => {
-          const city = game.cities.find((item) => item.id === node.cityId);
-          if (!city) return null;
-          return (
-            <Polyline
-              key={`logistics-${node.id}`}
-              positions={[[node.coordinates.lat, node.coordinates.lng], [city.coordinates.lat, city.coordinates.lng]]}
-              pathOptions={{ color: "#78dd9a", weight: 2, opacity: 0.56, dashArray: "2 8" }}
-            />
-          );
-        }) : null}
+      {mapMode === "logistics" ? game.logistics.routes.map((route) => (
+        <Polyline
+          key={route.id}
+          positions={[[route.from.lat, route.from.lng], [route.to.lat, route.to.lng]]}
+          pathOptions={{ color: routeColor(route), weight: 2, opacity: 0.62, dashArray: route.status === "well-supplied" ? "3 7" : "8 5" }}
+        >
+          <Tooltip direction="top" offset={[0, -8]}>
+            {route.label} - delay {route.delayDays} cycle(s)
+          </Tooltip>
+        </Polyline>
+      )) : null}
+      {mapMode === "logistics" ? game.logistics.nodes.map((node) => (
+        <Marker key={`supply-${node.id}`} position={[node.position.lat, node.position.lng]} icon={makeSupplyNodeIcon(node)}>
+          <Tooltip direction="top" offset={[0, -14]}>
+            {node.name} - supply strength {Math.round(node.strength)}%
+          </Tooltip>
+        </Marker>
+      )) : null}
       {nodeMarkers.map(({ node, icon }) => (
         <Marker
           key={node.id}
@@ -282,7 +276,7 @@ export function TacticalMap() {
           eventHandlers={{ click: () => setSelectedBattery(battery.id) }}
         >
           <Tooltip direction="top" offset={[0, -14]}>
-            Coverage {battery.coverageTier} - readiness {Math.round(battery.readiness)}%
+            Coverage {battery.coverageTier} - readiness {Math.round(battery.readiness)}% - {battery.status}
           </Tooltip>
         </Marker>
       ))}

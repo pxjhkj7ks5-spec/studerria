@@ -1,4 +1,5 @@
 import { ClipboardList } from "lucide-react";
+import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
 
 interface AfterActionReportProps {
@@ -6,16 +7,12 @@ interface AfterActionReportProps {
 }
 
 export function AfterActionReport({ game }: AfterActionReportProps) {
-  const active = game.liveThreats.length;
-  const lowestNode = [...game.infrastructure].sort((left, right) => left.integrity - right.integrity)[0];
-  const averageConfidence = active
-    ? Math.round(game.liveThreats.reduce((sum, threat) => sum + threat.confidence, 0) / active)
-    : 0;
-  const recommendation = game.resources.ammo < 25
+  const report = game.afterActionReports[0];
+  const fallbackRecommendation = game.resources.ammo < 25
     ? "Conserve ammo and restore logistics."
     : game.resources.energy < 45
       ? "Prioritize energy resilience."
-      : active > 6
+      : game.liveThreats.length > 6
         ? "Expand detection coverage."
         : "Maintain layered coverage.";
 
@@ -25,16 +22,53 @@ export function AfterActionReport({ game }: AfterActionReportProps) {
         <ClipboardList size={20} />
         <div>
           <strong>After-action report</strong>
-          <span>Rolling live summary</span>
+          <span>{report ? `Cycle ${report.day} · ${report.archetype ? archetypeLabel(report.archetype) : "contact cycle"}` : "Pending first completed cycle"}</span>
         </div>
       </div>
-      <div className="aar-grid">
-        <span><strong>{game.interceptions}</strong> Intercepts</span>
-        <span><strong>{game.impacts}</strong> Impacts</span>
-        <span><strong>{averageConfidence}%</strong> Intel accuracy</span>
-        <span><strong>{lowestNode ? Math.round(lowestNode.integrity) : 0}%</strong> Weakest node</span>
-      </div>
-      <p>{recommendation}</p>
+      {report ? (
+        <>
+          <p className="aar-summary">{report.situationSummary}</p>
+          <div className="aar-grid">
+            <span><strong>{report.threatOverview.totalTracks}</strong> Tracks</span>
+            <span><strong>{report.threatOverview.confirmedThreats}</strong> Confirmed</span>
+            <span><strong>{report.threatOverview.decoys}</strong> Decoys</span>
+            <span><strong>{report.threatOverview.unidentifiedTracks}</strong> Unknown</span>
+            <span><strong>{report.defensePerformance.interceptions}</strong> Intercepts</span>
+            <span><strong>{report.defensePerformance.missedThreats}</strong> Missed</span>
+          </div>
+          <div className="aar-section">
+            <strong>Defense Performance</strong>
+            <span>Ammo spent {Math.round(report.defensePerformance.ammoSpent)} · readiness {Math.round(report.defensePerformance.averageReadinessChange)}%</span>
+            <span>Strongest {report.defensePerformance.strongestUnit} · weakest area {report.defensePerformance.weakestCoverageArea}</span>
+          </div>
+          <div className="aar-section">
+            <strong>Damage Report</strong>
+            <span>{report.damageReport.damagedCities.length ? report.damageReport.damagedCities.join(", ") : "No new city damage reported"}</span>
+            <span>Energy {Math.round(report.damageReport.systems.energy)}% · Logistics {Math.round(report.damageReport.systems.logistics)}% · Morale {Math.round(report.damageReport.systems.civilMorale)}%</span>
+          </div>
+          <div className="aar-section">
+            <strong>Resource Changes</strong>
+            <span>Budget {signed(report.resourceChanges.budget)} · Ammo {signed(report.resourceChanges.ammo)} · Energy {signed(report.resourceChanges.energy)}</span>
+            <span>Morale {signed(report.resourceChanges.morale)} · Political {signed(report.resourceChanges.political)}</span>
+          </div>
+          <p>{report.recommendation}</p>
+        </>
+      ) : (
+        <>
+          <div className="aar-grid">
+            <span><strong>{game.interceptions}</strong> Intercepts</span>
+            <span><strong>{game.impacts}</strong> Impacts</span>
+            <span><strong>{game.liveThreats.length}</strong> Active tracks</span>
+            <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
+          </div>
+          <p>{fallbackRecommendation}</p>
+        </>
+      )}
     </section>
   );
+}
+
+function signed(value: number) {
+  const rounded = Math.round(value);
+  return `${rounded >= 0 ? "+" : ""}${rounded}`;
 }

@@ -9,7 +9,7 @@ const modeCopy: Record<MapMode, string> = {
   live: "Live tracks, cities, sectors, and active engagements.",
   threats: "Approximate corridors and confidence state. No real routing data.",
   coverage: "Abstract ППО coverage tiers and readiness pulses.",
-  logistics: "Supply pressure, damaged nodes, and repair priorities.",
+  logistics: "Supply pressure, damaged nodes, route delays, and repair priorities.",
 };
 
 export function MapLegend({ mode }: MapLegendProps) {

@@ -5,11 +5,14 @@ import { CityPanel } from "./components/CityPanel";
 import { IntelLog } from "./components/IntelLog";
 import { MapLegend } from "./components/MapLegend";
 import { ModeSelection } from "./components/ModeSelection";
+import { PlanningActionsPanel } from "./components/PlanningActionsPanel";
 import { ResourceBar } from "./components/ResourceBar";
+import { ScenarioSelection } from "./components/ScenarioSelection";
 import { TacticalMap } from "./components/TacticalMap";
 import { TutorialOverlay } from "./components/TutorialOverlay";
 import { UnitRail } from "./components/UnitRail";
 import { getCampaignModeDefinition } from "./data/campaignModes";
+import { getScenario } from "./data/scenarios";
 import { useGameStore } from "./store/useGameStore";
 import type { MapMode } from "./types/game";
 
@@ -23,15 +26,19 @@ const mapModes: Array<{ id: MapMode; label: string }> = [
 export default function App() {
   const game = useGameStore((state) => state.game);
   const campaignMode = useGameStore((state) => state.campaignMode);
+  const pendingCampaignMode = useGameStore((state) => state.pendingCampaignMode);
   const mapMode = useGameStore((state) => state.mapMode);
   const tutorialDismissed = useGameStore((state) => state.tutorialDismissed);
   const selectCampaignMode = useGameStore((state) => state.selectCampaignMode);
+  const selectScenario = useGameStore((state) => state.selectScenario);
+  const clearScenarioSelection = useGameStore((state) => state.clearScenarioSelection);
   const returnToModeSelect = useGameStore((state) => state.returnToModeSelect);
   const setMapMode = useGameStore((state) => state.setMapMode);
   const dismissTutorial = useGameStore((state) => state.dismissTutorial);
   const resetCampaign = useGameStore((state) => state.resetCampaign);
   const tick = useGameStore((state) => state.tick);
   const removeSelectedBattery = useGameStore((state) => state.removeSelectedBattery);
+  const startSelectedBatteryMaintenance = useGameStore((state) => state.startSelectedBatteryMaintenance);
   const selectedCityId = useGameStore((state) => state.selectedCityId);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const placementKind = useGameStore((state) => state.placementKind);
@@ -39,6 +46,7 @@ export default function App() {
   const selectedCity = game.cities.find((city) => city.id === selectedCityId) || game.cities[0];
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
+  const scenario = getScenario(game.scenarioId);
   const lastTickRef = useRef<number | null>(null);
   const accumulatorRef = useRef(0);
 
@@ -62,6 +70,10 @@ export default function App() {
     return () => window.cancelAnimationFrame(frameId);
   }, [campaignMode, tick]);
 
+  if (!campaignMode && pendingCampaignMode) {
+    return <ScenarioSelection onSelect={selectScenario} onBack={clearScenarioSelection} />;
+  }
+
   if (!campaignMode) {
     return <ModeSelection onSelect={selectCampaignMode} />;
   }
@@ -78,7 +90,7 @@ export default function App() {
           </div>
           <div>
             <h1>Shieldline</h1>
-            <span>{modeDefinition?.title || "Live defense"} · command watch</span>
+            <span>{scenario.title} · {modeDefinition?.title || "Live defense"} · {game.cyclePhase}</span>
           </div>
         </div>
         <ResourceBar game={game} />
@@ -118,8 +130,13 @@ export default function App() {
             <Crosshair size={22} />
             <div>
               <strong>Selected ППО</strong>
-              <span>Coverage {selectedBattery.coverageTier} · readiness {Math.round(selectedBattery.readiness)}%</span>
+              <span>
+                Coverage {selectedBattery.coverageTier} · readiness {Math.round(selectedBattery.readiness)}%
+                {" · "}fatigue {Math.round(selectedBattery.fatigue)}% · {selectedBattery.status}
+                {" · "}{selectedBattery.supplyStatus}
+              </span>
             </div>
+            <button type="button" onClick={startSelectedBatteryMaintenance} disabled={selectedBattery.status === "maintenance"}>Maintain</button>
             <button type="button" onClick={removeSelectedBattery}>Recall</button>
           </section>
         ) : (
@@ -132,11 +149,14 @@ export default function App() {
           </section>
         )}
         <div className="live-stats" aria-label="Live defense telemetry">
+          <span><strong>{game.day}</strong> Cycle</span>
           <span><strong>{game.liveThreats.length}</strong> Threats</span>
           <span><strong>{game.interceptions}</strong> Interceptions</span>
           <span><strong>{game.impacts}</strong> Impacts</span>
           <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
+          <span><strong>{game.logistics.resupplyDelayDays}</strong> Supply delay</span>
         </div>
+        <PlanningActionsPanel />
         <AfterActionReport game={game} />
         {game.resources.ammo < 15 ? (
           <div className="status-card status-card--lost">
@@ -162,7 +182,7 @@ export default function App() {
         <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Reset campaign confirmation">
           <section className="confirm-card">
             <strong>Reset campaign?</strong>
-            <span>This clears live threats, placements, and current resource state for this mode.</span>
+            <span>This clears live threats, placements, and current resource state for this scenario.</span>
             <div>
               <button type="button" onClick={() => setConfirmReset(false)}>Cancel</button>
               <button

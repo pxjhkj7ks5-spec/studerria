@@ -1,8 +1,10 @@
 import { initialCities, initialInfrastructure } from "../data/mapData";
 import { initialLaunchSectors } from "../data/launchSectors";
 import { getCampaignModeDefinition } from "../data/campaignModes";
+import { getScenario } from "../data/scenarios";
 import { unitDefinitions } from "../data/units";
-import type { CampaignMode, DailyForecast, DeployedUnit, GameState, IntelEntry, LiveThreat } from "../types/game";
+import { buildLogisticsState } from "./logistics";
+import type { CampaignMode, City, DailyForecast, DeployedUnit, GameState, IntelEntry, LiveThreat } from "../types/game";
 
 const initialUnits: DeployedUnit[] = [
   { id: "seed-radar-kyiv", kind: "radar", cityId: "kyiv", readiness: 86 },
@@ -75,14 +77,41 @@ export function createForecast(day: number, random: () => number): DailyForecast
 
 export function createInitialState(random: () => number = Math.random, mode: CampaignMode = "crisis"): GameState {
   const modeDefinition = getCampaignModeDefinition(mode);
-  return {
+  const scenario = getScenario(mode === "training" ? "first-night" : mode === "seven-day" ? "grid-pressure" : mode === "sandbox" ? "decoy-storm" : "thirty-days-under-pressure");
+  const cities = initialCities.map((city) => applyCityModifier(city, scenario.initialCityStateModifiers[city.id]));
+  const state: GameState = {
     day: 1,
+    scenarioId: scenario.id,
+    difficulty: scenario.difficulty,
+    cyclePhase: "planning",
+    cycleStartedAtMs: 0,
+    cycleDurationMs: 180000,
+    currentAttackPlan: null,
+    attackPlanHistory: [],
+    cycleSnapshot: null,
+    afterActionReports: [],
+    latestReportId: null,
+    planningActions: {
+      selected: [],
+      cooldowns: {},
+      usageCounts: {},
+      pendingAid: [],
+    },
+    logistics: {
+      nodes: [],
+      routes: [],
+      citySupply: {},
+      unitSupply: {},
+      resupplyDelayDays: 0,
+      ammoRecoveryMultiplier: 1,
+      repairRecoveryMultiplier: 1,
+    },
     elapsedMs: 0,
     wavePressure: 18,
     status: "active",
     statusReason: "",
-    resources: { ...modeDefinition.resources },
-    cities: initialCities.map((city) => ({ ...city })),
+    resources: { ...modeDefinition.resources, ...scenario.startingResources },
+    cities,
     infrastructure: initialInfrastructure.map((node) => ({ ...node })),
     launchSectors: initialLaunchSectors.map((sector) => ({
       ...sector,
@@ -98,6 +127,34 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
     impacts: 0,
     log: openingLog,
     forecast: createForecast(1, random),
+  };
+  state.logistics = buildLogisticsState(state);
+  return state;
+}
+
+export function createScenarioState(random: () => number = Math.random, mode: CampaignMode = "crisis", scenarioId = "thirty-days-under-pressure"): GameState {
+  const scenario = getScenario(scenarioId);
+  const state = createInitialState(random, mode);
+  state.scenarioId = scenario.id;
+  state.difficulty = scenario.difficulty;
+  state.resources = { ...scenario.startingResources };
+  state.cities = initialCities.map((city) => applyCityModifier(city, scenario.initialCityStateModifiers[city.id]));
+  state.liveThreats = [createOpeningThreat()];
+  state.logistics = buildLogisticsState(state);
+  state.log.unshift({
+    id: `scenario-${scenario.id}`,
+    time: "T+00:00",
+    title: "Scenario Selected",
+    body: `${scenario.title}: ${scenario.description}`,
+    tone: "info",
+  });
+  return state;
+}
+
+function applyCityModifier(city: City, modifier: Partial<Pick<City, "infrastructure" | "morale" | "energy" | "damage">> | undefined): City {
+  return {
+    ...city,
+    ...(modifier || {}),
   };
 }
 

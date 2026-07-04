@@ -1,4 +1,11 @@
+import { getScenario } from "../data/scenarios";
 import { unitDefinitions } from "../data/units";
+import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
+import { buildLogisticsState } from "./logistics";
+import { clamp, createId, pick, weightedChance } from "./math";
+import { applyPlanningActionCosts, applyPlanningRecoveryEffects, closePlanningDay } from "./planningActions";
+import { chooseAttackPlan, createThreatDirectorContext, pickThreatKindForPlan } from "./threatDirector";
+import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recoverReadiness } from "./unitReadiness";
 import type {
   CityId,
   Coordinates,
@@ -13,10 +20,10 @@ import type {
   UnitDefinition,
   UnitKind,
 } from "../types/game";
-import { clamp, createId, pick, weightedChance } from "./math";
 
-const SIMULATION_SPEED = 600;
-const MAX_LIVE_THREATS = 14;
+const MAX_LIVE_THREATS = 18;
+const PLANNING_WINDOW_MS = 30000;
+const MIN_ATTACK_WINDOW_MS = 90000;
 const UKRAINE_BOUNDS = {
   minLat: 44.4,
   maxLat: 52.4,
@@ -24,7 +31,7 @@ const UKRAINE_BOUNDS = {
   maxLng: 40.6,
 };
 
-const threatKinds: ThreatKind[] = ["drone", "ballistic", "cruise", "decoy", "combined", "saturation"];
+const fallbackThreatKinds: ThreatKind[] = ["drone", "ballistic", "cruise", "decoy", "combined", "saturation"];
 
 const rangeByTier: Record<DefenseBattery["coverageTier"], number> = {
   I: 0.85,
@@ -44,12 +51,37 @@ function cloneState(state: GameState): GameState {
       supports: [...sector.supports],
     })),
     units: state.units.map((unit) => ({ ...unit })),
-    batteries: state.batteries.map((battery) => ({ ...battery })),
-    liveThreats: state.liveThreats.map((threat) => ({ ...threat })),
-    interceptorShots: state.interceptorShots.map((shot) => ({ ...shot })),
-    impactMarkers: state.impactMarkers.map((marker) => ({ ...marker })),
+    batteries: state.batteries.map((battery) => ({ ...battery, position: { ...battery.position } })),
+    liveThreats: state.liveThreats.map((threat) => ({ ...threat, origin: { ...threat.origin }, target: { ...threat.target } })),
+    interceptorShots: state.interceptorShots.map((shot) => ({ ...shot, from: { ...shot.from }, to: { ...shot.to } })),
+    impactMarkers: state.impactMarkers.map((marker) => ({ ...marker, position: { ...marker.position } })),
     log: state.log.map((entry) => ({ ...entry })),
     forecast: { ...state.forecast },
+    currentAttackPlan: state.currentAttackPlan ? { ...state.currentAttackPlan, targetPriorities: [...state.currentAttackPlan.targetPriorities], threatMix: [...state.currentAttackPlan.threatMix] } : null,
+    attackPlanHistory: state.attackPlanHistory.map((plan) => ({ ...plan, targetPriorities: [...plan.targetPriorities], threatMix: [...plan.threatMix] })),
+    cycleSnapshot: state.cycleSnapshot ? {
+      ...state.cycleSnapshot,
+      resources: { ...state.cycleSnapshot.resources },
+      cities: state.cycleSnapshot.cities.map((city) => ({ ...city })),
+      infrastructure: state.cycleSnapshot.infrastructure.map((node) => ({ ...node })),
+      batteries: state.cycleSnapshot.batteries.map((battery) => ({ ...battery })),
+    } : null,
+    afterActionReports: state.afterActionReports.map((report) => ({ ...report })),
+    planningActions: {
+      selected: [...state.planningActions.selected],
+      cooldowns: { ...state.planningActions.cooldowns },
+      usageCounts: { ...state.planningActions.usageCounts },
+      pendingAid: state.planningActions.pendingAid.map((aid) => ({ ...aid })),
+    },
+    logistics: {
+      nodes: state.logistics.nodes.map((node) => ({ ...node, position: { ...node.position } })),
+      routes: state.logistics.routes.map((route) => ({ ...route, from: { ...route.from }, to: { ...route.to } })),
+      citySupply: { ...state.logistics.citySupply },
+      unitSupply: { ...state.logistics.unitSupply },
+      resupplyDelayDays: state.logistics.resupplyDelayDays,
+      ammoRecoveryMultiplier: state.logistics.ammoRecoveryMultiplier,
+      repairRecoveryMultiplier: state.logistics.repairRecoveryMultiplier,
+    },
   };
 }
 
@@ -68,7 +100,7 @@ function pushLog(entries: IntelEntry[], elapsedMs: number, title: string, body: 
     body,
     tone,
   });
-  entries.splice(24);
+  entries.splice(30);
 }
 
 function getUnitDefinition(kind: UnitKind): UnitDefinition {
@@ -100,23 +132,34 @@ function batteryTier(unit: UnitDefinition): DefenseBattery["coverageTier"] {
 }
 
 export function placeBattery(state: GameState, kind: UnitKind, position: Coordinates, random: () => number = Math.random): GameState {
+  const scenario = getScenario(state.scenarioId);
   const unit = getUnitDefinition(kind);
-  if (state.status !== "active" || state.resources.budget < unit.cost) return state;
+  if (state.status !== "active" || state.resources.budget < unit.cost || !scenario.allowedUnits.includes(kind)) return state;
 
   const next = cloneState(state);
   const quantized = quantizePlacement(position);
   const tier = batteryTier(unit);
   next.resources.budget = clamp(next.resources.budget - unit.cost, 0, 999);
-  next.batteries.push({
+  const battery: DefenseBattery = {
     id: createId("battery", Math.floor(next.elapsedMs), random),
     kind,
     position: quantized,
     coverageTier: tier,
     coverageRadius: rangeByTier[tier],
     readiness: unit.readiness,
-    cooldownMs: 0,
+    fatigue: 8,
+    daysSinceMaintenance: 0,
+    lastAction: "placed",
+    status: "ready",
+    supplyStatus: "strained",
+    cooldownMs: next.planningActions.selected.includes("rapid-redeployment") ? 900 : 0,
     assignedCityId: nearestCityId(next, quantized),
-  });
+  };
+  if (next.planningActions.selected.includes("rapid-redeployment")) {
+    applyRedeployFatigue(battery);
+  }
+  next.batteries.push(battery);
+  next.logistics = buildLogisticsState(next);
   pushLog(next.log, next.elapsedMs, `${unit.name} Placed`, `${unit.name} is active in Coverage ${tier}.`, "success");
   return next;
 }
@@ -128,7 +171,17 @@ export function removeBattery(state: GameState, batteryId: string): GameState {
   const unit = getUnitDefinition(battery.kind);
   next.batteries = next.batteries.filter((item) => item.id !== batteryId);
   next.resources.budget = clamp(next.resources.budget + Math.round(unit.cost * 0.45), 0, 999);
+  next.logistics = buildLogisticsState(next);
   pushLog(next.log, next.elapsedMs, `${unit.shortName} Recalled`, "A defense unit was recalled and partial budget was recovered.", "info");
+  return next;
+}
+
+export function setBatteryMaintenance(state: GameState, batteryId: string): GameState {
+  const next = cloneState(state);
+  const battery = next.batteries.find((item) => item.id === batteryId);
+  if (!battery || battery.status === "maintenance") return next;
+  enterMaintenance(battery);
+  pushLog(next.log, next.elapsedMs, "Maintenance Assigned", "A defense unit entered one abstract cycle of accelerated recovery.", "info");
   return next;
 }
 
@@ -151,26 +204,44 @@ function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () 
   return pick(sectors, random);
 }
 
+function pickTargetNode(state: GameState, kind: ThreatKind, random: () => number) {
+  const plan = state.currentAttackPlan;
+  const preferred = plan
+    ? state.infrastructure.filter((node) => plan.targetPriorities.includes(node.kind))
+    : [];
+  const pool = preferred.length ? preferred : state.infrastructure;
+  if (kind === "decoy") return pick(pool, random);
+  return [...pool].sort((left, right) => {
+    const leftCity = state.cities.find((city) => city.id === left.cityId);
+    const rightCity = state.cities.find((city) => city.id === right.cityId);
+    const leftScore = (left.critical ? 20 : 0) + (leftCity?.importance || 1) * 6 + (100 - left.integrity) * 0.22;
+    const rightScore = (right.critical ? 20 : 0) + (rightCity?.importance || 1) * 6 + (100 - right.integrity) * 0.22;
+    return rightScore - leftScore + (random() - 0.5) * 10;
+  })[0];
+}
+
 function spawnThreat(state: GameState, random: () => number): LiveThreat {
-  const node = pick(state.infrastructure, random);
-  const kind = pick(threatKinds, random);
+  const plan = state.currentAttackPlan;
+  const kind = plan ? pickThreatKindForPlan(plan, random) : pick(fallbackThreatKinds, random);
+  const node = pickTargetNode(state, kind, random);
   const launchSector = pickLaunchSector(state.launchSectors, kind, random);
   const difficulty: Record<ThreatKind, number> = {
-    drone: 26,
-    ballistic: 52,
+    drone: 24,
+    ballistic: 54,
     cruise: 42,
-    decoy: 20,
-    combined: 54,
-    saturation: 62,
+    decoy: 18,
+    combined: 56,
+    saturation: 48,
   };
   const speed: Record<ThreatKind, number> = {
-    drone: 0.0000055,
-    ballistic: 0.0000081,
-    cruise: 0.0000066,
-    decoy: 0.0000062,
-    combined: 0.000007,
-    saturation: 0.0000058,
+    drone: 0.0000049,
+    ballistic: 0.0000076,
+    cruise: 0.0000061,
+    decoy: 0.0000054,
+    combined: 0.0000064,
+    saturation: 0.0000048,
   };
+  const falseTrack = kind === "decoy" || random() < (plan?.deception || 0) * 0.045;
   return {
     id: createId("live-threat", Math.floor(state.elapsedMs), random),
     kind,
@@ -182,41 +253,51 @@ function spawnThreat(state: GameState, random: () => number): LiveThreat {
     launchSectorId: launchSector.id,
     launchSectorName: launchSector.name,
     progress: 0,
-    speed: speed[kind] * (0.92 + random() * 0.16),
-    difficulty: difficulty[kind] * launchSector.pressure + state.wavePressure * 0.18,
-    damage: kind === "decoy" ? 0 : 10 + random() * 18,
+    speed: speed[kind] * (0.9 + random() * 0.2),
+    difficulty: difficulty[kind] * launchSector.pressure + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
+    damage: falseTrack ? 0 : 9 + random() * 17 + (plan?.intensity || 1),
     detected: false,
-    confidence: 18 + random() * 24,
+    confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,
     saturation: kind === "saturation" ? 1.7 : kind === "combined" ? 1.25 : 1,
+    attackPlanId: plan?.id,
+    archetype: plan?.archetype,
+    isFalseTrack: falseTrack,
+    plannedTargetPriority: node.kind,
   };
 }
 
 function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => number) {
-  if (state.liveThreats.length >= MAX_LIVE_THREATS) return;
-  const pressure = 0.000045 + state.wavePressure * 0.000001;
+  if (state.cyclePhase !== "attack" || state.liveThreats.length >= MAX_LIVE_THREATS) return;
+  const plan = state.currentAttackPlan;
+  const pressure = 0.000035 + state.wavePressure * 0.00000055 + (plan?.intensity || 1) * 0.000018;
   if (random() < pressure * deltaMs) {
     const threat = spawnThreat(state, random);
     state.liveThreats.push(threat);
-    pushLog(state.log, state.elapsedMs, "Track Warning", "Uncertain inbound track appeared on the tactical map.", "warning");
+    pushLog(state.log, state.elapsedMs, "Track Warning", `${plan?.eventText || "Uncertain inbound track appeared on the tactical map."}`, "warning");
   }
 }
 
 function detectThreats(state: GameState, random: () => number) {
+  const highAlert = state.planningActions.selected.includes("high-alert");
+  const intelFocus = state.planningActions.selected.includes("intelligence-focus");
   for (const threat of state.liveThreats) {
     if (threat.detected) continue;
     const position = threatPosition(threat);
     const detectionScore = state.batteries.reduce((score, battery) => {
       const unit = getUnitDefinition(battery.kind);
+      if (battery.status === "maintenance") return score;
       const distance = abstractDistance(position, battery.position);
       if (distance > battery.coverageRadius * 1.25) return score;
-      return score + unit.detectionBonus * (battery.readiness / 100) * (1 - distance / (battery.coverageRadius * 1.35));
-    }, 16);
-    threat.confidence = clamp(threat.confidence + Math.max(0.25, detectionScore * 0.018), 0, 100);
-    if (weightedChance(detectionScore - threat.difficulty * 0.25, random)) {
+      const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
+      return score + unit.detectionBonus * (battery.readiness / 100) * statusPenalty * (1 - distance / (battery.coverageRadius * 1.35));
+    }, highAlert ? 28 : 16);
+    const confidenceBoost = (highAlert ? 0.028 : 0.018) + (intelFocus ? 0.012 : 0);
+    threat.confidence = clamp(threat.confidence + Math.max(0.2, detectionScore * confidenceBoost), 0, 100);
+    if (weightedChance(detectionScore - threat.difficulty * 0.22 + (intelFocus ? 8 : 0), random)) {
       threat.detected = true;
       threat.status = "detected";
-      threat.confidence = clamp(threat.confidence + 16 + random() * 16, 0, 100);
-      pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.kind} track classified with low-confidence intelligence.`, "info");
+      threat.confidence = clamp(threat.confidence + 16 + random() * 18 + (intelFocus ? 10 : 0), 0, 100);
+      pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track classified by abstract intelligence.`, "info");
     }
   }
 }
@@ -251,9 +332,16 @@ function updateShots(state: GameState, deltaMs: number) {
 }
 
 function engageThreats(state: GameState, random: () => number) {
+  const conserveAmmo = state.planningActions.selected.includes("conserve-ammo");
   for (const battery of state.batteries) {
     const unit = getUnitDefinition(battery.kind);
-    if (unit.interceptionPower <= 0 || battery.cooldownMs > 0 || state.resources.ammo < unit.ammoUse) continue;
+    const ammoUse = Math.max(1, Math.round(unit.ammoUse * (conserveAmmo ? 0.62 : 1)));
+    if (
+      unit.interceptionPower <= 0
+      || battery.cooldownMs > 0
+      || battery.status === "maintenance"
+      || state.resources.ammo < ammoUse
+    ) continue;
     const candidate = state.liveThreats
       .filter((threat) => threat.detected && threat.status !== "engaged")
       .map((threat) => ({ threat, distance: abstractDistance(threatPosition(threat), battery.position) }))
@@ -261,21 +349,23 @@ function engageThreats(state: GameState, random: () => number) {
       .sort((left, right) => right.threat.progress - left.threat.progress)[0];
     if (!candidate) continue;
 
-    const chance = unit.interceptionPower * (battery.readiness / 100)
+    const statusPenalty = battery.status === "exhausted" ? 0.44 : battery.status === "strained" ? 0.72 : 1;
+    const chance = unit.interceptionPower * (battery.readiness / 100) * statusPenalty
       - candidate.threat.difficulty * 0.24
       - candidate.threat.saturation * 4
-      + (1 - candidate.distance / battery.coverageRadius) * 18;
+      + (1 - candidate.distance / battery.coverageRadius) * 18
+      - (conserveAmmo ? 8 : 0);
     if (!weightedChance(chance, random)) {
       battery.cooldownMs = 1100;
-      battery.readiness = clamp(battery.readiness - 2, 35, 100);
+      applyEngagementFatigue(battery, ammoUse, false);
       continue;
     }
 
     candidate.threat.status = "engaged";
     candidate.threat.confidence = clamp(candidate.threat.confidence + 18, 0, 100);
-    state.resources.ammo = clamp(state.resources.ammo - unit.ammoUse, 0, 999);
-    battery.cooldownMs = 2600 + unit.ammoUse * 180;
-    battery.readiness = clamp(battery.readiness - 3.5, 35, 100);
+    state.resources.ammo = clamp(state.resources.ammo - ammoUse, 0, 999);
+    battery.cooldownMs = 2600 + ammoUse * 180;
+    applyEngagementFatigue(battery, ammoUse, true);
     state.interceptorShots.push({
       id: createId("shot", Math.floor(state.elapsedMs), random),
       batteryId: battery.id,
@@ -294,7 +384,7 @@ function applyImpact(state: GameState, threat: LiveThreat) {
   const city = state.cities.find((item) => item.id === threat.targetCityId);
   if (!node || !city) return;
 
-  const damage = threat.kind === "decoy" ? 2 : threat.damage;
+  const damage = threat.isFalseTrack || threat.kind === "decoy" ? 1.5 : threat.damage;
   node.integrity = clamp(node.integrity - damage);
   city.damage = clamp(city.damage + damage * 0.35);
   city.infrastructure = clamp(city.infrastructure - damage * 0.25);
@@ -309,7 +399,7 @@ function applyImpact(state: GameState, threat: LiveThreat) {
 function updateThreats(state: GameState, deltaMs: number) {
   const remaining: LiveThreat[] = [];
   for (const threat of state.liveThreats) {
-    const next = { ...threat, progress: threat.progress + threat.speed * deltaMs * (SIMULATION_SPEED / 600) };
+    const next = { ...threat, progress: threat.progress + threat.speed * deltaMs };
     if (next.progress >= 1) {
       applyImpact(state, next);
     } else {
@@ -320,20 +410,78 @@ function updateThreats(state: GameState, deltaMs: number) {
 }
 
 function updateResourcesAndTimers(state: GameState, deltaMs: number) {
+  state.logistics = buildLogisticsState(state);
+  const repairKinds = new Set(state.batteries.filter((battery) => battery.kind === "repair").map((battery) => battery.assignedCityId));
   for (const battery of state.batteries) {
     battery.cooldownMs = Math.max(0, battery.cooldownMs - deltaMs);
-    battery.readiness = clamp(battery.readiness + deltaMs * 0.00022, 35, 100);
+    battery.supplyStatus = state.logistics.unitSupply[battery.id] || "strained";
+    recoverReadiness(battery, deltaMs, repairKinds.has(battery.assignedCityId), battery.supplyStatus);
+    if (state.planningActions.selected.includes("high-alert")) {
+      battery.fatigue = clamp(battery.fatigue + deltaMs * 0.00009, 0, 100);
+    }
   }
   state.impactMarkers = state.impactMarkers
     .map((marker) => ({ ...marker, ttlMs: marker.ttlMs - deltaMs }))
     .filter((marker) => marker.ttlMs > 0);
-  state.wavePressure = clamp(state.wavePressure + deltaMs * 0.00022, 10, 100);
-  state.resources.budget = clamp(state.resources.budget + deltaMs * 0.00042, 0, 999);
-  state.resources.ammo = clamp(state.resources.ammo + deltaMs * 0.00022, 0, 999);
+  state.wavePressure = clamp(state.wavePressure + deltaMs * 0.00018, 10, 100);
+  state.resources.budget = clamp(state.resources.budget + deltaMs * 0.00036 * state.logistics.repairRecoveryMultiplier, 0, 999);
+  state.resources.ammo = clamp(state.resources.ammo + deltaMs * 0.0002 * state.logistics.ammoRecoveryMultiplier, 0, 999);
+}
+
+function startAttackCycle(state: GameState, random: () => number) {
+  const scenario = getScenario(state.scenarioId);
+  state.logistics = buildLogisticsState(state);
+  applyPlanningActionCosts(state);
+  applyPlanningRecoveryEffects(state);
+  const context = createThreatDirectorContext(state, scenario);
+  const plan = chooseAttackPlan(context, random);
+  state.currentAttackPlan = plan;
+  state.attackPlanHistory = [...state.attackPlanHistory, plan].slice(-8);
+  state.cycleSnapshot = createCycleSnapshot(state);
+  state.cyclePhase = "attack";
+  state.cycleStartedAtMs = state.elapsedMs;
+  pushLog(state.log, state.elapsedMs, "Threat Director", plan.eventText, plan.archetype === "combined" || plan.archetype === "saturation" ? "warning" : "info");
+}
+
+function finishAttackCycle(state: GameState) {
+  if (state.cycleSnapshot) {
+    const report = generateAfterActionReport(state, state.cycleSnapshot);
+    state.afterActionReports = [report, ...state.afterActionReports].slice(0, 8);
+    state.latestReportId = report.id;
+    pushLog(state.log, state.elapsedMs, "After Action Report", report.situationSummary, report.defensePerformance.missedThreats > 0 ? "warning" : "success");
+  }
+  state.day += 1;
+  for (const battery of state.batteries) {
+    battery.daysSinceMaintenance += 1;
+    if (battery.status === "maintenance") {
+      battery.status = "ready";
+      battery.lastAction = "maintenance complete";
+    }
+  }
+  closePlanningDay(state);
+  state.currentAttackPlan = null;
+  state.cycleSnapshot = null;
+  state.cyclePhase = "planning";
+  state.cycleStartedAtMs = state.elapsedMs;
+}
+
+function updateCycle(state: GameState, random: () => number) {
+  const phaseElapsed = state.elapsedMs - state.cycleStartedAtMs;
+  if (state.cyclePhase === "planning" && phaseElapsed >= PLANNING_WINDOW_MS) {
+    startAttackCycle(state, random);
+  }
+  if (
+    state.cyclePhase === "attack"
+    && phaseElapsed >= MIN_ATTACK_WINDOW_MS
+    && (phaseElapsed >= state.cycleDurationMs || state.liveThreats.length === 0)
+  ) {
+    finishAttackCycle(state);
+  }
 }
 
 function evaluateLiveStatus(state: GameState) {
   const destroyedCritical = state.infrastructure.filter((node) => node.critical && node.integrity <= 0).length;
+  const scenario = getScenario(state.scenarioId);
   if (state.resources.morale <= 0) {
     state.status = "lost";
     state.statusReason = "National morale collapsed.";
@@ -343,6 +491,9 @@ function evaluateLiveStatus(state: GameState) {
   } else if (destroyedCritical >= 3) {
     state.status = "lost";
     state.statusReason = "Too many critical infrastructure nodes were destroyed.";
+  } else if (scenario.durationDays > 0 && state.day > scenario.durationDays) {
+    state.status = "won";
+    state.statusReason = "Scenario duration completed with national systems still functioning.";
   }
 }
 
@@ -352,6 +503,7 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   const safeDelta = clamp(deltaMs, 0, 1000);
   state.elapsedMs += safeDelta;
   updateResourcesAndTimers(state, safeDelta);
+  updateCycle(state, random);
   maybeSpawnThreat(state, safeDelta, random);
   detectThreats(state, random);
   engageThreats(state, random);

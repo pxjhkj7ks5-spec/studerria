@@ -33,6 +33,31 @@ export type CampaignMode = "training" | "seven-day" | "crisis" | "sandbox";
 
 export type MapMode = "live" | "threats" | "coverage" | "logistics";
 
+export type DifficultyLevel = "training" | "standard" | "hard" | "endurance";
+
+export type CyclePhase = "planning" | "attack" | "recovery";
+
+export type AttackArchetype =
+  | "probe"
+  | "saturation"
+  | "infrastructure"
+  | "decoy-screen"
+  | "pressure"
+  | "combined";
+
+export type PlanningActionId =
+  | "high-alert"
+  | "conserve-ammo"
+  | "emergency-aid"
+  | "energy-repair"
+  | "morale-campaign"
+  | "rapid-redeployment"
+  | "intelligence-focus";
+
+export type UnitStatus = "ready" | "strained" | "exhausted" | "maintenance" | "redeploying";
+
+export type SupplyStatus = "well-supplied" | "strained" | "undersupplied";
+
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -90,6 +115,11 @@ export interface DefenseBattery {
   coverageTier: CoverageTier;
   coverageRadius: number;
   readiness: number;
+  fatigue: number;
+  daysSinceMaintenance: number;
+  lastAction: string;
+  status: UnitStatus;
+  supplyStatus: SupplyStatus;
   cooldownMs: number;
   assignedCityId: CityId;
 }
@@ -145,6 +175,10 @@ export interface LiveThreat {
   detected: boolean;
   confidence: number;
   saturation: number;
+  attackPlanId?: string;
+  archetype?: AttackArchetype;
+  isFalseTrack?: boolean;
+  plannedTargetPriority?: string;
 }
 
 export interface InterceptorShot {
@@ -172,8 +206,151 @@ export interface DailyForecast {
   vagueWarning: string;
 }
 
+export interface AttackPlan {
+  id: string;
+  day: number;
+  archetype: AttackArchetype;
+  intensity: number;
+  deception: number;
+  targetPriorities: InfrastructureKind[];
+  threatMix: ThreatKind[];
+  eventText: string;
+}
+
+export interface ThreatDirectorContext {
+  resources: Resources;
+  cityDamage: number;
+  placedDefenseUnits: number;
+  ammoLevel: number;
+  moraleLevel: number;
+  energyStability: number;
+  intelligenceConfidence: number;
+  currentDay: number;
+  difficulty: DifficultyLevel;
+  recentArchetypes: AttackArchetype[];
+  weakSystems: InfrastructureKind[];
+  threatDirectorBias?: Partial<Record<AttackArchetype, number>>;
+}
+
+export interface PlanningActionState {
+  selected: PlanningActionId[];
+  cooldowns: Partial<Record<PlanningActionId, number>>;
+  usageCounts: Partial<Record<PlanningActionId, number>>;
+  pendingAid: Array<{ arrivesDay: number; budget: number; ammo: number }>;
+}
+
+export interface SupplyNode {
+  id: string;
+  name: string;
+  position: Coordinates;
+  strength: number;
+  cityId?: CityId;
+  source: "infrastructure" | "battery";
+}
+
+export interface SupplyRoute {
+  id: string;
+  from: Coordinates;
+  to: Coordinates;
+  status: SupplyStatus;
+  delayDays: number;
+  label: string;
+}
+
+export interface LogisticsState {
+  nodes: SupplyNode[];
+  routes: SupplyRoute[];
+  citySupply: Partial<Record<CityId, SupplyStatus>>;
+  unitSupply: Record<string, SupplyStatus>;
+  resupplyDelayDays: number;
+  ammoRecoveryMultiplier: number;
+  repairRecoveryMultiplier: number;
+}
+
+export interface ScenarioDefinition {
+  id: string;
+  title: string;
+  description: string;
+  durationDays: number;
+  difficulty: DifficultyLevel;
+  startingResources: Resources;
+  initialCityStateModifiers: Partial<Record<CityId, Partial<Pick<City, "infrastructure" | "morale" | "energy" | "damage">>>>;
+  allowedUnits: UnitKind[];
+  threatDirectorBias: Partial<Record<AttackArchetype, number>>;
+  specialRules: string[];
+  winConditions: string[];
+  lossConditions: string[];
+}
+
+export interface AfterActionReport {
+  id: string;
+  day: number;
+  generatedAtMs: number;
+  archetype?: AttackArchetype;
+  situationSummary: string;
+  threatOverview: {
+    totalTracks: number;
+    confirmedThreats: number;
+    decoys: number;
+    unidentifiedTracks: number;
+  };
+  defensePerformance: {
+    interceptions: number;
+    missedThreats: number;
+    ammoSpent: number;
+    averageReadinessChange: number;
+    strongestUnit: string;
+    weakestCoverageArea: string;
+  };
+  damageReport: {
+    damagedCities: string[];
+    systems: {
+      infrastructure: number;
+      energy: number;
+      communications: number;
+      logistics: number;
+      civilMorale: number;
+      repairCapacity: number;
+    };
+  };
+  resourceChanges: {
+    budget: number;
+    ammo: number;
+    energy: number;
+    morale: number;
+    political: number;
+  };
+  recommendation: string;
+  actionEffects: string[];
+  logisticsNotes: string[];
+}
+
+export interface CycleSnapshot {
+  day: number;
+  resources: Resources;
+  cities: City[];
+  infrastructure: InfrastructureNode[];
+  batteries: DefenseBattery[];
+  interceptions: number;
+  impacts: number;
+  ammo: number;
+  threatCount: number;
+}
+
 export interface GameState {
   day: number;
+  scenarioId: string;
+  difficulty: DifficultyLevel;
+  cyclePhase: CyclePhase;
+  cycleStartedAtMs: number;
+  cycleDurationMs: number;
+  currentAttackPlan: AttackPlan | null;
+  attackPlanHistory: AttackPlan[];
+  cycleSnapshot: CycleSnapshot | null;
+  afterActionReports: AfterActionReport[];
+  latestReportId: string | null;
+  planningActions: PlanningActionState;
+  logistics: LogisticsState;
   elapsedMs: number;
   wavePressure: number;
   status: CampaignStatus;

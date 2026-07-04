@@ -11,6 +11,7 @@ export function CityPanel({ city, game }: CityPanelProps) {
   const cityNodes = game.infrastructure.filter((node) => node.cityId === city.id);
   const communications = averageKind(cityNodes, "communications", city.infrastructure);
   const logistics = averageKind(cityNodes, "logistics", city.infrastructure);
+  const supplyStatus = game.logistics.citySupply[city.id] || "strained";
   const repairCapacity = Math.max(12, Math.round((city.infrastructure + logistics - city.damage) / 2));
   const risk = city.damage > 55 ? "Critical" : city.energy < 45 || city.infrastructure < 50 ? "Stressed" : "Stable";
 
@@ -29,13 +30,13 @@ export function CityPanel({ city, game }: CityPanelProps) {
         <Metric icon={Factory} label="Infrastructure" value={city.infrastructure} />
         <Metric icon={Zap} label="Energy" value={city.energy} />
         <Metric icon={Radio} label="Comms" value={communications} />
-        <Metric icon={Truck} label="Logistics" value={logistics} />
+        <Metric icon={Truck} label={`Logistics (${supplyStatus.replace("-", " ")})`} value={logistics} />
         <Metric icon={Users} label="Civil morale" value={city.morale} />
         <Metric icon={Wrench} label="Repair cap" value={repairCapacity} />
       </div>
       <div className="assigned-row">
         <span>{cityNodes.length} infrastructure nodes</span>
-        <small>abstract sector placement</small>
+        <small>abstract supply: {supplyStatus.replace("-", " ")}</small>
       </div>
     </section>
   );
