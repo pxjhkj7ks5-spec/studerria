@@ -497,6 +497,10 @@ button {
   animation: radar-coverage-pulse 1s steps(2, end) infinite;
 }
 
+.frontline-buffer-zone {
+  filter: drop-shadow(0 0 5px rgba(255, 138, 53, 0.32));
+}
+
 .map-marker--battery {
   width: 22px;
   height: 22px;
@@ -554,14 +558,14 @@ button {
 .threat-marker-wrap {
   position: relative;
   display: block;
-  width: 34px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
 }
 
 .target-sprite {
   position: absolute;
-  top: 0;
-  left: -1px;
+  top: 4px;
+  left: 4px;
   display: grid;
   width: 24px;
   height: 24px;
@@ -609,8 +613,8 @@ button {
 }
 
 .threat-marker-wrap--compact .threat-confidence {
-  top: 17px;
-  left: 14px;
+  top: 18px;
+  left: 18px;
 }
 
 .threat-confidence--uncertain { border-color: rgba(85, 215, 255, 0.34); color: #bdeeff; }
@@ -1627,6 +1631,113 @@ button {
   backdrop-filter: none;
 }
 
+.admin-shell {
+  min-height: 100vh;
+  padding: 24px;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(9, 20, 31, 0.96), rgba(3, 12, 18, 0.98)),
+    var(--bg);
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.admin-topbar h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.admin-topbar span,
+.admin-editor small {
+  color: var(--muted);
+}
+
+.admin-back-link,
+.admin-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(100, 193, 255, 0.18);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(17, 31, 44, 0.86);
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.admin-status {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(82, 233, 128, 0.22);
+  border-radius: 8px;
+  color: #cdeeff;
+  background: rgba(12, 35, 45, 0.78);
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-editor--wide {
+  grid-column: 1 / -1;
+}
+
+.admin-editor span {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-editor textarea {
+  min-height: 300px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid rgba(111, 202, 255, 0.18);
+  border-radius: 8px;
+  color: #eaf7ff;
+  background: rgba(3, 12, 18, 0.86);
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  outline: none;
+}
+
+.admin-editor textarea:focus {
+  border-color: rgba(85, 215, 255, 0.46);
+  box-shadow: 0 0 0 3px rgba(85, 215, 255, 0.1);
+}
+
+.admin-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 14px 0 0;
+  background: linear-gradient(180deg, rgba(3, 12, 18, 0), rgba(3, 12, 18, 0.96) 36%);
+}
+
+.admin-actions button:last-child {
+  border-color: rgba(82, 233, 128, 0.32);
+  color: #ddffe8;
+  background: rgba(24, 82, 52, 0.74);
+}
+
 @keyframes launch-pulse {
   0%, 100% {
     transform: scale(1);
@@ -1864,6 +1975,14 @@ button {
   .scenario-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-editor--wide {
+    grid-column: auto;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1929,5 +2048,17 @@ button {
   .next-day {
     min-height: 72px;
     font-size: 25px;
+  }
+
+  .admin-shell {
+    padding: 12px;
+  }
+
+  .admin-topbar {
+    align-items: flex-start;
+  }
+
+  .admin-editor textarea {
+    min-height: 240px;
   }
 }

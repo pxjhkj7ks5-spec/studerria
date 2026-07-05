@@ -187,7 +187,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
   if (state.status !== "active" || state.resources.budget < unit.cost || !scenario.allowedUnits.includes(kind)) return state;
 
   const next = cloneState(state);
-  const placement = validateBatteryPlacement(position);
+  const placement = validateBatteryPlacement(kind, position);
   if (!placement.allowed) {
     next.placementWarning = placement.reason || "Placement blocked by control constraints.";
     pushLog(next.log, next.elapsedMs, "Placement Blocked", next.placementWarning, "warning");

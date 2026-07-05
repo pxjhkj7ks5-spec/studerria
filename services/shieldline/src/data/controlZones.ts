@@ -1,34 +1,34 @@
 import type { Coordinates } from "../types/game";
 
 export interface ControlOverlay {
-  controlledUkrainePolygon: Coordinates[];
-  temporarilyOccupiedPolygons: Coordinates[][];
+  ukrainePlacementPolygon: Coordinates[];
+  occupiedPolygons: Coordinates[][];
   frontline: Coordinates[];
-  hostileBorder: Coordinates[];
+  waterPlacementPolygons: Coordinates[][];
 }
 
-// Static, simplified game overlay. It is not a live front map and should be
-// replaced by a manually imported official snapshot when available.
-export const controlOverlay: ControlOverlay = {
-  controlledUkrainePolygon: [
-    { lat: 52.25, lng: 23.6 },
-    { lat: 52.05, lng: 30.8 },
-    { lat: 51.45, lng: 33.6 },
-    { lat: 50.7, lng: 34.7 },
-    { lat: 49.95, lng: 35.55 },
-    { lat: 49.25, lng: 36.35 },
-    { lat: 48.65, lng: 35.85 },
-    { lat: 48.2, lng: 35.25 },
-    { lat: 47.75, lng: 34.65 },
-    { lat: 47.45, lng: 33.3 },
-    { lat: 47.05, lng: 32.25 },
-    { lat: 46.6, lng: 31.05 },
-    { lat: 45.35, lng: 29.55 },
-    { lat: 45.55, lng: 28.2 },
-    { lat: 48.0, lng: 22.15 },
-    { lat: 50.45, lng: 23.55 },
+export const CONTROL_OVERLAY_STORAGE_KEY = "shieldline-control-overlay-v1";
+
+// Static, simplified editorial overlay. It is not a live front map.
+export const defaultControlOverlay: ControlOverlay = {
+  ukrainePlacementPolygon: [
+    { lat: 52.35, lng: 22.15 },
+    { lat: 52.35, lng: 31.85 },
+    { lat: 51.75, lng: 34.45 },
+    { lat: 50.45, lng: 36.25 },
+    { lat: 49.2, lng: 40.25 },
+    { lat: 47.85, lng: 39.35 },
+    { lat: 46.25, lng: 38.45 },
+    { lat: 45.35, lng: 36.8 },
+    { lat: 44.45, lng: 34.65 },
+    { lat: 44.35, lng: 33.2 },
+    { lat: 44.9, lng: 30.25 },
+    { lat: 45.45, lng: 28.15 },
+    { lat: 46.45, lng: 27.2 },
+    { lat: 48.1, lng: 22.1 },
+    { lat: 50.65, lng: 23.0 },
   ],
-  temporarilyOccupiedPolygons: [
+  occupiedPolygons: [
     [
       { lat: 48.9, lng: 37.0 },
       { lat: 49.2, lng: 39.8 },
@@ -56,18 +56,80 @@ export const controlOverlay: ControlOverlay = {
     { lat: 47.75, lng: 36.1 },
     { lat: 47.35, lng: 35.2 },
     { lat: 46.95, lng: 34.2 },
-    { lat: 46.7, lng: 33.1 },
+      { lat: 46.7, lng: 33.1 },
   ],
-  hostileBorder: [
-    { lat: 52.2, lng: 31.8 },
-    { lat: 51.8, lng: 33.8 },
-    { lat: 50.9, lng: 34.7 },
-    { lat: 50.1, lng: 35.7 },
-    { lat: 49.4, lng: 36.5 },
-    { lat: 48.8, lng: 38.1 },
-    { lat: 47.9, lng: 39.1 },
-    { lat: 46.7, lng: 38.5 },
-    { lat: 45.8, lng: 36.8 },
-    { lat: 44.7, lng: 33.8 },
+  waterPlacementPolygons: [
+    [
+      { lat: 46.35, lng: 27.2 },
+      { lat: 46.45, lng: 30.7 },
+      { lat: 45.95, lng: 32.8 },
+      { lat: 45.1, lng: 35.4 },
+      { lat: 43.2, lng: 36.8 },
+      { lat: 42.85, lng: 29.0 },
+      { lat: 44.1, lng: 27.0 },
+    ],
+    [
+      { lat: 47.35, lng: 35.45 },
+      { lat: 47.65, lng: 39.25 },
+      { lat: 46.0, lng: 39.35 },
+      { lat: 45.1, lng: 37.0 },
+      { lat: 45.3, lng: 35.0 },
+    ],
   ],
 };
+
+function isFiniteCoordinate(value: unknown): value is Coordinates {
+  const candidate = value as Coordinates;
+  return Number.isFinite(candidate?.lat) && Number.isFinite(candidate?.lng);
+}
+
+function cleanLine(value: unknown, fallback: Coordinates[], minPoints = 2) {
+  if (!Array.isArray(value)) return fallback;
+  const points = value.filter(isFiniteCoordinate).map((point) => ({ lat: point.lat, lng: point.lng }));
+  return points.length >= minPoints ? points : fallback;
+}
+
+function cleanPolygons(value: unknown, fallback: Coordinates[][]) {
+  if (!Array.isArray(value)) return fallback;
+  const polygons = value
+    .map((polygon) => cleanLine(polygon, [], 3))
+    .filter((polygon) => polygon.length >= 3);
+  return polygons;
+}
+
+export function readSavedControlOverlay(): Partial<ControlOverlay> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CONTROL_OVERLAY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ControlOverlay>;
+    return {
+      ukrainePlacementPolygon: cleanLine(parsed.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
+      occupiedPolygons: cleanPolygons(parsed.occupiedPolygons, defaultControlOverlay.occupiedPolygons),
+      frontline: cleanLine(parsed.frontline, defaultControlOverlay.frontline),
+      waterPlacementPolygons: cleanPolygons(parsed.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function getControlOverlay(): ControlOverlay {
+  const saved = readSavedControlOverlay();
+  return {
+    ukrainePlacementPolygon: saved?.ukrainePlacementPolygon || defaultControlOverlay.ukrainePlacementPolygon,
+    occupiedPolygons: saved?.occupiedPolygons || defaultControlOverlay.occupiedPolygons,
+    frontline: saved?.frontline || defaultControlOverlay.frontline,
+    waterPlacementPolygons: saved?.waterPlacementPolygons || defaultControlOverlay.waterPlacementPolygons,
+  };
+}
+
+export function saveControlOverlay(overlay: ControlOverlay) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CONTROL_OVERLAY_STORAGE_KEY, JSON.stringify(overlay));
+}
+
+export function resetControlOverlay() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(CONTROL_OVERLAY_STORAGE_KEY);
+}

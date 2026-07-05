@@ -2,8 +2,9 @@ import L from "leaflet";
 import { Circle, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMapEvents } from "react-leaflet";
 import { Fragment, useMemo } from "react";
 import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
-import { controlOverlay } from "../data/controlZones";
+import { getControlOverlay } from "../data/controlZones";
 import { getUnitDefinition } from "../data/units";
+import { createLineBufferPolygons } from "../game/placementRules";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -118,8 +119,8 @@ function makeThreatIcon(threat: LiveThreat) {
   return L.divIcon({
     className: "",
     html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span>${label}</span>`,
-    iconSize: [34, 24],
-    iconAnchor: [8, 8],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
   });
 }
 
@@ -196,6 +197,11 @@ export function TacticalMap() {
   const mapMode = useGameStore((state) => state.mapMode);
   const setSelectedCity = useGameStore((state) => state.setSelectedCity);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
+  const controlOverlay = useMemo(() => getControlOverlay(), []);
+  const frontBufferPolygons = useMemo(
+    () => createLineBufferPolygons(controlOverlay.frontline),
+    [controlOverlay.frontline],
+  );
 
   const cityMarkers = useMemo(
     () => game.cities.map((city) => ({
@@ -226,23 +232,33 @@ export function TacticalMap() {
         attribution="&copy; OpenStreetMap contributors"
       />
       <Polygon
-        positions={toPositions(controlOverlay.controlledUkrainePolygon)}
-        pathOptions={{ color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.035, opacity: 0.22, weight: 1 }}
+        positions={toPositions(controlOverlay.ukrainePlacementPolygon)}
+        pathOptions={{ color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.18, weight: 1 }}
       />
-      {controlOverlay.temporarilyOccupiedPolygons.map((polygon, index) => (
+      {controlOverlay.waterPlacementPolygons.map((polygon, index) => (
+        <Polygon
+          key={`water-placement-${index}`}
+          positions={toPositions(polygon)}
+          pathOptions={{ color: "#5ad8ff", fillColor: "#2aa8ff", fillOpacity: 0.055, opacity: 0.24, weight: 1, dashArray: "4 7" }}
+        />
+      ))}
+      {controlOverlay.occupiedPolygons.map((polygon, index) => (
         <Polygon
           key={`occupied-${index}`}
           positions={toPositions(polygon)}
-          pathOptions={{ color: "#ff6e6e", fillColor: "#ff6e6e", fillOpacity: 0.08, opacity: 0.32, weight: 1, dashArray: "6 6" }}
+          pathOptions={{ color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" }}
+        />
+      ))}
+      {frontBufferPolygons.map((polygon, index) => (
+        <Polygon
+          key={`front-buffer-${index}`}
+          positions={toPositions(polygon)}
+          pathOptions={{ color: "#ff9f42", fillColor: "#ff8a35", fillOpacity: 0.14, opacity: 0.42, weight: 0.8, className: "frontline-buffer-zone" }}
         />
       ))}
       <Polyline
         positions={toPositions(controlOverlay.frontline)}
-        pathOptions={{ color: "#ff6e6e", weight: 2, opacity: 0.62, dashArray: "8 5" }}
-      />
-      <Polyline
-        positions={toPositions(controlOverlay.hostileBorder)}
-        pathOptions={{ color: "#f2c865", weight: 1, opacity: 0.44, dashArray: "4 7" }}
+        pathOptions={{ color: "#ff5c5c", weight: 3, opacity: 0.78, dashArray: "8 5" }}
       />
       {game.launchSectors.map((sector) => (
         <Marker key={sector.id} position={[sector.coordinates.lat, sector.coordinates.lng]} icon={makeLaunchIcon(sector)}>

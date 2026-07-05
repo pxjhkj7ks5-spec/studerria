@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, AlertTriangle, Crosshair, Menu, RotateCcw, Shield, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
+import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
 import { IntelLog } from "./components/IntelLog";
 import { MapLegend } from "./components/MapLegend";
 import { ModeSelection } from "./components/ModeSelection";
@@ -30,6 +31,8 @@ const threatLabels: Array<{ kind: ThreatKind; label: string }> = [
   { kind: "iskander", label: "OTRK" },
 ];
 
+const SIMULATION_TICK_MS = 300;
+
 function formatAmmo(current: number | "infinite", capacity: number | "infinite") {
   if (capacity === "infinite" || current === "infinite") return "inf";
   return `${current}/${capacity}`;
@@ -41,6 +44,11 @@ function formatSeconds(ms: number) {
 }
 
 export default function App() {
+  const isAdminRoute = typeof window !== "undefined" && window.location.pathname.replace(/\/+$/, "").endsWith("/admin");
+  if (isAdminRoute) {
+    return <ControlZoneAdmin />;
+  }
+
   const game = useGameStore((state) => state.game);
   const campaignMode = useGameStore((state) => state.campaignMode);
   const pendingCampaignMode = useGameStore((state) => state.pendingCampaignMode);
@@ -77,7 +85,7 @@ export default function App() {
       const delta = timestamp - lastTickRef.current;
       lastTickRef.current = timestamp;
       accumulatorRef.current += delta;
-      if (accumulatorRef.current >= 180) {
+      if (accumulatorRef.current >= SIMULATION_TICK_MS) {
         tick(accumulatorRef.current);
         accumulatorRef.current = 0;
       }
@@ -182,7 +190,7 @@ export default function App() {
           <section className="live-card" aria-label="Live simulation status">
             <Zap size={22} />
             <div>
-              <strong>{placementKind ? "Click controlled map area to place PPO" : "Live Defense Active"}</strong>
+              <strong>{placementKind ? "Click an allowed area to place unit" : "Live Defense Active"}</strong>
               <span>{game.placementWarning || "Targets stay hidden until radar scan reveals them."}</span>
             </div>
           </section>
