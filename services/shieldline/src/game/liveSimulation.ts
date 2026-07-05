@@ -25,12 +25,6 @@ import type {
 const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
 const MIN_ATTACK_WINDOW_MS = 90000;
-const UKRAINE_BOUNDS = {
-  minLat: 44.4,
-  maxLat: 52.4,
-  minLng: 22.0,
-  maxLng: 40.6,
-};
 
 const fallbackThreatKinds: ThreatKind[] = ["geran2", "gerbera", "parodiya", "kh101", "kalibr", "iskander"];
 const ABSTRACT_KM_PER_DEGREE = 85;
@@ -176,13 +170,6 @@ function nearestCityId(state: GameState, position: Coordinates): CityId {
     .sort((left, right) => left.score - right.score)[0].cityId;
 }
 
-export function quantizePlacement(position: Coordinates): Coordinates {
-  return {
-    lat: clamp(Math.round(position.lat * 4) / 4, UKRAINE_BOUNDS.minLat, UKRAINE_BOUNDS.maxLat),
-    lng: clamp(Math.round(position.lng * 4) / 4, UKRAINE_BOUNDS.minLng, UKRAINE_BOUNDS.maxLng),
-  };
-}
-
 function batteryTier(unit: ReturnType<typeof getUnitDefinition>): DefenseBattery["coverageTier"] {
   if (unit.outerRangeKm >= 75) return "III";
   if (unit.outerRangeKm >= 35) return "II";
@@ -200,8 +187,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
   if (state.status !== "active" || state.resources.budget < unit.cost || !scenario.allowedUnits.includes(kind)) return state;
 
   const next = cloneState(state);
-  const quantized = quantizePlacement(position);
-  const placement = validateBatteryPlacement(quantized);
+  const placement = validateBatteryPlacement(position);
   if (!placement.allowed) {
     next.placementWarning = placement.reason || "Placement blocked by control constraints.";
     pushLog(next.log, next.elapsedMs, "Placement Blocked", next.placementWarning, "warning");
@@ -212,7 +198,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
   const battery: DefenseBattery = {
     id: createId("battery", Math.floor(next.elapsedMs), random),
     kind,
-    position: quantized,
+    position: { ...position },
     coverageTier: tier,
     coverageRadius: coverageRadiusFromUnit(unit),
     readiness: unit.readiness,
@@ -225,7 +211,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     cooldownMs: next.planningActions.selected.includes("rapid-redeployment") ? 900 : 0,
     reloadRemainingMs: 0,
     currentAmmo: unit.ammoCapacity,
-    assignedCityId: nearestCityId(next, quantized),
+    assignedCityId: nearestCityId(next, position),
   };
   if (next.planningActions.selected.includes("rapid-redeployment")) {
     applyRedeployFatigue(battery);

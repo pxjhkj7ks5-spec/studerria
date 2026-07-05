@@ -27,7 +27,7 @@ export function TutorialOverlay({ onDismiss }: TutorialOverlayProps) {
           <article>
             <Crosshair size={20} />
             <strong>Placement</strong>
-            <p>Pick a unit card, then click the map. Clicks are quantized into fictional sectors.</p>
+            <p>Pick a unit card, then click the map. Placement uses the exact cursor point inside allowed zones.</p>
           </article>
           <article>
             <Eye size={20} />
