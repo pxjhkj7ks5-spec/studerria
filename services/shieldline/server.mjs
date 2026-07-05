@@ -1,11 +1,14 @@
 import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { extname, join, normalize, resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, extname, join, normalize, resolve } from "node:path";
 
 const port = Number(process.env.PORT || 8080);
 const basePath = normalizeBasePath(process.env.SHIELDLINE_BASE_PATH || "/shieldline");
 const distDir = resolve("dist");
 const indexPath = join(distDir, "index.html");
+const controlOverlayFile = process.env.SHIELDLINE_CONTROL_OVERLAY_FILE || "/data/control-overlay.json";
+const adminPassword = process.env.SHIELDLINE_ADMIN_PASSWORD || "";
 
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -51,13 +54,100 @@ function resolveAssetPath(pathname) {
   return filePath;
 }
 
-createServer((req, res) => {
+function sendJson(res, status, payload) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function isControlOverlayApi(pathname) {
+  return pathname === `${basePath}/api/control-overlay` || (!basePath && pathname === "/api/control-overlay");
+}
+
+function hasAdminAccess(req) {
+  if (!adminPassword) return false;
+  if (req.headers["x-shieldline-admin-password"] === adminPassword) return true;
+  const authorization = String(req.headers.authorization || "");
+  if (!authorization.startsWith("Basic ")) return false;
+  try {
+    const decoded = Buffer.from(authorization.slice(6), "base64").toString("utf8");
+    return decoded === `admin:${adminPassword}`;
+  } catch {
+    return false;
+  }
+}
+
+function readRequestJson(req) {
+  return new Promise((resolveRequest, rejectRequest) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 512000) {
+        rejectRequest(new Error("Request body too large."));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolveRequest(JSON.parse(body || "{}"));
+      } catch {
+        rejectRequest(new Error("Invalid JSON body."));
+      }
+    });
+    req.on("error", rejectRequest);
+  });
+}
+
+async function handleControlOverlayApi(req, res) {
+  if (req.method === "GET") {
+    try {
+      if (!existsSync(controlOverlayFile)) {
+        sendJson(res, 200, { overlay: null });
+        return;
+      }
+      const raw = await readFile(controlOverlayFile, "utf8");
+      sendJson(res, 200, { overlay: JSON.parse(raw) });
+    } catch {
+      sendJson(res, 500, { error: "Could not read control overlay." });
+    }
+    return;
+  }
+
+  if (req.method === "PUT") {
+    if (!hasAdminAccess(req)) {
+      sendJson(res, 401, { error: "Admin password is required." });
+      return;
+    }
+    try {
+      const payload = await readRequestJson(req);
+      await mkdir(dirname(controlOverlayFile), { recursive: true });
+      await writeFile(controlOverlayFile, `${JSON.stringify(payload.overlay || payload, null, 2)}\n`, "utf8");
+      sendJson(res, 200, { ok: true });
+    } catch (error) {
+      sendJson(res, 400, { error: error instanceof Error ? error.message : "Could not save control overlay." });
+    }
+    return;
+  }
+
+  res.writeHead(405, { Allow: "GET, PUT" });
+  res.end();
+}
+
+createServer(async (req, res) => {
   const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
   const pathname = requestUrl.pathname.replace(/\/+$/, "") || "/";
 
   if (basePath && pathname !== basePath && !pathname.startsWith(`${basePath}/`)) {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Not found");
+    return;
+  }
+
+  if (isControlOverlayApi(pathname)) {
+    await handleControlOverlayApi(req, res);
     return;
   }
 

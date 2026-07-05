@@ -1,6 +1,6 @@
 import { ArrowLeft, RotateCcw, Save } from "lucide-react";
 import { useMemo, useState } from "react";
-import { defaultControlOverlay, getControlOverlay, resetControlOverlay, saveControlOverlay } from "../data/controlZones";
+import { defaultControlOverlay, getControlOverlay, resetControlOverlay, saveControlOverlay, saveControlOverlayToServer } from "../data/controlZones";
 import type { ControlOverlay } from "../data/controlZones";
 import type { Coordinates } from "../types/game";
 
@@ -33,10 +33,11 @@ export function ControlZoneAdmin() {
   const [frontline, setFrontline] = useState(pretty(initialOverlay.frontline));
   const [occupiedPolygons, setOccupiedPolygons] = useState(pretty(initialOverlay.occupiedPolygons));
   const [waterPolygons, setWaterPolygons] = useState(pretty(initialOverlay.waterPlacementPolygons));
+  const [password, setPassword] = useState(() => (typeof window === "undefined" ? "" : window.sessionStorage.getItem("shieldline-admin-password") || ""));
   const [status, setStatus] = useState("Edit zones, then save. The live map uses saved values on the next render.");
   const basePath = import.meta.env.BASE_URL || "/shieldline/";
 
-  const save = () => {
+  const save = async () => {
     try {
       const overlay: ControlOverlay = {
         ukrainePlacementPolygon: defaultControlOverlay.ukrainePlacementPolygon,
@@ -44,8 +45,26 @@ export function ControlZoneAdmin() {
         frontline: parseCoordinates(frontline, "Front line", 2),
         waterPlacementPolygons: parsePolygons(waterPolygons, "Water placement zones"),
       };
-      saveControlOverlay(overlay);
-      setStatus("Saved. Return to the map to use the updated placement rules.");
+      if (!password.trim()) {
+        setStatus("Enter the Shieldline admin password before saving server zones.");
+        return;
+      }
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem("shieldline-admin-password", password);
+      }
+      try {
+        await saveControlOverlayToServer(basePath, overlay, password);
+        saveControlOverlay(overlay);
+        setStatus("Saved to server. Return to the map to use the updated placement rules.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not save zones.";
+        if (message.includes("Failed to fetch") || message.includes("Unexpected token") || message.includes("Server API is not available")) {
+          saveControlOverlay(overlay);
+          setStatus("Saved locally for dev preview. Server API is not available on this host.");
+          return;
+        }
+        setStatus(message);
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save zones.");
     }
@@ -75,6 +94,19 @@ export function ControlZoneAdmin() {
       <section className="admin-status" aria-live="polite">
         {status}
       </section>
+
+      <label className="admin-password">
+        <span>
+          <strong>Admin password</strong>
+          <small>Matches `SHIELDLINE_ADMIN_PASSWORD` on the server.</small>
+        </span>
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
+        />
+      </label>
 
       <section className="admin-grid">
         <label className="admin-editor">

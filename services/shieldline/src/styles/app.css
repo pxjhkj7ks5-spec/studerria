@@ -1689,6 +1689,37 @@ button {
   gap: 16px;
 }
 
+.admin-password {
+  display: grid;
+  max-width: 420px;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.admin-password span {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-password small {
+  color: var(--muted);
+}
+
+.admin-password input {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(111, 202, 255, 0.18);
+  border-radius: 8px;
+  color: #eaf7ff;
+  background: rgba(3, 12, 18, 0.86);
+  outline: none;
+}
+
+.admin-password input:focus {
+  border-color: rgba(85, 215, 255, 0.46);
+  box-shadow: 0 0 0 3px rgba(85, 215, 255, 0.1);
+}
+
 .admin-editor {
   display: grid;
   gap: 10px;

@@ -133,3 +133,42 @@ export function resetControlOverlay() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(CONTROL_OVERLAY_STORAGE_KEY);
 }
+
+function apiUrl(basePath: string) {
+  const normalized = (basePath || "/shieldline/").replace(/\/+$/, "");
+  return `${normalized}/api/control-overlay`;
+}
+
+export async function hydrateControlOverlayFromServer(basePath: string) {
+  try {
+    const response = await fetch(apiUrl(basePath), { cache: "no-store" });
+    if (!response.ok) return false;
+    const payload = await response.json() as { overlay?: Partial<ControlOverlay> | null };
+    if (!payload.overlay) return false;
+    saveControlOverlay({
+      ukrainePlacementPolygon: cleanLine(payload.overlay.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
+      occupiedPolygons: cleanPolygons(payload.overlay.occupiedPolygons, defaultControlOverlay.occupiedPolygons),
+      frontline: cleanLine(payload.overlay.frontline, defaultControlOverlay.frontline),
+      waterPlacementPolygons: cleanPolygons(payload.overlay.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveControlOverlayToServer(basePath: string, overlay: ControlOverlay, password: string) {
+  const response = await fetch(apiUrl(basePath), {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shieldline-Admin-Password": password,
+    },
+    body: JSON.stringify({ overlay }),
+  });
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("Server API is not available.");
+    const payload = await response.json().catch(() => ({} as { error?: string }));
+    throw new Error(payload.error || "Could not save control overlay.");
+  }
+}
