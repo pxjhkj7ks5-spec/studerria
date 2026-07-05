@@ -73,7 +73,7 @@ export const unitDefinitions: UnitDefinition[] = [
     engagementChanceByThreat: chances({}),
     mobility: 1,
     readiness: 88,
-    description: "Long-range early warning asset with a rotating abstract detection sector.",
+    description: "Long-range early warning asset with a periodic abstract detection scan.",
   },
   {
     kind: "mvg",

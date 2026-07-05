@@ -176,8 +176,6 @@ export interface DefenseBattery {
   reloadRemainingMs: number;
   currentAmmo: number | "infinite";
   assignedCityId: CityId;
-  sweepAngleDeg?: number;
-  sweepSpeedDegPerMs?: number;
 }
 
 export interface LaunchSector {

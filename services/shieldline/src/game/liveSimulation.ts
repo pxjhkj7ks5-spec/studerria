@@ -226,8 +226,6 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     reloadRemainingMs: 0,
     currentAmmo: unit.ammoCapacity,
     assignedCityId: nearestCityId(next, quantized),
-    sweepAngleDeg: unit.engagementMode === "detect" ? random() * 360 : undefined,
-    sweepSpeedDegPerMs: unit.engagementMode === "detect" ? 0.075 : undefined,
   };
   if (next.planningActions.selected.includes("rapid-redeployment")) {
     applyRedeployFatigue(battery);
@@ -284,11 +282,6 @@ function bearingDeg(from: Coordinates, to: Coordinates) {
   const y = Math.sin(dLng) * Math.cos(lat2);
   const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-function angleDeltaDeg(left: number, right: number) {
-  const delta = Math.abs(((left - right + 540) % 360) - 180);
-  return delta;
 }
 
 function isDroneClass(kind: ThreatKind) {
@@ -447,36 +440,34 @@ function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => numbe
   }
 }
 
-function detectThreats(state: GameState, random: () => number) {
+function detectThreats(state: GameState, random: () => number, shouldScan: boolean) {
   const highAlert = state.planningActions.selected.includes("high-alert");
   const intelFocus = state.planningActions.selected.includes("intelligence-focus");
   for (const threat of state.liveThreats) {
     const position = threatPosition(threat);
-    for (const battery of state.batteries) {
-      const unit = getUnitDefinition(battery.kind);
-      if (unit.engagementMode !== "detect" || battery.status === "maintenance") continue;
-      const sweep = battery.sweepAngleDeg ?? 0;
-      const targetBearing = bearingDeg(battery.position, position);
-      const beamWidth = highAlert ? 28 : 22;
-      if (angleDeltaDeg(sweep, targetBearing) > beamWidth) continue;
-      const rangeKm = distanceKm(position, battery.position);
-      if (rangeKm > 100) continue;
-      const bandChance = rangeKm <= 50 ? 95 : rangeKm <= 75 ? 75 : 40;
-      const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
-      const readinessFactor = 0.58 + (battery.readiness / 100) * 0.42;
-      const planningBoost = (highAlert ? 8 : 0) + (intelFocus ? 6 : 0);
-      const chance = clamp(bandChance * statusPenalty * readinessFactor + planningBoost - threat.difficulty * 0.08, 5, 98);
-      threat.confidence = clamp(threat.confidence + (chance / 100) * 8, 0, 100);
-      if (!weightedChance(chance, random)) continue;
-      threat.detected = true;
-      threat.status = "detected";
-      threat.revealed = true;
-      threat.lastKnownPosition = position;
-      threat.headingDeg = bearingDeg(threat.origin, threat.target);
-      threat.trackQuality = clamp(chance + (intelFocus ? 8 : 0), 0, 100);
-      threat.confidence = clamp(threat.confidence + 18 + random() * 12 + (intelFocus ? 10 : 0), 0, 100);
-      pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track revealed by radar sweep.`, "info");
-      break;
+    if (shouldScan) {
+      for (const battery of state.batteries) {
+        const unit = getUnitDefinition(battery.kind);
+        if (unit.engagementMode !== "detect" || battery.status === "maintenance") continue;
+        const rangeKm = distanceKm(position, battery.position);
+        if (rangeKm > 100) continue;
+        const bandChance = rangeKm <= 50 ? 95 : rangeKm <= 75 ? 75 : 40;
+        const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
+        const readinessFactor = 0.58 + (battery.readiness / 100) * 0.42;
+        const planningBoost = (highAlert ? 8 : 0) + (intelFocus ? 6 : 0);
+        const chance = clamp(bandChance * statusPenalty * readinessFactor + planningBoost - threat.difficulty * 0.08, 5, 98);
+        threat.confidence = clamp(threat.confidence + (chance / 100) * 8, 0, 100);
+        if (!weightedChance(chance, random)) continue;
+        threat.detected = true;
+        threat.status = "detected";
+        threat.revealed = true;
+        threat.lastKnownPosition = position;
+        threat.headingDeg = bearingDeg(threat.origin, threat.target);
+        threat.trackQuality = clamp(chance + (intelFocus ? 8 : 0), 0, 100);
+        threat.confidence = clamp(threat.confidence + 18 + random() * 12 + (intelFocus ? 10 : 0), 0, 100);
+        pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track revealed by radar scan.`, "info");
+        break;
+      }
     }
     if (threat.revealed) {
       threat.lastKnownPosition = position;
@@ -711,11 +702,6 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
     if (battery.currentAmmo === undefined || battery.currentAmmo === null) {
       battery.currentAmmo = unit.ammoCapacity;
     }
-    if (unit.engagementMode === "detect") {
-      const speed = Math.max(battery.sweepSpeedDegPerMs ?? 0, 0.075);
-      battery.sweepSpeedDegPerMs = speed;
-      battery.sweepAngleDeg = ((battery.sweepAngleDeg ?? 0) + deltaMs * speed) % 360;
-    }
     if (battery.reloadRemainingMs === undefined || battery.reloadRemainingMs === null) {
       battery.reloadRemainingMs = 0;
     }
@@ -819,13 +805,14 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   if (current.status !== "active") return current;
   const state = cloneState(current);
   const safeDelta = clamp(deltaMs, 0, 1000);
+  const previousElapsedMs = state.elapsedMs;
   state.elapsedMs += safeDelta;
   updateResourcesAndTimers(state, safeDelta);
   updateLaunchSectors(state);
   updateCycle(state, random);
   resolvePendingLaunches(state, random);
   maybeSpawnThreat(state, safeDelta, random);
-  detectThreats(state, random);
+  detectThreats(state, random, Math.floor(previousElapsedMs / 1000) !== Math.floor(state.elapsedMs / 1000));
   engageThreats(state, random);
   updateShots(state, safeDelta);
   updateThreats(state, safeDelta);

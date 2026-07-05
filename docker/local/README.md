@@ -201,6 +201,7 @@ Server `.env` baseline:
 ```env
 NODE_ENV=production
 CHARREDMAP_NODE_ENV=production
+SHIELDLINE_NODE_ENV=production
 STUDERRIA_TG_BOT_TOKEN=your-telegram-bot-token
 STUDERRIA_TG_DEV_GREETING_ENABLED=false
 STUDERRIA_TG_DEV_GREETING_TARGET_CHAT_ID=

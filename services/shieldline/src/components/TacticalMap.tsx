@@ -1,7 +1,7 @@
 import L from "leaflet";
 import { Circle, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMapEvents } from "react-leaflet";
 import { Fragment, useMemo } from "react";
-import { carrierSprites, launchSprites, markerSprites, unitSprites } from "../assets/sprites/spriteCatalog";
+import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { controlOverlay } from "../data/controlZones";
 import { getUnitDefinition } from "../data/units";
 import { useGameStore } from "../store/useGameStore";
@@ -17,7 +17,6 @@ import type {
   LiveThreat,
   SupplyNode,
   SupplyRoute,
-  ThreatKind,
 } from "../types/game";
 
 const mapCenter: [number, number] = [48.7, 31.4];
@@ -41,13 +40,6 @@ function shotPosition(shot: InterceptorShot) {
     lat: shot.from.lat + (shot.to.lat - shot.from.lat) * shot.progress,
     lng: shot.from.lng + (shot.to.lng - shot.from.lng) * shot.progress,
   };
-}
-
-function endpointFromBearing(origin: { lat: number; lng: number }, bearingDeg: number, distanceKm: number) {
-  const rad = (bearingDeg * Math.PI) / 180;
-  const lat = origin.lat + (Math.cos(rad) * distanceKm) / 111;
-  const lng = origin.lng + (Math.sin(rad) * distanceKm) / (111 * Math.cos((origin.lat * Math.PI) / 180));
-  return { lat, lng };
 }
 
 function toPositions(points: Array<{ lat: number; lng: number }>): [number, number][] {
@@ -96,8 +88,8 @@ function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
   return L.divIcon({
     className: "",
     html: imageMarkerHtml(unitSprites[battery.kind], `map-marker--battery map-marker--unit-${battery.status} ${selected ? "map-marker--selected" : ""}`),
-    iconSize: [10, 10],
-    iconAnchor: [5, 5],
+    iconSize: [8, 8],
+    iconAnchor: [4, 4],
   });
 }
 
@@ -106,7 +98,7 @@ function makeThreatIcon(threat: LiveThreat) {
   const label = threat.confidence >= 70 ? threatLabel(threat) : "";
   return L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--heading:${threat.headingDeg}deg"><span class="target-glyph target-glyph--${threat.kind} target-glyph--${tone}"></span>${label}</span>`,
+    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--heading:${threat.headingDeg}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span>${label}</span>`,
     iconSize: [34, 24],
     iconAnchor: [8, 8],
   });
@@ -135,8 +127,8 @@ function makeLaunchIcon(sector: LaunchSector) {
   return L.divIcon({
     className: "",
     html: imageMarkerHtml(launchSprites[category], `map-marker--launch map-marker--launch-${sector.state || "idle"}`),
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
+    iconSize: [9, 9],
+    iconAnchor: [5, 5],
   });
 }
 
@@ -265,30 +257,21 @@ export function TacticalMap() {
       })}
       {mapMode !== "threats" ? game.batteries.map((battery) => {
         const unit = getUnitDefinition(battery.kind);
-        const beamEnd = unit.engagementMode === "detect"
-          ? endpointFromBearing(battery.position, battery.sweepAngleDeg ?? 0, 100)
-          : null;
         return (
           <Fragment key={`coverage-wrap-${battery.id}`}>
             <Circle
               key={`coverage-${battery.id}`}
               center={[battery.position.lat, battery.position.lng]}
-              radius={battery.coverageRadius * 85000}
+              radius={battery.coverageRadius * 72000}
               pathOptions={{
                 color: battery.id === selectedBatteryId ? "#f2c865" : "#55d7ff",
                 fillColor: battery.id === selectedBatteryId ? "#f2c865" : "#55d7ff",
-                fillOpacity: battery.id === selectedBatteryId ? 0.12 : 0.045,
-                opacity: battery.id === selectedBatteryId ? 0.75 : 0.34,
+                fillOpacity: battery.id === selectedBatteryId ? 0.09 : 0.025,
+                opacity: battery.id === selectedBatteryId ? 0.58 : 0.22,
                 weight: battery.id === selectedBatteryId ? 2 : 1,
+                className: unit.engagementMode === "detect" ? "coverage-ring coverage-ring--radar" : "coverage-ring",
               }}
             />
-            {beamEnd ? (
-              <Polyline
-                key={`radar-beam-${battery.id}`}
-                positions={[[battery.position.lat, battery.position.lng], [beamEnd.lat, beamEnd.lng]]}
-                pathOptions={{ color: "#6be9ff", weight: 3, opacity: 0.42 }}
-              />
-            ) : null}
           </Fragment>
         );
       }) : null}

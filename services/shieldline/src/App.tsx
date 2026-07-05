@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, AlertTriangle, Crosshair, Menu, RotateCcw, Shield, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
-import { CityPanel } from "./components/CityPanel";
 import { IntelLog } from "./components/IntelLog";
 import { MapLegend } from "./components/MapLegend";
 import { ModeSelection } from "./components/ModeSelection";
@@ -57,11 +56,9 @@ export default function App() {
   const tick = useGameStore((state) => state.tick);
   const removeSelectedBattery = useGameStore((state) => state.removeSelectedBattery);
   const startSelectedBatteryMaintenance = useGameStore((state) => state.startSelectedBatteryMaintenance);
-  const selectedCityId = useGameStore((state) => state.selectedCityId);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const placementKind = useGameStore((state) => state.placementKind);
   const [confirmReset, setConfirmReset] = useState(false);
-  const selectedCity = game.cities.find((city) => city.id === selectedCityId) || game.cities[0];
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
   const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
@@ -131,7 +128,6 @@ export default function App() {
           ))}
         </aside>
         <MapLegend mode={mapMode} />
-        <CityPanel city={selectedCity} game={game} />
       </section>
 
       <aside className="right-panel" aria-label="Live intelligence and event log">
@@ -187,7 +183,7 @@ export default function App() {
             <Zap size={22} />
             <div>
               <strong>{placementKind ? "Click controlled map area to place PPO" : "Live Defense Active"}</strong>
-              <span>{game.placementWarning || "Targets stay hidden until radar sweep reveals them."}</span>
+              <span>{game.placementWarning || "Targets stay hidden until radar scan reveals them."}</span>
             </div>
           </section>
         )}

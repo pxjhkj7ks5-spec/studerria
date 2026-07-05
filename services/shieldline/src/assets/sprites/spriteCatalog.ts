@@ -2,6 +2,12 @@ import threatBallistic from "./threats/ballistic.png";
 import threatCruise from "./threats/cruise.png";
 import threatDecoy from "./threats/decoy.png";
 import threatDrone from "./threats/drone.png";
+import threatGeran2 from "./threats/geran2.png";
+import threatGerbera from "./threats/gerbera.png";
+import threatIskander from "./threats/iskander.png";
+import threatKalibr from "./threats/kalibr.png";
+import threatKh101 from "./threats/kh101.png";
+import threatParodiya from "./threats/parodiya.png";
 import threatSaturation from "./threats/saturation.png";
 import confirmedThreat from "./icons/confirmed-threat.png";
 import detectedTrack from "./icons/detected-track.png";
@@ -35,12 +41,12 @@ export const threatSprites: Record<ThreatKind, string> = {
   decoy: threatDecoy,
   combined: threatCruise,
   saturation: threatSaturation,
-  geran2: threatDrone,
-  gerbera: threatDrone,
-  parodiya: threatDecoy,
-  kh101: threatCruise,
-  kalibr: threatCruise,
-  iskander: threatBallistic,
+  geran2: threatGeran2,
+  gerbera: threatGerbera,
+  parodiya: threatParodiya,
+  kh101: threatKh101,
+  kalibr: threatKalibr,
+  iskander: threatIskander,
 };
 
 export const unitSprites: Record<UnitKind, string> = {
