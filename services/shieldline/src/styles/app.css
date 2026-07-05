@@ -493,6 +493,7 @@ button {
 }
 
 .coverage-ring--radar {
+  filter: drop-shadow(0 0 4px rgba(82, 233, 128, 0.38));
   animation: radar-coverage-pulse 1s steps(2, end) infinite;
 }
 
@@ -560,7 +561,7 @@ button {
   width: 24px;
   height: 24px;
   place-items: center;
-  transform: rotate(var(--heading));
+  transform: rotate(var(--target-heading));
   transform-origin: center;
   filter:
     drop-shadow(0 1px 1px rgba(0, 0, 0, 0.92))
@@ -1624,10 +1625,10 @@ button {
 
 @keyframes radar-coverage-pulse {
   0%, 100% {
-    opacity: 0.22;
+    opacity: 0.56;
   }
   50% {
-    opacity: 0.34;
+    opacity: 0.82;
   }
 }
 

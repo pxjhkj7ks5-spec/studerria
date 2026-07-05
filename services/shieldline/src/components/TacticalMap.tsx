@@ -84,6 +84,24 @@ function threatLabel(threat: LiveThreat) {
   return `<span class="threat-confidence threat-confidence--${tone}">${label} ${Math.round(threat.confidence)}%</span>`;
 }
 
+function threatRouteColor(tone: ReturnType<typeof threatTone>) {
+  if (tone === "confirmed") return "#ff3535";
+  if (tone === "detected") return "#ffd24a";
+  if (tone === "decoy") return "#b997ff";
+  return "#35d8ff";
+}
+
+function coverageTone(unit: ReturnType<typeof getUnitDefinition>, selected: boolean) {
+  if (unit.engagementMode === "detect") {
+    return selected
+      ? { color: "#72ff9d", fill: "#52e980", fillOpacity: 0.14, opacity: 0.82, weight: 2.4 }
+      : { color: "#52e980", fill: "#36d977", fillOpacity: 0.075, opacity: 0.58, weight: 1.5 };
+  }
+  return selected
+    ? { color: "#73e4ff", fill: "#55d7ff", fillOpacity: 0.13, opacity: 0.78, weight: 2.2 }
+    : { color: "#55d7ff", fill: "#27bfff", fillOpacity: 0.06, opacity: 0.48, weight: 1.35 };
+}
+
 function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
   return L.divIcon({
     className: "",
@@ -96,9 +114,10 @@ function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
 function makeThreatIcon(threat: LiveThreat) {
   const tone = threatTone(threat);
   const label = threat.confidence >= 70 ? threatLabel(threat) : "";
+  const targetHeading = threat.headingDeg - 90;
   return L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--heading:${threat.headingDeg}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span>${label}</span>`,
+    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span>${label}</span>`,
     iconSize: [34, 24],
     iconAnchor: [8, 8],
   });
@@ -247,16 +266,18 @@ export function TacticalMap() {
             key={`route-${threat.id}`}
             positions={[[current.lat, current.lng], [threat.target.lat, threat.target.lng]]}
             pathOptions={{
-              color: tone === "confirmed" ? "#ff6e6e" : tone === "detected" ? "#f2c865" : tone === "decoy" ? "#a38cff" : "#55d7ff",
-              weight: mapMode === "threats" ? 2 : 1,
-              opacity: mapMode === "coverage" ? 0.18 : 0.48,
-              dashArray: tone === "confirmed" ? "8 4" : "5 7",
+              color: threatRouteColor(tone),
+              weight: mapMode === "threats" ? 3 : 2,
+              opacity: mapMode === "coverage" ? 0.44 : 0.72,
+              dashArray: tone === "confirmed" ? "10 4" : "6 6",
             }}
           />
         );
       })}
       {mapMode !== "threats" ? game.batteries.map((battery) => {
         const unit = getUnitDefinition(battery.kind);
+        const selected = battery.id === selectedBatteryId;
+        const coverage = coverageTone(unit, selected);
         return (
           <Fragment key={`coverage-wrap-${battery.id}`}>
             <Circle
@@ -264,11 +285,11 @@ export function TacticalMap() {
               center={[battery.position.lat, battery.position.lng]}
               radius={battery.coverageRadius * 72000}
               pathOptions={{
-                color: battery.id === selectedBatteryId ? "#f2c865" : "#55d7ff",
-                fillColor: battery.id === selectedBatteryId ? "#f2c865" : "#55d7ff",
-                fillOpacity: battery.id === selectedBatteryId ? 0.09 : 0.025,
-                opacity: battery.id === selectedBatteryId ? 0.58 : 0.22,
-                weight: battery.id === selectedBatteryId ? 2 : 1,
+                color: coverage.color,
+                fillColor: coverage.fill,
+                fillOpacity: coverage.fillOpacity,
+                opacity: coverage.opacity,
+                weight: coverage.weight,
                 className: unit.engagementMode === "detect" ? "coverage-ring coverage-ring--radar" : "coverage-ring",
               }}
             />
