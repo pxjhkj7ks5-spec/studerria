@@ -498,14 +498,19 @@ button {
 }
 
 .map-marker--battery {
-  width: 8px;
-  height: 8px;
+  width: 22px;
+  height: 22px;
   color: #bff0ff;
   background: transparent;
   box-shadow:
     0 0 0 2px rgba(85, 215, 255, 0.08),
     0 0 9px rgba(85, 215, 255, 0.14);
   animation: marker-pulse 2.8s ease-out infinite;
+}
+
+.map-marker--battery img {
+  width: 22px !important;
+  height: 22px !important;
 }
 
 .map-marker--threat {
@@ -642,13 +647,18 @@ button {
 }
 
 .map-marker--launch {
-  width: 9px;
-  height: 9px;
+  width: 18px;
+  height: 18px;
   opacity: 0.78;
   background: rgba(7, 18, 27, 0.34);
   box-shadow:
     0 0 0 2px rgba(255, 110, 110, 0.09),
     0 0 9px rgba(255, 110, 110, 0.18);
+}
+
+.map-marker--launch img {
+  width: 18px !important;
+  height: 18px !important;
 }
 
 .map-marker--launch-warning,
@@ -664,10 +674,15 @@ button {
 }
 
 .map-marker--carrier {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   opacity: 0.88;
   transform: rotate(var(--heading, 0deg));
+}
+
+.map-marker--carrier img {
+  width: 20px !important;
+  height: 20px !important;
 }
 
 .map-marker--supply {

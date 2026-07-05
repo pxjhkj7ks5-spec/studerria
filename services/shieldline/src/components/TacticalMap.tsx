@@ -106,8 +106,8 @@ function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
   return L.divIcon({
     className: "",
     html: imageMarkerHtml(unitSprites[battery.kind], `map-marker--battery map-marker--unit-${battery.status} ${selected ? "map-marker--selected" : ""}`),
-    iconSize: [8, 8],
-    iconAnchor: [4, 4],
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
   });
 }
 
@@ -146,8 +146,8 @@ function makeLaunchIcon(sector: LaunchSector) {
   return L.divIcon({
     className: "",
     html: imageMarkerHtml(launchSprites[category], `map-marker--launch map-marker--launch-${sector.state || "idle"}`),
-    iconSize: [9, 9],
-    iconAnchor: [5, 5],
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
   });
 }
 
@@ -155,8 +155,8 @@ function makeCarrierIcon(carrier: CarrierTrack) {
   return L.divIcon({
     className: "",
     html: imageMarkerHtml(carrierSprites[carrier.kind], "map-marker--carrier"),
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
 }
 
