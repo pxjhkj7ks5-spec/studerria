@@ -1,8 +1,9 @@
 import { deepstateOccupiedPolygons } from "./deepstateOccupiedZones";
+import { ukrainePlacementPolygons } from "./ukraineBoundary";
 import type { Coordinates } from "../types/game";
 
 export interface ControlOverlay {
-  ukrainePlacementPolygon: Coordinates[];
+  ukrainePlacementPolygons: Coordinates[][];
   occupiedPolygons: Coordinates[][];
   waterPlacementPolygons: Coordinates[][];
 }
@@ -29,25 +30,27 @@ const legacyEditorialOccupiedPolygons: Coordinates[][] = [
   ],
 ];
 
+const legacyUkrainePlacementPolygon: Coordinates[] = [
+  { lat: 52.35, lng: 22.15 },
+  { lat: 52.35, lng: 31.85 },
+  { lat: 51.75, lng: 34.45 },
+  { lat: 50.45, lng: 36.25 },
+  { lat: 49.2, lng: 40.25 },
+  { lat: 47.85, lng: 39.35 },
+  { lat: 46.25, lng: 38.45 },
+  { lat: 45.35, lng: 36.8 },
+  { lat: 44.45, lng: 34.65 },
+  { lat: 44.35, lng: 33.2 },
+  { lat: 44.9, lng: 30.25 },
+  { lat: 45.45, lng: 28.15 },
+  { lat: 46.45, lng: 27.2 },
+  { lat: 48.1, lng: 22.1 },
+  { lat: 50.65, lng: 23.0 },
+];
+
 // Static, simplified editorial overlay. It is not a live front map.
 export const defaultControlOverlay: ControlOverlay = {
-  ukrainePlacementPolygon: [
-    { lat: 52.35, lng: 22.15 },
-    { lat: 52.35, lng: 31.85 },
-    { lat: 51.75, lng: 34.45 },
-    { lat: 50.45, lng: 36.25 },
-    { lat: 49.2, lng: 40.25 },
-    { lat: 47.85, lng: 39.35 },
-    { lat: 46.25, lng: 38.45 },
-    { lat: 45.35, lng: 36.8 },
-    { lat: 44.45, lng: 34.65 },
-    { lat: 44.35, lng: 33.2 },
-    { lat: 44.9, lng: 30.25 },
-    { lat: 45.45, lng: 28.15 },
-    { lat: 46.45, lng: 27.2 },
-    { lat: 48.1, lng: 22.1 },
-    { lat: 50.65, lng: 23.0 },
-  ],
+  ukrainePlacementPolygons,
   occupiedPolygons: deepstateOccupiedPolygons,
   waterPlacementPolygons: [
     [
@@ -103,6 +106,16 @@ function cleanOccupiedPolygons(value: unknown) {
   return samePolygons(polygons, legacyEditorialOccupiedPolygons) ? defaultControlOverlay.occupiedPolygons : polygons;
 }
 
+function cleanUkrainePlacementPolygons(value: unknown, legacyValue: unknown) {
+  const polygons = cleanPolygons(value, []);
+  if (polygons.length >= 1) return polygons;
+  const legacyPolygon = cleanLine(legacyValue, [], 3);
+  if (legacyPolygon.length < 3 || samePolygons([legacyPolygon], [legacyUkrainePlacementPolygon])) {
+    return defaultControlOverlay.ukrainePlacementPolygons;
+  }
+  return [legacyPolygon];
+}
+
 export function readSavedControlOverlay(): Partial<ControlOverlay> | null {
   if (typeof window === "undefined") return null;
   try {
@@ -110,7 +123,7 @@ export function readSavedControlOverlay(): Partial<ControlOverlay> | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ControlOverlay>;
     return {
-      ukrainePlacementPolygon: cleanLine(parsed.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
+      ukrainePlacementPolygons: cleanUkrainePlacementPolygons(parsed.ukrainePlacementPolygons, (parsed as { ukrainePlacementPolygon?: unknown }).ukrainePlacementPolygon),
       occupiedPolygons: cleanOccupiedPolygons(parsed.occupiedPolygons),
       waterPlacementPolygons: cleanPolygons(parsed.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
     };
@@ -122,7 +135,7 @@ export function readSavedControlOverlay(): Partial<ControlOverlay> | null {
 export function getControlOverlay(): ControlOverlay {
   const saved = readSavedControlOverlay();
   return {
-    ukrainePlacementPolygon: saved?.ukrainePlacementPolygon || defaultControlOverlay.ukrainePlacementPolygon,
+    ukrainePlacementPolygons: saved?.ukrainePlacementPolygons || defaultControlOverlay.ukrainePlacementPolygons,
     occupiedPolygons: saved?.occupiedPolygons || defaultControlOverlay.occupiedPolygons,
     waterPlacementPolygons: saved?.waterPlacementPolygons || defaultControlOverlay.waterPlacementPolygons,
   };
@@ -154,7 +167,7 @@ export async function hydrateControlOverlayFromServer(basePath: string) {
     const payload = await response.json() as { overlay?: Partial<ControlOverlay> | null };
     if (!payload.overlay) return false;
     saveControlOverlay({
-      ukrainePlacementPolygon: cleanLine(payload.overlay.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
+      ukrainePlacementPolygons: cleanUkrainePlacementPolygons(payload.overlay.ukrainePlacementPolygons, (payload.overlay as { ukrainePlacementPolygon?: unknown }).ukrainePlacementPolygon),
       occupiedPolygons: cleanOccupiedPolygons(payload.overlay.occupiedPolygons),
       waterPlacementPolygons: cleanPolygons(payload.overlay.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
     });

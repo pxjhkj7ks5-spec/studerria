@@ -48,6 +48,9 @@ function toPositions(points: Array<{ lat: number; lng: number }>): [number, numb
   return points.map((point) => [point.lat, point.lng]);
 }
 
+const ukrainePlacementStyle = { color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.22, weight: 1 };
+const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" };
+
 function makeCityIcon(city: City, selected: boolean) {
   const damageClass = city.damage > 55 ? "danger" : city.damage > 25 ? "warning" : "stable";
   const alert = city.alertState || "calm";
@@ -200,6 +203,14 @@ export function TacticalMap() {
   const setSelectedCity = useGameStore((state) => state.setSelectedCity);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
   const controlOverlay = useMemo(() => getControlOverlay(), []);
+  const ukrainePlacementPositions = useMemo(
+    () => controlOverlay.ukrainePlacementPolygons.map((polygon) => toPositions(polygon)),
+    [controlOverlay],
+  );
+  const occupiedZonePositions = useMemo(
+    () => controlOverlay.occupiedPolygons.map((polygon) => toPositions(polygon)),
+    [controlOverlay],
+  );
 
   const cityMarkers = useMemo(
     () => game.cities.map((city) => ({
@@ -221,6 +232,10 @@ export function TacticalMap() {
       maxZoom={12}
       zoomControl={false}
       attributionControl
+      preferCanvas
+      zoomAnimation={false}
+      markerZoomAnimation={false}
+      fadeAnimation={false}
       className="leaflet-stage"
       scrollWheelZoom
     >
@@ -230,15 +245,18 @@ export function TacticalMap() {
         attribution={darkMapTiles.attribution}
         className={darkMapTiles.className}
       />
-      <Polygon
-        positions={toPositions(controlOverlay.ukrainePlacementPolygon)}
-        pathOptions={{ color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.18, weight: 1 }}
-      />
-      {controlOverlay.occupiedPolygons.map((polygon, index) => (
+      {ukrainePlacementPositions.map((positions, index) => (
+        <Polygon
+          key={`ukraine-placement-${index}`}
+          positions={positions}
+          pathOptions={ukrainePlacementStyle}
+        />
+      ))}
+      {occupiedZonePositions.map((positions, index) => (
         <Polygon
           key={`occupied-${index}`}
-          positions={toPositions(polygon)}
-          pathOptions={{ color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" }}
+          positions={positions}
+          pathOptions={occupiedZoneStyle}
         />
       ))}
       {placementKind && placementKind !== "boat" ? game.cities.map((city) => (

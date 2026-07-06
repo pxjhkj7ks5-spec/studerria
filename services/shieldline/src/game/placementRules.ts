@@ -41,7 +41,8 @@ export function validateBatteryPlacement(kind: UnitKind, position: Coordinates, 
       : { allowed: false, reason: "Boats can be placed only on water areas." };
   }
 
-  if (!pointInPolygon(position, overlay.ukrainePlacementPolygon)) {
+  const insideUkraine = overlay.ukrainePlacementPolygons.some((polygon) => pointInPolygon(position, polygon));
+  if (!insideUkraine) {
     return { allowed: false, reason: "PPO placement is allowed only inside Ukraine." };
   }
   const insideOccupied = overlay.occupiedPolygons.some((polygon) => pointInPolygon(position, polygon));

@@ -11,6 +11,21 @@ function normalizeBasePath(value: string | undefined) {
 export default defineConfig({
   base: normalizeBasePath(process.env.SHIELDLINE_BASE_PATH),
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/lucide-react")) {
+            return "icons-vendor";
+          }
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     host: "0.0.0.0",
     port: 5173,

@@ -32,6 +32,10 @@ function toPositions(points: Coordinates[]): [number, number][] {
   return points.map((point) => [point.lat, point.lng]);
 }
 
+const ukrainePlacementStyle = { color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.22, weight: 1 };
+const waterPlacementStyle = { color: "#5ad8ff", fillColor: "#2aa8ff", fillOpacity: 0.085, opacity: 0.36, weight: 1.2, dashArray: "4 7" };
+const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.16, opacity: 0.56, weight: 1.4, dashArray: "6 5" };
+
 function pointFromEvent(event: { latlng: { lat: number; lng: number } }): Coordinates {
   return { lat: event.latlng.lat, lng: event.latlng.lng };
 }
@@ -58,6 +62,19 @@ interface AdminMapProps {
 
 function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps) {
   const draftColor = mode === "water" ? "#5ad8ff" : "#ff6e6e";
+  const ukrainePlacementPositions = useMemo(
+    () => overlay.ukrainePlacementPolygons.map((polygon) => toPositions(polygon)),
+    [overlay.ukrainePlacementPolygons],
+  );
+  const waterPlacementPositions = useMemo(
+    () => overlay.waterPlacementPolygons.map((polygon) => toPositions(polygon)),
+    [overlay.waterPlacementPolygons],
+  );
+  const occupiedZonePositions = useMemo(
+    () => overlay.occupiedPolygons.map((polygon) => toPositions(polygon)),
+    [overlay.occupiedPolygons],
+  );
+  const draftPositions = useMemo(() => toPositions(draftPolygon), [draftPolygon]);
 
   return (
     <MapContainer
@@ -67,32 +84,39 @@ function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps
       maxZoom={12}
       zoomControl
       attributionControl
+      preferCanvas
+      zoomAnimation={false}
+      markerZoomAnimation={false}
+      fadeAnimation={false}
       className="admin-map"
       scrollWheelZoom
     >
       <ClickCapture onClick={onMapClick} />
       <TileLayer url={darkMapTiles.url} attribution={darkMapTiles.attribution} className={darkMapTiles.className} />
-      <Polygon
-        positions={toPositions(overlay.ukrainePlacementPolygon)}
-        pathOptions={{ color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.18, weight: 1 }}
-      />
-      {overlay.waterPlacementPolygons.map((polygon, index) => (
+      {ukrainePlacementPositions.map((positions, index) => (
         <Polygon
-          key={`water-${index}`}
-          positions={toPositions(polygon)}
-          pathOptions={{ color: "#5ad8ff", fillColor: "#2aa8ff", fillOpacity: 0.085, opacity: 0.36, weight: 1.2, dashArray: "4 7" }}
+          key={`ukraine-placement-${index}`}
+          positions={positions}
+          pathOptions={ukrainePlacementStyle}
         />
       ))}
-      {overlay.occupiedPolygons.map((polygon, index) => (
+      {waterPlacementPositions.map((positions, index) => (
+        <Polygon
+          key={`water-${index}`}
+          positions={positions}
+          pathOptions={waterPlacementStyle}
+        />
+      ))}
+      {occupiedZonePositions.map((positions, index) => (
         <Polygon
           key={`occupied-${index}`}
-          positions={toPositions(polygon)}
-          pathOptions={{ color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.16, opacity: 0.56, weight: 1.4, dashArray: "6 5" }}
+          positions={positions}
+          pathOptions={occupiedZoneStyle}
         />
       ))}
       {draftPolygon.length ? (
         <>
-          <Polyline positions={toPositions(draftPolygon)} pathOptions={{ color: draftColor, weight: 2.5, opacity: 0.92, dashArray: "3 5" }} />
+          <Polyline positions={draftPositions} pathOptions={{ color: draftColor, weight: 2.5, opacity: 0.92, dashArray: "3 5" }} />
           {draftPolygon.map((point, index) => (
             <CircleMarker
               key={`draft-${pointKey(point, index)}`}
