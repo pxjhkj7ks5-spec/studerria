@@ -133,7 +133,7 @@ export function archetypeLabel(archetype: AttackArchetype) {
   return {
     probe: "Probe attack",
     saturation: "Saturation raid",
-    infrastructure: "Infrastructure strike",
+    infrastructure: "City systems strike",
     "decoy-screen": "Decoy screen",
     pressure: "Pressure campaign",
     combined: "Combined attack",

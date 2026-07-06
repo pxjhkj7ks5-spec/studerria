@@ -12,23 +12,13 @@ import type {
   CarrierTrack,
   DefenseBattery,
   ImpactMarker,
-  InfrastructureKind,
-  InfrastructureNode,
   InterceptorShot,
   LaunchSector,
   LiveThreat,
-  SupplyNode,
   SupplyRoute,
 } from "../types/game";
 
 const mapCenter: [number, number] = [48.7, 31.4];
-
-const nodeGlyph: Record<InfrastructureKind, string> = {
-  energy: "E",
-  logistics: "L",
-  industry: "I",
-  communications: "C",
-};
 
 function threatPosition(threat: LiveThreat) {
   return {
@@ -59,16 +49,6 @@ function makeCityIcon(city: City, selected: boolean) {
     html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--${damageClass} map-marker--city-${alert} ${selected ? "map-marker--selected" : ""}" aria-hidden="true"></span><b>${city.name}</b></span>`,
     iconSize: [92, 24],
     iconAnchor: [8, 12],
-  });
-}
-
-function makeNodeIcon(node: InfrastructureNode) {
-  const tone = node.integrity < 35 ? "danger" : node.integrity < 65 ? "warning" : "stable";
-  return L.divIcon({
-    className: "",
-    html: `<span class="map-marker map-marker--node map-marker--${tone}">${nodeGlyph[node.kind]}</span>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
   });
 }
 
@@ -165,15 +145,6 @@ function makeCarrierIcon(carrier: CarrierTrack) {
   });
 }
 
-function makeSupplyNodeIcon(node: SupplyNode) {
-  return L.divIcon({
-    className: "",
-    html: imageMarkerHtml(markerSprites.detectedTrack, `map-marker--supply map-marker--supply-${node.source}`),
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
-  });
-}
-
 function routeColor(route: SupplyRoute) {
   if (route.status === "well-supplied") return "#78dd9a";
   if (route.status === "undersupplied") return "#ff6e6e";
@@ -219,11 +190,6 @@ export function TacticalMap() {
     })),
     [game.cities, selectedCityId],
   );
-  const nodeMarkers = useMemo(
-    () => game.infrastructure.map((node) => ({ node, icon: makeNodeIcon(node) })),
-    [game.infrastructure],
-  );
-
   return (
     <MapContainer
       center={mapCenter}
@@ -233,8 +199,13 @@ export function TacticalMap() {
       zoomControl={false}
       attributionControl
       preferCanvas
-      zoomAnimation={false}
-      markerZoomAnimation={false}
+      zoomAnimation
+      markerZoomAnimation
+      zoomSnap={0.25}
+      zoomDelta={0.5}
+      wheelPxPerZoomLevel={140}
+      wheelDebounceTime={35}
+      zoomAnimationThreshold={4}
       fadeAnimation={false}
       className="leaflet-stage"
       scrollWheelZoom
@@ -338,25 +309,6 @@ export function TacticalMap() {
           </Tooltip>
         </Polyline>
       )) : null}
-      {mapMode === "logistics" ? game.logistics.nodes.map((node) => (
-        <Marker key={`supply-${node.id}`} position={[node.position.lat, node.position.lng]} icon={makeSupplyNodeIcon(node)}>
-          <Tooltip direction="top" offset={[0, -14]}>
-            {node.name} - supply strength {Math.round(node.strength)}%
-          </Tooltip>
-        </Marker>
-      )) : null}
-      {nodeMarkers.map(({ node, icon }) => (
-        <Marker
-          key={node.id}
-          position={[node.coordinates.lat, node.coordinates.lng]}
-          icon={icon}
-          eventHandlers={{ click: () => setSelectedCity(node.cityId) }}
-        >
-          <Tooltip direction="top" offset={[0, -12]}>
-            {node.name} - {Math.round(node.integrity)}%
-          </Tooltip>
-        </Marker>
-      ))}
       {cityMarkers.map(({ city, icon }) => (
         <Marker
           key={city.id}
@@ -365,7 +317,7 @@ export function TacticalMap() {
           eventHandlers={{ click: () => setSelectedCity(city.id) }}
         >
           <Tooltip direction="top" offset={[0, -16]}>
-            {city.name} - infrastructure {Math.round(city.infrastructure)}%
+            {city.name} - city services {Math.round(city.infrastructure)}%
           </Tooltip>
         </Marker>
       ))}

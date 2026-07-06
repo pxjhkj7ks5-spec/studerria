@@ -15,7 +15,7 @@ export function TutorialOverlay({ onDismiss }: TutorialOverlayProps) {
           <RadioTower size={24} />
           <div>
             <strong>First run briefing</strong>
-            <span>Survive by reading uncertainty, placing coverage, and protecting infrastructure.</span>
+            <span>Survive by reading uncertainty, placing coverage, and protecting cities.</span>
           </div>
         </div>
         <div className="tutorial-steps">

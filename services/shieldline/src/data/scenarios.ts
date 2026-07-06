@@ -18,8 +18,8 @@ export const scenarios: ScenarioDefinition[] = [
   },
   {
     id: "grid-pressure",
-    title: "Grid Pressure",
-    description: "Energy nodes start under strain and the director favors infrastructure pressure.",
+    title: "Energy Pressure",
+    description: "Energy stability starts under strain and the director favors city pressure.",
     durationDays: 7,
     difficulty: "standard",
     startingResources: { budget: 135, ammo: 96, energy: 70, morale: 76, political: 50 },
@@ -30,9 +30,9 @@ export const scenarios: ScenarioDefinition[] = [
     },
     allowedUnits: unitKinds,
     threatDirectorBias: { infrastructure: 1.45, pressure: 1.15 },
-    specialRules: ["Energy repairs have increased value", "Infrastructure strikes are more common"],
+    specialRules: ["Energy repairs have increased value", "City pressure attacks are more common"],
     winConditions: ["Prevent national energy stability from collapsing."],
-    lossConditions: ["Energy reaches zero or too many critical nodes fail."],
+    lossConditions: ["Energy reaches zero or too many cities lose essential services."],
   },
   {
     id: "decoy-storm",
@@ -61,7 +61,7 @@ export const scenarios: ScenarioDefinition[] = [
     },
     allowedUnits: unitKinds,
     threatDirectorBias: { infrastructure: 1.2, saturation: 1.25, pressure: 1.2 },
-    specialRules: ["Supply delays are more punishing", "Logistics hubs are high value"],
+    specialRules: ["Supply delays are more punishing", "City resupply is high value"],
     winConditions: ["Keep supply routes functional through the campaign."],
     lossConditions: ["Logistics strain prevents recovery for multiple cycles."],
   },
@@ -76,8 +76,8 @@ export const scenarios: ScenarioDefinition[] = [
     allowedUnits: unitKinds,
     threatDirectorBias: { pressure: 1.2, combined: 1.15, saturation: 1.1 },
     specialRules: ["Late-cycle combined attacks unlock sooner", "Fatigue management is decisive"],
-    winConditions: ["Survive all operation cycles with morale, energy, and critical systems intact."],
-    lossConditions: ["Morale, energy, or critical infrastructure collapse."],
+    winConditions: ["Survive all operation cycles with morale, energy, and city services intact."],
+    lossConditions: ["Morale, energy, or city services collapse."],
   },
 ];
 

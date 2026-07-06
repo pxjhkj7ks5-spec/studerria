@@ -28,7 +28,7 @@ export const eventDeck = [
   },
   {
     title: "Repair Boost",
-    body: "Local crews coordinate better than expected and stabilize damaged nodes.",
+    body: "Local crews coordinate better than expected and stabilize city services.",
     budget: -2,
     ammo: 0,
     energy: 3,
@@ -54,7 +54,7 @@ export const eventDeck = [
     political: 2,
   },
   {
-    title: "Infrastructure Overload",
+    title: "City Services Overload",
     body: "Emergency rerouting keeps services online but strains the grid.",
     budget: -3,
     ammo: 0,

@@ -6,7 +6,6 @@ import type {
   DailyForecast,
   DeployedUnit,
   GameState,
-  InfrastructureNode,
   IntelEntry,
   Threat,
   ThreatKind,
@@ -45,12 +44,6 @@ function getCity(state: GameState, cityId: CityId) {
   return city;
 }
 
-function getNode(state: GameState, nodeId: string) {
-  const node = state.infrastructure.find((item) => item.id === nodeId);
-  if (!node) throw new Error(`Unknown infrastructure node: ${nodeId}`);
-  return node;
-}
-
 function unitsAtCity(units: DeployedUnit[], cityId: CityId) {
   return units.filter((unit) => unit.cityId === cityId);
 }
@@ -71,7 +64,7 @@ function generateThreats(state: GameState, random: () => number): Threat[] {
   const threats: Threat[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    const node = pick(state.infrastructure, random);
+    const city = pick(state.cities, random);
     const kind = pick(threatKinds, random);
     const pressureBonus = state.forecast.pressure / 12;
     const difficultyByKind: Record<ThreatKind, number> = {
@@ -92,8 +85,7 @@ function generateThreats(state: GameState, random: () => number): Threat[] {
     threats.push({
       id: createId("threat", state.day, random),
       kind,
-      targetCityId: node.cityId,
-      targetNodeId: node.id,
+      targetCityId: city.id,
       difficulty: difficultyByKind[kind] + pressureBonus + random() * 12,
       saturation: kind === "saturation" ? 1.7 : kind === "combined" ? 1.3 : 1,
       disguisedAs: random() > 0.68 ? pick(threatKinds, random) : undefined,
@@ -116,7 +108,6 @@ function identifyThreat(threat: Threat, cityUnits: DeployedUnit[], forecast: Dai
 
 function resolveThreat(state: GameState, threat: Threat, random: () => number) {
   const targetCity = getCity(state, threat.targetCityId);
-  const targetNode = getNode(state, threat.targetNodeId);
   const cityUnits = unitsAtCity(state.units, targetCity.id);
   const identifiedAs = identifyThreat(threat, cityUnits, state.forecast, random);
   const detectionScore = cityUnits.reduce((score, unit) => {
@@ -164,21 +155,20 @@ function resolveThreat(state: GameState, threat: Threat, random: () => number) {
   }
 
   const damage = Math.round(9 + threat.difficulty * 0.22 + random() * 10);
-  targetNode.integrity = clamp(targetNode.integrity - damage);
   targetCity.damage = clamp(targetCity.damage + damage * 0.45);
   targetCity.infrastructure = clamp(targetCity.infrastructure - damage * 0.35);
-  targetCity.energy = clamp(targetCity.energy - (targetNode.kind === "energy" ? damage * 0.55 : damage * 0.22));
+  targetCity.energy = clamp(targetCity.energy - damage * 0.25);
   targetCity.morale = clamp(targetCity.morale - damage * 0.2);
 
-  state.resources.energy = clamp(state.resources.energy - (targetNode.kind === "energy" ? damage * 0.4 : damage * 0.12));
+  state.resources.energy = clamp(state.resources.energy - damage * 0.14);
   state.resources.morale = clamp(state.resources.morale - (targetCity.importance + damage * 0.08));
-  state.resources.political = clamp(state.resources.political - (targetNode.critical ? 4 : 2));
+  state.resources.political = clamp(state.resources.political - Math.max(2, targetCity.importance));
 
   pushLog(
     state.log,
     state.day,
-    "Infrastructure Hit",
-    `${targetNode.name} near ${targetCity.name} took damage after an uncertain ${identifiedAs} report.`,
+    "City Hit",
+    `${targetCity.name} took damage after an uncertain ${identifiedAs} report.`,
     "danger",
   );
 }
@@ -230,16 +220,16 @@ function updateReadiness(state: GameState) {
 }
 
 function evaluateStatus(state: GameState) {
-  const destroyedCritical = state.infrastructure.filter((node) => node.critical && node.integrity <= 0).length;
+  const collapsedCities = state.cities.filter((city) => city.infrastructure <= 0 || city.damage >= 100).length;
   if (state.resources.morale <= 0) {
     state.status = "lost";
     state.statusReason = "National morale collapsed.";
   } else if (state.resources.energy <= 0) {
     state.status = "lost";
     state.statusReason = "Energy stability collapsed.";
-  } else if (destroyedCritical >= 3) {
+  } else if (collapsedCities >= 3) {
     state.status = "lost";
-    state.statusReason = "Too many critical infrastructure nodes were destroyed.";
+    state.statusReason = "Too many cities lost essential services.";
   } else if (state.day > 30) {
     state.status = "won";
     state.statusReason = "The 30-day crisis campaign was survived.";

@@ -210,7 +210,7 @@ export interface Threat {
   id: string;
   kind: ThreatKind;
   targetCityId: CityId;
-  targetNodeId: string;
+  targetNodeId?: string;
   difficulty: number;
   saturation: number;
   disguisedAs?: ThreatKind;
@@ -222,7 +222,7 @@ export interface LiveThreat {
   status: ThreatStatus;
   origin: Coordinates;
   target: Coordinates;
-  targetNodeId: string;
+  targetNodeId?: string;
   targetCityId: CityId;
   launchSectorId: string;
   launchSectorName: string;
@@ -335,7 +335,7 @@ export interface PendingLaunch {
   id: string;
   kind: ThreatKind;
   sectorId: string;
-  targetNodeId: string;
+  targetCityId: CityId;
   launchesAtMs: number;
 }
 

@@ -85,8 +85,13 @@ function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps
       zoomControl
       attributionControl
       preferCanvas
-      zoomAnimation={false}
-      markerZoomAnimation={false}
+      zoomAnimation
+      markerZoomAnimation
+      zoomSnap={0.25}
+      zoomDelta={0.5}
+      wheelPxPerZoomLevel={140}
+      wheelDebounceTime={35}
+      zoomAnimationThreshold={4}
       fadeAnimation={false}
       className="admin-map"
       scrollWheelZoom

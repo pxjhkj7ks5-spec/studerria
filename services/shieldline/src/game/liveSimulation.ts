@@ -284,18 +284,11 @@ function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () 
   return pick(sectors, random);
 }
 
-function pickTargetNode(state: GameState, kind: ThreatKind, random: () => number) {
-  const plan = state.currentAttackPlan;
-  const preferred = plan
-    ? state.infrastructure.filter((node) => plan.targetPriorities.includes(node.kind))
-    : [];
-  const pool = preferred.length ? preferred : state.infrastructure;
-  if (kind === "decoy" || kind === "parodiya") return pick(pool, random);
-  return [...pool].sort((left, right) => {
-    const leftCity = state.cities.find((city) => city.id === left.cityId);
-    const rightCity = state.cities.find((city) => city.id === right.cityId);
-    const leftScore = (left.critical ? 20 : 0) + (leftCity?.importance || 1) * 6 + (100 - left.integrity) * 0.22;
-    const rightScore = (right.critical ? 20 : 0) + (rightCity?.importance || 1) * 6 + (100 - right.integrity) * 0.22;
+function pickTargetCity(state: GameState, kind: ThreatKind, random: () => number) {
+  if (kind === "decoy" || kind === "parodiya") return pick(state.cities, random);
+  return [...state.cities].sort((left, right) => {
+    const leftScore = left.importance * 9 + left.damage * 0.42 + (100 - left.infrastructure) * 0.16 + (100 - left.energy) * 0.12;
+    const rightScore = right.importance * 9 + right.damage * 0.42 + (100 - right.infrastructure) * 0.16 + (100 - right.energy) * 0.12;
     return rightScore - leftScore + (random() - 0.5) * 10;
   })[0];
 }
@@ -314,12 +307,12 @@ function createCarrierForThreat(state: GameState, kind: ThreatKind, launchSector
   return carrier.id;
 }
 
-function spawnThreat(state: GameState, random: () => number, forcedKind?: ThreatKind, forcedTargetNodeId?: string, forcedSectorId?: string): LiveThreat {
+function spawnThreat(state: GameState, random: () => number, forcedKind?: ThreatKind, forcedTargetCityId?: CityId, forcedSectorId?: string): LiveThreat {
   const plan = state.currentAttackPlan;
   const kind = forcedKind || (plan ? pickThreatKindForPlan(plan, random) : pick(fallbackThreatKinds, random));
-  const node = forcedTargetNodeId
-    ? state.infrastructure.find((item) => item.id === forcedTargetNodeId) || pickTargetNode(state, kind, random)
-    : pickTargetNode(state, kind, random);
+  const city = forcedTargetCityId
+    ? state.cities.find((item) => item.id === forcedTargetCityId) || pickTargetCity(state, kind, random)
+    : pickTargetCity(state, kind, random);
   const launchSector = forcedSectorId
     ? state.launchSectors.find((sector) => sector.id === forcedSectorId) || pickLaunchSector(state.launchSectors, kind, random)
     : pickLaunchSector(state.launchSectors, kind, random);
@@ -328,15 +321,14 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
   const flightDurationMs = durationWindow[0] + random() * (durationWindow[1] - durationWindow[0]);
   const falseTrack = kind === "decoy" || kind === "parodiya" || random() < (plan?.deception || 0) * 0.045;
   const origin = launchSector.coordinates;
-  const heading = bearingDeg(origin, node.coordinates);
+  const heading = bearingDeg(origin, city.coordinates);
   return {
     id: createId("live-threat", Math.floor(state.elapsedMs), random),
     kind,
     status: "inbound",
     origin,
-    target: node.coordinates,
-    targetNodeId: node.id,
-    targetCityId: node.cityId,
+    target: city.coordinates,
+    targetCityId: city.id,
     launchSectorId: launchSector.id,
     launchSectorName: launchSector.name,
     progress: 0,
@@ -349,7 +341,7 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     attackPlanId: plan?.id,
     archetype: plan?.archetype,
     isFalseTrack: falseTrack,
-    plannedTargetPriority: node.kind,
+    plannedTargetPriority: city.name,
     headingDeg: heading,
     revealed: false,
     trackQuality: 0,
@@ -367,7 +359,7 @@ function markLaunchSector(state: GameState, sectorId: string, status: NonNullabl
 }
 
 function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () => number) {
-  const node = pickTargetNode(state, kind, random);
+  const city = pickTargetCity(state, kind, random);
   const launchSector = pickLaunchSector(state.launchSectors, kind, random);
   const warningMs = kind === "iskander" ? 15000 : 0;
   if (warningMs > 0) {
@@ -375,7 +367,7 @@ function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () =>
       id: createId("pending-launch", Math.floor(state.elapsedMs), random),
       kind,
       sectorId: launchSector.id,
-      targetNodeId: node.id,
+      targetCityId: city.id,
       launchesAtMs: state.elapsedMs + warningMs,
     };
     state.pendingLaunches.push(pending);
@@ -384,7 +376,7 @@ function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () =>
     return;
   }
   markLaunchSector(state, launchSector.id, "launching", 8000);
-  state.liveThreats.push(spawnThreat(state, random, kind, node.id, launchSector.id));
+  state.liveThreats.push(spawnThreat(state, random, kind, city.id, launchSector.id));
 }
 
 function resolvePendingLaunches(state: GameState, random: () => number) {
@@ -395,7 +387,7 @@ function resolvePendingLaunches(state: GameState, random: () => number) {
       continue;
     }
     markLaunchSector(state, launch.sectorId, "launching", 9000);
-    state.liveThreats.push(spawnThreat(state, random, launch.kind, launch.targetNodeId, launch.sectorId));
+    state.liveThreats.push(spawnThreat(state, random, launch.kind, launch.targetCityId, launch.sectorId));
     pushLog(state.log, state.elapsedMs, "Missile Launch", "A prepared ballistic launch entered the battlespace.", "danger");
   }
   state.pendingLaunches = remaining;
@@ -620,20 +612,18 @@ function engageThreats(state: GameState, random: () => number) {
 }
 
 function applyImpact(state: GameState, threat: LiveThreat) {
-  const node = state.infrastructure.find((item) => item.id === threat.targetNodeId);
   const city = state.cities.find((item) => item.id === threat.targetCityId);
-  if (!node || !city) return;
+  if (!city) return;
 
   const damage = threat.isFalseTrack ? 0 : threat.damage;
-  node.integrity = clamp(node.integrity - damage);
   city.damage = clamp(city.damage + damage * 0.35);
   city.infrastructure = clamp(city.infrastructure - damage * 0.25);
-  city.energy = clamp(city.energy - (node.kind === "energy" ? damage * 0.42 : damage * 0.12));
-  state.resources.energy = clamp(state.resources.energy - (node.kind === "energy" ? damage * 0.22 : damage * 0.06));
-  state.resources.morale = clamp(state.resources.morale - (node.critical ? 2.5 : 1.4));
+  city.energy = clamp(city.energy - damage * 0.2);
+  state.resources.energy = clamp(state.resources.energy - damage * 0.1);
+  state.resources.morale = clamp(state.resources.morale - (city.importance * 0.5 + 0.8));
   state.impacts += 1;
-  state.impactMarkers.push({ id: createId("impact", Math.floor(state.elapsedMs), Math.random), position: node.coordinates, tone: "impact", ttlMs: 2600 });
-  pushLog(state.log, state.elapsedMs, "Impact", `${node.name} was disrupted by an unresolved ${threat.kind} track.`, "danger");
+  state.impactMarkers.push({ id: createId("impact", Math.floor(state.elapsedMs), Math.random), position: city.coordinates, tone: "impact", ttlMs: 2600 });
+  pushLog(state.log, state.elapsedMs, "Impact", `${city.name} was hit by an unresolved ${threat.kind} track.`, "danger");
 }
 
 function updateThreats(state: GameState, deltaMs: number) {
@@ -770,7 +760,7 @@ function updateCycle(state: GameState, random: () => number) {
 }
 
 function evaluateLiveStatus(state: GameState) {
-  const destroyedCritical = state.infrastructure.filter((node) => node.critical && node.integrity <= 0).length;
+  const collapsedCities = state.cities.filter((city) => city.infrastructure <= 0 || city.damage >= 100).length;
   const scenario = getScenario(state.scenarioId);
   if (state.resources.morale <= 0) {
     state.status = "lost";
@@ -778,9 +768,9 @@ function evaluateLiveStatus(state: GameState) {
   } else if (state.resources.energy <= 0) {
     state.status = "lost";
     state.statusReason = "Energy stability collapsed.";
-  } else if (destroyedCritical >= 3) {
+  } else if (collapsedCities >= 3) {
     state.status = "lost";
-    state.statusReason = "Too many critical infrastructure nodes were destroyed.";
+    state.statusReason = "Too many cities lost essential services.";
   } else if (scenario.durationDays > 0 && state.day > scenario.durationDays) {
     state.status = "won";
     state.statusReason = "Scenario duration completed with national systems still functioning.";

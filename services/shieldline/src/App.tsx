@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, AlertTriangle, Crosshair, Menu, RotateCcw, Shield, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ClipboardList, Crosshair, Layers, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
 import { IntelLog } from "./components/IntelLog";
@@ -15,7 +15,7 @@ import { getCampaignModeDefinition } from "./data/campaignModes";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { useGameStore } from "./store/useGameStore";
-import type { MapMode, ThreatKind } from "./types/game";
+import type { CampaignStatus, DefenseBattery, MapMode, ThreatKind, UnitDefinition, UnitKind } from "./types/game";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "live", label: "Live" },
@@ -32,6 +32,26 @@ const threatLabels: Array<{ kind: ThreatKind; label: string }> = [
 ];
 
 const SIMULATION_TICK_MS = 300;
+
+type ActivePanel = "layers" | "units" | "planning" | "intel" | "report" | "settings";
+
+const panelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }> = [
+  { id: "layers", label: "Layers", icon: Layers },
+  { id: "units", label: "Units", icon: Crosshair },
+  { id: "planning", label: "Planning", icon: SlidersHorizontal },
+  { id: "intel", label: "Intel", icon: Radio },
+  { id: "report", label: "Report", icon: ClipboardList },
+  { id: "settings", label: "Settings", icon: Settings },
+];
+
+const panelTitle: Record<ActivePanel, string> = {
+  layers: "Map layers",
+  units: "Defense units",
+  planning: "Planning",
+  intel: "Live intelligence",
+  report: "After-action",
+  settings: "Settings",
+};
 
 function formatAmmo(current: number | "infinite", capacity: number | "infinite") {
   if (capacity === "infinite" || current === "infinite") return "inf";
@@ -67,6 +87,7 @@ export default function App() {
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const placementKind = useGameStore((state) => state.placementKind);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [activePanel, setActivePanel] = useState<ActivePanel>("units");
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
   const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
@@ -104,125 +125,133 @@ export default function App() {
   }
 
   return (
-    <main className="shell" aria-label="Shieldline real-time defense simulation">
-      <header className="topbar">
-        <div className="brand-card">
-          <button className="icon-button" type="button" aria-label="Shieldline menu" onClick={returnToModeSelect}>
-            <Menu size={24} />
-          </button>
-          <div className="brand-mark" aria-hidden="true">
-            <Shield size={28} />
-          </div>
-          <div>
-            <h1>Shieldline</h1>
-            <span>{scenario.title} · {modeDefinition?.title || "Live defense"} · {game.cyclePhase}</span>
-          </div>
+    <main className="shell shell--map-first" aria-label="Shieldline real-time defense simulation">
+      <nav className="app-rail" aria-label="Shieldline panels">
+        <button className="rail-button rail-button--menu" type="button" aria-label="Back to scenario selection" onClick={returnToModeSelect}>
+          <Menu size={24} />
+        </button>
+        <div className="rail-brand" aria-hidden="true">
+          <Shield size={24} />
         </div>
-        <ResourceBar game={game} />
-      </header>
+        <div className="rail-button-stack">
+          {panelItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                className={`rail-button ${activePanel === item.id ? "rail-button--active" : ""}`}
+                type="button"
+                key={item.id}
+                onClick={() => setActivePanel(item.id)}
+                aria-label={item.label}
+                title={item.label}
+              >
+                <Icon size={21} />
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       <section className={`map-stage map-stage--${mapMode} ${placementKind ? "map-stage--placing" : ""}`} aria-label="Live defense map">
         <TacticalMap />
-        <aside className="left-rail" aria-label="Map layers">
-          {mapModes.map((mode) => (
-            <button
-              className={`nav-pill ${mapMode === mode.id ? "nav-pill--active" : ""}`}
-              type="button"
-              key={mode.id}
-              onClick={() => setMapMode(mode.id)}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </aside>
+        <header className="map-status-strip" aria-label="Campaign status">
+          <div className="strip-brand">
+            <Shield size={22} />
+            <div>
+              <h1>Shieldline</h1>
+              <span>{scenario.title} · {modeDefinition?.title || "Live defense"} · {game.cyclePhase}</span>
+            </div>
+          </div>
+          <ResourceBar game={game} />
+        </header>
         <MapLegend mode={mapMode} />
       </section>
 
-      <aside className="right-panel" aria-label="Live intelligence and event log">
-        <IntelLog game={game} />
-        {game.status !== "active" ? (
-          <div className={`status-card status-card--${game.status}`}>
-            <Activity size={22} />
-            <div>
-              <strong>{game.status === "won" ? "Campaign Stabilized" : "Campaign Failed"}</strong>
-              <span>{game.statusReason}</span>
-            </div>
+      <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={`${panelTitle[activePanel]} panel`}>
+        <div className="drawer-header">
+          <div>
+            <span>Shieldline</span>
+            <strong>{panelTitle[activePanel]}</strong>
           </div>
-        ) : null}
-        {selectedBattery ? (
-          <section className="selected-unit-card" aria-label="Selected defense unit">
-            <div className="selected-unit-card__head">
-              <Crosshair size={22} />
-              <div>
-                <strong>{selectedUnit?.name || "Selected PPO"}</strong>
-                <span>{selectedBattery.status} · {selectedBattery.supplyStatus} · last: {selectedBattery.lastEngagementResult}</span>
-              </div>
-            </div>
-            {selectedUnit ? (
-              <>
-                <div className="selected-unit-grid">
-                  <span><b>{selectedUnit.primaryRangeKm} km</b> primary</span>
-                  <span><b>{selectedUnit.outerRangeKm} km</b> outer</span>
-                  <span><b>{formatAmmo(selectedBattery.currentAmmo, selectedUnit.ammoCapacity)}</b> ammo</span>
-                  <span><b>{formatSeconds(selectedBattery.reloadRemainingMs)}</b> reload</span>
-                  <span><b>{formatSeconds(selectedBattery.cooldownMs)}</b> cooldown</span>
-                  <span><b>{Math.round(selectedBattery.readiness)}%</b> readiness</span>
-                  <span><b>{Math.round(selectedBattery.fatigue)}%</b> fatigue</span>
-                  <span><b>{selectedUnit.primaryAccuracy}%</b> primary acc</span>
-                  <span><b>{selectedUnit.outerAccuracy}%</b> outer acc</span>
-                </div>
-                <div className="chance-grid" aria-label="Threat-specific hit chances">
-                  {threatLabels.map(({ kind, label }) => (
-                    <span key={kind}>
-                      <b>{Math.round(selectedUnit.engagementChanceByThreat[kind])}%</b>
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </>
-            ) : null}
-            <div className="selected-unit-card__actions">
-              <button type="button" onClick={startSelectedBatteryMaintenance} disabled={selectedBattery.status === "maintenance" || selectedBattery.status === "reloading"}>Maintain</button>
-              <button type="button" onClick={removeSelectedBattery}>Recall</button>
-            </div>
-          </section>
-        ) : (
-          <section className="live-card" aria-label="Live simulation status">
-            <Zap size={22} />
-            <div>
-              <strong>{placementKind ? "Click an allowed area to place unit" : "Live Defense Active"}</strong>
-              <span>{game.placementWarning || "Targets stay hidden until radar scan reveals them."}</span>
-            </div>
-          </section>
-        )}
-        <div className="live-stats" aria-label="Live defense telemetry">
-          <span><strong>{game.day}</strong> Cycle</span>
-          <span><strong>{revealedThreats}</strong> Revealed</span>
-          <span><strong>{game.interceptions}</strong> Interceptions</span>
-          <span><strong>{game.impacts}</strong> Impacts</span>
-          <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
-          <span><strong>{game.logistics.resupplyDelayDays}</strong> Supply delay</span>
+          <button className="drawer-close" type="button" aria-label="Show map focus" onClick={() => setActivePanel("layers")}>
+            <Layers size={18} />
+          </button>
         </div>
-        <PlanningActionsPanel />
-        <AfterActionReport game={game} />
-        {game.resources.ammo < 15 ? (
-          <div className="status-card status-card--lost">
-            <AlertTriangle size={20} />
-            <div>
-              <strong>Ammo Low</strong>
-              <span>Coverage remains active, but engagements are limited.</span>
+        {activePanel === "layers" ? (
+          <section className="drawer-section">
+            <div className="panel-layer-list">
+              {mapModes.map((mode) => (
+                <button
+                  className={`nav-pill ${mapMode === mode.id ? "nav-pill--active" : ""}`}
+                  type="button"
+                  key={mode.id}
+                  onClick={() => setMapMode(mode.id)}
+                >
+                  {mode.label}
+                </button>
+              ))}
             </div>
-          </div>
+            <div className="live-stats live-stats--drawer" aria-label="Live defense telemetry">
+              <span><strong>{game.day}</strong> Cycle</span>
+              <span><strong>{revealedThreats}</strong> Revealed</span>
+              <span><strong>{game.interceptions}</strong> Interceptions</span>
+              <span><strong>{game.impacts}</strong> Impacts</span>
+              <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
+              <span><strong>{game.logistics.resupplyDelayDays}</strong> Supply delay</span>
+            </div>
+            {selectedBattery ? (
+              <SelectedUnitPanel
+                selectedBattery={selectedBattery}
+                selectedUnit={selectedUnit}
+                onMaintain={startSelectedBatteryMaintenance}
+                onRecall={removeSelectedBattery}
+              />
+            ) : (
+              <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
+            )}
+          </section>
         ) : null}
-        <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
-          <RotateCcw size={16} />
-          Reset Campaign
-        </button>
+        {activePanel === "units" ? <UnitRail /> : null}
+        {activePanel === "planning" ? (
+          <section className="drawer-section">
+            <PlanningActionsPanel />
+            {game.resources.ammo < 15 ? <AmmoLowCard /> : null}
+          </section>
+        ) : null}
+        {activePanel === "intel" ? (
+          <section className="drawer-section">
+            <IntelLog game={game} />
+            {game.status !== "active" ? <CampaignStatusCard status={game.status} statusReason={game.statusReason} /> : null}
+          </section>
+        ) : null}
+        {activePanel === "report" ? (
+          <section className="drawer-section">
+            <AfterActionReport game={game} />
+          </section>
+        ) : null}
+        {activePanel === "settings" ? (
+          <section className="drawer-section">
+            {selectedBattery ? (
+              <SelectedUnitPanel
+                selectedBattery={selectedBattery}
+                selectedUnit={selectedUnit}
+                onMaintain={startSelectedBatteryMaintenance}
+                onRecall={removeSelectedBattery}
+              />
+            ) : (
+              <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
+            )}
+            <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
+              <RotateCcw size={16} />
+              Reset Campaign
+            </button>
+            <button className="reset-button reset-button--secondary" type="button" onClick={returnToModeSelect}>
+              <Menu size={16} />
+              Change Scenario
+            </button>
+          </section>
+        ) : null}
       </aside>
-
-      <footer className="unit-dock" aria-label="Defense placement cards">
-        <UnitRail />
-      </footer>
 
       {!tutorialDismissed ? <TutorialOverlay onDismiss={dismissTutorial} /> : null}
       {confirmReset ? (
@@ -246,5 +275,92 @@ export default function App() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+function LiveStatusPanel({ placementKind, placementWarning }: { placementKind: UnitKind | null; placementWarning: string | null }) {
+  return (
+    <section className="live-card" aria-label="Live simulation status">
+      <Zap size={22} />
+      <div>
+        <strong>{placementKind ? "Click an allowed area to place unit" : "Live Defense Active"}</strong>
+        <span>{placementWarning || "Targets stay hidden until radar scan reveals them."}</span>
+      </div>
+    </section>
+  );
+}
+
+function CampaignStatusCard({ status, statusReason }: { status: CampaignStatus; statusReason: string }) {
+  return (
+    <div className={`status-card status-card--${status}`}>
+      <Activity size={22} />
+      <div>
+        <strong>{status === "won" ? "Campaign Stabilized" : "Campaign Failed"}</strong>
+        <span>{statusReason}</span>
+      </div>
+    </div>
+  );
+}
+
+function AmmoLowCard() {
+  return (
+    <div className="status-card status-card--lost">
+      <AlertTriangle size={20} />
+      <div>
+        <strong>Ammo Low</strong>
+        <span>Coverage remains active, but engagements are limited.</span>
+      </div>
+    </div>
+  );
+}
+
+function SelectedUnitPanel({
+  selectedBattery,
+  selectedUnit,
+  onMaintain,
+  onRecall,
+}: {
+  selectedBattery: DefenseBattery;
+  selectedUnit: UnitDefinition | null;
+  onMaintain: () => void;
+  onRecall: () => void;
+}) {
+  return (
+    <section className="selected-unit-card" aria-label="Selected defense unit">
+      <div className="selected-unit-card__head">
+        <Crosshair size={22} />
+        <div>
+          <strong>{selectedUnit?.name || "Selected PPO"}</strong>
+          <span>{selectedBattery.status} · {selectedBattery.supplyStatus} · last: {selectedBattery.lastEngagementResult}</span>
+        </div>
+      </div>
+      {selectedUnit ? (
+        <>
+          <div className="selected-unit-grid">
+            <span><b>{selectedUnit.primaryRangeKm} km</b> primary</span>
+            <span><b>{selectedUnit.outerRangeKm} km</b> outer</span>
+            <span><b>{formatAmmo(selectedBattery.currentAmmo, selectedUnit.ammoCapacity)}</b> ammo</span>
+            <span><b>{formatSeconds(selectedBattery.reloadRemainingMs)}</b> reload</span>
+            <span><b>{formatSeconds(selectedBattery.cooldownMs)}</b> cooldown</span>
+            <span><b>{Math.round(selectedBattery.readiness)}%</b> readiness</span>
+            <span><b>{Math.round(selectedBattery.fatigue)}%</b> fatigue</span>
+            <span><b>{selectedUnit.primaryAccuracy}%</b> primary acc</span>
+            <span><b>{selectedUnit.outerAccuracy}%</b> outer acc</span>
+          </div>
+          <div className="chance-grid" aria-label="Threat-specific hit chances">
+            {threatLabels.map(({ kind, label }) => (
+              <span key={kind}>
+                <b>{Math.round(selectedUnit.engagementChanceByThreat[kind])}%</b>
+                {label}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : null}
+      <div className="selected-unit-card__actions">
+        <button type="button" onClick={onMaintain} disabled={selectedBattery.status === "maintenance" || selectedBattery.status === "reloading"}>Maintain</button>
+        <button type="button" onClick={onRecall}>Recall</button>
+      </div>
+    </section>
   );
 }

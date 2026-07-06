@@ -30,7 +30,7 @@ export const campaignModes: CampaignModeDefinition[] = [
     id: "crisis",
     title: "30-Day Crisis",
     durationLabel: "Extended",
-    description: "A longer campaign where readiness, logistics, morale, and infrastructure attrition matter.",
+    description: "A longer campaign where readiness, logistics, morale, and city service attrition matter.",
     posture: "Sustained pressure",
     resources: { budget: 120, ammo: 86, energy: 78, morale: 72, political: 45 },
   },

@@ -31,15 +31,14 @@ const openingLog: IntelEntry[] = [
 ];
 
 function createOpeningThreat(): LiveThreat {
-  const targetNode = initialInfrastructure.find((node) => node.id === "grid-kyiv") || initialInfrastructure[0];
+  const targetCity = initialCities.find((city) => city.id === "kyiv") || initialCities[0];
   return {
     id: "opening-track-1",
     kind: "geran2",
     status: "inbound",
     origin: { lat: 51.8, lng: 40.0 },
-    target: targetNode.coordinates,
-    targetNodeId: targetNode.id,
-    targetCityId: targetNode.cityId,
+    target: targetCity.coordinates,
+    targetCityId: targetCity.id,
     launchSectorId: "drone-northwest",
     launchSectorName: "Northwest Drone Launch Area",
     progress: 0.02,
@@ -63,7 +62,7 @@ export function createForecast(day: number, random: () => number): DailyForecast
   const pressure = Math.round(10 + random() * 25 + day * 0.7);
   const warningBank = [
     "Signals suggest a mixed pressure campaign, but target confidence is low.",
-    "Analysts report unusual routing patterns near critical infrastructure.",
+    "Analysts report unusual routing patterns near major cities.",
     "Support teams expect a difficult maintenance window.",
     "Several warnings appear contradictory. Keep reserves flexible.",
   ];

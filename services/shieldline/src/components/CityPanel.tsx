@@ -33,7 +33,7 @@ export function CityPanel({ city, game }: CityPanelProps) {
         <strong>{alertState === "calm" ? "No active track nearby" : "Command alert active"}</strong>
       </div>
       <div className="city-systems">
-        <Metric icon={Factory} label="Infrastructure" value={city.infrastructure} />
+        <Metric icon={Factory} label="City services" value={city.infrastructure} />
         <Metric icon={Zap} label="Energy" value={city.energy} />
         <Metric icon={Radio} label="Comms" value={communications} />
         <Metric icon={Truck} label={`Logistics (${supplyStatus.replace("-", " ")})`} value={logistics} />
@@ -41,7 +41,7 @@ export function CityPanel({ city, game }: CityPanelProps) {
         <Metric icon={Wrench} label="Repair cap" value={repairCapacity} />
       </div>
       <div className="assigned-row">
-        <span>{cityNodes.length} infrastructure nodes</span>
+        <span>{cityUnits.length} defense units nearby</span>
         <small>abstract supply: {supplyStatus.replace("-", " ")}</small>
       </div>
     </section>
