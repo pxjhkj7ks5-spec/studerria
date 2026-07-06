@@ -2,7 +2,6 @@ import { ArrowLeft, Lock, MousePointer2, RotateCcw, Save, Trash2, Undo2 } from "
 import { useEffect, useMemo, useState } from "react";
 import { CircleMarker, MapContainer, Polygon, Polyline, TileLayer, useMapEvents } from "react-leaflet";
 import {
-  createOccupiedPolygonToPlacementEdge,
   defaultControlOverlay,
   getControlOverlay,
   resetControlOverlay,
@@ -11,18 +10,13 @@ import {
   verifyControlOverlayAdminPassword,
 } from "../data/controlZones";
 import type { ControlOverlay } from "../data/controlZones";
-import { createLineBufferPolygons } from "../game/placementRules";
 import type { Coordinates } from "../types/game";
 
-type ZoneMode = "frontline" | "occupied" | "water";
+type ZoneMode = "occupied" | "water";
 
 const mapCenter: [number, number] = [48.7, 31.4];
 
 const modeLabels: Record<ZoneMode, { title: string; help: string }> = {
-  frontline: {
-    title: "Front line",
-    help: "Click the map to append front-line points. The no-placement buffer is generated automatically.",
-  },
   occupied: {
     title: "Occupied zones",
     help: "Click at least three points around a blocked land area, then close the polygon.",
@@ -62,8 +56,7 @@ interface AdminMapProps {
 }
 
 function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps) {
-  const frontBufferPolygons = useMemo(() => createLineBufferPolygons(overlay.frontline), [overlay.frontline]);
-  const draftColor = mode === "water" ? "#5ad8ff" : mode === "occupied" ? "#ff6e6e" : "#ffcf6e";
+  const draftColor = mode === "water" ? "#5ad8ff" : "#ff6e6e";
 
   return (
     <MapContainer
@@ -96,22 +89,6 @@ function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps
           pathOptions={{ color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.16, opacity: 0.56, weight: 1.4, dashArray: "6 5" }}
         />
       ))}
-      {frontBufferPolygons.map((polygon, index) => (
-        <Polygon
-          key={`front-buffer-${index}`}
-          positions={toPositions(polygon)}
-          pathOptions={{ color: "#ff9f42", fillColor: "#ff8a35", fillOpacity: 0.16, opacity: 0.46, weight: 0.8, className: "frontline-buffer-zone" }}
-        />
-      ))}
-      <Polyline positions={toPositions(overlay.frontline)} pathOptions={{ color: "#ff5c5c", weight: 3, opacity: 0.84, dashArray: "8 5" }} />
-      {overlay.frontline.map((point, index) => (
-        <CircleMarker
-          key={`front-point-${pointKey(point, index)}`}
-          center={[point.lat, point.lng]}
-          radius={4}
-          pathOptions={{ color: "#ffefb0", fillColor: "#ff5c5c", fillOpacity: 0.95, weight: 1.5 }}
-        />
-      ))}
       {draftPolygon.length ? (
         <>
           <Polyline positions={toPositions(draftPolygon)} pathOptions={{ color: draftColor, weight: 2.5, opacity: 0.92, dashArray: "3 5" }} />
@@ -132,7 +109,7 @@ function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps
 export function ControlZoneAdmin() {
   const initialOverlay = useMemo(() => getControlOverlay(), []);
   const [overlay, setOverlay] = useState<ControlOverlay>(initialOverlay);
-  const [mode, setMode] = useState<ZoneMode>("frontline");
+  const [mode, setMode] = useState<ZoneMode>("occupied");
   const [draftPolygon, setDraftPolygon] = useState<Coordinates[]>([]);
   const [password, setPassword] = useState(() => (typeof window === "undefined" ? "" : window.sessionStorage.getItem("shieldline-admin-password") || ""));
   const [authenticated, setAuthenticated] = useState(false);
@@ -180,27 +157,16 @@ export function ControlZoneAdmin() {
   };
 
   const appendPoint = (point: Coordinates) => {
-    if (mode === "frontline") {
-      setOverlay((current) => ({ ...current, frontline: [...current.frontline, point] }));
-      setStatus("Front-line point added.");
-      return;
-    }
     setDraftPolygon((current) => [...current, point]);
     setStatus(`${modeLabels[mode].title}: draft point added.`);
   };
 
   const undoPoint = () => {
-    if (mode === "frontline") {
-      setOverlay((current) => ({ ...current, frontline: current.frontline.slice(0, -1) }));
-      setStatus("Last front-line point removed.");
-      return;
-    }
     setDraftPolygon((current) => current.slice(0, -1));
     setStatus("Last draft point removed.");
   };
 
   const closePolygon = () => {
-    if (mode === "frontline") return;
     if (draftPolygon.length < 3) {
       setStatus("Add at least three map points before closing a polygon.");
       return;
@@ -214,22 +180,7 @@ export function ControlZoneAdmin() {
     setStatus(`${modeLabels[mode].title}: polygon closed.`);
   };
 
-  const fillOccupiedToPlacementEdge = () => {
-    const polygon = createOccupiedPolygonToPlacementEdge(overlay.frontline, overlay.ukrainePlacementPolygon);
-    if (polygon.length < 3) {
-      setStatus("Front line needs at least two points before filling occupied territory.");
-      return;
-    }
-    setOverlay((current) => ({
-      ...current,
-      occupiedPolygons: [polygon],
-    }));
-    setDraftPolygon([]);
-    setStatus("Occupied territory filled from the front line to the outer placement edge.");
-  };
-
   const removeLastPolygon = () => {
-    if (mode === "frontline") return;
     setOverlay((current) => ({
       ...current,
       occupiedPolygons: mode === "occupied" ? current.occupiedPolygons.slice(0, -1) : current.occupiedPolygons,
@@ -239,11 +190,6 @@ export function ControlZoneAdmin() {
   };
 
   const clearCurrentLayer = () => {
-    if (mode === "frontline") {
-      setOverlay((current) => ({ ...current, frontline: [] }));
-      setStatus("Front line cleared.");
-      return;
-    }
     setDraftPolygon([]);
     setOverlay((current) => ({
       ...current,
@@ -261,10 +207,6 @@ export function ControlZoneAdmin() {
   };
 
   const save = async () => {
-    if (overlay.frontline.length < 2) {
-      setStatus("Front line needs at least two points.");
-      return;
-    }
     try {
       await saveControlOverlayToServer(basePath, overlay, password);
       saveControlOverlay(overlay);
@@ -328,7 +270,7 @@ export function ControlZoneAdmin() {
         </a>
         <div>
           <h1>Shieldline Zones</h1>
-          <span>Click the map to configure occupied areas, front line, and water-only boat placement.</span>
+          <span>Click the map to configure occupied areas and water-only boat placement.</span>
         </div>
       </header>
 
@@ -361,24 +303,20 @@ export function ControlZoneAdmin() {
           </div>
 
           <div className="admin-zone-stats">
-            <span><b>{overlay.frontline.length}</b> front points</span>
             <span><b>{overlay.occupiedPolygons.length}</b> occupied polygons</span>
             <span><b>{overlay.waterPlacementPolygons.length}</b> water polygons</span>
             <span><b>{draftPolygon.length}</b> draft points</span>
           </div>
 
           <div className="admin-zone-actions">
-            <button type="button" onClick={undoPoint} disabled={mode === "frontline" ? overlay.frontline.length <= 2 : draftPolygon.length === 0}>
+            <button type="button" onClick={undoPoint} disabled={draftPolygon.length === 0}>
               <Undo2 size={16} />
               Undo point
             </button>
-            <button type="button" onClick={closePolygon} disabled={mode === "frontline" || draftPolygon.length < 3}>
+            <button type="button" onClick={closePolygon} disabled={draftPolygon.length < 3}>
               Close polygon
             </button>
-            <button type="button" onClick={fillOccupiedToPlacementEdge} disabled={overlay.frontline.length < 2}>
-              Fill occupied side
-            </button>
-            <button type="button" onClick={removeLastPolygon} disabled={mode === "frontline"}>
+            <button type="button" onClick={removeLastPolygon}>
               <Trash2 size={16} />
               Remove last polygon
             </button>

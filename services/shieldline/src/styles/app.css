@@ -511,10 +511,6 @@ button {
   animation: radar-coverage-pulse 1s steps(2, end) infinite;
 }
 
-.frontline-buffer-zone {
-  filter: drop-shadow(0 0 5px rgba(255, 138, 53, 0.32));
-}
-
 .map-marker--battery {
   width: 22px;
   height: 22px;

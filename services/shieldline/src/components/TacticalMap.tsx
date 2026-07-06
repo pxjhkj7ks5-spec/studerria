@@ -4,7 +4,6 @@ import { Fragment, useMemo } from "react";
 import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { getUnitDefinition } from "../data/units";
-import { createLineBufferPolygons } from "../game/placementRules";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -198,10 +197,6 @@ export function TacticalMap() {
   const setSelectedCity = useGameStore((state) => state.setSelectedCity);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
   const controlOverlay = useMemo(() => getControlOverlay(), []);
-  const frontBufferPolygons = useMemo(
-    () => createLineBufferPolygons(controlOverlay.frontline),
-    [controlOverlay.frontline],
-  );
 
   const cityMarkers = useMemo(
     () => game.cities.map((city) => ({
@@ -249,17 +244,6 @@ export function TacticalMap() {
           pathOptions={{ color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" }}
         />
       ))}
-      {frontBufferPolygons.map((polygon, index) => (
-        <Polygon
-          key={`front-buffer-${index}`}
-          positions={toPositions(polygon)}
-          pathOptions={{ color: "#ff9f42", fillColor: "#ff8a35", fillOpacity: 0.14, opacity: 0.42, weight: 0.8, className: "frontline-buffer-zone" }}
-        />
-      ))}
-      <Polyline
-        positions={toPositions(controlOverlay.frontline)}
-        pathOptions={{ color: "#ff5c5c", weight: 3, opacity: 0.78, dashArray: "8 5" }}
-      />
       {game.launchSectors.map((sector) => (
         <Marker key={sector.id} position={[sector.coordinates.lat, sector.coordinates.lng]} icon={makeLaunchIcon(sector)}>
           <Tooltip direction="left" offset={[-8, 0]}>

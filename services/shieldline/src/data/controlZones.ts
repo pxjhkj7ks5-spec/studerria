@@ -4,7 +4,6 @@ import type { Coordinates } from "../types/game";
 export interface ControlOverlay {
   ukrainePlacementPolygon: Coordinates[];
   occupiedPolygons: Coordinates[][];
-  frontline: Coordinates[];
   waterPlacementPolygons: Coordinates[][];
 }
 
@@ -50,17 +49,6 @@ export const defaultControlOverlay: ControlOverlay = {
     { lat: 50.65, lng: 23.0 },
   ],
   occupiedPolygons: deepstateOccupiedPolygons,
-  frontline: [
-    { lat: 50.85, lng: 35.1 },
-    { lat: 50.25, lng: 36.0 },
-    { lat: 49.55, lng: 36.5 },
-    { lat: 48.85, lng: 37.2 },
-    { lat: 48.15, lng: 37.0 },
-    { lat: 47.75, lng: 36.1 },
-    { lat: 47.35, lng: 35.2 },
-    { lat: 46.95, lng: 34.2 },
-    { lat: 46.7, lng: 33.1 },
-  ],
   waterPlacementPolygons: [
     [
       { lat: 46.35, lng: 27.2 },
@@ -115,43 +103,6 @@ function cleanOccupiedPolygons(value: unknown) {
   return samePolygons(polygons, legacyEditorialOccupiedPolygons) ? defaultControlOverlay.occupiedPolygons : polygons;
 }
 
-function squaredDistance(left: Coordinates, right: Coordinates) {
-  const dLat = left.lat - right.lat;
-  const dLng = left.lng - right.lng;
-  return dLat * dLat + dLng * dLng;
-}
-
-function nearestPointIndex(points: Coordinates[], target: Coordinates) {
-  return points.reduce((best, point, index) => (
-    squaredDistance(point, target) < squaredDistance(points[best], target) ? index : best
-  ), 0);
-}
-
-function wrappedSegment(points: Coordinates[], startIndex: number, endIndex: number) {
-  if (startIndex <= endIndex) return points.slice(startIndex, endIndex + 1);
-  return [...points.slice(startIndex), ...points.slice(0, endIndex + 1)];
-}
-
-function averageLng(points: Coordinates[]) {
-  return points.reduce((sum, point) => sum + point.lng, 0) / points.length;
-}
-
-export function createOccupiedPolygonToPlacementEdge(frontline: Coordinates[], placementPolygon = defaultControlOverlay.ukrainePlacementPolygon) {
-  if (frontline.length < 2 || placementPolygon.length < 3) return [];
-  const startIndex = nearestPointIndex(placementPolygon, frontline[0]);
-  const endIndex = nearestPointIndex(placementPolygon, frontline[frontline.length - 1]);
-  const forwardSegment = wrappedSegment(placementPolygon, startIndex, endIndex);
-  const reverseSegment = wrappedSegment(placementPolygon, endIndex, startIndex).reverse();
-  const frontierLng = averageLng(frontline);
-  const borderSegment = averageLng(forwardSegment) >= frontierLng && averageLng(forwardSegment) >= averageLng(reverseSegment)
-    ? forwardSegment
-    : reverseSegment;
-  return [
-    ...frontline.map((point) => ({ ...point })),
-    ...borderSegment.reverse().map((point) => ({ ...point })),
-  ];
-}
-
 export function readSavedControlOverlay(): Partial<ControlOverlay> | null {
   if (typeof window === "undefined") return null;
   try {
@@ -161,7 +112,6 @@ export function readSavedControlOverlay(): Partial<ControlOverlay> | null {
     return {
       ukrainePlacementPolygon: cleanLine(parsed.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
       occupiedPolygons: cleanOccupiedPolygons(parsed.occupiedPolygons),
-      frontline: cleanLine(parsed.frontline, defaultControlOverlay.frontline),
       waterPlacementPolygons: cleanPolygons(parsed.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
     };
   } catch {
@@ -174,7 +124,6 @@ export function getControlOverlay(): ControlOverlay {
   return {
     ukrainePlacementPolygon: saved?.ukrainePlacementPolygon || defaultControlOverlay.ukrainePlacementPolygon,
     occupiedPolygons: saved?.occupiedPolygons || defaultControlOverlay.occupiedPolygons,
-    frontline: saved?.frontline || defaultControlOverlay.frontline,
     waterPlacementPolygons: saved?.waterPlacementPolygons || defaultControlOverlay.waterPlacementPolygons,
   };
 }
@@ -207,7 +156,6 @@ export async function hydrateControlOverlayFromServer(basePath: string) {
     saveControlOverlay({
       ukrainePlacementPolygon: cleanLine(payload.overlay.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
       occupiedPolygons: cleanOccupiedPolygons(payload.overlay.occupiedPolygons),
-      frontline: cleanLine(payload.overlay.frontline, defaultControlOverlay.frontline),
       waterPlacementPolygons: cleanPolygons(payload.overlay.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
     });
     return true;
