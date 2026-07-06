@@ -220,7 +220,7 @@ export function TacticalMap() {
       center={mapCenter}
       zoom={6}
       minZoom={5}
-      maxZoom={8}
+      maxZoom={12}
       zoomControl={false}
       attributionControl={false}
       className="leaflet-stage"
