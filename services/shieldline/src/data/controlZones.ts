@@ -1,3 +1,4 @@
+import { deepstateOccupiedPolygons } from "./deepstateOccupiedZones";
 import type { Coordinates } from "../types/game";
 
 export interface ControlOverlay {
@@ -8,6 +9,26 @@ export interface ControlOverlay {
 }
 
 export const CONTROL_OVERLAY_STORAGE_KEY = "shieldline-control-overlay-v1";
+
+const legacyEditorialOccupiedPolygons: Coordinates[][] = [
+  [
+    { lat: 48.9, lng: 37.0 },
+    { lat: 49.2, lng: 39.8 },
+    { lat: 47.1, lng: 39.3 },
+    { lat: 46.3, lng: 36.4 },
+    { lat: 46.2, lng: 33.9 },
+    { lat: 47.2, lng: 34.2 },
+    { lat: 47.7, lng: 35.1 },
+    { lat: 48.25, lng: 36.0 },
+  ],
+  [
+    { lat: 46.4, lng: 32.2 },
+    { lat: 46.4, lng: 35.7 },
+    { lat: 45.2, lng: 36.4 },
+    { lat: 44.4, lng: 33.4 },
+    { lat: 45.1, lng: 30.7 },
+  ],
+];
 
 // Static, simplified editorial overlay. It is not a live front map.
 export const defaultControlOverlay: ControlOverlay = {
@@ -28,25 +49,7 @@ export const defaultControlOverlay: ControlOverlay = {
     { lat: 48.1, lng: 22.1 },
     { lat: 50.65, lng: 23.0 },
   ],
-  occupiedPolygons: [
-    [
-      { lat: 48.9, lng: 37.0 },
-      { lat: 49.2, lng: 39.8 },
-      { lat: 47.1, lng: 39.3 },
-      { lat: 46.3, lng: 36.4 },
-      { lat: 46.2, lng: 33.9 },
-      { lat: 47.2, lng: 34.2 },
-      { lat: 47.7, lng: 35.1 },
-      { lat: 48.25, lng: 36.0 },
-    ],
-    [
-      { lat: 46.4, lng: 32.2 },
-      { lat: 46.4, lng: 35.7 },
-      { lat: 45.2, lng: 36.4 },
-      { lat: 44.4, lng: 33.4 },
-      { lat: 45.1, lng: 30.7 },
-    ],
-  ],
+  occupiedPolygons: deepstateOccupiedPolygons,
   frontline: [
     { lat: 50.85, lng: 35.1 },
     { lat: 50.25, lng: 36.0 },
@@ -97,6 +100,21 @@ function cleanPolygons(value: unknown, fallback: Coordinates[][]) {
   return polygons;
 }
 
+function sameCoordinate(left: Coordinates, right: Coordinates) {
+  return Math.abs(left.lat - right.lat) < 0.00001 && Math.abs(left.lng - right.lng) < 0.00001;
+}
+
+function samePolygons(left: Coordinates[][], right: Coordinates[][]) {
+  return left.length === right.length && left.every((polygon, polygonIndex) => (
+    polygon.length === right[polygonIndex].length && polygon.every((point, pointIndex) => sameCoordinate(point, right[polygonIndex][pointIndex]))
+  ));
+}
+
+function cleanOccupiedPolygons(value: unknown) {
+  const polygons = cleanPolygons(value, defaultControlOverlay.occupiedPolygons);
+  return samePolygons(polygons, legacyEditorialOccupiedPolygons) ? defaultControlOverlay.occupiedPolygons : polygons;
+}
+
 function squaredDistance(left: Coordinates, right: Coordinates) {
   const dLat = left.lat - right.lat;
   const dLng = left.lng - right.lng;
@@ -142,7 +160,7 @@ export function readSavedControlOverlay(): Partial<ControlOverlay> | null {
     const parsed = JSON.parse(raw) as Partial<ControlOverlay>;
     return {
       ukrainePlacementPolygon: cleanLine(parsed.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
-      occupiedPolygons: cleanPolygons(parsed.occupiedPolygons, defaultControlOverlay.occupiedPolygons),
+      occupiedPolygons: cleanOccupiedPolygons(parsed.occupiedPolygons),
       frontline: cleanLine(parsed.frontline, defaultControlOverlay.frontline),
       waterPlacementPolygons: cleanPolygons(parsed.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
     };
@@ -188,7 +206,7 @@ export async function hydrateControlOverlayFromServer(basePath: string) {
     if (!payload.overlay) return false;
     saveControlOverlay({
       ukrainePlacementPolygon: cleanLine(payload.overlay.ukrainePlacementPolygon, defaultControlOverlay.ukrainePlacementPolygon, 3),
-      occupiedPolygons: cleanPolygons(payload.overlay.occupiedPolygons, defaultControlOverlay.occupiedPolygons),
+      occupiedPolygons: cleanOccupiedPolygons(payload.overlay.occupiedPolygons),
       frontline: cleanLine(payload.overlay.frontline, defaultControlOverlay.frontline),
       waterPlacementPolygons: cleanPolygons(payload.overlay.waterPlacementPolygons, defaultControlOverlay.waterPlacementPolygons),
     });
