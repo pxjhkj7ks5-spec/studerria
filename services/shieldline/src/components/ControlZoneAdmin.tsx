@@ -2,7 +2,7 @@ import { ArrowLeft, Lock, MousePointer2, RotateCcw, Save, Trash2, Undo2 } from "
 import { useEffect, useMemo, useState } from "react";
 import { CircleMarker, MapContainer, Polygon, Polyline, TileLayer, useMapEvents } from "react-leaflet";
 import {
-  createOccupiedPolygonToRussiaBorder,
+  createOccupiedPolygonToPlacementEdge,
   defaultControlOverlay,
   getControlOverlay,
   resetControlOverlay,
@@ -103,7 +103,6 @@ function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps
           pathOptions={{ color: "#ff9f42", fillColor: "#ff8a35", fillOpacity: 0.16, opacity: 0.46, weight: 0.8, className: "frontline-buffer-zone" }}
         />
       ))}
-      <Polyline positions={toPositions(overlay.russiaBorder)} pathOptions={{ color: "#f2c865", weight: 2, opacity: 0.64, dashArray: "5 7" }} />
       <Polyline positions={toPositions(overlay.frontline)} pathOptions={{ color: "#ff5c5c", weight: 3, opacity: 0.84, dashArray: "8 5" }} />
       {overlay.frontline.map((point, index) => (
         <CircleMarker
@@ -215,8 +214,8 @@ export function ControlZoneAdmin() {
     setStatus(`${modeLabels[mode].title}: polygon closed.`);
   };
 
-  const fillOccupiedToRussiaBorder = () => {
-    const polygon = createOccupiedPolygonToRussiaBorder(overlay.frontline, overlay.russiaBorder);
+  const fillOccupiedToPlacementEdge = () => {
+    const polygon = createOccupiedPolygonToPlacementEdge(overlay.frontline, overlay.ukrainePlacementPolygon);
     if (polygon.length < 3) {
       setStatus("Front line needs at least two points before filling occupied territory.");
       return;
@@ -226,7 +225,7 @@ export function ControlZoneAdmin() {
       occupiedPolygons: [polygon],
     }));
     setDraftPolygon([]);
-    setStatus("Occupied territory filled from the front line to the RF border.");
+    setStatus("Occupied territory filled from the front line to the outer placement edge.");
   };
 
   const removeLastPolygon = () => {
@@ -374,8 +373,8 @@ export function ControlZoneAdmin() {
             <button type="button" onClick={closePolygon} disabled={mode === "frontline" || draftPolygon.length < 3}>
               Close polygon
             </button>
-            <button type="button" onClick={fillOccupiedToRussiaBorder} disabled={overlay.frontline.length < 2}>
-              Fill to RF border
+            <button type="button" onClick={fillOccupiedToPlacementEdge} disabled={overlay.frontline.length < 2}>
+              Fill occupied side
             </button>
             <button type="button" onClick={removeLastPolygon} disabled={mode === "frontline"}>
               <Trash2 size={16} />
