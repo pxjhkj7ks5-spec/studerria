@@ -52,9 +52,9 @@ function makeCityIcon(city: City, selected: boolean) {
   const alert = city.alertState || "calm";
   return L.divIcon({
     className: "",
-    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--${damageClass} map-marker--city-${alert} ${selected ? "map-marker--selected" : ""}">${city.name.slice(0, 1)}</span><b>${city.name}</b></span>`,
-    iconSize: [118, 34],
-    iconAnchor: [17, 17],
+    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--${damageClass} map-marker--city-${alert} ${selected ? "map-marker--selected" : ""}" aria-hidden="true"></span><b>${city.name}</b></span>`,
+    iconSize: [92, 24],
+    iconAnchor: [8, 12],
   });
 }
 
