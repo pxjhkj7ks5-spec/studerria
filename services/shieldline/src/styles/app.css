@@ -1654,12 +1654,15 @@ button {
 }
 
 .admin-topbar span,
-.admin-editor small {
+.admin-password small,
+.admin-login-card span {
   color: var(--muted);
 }
 
 .admin-back-link,
-.admin-actions button {
+.admin-actions button,
+.admin-zone-actions button,
+.admin-login-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1681,12 +1684,6 @@ button {
   border-radius: 8px;
   color: #cdeeff;
   background: rgba(12, 35, 45, 0.78);
-}
-
-.admin-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
 }
 
 .admin-password {
@@ -1720,36 +1717,137 @@ button {
   box-shadow: 0 0 0 3px rgba(85, 215, 255, 0.1);
 }
 
-.admin-editor {
+.admin-shell--login {
   display: grid;
-  gap: 10px;
-  min-width: 0;
+  place-items: center;
 }
 
-.admin-editor--wide {
-  grid-column: 1 / -1;
-}
-
-.admin-editor span {
+.admin-login-card {
   display: grid;
-  gap: 3px;
-}
-
-.admin-editor textarea {
-  min-height: 300px;
-  resize: vertical;
-  padding: 12px;
-  border: 1px solid rgba(111, 202, 255, 0.18);
+  width: min(480px, 100%);
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid rgba(155, 217, 255, 0.18);
   border-radius: 8px;
-  color: #eaf7ff;
-  background: rgba(3, 12, 18, 0.86);
-  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  outline: none;
+  background: rgba(9, 20, 30, 0.92);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
 }
 
-.admin-editor textarea:focus {
-  border-color: rgba(85, 215, 255, 0.46);
-  box-shadow: 0 0 0 3px rgba(85, 215, 255, 0.1);
+.admin-login-card .admin-status,
+.admin-login-card .admin-password {
+  margin-bottom: 0;
+}
+
+.admin-login-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-login-card__head h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.admin-login-button {
+  border-color: rgba(82, 233, 128, 0.32);
+  color: #ddffe8;
+  background: rgba(24, 82, 52, 0.74);
+}
+
+.admin-login-button:disabled,
+.admin-zone-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.admin-zone-layout {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 16px;
+  min-height: min(660px, calc(100vh - 188px));
+}
+
+.admin-zone-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(155, 217, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(9, 20, 30, 0.82);
+}
+
+.admin-mode-tabs {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-mode-tab {
+  min-height: 38px;
+  border: 1px solid rgba(100, 193, 255, 0.16);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(17, 31, 44, 0.8);
+  font-weight: 800;
+}
+
+.admin-mode-tab--active {
+  border-color: rgba(85, 215, 255, 0.48);
+  color: #dff8ff;
+  background: rgba(35, 97, 139, 0.68);
+}
+
+.admin-mode-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #dceeff;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-zone-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-zone-stats span {
+  display: grid;
+  min-height: 52px;
+  align-content: center;
+  padding: 8px;
+  border: 1px solid rgba(137, 211, 255, 0.14);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 12px;
+}
+
+.admin-zone-stats b {
+  color: #eef7ff;
+  font-size: 20px;
+}
+
+.admin-zone-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.admin-zone-actions button {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.admin-map {
+  min-height: min(660px, calc(100vh - 188px));
+  border: 1px solid rgba(155, 217, 255, 0.18);
+  border-radius: 8px;
+  background: #102131;
+  overflow: hidden;
 }
 
 .admin-actions {
@@ -2007,12 +2105,17 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .admin-grid {
+  .admin-zone-layout {
     grid-template-columns: 1fr;
   }
 
-  .admin-editor--wide {
-    grid-column: auto;
+  .admin-zone-panel {
+    order: 2;
+  }
+
+  .admin-map {
+    order: 1;
+    min-height: 520px;
   }
 }
 
@@ -2089,7 +2192,16 @@ button {
     align-items: flex-start;
   }
 
-  .admin-editor textarea {
-    min-height: 240px;
+  .admin-map {
+    min-height: 420px;
+  }
+
+  .admin-actions {
+    flex-direction: column;
+  }
+
+  .admin-actions button,
+  .admin-login-button {
+    width: 100%;
   }
 }

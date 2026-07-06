@@ -67,6 +67,10 @@ function isControlOverlayApi(pathname) {
   return pathname === `${basePath}/api/control-overlay` || (!basePath && pathname === "/api/control-overlay");
 }
 
+function isControlOverlayAuthApi(pathname) {
+  return pathname === `${basePath}/api/control-overlay/auth` || (!basePath && pathname === "/api/control-overlay/auth");
+}
+
 function hasAdminAccess(req) {
   if (!adminPassword) return false;
   if (req.headers["x-shieldline-admin-password"] === adminPassword) return true;
@@ -136,6 +140,19 @@ async function handleControlOverlayApi(req, res) {
   res.end();
 }
 
+function handleControlOverlayAuth(req, res) {
+  if (req.method !== "POST") {
+    res.writeHead(405, { Allow: "POST" });
+    res.end();
+    return;
+  }
+  if (!hasAdminAccess(req)) {
+    sendJson(res, 401, { error: "Admin password is required." });
+    return;
+  }
+  sendJson(res, 200, { ok: true });
+}
+
 createServer(async (req, res) => {
   const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
   const pathname = requestUrl.pathname.replace(/\/+$/, "") || "/";
@@ -148,6 +165,11 @@ createServer(async (req, res) => {
 
   if (isControlOverlayApi(pathname)) {
     await handleControlOverlayApi(req, res);
+    return;
+  }
+
+  if (isControlOverlayAuthApi(pathname)) {
+    handleControlOverlayAuth(req, res);
     return;
   }
 

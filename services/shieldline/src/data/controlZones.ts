@@ -139,6 +139,10 @@ function apiUrl(basePath: string) {
   return `${normalized}/api/control-overlay`;
 }
 
+function adminAuthUrl(basePath: string) {
+  return `${apiUrl(basePath)}/auth`;
+}
+
 export async function hydrateControlOverlayFromServer(basePath: string) {
   try {
     const response = await fetch(apiUrl(basePath), { cache: "no-store" });
@@ -171,4 +175,20 @@ export async function saveControlOverlayToServer(basePath: string, overlay: Cont
     const payload = await response.json().catch(() => ({} as { error?: string }));
     throw new Error(payload.error || "Could not save control overlay.");
   }
+}
+
+export async function verifyControlOverlayAdminPassword(basePath: string, password: string) {
+  const response = await fetch(adminAuthUrl(basePath), {
+    method: "POST",
+    headers: {
+      "X-Shieldline-Admin-Password": password,
+    },
+  });
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("Server API is not available.");
+    const payload = await response.json().catch(() => ({} as { error?: string }));
+    throw new Error(payload.error || "Invalid admin password.");
+  }
+  const payload = await response.json().catch(() => ({} as { ok?: boolean }));
+  if (!payload.ok) throw new Error("Invalid admin password.");
 }
