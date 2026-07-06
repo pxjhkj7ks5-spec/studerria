@@ -3,6 +3,7 @@ import { Circle, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, us
 import { Fragment, useMemo } from "react";
 import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
+import { darkMapTiles } from "../data/mapTiles";
 import { getUnitDefinition } from "../data/units";
 import { useGameStore } from "../store/useGameStore";
 import type {
@@ -217,14 +218,15 @@ export function TacticalMap() {
       minZoom={5}
       maxZoom={12}
       zoomControl={false}
-      attributionControl={false}
+      attributionControl
       className="leaflet-stage"
       scrollWheelZoom
     >
       <MapClickPlacement />
       <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution="&copy; OpenStreetMap contributors"
+        url={darkMapTiles.url}
+        attribution={darkMapTiles.attribution}
+        className={darkMapTiles.className}
       />
       <Polygon
         positions={toPositions(controlOverlay.ukrainePlacementPolygon)}

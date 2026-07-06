@@ -345,13 +345,24 @@ button {
   background: #0a1520;
 }
 
-.leaflet-tile {
-  opacity: 1;
-  filter: grayscale(0.88) sepia(0.16) hue-rotate(155deg) saturate(0.82) brightness(0.72) contrast(1.22);
+.dark-basemap-tile {
+  opacity: 0.96;
+  filter: saturate(0.92) brightness(0.88) contrast(1.08);
 }
 
 .leaflet-container {
   font: inherit;
+}
+
+.leaflet-control-attribution {
+  color: rgba(210, 229, 239, 0.64);
+  background: rgba(4, 12, 18, 0.72);
+  border-top-left-radius: 6px;
+  backdrop-filter: blur(8px);
+}
+
+.leaflet-control-attribution a {
+  color: rgba(115, 228, 255, 0.78);
 }
 
 .map-stage::after {

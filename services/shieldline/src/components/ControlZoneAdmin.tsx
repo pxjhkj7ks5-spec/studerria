@@ -10,6 +10,7 @@ import {
   verifyControlOverlayAdminPassword,
 } from "../data/controlZones";
 import type { ControlOverlay } from "../data/controlZones";
+import { darkMapTiles } from "../data/mapTiles";
 import type { Coordinates } from "../types/game";
 
 type ZoneMode = "occupied" | "water";
@@ -65,12 +66,12 @@ function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps
       minZoom={5}
       maxZoom={12}
       zoomControl
-      attributionControl={false}
+      attributionControl
       className="admin-map"
       scrollWheelZoom
     >
       <ClickCapture onClick={onMapClick} />
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+      <TileLayer url={darkMapTiles.url} attribution={darkMapTiles.attribution} className={darkMapTiles.className} />
       <Polygon
         positions={toPositions(overlay.ukrainePlacementPolygon)}
         pathOptions={{ color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.18, weight: 1 }}
