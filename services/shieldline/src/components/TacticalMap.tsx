@@ -5,6 +5,7 @@ import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprite
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { getUnitDefinition } from "../data/units";
+import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -195,6 +196,7 @@ export function TacticalMap() {
   const selectedCityId = useGameStore((state) => state.selectedCityId);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const mapMode = useGameStore((state) => state.mapMode);
+  const placementKind = useGameStore((state) => state.placementKind);
   const setSelectedCity = useGameStore((state) => state.setSelectedCity);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
   const controlOverlay = useMemo(() => getControlOverlay(), []);
@@ -232,13 +234,6 @@ export function TacticalMap() {
         positions={toPositions(controlOverlay.ukrainePlacementPolygon)}
         pathOptions={{ color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.18, weight: 1 }}
       />
-      {controlOverlay.waterPlacementPolygons.map((polygon, index) => (
-        <Polygon
-          key={`water-placement-${index}`}
-          positions={toPositions(polygon)}
-          pathOptions={{ color: "#5ad8ff", fillColor: "#2aa8ff", fillOpacity: 0.055, opacity: 0.24, weight: 1, dashArray: "4 7" }}
-        />
-      ))}
       {controlOverlay.occupiedPolygons.map((polygon, index) => (
         <Polygon
           key={`occupied-${index}`}
@@ -246,6 +241,22 @@ export function TacticalMap() {
           pathOptions={{ color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" }}
         />
       ))}
+      {placementKind && placementKind !== "boat" ? game.cities.map((city) => (
+        <Circle
+          key={`city-exclusion-${city.id}`}
+          center={[city.coordinates.lat, city.coordinates.lng]}
+          radius={CITY_PLACEMENT_EXCLUSION_KM * 1000}
+          pathOptions={{
+            color: "#ff8b6e",
+            fillColor: "#ff4f4f",
+            fillOpacity: 0.055,
+            opacity: 0.58,
+            weight: 1,
+            dashArray: "4 5",
+            className: "city-exclusion-ring",
+          }}
+        />
+      )) : null}
       {game.launchSectors.map((sector) => (
         <Marker key={sector.id} position={[sector.coordinates.lat, sector.coordinates.lng]} icon={makeLaunchIcon(sector)}>
           <Tooltip direction="left" offset={[-8, 0]}>

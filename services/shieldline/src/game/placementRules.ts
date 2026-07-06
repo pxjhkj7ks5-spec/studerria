@@ -1,7 +1,8 @@
 import { getControlOverlay } from "../data/controlZones";
-import type { Coordinates, UnitKind } from "../types/game";
+import type { City, Coordinates, UnitKind } from "../types/game";
 
 const EARTH_RADIUS_KM = 6371;
+export const CITY_PLACEMENT_EXCLUSION_KM = 10;
 
 function toRad(value: number) {
   return (value * Math.PI) / 180;
@@ -30,7 +31,7 @@ export function pointInPolygon(point: Coordinates, polygon: Coordinates[]) {
   return inside;
 }
 
-export function validateBatteryPlacement(kind: UnitKind, position: Coordinates): { allowed: boolean; reason?: string } {
+export function validateBatteryPlacement(kind: UnitKind, position: Coordinates, cities: City[] = []): { allowed: boolean; reason?: string } {
   const overlay = getControlOverlay();
 
   if (kind === "boat") {
@@ -46,6 +47,10 @@ export function validateBatteryPlacement(kind: UnitKind, position: Coordinates):
   const insideOccupied = overlay.occupiedPolygons.some((polygon) => pointInPolygon(position, polygon));
   if (insideOccupied) {
     return { allowed: false, reason: "Placement is blocked inside occupied territory." };
+  }
+  const blockedCity = cities.find((city) => distanceKm(city.coordinates, position) < CITY_PLACEMENT_EXCLUSION_KM);
+  if (blockedCity) {
+    return { allowed: false, reason: `PPO placement is blocked within 10 km of ${blockedCity.name}.` };
   }
   return { allowed: true };
 }

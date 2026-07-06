@@ -522,6 +522,10 @@ button {
   animation: radar-coverage-pulse 1s steps(2, end) infinite;
 }
 
+.city-exclusion-ring {
+  filter: drop-shadow(0 0 5px rgba(255, 79, 79, 0.28));
+}
+
 .map-marker--battery {
   width: 22px;
   height: 22px;
