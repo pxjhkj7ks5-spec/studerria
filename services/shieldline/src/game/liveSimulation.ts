@@ -162,12 +162,16 @@ function pushLog(entries: IntelEntry[], elapsedMs: number, title: string, body: 
 }
 
 function nearestCityId(state: GameState, position: Coordinates): CityId {
-  return state.cities
-    .map((city) => ({
-      cityId: city.id,
-      score: Math.abs(city.coordinates.lat - position.lat) + Math.abs(city.coordinates.lng - position.lng),
-    }))
-    .sort((left, right) => left.score - right.score)[0].cityId;
+  let nearest = state.cities[0];
+  let nearestScore = Infinity;
+  for (const city of state.cities) {
+    const score = Math.abs(city.coordinates.lat - position.lat) + Math.abs(city.coordinates.lng - position.lng);
+    if (score < nearestScore) {
+      nearest = city;
+      nearestScore = score;
+    }
+  }
+  return nearest.id;
 }
 
 function batteryTier(unit: ReturnType<typeof getUnitDefinition>): DefenseBattery["coverageTier"] {
@@ -286,11 +290,20 @@ function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () 
 
 function pickTargetCity(state: GameState, kind: ThreatKind, random: () => number) {
   if (kind === "decoy" || kind === "parodiya") return pick(state.cities, random);
-  return [...state.cities].sort((left, right) => {
-    const leftScore = left.importance * 9 + left.damage * 0.42 + (100 - left.infrastructure) * 0.16 + (100 - left.energy) * 0.12;
-    const rightScore = right.importance * 9 + right.damage * 0.42 + (100 - right.infrastructure) * 0.16 + (100 - right.energy) * 0.12;
-    return rightScore - leftScore + (random() - 0.5) * 10;
-  })[0];
+  let selected = state.cities[0];
+  let selectedScore = -Infinity;
+  for (const city of state.cities) {
+    const score = city.importance * 9
+      + city.damage * 0.42
+      + (100 - city.infrastructure) * 0.16
+      + (100 - city.energy) * 0.12
+      + (random() - 0.5) * 10;
+    if (score > selectedScore) {
+      selected = city;
+      selectedScore = score;
+    }
+  }
+  return selected;
 }
 
 function createCarrierForThreat(state: GameState, kind: ThreatKind, launchSector: LaunchSector, random: () => number) {
@@ -457,11 +470,12 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
 
 function updateShots(state: GameState, deltaMs: number) {
   const resolvedThreatIds = new Set<string>();
+  const threatById = new Map(state.liveThreats.map((threat) => [threat.id, threat]));
   const nextShots: InterceptorShot[] = [];
   for (const shot of state.interceptorShots) {
     const nextProgress = shot.progress + shot.speed * deltaMs;
     if (nextProgress >= 1) {
-      const threat = state.liveThreats.find((item) => item.id === shot.threatId);
+      const threat = threatById.get(shot.threatId);
       if (threat) {
         threat.status = "intercepted";
         resolvedThreatIds.add(threat.id);
@@ -569,20 +583,20 @@ function engageThreats(state: GameState, random: () => number) {
       || battery.status === "reloading"
       || !hasLocalAmmo(unit, battery)
     ) continue;
-    const candidate = state.liveThreats
-      .filter((threat) => threat.revealed && threat.status !== "engaged")
-      .filter((threat) => battery.kind !== "drone-operators" || isDroneClass(threat.kind))
-      .map((threat) => {
-        const distanceKm = abstractDistanceKm(threatPosition(threat), battery.position);
-        const chance = engagementChance(unit, battery, threat, distanceKm, conserveAmmo);
-        return { threat, distanceKm, chance, outerBand: distanceKm > unit.primaryRangeKm };
-      })
-      .filter((entry) => entry.chance > 0)
-      .sort((left, right) => {
-        const leftScore = threatPriority(left.threat.kind) + left.threat.progress * 42 + left.chance * 0.18;
-        const rightScore = threatPriority(right.threat.kind) + right.threat.progress * 42 + right.chance * 0.18;
-        return rightScore - leftScore;
-      })[0];
+    let candidate: { threat: LiveThreat; distanceKm: number; chance: number; outerBand: boolean } | null = null;
+    let candidateScore = -Infinity;
+    for (const threat of state.liveThreats) {
+      if (!threat.revealed || threat.status === "engaged") continue;
+      if (battery.kind === "drone-operators" && !isDroneClass(threat.kind)) continue;
+      const distanceKm = abstractDistanceKm(threatPosition(threat), battery.position);
+      const chance = engagementChance(unit, battery, threat, distanceKm, conserveAmmo);
+      if (chance <= 0) continue;
+      const score = threatPriority(threat.kind) + threat.progress * 42 + chance * 0.18;
+      if (score > candidateScore) {
+        candidate = { threat, distanceKm, chance, outerBand: distanceKm > unit.primaryRangeKm };
+        candidateScore = score;
+      }
+    }
     if (!candidate) continue;
 
     consumeLocalAmmo(unit, battery);

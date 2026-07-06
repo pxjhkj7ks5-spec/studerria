@@ -1,6 +1,6 @@
 import L from "leaflet";
-import { Circle, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMapEvents } from "react-leaflet";
-import { Fragment, useMemo } from "react";
+import { Circle, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
@@ -19,11 +19,56 @@ import type {
 } from "../types/game";
 
 const mapCenter: [number, number] = [48.7, 31.4];
+const CHUNK_SIZE_DEG = 2;
+const VIEWPORT_PAD_RATIO = 0.42;
+const LOW_FPS_THRESHOLD = 42;
+const RECOVERED_FPS_THRESHOLD = 52;
+const MAX_RENDERED_IMPACTS_LOW_FPS = 10;
+
+interface RenderBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+  zoom: number;
+  chunkKeys: Set<string>;
+  key: string;
+}
+
+interface RenderCounts {
+  activeObjects: number;
+  renderedObjects: number;
+  activeChunks: number;
+  cachedChunks: number;
+}
+
+interface PerformanceStats {
+  fps: number;
+  frameMs: number;
+  memoryMb: number | null;
+  quality: "full" | "reduced";
+}
+
+const cityIconCache = new Map<string, L.DivIcon>();
+const batteryIconCache = new Map<string, L.DivIcon>();
+const shotIconCache = new Map<string, L.DivIcon>();
+const impactIconCache = new Map<string, L.DivIcon>();
+const launchIconCache = new Map<string, L.DivIcon>();
+const carrierIconCache = new Map<string, L.DivIcon>();
+const threatIconCache = new Map<string, L.DivIcon>();
 
 function threatPosition(threat: LiveThreat) {
   return {
     lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * threat.progress,
     lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * threat.progress,
+  };
+}
+
+function interpolatedThreatPosition(threat: LiveThreat, elapsedSinceSyncMs: number) {
+  const progress = Math.min(1, threat.progress + threat.speed * elapsedSinceSyncMs);
+  return {
+    lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * progress,
+    lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * progress,
   };
 }
 
@@ -34,8 +79,108 @@ function shotPosition(shot: InterceptorShot) {
   };
 }
 
+function interpolatedShotPosition(shot: InterceptorShot, elapsedSinceSyncMs: number) {
+  const progress = Math.min(1, shot.progress + shot.speed * elapsedSinceSyncMs);
+  return {
+    lat: shot.from.lat + (shot.to.lat - shot.from.lat) * progress,
+    lng: shot.from.lng + (shot.to.lng - shot.from.lng) * progress,
+  };
+}
+
 function toPositions(points: Array<{ lat: number; lng: number }>): [number, number][] {
   return points.map((point) => [point.lat, point.lng]);
+}
+
+function chunkCoord(value: number) {
+  return Math.floor(value / CHUNK_SIZE_DEG);
+}
+
+function chunkKeyForPoint(point: { lat: number; lng: number }) {
+  return `${chunkCoord(point.lat)}:${chunkCoord(point.lng)}`;
+}
+
+function chunkKeysForBounds(bounds: Pick<RenderBounds, "north" | "south" | "east" | "west">) {
+  const keys = new Set<string>();
+  const south = Math.min(bounds.south, bounds.north);
+  const north = Math.max(bounds.south, bounds.north);
+  const west = Math.min(bounds.west, bounds.east);
+  const east = Math.max(bounds.west, bounds.east);
+  for (let lat = chunkCoord(south) - 1; lat <= chunkCoord(north) + 1; lat += 1) {
+    for (let lng = chunkCoord(west) - 1; lng <= chunkCoord(east) + 1; lng += 1) {
+      keys.add(`${lat}:${lng}`);
+    }
+  }
+  return keys;
+}
+
+function createRenderBounds(map: L.Map): RenderBounds {
+  const padded = map.getBounds().pad(VIEWPORT_PAD_RATIO);
+  const north = padded.getNorth();
+  const south = padded.getSouth();
+  const east = padded.getEast();
+  const west = padded.getWest();
+  const zoom = map.getZoom();
+  const chunkKeys = chunkKeysForBounds({ north, south, east, west });
+  return {
+    north,
+    south,
+    east,
+    west,
+    zoom,
+    chunkKeys,
+    key: `${north.toFixed(2)}:${south.toFixed(2)}:${east.toFixed(2)}:${west.toFixed(2)}:${zoom.toFixed(2)}`,
+  };
+}
+
+function pointInBounds(point: { lat: number; lng: number }, bounds: RenderBounds | null, radiusDeg = 0) {
+  if (!bounds) return true;
+  if (!bounds.chunkKeys.has(chunkKeyForPoint(point))) return false;
+  return point.lat >= bounds.south - radiusDeg
+    && point.lat <= bounds.north + radiusDeg
+    && point.lng >= bounds.west - radiusDeg
+    && point.lng <= bounds.east + radiusDeg;
+}
+
+function lineInBounds(from: { lat: number; lng: number }, to: { lat: number; lng: number }, bounds: RenderBounds | null) {
+  if (!bounds) return true;
+  if (pointInBounds(from, bounds) || pointInBounds(to, bounds)) return true;
+  const minLat = Math.min(from.lat, to.lat);
+  const maxLat = Math.max(from.lat, to.lat);
+  const minLng = Math.min(from.lng, to.lng);
+  const maxLng = Math.max(from.lng, to.lng);
+  return maxLat >= bounds.south && minLat <= bounds.north && maxLng >= bounds.west && minLng <= bounds.east;
+}
+
+function polygonBounds(points: Array<{ lat: number; lng: number }>) {
+  let north = -Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let west = Infinity;
+  for (const point of points) {
+    north = Math.max(north, point.lat);
+    south = Math.min(south, point.lat);
+    east = Math.max(east, point.lng);
+    west = Math.min(west, point.lng);
+  }
+  return { north, south, east, west, chunkKeys: chunkKeysForBounds({ north, south, east, west }) };
+}
+
+function boundsIntersect(
+  shape: { north: number; south: number; east: number; west: number; chunkKeys?: Set<string> },
+  bounds: RenderBounds | null,
+) {
+  if (!bounds) return true;
+  if (shape.chunkKeys) {
+    let hasSharedChunk = false;
+    for (const key of shape.chunkKeys) {
+      if (bounds.chunkKeys.has(key)) {
+        hasSharedChunk = true;
+        break;
+      }
+    }
+    if (!hasSharedChunk) return false;
+  }
+  return shape.north >= bounds.south && shape.south <= bounds.north && shape.east >= bounds.west && shape.west <= bounds.east;
 }
 
 const ukrainePlacementStyle = { color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.22, weight: 1 };
@@ -44,12 +189,17 @@ const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity:
 function makeCityIcon(city: City, selected: boolean) {
   const damageClass = city.damage > 55 ? "danger" : city.damage > 25 ? "warning" : "stable";
   const alert = city.alertState || "calm";
-  return L.divIcon({
+  const key = `${city.id}:${damageClass}:${alert}:${selected}`;
+  const cached = cityIconCache.get(key);
+  if (cached) return cached;
+  const icon = L.divIcon({
     className: "",
     html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--${damageClass} map-marker--city-${alert} ${selected ? "map-marker--selected" : ""}" aria-hidden="true"></span><b>${city.name}</b></span>`,
     iconSize: [92, 24],
     iconAnchor: [8, 12],
   });
+  cityIconCache.set(key, icon);
+  return icon;
 }
 
 function imageMarkerHtml(src: string, className: string) {
@@ -88,61 +238,89 @@ function coverageTone(unit: ReturnType<typeof getUnitDefinition>, selected: bool
 }
 
 function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
-  return L.divIcon({
+  const key = `${battery.kind}:${battery.status}:${selected}`;
+  const cached = batteryIconCache.get(key);
+  if (cached) return cached;
+  const icon = L.divIcon({
     className: "",
     html: imageMarkerHtml(unitSprites[battery.kind], `map-marker--battery map-marker--unit-${battery.status} ${selected ? "map-marker--selected" : ""}`),
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   });
+  batteryIconCache.set(key, icon);
+  return icon;
 }
 
 function makeThreatIcon(threat: LiveThreat) {
   const tone = threatTone(threat);
   const label = threat.confidence >= 70 ? threatLabel(threat) : "";
-  const targetHeading = threat.headingDeg - 90;
-  return L.divIcon({
+  const targetHeading = Math.round(threat.headingDeg - 90);
+  const key = `${threat.kind}:${tone}:${Math.round(threat.confidence / 10)}:${targetHeading}:${Boolean(label)}`;
+  const cached = threatIconCache.get(key);
+  if (cached) return cached;
+  const icon = L.divIcon({
     className: "",
     html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span>${label}</span>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
+  threatIconCache.set(key, icon);
+  return icon;
 }
 
 function makeShotIcon() {
-  return L.divIcon({
+  const cached = shotIconCache.get("shot");
+  if (cached) return cached;
+  const icon = L.divIcon({
     className: "",
     html: imageMarkerHtml(markerSprites.interceptorShot, "map-marker--shot"),
     iconSize: [14, 14],
     iconAnchor: [7, 7],
   });
+  shotIconCache.set("shot", icon);
+  return icon;
 }
 
 function makeImpactIcon(marker: ImpactMarker) {
-  return L.divIcon({
+  const key = marker.tone;
+  const cached = impactIconCache.get(key);
+  if (cached) return cached;
+  const icon = L.divIcon({
     className: "",
     html: imageMarkerHtml(marker.tone === "impact" ? markerSprites.impactEvent : markerSprites.interceptedThreat, `map-marker--${marker.tone}`),
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
+  impactIconCache.set(key, icon);
+  return icon;
 }
 
 function makeLaunchIcon(sector: LaunchSector) {
   const category = sector.category || "drone";
-  return L.divIcon({
+  const key = `${category}:${sector.state || "idle"}`;
+  const cached = launchIconCache.get(key);
+  if (cached) return cached;
+  const icon = L.divIcon({
     className: "",
     html: imageMarkerHtml(launchSprites[category], `map-marker--launch map-marker--launch-${sector.state || "idle"}`),
     iconSize: [18, 18],
     iconAnchor: [9, 9],
   });
+  launchIconCache.set(key, icon);
+  return icon;
 }
 
 function makeCarrierIcon(carrier: CarrierTrack) {
-  return L.divIcon({
+  const cached = carrierIconCache.get(carrier.kind);
+  if (cached) return cached;
+  const icon = L.divIcon({
     className: "",
     html: imageMarkerHtml(carrierSprites[carrier.kind], "map-marker--carrier"),
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
+  carrierIconCache.set(carrier.kind, icon);
+  return icon;
 }
 
 function routeColor(route: SupplyRoute) {
@@ -165,6 +343,263 @@ function MapClickPlacement() {
   return null;
 }
 
+function MapViewportTracker({ onChange }: { onChange: (bounds: RenderBounds) => void }) {
+  const frameRef = useRef(0);
+  const lastKeyRef = useRef("");
+  const map = useMapEvents({
+    move() {
+      schedule();
+    },
+    moveend() {
+      schedule();
+    },
+    zoomend() {
+      schedule();
+    },
+    resize() {
+      schedule();
+    },
+  });
+
+  function schedule() {
+    window.cancelAnimationFrame(frameRef.current);
+    frameRef.current = window.requestAnimationFrame(() => {
+      const next = createRenderBounds(map);
+      if (next.key === lastKeyRef.current) return;
+      lastKeyRef.current = next.key;
+      onChange(next);
+    });
+  }
+
+  useEffect(() => {
+    schedule();
+    return () => window.cancelAnimationFrame(frameRef.current);
+  }, []);
+
+  return null;
+}
+
+interface MovingObjectsLayerProps {
+  threats: LiveThreat[];
+  shots: InterceptorShot[];
+  impacts: ImpactMarker[];
+  elapsedMs: number;
+  mapMode: string;
+  reducedQuality: boolean;
+}
+
+function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reducedQuality }: MovingObjectsLayerProps) {
+  const map = useMap();
+  const threatGroupRef = useRef<L.LayerGroup | null>(null);
+  const shotGroupRef = useRef<L.LayerGroup | null>(null);
+  const impactGroupRef = useRef<L.LayerGroup | null>(null);
+  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null }>());
+  const shotPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline }>());
+  const impactPoolRef = useRef(new Map<string, L.Marker>());
+  const latestRef = useRef({ threats, shots, impacts, elapsedMs, mapMode, reducedQuality });
+  const syncAtRef = useRef(0);
+  const frameRef = useRef(0);
+
+  useEffect(() => {
+    const threatGroup = L.layerGroup().addTo(map);
+    const shotGroup = L.layerGroup().addTo(map);
+    const impactGroup = L.layerGroup().addTo(map);
+    threatGroupRef.current = threatGroup;
+    shotGroupRef.current = shotGroup;
+    impactGroupRef.current = impactGroup;
+
+    const animate = () => {
+      const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
+      const latest = latestRef.current;
+      for (const threat of latest.threats) {
+        const pooled = threatPoolRef.current.get(threat.id);
+        if (!pooled) continue;
+        const current = interpolatedThreatPosition(threat, elapsedSinceSync);
+        pooled.marker.setLatLng([current.lat, current.lng]);
+        if (pooled.route) {
+          pooled.route.setLatLngs([[current.lat, current.lng], [threat.target.lat, threat.target.lng]]);
+        }
+      }
+      for (const shot of latest.shots) {
+        const pooled = shotPoolRef.current.get(shot.id);
+        if (!pooled) continue;
+        const current = interpolatedShotPosition(shot, elapsedSinceSync);
+        pooled.marker.setLatLng([current.lat, current.lng]);
+        pooled.route.setLatLngs([[shot.from.lat, shot.from.lng], [current.lat, current.lng]]);
+      }
+      frameRef.current = window.requestAnimationFrame(animate);
+    };
+    frameRef.current = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(frameRef.current);
+      threatGroup.remove();
+      shotGroup.remove();
+      impactGroup.remove();
+      threatPoolRef.current.clear();
+      shotPoolRef.current.clear();
+      impactPoolRef.current.clear();
+      threatGroupRef.current = null;
+      shotGroupRef.current = null;
+      impactGroupRef.current = null;
+    };
+  }, [map]);
+
+  useEffect(() => {
+    latestRef.current = { threats, shots, impacts, elapsedMs, mapMode, reducedQuality };
+    syncAtRef.current = performance.now();
+    const threatGroup = threatGroupRef.current;
+    const shotGroup = shotGroupRef.current;
+    const impactGroup = impactGroupRef.current;
+    if (!threatGroup || !shotGroup || !impactGroup) return;
+
+    const threatIds = new Set(threats.map((threat) => threat.id));
+    for (const [id, pooled] of threatPoolRef.current) {
+      if (!threatIds.has(id)) {
+        pooled.marker.remove();
+        pooled.route?.remove();
+        threatPoolRef.current.delete(id);
+      }
+    }
+    for (const threat of threats) {
+      const tone = threatTone(threat);
+      const routeAllowed = threat.confidence >= (reducedQuality ? 72 : 58) && (!reducedQuality || mapMode === "threats");
+      let pooled = threatPoolRef.current.get(threat.id);
+      const current = threatPosition(threat);
+      if (!pooled) {
+        pooled = {
+          marker: L.marker([current.lat, current.lng], { icon: makeThreatIcon(threat), interactive: false }).addTo(threatGroup),
+          route: null,
+        };
+        threatPoolRef.current.set(threat.id, pooled);
+      } else {
+        pooled.marker.setIcon(makeThreatIcon(threat));
+      }
+      if (routeAllowed && !pooled.route) {
+        pooled.route = L.polyline([[current.lat, current.lng], [threat.target.lat, threat.target.lng]], {
+          color: threatRouteColor(tone),
+          weight: mapMode === "threats" ? 3 : 2,
+          opacity: mapMode === "coverage" ? 0.44 : 0.72,
+          dashArray: tone === "confirmed" ? "10 4" : "6 6",
+          interactive: false,
+        }).addTo(threatGroup);
+      } else if (!routeAllowed && pooled.route) {
+        pooled.route.remove();
+        pooled.route = null;
+      } else if (pooled.route) {
+        pooled.route.setStyle({
+          color: threatRouteColor(tone),
+          weight: mapMode === "threats" ? 3 : 2,
+          opacity: mapMode === "coverage" ? 0.44 : 0.72,
+          dashArray: tone === "confirmed" ? "10 4" : "6 6",
+        });
+      }
+    }
+
+    const shotIds = new Set(shots.map((shot) => shot.id));
+    for (const [id, pooled] of shotPoolRef.current) {
+      if (!shotIds.has(id)) {
+        pooled.marker.remove();
+        pooled.route.remove();
+        shotPoolRef.current.delete(id);
+      }
+    }
+    for (const shot of shots) {
+      let pooled = shotPoolRef.current.get(shot.id);
+      const current = shotPosition(shot);
+      const pathOptions = {
+        color: shot.style === "gun" ? "#ffd466" : shot.style === "drone" ? "#7ee7ff" : shot.style === "ew" ? "#b58cff" : "#ffef9a",
+        weight: shot.style === "gun" ? 2 : 1,
+        opacity: reducedQuality ? 0.52 : 0.74,
+        dashArray: shot.style === "missile" ? "8 5" : shot.style === "gun" ? "2 7" : "4 5",
+        interactive: false,
+      };
+      if (!pooled) {
+        pooled = {
+          marker: L.marker([current.lat, current.lng], { icon: makeShotIcon(), interactive: false }).addTo(shotGroup),
+          route: L.polyline([[shot.from.lat, shot.from.lng], [current.lat, current.lng]], pathOptions).addTo(shotGroup),
+        };
+        shotPoolRef.current.set(shot.id, pooled);
+      } else {
+        pooled.route.setStyle(pathOptions);
+      }
+    }
+
+    const renderedImpacts = reducedQuality ? impacts.slice(0, MAX_RENDERED_IMPACTS_LOW_FPS) : impacts;
+    const impactIds = new Set(renderedImpacts.map((impact) => impact.id));
+    for (const [id, marker] of impactPoolRef.current) {
+      if (!impactIds.has(id)) {
+        marker.remove();
+        impactPoolRef.current.delete(id);
+      }
+    }
+    for (const impact of renderedImpacts) {
+      if (!impactPoolRef.current.has(impact.id)) {
+        impactPoolRef.current.set(
+          impact.id,
+          L.marker([impact.position.lat, impact.position.lng], { icon: makeImpactIcon(impact), interactive: false }).addTo(impactGroup),
+        );
+      }
+    }
+  }, [threats, shots, impacts, elapsedMs, mapMode, reducedQuality]);
+
+  return null;
+}
+
+function usePerformanceStats(renderCounts: RenderCounts): PerformanceStats {
+  const [stats, setStats] = useState<PerformanceStats>({ fps: 60, frameMs: 16.7, memoryMb: null, quality: "full" });
+  const statsRef = useRef(stats);
+
+  useEffect(() => {
+    statsRef.current = stats;
+  }, [stats]);
+
+  useEffect(() => {
+    let frameId = 0;
+    let frames = 0;
+    let lastFrame = performance.now();
+    let lastReport = lastFrame;
+    const loop = (timestamp: number) => {
+      frames += 1;
+      const frameMs = timestamp - lastFrame;
+      lastFrame = timestamp;
+      if (timestamp - lastReport >= 500) {
+        const fps = Math.round((frames * 1000) / (timestamp - lastReport));
+        const quality = fps < LOW_FPS_THRESHOLD
+          ? "reduced"
+          : fps > RECOVERED_FPS_THRESHOLD
+            ? "full"
+            : statsRef.current.quality;
+        const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
+        const memoryMb = memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : null;
+        setStats({ fps, frameMs: Math.round(frameMs * 10) / 10, memoryMb, quality });
+        frames = 0;
+        lastReport = timestamp;
+      }
+      frameId = window.requestAnimationFrame(loop);
+    };
+    frameId = window.requestAnimationFrame(loop);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [renderCounts.activeObjects, renderCounts.renderedObjects]);
+
+  return stats;
+}
+
+function PerformanceOverlay({ stats, counts }: { stats: PerformanceStats; counts: RenderCounts }) {
+  return (
+    <aside className={`perf-overlay perf-overlay--${stats.quality}`} aria-label="Shieldline performance monitor">
+      <span><b>{stats.fps}</b> FPS</span>
+      <span><b>{stats.frameMs}</b> ms</span>
+      <span><b>{counts.activeObjects}</b> active</span>
+      <span><b>{counts.renderedObjects}</b> rendered</span>
+      <span><b>{counts.activeChunks}</b> chunks</span>
+      <span><b>{counts.cachedChunks}</b> cache</span>
+      <span><b>{stats.memoryMb === null ? "n/a" : `${stats.memoryMb}MB`}</b> mem</span>
+      <span><b>local</b> net</span>
+    </aside>
+  );
+}
+
 export function TacticalMap() {
   const game = useGameStore((state) => state.game);
   const selectedCityId = useGameStore((state) => state.selectedCityId);
@@ -173,201 +608,286 @@ export function TacticalMap() {
   const placementKind = useGameStore((state) => state.placementKind);
   const setSelectedCity = useGameStore((state) => state.setSelectedCity);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
+  const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
+  const chunkCacheRef = useRef(new Set<string>());
+  const [cachedChunkCount, setCachedChunkCount] = useState(0);
   const controlOverlay = useMemo(() => getControlOverlay(), []);
-  const ukrainePlacementPositions = useMemo(
-    () => controlOverlay.ukrainePlacementPolygons.map((polygon) => toPositions(polygon)),
+  const ukrainePlacementPolygons = useMemo(
+    () => controlOverlay.ukrainePlacementPolygons.map((polygon) => ({
+      positions: toPositions(polygon),
+      bounds: polygonBounds(polygon),
+    })),
     [controlOverlay],
   );
-  const occupiedZonePositions = useMemo(
-    () => controlOverlay.occupiedPolygons.map((polygon) => toPositions(polygon)),
+  const occupiedZonePolygons = useMemo(
+    () => controlOverlay.occupiedPolygons.map((polygon) => ({
+      positions: toPositions(polygon),
+      bounds: polygonBounds(polygon),
+    })),
     [controlOverlay],
   );
 
+  const visibleCities = useMemo(
+    () => game.cities.filter((city) => pointInBounds(city.coordinates, renderBounds)),
+    [game.cities, renderBounds],
+  );
   const cityMarkers = useMemo(
-    () => game.cities.map((city) => ({
+    () => visibleCities.map((city) => ({
       city,
       icon: makeCityIcon(city, city.id === selectedCityId),
     })),
-    [game.cities, selectedCityId],
+    [visibleCities, selectedCityId],
   );
+  const visibleUkrainePlacementPolygons = useMemo(
+    () => ukrainePlacementPolygons.filter((polygon) => boundsIntersect(polygon.bounds, renderBounds)),
+    [ukrainePlacementPolygons, renderBounds],
+  );
+  const visibleOccupiedZonePolygons = useMemo(
+    () => occupiedZonePolygons.filter((polygon) => boundsIntersect(polygon.bounds, renderBounds)),
+    [occupiedZonePolygons, renderBounds],
+  );
+  const visibleLaunchSectors = useMemo(
+    () => game.launchSectors.filter((sector) => pointInBounds(sector.coordinates, renderBounds)),
+    [game.launchSectors, renderBounds],
+  );
+  const visibleCarriers = useMemo(
+    () => game.carriers.filter((carrier) => pointInBounds(carrier.position, renderBounds)),
+    [game.carriers, renderBounds],
+  );
+  const visibleBatteries = useMemo(
+    () => game.batteries.filter((battery) => pointInBounds(battery.position, renderBounds, Math.max(0.15, battery.coverageRadius * 0.15))),
+    [game.batteries, renderBounds],
+  );
+  const visibleCoverageBatteries = useMemo(
+    () => mapMode === "threats" ? [] : game.batteries.filter((battery) => pointInBounds(battery.position, renderBounds, battery.coverageRadius)),
+    [game.batteries, mapMode, renderBounds],
+  );
+  const visibleRoutes = useMemo(
+    () => mapMode === "logistics" ? game.logistics.routes.filter((route) => lineInBounds(route.from, route.to, renderBounds)) : [],
+    [game.logistics.routes, mapMode, renderBounds],
+  );
+  const visibleThreats = useMemo(
+    () => game.liveThreats.filter((threat) => threat.revealed && lineInBounds(threatPosition(threat), threat.target, renderBounds)),
+    [game.liveThreats, renderBounds],
+  );
+  const visibleShots = useMemo(
+    () => game.interceptorShots.filter((shot) => lineInBounds(shot.from, shotPosition(shot), renderBounds)),
+    [game.interceptorShots, renderBounds],
+  );
+  const visibleImpactMarkers = useMemo(
+    () => game.impactMarkers.filter((marker) => pointInBounds(marker.position, renderBounds)),
+    [game.impactMarkers, renderBounds],
+  );
+  useEffect(() => {
+    if (!renderBounds) return;
+    for (const key of renderBounds.chunkKeys) {
+      chunkCacheRef.current.add(key);
+    }
+    setCachedChunkCount(chunkCacheRef.current.size);
+  }, [renderBounds?.key]);
+  const renderCounts = useMemo<RenderCounts>(() => {
+    const activeObjects = game.cities.length
+      + game.launchSectors.length
+      + game.carriers.length
+      + game.batteries.length
+      + game.liveThreats.length
+      + game.interceptorShots.length
+      + game.impactMarkers.length
+      + (mapMode === "logistics" ? game.logistics.routes.length : 0);
+    const renderedObjects = visibleCities.length
+      + visibleLaunchSectors.length
+      + visibleCarriers.length
+      + visibleBatteries.length
+      + visibleThreats.length
+      + visibleShots.length
+      + visibleImpactMarkers.length
+      + visibleCoverageBatteries.length
+      + visibleRoutes.length
+      + visibleUkrainePlacementPolygons.length
+      + visibleOccupiedZonePolygons.length;
+    return {
+      activeObjects,
+      renderedObjects,
+      activeChunks: renderBounds?.chunkKeys.size || 0,
+      cachedChunks: cachedChunkCount,
+    };
+  }, [
+    cachedChunkCount,
+    game.cities.length,
+    game.launchSectors.length,
+    game.carriers.length,
+    game.batteries.length,
+    game.liveThreats.length,
+    game.interceptorShots.length,
+    game.impactMarkers.length,
+    game.logistics.routes.length,
+    mapMode,
+    renderBounds,
+    visibleBatteries.length,
+    visibleCarriers.length,
+    visibleCities.length,
+    visibleCoverageBatteries.length,
+    visibleImpactMarkers.length,
+    visibleLaunchSectors.length,
+    visibleOccupiedZonePolygons.length,
+    visibleRoutes.length,
+    visibleShots.length,
+    visibleThreats.length,
+    visibleUkrainePlacementPolygons.length,
+  ]);
+  const performanceStats = usePerformanceStats(renderCounts);
+  const reducedQuality = performanceStats.quality === "reduced";
+
   return (
-    <MapContainer
-      center={mapCenter}
-      zoom={6}
-      minZoom={5}
-      maxZoom={12}
-      zoomControl={false}
-      attributionControl
-      preferCanvas
-      zoomAnimation
-      markerZoomAnimation
-      zoomSnap={0.25}
-      zoomDelta={0.5}
-      wheelPxPerZoomLevel={140}
-      wheelDebounceTime={35}
-      zoomAnimationThreshold={4}
-      fadeAnimation={false}
-      className="leaflet-stage"
-      scrollWheelZoom
-    >
-      <MapClickPlacement />
-      <TileLayer
-        url={darkMapTiles.url}
-        attribution={darkMapTiles.attribution}
-        className={darkMapTiles.className}
-      />
-      {ukrainePlacementPositions.map((positions, index) => (
-        <Polygon
-          key={`ukraine-placement-${index}`}
-          positions={positions}
-          pathOptions={ukrainePlacementStyle}
+    <>
+      <MapContainer
+        center={mapCenter}
+        zoom={6}
+        minZoom={5}
+        maxZoom={12}
+        zoomControl={false}
+        attributionControl
+        preferCanvas
+        zoomAnimation
+        markerZoomAnimation
+        inertia
+        inertiaDeceleration={2400}
+        easeLinearity={0.18}
+        zoomSnap={0.25}
+        zoomDelta={0.5}
+        wheelPxPerZoomLevel={160}
+        wheelDebounceTime={35}
+        zoomAnimationThreshold={4}
+        fadeAnimation={false}
+        className="leaflet-stage"
+        scrollWheelZoom
+      >
+        <MapViewportTracker onChange={setRenderBounds} />
+        <MapClickPlacement />
+        <MovingObjectsLayer
+          threats={visibleThreats}
+          shots={visibleShots}
+          impacts={visibleImpactMarkers}
+          elapsedMs={game.elapsedMs}
+          mapMode={mapMode}
+          reducedQuality={reducedQuality}
         />
-      ))}
-      {occupiedZonePositions.map((positions, index) => (
-        <Polygon
-          key={`occupied-${index}`}
-          positions={positions}
-          pathOptions={occupiedZoneStyle}
+        <TileLayer
+          url={darkMapTiles.url}
+          attribution={darkMapTiles.attribution}
+          className={darkMapTiles.className}
+          keepBuffer={4}
+          updateWhenIdle
+          updateWhenZooming={false}
         />
-      ))}
-      {placementKind && placementKind !== "boat" ? game.cities.map((city) => (
-        <Circle
-          key={`city-exclusion-${city.id}`}
-          center={[city.coordinates.lat, city.coordinates.lng]}
-          radius={CITY_PLACEMENT_EXCLUSION_KM * 1000}
-          pathOptions={{
-            color: "#ff8b6e",
-            fillColor: "#ff4f4f",
-            fillOpacity: 0.055,
-            opacity: 0.58,
-            weight: 1,
-            dashArray: "4 5",
-            className: "city-exclusion-ring",
-          }}
-        />
-      )) : null}
-      {game.launchSectors.map((sector) => (
-        <Marker key={sector.id} position={[sector.coordinates.lat, sector.coordinates.lng]} icon={makeLaunchIcon(sector)}>
-          <Tooltip direction="left" offset={[-8, 0]}>
-            {sector.name} - {sector.state || "idle"}
-          </Tooltip>
-        </Marker>
-      ))}
-      {game.carriers.map((carrier) => (
-        <Marker key={carrier.id} position={[carrier.position.lat, carrier.position.lng]} icon={makeCarrierIcon(carrier)}>
-          <Tooltip direction="top" offset={[0, -10]}>
-            {carrier.kind === "tu95" ? "Aviation carrier marker" : "Naval carrier marker"} - fictional UI entity
-          </Tooltip>
-        </Marker>
-      ))}
-      {game.liveThreats.filter((threat) => threat.revealed && threat.confidence >= 58).map((threat) => {
-        const current = threatPosition(threat);
-        const tone = threatTone(threat);
-        return (
-          <Polyline
-            key={`route-${threat.id}`}
-            positions={[[current.lat, current.lng], [threat.target.lat, threat.target.lng]]}
+        {visibleUkrainePlacementPolygons.map((polygon, index) => (
+          <Polygon
+            key={`ukraine-placement-${index}`}
+            positions={polygon.positions}
+            pathOptions={ukrainePlacementStyle}
+          />
+        ))}
+        {visibleOccupiedZonePolygons.map((polygon, index) => (
+          <Polygon
+            key={`occupied-${index}`}
+            positions={polygon.positions}
+            pathOptions={occupiedZoneStyle}
+          />
+        ))}
+        {placementKind && placementKind !== "boat" ? visibleCities.map((city) => (
+          <Circle
+            key={`city-exclusion-${city.id}`}
+            center={[city.coordinates.lat, city.coordinates.lng]}
+            radius={CITY_PLACEMENT_EXCLUSION_KM * 1000}
             pathOptions={{
-              color: threatRouteColor(tone),
-              weight: mapMode === "threats" ? 3 : 2,
-              opacity: mapMode === "coverage" ? 0.44 : 0.72,
-              dashArray: tone === "confirmed" ? "10 4" : "6 6",
+              color: "#ff8b6e",
+              fillColor: "#ff4f4f",
+              fillOpacity: reducedQuality ? 0.035 : 0.055,
+              opacity: reducedQuality ? 0.42 : 0.58,
+              weight: 1,
+              dashArray: "4 5",
+              className: "city-exclusion-ring",
             }}
           />
-        );
-      })}
-      {mapMode !== "threats" ? game.batteries.map((battery) => {
-        const unit = getUnitDefinition(battery.kind);
-        const selected = battery.id === selectedBatteryId;
-        const coverage = coverageTone(unit, selected);
-        return (
-          <Fragment key={`coverage-wrap-${battery.id}`}>
-            <Circle
-              key={`coverage-${battery.id}`}
-              center={[battery.position.lat, battery.position.lng]}
-              radius={battery.coverageRadius * 72000}
-              pathOptions={{
-                color: coverage.color,
-                fillColor: coverage.fill,
-                fillOpacity: coverage.fillOpacity,
-                opacity: coverage.opacity,
-                weight: coverage.weight,
-                className: unit.engagementMode === "detect" ? "coverage-ring coverage-ring--radar" : "coverage-ring",
-              }}
-            />
-          </Fragment>
-        );
-      }) : null}
-      {mapMode === "logistics" ? game.logistics.routes.map((route) => (
-        <Polyline
-          key={route.id}
-          positions={[[route.from.lat, route.from.lng], [route.to.lat, route.to.lng]]}
-          pathOptions={{ color: routeColor(route), weight: 2, opacity: 0.62, dashArray: route.status === "well-supplied" ? "3 7" : "8 5" }}
-        >
-          <Tooltip direction="top" offset={[0, -8]}>
-            {route.label} - delay {route.delayDays} cycle(s)
-          </Tooltip>
-        </Polyline>
-      )) : null}
-      {cityMarkers.map(({ city, icon }) => (
-        <Marker
-          key={city.id}
-          position={[city.coordinates.lat, city.coordinates.lng]}
-          icon={icon}
-          eventHandlers={{ click: () => setSelectedCity(city.id) }}
-        >
-          <Tooltip direction="top" offset={[0, -16]}>
-            {city.name} - city services {Math.round(city.infrastructure)}%
-          </Tooltip>
-        </Marker>
-      ))}
-      {game.batteries.map((battery) => (
-        <Marker
-          key={battery.id}
-          position={[battery.position.lat, battery.position.lng]}
-          icon={makeBatteryIcon(battery, battery.id === selectedBatteryId)}
-          eventHandlers={{ click: () => setSelectedBattery(battery.id) }}
-        >
-          <Tooltip direction="top" offset={[0, -14]}>
-            {(() => {
-              const unit = getUnitDefinition(battery.kind);
-              const ammo = battery.currentAmmo === "infinite" ? "∞" : `${battery.currentAmmo}/${unit.ammoCapacity}`;
-              const reload = battery.reloadRemainingMs > 0 ? ` - reload ${Math.ceil(battery.reloadRemainingMs / 1000)}s` : "";
-              return `${unit.shortName} - ${unit.primaryRangeKm}/${unit.outerRangeKm} км - БК ${ammo} - ${Math.round(battery.readiness)}% - ${battery.status}${reload}`;
-            })()}
-          </Tooltip>
-        </Marker>
-      ))}
-      {game.liveThreats.filter((threat) => threat.revealed).map((threat) => {
-        const current = threatPosition(threat);
-        return (
-          <Marker key={threat.id} position={[current.lat, current.lng]} icon={makeThreatIcon(threat)}>
-            <Tooltip direction="top" offset={[0, -14]}>
-              {threat.kind} - {threat.status} - track quality {Math.round(threat.trackQuality)}%
+        )) : null}
+        {visibleLaunchSectors.map((sector) => (
+          <Marker key={sector.id} position={[sector.coordinates.lat, sector.coordinates.lng]} icon={makeLaunchIcon(sector)}>
+            <Tooltip direction="left" offset={[-8, 0]}>
+              {sector.name} - {sector.state || "idle"}
             </Tooltip>
           </Marker>
-        );
-      })}
-      {game.interceptorShots.map((shot) => {
-        const current = shotPosition(shot);
-        return (
-          <Fragment key={shot.id}>
-            <Polyline
-              positions={[[shot.from.lat, shot.from.lng], [current.lat, current.lng]]}
-              pathOptions={{
-                color: shot.style === "gun" ? "#ffd466" : shot.style === "drone" ? "#7ee7ff" : shot.style === "ew" ? "#b58cff" : "#ffef9a",
-                weight: shot.style === "gun" ? 2 : 1,
-                opacity: 0.74,
-                dashArray: shot.style === "missile" ? "8 5" : shot.style === "gun" ? "2 7" : "4 5",
-              }}
-            />
-            <Marker position={[current.lat, current.lng]} icon={makeShotIcon()} />
-          </Fragment>
-        );
-      })}
-      {game.impactMarkers.map((marker) => (
-        <Marker key={marker.id} position={[marker.position.lat, marker.position.lng]} icon={makeImpactIcon(marker)} />
-      ))}
-    </MapContainer>
+        ))}
+        {visibleCarriers.map((carrier) => (
+          <Marker key={carrier.id} position={[carrier.position.lat, carrier.position.lng]} icon={makeCarrierIcon(carrier)}>
+            <Tooltip direction="top" offset={[0, -10]}>
+              {carrier.kind === "tu95" ? "Aviation carrier marker" : "Naval carrier marker"} - fictional UI entity
+            </Tooltip>
+          </Marker>
+        ))}
+        {visibleCoverageBatteries.map((battery) => {
+          const unit = getUnitDefinition(battery.kind);
+          const selected = battery.id === selectedBatteryId;
+          const coverage = coverageTone(unit, selected);
+          return (
+            <Fragment key={`coverage-wrap-${battery.id}`}>
+              <Circle
+                key={`coverage-${battery.id}`}
+                center={[battery.position.lat, battery.position.lng]}
+                radius={battery.coverageRadius * 72000}
+                pathOptions={{
+                  color: coverage.color,
+                  fillColor: coverage.fill,
+                  fillOpacity: reducedQuality ? coverage.fillOpacity * 0.62 : coverage.fillOpacity,
+                  opacity: reducedQuality ? coverage.opacity * 0.72 : coverage.opacity,
+                  weight: reducedQuality ? Math.max(1, coverage.weight - 0.35) : coverage.weight,
+                  className: unit.engagementMode === "detect" ? "coverage-ring coverage-ring--radar" : "coverage-ring",
+                }}
+              />
+            </Fragment>
+          );
+        })}
+        {visibleRoutes.map((route) => (
+          <Polyline
+            key={route.id}
+            positions={[[route.from.lat, route.from.lng], [route.to.lat, route.to.lng]]}
+            pathOptions={{ color: routeColor(route), weight: reducedQuality ? 1.35 : 2, opacity: reducedQuality ? 0.42 : 0.62, dashArray: route.status === "well-supplied" ? "3 7" : "8 5" }}
+          >
+            <Tooltip direction="top" offset={[0, -8]}>
+              {route.label} - delay {route.delayDays} cycle(s)
+            </Tooltip>
+          </Polyline>
+        ))}
+        {cityMarkers.map(({ city, icon }) => (
+          <Marker
+            key={city.id}
+            position={[city.coordinates.lat, city.coordinates.lng]}
+            icon={icon}
+            eventHandlers={{ click: () => setSelectedCity(city.id) }}
+          >
+            <Tooltip direction="top" offset={[0, -16]}>
+              {city.name} - city services {Math.round(city.infrastructure)}%
+            </Tooltip>
+          </Marker>
+        ))}
+        {visibleBatteries.map((battery) => (
+          <Marker
+            key={battery.id}
+            position={[battery.position.lat, battery.position.lng]}
+            icon={makeBatteryIcon(battery, battery.id === selectedBatteryId)}
+            eventHandlers={{ click: () => setSelectedBattery(battery.id) }}
+          >
+            <Tooltip direction="top" offset={[0, -14]}>
+              {(() => {
+                const unit = getUnitDefinition(battery.kind);
+                const ammo = battery.currentAmmo === "infinite" ? "∞" : `${battery.currentAmmo}/${unit.ammoCapacity}`;
+                const reload = battery.reloadRemainingMs > 0 ? ` - reload ${Math.ceil(battery.reloadRemainingMs / 1000)}s` : "";
+                return `${unit.shortName} - ${unit.primaryRangeKm}/${unit.outerRangeKm} км - БК ${ammo} - ${Math.round(battery.readiness)}% - ${battery.status}${reload}`;
+              })()}
+            </Tooltip>
+          </Marker>
+        ))}
+      </MapContainer>
+      <PerformanceOverlay stats={performanceStats} counts={renderCounts} />
+    </>
   );
 }

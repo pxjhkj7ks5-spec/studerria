@@ -13,6 +13,17 @@ function statusFromScore(score: number): SupplyStatus {
   return "strained";
 }
 
+function nearestSupplyNode(position: { lat: number; lng: number }, nodes: SupplyNode[]) {
+  let nearest: { node: SupplyNode; distance: number } | null = null;
+  for (const node of nodes) {
+    const distance = abstractDistance(position, node.position);
+    if (!nearest || distance < nearest.distance) {
+      nearest = { node, distance };
+    }
+  }
+  return nearest;
+}
+
 export function buildLogisticsState(state: GameState): LogisticsState {
   const nodes: SupplyNode[] = [
     ...state.infrastructure
@@ -32,9 +43,7 @@ export function buildLogisticsState(state: GameState): LogisticsState {
   const routes: SupplyRoute[] = [];
 
   for (const city of state.cities) {
-    const nearest = nodes
-      .map((node) => ({ node, distance: abstractDistance(city.coordinates, node.position) }))
-      .sort((left, right) => left.distance - right.distance)[0];
+    const nearest = nearestSupplyNode(city.coordinates, nodes);
     const baseScore = nearest ? nearest.node.strength - nearest.distance * 11 : 18;
     const status = statusFromScore(baseScore);
     citySupply[city.id] = status;
@@ -52,9 +61,7 @@ export function buildLogisticsState(state: GameState): LogisticsState {
 
   for (const battery of state.batteries) {
     unitSupply[battery.id] = getUnitSupplyStatus(battery, nodes);
-    const nearest = nodes
-      .map((node) => ({ node, distance: abstractDistance(battery.position, node.position) }))
-      .sort((left, right) => left.distance - right.distance)[0];
+    const nearest = nearestSupplyNode(battery.position, nodes);
     if (nearest) {
       routes.push({
         id: `unit-route-${battery.id}-${nearest.node.id}`,
@@ -84,9 +91,7 @@ export function buildLogisticsState(state: GameState): LogisticsState {
 }
 
 export function getUnitSupplyStatus(battery: DefenseBattery, nodes: SupplyNode[]): SupplyStatus {
-  const nearest = nodes
-    .map((node) => ({ node, distance: abstractDistance(battery.position, node.position) }))
-    .sort((left, right) => left.distance - right.distance)[0];
+  const nearest = nearestSupplyNode(battery.position, nodes);
   if (!nearest) return "undersupplied";
   return statusFromScore(nearest.node.strength - nearest.distance * 13);
 }

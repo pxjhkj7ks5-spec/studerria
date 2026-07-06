@@ -440,6 +440,48 @@ button {
 .legend-item--intercepted svg { color: var(--green); }
 .legend-item--impact svg { color: #ff9a76; }
 
+.perf-overlay {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 660;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 5px;
+  max-width: min(430px, calc(100% - 96px));
+  padding: 8px;
+  color: rgba(225, 236, 246, 0.84);
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none;
+  border: 1px solid rgba(110, 189, 231, 0.16);
+  border-radius: 8px;
+  background: rgba(5, 12, 18, 0.72);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+
+.perf-overlay span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 68px;
+  padding: 5px 6px;
+  border: 1px solid rgba(94, 201, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.perf-overlay b {
+  color: #f2d68d;
+  font-weight: 800;
+}
+
+.perf-overlay--reduced {
+  border-color: rgba(255, 210, 74, 0.32);
+  background: rgba(26, 20, 5, 0.76);
+}
+
 .map-marker {
   display: grid;
   place-items: center;
@@ -2532,6 +2574,10 @@ button {
     top: 74px;
     right: 10px;
     width: min(250px, calc(100vw - 88px));
+  }
+
+  .perf-overlay {
+    display: none;
   }
 
   .panel-layer-list,
