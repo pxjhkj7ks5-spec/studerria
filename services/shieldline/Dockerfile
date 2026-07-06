@@ -23,7 +23,10 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=8080
 ENV SHIELDLINE_BASE_PATH=${SHIELDLINE_BASE_PATH}
 
-RUN groupadd --system --gid 1001 nodejs && useradd --system --uid 1001 --gid nodejs shieldline
+RUN groupadd --system --gid 1001 nodejs \
+  && useradd --system --uid 1001 --gid nodejs shieldline \
+  && mkdir -p /data \
+  && chown -R shieldline:nodejs /data
 
 COPY --chown=shieldline:nodejs --from=builder /app/dist ./dist
 COPY --chown=shieldline:nodejs --from=builder /app/server.mjs ./server.mjs

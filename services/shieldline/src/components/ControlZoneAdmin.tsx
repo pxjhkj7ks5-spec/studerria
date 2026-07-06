@@ -270,7 +270,9 @@ export function ControlZoneAdmin() {
       saveControlOverlay(overlay);
       setStatus("Saved to server. Return to the map to use the updated placement rules.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save zones.");
+      saveControlOverlay(overlay);
+      const message = error instanceof Error ? error.message : "Could not save zones.";
+      setStatus(`Saved in this browser, but server save failed: ${message}`);
     }
   };
 

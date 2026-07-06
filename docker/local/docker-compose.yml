@@ -345,7 +345,7 @@ services:
       SHIELDLINE_ADMIN_PASSWORD: ${SHIELDLINE_ADMIN_PASSWORD:-change-me-shieldline-admin}
       SHIELDLINE_CONTROL_OVERLAY_FILE: ${SHIELDLINE_CONTROL_OVERLAY_FILE:-/data/control-overlay.json}
     volumes:
-      - shieldline_data:/data
+      - shieldline_control_data:/data
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -439,7 +439,7 @@ volumes:
   charredmap_data:
   naradadruk_data:
   slashtg_data:
-  shieldline_data:
+  shieldline_control_data:
   osix_raw_snapshots:
   clickhouse_data:
   loki_data:
