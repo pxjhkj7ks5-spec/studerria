@@ -188,6 +188,9 @@ export interface LaunchSector {
   state?: LaunchAreaState;
   stateUntilMs?: number;
   warningStartedAtMs?: number;
+  targetCityId?: CityId;
+  targetCoordinates?: Coordinates;
+  targetHeadingDeg?: number;
 }
 
 export interface Resources {

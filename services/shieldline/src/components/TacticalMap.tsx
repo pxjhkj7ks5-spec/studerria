@@ -296,14 +296,17 @@ function makeImpactIcon(marker: ImpactMarker) {
 
 function makeLaunchIcon(sector: LaunchSector) {
   const category = sector.category || "drone";
-  const key = `${category}:${sector.state || "idle"}`;
+  const state = sector.state || "idle";
+  const hasDirection = sector.targetHeadingDeg !== undefined && (state === "warning" || state === "launching" || state === "cooldown");
+  const directionDeg = hasDirection ? Math.round(sector.targetHeadingDeg! - 90) : 0;
+  const key = `${category}:${state}:${hasDirection ? directionDeg : "none"}`;
   const cached = launchIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: imageMarkerHtml(launchSprites[category], `map-marker--launch map-marker--launch-${sector.state || "idle"}`),
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
+    html: `<span class="launch-marker-shell launch-marker-shell--${state} ${hasDirection ? "launch-marker-shell--directed" : ""}" style="--launch-heading:${directionDeg}deg"><span class="launch-direction" aria-hidden="true"></span><span class="launch-ripple" aria-hidden="true"></span>${imageMarkerHtml(launchSprites[category], `map-marker--launch map-marker--launch-${state}`)}</span>`,
+    iconSize: [58, 58],
+    iconAnchor: [29, 29],
   });
   launchIconCache.set(key, icon);
   return icon;

@@ -98,6 +98,7 @@ function cloneState(state: GameState): GameState {
     launchSectors: state.launchSectors.map((sector) => ({
       ...sector,
       coordinates: { ...sector.coordinates },
+      targetCoordinates: sector.targetCoordinates ? { ...sector.targetCoordinates } : undefined,
       supports: [...sector.supports],
     })),
     units: state.units.map((unit) => ({ ...unit })),
@@ -363,12 +364,23 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
   };
 }
 
-function markLaunchSector(state: GameState, sectorId: string, status: NonNullable<LaunchSector["state"]>, durationMs: number) {
+function markLaunchSector(
+  state: GameState,
+  sectorId: string,
+  status: NonNullable<LaunchSector["state"]>,
+  durationMs: number,
+  target?: { cityId: CityId; coordinates: Coordinates },
+) {
   const sector = state.launchSectors.find((item) => item.id === sectorId);
   if (!sector) return;
   sector.state = status;
   sector.stateUntilMs = state.elapsedMs + durationMs;
   if (status === "warning") sector.warningStartedAtMs = state.elapsedMs;
+  if (target) {
+    sector.targetCityId = target.cityId;
+    sector.targetCoordinates = { ...target.coordinates };
+    sector.targetHeadingDeg = bearingDeg(sector.coordinates, target.coordinates);
+  }
 }
 
 function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () => number) {
@@ -384,11 +396,11 @@ function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () =>
       launchesAtMs: state.elapsedMs + warningMs,
     };
     state.pendingLaunches.push(pending);
-    markLaunchSector(state, launchSector.id, "warning", warningMs);
+    markLaunchSector(state, launchSector.id, "warning", warningMs, { cityId: city.id, coordinates: city.coordinates });
     pushLog(state.log, state.elapsedMs, "Launch Warning", `${launchSector.name} shows abstract OTRK launch preparation.`, "warning");
     return;
   }
-  markLaunchSector(state, launchSector.id, "launching", 8000);
+  markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates });
   state.liveThreats.push(spawnThreat(state, random, kind, city.id, launchSector.id));
 }
 
@@ -399,7 +411,14 @@ function resolvePendingLaunches(state: GameState, random: () => number) {
       remaining.push(launch);
       continue;
     }
-    markLaunchSector(state, launch.sectorId, "launching", 9000);
+    const targetCity = state.cities.find((city) => city.id === launch.targetCityId);
+    markLaunchSector(
+      state,
+      launch.sectorId,
+      "launching",
+      18000,
+      targetCity ? { cityId: targetCity.id, coordinates: targetCity.coordinates } : undefined,
+    );
     state.liveThreats.push(spawnThreat(state, random, launch.kind, launch.targetCityId, launch.sectorId));
     pushLog(state.log, state.elapsedMs, "Missile Launch", "A prepared ballistic launch entered the battlespace.", "danger");
   }
@@ -411,10 +430,13 @@ function updateLaunchSectors(state: GameState) {
     if (sector.state && sector.state !== "idle" && sector.stateUntilMs && sector.stateUntilMs <= state.elapsedMs) {
       if (sector.state === "launching") {
         sector.state = "cooldown";
-        sector.stateUntilMs = state.elapsedMs + 12000;
+        sector.stateUntilMs = state.elapsedMs + 16000;
       } else {
         sector.state = "idle";
         sector.stateUntilMs = undefined;
+        sector.targetCityId = undefined;
+        sector.targetCoordinates = undefined;
+        sector.targetHeadingDeg = undefined;
       }
     }
   }
