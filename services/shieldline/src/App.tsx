@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, AlertTriangle, ClipboardList, Crosshair, Layers, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ClipboardList, Crosshair, Layers, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
 import { IntelLog } from "./components/IntelLog";
@@ -87,7 +87,7 @@ export default function App() {
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const placementKind = useGameStore((state) => state.placementKind);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [activePanel, setActivePanel] = useState<ActivePanel>("units");
+  const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
   const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
@@ -125,7 +125,7 @@ export default function App() {
   }
 
   return (
-    <main className="shell shell--map-first" aria-label="Shieldline real-time defense simulation">
+    <main className={`shell shell--map-first ${activePanel ? "shell--drawer-open" : "shell--drawer-closed"}`} aria-label="Shieldline real-time defense simulation">
       <nav className="app-rail" aria-label="Shieldline panels">
         <button className="rail-button rail-button--menu" type="button" aria-label="Back to scenario selection" onClick={returnToModeSelect}>
           <Menu size={24} />
@@ -141,8 +141,9 @@ export default function App() {
                 className={`rail-button ${activePanel === item.id ? "rail-button--active" : ""}`}
                 type="button"
                 key={item.id}
-                onClick={() => setActivePanel(item.id)}
+                onClick={() => setActivePanel((current) => (current === item.id ? null : item.id))}
                 aria-label={item.label}
+                aria-pressed={activePanel === item.id}
                 title={item.label}
               >
                 <Icon size={21} />
@@ -167,91 +168,93 @@ export default function App() {
         <MapLegend mode={mapMode} />
       </section>
 
-      <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={`${panelTitle[activePanel]} panel`}>
-        <div className="drawer-header">
-          <div>
-            <span>Shieldline</span>
-            <strong>{panelTitle[activePanel]}</strong>
+      {activePanel ? (
+        <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={`${panelTitle[activePanel]} panel`}>
+          <div className="drawer-header">
+            <div>
+              <span>Shieldline</span>
+              <strong>{panelTitle[activePanel]}</strong>
+            </div>
+            <button className="drawer-close" type="button" aria-label="Close side panel" onClick={() => setActivePanel(null)}>
+              <X size={18} />
+            </button>
           </div>
-          <button className="drawer-close" type="button" aria-label="Show map focus" onClick={() => setActivePanel("layers")}>
-            <Layers size={18} />
-          </button>
-        </div>
-        {activePanel === "layers" ? (
-          <section className="drawer-section">
-            <div className="panel-layer-list">
-              {mapModes.map((mode) => (
-                <button
-                  className={`nav-pill ${mapMode === mode.id ? "nav-pill--active" : ""}`}
-                  type="button"
-                  key={mode.id}
-                  onClick={() => setMapMode(mode.id)}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <div className="live-stats live-stats--drawer" aria-label="Live defense telemetry">
-              <span><strong>{game.day}</strong> Cycle</span>
-              <span><strong>{revealedThreats}</strong> Revealed</span>
-              <span><strong>{game.interceptions}</strong> Interceptions</span>
-              <span><strong>{game.impacts}</strong> Impacts</span>
-              <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
-              <span><strong>{game.logistics.resupplyDelayDays}</strong> Supply delay</span>
-            </div>
-            {selectedBattery ? (
-              <SelectedUnitPanel
-                selectedBattery={selectedBattery}
-                selectedUnit={selectedUnit}
-                onMaintain={startSelectedBatteryMaintenance}
-                onRecall={removeSelectedBattery}
-              />
-            ) : (
-              <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
-            )}
-          </section>
-        ) : null}
-        {activePanel === "units" ? <UnitRail /> : null}
-        {activePanel === "planning" ? (
-          <section className="drawer-section">
-            <PlanningActionsPanel />
-            {game.resources.ammo < 15 ? <AmmoLowCard /> : null}
-          </section>
-        ) : null}
-        {activePanel === "intel" ? (
-          <section className="drawer-section">
-            <IntelLog game={game} />
-            {game.status !== "active" ? <CampaignStatusCard status={game.status} statusReason={game.statusReason} /> : null}
-          </section>
-        ) : null}
-        {activePanel === "report" ? (
-          <section className="drawer-section">
-            <AfterActionReport game={game} />
-          </section>
-        ) : null}
-        {activePanel === "settings" ? (
-          <section className="drawer-section">
-            {selectedBattery ? (
-              <SelectedUnitPanel
-                selectedBattery={selectedBattery}
-                selectedUnit={selectedUnit}
-                onMaintain={startSelectedBatteryMaintenance}
-                onRecall={removeSelectedBattery}
-              />
-            ) : (
-              <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
-            )}
-            <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
-              <RotateCcw size={16} />
-              Reset Campaign
-            </button>
-            <button className="reset-button reset-button--secondary" type="button" onClick={returnToModeSelect}>
-              <Menu size={16} />
-              Change Scenario
-            </button>
-          </section>
-        ) : null}
-      </aside>
+          {activePanel === "layers" ? (
+            <section className="drawer-section">
+              <div className="panel-layer-list">
+                {mapModes.map((mode) => (
+                  <button
+                    className={`nav-pill ${mapMode === mode.id ? "nav-pill--active" : ""}`}
+                    type="button"
+                    key={mode.id}
+                    onClick={() => setMapMode(mode.id)}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+              <div className="live-stats live-stats--drawer" aria-label="Live defense telemetry">
+                <span><strong>{game.day}</strong> Cycle</span>
+                <span><strong>{revealedThreats}</strong> Revealed</span>
+                <span><strong>{game.interceptions}</strong> Interceptions</span>
+                <span><strong>{game.impacts}</strong> Impacts</span>
+                <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
+                <span><strong>{game.logistics.resupplyDelayDays}</strong> Supply delay</span>
+              </div>
+              {selectedBattery ? (
+                <SelectedUnitPanel
+                  selectedBattery={selectedBattery}
+                  selectedUnit={selectedUnit}
+                  onMaintain={startSelectedBatteryMaintenance}
+                  onRecall={removeSelectedBattery}
+                />
+              ) : (
+                <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
+              )}
+            </section>
+          ) : null}
+          {activePanel === "units" ? <UnitRail /> : null}
+          {activePanel === "planning" ? (
+            <section className="drawer-section">
+              <PlanningActionsPanel />
+              {game.resources.ammo < 15 ? <AmmoLowCard /> : null}
+            </section>
+          ) : null}
+          {activePanel === "intel" ? (
+            <section className="drawer-section">
+              <IntelLog game={game} />
+              {game.status !== "active" ? <CampaignStatusCard status={game.status} statusReason={game.statusReason} /> : null}
+            </section>
+          ) : null}
+          {activePanel === "report" ? (
+            <section className="drawer-section">
+              <AfterActionReport game={game} />
+            </section>
+          ) : null}
+          {activePanel === "settings" ? (
+            <section className="drawer-section">
+              {selectedBattery ? (
+                <SelectedUnitPanel
+                  selectedBattery={selectedBattery}
+                  selectedUnit={selectedUnit}
+                  onMaintain={startSelectedBatteryMaintenance}
+                  onRecall={removeSelectedBattery}
+                />
+              ) : (
+                <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
+              )}
+              <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
+                <RotateCcw size={16} />
+                Reset Campaign
+              </button>
+              <button className="reset-button reset-button--secondary" type="button" onClick={returnToModeSelect}>
+                <Menu size={16} />
+                Change Scenario
+              </button>
+            </section>
+          ) : null}
+        </aside>
+      ) : null}
 
       {!tutorialDismissed ? <TutorialOverlay onDismiss={dismissTutorial} /> : null}
       {confirmReset ? (
