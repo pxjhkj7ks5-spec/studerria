@@ -21,6 +21,7 @@ import type {
 const mapCenter: [number, number] = [48.7, 31.4];
 const CHUNK_SIZE_DEG = 2;
 const VIEWPORT_PAD_RATIO = 0.42;
+const VIEWPORT_MOVE_UPDATE_MS = 280;
 const LOW_FPS_THRESHOLD = 42;
 const RECOVERED_FPS_THRESHOLD = 52;
 const MAX_RENDERED_IMPACTS_LOW_FPS = 10;
@@ -344,35 +345,68 @@ function MapClickPlacement() {
 
 function MapViewportTracker({ onChange }: { onChange: (bounds: RenderBounds) => void }) {
   const frameRef = useRef(0);
+  const moveTimeoutRef = useRef<number | null>(null);
+  const lastMoveUpdateRef = useRef(0);
+  const zoomingRef = useRef(false);
   const lastKeyRef = useRef("");
   const map = useMapEvents({
     move() {
-      schedule();
+      scheduleMoveUpdate();
+    },
+    zoomstart() {
+      zoomingRef.current = true;
+      clearMoveTimeout();
     },
     moveend() {
-      schedule();
+      scheduleImmediateUpdate();
     },
     zoomend() {
-      schedule();
+      zoomingRef.current = false;
+      scheduleImmediateUpdate();
     },
     resize() {
-      schedule();
+      scheduleImmediateUpdate();
     },
   });
 
-  function schedule() {
+  function clearMoveTimeout() {
+    if (moveTimeoutRef.current === null) return;
+    window.clearTimeout(moveTimeoutRef.current);
+    moveTimeoutRef.current = null;
+  }
+
+  function scheduleMoveUpdate() {
+    if (zoomingRef.current || moveTimeoutRef.current !== null) return;
+    const elapsed = performance.now() - lastMoveUpdateRef.current;
+    const delay = Math.max(0, VIEWPORT_MOVE_UPDATE_MS - elapsed);
+    moveTimeoutRef.current = window.setTimeout(() => {
+      moveTimeoutRef.current = null;
+      scheduleViewportFrame();
+    }, delay);
+  }
+
+  function scheduleImmediateUpdate() {
+    clearMoveTimeout();
+    scheduleViewportFrame();
+  }
+
+  function scheduleViewportFrame() {
     window.cancelAnimationFrame(frameRef.current);
     frameRef.current = window.requestAnimationFrame(() => {
       const next = createRenderBounds(map);
       if (next.key === lastKeyRef.current) return;
       lastKeyRef.current = next.key;
+      lastMoveUpdateRef.current = performance.now();
       onChange(next);
     });
   }
 
   useEffect(() => {
-    schedule();
-    return () => window.cancelAnimationFrame(frameRef.current);
+    scheduleImmediateUpdate();
+    return () => {
+      clearMoveTimeout();
+      window.cancelAnimationFrame(frameRef.current);
+    };
   }, []);
 
   return null;
@@ -397,6 +431,7 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
   const impactPoolRef = useRef(new Map<string, L.Marker>());
   const latestRef = useRef({ threats, shots, impacts, elapsedMs, mapMode, reducedQuality });
   const syncAtRef = useRef(0);
+  const mapMovingRef = useRef(false);
   const frameRef = useRef(0);
 
   useEffect(() => {
@@ -407,24 +442,38 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
     shotGroupRef.current = shotGroup;
     impactGroupRef.current = impactGroup;
 
+    const pauseMapAnimation = () => {
+      mapMovingRef.current = true;
+    };
+    const resumeMapAnimation = () => {
+      mapMovingRef.current = false;
+      syncAtRef.current = performance.now();
+    };
+    map.on("movestart", pauseMapAnimation);
+    map.on("zoomstart", pauseMapAnimation);
+    map.on("moveend", resumeMapAnimation);
+    map.on("zoomend", resumeMapAnimation);
+
     const animate = () => {
-      const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
-      const latest = latestRef.current;
-      for (const threat of latest.threats) {
-        const pooled = threatPoolRef.current.get(threat.id);
-        if (!pooled) continue;
-        const current = interpolatedThreatPosition(threat, elapsedSinceSync);
-        pooled.marker.setLatLng([current.lat, current.lng]);
-        if (pooled.route) {
-          pooled.route.setLatLngs([[current.lat, current.lng], [threat.target.lat, threat.target.lng]]);
+      if (!mapMovingRef.current) {
+        const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
+        const latest = latestRef.current;
+        for (const threat of latest.threats) {
+          const pooled = threatPoolRef.current.get(threat.id);
+          if (!pooled) continue;
+          const current = interpolatedThreatPosition(threat, elapsedSinceSync);
+          pooled.marker.setLatLng([current.lat, current.lng]);
+          if (pooled.route) {
+            pooled.route.setLatLngs([[current.lat, current.lng], [threat.target.lat, threat.target.lng]]);
+          }
         }
-      }
-      for (const shot of latest.shots) {
-        const pooled = shotPoolRef.current.get(shot.id);
-        if (!pooled) continue;
-        const current = interpolatedShotPosition(shot, elapsedSinceSync);
-        pooled.marker.setLatLng([current.lat, current.lng]);
-        pooled.route.setLatLngs([[shot.from.lat, shot.from.lng], [current.lat, current.lng]]);
+        for (const shot of latest.shots) {
+          const pooled = shotPoolRef.current.get(shot.id);
+          if (!pooled) continue;
+          const current = interpolatedShotPosition(shot, elapsedSinceSync);
+          pooled.marker.setLatLng([current.lat, current.lng]);
+          pooled.route.setLatLngs([[shot.from.lat, shot.from.lng], [current.lat, current.lng]]);
+        }
       }
       frameRef.current = window.requestAnimationFrame(animate);
     };
@@ -432,6 +481,10 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
 
     return () => {
       window.cancelAnimationFrame(frameRef.current);
+      map.off("movestart", pauseMapAnimation);
+      map.off("zoomstart", pauseMapAnimation);
+      map.off("moveend", resumeMapAnimation);
+      map.off("zoomend", resumeMapAnimation);
       threatGroup.remove();
       shotGroup.remove();
       impactGroup.remove();
