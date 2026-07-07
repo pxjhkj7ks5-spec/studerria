@@ -354,15 +354,16 @@ button {
   font: inherit;
 }
 
-.leaflet-control-attribution {
-  color: rgba(210, 229, 239, 0.64);
-  background: rgba(4, 12, 18, 0.72);
+.map-stage .leaflet-container .leaflet-control-attribution {
+  color: rgba(238, 247, 255, 0.88);
+  background: rgba(5, 12, 18, 0.88);
   border-top-left-radius: 6px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(8px);
 }
 
-.leaflet-control-attribution a {
-  color: rgba(115, 228, 255, 0.78);
+.map-stage .leaflet-container .leaflet-control-attribution a {
+  color: #82dcff;
 }
 
 .map-stage::after {
