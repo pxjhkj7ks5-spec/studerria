@@ -187,14 +187,13 @@ function boundsIntersect(
 const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" };
 
 function makeCityIcon(city: City) {
-  const damageClass = city.damage > 55 ? "danger" : city.damage > 25 ? "warning" : "stable";
   const alert = city.alertState || "calm";
-  const key = `${city.id}:${damageClass}:${alert}`;
+  const key = `${city.id}:${alert}`;
   const cached = cityIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--${damageClass} map-marker--city-${alert}" aria-hidden="true"></span><b>${city.name}</b></span>`,
+    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--city-${alert}" aria-hidden="true"></span><b>${city.name}</b></span>`,
     iconSize: [92, 24],
     iconAnchor: [8, 12],
   });

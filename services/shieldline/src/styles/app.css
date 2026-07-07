@@ -528,6 +528,33 @@ button {
   transform: rotate(45deg);
 }
 
+.map-marker--city-calm {
+  color: #55d7ff;
+  background: rgba(10, 50, 69, 0.94);
+  box-shadow:
+    0 0 0 2px rgba(85, 215, 255, 0.1),
+    0 0 11px rgba(85, 215, 255, 0.2),
+    0 5px 10px rgba(0, 0, 0, 0.34);
+}
+
+.map-marker--city-probable-target {
+  color: #f2c865;
+  background: rgba(86, 58, 16, 0.94);
+  box-shadow:
+    0 0 0 2px rgba(242, 200, 101, 0.16),
+    0 0 13px rgba(242, 200, 101, 0.26),
+    0 5px 10px rgba(0, 0, 0, 0.34);
+}
+
+.map-marker--city-air-raid {
+  color: #ff6e6e;
+  background: rgba(92, 24, 24, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(255, 110, 110, 0.2),
+    0 0 15px rgba(255, 110, 110, 0.32),
+    0 5px 10px rgba(0, 0, 0, 0.34);
+}
+
 .map-marker--city::after {
   content: "";
   width: 5px;
