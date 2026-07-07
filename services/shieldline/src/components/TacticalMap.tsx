@@ -183,7 +183,6 @@ function boundsIntersect(
   return shape.north >= bounds.south && shape.south <= bounds.north && shape.east >= bounds.west && shape.west <= bounds.east;
 }
 
-const ukrainePlacementStyle = { color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.22, weight: 1 };
 const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" };
 
 function makeCityIcon(city: City, selected: boolean) {
@@ -612,13 +611,6 @@ export function TacticalMap() {
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
   const controlOverlay = useMemo(() => getControlOverlay(), []);
-  const ukrainePlacementPolygons = useMemo(
-    () => controlOverlay.ukrainePlacementPolygons.map((polygon) => ({
-      positions: toPositions(polygon),
-      bounds: polygonBounds(polygon),
-    })),
-    [controlOverlay],
-  );
   const occupiedZonePolygons = useMemo(
     () => controlOverlay.occupiedPolygons.map((polygon) => ({
       positions: toPositions(polygon),
@@ -637,10 +629,6 @@ export function TacticalMap() {
       icon: makeCityIcon(city, city.id === selectedCityId),
     })),
     [visibleCities, selectedCityId],
-  );
-  const visibleUkrainePlacementPolygons = useMemo(
-    () => ukrainePlacementPolygons.filter((polygon) => boundsIntersect(polygon.bounds, renderBounds)),
-    [ukrainePlacementPolygons, renderBounds],
   );
   const visibleOccupiedZonePolygons = useMemo(
     () => occupiedZonePolygons.filter((polygon) => boundsIntersect(polygon.bounds, renderBounds)),
@@ -703,7 +691,6 @@ export function TacticalMap() {
       + visibleImpactMarkers.length
       + visibleCoverageBatteries.length
       + visibleRoutes.length
-      + visibleUkrainePlacementPolygons.length
       + visibleOccupiedZonePolygons.length;
     return {
       activeObjects,
@@ -733,7 +720,6 @@ export function TacticalMap() {
     visibleRoutes.length,
     visibleShots.length,
     visibleThreats.length,
-    visibleUkrainePlacementPolygons.length,
   ]);
   const performanceStats = usePerformanceStats(renderCounts);
   const reducedQuality = performanceStats.quality === "reduced";
@@ -780,13 +766,6 @@ export function TacticalMap() {
           updateWhenIdle
           updateWhenZooming={false}
         />
-        {visibleUkrainePlacementPolygons.map((polygon, index) => (
-          <Polygon
-            key={`ukraine-placement-${index}`}
-            positions={polygon.positions}
-            pathOptions={ukrainePlacementStyle}
-          />
-        ))}
         {visibleOccupiedZonePolygons.map((polygon, index) => (
           <Polygon
             key={`occupied-${index}`}
