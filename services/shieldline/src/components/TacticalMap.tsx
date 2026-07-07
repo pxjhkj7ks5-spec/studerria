@@ -186,15 +186,15 @@ function boundsIntersect(
 
 const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" };
 
-function makeCityIcon(city: City, selected: boolean) {
+function makeCityIcon(city: City) {
   const damageClass = city.damage > 55 ? "danger" : city.damage > 25 ? "warning" : "stable";
   const alert = city.alertState || "calm";
-  const key = `${city.id}:${damageClass}:${alert}:${selected}`;
+  const key = `${city.id}:${damageClass}:${alert}`;
   const cached = cityIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--${damageClass} map-marker--city-${alert} ${selected ? "map-marker--selected" : ""}" aria-hidden="true"></span><b>${city.name}</b></span>`,
+    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--${damageClass} map-marker--city-${alert}" aria-hidden="true"></span><b>${city.name}</b></span>`,
     iconSize: [92, 24],
     iconAnchor: [8, 12],
   });
@@ -654,11 +654,9 @@ function PerformanceOverlay({ stats, counts }: { stats: PerformanceStats; counts
 
 export function TacticalMap() {
   const game = useGameStore((state) => state.game);
-  const selectedCityId = useGameStore((state) => state.selectedCityId);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const mapMode = useGameStore((state) => state.mapMode);
   const placementKind = useGameStore((state) => state.placementKind);
-  const setSelectedCity = useGameStore((state) => state.setSelectedCity);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
   const chunkCacheRef = useRef(new Set<string>());
@@ -679,9 +677,9 @@ export function TacticalMap() {
   const cityMarkers = useMemo(
     () => visibleCities.map((city) => ({
       city,
-      icon: makeCityIcon(city, city.id === selectedCityId),
+      icon: makeCityIcon(city),
     })),
-    [visibleCities, selectedCityId],
+    [visibleCities],
   );
   const visibleOccupiedZonePolygons = useMemo(
     () => occupiedZonePolygons.filter((polygon) => boundsIntersect(polygon.bounds, renderBounds)),
@@ -894,7 +892,6 @@ export function TacticalMap() {
             key={city.id}
             position={[city.coordinates.lat, city.coordinates.lng]}
             icon={icon}
-            eventHandlers={{ click: () => setSelectedCity(city.id) }}
           >
             <Tooltip direction="top" offset={[0, -16]}>
               {city.name} - city services {Math.round(city.infrastructure)}%

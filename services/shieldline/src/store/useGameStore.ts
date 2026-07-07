@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { placeBattery, removeBattery, setBatteryMaintenance, tickSimulation } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { togglePlanningAction } from "../game/planningActions";
-import type { CampaignMode, CityId, Coordinates, GameState, MapMode, PlanningActionId, UnitKind } from "../types/game";
+import type { CampaignMode, Coordinates, GameState, MapMode, PlanningActionId, UnitKind } from "../types/game";
 
 const tutorialKey = "shieldline-tutorial-complete-v1";
 
@@ -18,7 +18,6 @@ interface GameStore {
   pendingCampaignMode: CampaignMode | null;
   mapMode: MapMode;
   tutorialDismissed: boolean;
-  selectedCityId: CityId;
   selectedBatteryId: string | null;
   placementKind: UnitKind | null;
   selectCampaignMode: (mode: CampaignMode) => void;
@@ -27,7 +26,6 @@ interface GameStore {
   returnToModeSelect: () => void;
   setMapMode: (mode: MapMode) => void;
   dismissTutorial: () => void;
-  setSelectedCity: (cityId: CityId) => void;
   setSelectedBattery: (batteryId: string | null) => void;
   beginPlacement: (kind: UnitKind) => void;
   cancelPlacement: () => void;
@@ -47,7 +45,6 @@ export const useGameStore = create<GameStore>()(
       pendingCampaignMode: null,
       mapMode: "live",
       tutorialDismissed: readTutorialDismissed(),
-      selectedCityId: "kyiv",
       selectedBatteryId: null,
       placementKind: null,
       selectCampaignMode: (mode) => set({
@@ -60,7 +57,6 @@ export const useGameStore = create<GameStore>()(
           pendingCampaignMode: null,
           mapMode: "live",
           game: createScenarioState(Math.random, mode, scenarioId),
-          selectedCityId: "kyiv",
           selectedBatteryId: null,
           placementKind: null,
         });
@@ -74,7 +70,6 @@ export const useGameStore = create<GameStore>()(
         }
         set({ tutorialDismissed: true });
       },
-      setSelectedCity: (cityId) => set({ selectedCityId: cityId }),
       setSelectedBattery: (batteryId) => set({ selectedBatteryId: batteryId, placementKind: null }),
       beginPlacement: (kind) => set({ placementKind: kind, selectedBatteryId: null }),
       cancelPlacement: () => set({ placementKind: null }),
@@ -98,7 +93,6 @@ export const useGameStore = create<GameStore>()(
       tick: (deltaMs) => set((state) => ({ game: tickSimulation(state.game, deltaMs) })),
       resetCampaign: () => set({
         game: createScenarioState(Math.random, get().campaignMode || "crisis", get().game.scenarioId),
-        selectedCityId: "kyiv",
         selectedBatteryId: null,
         placementKind: null,
       }),
@@ -111,7 +105,6 @@ export const useGameStore = create<GameStore>()(
         campaignMode: state.campaignMode,
         pendingCampaignMode: state.pendingCampaignMode,
         mapMode: state.mapMode,
-        selectedCityId: state.selectedCityId,
         selectedBatteryId: state.selectedBatteryId,
       }),
     },
