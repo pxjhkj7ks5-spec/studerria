@@ -1587,6 +1587,9 @@ button {
 
 .unit-card--disabled {
   cursor: not-allowed;
+}
+
+.unit-card--disabled > :not(.unit-hover-card) {
   opacity: 0.52;
 }
 
@@ -2331,6 +2334,10 @@ button {
 }
 
 .command-drawer .unit-card--disabled {
+  background: rgba(20, 31, 42, 0.62);
+}
+
+.command-drawer .unit-card--disabled > :not(.unit-hover-card) {
   opacity: 0.46;
 }
 
