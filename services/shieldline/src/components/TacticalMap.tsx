@@ -241,7 +241,7 @@ function threatTone(threat: LiveThreat) {
 function threatRouteColor(tone: ReturnType<typeof threatTone>) {
   if (tone === "confirmed") return "#ff3535";
   if (tone === "decoy") return "#b997ff";
-  return "#35d8ff";
+  return "#ff3535";
 }
 
 function coverageTone(unit: ReturnType<typeof getUnitDefinition>, selected: boolean) {
