@@ -436,7 +436,6 @@ button {
 }
 
 .legend-item--uncertain svg { color: var(--cyan); }
-.legend-item--detected svg { color: var(--amber); }
 .legend-item--confirmed svg { color: var(--red); }
 .legend-item--intercepted svg { color: var(--green); }
 .legend-item--impact svg { color: #ff9a76; }
@@ -624,20 +623,13 @@ button {
     0 0 24px rgba(242, 200, 101, 0.25);
 }
 
-.map-marker--threat-engaged,
-.map-marker--threat-detected {
+.map-marker--threat-engaged {
   color: #ff9f9f;
 }
 
 .map-marker--threat-uncertain {
   opacity: 0.76;
   filter: saturate(0.85);
-}
-
-.map-marker--threat-detected {
-  box-shadow:
-    0 0 0 5px rgba(242, 200, 101, 0.14),
-    0 0 28px rgba(242, 200, 101, 0.3);
 }
 
 .map-marker--threat-confirmed {
@@ -715,7 +707,6 @@ button {
 }
 
 .threat-confidence--uncertain { border-color: rgba(85, 215, 255, 0.34); color: #bdeeff; }
-.threat-confidence--detected { border-color: rgba(242, 200, 101, 0.46); color: #ffe4a4; }
 .threat-confidence--confirmed { border-color: rgba(255, 110, 110, 0.54); color: #ffb6b6; }
 .threat-confidence--decoy { border-color: rgba(163, 140, 255, 0.5); color: #d9ceff; }
 

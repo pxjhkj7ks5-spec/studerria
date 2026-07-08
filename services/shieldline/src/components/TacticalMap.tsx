@@ -234,19 +234,17 @@ function imageMarkerHtml(src: string, className: string) {
 function threatTone(threat: LiveThreat) {
   if (threat.kind === "decoy") return "decoy";
   if (threat.status === "engaged") return "confirmed";
-  if (threat.detected || threat.confidence >= 55) return "detected";
   return "uncertain";
 }
 
 function threatLabel(threat: LiveThreat) {
   const tone = threatTone(threat);
-  const label = tone === "confirmed" ? "confirmed" : tone === "detected" ? "detected" : tone === "decoy" ? "possible decoy" : "uncertain";
+  const label = tone === "confirmed" ? "confirmed" : tone === "decoy" ? "possible decoy" : "radar contact";
   return `<span class="threat-confidence threat-confidence--${tone}">${label} ${Math.round(threat.confidence)}%</span>`;
 }
 
 function threatRouteColor(tone: ReturnType<typeof threatTone>) {
   if (tone === "confirmed") return "#ff3535";
-  if (tone === "detected") return "#ffd24a";
   if (tone === "decoy") return "#b997ff";
   return "#35d8ff";
 }

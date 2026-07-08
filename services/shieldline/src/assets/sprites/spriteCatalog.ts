@@ -10,7 +10,6 @@ import threatKh101 from "./threats/kh101.png";
 import threatParodiya from "./threats/parodiya.png";
 import threatSaturation from "./threats/saturation.png";
 import confirmedThreat from "./icons/confirmed-threat.png";
-import detectedTrack from "./icons/detected-track.png";
 import impactEvent from "./icons/impact-event.png";
 import interceptedThreat from "./icons/intercepted-threat.png";
 import interceptorShot from "./icons/interceptor-shot.png";
@@ -78,7 +77,6 @@ export const launchSprites = {
 
 export const markerSprites = {
   unknownTrack,
-  detectedTrack,
   confirmedThreat,
   interceptedThreat,
   impactEvent,

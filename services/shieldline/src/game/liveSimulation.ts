@@ -387,7 +387,6 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     speed: 1 / flightDurationMs,
     difficulty: threatBaseDifficulty[kind] * launchSector.pressure + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
     damage: falseTrack ? 0 : threatDamage[kind],
-    detected: false,
     confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,
     saturation: kind === "saturation" || kind === "geran2" ? 1.25 : kind === "combined" ? 1.35 : 1,
     attackPlanId: plan?.id,
@@ -496,34 +495,41 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
   const intelFocus = state.planningActions.selected.includes("intelligence-focus");
   for (const threat of state.liveThreats) {
     const position = threatPosition(threat);
-    if (shouldScan) {
-      for (const battery of state.batteries) {
-        const unit = getUnitDefinition(battery.kind);
-        if (unit.engagementMode !== "detect" || battery.status === "maintenance") continue;
-        const rangeKm = distanceKm(position, battery.position);
-        if (rangeKm > 100) continue;
-        const bandChance = rangeKm <= 50 ? 95 : rangeKm <= 75 ? 75 : 40;
-        const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
-        const readinessFactor = 0.58 + (battery.readiness / 100) * 0.42;
-        const planningBoost = (highAlert ? 8 : 0) + (intelFocus ? 6 : 0);
-        const chance = clamp(bandChance * statusPenalty * readinessFactor + planningBoost - threat.difficulty * 0.08, 5, 98);
-        threat.confidence = clamp(threat.confidence + (chance / 100) * 8, 0, 100);
-        if (!weightedChance(chance, random)) continue;
-        threat.detected = true;
-        threat.status = "detected";
-        threat.revealed = true;
-        threat.lastKnownPosition = position;
-        threat.headingDeg = bearingDeg(threat.origin, threat.target);
-        threat.trackQuality = clamp(chance + (intelFocus ? 8 : 0), 0, 100);
-        threat.confidence = clamp(threat.confidence + 18 + random() * 12 + (intelFocus ? 10 : 0), 0, 100);
-        pushLog(state.log, state.elapsedMs, "Target Detected", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track revealed by radar scan.`, "info");
-        break;
-      }
+    const wasRevealed = threat.revealed;
+    let bestRadarChance = 0;
+    for (const battery of state.batteries) {
+      const unit = getUnitDefinition(battery.kind);
+      if (unit.engagementMode !== "detect" || battery.status === "maintenance") continue;
+      const rangeKm = distanceKm(position, battery.position);
+      if (rangeKm > 100) continue;
+      const bandChance = rangeKm <= 50 ? 95 : rangeKm <= 75 ? 75 : 40;
+      const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
+      const readinessFactor = 0.58 + (battery.readiness / 100) * 0.42;
+      const planningBoost = (highAlert ? 8 : 0) + (intelFocus ? 6 : 0);
+      const chance = clamp(bandChance * statusPenalty * readinessFactor + planningBoost - threat.difficulty * 0.08, 5, 98);
+      bestRadarChance = Math.max(bestRadarChance, chance);
     }
-    if (threat.revealed) {
-      threat.lastKnownPosition = position;
-      threat.headingDeg = bearingDeg(threat.origin, threat.target);
-      threat.trackQuality = clamp(threat.trackQuality - 0.06, 18, 100);
+
+    threat.revealed = bestRadarChance > 0;
+    if (!threat.revealed) {
+      if (threat.status !== "engaged") threat.status = "inbound";
+      threat.trackQuality = clamp(threat.trackQuality - 0.32, 0, 100);
+      continue;
+    }
+
+    if (threat.status !== "engaged") threat.status = "inbound";
+    threat.lastKnownPosition = position;
+    threat.headingDeg = bearingDeg(threat.origin, threat.target);
+    threat.trackQuality = shouldScan
+      ? clamp(bestRadarChance + (intelFocus ? 8 : 0), 18, 100)
+      : clamp(threat.trackQuality - 0.04, 18, 100);
+
+    if (shouldScan) {
+      const firstContactBoost = wasRevealed ? 0 : 8 + random() * 8;
+      threat.confidence = clamp(threat.confidence + (bestRadarChance / 100) * 8 + firstContactBoost + (intelFocus ? 6 : 0), 0, 100);
+      if (!wasRevealed) {
+        pushLog(state.log, state.elapsedMs, "Radar Contact", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track entered radar coverage.`, "info");
+      }
     }
   }
 }

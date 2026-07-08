@@ -45,7 +45,6 @@ function createOpeningThreat(): LiveThreat {
     speed: 0.0000055,
     difficulty: 28,
     damage: 3,
-    detected: false,
     confidence: 32,
     saturation: 1,
     headingDeg: 240,

@@ -64,7 +64,7 @@ export type CampaignStatus = "active" | "won" | "lost";
 
 export type CoverageTier = "I" | "II" | "III";
 
-export type ThreatStatus = "inbound" | "detected" | "engaged" | "intercepted" | "impact";
+export type ThreatStatus = "inbound" | "engaged" | "intercepted" | "impact";
 
 export type CampaignMode = "training" | "seven-day" | "crisis" | "sandbox";
 
@@ -233,7 +233,6 @@ export interface LiveThreat {
   speed: number;
   difficulty: number;
   damage: number;
-  detected: boolean;
   confidence: number;
   saturation: number;
   attackPlanId?: string;
