@@ -537,12 +537,21 @@ button {
     0 5px 10px rgba(0, 0, 0, 0.34);
 }
 
-.map-marker--city-probable-target {
-  color: #f2c865;
-  background: rgba(86, 58, 16, 0.94);
+.map-marker--city-launch-corridor {
+  color: #ffd34a;
+  background: rgba(86, 70, 12, 0.94);
   box-shadow:
-    0 0 0 2px rgba(242, 200, 101, 0.16),
-    0 0 13px rgba(242, 200, 101, 0.26),
+    0 0 0 2px rgba(255, 211, 74, 0.16),
+    0 0 13px rgba(255, 211, 74, 0.28),
+    0 5px 10px rgba(0, 0, 0, 0.34);
+}
+
+.map-marker--city-probable-target {
+  color: #ff9f43;
+  background: rgba(91, 48, 12, 0.94);
+  box-shadow:
+    0 0 0 2px rgba(255, 159, 67, 0.18),
+    0 0 14px rgba(255, 159, 67, 0.3),
     0 5px 10px rgba(0, 0, 0, 0.34);
 }
 
@@ -586,6 +595,10 @@ button {
 
 .city-exclusion-ring {
   filter: drop-shadow(0 0 5px rgba(255, 79, 79, 0.28));
+}
+
+.launch-risk-cone {
+  filter: drop-shadow(0 0 5px rgba(255, 211, 74, 0.2));
 }
 
 .map-marker--battery {
@@ -943,9 +956,14 @@ button {
   font-size: 11px;
 }
 
+.city-alert-state--launch-corridor {
+  border-color: rgba(255, 211, 74, 0.34);
+  color: #ffe28a;
+}
+
 .city-alert-state--probable-target {
-  border-color: rgba(242, 200, 101, 0.34);
-  color: var(--amber);
+  border-color: rgba(255, 159, 67, 0.38);
+  color: #ffbf7a;
 }
 
 .city-alert-state--air-raid {
@@ -954,9 +972,14 @@ button {
   background: rgba(255, 110, 110, 0.08);
 }
 
+.city-marker-label--launch-corridor b {
+  border-color: rgba(255, 211, 74, 0.45);
+  color: #ffe28a;
+}
+
 .city-marker-label--probable-target b {
-  border-color: rgba(242, 200, 101, 0.45);
-  color: #ffe4a4;
+  border-color: rgba(255, 159, 67, 0.5);
+  color: #ffd0a1;
 }
 
 .city-marker-label--air-raid b {

@@ -15,7 +15,13 @@ export function CityPanel({ city, game }: CityPanelProps) {
   const repairCapacity = Math.max(12, Math.round((city.infrastructure + logistics - city.damage) / 2));
   const risk = city.damage > 55 ? "Critical" : city.energy < 45 || city.infrastructure < 50 ? "Stressed" : "Stable";
   const alertState = city.alertState || "calm";
-  const alertLabel = alertState === "air-raid" ? "Air raid" : alertState === "probable-target" ? "Probable target" : "Calm";
+  const alertLabel = alertState === "air-raid"
+    ? "Air raid"
+    : alertState === "probable-target"
+      ? "Probable target"
+      : alertState === "launch-corridor"
+        ? "Launch corridor"
+        : "Calm";
 
   return (
     <section className="city-panel" aria-label={`${city.name} status`}>

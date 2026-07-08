@@ -56,7 +56,7 @@ export type CarrierKind = "tu95" | "black-sea-ship";
 
 export type LaunchAreaState = "idle" | "warning" | "launching" | "cooldown";
 
-export type CityAlertState = "calm" | "probable-target" | "air-raid";
+export type CityAlertState = "calm" | "launch-corridor" | "probable-target" | "air-raid";
 
 export type IntelTone = "info" | "success" | "warning" | "danger";
 

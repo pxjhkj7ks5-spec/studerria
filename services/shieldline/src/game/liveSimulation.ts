@@ -25,6 +25,11 @@ import type {
 const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
 const MIN_ATTACK_WINDOW_MS = 90000;
+const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
+const LAUNCH_CONE_RANGE_KM = 900;
+const AIR_RAID_TRACK_DISTANCE_KM = 55;
+const AIR_RAID_TARGET_DISTANCE_KM = 60;
+const PROBABLE_TARGET_DISTANCE_KM = 82;
 
 const fallbackThreatKinds: ThreatKind[] = ["geran2", "gerbera", "parodiya", "kh101", "kalibr", "iskander"];
 const ABSTRACT_KM_PER_DEGREE = 85;
@@ -266,6 +271,13 @@ function abstractDistanceKm(left: Coordinates, right: Coordinates) {
   return abstractDistance(left, right) * ABSTRACT_KM_PER_DEGREE;
 }
 
+function mapDistanceKm(left: Coordinates, right: Coordinates) {
+  const latKm = (left.lat - right.lat) * 111;
+  const avgLat = ((left.lat + right.lat) / 2 * Math.PI) / 180;
+  const lngKm = (left.lng - right.lng) * 111 * Math.max(0.35, Math.cos(avgLat));
+  return Math.sqrt(latKm * latKm + lngKm * lngKm);
+}
+
 function bearingDeg(from: Coordinates, to: Coordinates) {
   const lat1 = (from.lat * Math.PI) / 180;
   const lat2 = (to.lat * Math.PI) / 180;
@@ -273,6 +285,32 @@ function bearingDeg(from: Coordinates, to: Coordinates) {
   const y = Math.sin(dLng) * Math.cos(lat2);
   const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function angleDeltaDeg(left: number, right: number) {
+  return Math.abs(((left - right + 540) % 360) - 180);
+}
+
+function stableHash(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function cityInLaunchCone(city: Coordinates, sector: LaunchSector) {
+  if (sector.targetHeadingDeg === undefined) return false;
+  const distance = mapDistanceKm(sector.coordinates, city);
+  if (distance > LAUNCH_CONE_RANGE_KM) return false;
+  return angleDeltaDeg(bearingDeg(sector.coordinates, city), sector.targetHeadingDeg) <= LAUNCH_CONE_HALF_ANGLE_DEG;
+}
+
+function activeLaunchCorridors(state: GameState) {
+  return state.launchSectors.filter((sector) =>
+    (sector.state === "warning" || sector.state === "launching")
+      && sector.targetHeadingDeg !== undefined
+  );
 }
 
 function isDroneClass(kind: ThreatKind) {
@@ -680,28 +718,61 @@ function updateThreats(state: GameState, deltaMs: number) {
 }
 
 function updateCityAlerts(state: GameState) {
-  const missileLaunchActive = state.launchSectors.some((sector) =>
-    (sector.state === "warning" || sector.state === "launching")
-      && (sector.category === "ballistic" || sector.category === "carrier" || sector.category === "cruise")
-  );
+  const launchCorridors = activeLaunchCorridors(state);
+  const probableLaunchTargets = new Set<CityId>();
+  for (const sector of launchCorridors) {
+    const targetCoordinates = sector.targetCoordinates;
+    const targetCityId = sector.targetCityId;
+    const targetCount = 2 + (stableHash(`${sector.id}:${targetCityId || "target"}`) % 3);
+    const sectorTargets = new Set<CityId>();
+    const candidates = state.cities
+      .filter((city) => cityInLaunchCone(city.coordinates, sector))
+      .map((city) => ({
+        city,
+        score: (targetCoordinates ? abstractDistanceKm(city.coordinates, targetCoordinates) : 0)
+          + angleDeltaDeg(bearingDeg(sector.coordinates, city.coordinates), sector.targetHeadingDeg!) * 8
+          - city.importance * 2,
+      }))
+      .sort((left, right) => left.score - right.score);
+    if (targetCityId) sectorTargets.add(targetCityId);
+    for (const { city } of candidates) {
+      if (sectorTargets.size >= targetCount) break;
+      sectorTargets.add(city.id);
+    }
+    for (const cityId of sectorTargets) {
+      probableLaunchTargets.add(cityId);
+    }
+  }
+
+  function raiseAlert(current: NonNullable<GameState["cities"][number]["alertState"]>, next: NonNullable<GameState["cities"][number]["alertState"]>) {
+    const rank = { calm: 0, "launch-corridor": 1, "probable-target": 2, "air-raid": 3 };
+    return rank[next] > rank[current] ? next : current;
+  }
+
   for (const city of state.cities) {
     let alert: NonNullable<typeof city.alertState> = "calm";
+    if (launchCorridors.some((sector) => cityInLaunchCone(city.coordinates, sector))) {
+      alert = raiseAlert(alert, "launch-corridor");
+    }
+    if (probableLaunchTargets.has(city.id)) {
+      alert = raiseAlert(alert, "probable-target");
+    }
     for (const threat of state.liveThreats) {
       if (!threat.revealed) continue;
       const position = threatPosition(threat);
-      const cityDistance = distanceKm(city.coordinates, position);
-      if ((isDroneClass(threat.kind) && cityDistance <= 50) || (isMissileClass(threat.kind) && missileLaunchActive)) {
-        alert = "air-raid";
+      const trackDistance = distanceKm(city.coordinates, position);
+      const targetDistance = distanceKm(city.coordinates, threat.target);
+      if (
+        trackDistance <= AIR_RAID_TRACK_DISTANCE_KM
+        || (isMissileClass(threat.kind) && threat.progress >= 0.62 && targetDistance <= AIR_RAID_TARGET_DISTANCE_KM)
+        || (isDroneClass(threat.kind) && trackDistance <= AIR_RAID_TRACK_DISTANCE_KM)
+      ) {
+        alert = raiseAlert(alert, "air-raid");
         break;
       }
-      const targetDistance = distanceKm(city.coordinates, threat.target);
-      const trackDistance = distanceKm(city.coordinates, position);
-      if (targetDistance <= 70 || trackDistance <= 70) {
-        alert = "probable-target";
+      if (targetDistance <= PROBABLE_TARGET_DISTANCE_KM || trackDistance <= PROBABLE_TARGET_DISTANCE_KM) {
+        alert = raiseAlert(alert, "probable-target");
       }
-    }
-    if (missileLaunchActive && alert === "calm") {
-      alert = "probable-target";
     }
     city.alertState = alert;
   }
