@@ -433,6 +433,7 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
   const impactPoolRef = useRef(new Map<string, L.Marker>());
   const latestRef = useRef({ threats, shots, impacts, elapsedMs, mapMode, reducedQuality });
   const syncAtRef = useRef(0);
+  const lastSyncedElapsedMsRef = useRef<number | null>(null);
   const mapMovingRef = useRef(false);
   const frameRef = useRef(0);
 
@@ -449,7 +450,6 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
     };
     const resumeMapAnimation = () => {
       mapMovingRef.current = false;
-      syncAtRef.current = performance.now();
     };
     map.on("movestart", pauseMapAnimation);
     map.on("zoomstart", pauseMapAnimation);
@@ -501,7 +501,11 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
 
   useEffect(() => {
     latestRef.current = { threats, shots, impacts, elapsedMs, mapMode, reducedQuality };
-    syncAtRef.current = performance.now();
+    if (lastSyncedElapsedMsRef.current !== elapsedMs) {
+      lastSyncedElapsedMsRef.current = elapsedMs;
+      syncAtRef.current = performance.now();
+    }
+    const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
     const threatGroup = threatGroupRef.current;
     const shotGroup = shotGroupRef.current;
     const impactGroup = impactGroupRef.current;
@@ -519,7 +523,7 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
       const tone = threatTone(threat);
       const routeAllowed = threat.confidence >= (reducedQuality ? 72 : 58) && (!reducedQuality || mapMode === "threats");
       let pooled = threatPoolRef.current.get(threat.id);
-      const current = threatPosition(threat);
+      const current = interpolatedThreatPosition(threat, elapsedSinceSync);
       if (!pooled) {
         pooled = {
           marker: L.marker([current.lat, current.lng], { icon: makeThreatIcon(threat), interactive: false }).addTo(threatGroup),
@@ -560,7 +564,7 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
     }
     for (const shot of shots) {
       let pooled = shotPoolRef.current.get(shot.id);
-      const current = shotPosition(shot);
+      const current = interpolatedShotPosition(shot, elapsedSinceSync);
       const pathOptions = {
         color: shot.style === "gun" ? "#ffd466" : shot.style === "drone" ? "#7ee7ff" : shot.style === "ew" ? "#b58cff" : "#ffef9a",
         weight: shot.style === "gun" ? 2 : 1,
