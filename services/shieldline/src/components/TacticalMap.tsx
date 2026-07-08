@@ -237,12 +237,6 @@ function threatTone(threat: LiveThreat) {
   return "uncertain";
 }
 
-function threatLabel(threat: LiveThreat) {
-  const tone = threatTone(threat);
-  const label = tone === "confirmed" ? "confirmed" : tone === "decoy" ? "possible decoy" : "radar contact";
-  return `<span class="threat-confidence threat-confidence--${tone}">${label} ${Math.round(threat.confidence)}%</span>`;
-}
-
 function threatRouteColor(tone: ReturnType<typeof threatTone>) {
   if (tone === "confirmed") return "#ff3535";
   if (tone === "decoy") return "#b997ff";
@@ -276,14 +270,13 @@ function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
 
 function makeThreatIcon(threat: LiveThreat) {
   const tone = threatTone(threat);
-  const label = threat.confidence >= 70 ? threatLabel(threat) : "";
   const targetHeading = Math.round(threat.headingDeg - 90);
-  const key = `${threat.kind}:${tone}:${Math.round(threat.confidence / 10)}:${targetHeading}:${Boolean(label)}`;
+  const key = `${threat.kind}:${tone}:${Math.round(threat.confidence / 10)}:${targetHeading}`;
   const cached = threatIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span>${label}</span>`,
+    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span></span>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
