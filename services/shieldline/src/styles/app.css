@@ -796,7 +796,14 @@ button {
     0 0 22px rgba(255, 92, 70, 0.34);
 }
 
-.launch-marker-shell--warning .launch-ripple,
+.launch-marker-shell--warning .launch-ripple {
+  border-color: rgba(255, 211, 92, 0.72);
+  box-shadow:
+    0 0 0 7px rgba(255, 205, 74, 0.1),
+    0 0 24px rgba(255, 205, 74, 0.42);
+  animation: launch-warning-glimmer 1.8s ease-in-out infinite;
+}
+
 .launch-marker-shell--launching .launch-ripple {
   animation: launch-glimmer 1.8s ease-in-out infinite;
 }
@@ -827,7 +834,11 @@ button {
   height: 26px !important;
 }
 
-.map-marker--launch-warning,
+.map-marker--launch-warning {
+  opacity: 1;
+  filter: drop-shadow(0 0 10px rgba(255, 205, 74, 0.72));
+}
+
 .map-marker--launch-launching {
   opacity: 1;
   filter: drop-shadow(0 0 10px rgba(255, 70, 70, 0.78));
@@ -2425,6 +2436,21 @@ button {
     box-shadow:
       0 0 0 12px rgba(255, 90, 76, 0.14),
       0 0 30px rgba(255, 92, 70, 0.5);
+  }
+}
+
+@keyframes launch-warning-glimmer {
+  0%, 100% {
+    opacity: 0.38;
+    box-shadow:
+      0 0 0 6px rgba(255, 205, 74, 0.1),
+      0 0 18px rgba(255, 205, 74, 0.34);
+  }
+  50% {
+    opacity: 0.95;
+    box-shadow:
+      0 0 0 12px rgba(255, 205, 74, 0.17),
+      0 0 30px rgba(255, 205, 74, 0.54);
   }
 }
 
