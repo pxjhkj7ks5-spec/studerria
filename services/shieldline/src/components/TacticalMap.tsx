@@ -297,7 +297,7 @@ function makeImpactIcon(marker: ImpactMarker) {
 function makeLaunchIcon(sector: LaunchSector) {
   const category = sector.category || "drone";
   const state = sector.state || "idle";
-  const hasDirection = sector.targetHeadingDeg !== undefined && (state === "warning" || state === "launching" || state === "cooldown");
+  const hasDirection = sector.targetHeadingDeg !== undefined && (state === "warning" || state === "launching");
   const directionDeg = hasDirection ? Math.round(sector.targetHeadingDeg! - 90) : 0;
   const key = `${category}:${state}:${hasDirection ? directionDeg : "none"}`;
   const cached = launchIconCache.get(key);

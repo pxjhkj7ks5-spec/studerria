@@ -779,10 +779,6 @@ button {
   opacity: 0.88;
 }
 
-.launch-marker-shell--cooldown .launch-direction {
-  opacity: 0.38;
-}
-
 .launch-ripple {
   position: absolute;
   z-index: 2;
