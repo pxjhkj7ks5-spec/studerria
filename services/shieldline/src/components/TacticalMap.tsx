@@ -214,14 +214,15 @@ function launchConePolygon(sector: LaunchSector) {
 
 function makeCityIcon(city: City) {
   const alert = city.alertState || "calm";
-  const key = `${city.id}:${alert}`;
+  const hp = Math.round(city.infrastructure);
+  const key = `${city.id}:${alert}:${hp}`;
   const cached = cityIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--city-${alert}" aria-hidden="true"></span><b>${city.name}</b></span>`,
-    iconSize: [92, 24],
-    iconAnchor: [8, 12],
+    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--city-${alert}" aria-hidden="true"></span><b>HP ${hp}%</b></span>`,
+    iconSize: [58, 42],
+    iconAnchor: [29, 8],
   });
   cityIconCache.set(key, icon);
   return icon;
