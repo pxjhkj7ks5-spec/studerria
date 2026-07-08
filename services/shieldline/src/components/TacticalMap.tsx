@@ -688,7 +688,7 @@ export function TacticalMap() {
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
   const [isMapZooming, setIsMapZooming] = useState(false);
-  const [stableCoverageBatteries, setStableCoverageBatteries] = useState<DefenseBattery[]>([]);
+  const radiusOverlayRenderer = useMemo(() => L.svg({ padding: 0.6 }), []);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
   const controlOverlay = useMemo(() => getControlOverlay(), []);
@@ -738,11 +738,6 @@ export function TacticalMap() {
     () => mapMode === "threats" ? [] : game.batteries.filter((battery) => pointInBounds(battery.position, renderBounds, battery.coverageRadius)),
     [game.batteries, mapMode, renderBounds],
   );
-  useEffect(() => {
-    if (isMapZooming) return;
-    setStableCoverageBatteries(visibleCoverageBatteries);
-  }, [isMapZooming, visibleCoverageBatteries]);
-  const renderedCoverageBatteries = isMapZooming ? stableCoverageBatteries : visibleCoverageBatteries;
   const visibleRoutes = useMemo(
     () => mapMode === "logistics" ? game.logistics.routes.filter((route) => lineInBounds(route.from, route.to, renderBounds)) : [],
     [game.logistics.routes, mapMode, renderBounds],
@@ -782,7 +777,7 @@ export function TacticalMap() {
       + visibleThreats.length
       + visibleShots.length
       + visibleImpactMarkers.length
-      + renderedCoverageBatteries.length
+      + visibleCoverageBatteries.length
       + visibleRoutes.length
       + visibleOccupiedZonePolygons.length;
     return {
@@ -806,7 +801,7 @@ export function TacticalMap() {
     visibleBatteries.length,
     visibleCarriers.length,
     visibleCities.length,
-    renderedCoverageBatteries.length,
+    visibleCoverageBatteries.length,
     visibleImpactMarkers.length,
     visibleLaunchSectors.length,
     visibleOccupiedZonePolygons.length,
@@ -856,8 +851,8 @@ export function TacticalMap() {
           attribution={darkMapTiles.attribution}
           className={darkMapTiles.className}
           keepBuffer={4}
-          updateWhenIdle
-          updateWhenZooming={false}
+          updateWhenIdle={false}
+          updateWhenZooming
         />
         {visibleOccupiedZonePolygons.map((polygon, index) => (
           <Polygon
@@ -871,6 +866,7 @@ export function TacticalMap() {
             key={`city-exclusion-${city.id}`}
             center={[city.coordinates.lat, city.coordinates.lng]}
             radius={CITY_PLACEMENT_EXCLUSION_KM * 1000}
+            renderer={radiusOverlayRenderer}
             pathOptions={{
               color: "#ff8b6e",
               fillColor: "#ff4f4f",
@@ -903,7 +899,7 @@ export function TacticalMap() {
             </Tooltip>
           </Marker>
         ))}
-        {renderedCoverageBatteries.map((battery) => {
+        {visibleCoverageBatteries.map((battery) => {
           const unit = getUnitDefinition(battery.kind);
           const selected = battery.id === selectedBatteryId;
           const coverage = coverageTone(unit, selected);
@@ -913,6 +909,7 @@ export function TacticalMap() {
                 key={`coverage-${battery.id}`}
                 center={[battery.position.lat, battery.position.lng]}
                 radius={battery.coverageRadius * 72000}
+                renderer={radiusOverlayRenderer}
                 pathOptions={{
                   color: coverage.color,
                   fillColor: coverage.fill,
