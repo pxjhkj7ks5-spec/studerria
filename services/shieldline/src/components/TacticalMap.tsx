@@ -25,8 +25,6 @@ const VIEWPORT_MOVE_UPDATE_MS = 280;
 const LOW_FPS_THRESHOLD = 42;
 const RECOVERED_FPS_THRESHOLD = 52;
 const MAX_RENDERED_IMPACTS_LOW_FPS = 10;
-const LAUNCH_CONE_RANGE_KM = 900;
-const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
 
 interface RenderBounds {
   north: number;
@@ -187,30 +185,6 @@ function boundsIntersect(
 }
 
 const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.13, opacity: 0.52, weight: 1.4, dashArray: "6 5" };
-const launchConeStyle = { color: "#ffd34a", fillColor: "#ffd34a", fillOpacity: 0.07, opacity: 0.34, weight: 1.2, dashArray: "5 5", className: "launch-risk-cone" };
-
-function destinationPoint(origin: { lat: number; lng: number }, headingDeg: number, distanceKm: number) {
-  const heading = (headingDeg * Math.PI) / 180;
-  const latDelta = Math.cos(heading) * (distanceKm / 111);
-  const lngScale = Math.max(0.35, Math.cos((origin.lat * Math.PI) / 180));
-  const lngDelta = Math.sin(heading) * (distanceKm / (111 * lngScale));
-  return {
-    lat: origin.lat + latDelta,
-    lng: origin.lng + lngDelta,
-  };
-}
-
-function launchConePolygon(sector: LaunchSector) {
-  if (sector.targetHeadingDeg === undefined || (sector.state !== "warning" && sector.state !== "launching")) return null;
-  const left = destinationPoint(sector.coordinates, sector.targetHeadingDeg - LAUNCH_CONE_HALF_ANGLE_DEG, LAUNCH_CONE_RANGE_KM);
-  const right = destinationPoint(sector.coordinates, sector.targetHeadingDeg + LAUNCH_CONE_HALF_ANGLE_DEG, LAUNCH_CONE_RANGE_KM);
-  const positions = toPositions([sector.coordinates, left, right]);
-  return {
-    id: sector.id,
-    positions,
-    bounds: polygonBounds([sector.coordinates, left, right]),
-  };
-}
 
 function makeCityIcon(city: City) {
   const alert = city.alertState || "calm";
@@ -719,13 +693,6 @@ export function TacticalMap() {
     () => game.launchSectors.filter((sector) => pointInBounds(sector.coordinates, renderBounds)),
     [game.launchSectors, renderBounds],
   );
-  const visibleLaunchCones = useMemo(
-    () => game.launchSectors
-      .map(launchConePolygon)
-      .filter((polygon): polygon is NonNullable<ReturnType<typeof launchConePolygon>> => Boolean(polygon))
-      .filter((polygon) => pointInBounds({ lat: polygon.positions[0][0], lng: polygon.positions[0][1] }, renderBounds)),
-    [game.launchSectors, renderBounds],
-  );
   const visibleCarriers = useMemo(
     () => game.carriers.filter((carrier) => pointInBounds(carrier.position, renderBounds)),
     [game.carriers, renderBounds],
@@ -878,13 +845,6 @@ export function TacticalMap() {
             }}
           />
         )) : null}
-        {visibleLaunchCones.map((polygon) => (
-          <Polygon
-            key={`launch-cone-${polygon.id}`}
-            positions={polygon.positions}
-            pathOptions={launchConeStyle}
-          />
-        ))}
         {visibleLaunchSectors.map((sector) => (
           <Marker key={sector.id} position={[sector.coordinates.lat, sector.coordinates.lng]} icon={makeLaunchIcon(sector)}>
             <Tooltip direction="left" offset={[-8, 0]}>
