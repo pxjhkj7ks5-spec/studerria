@@ -371,7 +371,13 @@ function MapClickPlacement() {
   return null;
 }
 
-function MapViewportTracker({ onChange }: { onChange: (bounds: RenderBounds) => void }) {
+function MapViewportTracker({
+  onChange,
+  onZoomingChange,
+}: {
+  onChange: (bounds: RenderBounds) => void;
+  onZoomingChange: (zooming: boolean) => void;
+}) {
   const frameRef = useRef(0);
   const moveTimeoutRef = useRef<number | null>(null);
   const lastMoveUpdateRef = useRef(0);
@@ -383,6 +389,7 @@ function MapViewportTracker({ onChange }: { onChange: (bounds: RenderBounds) => 
     },
     zoomstart() {
       zoomingRef.current = true;
+      onZoomingChange(true);
       clearMoveTimeout();
     },
     moveend() {
@@ -390,6 +397,7 @@ function MapViewportTracker({ onChange }: { onChange: (bounds: RenderBounds) => 
     },
     zoomend() {
       zoomingRef.current = false;
+      onZoomingChange(false);
       scheduleImmediateUpdate();
     },
     resize() {
@@ -687,6 +695,8 @@ export function TacticalMap() {
   const placementKind = useGameStore((state) => state.placementKind);
   const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
+  const [isMapZooming, setIsMapZooming] = useState(false);
+  const [stableCoverageBatteries, setStableCoverageBatteries] = useState<DefenseBattery[]>([]);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
   const controlOverlay = useMemo(() => getControlOverlay(), []);
@@ -736,6 +746,11 @@ export function TacticalMap() {
     () => mapMode === "threats" ? [] : game.batteries.filter((battery) => pointInBounds(battery.position, renderBounds, battery.coverageRadius)),
     [game.batteries, mapMode, renderBounds],
   );
+  useEffect(() => {
+    if (isMapZooming) return;
+    setStableCoverageBatteries(visibleCoverageBatteries);
+  }, [isMapZooming, visibleCoverageBatteries]);
+  const renderedCoverageBatteries = isMapZooming ? stableCoverageBatteries : visibleCoverageBatteries;
   const visibleRoutes = useMemo(
     () => mapMode === "logistics" ? game.logistics.routes.filter((route) => lineInBounds(route.from, route.to, renderBounds)) : [],
     [game.logistics.routes, mapMode, renderBounds],
@@ -775,7 +790,7 @@ export function TacticalMap() {
       + visibleThreats.length
       + visibleShots.length
       + visibleImpactMarkers.length
-      + visibleCoverageBatteries.length
+      + renderedCoverageBatteries.length
       + visibleRoutes.length
       + visibleOccupiedZonePolygons.length;
     return {
@@ -799,7 +814,7 @@ export function TacticalMap() {
     visibleBatteries.length,
     visibleCarriers.length,
     visibleCities.length,
-    visibleCoverageBatteries.length,
+    renderedCoverageBatteries.length,
     visibleImpactMarkers.length,
     visibleLaunchSectors.length,
     visibleOccupiedZonePolygons.length,
@@ -831,10 +846,10 @@ export function TacticalMap() {
         wheelDebounceTime={35}
         zoomAnimationThreshold={4}
         fadeAnimation={false}
-        className="leaflet-stage"
+        className={isMapZooming ? "leaflet-stage leaflet-stage--zooming" : "leaflet-stage"}
         scrollWheelZoom
       >
-        <MapViewportTracker onChange={setRenderBounds} />
+        <MapViewportTracker onChange={setRenderBounds} onZoomingChange={setIsMapZooming} />
         <MapClickPlacement />
         <MovingObjectsLayer
           threats={visibleThreats}
@@ -896,7 +911,7 @@ export function TacticalMap() {
             </Tooltip>
           </Marker>
         ))}
-        {visibleCoverageBatteries.map((battery) => {
+        {renderedCoverageBatteries.map((battery) => {
           const unit = getUnitDefinition(battery.kind);
           const selected = battery.id === selectedBatteryId;
           const coverage = coverageTone(unit, selected);
