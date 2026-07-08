@@ -29,7 +29,6 @@ function chances(values: Partial<Record<ThreatKind, number>>): Record<ThreatKind
     parodiya: decoy || drone,
     kh101: cruise,
     kalibr: cruise,
-    iskander: ballistic,
     ...values,
   };
 }
@@ -320,7 +319,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 95,
     outerAccuracy: 43.7,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 95, cruise: 47.5, ballistic: 95, decoy: 65 }),
+    engagementChanceByThreat: chances({ drone: 95, cruise: 47.5, ballistic: 95, iskander: 88, decoy: 65 }),
     mobility: 1,
     readiness: 76,
     description: "Strategic high-cost battery with the best ballistic interception profile.",
