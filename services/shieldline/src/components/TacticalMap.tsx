@@ -220,7 +220,7 @@ function makeCityIcon(city: City) {
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--city-${alert}" aria-hidden="true"></span><b>HP ${hp}%</b></span>`,
+    html: `<span class="city-marker-label city-marker-label--${alert}"><span class="map-marker map-marker--city map-marker--city-${alert}" aria-hidden="true"></span><b>${hp}% 🛡️</b></span>`,
     iconSize: [58, 42],
     iconAnchor: [29, 8],
   });
