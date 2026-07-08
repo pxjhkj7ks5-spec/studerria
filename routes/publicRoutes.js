@@ -42,6 +42,8 @@ function registerPublicRoutes(app, deps) {
   });
 
   app.get('/changelog', (req, res) => res.render('changelog', { layout: false }));
+
+  app.get('/preview', (req, res) => res.render('preview', { layout: false }));
 }
 
 module.exports = {
