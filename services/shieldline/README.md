@@ -5,9 +5,10 @@ Shieldline is a fictional strategic map-defense browser game served inside Stude
 It is intentionally isolated as a sidecar service:
 
 - Vite + React + TypeScript
-- Zustand persisted state in localStorage
-- React-Leaflet map UI
-- no Studerria database or account integration in the MVP
+- Telegram-aware React/PWA command shell with an optional legacy map view (`?legacy=1`)
+- deterministic server-side mission resolution and append-only file-backed event store
+- Daily Defense reports, replay, ranked projection and async co-op command-room APIs
+- a server-issued guest session cookie is used for local/standalone identity; trusted Telegram identity and bot delivery stay disabled until a server-side `initData` validator and notification worker are connected
 
 ## Local development
 
@@ -26,4 +27,4 @@ npm run build
 npm start
 ```
 
-The production server serves `dist` on port `8080` and falls back to `index.html` for `/shieldline/*` refreshes.
+The production server serves `dist` on port `8080`, falls back to `index.html` for `/shieldline/*` refreshes, and stores the game event stream in `SHIELDLINE_GAME_STORE_FILE` (default `/data/game-store.json`). The `shieldline_control_data` Docker volume persists that state.

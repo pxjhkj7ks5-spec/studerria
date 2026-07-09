@@ -1,7 +1,9 @@
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
+import { createGameStore, dayKey } from "./serverGame.mjs";
 
 const port = Number(process.env.PORT || 8080);
 const basePath = normalizeBasePath(process.env.SHIELDLINE_BASE_PATH || "/shieldline");
@@ -9,6 +11,7 @@ const distDir = resolve("dist");
 const indexPath = join(distDir, "index.html");
 const controlOverlayFile = process.env.SHIELDLINE_CONTROL_OVERLAY_FILE || "/data/control-overlay.json";
 const adminPassword = process.env.SHIELDLINE_ADMIN_PASSWORD || "";
+const gameStore = await createGameStore(process.env.SHIELDLINE_GAME_STORE_FILE || "/data/game-store.json");
 
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -69,6 +72,71 @@ function isControlOverlayApi(pathname) {
 
 function isControlOverlayAuthApi(pathname) {
   return pathname === `${basePath}/api/control-overlay/auth` || (!basePath && pathname === "/api/control-overlay/auth");
+}
+
+function isGameApi(pathname) {
+  const apiBase = `${basePath}/api` || "/api";
+  return pathname === apiBase || pathname.startsWith(`${apiBase}/`);
+}
+
+function gameApiPath(pathname) {
+  const apiBase = `${basePath}/api` || "/api";
+  return pathname.slice(apiBase.length) || "/";
+}
+
+function safeActor(req, res) {
+  const existing = String(req.headers.cookie || "").match(/(?:^|;\s*)shieldline_sid=([a-z0-9_-]{8,64})/i)?.[1];
+  if (existing) return existing;
+  const issued = `guest-${randomUUID().slice(0, 18)}`;
+  res.setHeader("Set-Cookie", `shieldline_sid=${issued}; Path=${basePath || "/"}; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+  return issued;
+}
+
+async function handleGameApi(req, res, pathname) {
+  const path = gameApiPath(pathname);
+  try {
+    if (req.method === "GET" && path === "/daily") {
+      sendJson(res, 200, await gameStore.getDailyReport(new URL(req.url || "/", "http://127.0.0.1").searchParams.get("day") || dayKey()));
+      return;
+    }
+    if (req.method === "GET" && path === "/leaderboard") {
+      sendJson(res, 200, { entries: await gameStore.leaderboard() });
+      return;
+    }
+    if (req.method === "POST" && path === "/missions/run") {
+      const body = await readRequestJson(req);
+      const actorId = safeActor(req, res);
+      const seed = String(body.seed || `${dayKey()}-${actorId}`).replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
+      const run = await gameStore.runMission(seed || dayKey(), actorId);
+      sendJson(res, 201, run);
+      return;
+    }
+    if (req.method === "GET" && path.startsWith("/runs/")) {
+      const run = await gameStore.getRun(path.slice("/runs/".length));
+      if (!run) { sendJson(res, 404, { error: "Run not found." }); return; }
+      sendJson(res, 200, run);
+      return;
+    }
+    if (req.method === "GET" && path.startsWith("/rooms/")) {
+      sendJson(res, 200, await gameStore.getRoom(path.slice("/rooms/".length)));
+      return;
+    }
+    const roomMatch = path.match(/^\/rooms\/([^/]+)\/claim$/);
+    if (req.method === "POST" && roomMatch) {
+      const body = await readRequestJson(req);
+      const sectorId = String(body.sectorId || "");
+      if (!new Set(["north", "south", "east", "west", "hq"]).has(sectorId)) { sendJson(res, 400, { error: "Unknown sector." }); return; }
+      sendJson(res, 200, await gameStore.claimSector(roomMatch[1], sectorId, safeActor(req, res)));
+      return;
+    }
+    if (req.method === "GET" && path === "/notifications/outbox") {
+      sendJson(res, 200, { items: await gameStore.notificationOutbox() });
+      return;
+    }
+    sendJson(res, 404, { error: "Unknown Shieldline game API route." });
+  } catch (error) {
+    sendJson(res, 400, { error: error instanceof Error ? error.message : "Game command could not be processed." });
+  }
 }
 
 function hasAdminAccess(req) {
@@ -170,6 +238,11 @@ createServer(async (req, res) => {
 
   if (isControlOverlayAuthApi(pathname)) {
     handleControlOverlayAuth(req, res);
+    return;
+  }
+
+  if (isGameApi(pathname)) {
+    await handleGameApi(req, res, pathname);
     return;
   }
 

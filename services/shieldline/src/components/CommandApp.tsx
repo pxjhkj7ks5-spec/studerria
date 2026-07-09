@@ -1,11 +1,12 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Activity, ArrowLeft, BarChart3, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Play, Radio, RotateCcw, Shield, ShieldCheck, Swords, Trophy, Users, Waves, Zap } from "lucide-react";
-import { localGameRepository } from "../data/localGameRepository";
+import { apiGameRepository } from "../data/apiGameRepository";
 import { gameModes, getGameMode } from "../data/gameModes";
 import { campaignMissions } from "../data/missions";
-import type { GameModeId, MissionRun, ReplayEvent, SectorId } from "../domain/contracts";
+import { telegramCommandFeedback } from "../platform/telegramShell";
+import type { CoOpRoom, DailyReport, GameModeId, LeaderboardEntry, MissionRun, ReplayEvent, SectorId } from "../domain/contracts";
 
-type Screen = "modes" | "briefing" | "operation" | "report" | "replay";
+type Screen = "modes" | "briefing" | "operation" | "report" | "replay" | "daily" | "ranking" | "coop";
 type Tab = "city" | "operations" | "squad" | "rating" | "reports";
 
 const icons: Record<GameModeId, typeof Shield> = { campaign: Swords, "daily-defense": Home, "ranked-challenge": Trophy, "co-op-command": Users, sandbox: Gamepad2, training: CircleHelp };
@@ -18,6 +19,9 @@ export function CommandApp() {
   const [activeTab, setActiveTab] = useState<Tab>("operations");
   const [replayIndex, setReplayIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+  const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [room, setRoom] = useState<CoOpRoom | null>(null);
   const mission = campaignMissions[0];
   const replayEvent = run?.replay[replayIndex];
 
@@ -38,16 +42,25 @@ export function CommandApp() {
 
   const runMission = async () => {
     setIsRunning(true);
-    // This local async call is the single seam to replace with the authoritative API.
-    const nextRun = await localGameRepository.runMission(mission, `local-${new Date().toISOString().slice(0, 10)}`);
-    setRun(nextRun);
-    setIsRunning(false);
-    setScreen("operation");
-    window.setTimeout(() => setScreen("report"), 1250);
+    try {
+      if (selectedMode === "daily-defense") {
+        const report = await apiGameRepository.getDailyReport(new Date().toISOString().slice(0, 10));
+        const dailyRun = report ? await apiGameRepository.getRun(report.runId) : null;
+        if (report && dailyRun) { setDailyReport(report); setRun(dailyRun); setScreen("daily"); telegramCommandFeedback(); }
+        return;
+      }
+      if (selectedMode === "ranked-challenge") { setLeaderboard(await apiGameRepository.getLeaderboard()); setScreen("ranking"); telegramCommandFeedback(); return; }
+      if (selectedMode === "co-op-command") { setRoom(await apiGameRepository.getCoOpRoom("kyiv-01")); setScreen("coop"); telegramCommandFeedback(); return; }
+      const nextRun = await apiGameRepository.runMission(mission, `${selectedMode}-${new Date().toISOString().slice(0, 10)}`);
+      setRun(nextRun); telegramCommandFeedback(); setScreen("operation"); window.setTimeout(() => setScreen("report"), 1250);
+    } finally { setIsRunning(false); }
   };
 
   if (screen === "modes") return <ModeCatalog onSelect={selectMode} />;
   if (screen === "briefing") return <Briefing modeId={selectedMode} onBack={() => setScreen("modes")} onStart={runMission} isRunning={isRunning} />;
+  if (screen === "ranking") return <CommandFrame onBack={() => setScreen("modes")}><Ranking entries={leaderboard} /></CommandFrame>;
+  if (screen === "coop") return <CommandFrame onBack={() => setScreen("modes")}><Coop room={room} onClaim={async (sectorId) => setRoom(await apiGameRepository.claimCoOpSector("kyiv-01", sectorId))} /></CommandFrame>;
+  if (screen === "daily") return <CommandFrame onBack={() => setScreen("modes")}><DailyDefense report={dailyReport} run={run} onReplay={() => { setReplayIndex(0); setScreen("replay"); }} /></CommandFrame>;
   if (!run) return null;
 
   return (
@@ -95,26 +108,31 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
 function Briefing({ modeId, onBack, onStart, isRunning }: { modeId: GameModeId; onBack: () => void; onStart: () => void; isRunning: boolean }) {
   const mode = getGameMode(modeId);
   const mission = campaignMissions[0];
-  const launchable = modeId === "campaign";
   return <main className="command-app" aria-label="Mission briefing">
     <header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back"><ArrowLeft size={20} /></button><div className="command-brand"><ShieldCheck size={22} /><span>Mission briefing</span><small>{mode.title}</small></div></header>
     <section className="briefing-screen">
       <span className="hero-chip"><Waves size={14} /> {mission.subtitle}</span>
-      <h1>{launchable ? mission.title : mode.title}</h1>
-      <p className="briefing-lead">{launchable ? mission.briefing : "The game contract and mobile shell are ready for this mode. Its shared or scheduled server workflow will attach to the same event stream after Campaign validation."}</p>
+      <h1>{modeId === "campaign" ? mission.title : mode.title}</h1>
+      <p className="briefing-lead">{modeId === "campaign" ? mission.briefing : mode.description}</p>
       <section className="briefing-sector-map" aria-label="City sector map">
         <span className="sector sector--north">North <b>72%</b></span><span className="sector sector--west">West <b>74%</b></span><span className="sector sector--hq">HQ <Shield size={18} /></span><span className="sector sector--east sector--risk">East <b>68%</b></span><span className="sector sector--south">South <b>61%</b></span>
         <i className="route route--east" /><i className="route route--north" /><i className="route route--south" />
       </section>
       <section className="briefing-facts"><Fact label="Duration" value={`${mission.durationMinutes} min at x${mission.simulationSpeed}`} /><Fact label="Difficulty" value={mission.difficulty} /><Fact label="Main risk" value={mission.mainRisk} /><Fact label="Win condition" value={mission.victoryCondition} /></section>
       <section className="reserve-bar"><span>Reserve</span><b>Ammo {mission.resources.ammo}</b><b>Morale {mission.resources.morale}%</b><b>Energy {mission.resources.energy}%</b></section>
-      <button className="primary-command" type="button" onClick={launchable ? onStart : onBack} disabled={isRunning}><Play size={19} />{isRunning ? "Running server-equivalent simulation…" : launchable ? "Begin night operation" : "Return to command modes"}</button>
-      <small className="briefing-note">Local prototype uses a deterministic seed and append-only events. In production the same command resolves server-side.</small>
+      <button className="primary-command" type="button" onClick={onStart} disabled={isRunning}><Play size={19} />{isRunning ? "Synchronizing command…" : modeId === "daily-defense" ? "Open daily report" : modeId === "ranked-challenge" ? "View shared ranking" : modeId === "co-op-command" ? "Open command room" : "Begin night operation"}</button>
+      <small className="briefing-note">Commands resolve through the Shieldline API when available; standalone development keeps a deterministic local fallback.</small>
     </section>
   </main>;
 }
 
 function OperationLoading() { return <section className="operation-loading"><div className="scan-ring"><Radio size={38} /></div><h1>Night simulation resolved</h1><p>Building after-action report from the immutable event stream.</p></section>; }
+
+function CommandFrame({ onBack, children }: { onBack: () => void; children: ReactNode }) { return <main className="command-app" aria-label="Shieldline command center"><header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back to modes"><ArrowLeft size={20} /></button><div className="command-brand"><ShieldCheck size={22} /><span>Shieldline</span><small>City 01 · command view</small></div></header><section className="command-content">{children}</section><BottomNav active="operations" onChange={() => undefined} /></main>; }
+
+function DailyDefense({ report, run, onReplay }: { report: DailyReport | null; run: MissionRun | null; onReplay: () => void }) { return <section className="report-screen" aria-label="Daily defense report"><span className="hero-chip"><Home size={14} /> Daily Defense · city persists</span><h1>Morning report</h1><p>{report?.summary || "The daily command report is being prepared."} Your repair and doctrine decisions are ready for the next night.</p>{run ? <><SectorMap summary={run.sectorSummary} /><section className="recommendation"><Flag size={19} /><div><strong>Daily command</strong><span>{report?.recommendedAction}</span></div></section><button className="primary-command" type="button" onClick={onReplay}><Play size={19} /> Review nightly replay</button></> : null}</section>; }
+function Ranking({ entries }: { entries: LeaderboardEntry[] }) { return <section className="report-screen ranking-screen" aria-label="Ranked challenge leaderboard"><span className="hero-chip"><Trophy size={14} /> Ranked Challenge · shared results</span><h1>Daily ranking</h1><p>Each run is scored from its server-side event stream. Cosmetic and convenience features never change combat power.</p><ol>{entries.length ? entries.map((entry) => <li key={`${entry.userId}-${entry.rank}`}><b>#{entry.rank}</b><span>{entry.displayName}</span><em>{entry.result}</em><strong>{entry.score}</strong></li>) : <li><span>No completed ranked runs yet.</span></li>}</ol></section>; }
+function Coop({ room, onClaim }: { room: CoOpRoom | null; onClaim: (sectorId: SectorId) => void }) { const sectors: SectorId[] = ["north", "south", "east", "west"]; return <section className="report-screen coop-screen" aria-label="Async co-op command room"><span className="hero-chip"><Users size={14} /> Co-op Command · async room</span><h1>Kyiv-01</h1><p>Claim one sector. Every claim writes an auditable command event and increments the room revision.</p><div className="coop-grid">{sectors.map((sector) => <button key={sector} type="button" onClick={() => onClaim(sector)} disabled={Boolean(room?.sectorAssignments[sector])}><span>{sector}</span><b>{room?.sectorAssignments[sector] || "Claim sector"}</b></button>)}</div><section className="recommendation"><Command size={19} /><div><strong>HQ feed · revision {room?.revision || 0}</strong><span>{room?.commandLog.at(-1)?.message || "Awaiting sector commands."}</span></div></section></section>; }
 
 function AfterAction({ run, onReplay }: { run: MissionRun; onReplay: () => void }) {
   const title = run.result === "victory" ? "Night held" : run.result === "contained" ? "Pressure contained" : "Defense setback";

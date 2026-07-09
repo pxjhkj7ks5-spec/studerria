@@ -344,6 +344,7 @@ services:
       SHIELDLINE_BASE_PATH: /shieldline
       SHIELDLINE_ADMIN_PASSWORD: ${SHIELDLINE_ADMIN_PASSWORD:-change-me-shieldline-admin}
       SHIELDLINE_CONTROL_OVERLAY_FILE: ${SHIELDLINE_CONTROL_OVERLAY_FILE:-/data/control-overlay.json}
+      SHIELDLINE_GAME_STORE_FILE: ${SHIELDLINE_GAME_STORE_FILE:-/data/game-store.json}
     volumes:
       - shieldline_control_data:/data
     read_only: true

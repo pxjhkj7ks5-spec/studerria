@@ -140,3 +140,9 @@ export interface SimulationRepository {
   getDailyReport(dayKey: string): Promise<DailyReport | null>;
   getLeaderboard(): Promise<LeaderboardEntry[]>;
 }
+
+export interface CommandRepository extends SimulationRepository {
+  getRun(runId: string): Promise<MissionRun | null>;
+  getCoOpRoom(roomId: string): Promise<CoOpRoom>;
+  claimCoOpSector(roomId: string, sectorId: SectorId): Promise<CoOpRoom>;
+}

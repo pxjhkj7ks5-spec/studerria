@@ -4,6 +4,7 @@ type TelegramWebApp = {
   themeParams?: Record<string, string>;
   viewportStableHeight?: number;
   onEvent?: (event: string, callback: () => void) => void;
+  HapticFeedback?: { notificationOccurred?: (type: "success" | "error" | "warning") => void };
 };
 
 declare global { interface Window { Telegram?: { WebApp?: TelegramWebApp } } }
@@ -22,4 +23,8 @@ export function initializeTelegramShell() {
   sync();
   app.onEvent?.("viewportChanged", sync);
   app.onEvent?.("themeChanged", sync);
+}
+
+export function telegramCommandFeedback(result: "success" | "error" | "warning" = "success") {
+  window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.(result);
 }
