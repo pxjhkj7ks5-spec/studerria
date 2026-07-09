@@ -36,6 +36,13 @@ const threatLabels: Array<{ kind: ThreatKind; label: string }> = [
 
 const SIMULATION_TICK_MS = 300;
 
+function coOpSectorForCity(cityId: string) {
+  if (["chernihiv", "sumy", "kyiv", "zhytomyr", "rivne", "lutsk"].includes(cityId)) return "north";
+  if (["kharkiv", "dnipro", "zaporizhzhia", "poltava", "kryvyi-rih"].includes(cityId)) return "east";
+  if (["odesa", "mykolaiv", "kropyvnytskyi", "cherkasy"].includes(cityId)) return "south";
+  return "west";
+}
+
 type ActivePanel = "layers" | "units" | "planning" | "intel" | "report" | "settings";
 
 const panelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }> = [
@@ -97,6 +104,7 @@ export default function App() {
   const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
   const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
   const rankedSubmissionRef = useRef<string | null>(null);
+  const coOpSyncedBatteryIds = useRef(new Set<string>());
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
   const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
@@ -105,6 +113,10 @@ export default function App() {
   const accumulatorRef = useRef(0);
   const revealedThreats = game.liveThreats.filter((threat) => threat.revealed).length;
   const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+  const coOpSession = (() => {
+    if (typeof window === "undefined" || tacticalMode !== "co-op-command") return null;
+    try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
+  })();
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
     url.search = "";
@@ -146,6 +158,19 @@ export default function App() {
       rankedSubmissionRef.current = null;
     });
   }, [game.batteries, game.latestReportId, tacticalMode]);
+
+  useEffect(() => {
+    if (tacticalMode !== "co-op-command" || !coOpSession) return;
+    for (const battery of game.batteries) {
+      if (coOpSyncedBatteryIds.current.has(battery.id)) continue;
+      const sectorId = coOpSectorForCity(battery.assignedCityId);
+      if (sectorId !== coOpSession.sectorId) continue;
+      coOpSyncedBatteryIds.current.add(battery.id);
+      void apiGameRepository.sendCoOpCommand(coOpSession.roomId, sectorId as "north" | "south" | "east" | "west", { type: "asset.place", payload: { batteryId: battery.id, kind: battery.kind, cityId: battery.assignedCityId, readiness: Math.round(battery.readiness) } }).catch(() => {
+        coOpSyncedBatteryIds.current.delete(battery.id);
+      });
+    }
+  }, [coOpSession, game.batteries, tacticalMode]);
 
   if (!campaignMode && pendingCampaignMode) {
     return <ScenarioSelection onSelect={selectScenario} onBack={clearScenarioSelection} />;
@@ -191,7 +216,7 @@ export default function App() {
             <Shield size={22} />
             <div>
               <h1>Shieldline</h1>
-              <span>{tacticalMode === "daily-defense" ? "Daily Defense · city planning" : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
+              <span>{tacticalMode === "daily-defense" ? "Daily Defense · city planning" : tacticalMode === "co-op-command" && coOpSession ? `Co-op Command · ${coOpSession.sectorId} sector` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
             </div>
           </div>
           <ResourceBar game={game} />

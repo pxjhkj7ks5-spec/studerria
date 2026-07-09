@@ -156,6 +156,7 @@ export interface CoOpRoom {
   sectorAssignments: Partial<Record<SectorId, string>>;
   members: Array<{ userId: string; role: SectorId; ready: boolean }>;
   commandLog: SimulationEvent[];
+  viewerId?: string;
 }
 
 export interface SimulationRepository {
@@ -170,4 +171,5 @@ export interface CommandRepository extends SimulationRepository {
   claimCoOpSector(roomId: string, sectorId: SectorId): Promise<CoOpRoom>;
   getRankedChallenge(dayKey?: string): Promise<RankedChallenge>;
   submitRankedChallenge(challengeId: string, plan: DailyDefensePlan): Promise<RankedResult>;
+  sendCoOpCommand(roomId: string, sectorId: SectorId, command: { type: string; payload: Record<string, string | number> }): Promise<CoOpRoom>;
 }

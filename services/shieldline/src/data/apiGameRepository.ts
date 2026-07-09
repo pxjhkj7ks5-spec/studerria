@@ -38,4 +38,7 @@ export const apiGameRepository: CommandRepository = {
   async submitRankedChallenge(challengeId: string, plan: DailyDefensePlan): Promise<RankedResult> {
     return request<RankedResult>("/ranked/submit", { method: "POST", body: JSON.stringify({ challengeId, plan }) });
   },
+  async sendCoOpCommand(roomId: string, sectorId: SectorId, command: { type: string; payload: Record<string, string | number> }): Promise<CoOpRoom> {
+    return request<CoOpRoom>(`/rooms/${encodeURIComponent(roomId)}/commands`, { method: "POST", body: JSON.stringify({ sectorId, ...command }) });
+  },
 };

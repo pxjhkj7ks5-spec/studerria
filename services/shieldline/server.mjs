@@ -136,7 +136,8 @@ async function handleGameApi(req, res, pathname) {
       return;
     }
     if (req.method === "GET" && path.startsWith("/rooms/")) {
-      sendJson(res, 200, await gameStore.getRoom(path.slice("/rooms/".length)));
+      const viewerId = safeActor(req, res);
+      sendJson(res, 200, { ...(await gameStore.getRoom(path.slice("/rooms/".length))), viewerId });
       return;
     }
     const roomMatch = path.match(/^\/rooms\/([^/]+)\/claim$/);
@@ -144,7 +145,17 @@ async function handleGameApi(req, res, pathname) {
       const body = await readRequestJson(req);
       const sectorId = String(body.sectorId || "");
       if (!new Set(["north", "south", "east", "west", "hq"]).has(sectorId)) { sendJson(res, 400, { error: "Unknown sector." }); return; }
-      sendJson(res, 200, await gameStore.claimSector(roomMatch[1], sectorId, safeActor(req, res)));
+      const viewerId = safeActor(req, res);
+      sendJson(res, 200, { ...(await gameStore.claimSector(roomMatch[1], sectorId, viewerId)), viewerId });
+      return;
+    }
+    const commandMatch = path.match(/^\/rooms\/([^/]+)\/commands$/);
+    if (req.method === "POST" && commandMatch) {
+      const body = await readRequestJson(req);
+      const sectorId = String(body.sectorId || "");
+      if (!new Set(["north", "south", "east", "west"]).has(sectorId)) { sendJson(res, 400, { error: "Unknown sector." }); return; }
+      const viewerId = safeActor(req, res);
+      sendJson(res, 201, { ...(await gameStore.appendRoomCommand(commandMatch[1], viewerId, sectorId, String(body.type || "unknown"), body.payload)), viewerId });
       return;
     }
     if (req.method === "GET" && path === "/notifications/outbox") {

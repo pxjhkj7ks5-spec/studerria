@@ -84,6 +84,13 @@ function normalizeDailyPlan(input = {}) {
   return { assetCount, radarCount, kineticCount, averageReadiness, assets };
 }
 
+function coOpSectorForCity(cityId) {
+  if (["chernihiv", "sumy", "kyiv", "zhytomyr", "rivne", "lutsk"].includes(cityId)) return "north";
+  if (["kharkiv", "dnipro", "zaporizhzhia", "poltava", "kryvyi-rih"].includes(cityId)) return "east";
+  if (["odesa", "mykolaiv", "kropyvnytskyi", "cherkasy"].includes(cityId)) return "south";
+  return "west";
+}
+
 export async function createGameStore(file) {
   async function readStore() {
     if (!existsSync(file)) return structuredClone(DEFAULT_STORE);
@@ -166,6 +173,18 @@ export async function createGameStore(file) {
       const command = event(`room-${roomId}`, sequence, "mission.started", Date.now(), `${actorId} claimed ${sectorId}.`, { sectorId, payload: { command: "sector.claim", actorId } });
       room.sectorAssignments[sectorId] = actorId;
       room.members = room.members.filter((member) => member.userId !== actorId).concat({ userId: actorId, role: sectorId, ready: true });
+      room.commandLog.push(command); room.revision += 1; store.rooms[roomId] = room; store.events.push(command); await save(store);
+      return room;
+    },
+    async appendRoomCommand(roomId, actorId, sectorId, type, payload = {}) {
+      const store = await readStore();
+      const room = store.rooms[roomId];
+      if (!room) throw new Error("Co-op room not found.");
+      const member = room.members.find((item) => item.userId === actorId);
+      if (!member || member.role !== sectorId) throw new Error("Claim this sector before issuing a command.");
+      if (type === "asset.place" && coOpSectorForCity(String(payload.cityId || "")) !== sectorId) throw new Error("This asset is outside your assigned sector.");
+      const sequence = room.commandLog.length + 1;
+      const command = event(`room-${roomId}`, sequence, "mission.started", Date.now(), `${actorId} issued ${type} in ${sectorId}.`, { sectorId, payload: { command: type, actorId, ...payload } });
       room.commandLog.push(command); room.revision += 1; store.rooms[roomId] = room; store.events.push(command); await save(store);
       return room;
     },
