@@ -96,7 +96,8 @@ async function handleGameApi(req, res, pathname) {
   const path = gameApiPath(pathname);
   try {
     if (req.method === "GET" && path === "/daily") {
-      sendJson(res, 200, await gameStore.getDailyReport(new URL(req.url || "/", "http://127.0.0.1").searchParams.get("day") || dayKey()));
+      const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
+      sendJson(res, 200, await gameStore.getDailyReport(query.get("day") || dayKey(), { assetCount: Math.max(0, Math.min(32, Number(query.get("assets") || 0))) }));
       return;
     }
     if (req.method === "GET" && path === "/leaderboard") {

@@ -5,7 +5,7 @@ import type { Coordinates, Resources, ThreatKind, UnitKind } from "../types/game
  * these shapes today; the server-side command/event store can replace them without
  * changing the game shell.
  */
-export type GameModeId = "campaign" | "daily-defense" | "ranked-challenge" | "co-op-command" | "sandbox" | "training";
+export type GameModeId = "campaign" | "rapid-response" | "ranked-challenge" | "co-op-command" | "sandbox" | "training" | "daily-defense";
 export type SectorId = "north" | "south" | "east" | "west" | "hq";
 export type SimulationEventType = "mission.started" | "wave.detected" | "interception" | "impact" | "mission.completed";
 
@@ -116,6 +116,8 @@ export interface DailyReport {
   recommendedAction: string;
 }
 
+export interface DailyDefensePlan { assetCount: number; }
+
 export interface LeaderboardEntry {
   rank: number;
   userId: string;
@@ -137,7 +139,7 @@ export interface CoOpRoom {
 
 export interface SimulationRepository {
   runMission(mission: MissionDefinition, seed: string): Promise<MissionRun>;
-  getDailyReport(dayKey: string): Promise<DailyReport | null>;
+  getDailyReport(dayKey: string, plan?: DailyDefensePlan): Promise<DailyReport | null>;
   getLeaderboard(): Promise<LeaderboardEntry[]>;
 }
 

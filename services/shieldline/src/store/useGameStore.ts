@@ -4,6 +4,7 @@ import { placeBattery, removeBattery, setBatteryMaintenance, tickSimulation } fr
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { togglePlanningAction } from "../game/planningActions";
 import type { CampaignMode, Coordinates, GameState, MapMode, PlanningActionId, UnitKind } from "../types/game";
+import type { GameModeId } from "../domain/contracts";
 
 const tutorialKey = "shieldline-tutorial-complete-v1";
 
@@ -15,12 +16,15 @@ function readTutorialDismissed() {
 interface GameStore {
   game: GameState;
   campaignMode: CampaignMode | null;
+  activeGameMode: GameModeId | null;
+  dailyCityGame: GameState | null;
   pendingCampaignMode: CampaignMode | null;
   mapMode: MapMode;
   tutorialDismissed: boolean;
   selectedBatteryId: string | null;
   placementKind: UnitKind | null;
   selectCampaignMode: (mode: CampaignMode) => void;
+  launchTacticalMode: (mode: GameModeId) => void;
   selectScenario: (scenarioId: string) => void;
   clearScenarioSelection: () => void;
   returnToModeSelect: () => void;
@@ -42,6 +46,8 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       game: createInitialState(),
       campaignMode: null,
+      activeGameMode: null,
+      dailyCityGame: null,
       pendingCampaignMode: null,
       mapMode: "live",
       tutorialDismissed: readTutorialDismissed(),
@@ -50,6 +56,30 @@ export const useGameStore = create<GameStore>()(
       selectCampaignMode: (mode) => set({
         pendingCampaignMode: mode,
       }),
+      launchTacticalMode: (mode) => {
+        if (mode === "daily-defense") {
+          const dailyGame = get().dailyCityGame || createScenarioState(Math.random, "crisis", "thirty-days-under-pressure");
+          set({ campaignMode: "crisis", activeGameMode: mode, pendingCampaignMode: null, mapMode: "live", game: dailyGame, selectedBatteryId: null, placementKind: null });
+          return;
+        }
+        const profile = {
+          campaign: { campaignMode: "crisis" as const, scenarioId: "thirty-days-under-pressure" },
+          "rapid-response": { campaignMode: "seven-day" as const, scenarioId: "grid-pressure" },
+          "ranked-challenge": { campaignMode: "crisis" as const, scenarioId: "grid-pressure" },
+          "co-op-command": { campaignMode: "crisis" as const, scenarioId: "thirty-days-under-pressure" },
+          sandbox: { campaignMode: "sandbox" as const, scenarioId: "decoy-storm" },
+          training: { campaignMode: "training" as const, scenarioId: "first-night" },
+        }[mode];
+        set({
+          campaignMode: profile.campaignMode,
+          activeGameMode: mode,
+          pendingCampaignMode: null,
+          mapMode: "live",
+          game: createScenarioState(Math.random, profile.campaignMode, profile.scenarioId),
+          selectedBatteryId: null,
+          placementKind: null,
+        });
+      },
       selectScenario: (scenarioId) => {
         const mode = get().pendingCampaignMode || "crisis";
         set({
@@ -62,7 +92,7 @@ export const useGameStore = create<GameStore>()(
         });
       },
       clearScenarioSelection: () => set({ pendingCampaignMode: null }),
-      returnToModeSelect: () => set({ campaignMode: null, pendingCampaignMode: null, placementKind: null, selectedBatteryId: null }),
+      returnToModeSelect: () => set({ campaignMode: null, activeGameMode: null, pendingCampaignMode: null, placementKind: null, selectedBatteryId: null }),
       setMapMode: (mode) => set({ mapMode: mode }),
       dismissTutorial: () => {
         if (typeof window !== "undefined") {
@@ -77,25 +107,26 @@ export const useGameStore = create<GameStore>()(
         const { game, placementKind } = get();
         if (!placementKind) return;
         const nextGame = placeBattery(game, placementKind, position);
-        set({ game: nextGame, placementKind: nextGame.placementWarning ? placementKind : null });
+        set({ game: nextGame, dailyCityGame: get().activeGameMode === "daily-defense" ? nextGame : get().dailyCityGame, placementKind: nextGame.placementWarning ? placementKind : null });
       },
       removeSelectedBattery: () => {
         const { game, selectedBatteryId } = get();
         if (!selectedBatteryId) return;
-        set({ game: removeBattery(game, selectedBatteryId), selectedBatteryId: null });
+        const nextGame = removeBattery(game, selectedBatteryId);
+        set({ game: nextGame, dailyCityGame: get().activeGameMode === "daily-defense" ? nextGame : get().dailyCityGame, selectedBatteryId: null });
       },
       startSelectedBatteryMaintenance: () => {
         const { game, selectedBatteryId } = get();
         if (!selectedBatteryId) return;
-        set({ game: setBatteryMaintenance(game, selectedBatteryId) });
+        const nextGame = setBatteryMaintenance(game, selectedBatteryId);
+        set({ game: nextGame, dailyCityGame: get().activeGameMode === "daily-defense" ? nextGame : get().dailyCityGame });
       },
-      togglePlanningAction: (actionId) => set((state) => ({ game: togglePlanningAction(state.game, actionId) })),
+      togglePlanningAction: (actionId) => set((state) => { const game = togglePlanningAction(state.game, actionId); return { game, dailyCityGame: state.activeGameMode === "daily-defense" ? game : state.dailyCityGame }; }),
       tick: (deltaMs) => set((state) => ({ game: tickSimulation(state.game, deltaMs) })),
-      resetCampaign: () => set({
-        game: createScenarioState(Math.random, get().campaignMode || "crisis", get().game.scenarioId),
-        selectedBatteryId: null,
-        placementKind: null,
-      }),
+      resetCampaign: () => {
+        const game = createScenarioState(Math.random, get().campaignMode || "crisis", get().game.scenarioId);
+        set({ game, dailyCityGame: get().activeGameMode === "daily-defense" ? game : get().dailyCityGame, selectedBatteryId: null, placementKind: null });
+      },
     }),
     {
       name: "shieldline-live-v7",
@@ -103,6 +134,8 @@ export const useGameStore = create<GameStore>()(
       partialize: (state) => ({
         game: state.game,
         campaignMode: state.campaignMode,
+        activeGameMode: state.activeGameMode,
+        dailyCityGame: state.dailyCityGame,
         pendingCampaignMode: state.pendingCampaignMode,
         mapMode: state.mapMode,
         selectedBatteryId: state.selectedBatteryId,

@@ -100,9 +100,15 @@ export default function App() {
   const lastTickRef = useRef<number | null>(null);
   const accumulatorRef = useRef(0);
   const revealedThreats = game.liveThreats.filter((threat) => threat.revealed).length;
+  const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+  const returnToCommandModes = () => {
+    const url = new URL(window.location.href);
+    url.search = "";
+    window.location.assign(url.toString());
+  };
 
   useEffect(() => {
-    if (!campaignMode) return undefined;
+    if (!campaignMode || tacticalMode === "daily-defense") return undefined;
     let frameId = 0;
     const frame = (timestamp: number) => {
       if (lastTickRef.current === null) {
@@ -132,7 +138,7 @@ export default function App() {
   return (
     <main className={`shell shell--map-first ${activePanel ? "shell--drawer-open" : "shell--drawer-closed"}`} aria-label="Shieldline real-time defense simulation">
       <nav className="app-rail" aria-label="Shieldline panels">
-        <button className="rail-button rail-button--menu" type="button" aria-label="Back to scenario selection" onClick={returnToModeSelect}>
+        <button className="rail-button rail-button--menu" type="button" aria-label="Back to command modes" onClick={returnToCommandModes}>
           <Menu size={24} />
         </button>
         <div className="rail-brand" aria-hidden="true">
@@ -165,7 +171,7 @@ export default function App() {
             <Shield size={22} />
             <div>
               <h1>Shieldline</h1>
-              <span>{scenario.title} · {modeDefinition?.title || "Live defense"} · {game.cyclePhase}</span>
+              <span>{tacticalMode === "daily-defense" ? "Daily Defense · city planning" : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
             </div>
           </div>
           <ResourceBar game={game} />
@@ -252,7 +258,7 @@ export default function App() {
                 <RotateCcw size={16} />
                 Reset Campaign
               </button>
-              <button className="reset-button reset-button--secondary" type="button" onClick={returnToModeSelect}>
+              <button className="reset-button reset-button--secondary" type="button" onClick={returnToCommandModes}>
                 <Menu size={16} />
                 Change Scenario
               </button>

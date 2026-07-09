@@ -1,7 +1,7 @@
 import { localGameRepository } from "./localGameRepository";
 import { campaignMissions } from "./missions";
 import { runDeterministicMission } from "../game/deterministicMission";
-import type { CoOpRoom, CommandRepository, DailyReport, LeaderboardEntry, MissionDefinition, MissionRun, SectorId } from "../domain/contracts";
+import type { CoOpRoom, CommandRepository, DailyDefensePlan, DailyReport, LeaderboardEntry, MissionDefinition, MissionRun, SectorId } from "../domain/contracts";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${import.meta.env.BASE_URL}api${path}`, {
@@ -18,8 +18,8 @@ export const apiGameRepository: CommandRepository = {
     try { return await request<MissionRun>("/missions/run", { method: "POST", body: JSON.stringify({ missionId: mission.id, seed }) }); }
     catch { return localGameRepository.runMission(mission, seed); }
   },
-  async getDailyReport(dayKey: string): Promise<DailyReport | null> {
-    try { return (await request<{ report: DailyReport }>(`/daily?day=${encodeURIComponent(dayKey)}`)).report; }
+  async getDailyReport(dayKey: string, plan?: DailyDefensePlan): Promise<DailyReport | null> {
+    try { return (await request<{ report: DailyReport }>(`/daily?day=${encodeURIComponent(dayKey)}&assets=${Math.max(0, plan?.assetCount || 0)}`)).report; }
     catch { return localGameRepository.getDailyReport(dayKey); }
   },
   async getLeaderboard(): Promise<LeaderboardEntry[]> {

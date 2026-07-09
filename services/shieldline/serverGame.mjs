@@ -29,7 +29,7 @@ function event(runId, sequence, type, occurredAtMs, message, extras = {}) {
   return { id: `${runId}-evt-${sequence}`, runId, sequence, type, occurredAtMs, message, payload: {}, ...extras };
 }
 
-export function simulateMission(seed, now = new Date().toISOString()) {
+export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0) {
   const random = seededRandom(`${mission.id}:${seed}:v1`);
   const runId = `run-${mission.id}-${seed.slice(0, 24).replace(/[^a-z0-9-]/gi, "-")}`;
   const events = [event(runId, 1, "mission.started", 0, "Mission command accepted; authoritative simulation started.", { payload: { seed } })];
@@ -43,7 +43,7 @@ export function simulateMission(seed, now = new Date().toISOString()) {
     const detectedAt = Math.max(500, wave.etaSeconds * 500);
     const detected = event(runId, sequence++, "wave.detected", detectedAt, `${wave.size} tracks detected toward the ${wave.targetSector} sector.`, { sectorId: wave.targetSector, waveId: wave.id, payload: { tracks: wave.size, difficulty: wave.difficulty } });
     events.push(detected); replay.push({ ...detected, replayAtMs: detectedAt, route: { from: wave.originSector, to: wave.targetSector } });
-    const coverage = 0.38 + random() * 0.42;
+    const coverage = Math.min(0.9, 0.38 + random() * 0.42 + defenseBonus);
     const success = Math.max(0, Math.min(wave.size, Math.round(wave.size * coverage - wave.difficulty / 140 + random() * 1.8)));
     const missed = wave.size - success;
     interceptions += success; impacts += missed; ammoSpent += success * (wave.threatKind === "kh101" ? 3 : 1);
@@ -88,13 +88,14 @@ export async function createGameStore(file) {
   return {
     async runMission(seed, actorId = "web-commander") { return persistRun(simulateMission(seed), { source: "command", actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId }); },
     async getRun(runId) { return (await readStore()).runs[runId] || null; },
-    async getDailyReport(key = dayKey()) {
+    async getDailyReport(key = dayKey(), plan = {}) {
       const store = await readStore();
       if (store.dailyReports[key]) return { report: store.dailyReports[key], run: store.runs[store.dailyReports[key].runId] };
-      const run = simulateMission(`daily-${key}`);
-      store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key } };
+      const defenseBonus = Math.min(0.18, Math.max(0, Number(plan.assetCount || 0)) * 0.025);
+      const run = simulateMission(`daily-${key}-assets-${Number(plan.assetCount || 0)}`, new Date().toISOString(), defenseBonus);
+      store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key, assetCount: Number(plan.assetCount || 0), defenseBonus } };
       store.events.push(...run.events);
-      const report = { id: `daily-${key}`, cityId: "city-01", dayKey: key, runId: run.id, summary: `${run.interceptions} interceptions, ${run.impacts} impacts.`, replayId: run.id, recommendedAction: run.impacts ? "Reinforce the east sector before the next night." : "Use the stable night to recover readiness." };
+      const report = { id: `daily-${key}`, cityId: "city-01", dayKey: key, runId: run.id, summary: `${run.interceptions} interceptions, ${run.impacts} impacts from ${Number(plan.assetCount || 0)} prepared defense asset(s).`, replayId: run.id, recommendedAction: run.impacts ? "Reinforce the east sector before the next night." : "Use the stable night to recover readiness." };
       store.dailyReports[key] = report;
       store.notificationOutbox.push({ id: `notice-${key}`, type: "daily.report.ready", createdAt: new Date().toISOString(), payload: { dayKey: key, reportId: report.id } });
       await save(store);

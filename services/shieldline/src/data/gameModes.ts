@@ -19,8 +19,8 @@ export const gameModes: GameModeDefinition[] = [
     description: "A sequence of night operations. Each mission preserves the city state and sharpens the next decision.", mainRisk: "Cascading pressure across sectors", victory: "Protect critical city systems through the operation", availability: "available",
   },
   {
-    id: "daily-defense", eyebrow: "Daily city", title: "Daily Defense", duration: "2-8 min", difficulty: "Daily adaptive", resources: "Repair · supply · readiness",
-    description: "One persistent city, one resolved night. Review the report, adjust its sectors, then prepare tomorrow.", mainRisk: "Slow infrastructure attrition", victory: "Keep morale and essential systems stable", availability: "preview",
+    id: "rapid-response", eyebrow: "Manual operation", title: "Rapid Response", duration: "15-30 min", difficulty: "Standard", resources: "Ready assets · reserve",
+    description: "A self-contained manual operation for testing a defense plan under immediate pressure, without seasonal ranking.", mainRisk: "Compressed decision window", victory: "Contain the incoming wave with your deployed assets", availability: "available",
   },
   {
     id: "ranked-challenge", eyebrow: "Shared seed", title: "Ranked Challenge", duration: "8-15 min", difficulty: "Fixed scenario", resources: "Equal loadout", description: "Everyone receives the same daily or weekly scenario. Score comes from outcomes, not purchases.", mainRisk: "No room for brute force", victory: "Earn the best score from the same seed", availability: "preview",
@@ -33,6 +33,10 @@ export const gameModes: GameModeDefinition[] = [
   },
   {
     id: "training", eyebrow: "Guided", title: "Training", duration: "10 min", difficulty: "Guided", resources: "Protected reserve", description: "A short guided operation that explains sectors, readiness, reports and replay without punishment.", mainRisk: "Low", victory: "Complete the command checklist", availability: "preview",
+  },
+  {
+    id: "daily-defense", eyebrow: "Mode 7 · Daily farm", title: "Daily Defense", duration: "2-8 min", difficulty: "Daily adaptive", resources: "Repair · supply · readiness",
+    description: "One persistent city. After you place and improve defense assets, one server-side night is resolved per day; then you review the report and return to planning.", mainRisk: "Slow infrastructure attrition", victory: "Keep morale and essential systems stable", availability: "preview",
   },
 ];
 
