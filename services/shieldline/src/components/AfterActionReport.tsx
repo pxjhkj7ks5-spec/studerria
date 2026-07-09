@@ -1,12 +1,14 @@
 import { ClipboardList } from "lucide-react";
 import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
+import type { RankedResult } from "../domain/contracts";
 
 interface AfterActionReportProps {
   game: GameState;
+  rankedResult?: RankedResult | null;
 }
 
-export function AfterActionReport({ game }: AfterActionReportProps) {
+export function AfterActionReport({ game, rankedResult }: AfterActionReportProps) {
   const report = game.afterActionReports[0];
   const fallbackRecommendation = game.resources.ammo < 25
     ? "Conserve ammo and restore logistics."
@@ -52,6 +54,7 @@ export function AfterActionReport({ game }: AfterActionReportProps) {
             <span>Morale {signed(report.resourceChanges.morale)} · Political {signed(report.resourceChanges.political)}</span>
           </div>
           <p>{report.recommendation}</p>
+          {rankedResult ? <div className="aar-section aar-section--ranked"><strong>Ranked result</strong><span>#{rankedResult.entry.rank} · {rankedResult.entry.score} score · {rankedResult.challenge.title}</span></div> : null}
         </>
       ) : (
         <>

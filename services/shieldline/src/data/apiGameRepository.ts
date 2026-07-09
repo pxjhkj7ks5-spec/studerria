@@ -1,7 +1,7 @@
 import { localGameRepository } from "./localGameRepository";
 import { campaignMissions } from "./missions";
 import { runDeterministicMission } from "../game/deterministicMission";
-import type { CoOpRoom, CommandRepository, DailyDefensePlan, DailyReport, LeaderboardEntry, MissionDefinition, MissionRun, SectorId } from "../domain/contracts";
+import type { CoOpRoom, CommandRepository, DailyDefensePlan, DailyReport, LeaderboardEntry, MissionDefinition, MissionRun, RankedChallenge, RankedResult, SectorId } from "../domain/contracts";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${import.meta.env.BASE_URL}api${path}`, {
@@ -33,5 +33,9 @@ export const apiGameRepository: CommandRepository = {
   async getCoOpRoom(roomId: string): Promise<CoOpRoom> { return request<CoOpRoom>(`/rooms/${encodeURIComponent(roomId)}`); },
   async claimCoOpSector(roomId: string, sectorId: SectorId): Promise<CoOpRoom> {
     return request<CoOpRoom>(`/rooms/${encodeURIComponent(roomId)}/claim`, { method: "POST", body: JSON.stringify({ sectorId }) });
+  },
+  async getRankedChallenge(dayKey?: string): Promise<RankedChallenge> { return request<RankedChallenge>(`/ranked/current${dayKey ? `?day=${encodeURIComponent(dayKey)}` : ""}`); },
+  async submitRankedChallenge(challengeId: string, plan: DailyDefensePlan): Promise<RankedResult> {
+    return request<RankedResult>("/ranked/submit", { method: "POST", body: JSON.stringify({ challengeId, plan }) });
   },
 };

@@ -12,11 +12,13 @@ import { TacticalMap } from "./components/TacticalMap";
 import { TutorialOverlay } from "./components/TutorialOverlay";
 import { UnitRail } from "./components/UnitRail";
 import { CommandApp } from "./components/CommandApp";
+import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { useGameStore } from "./store/useGameStore";
 import type { CampaignStatus, DefenseBattery, MapMode, ThreatKind, UnitDefinition, UnitKind } from "./types/game";
+import type { RankedResult } from "./domain/contracts";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "live", label: "Live" },
@@ -93,6 +95,8 @@ export default function App() {
   const placementKind = useGameStore((state) => state.placementKind);
   const [confirmReset, setConfirmReset] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
+  const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
+  const rankedSubmissionRef = useRef<string | null>(null);
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
   const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
@@ -126,6 +130,22 @@ export default function App() {
     frameId = window.requestAnimationFrame(frame);
     return () => window.cancelAnimationFrame(frameId);
   }, [campaignMode, tick]);
+
+  useEffect(() => {
+    if (tacticalMode !== "ranked-challenge" || !game.latestReportId || rankedSubmissionRef.current === game.latestReportId || !game.batteries.length) return;
+    rankedSubmissionRef.current = game.latestReportId;
+    const assets = game.batteries.map((battery) => ({ kind: battery.kind, cityId: battery.assignedCityId, readiness: battery.readiness }));
+    const plan = {
+      assetCount: assets.length,
+      radarCount: assets.filter((asset) => asset.kind === "radar").length,
+      kineticCount: assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length,
+      averageReadiness: assets.reduce((sum, asset) => sum + asset.readiness, 0) / assets.length,
+      assets,
+    };
+    void apiGameRepository.getRankedChallenge().then((challenge) => apiGameRepository.submitRankedChallenge(challenge.id, plan)).then(setRankedResult).catch(() => {
+      rankedSubmissionRef.current = null;
+    });
+  }, [game.batteries, game.latestReportId, tacticalMode]);
 
   if (!campaignMode && pendingCampaignMode) {
     return <ScenarioSelection onSelect={selectScenario} onBack={clearScenarioSelection} />;
@@ -239,7 +259,7 @@ export default function App() {
           ) : null}
           {activePanel === "report" ? (
             <section className="drawer-section">
-              <AfterActionReport game={game} />
+              <AfterActionReport game={game} rankedResult={rankedResult} />
             </section>
           ) : null}
           {activePanel === "settings" ? (

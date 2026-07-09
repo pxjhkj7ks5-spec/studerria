@@ -110,6 +110,17 @@ async function handleGameApi(req, res, pathname) {
       sendJson(res, 200, { entries: await gameStore.leaderboard() });
       return;
     }
+    if (req.method === "GET" && path === "/ranked/current") {
+      const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
+      const key = /^\d{4}-\d{2}-\d{2}$/.test(String(query.get("day") || "")) ? query.get("day") : dayKey();
+      sendJson(res, 200, gameStore.rankedChallenge(key));
+      return;
+    }
+    if (req.method === "POST" && path === "/ranked/submit") {
+      const body = await readRequestJson(req);
+      sendJson(res, 201, await gameStore.submitRanked(String(body.challengeId || ""), body.plan, safeActor(req, res)));
+      return;
+    }
     if (req.method === "POST" && path === "/missions/run") {
       const body = await readRequestJson(req);
       const actorId = safeActor(req, res);

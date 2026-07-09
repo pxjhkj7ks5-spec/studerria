@@ -133,6 +133,21 @@ export interface LeaderboardEntry {
   updatedAt: string;
 }
 
+export interface RankedChallenge {
+  id: string;
+  dayKey: string;
+  seed: string;
+  title: string;
+  rules: string[];
+}
+
+export interface RankedResult {
+  challengeId: string;
+  challenge: RankedChallenge;
+  run: MissionRun;
+  entry: LeaderboardEntry;
+}
+
 export interface CoOpRoom {
   id: string;
   mode: "async" | "live";
@@ -153,4 +168,6 @@ export interface CommandRepository extends SimulationRepository {
   getRun(runId: string): Promise<MissionRun | null>;
   getCoOpRoom(roomId: string): Promise<CoOpRoom>;
   claimCoOpSector(roomId: string, sectorId: SectorId): Promise<CoOpRoom>;
+  getRankedChallenge(dayKey?: string): Promise<RankedChallenge>;
+  submitRankedChallenge(challengeId: string, plan: DailyDefensePlan): Promise<RankedResult>;
 }

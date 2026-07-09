@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 
-const DEFAULT_STORE = { version: 1, events: [], runs: {}, dailyReports: {}, rooms: {}, notificationOutbox: [] };
+const DEFAULT_STORE = { version: 1, events: [], runs: {}, dailyReports: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [] };
 const mission = {
   id: "campaign-night-01",
   title: "Night 01: Signal Window",
@@ -29,9 +29,15 @@ function event(runId, sequence, type, occurredAtMs, message, extras = {}) {
   return { id: `${runId}-evt-${sequence}`, runId, sequence, type, occurredAtMs, message, payload: {}, ...extras };
 }
 
+function stableHash(value) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+  return (hash >>> 0).toString(36);
+}
+
 export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0) {
   const random = seededRandom(`${mission.id}:${seed}:v1`);
-  const runId = `run-${mission.id}-${seed.slice(0, 24).replace(/[^a-z0-9-]/gi, "-")}`;
+  const runId = `run-${mission.id}-${seed.slice(0, 18).replace(/[^a-z0-9-]/gi, "-")}-${stableHash(seed)}`;
   const events = [event(runId, 1, "mission.started", 0, "Mission command accepted; authoritative simulation started.", { payload: { seed } })];
   const replay = [];
   let sequence = 2;
@@ -118,7 +124,31 @@ export async function createGameStore(file) {
     },
     async leaderboard() {
       const store = await readStore();
-      return Object.values(store.runs).map((run) => ({ userId: run.metadata?.actorId || "anonymous", displayName: run.metadata?.displayName || "Commander", score: Math.max(0, run.interceptions * 100 - run.impacts * 35 - run.ammoSpent), result: run.result, updatedAt: run.completedAt })).sort((left, right) => right.score - left.score).slice(0, 100).map((entry, index) => ({ ...entry, rank: index + 1 }));
+      return Object.values(store.runs).filter((run) => run.metadata?.source === "ranked").map((run) => ({ userId: run.metadata?.actorId || "anonymous", displayName: run.metadata?.displayName || "Commander", score: Math.max(0, run.interceptions * 100 - run.impacts * 35 - run.ammoSpent), result: run.result, updatedAt: run.completedAt })).sort((left, right) => right.score - left.score).slice(0, 100).map((entry, index) => ({ ...entry, rank: index + 1 }));
+    },
+    rankedChallenge(key = dayKey()) {
+      return { id: `ranked-${key}`, dayKey: key, seed: `ranked-${key}-v1`, title: "Daily Equal Command", rules: ["Same seed for every commander.", "Server resolves the submitted defense plan.", "No paid combat modifiers."] };
+    },
+    async submitRanked(challengeId, plan, actorId) {
+      const challenge = this.rankedChallenge(challengeId.replace(/^ranked-/, ""));
+      if (challenge.id !== challengeId) throw new Error("Unknown ranked challenge.");
+      const store = await readStore();
+      const existingRunId = store.rankedSubmissions[challenge.id]?.[actorId];
+      if (existingRunId) {
+        const run = store.runs[existingRunId];
+        const entries = await this.leaderboard();
+        return { challengeId, challenge, run, entry: entries.find((entry) => entry.userId === actorId) || { rank: entries.length + 1, userId: actorId, displayName: actorId, score: 0, result: run.result, updatedAt: run.completedAt } };
+      }
+      const resolvedPlan = normalizeDailyPlan(plan);
+      if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before entering Ranked Challenge.");
+      const defenseBonus = Math.min(0.24, resolvedPlan.assetCount * 0.012 + resolvedPlan.radarCount * 0.018 + resolvedPlan.kineticCount * 0.02 + (resolvedPlan.averageReadiness / 100) * 0.04);
+      const run = simulateMission(`${challenge.seed}-${actorId}`, new Date().toISOString(), defenseBonus);
+      store.runs[run.id] = { ...run, metadata: { source: "ranked", challengeId, actorId, displayName: actorId, plan: resolvedPlan, defenseBonus } };
+      store.events.push(...run.events);
+      store.rankedSubmissions[challenge.id] = { ...(store.rankedSubmissions[challenge.id] || {}), [actorId]: run.id };
+      await save(store);
+      const entries = await this.leaderboard();
+      return { challengeId, challenge, run: store.runs[run.id], entry: entries.find((entry) => entry.userId === actorId) };
     },
     async getRoom(roomId = "kyiv-01") {
       const store = await readStore();
