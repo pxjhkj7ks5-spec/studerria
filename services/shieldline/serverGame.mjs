@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 
-const DEFAULT_STORE = { version: 1, events: [], runs: {}, dailyReports: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [] };
+const DEFAULT_STORE = { version: 1, events: [], runs: {}, dailyReports: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {} };
 const mission = {
   id: "campaign-night-01",
   title: "Night 01: Signal Window",
@@ -189,5 +189,22 @@ export async function createGameStore(file) {
       return room;
     },
     async notificationOutbox() { return (await readStore()).notificationOutbox; },
+    async setNotificationPreference(userId, chatId, enabled) {
+      const store = await readStore();
+      store.notificationPreferences[userId] = { chatId: String(chatId), enabled: Boolean(enabled), updatedAt: new Date().toISOString() };
+      await save(store);
+      return store.notificationPreferences[userId];
+    },
+    async pendingNotificationDeliveries() {
+      const store = await readStore();
+      return store.notificationOutbox.flatMap((item) => Object.entries(store.notificationPreferences).filter(([, preference]) => preference.enabled && !(item.deliveredTo || []).includes(preference.chatId)).map(([, preference]) => ({ item, chatId: preference.chatId })));
+    },
+    async markNotificationDelivered(notificationId, chatId) {
+      const store = await readStore();
+      const item = store.notificationOutbox.find((entry) => entry.id === notificationId);
+      if (!item) return;
+      item.deliveredTo = [...new Set([...(item.deliveredTo || []), String(chatId)])];
+      await save(store);
+    },
   };
 }

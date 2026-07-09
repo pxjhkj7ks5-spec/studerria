@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
@@ -12,6 +12,8 @@ const indexPath = join(distDir, "index.html");
 const controlOverlayFile = process.env.SHIELDLINE_CONTROL_OVERLAY_FILE || "/data/control-overlay.json";
 const adminPassword = process.env.SHIELDLINE_ADMIN_PASSWORD || "";
 const gameStore = await createGameStore(process.env.SHIELDLINE_GAME_STORE_FILE || "/data/game-store.json");
+const telegramBotToken = process.env.SHIELDLINE_TELEGRAM_BOT_TOKEN || "";
+const telegramAuthMaxAgeSeconds = Number(process.env.SHIELDLINE_TELEGRAM_AUTH_MAX_AGE_SECONDS || 86400);
 
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -92,6 +94,37 @@ function safeActor(req, res) {
   return issued;
 }
 
+function issueActorCookie(res, actorId) {
+  res.setHeader("Set-Cookie", `shieldline_sid=${actorId}; Path=${basePath || "/"}; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+}
+
+function validateTelegramInitData(initData) {
+  if (!telegramBotToken) throw new Error("Telegram auth is not configured.");
+  const params = new URLSearchParams(String(initData || ""));
+  const hash = params.get("hash") || "";
+  params.delete("hash");
+  const checkString = [...params.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([key, value]) => `${key}=${value}`).join("\n");
+  const secret = createHmac("sha256", "WebAppData").update(telegramBotToken).digest();
+  const expected = createHmac("sha256", secret).update(checkString).digest("hex");
+  if (!hash || hash.length !== expected.length || !timingSafeEqual(Buffer.from(hash), Buffer.from(expected))) throw new Error("Telegram initData signature is invalid.");
+  const authDate = Number(params.get("auth_date") || 0);
+  if (!authDate || Math.abs(Date.now() / 1000 - authDate) > telegramAuthMaxAgeSeconds) throw new Error("Telegram initData has expired.");
+  const user = JSON.parse(params.get("user") || "{}");
+  if (!Number.isSafeInteger(user.id)) throw new Error("Telegram user is missing.");
+  return user;
+}
+
+async function deliverTelegramNotifications() {
+  if (!telegramBotToken) return;
+  for (const { item, chatId } of await gameStore.pendingNotificationDeliveries()) {
+    const text = item.type === "daily.report.ready" ? "Shieldline: your daily defense report is ready." : "Shieldline: you have a new command update.";
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text }) });
+      if (response.ok) await gameStore.markNotificationDelivered(item.id, chatId);
+    } catch { /* Keep the outbox item for the next worker pass. */ }
+  }
+}
+
 async function handleGameApi(req, res, pathname) {
   const path = gameApiPath(pathname);
   try {
@@ -104,6 +137,20 @@ async function handleGameApi(req, res, pathname) {
       const body = await readRequestJson(req);
       const key = /^\d{4}-\d{2}-\d{2}$/.test(String(body.dayKey || "")) ? body.dayKey : dayKey();
       sendJson(res, 200, await gameStore.getDailyReport(key, body.plan));
+      return;
+    }
+    if (req.method === "POST" && path === "/auth/telegram/init") {
+      const user = validateTelegramInitData((await readRequestJson(req)).initData);
+      const actorId = `tg-${user.id}`;
+      issueActorCookie(res, actorId);
+      sendJson(res, 200, { user: { id: actorId, displayName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "Telegram commander", platform: "telegram" } });
+      return;
+    }
+    if (req.method === "POST" && path === "/notifications/preferences") {
+      const body = await readRequestJson(req);
+      const actorId = safeActor(req, res);
+      if (!actorId.startsWith("tg-")) throw new Error("Telegram authorization is required for bot notifications.");
+      sendJson(res, 200, await gameStore.setNotificationPreference(actorId, actorId.slice(3), body.enabled));
       return;
     }
     if (req.method === "GET" && path === "/leaderboard") {
@@ -291,3 +338,6 @@ createServer(async (req, res) => {
 }).listen(port, "0.0.0.0", () => {
   console.log(`Shieldline listening on 0.0.0.0:${port}${basePath || "/"}`);
 });
+
+const notificationTimer = setInterval(() => { void deliverTelegramNotifications(); }, 30_000);
+notificationTimer.unref();

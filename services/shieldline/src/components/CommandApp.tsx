@@ -3,7 +3,7 @@ import { Activity, ArrowLeft, BarChart3, ChevronRight, CircleHelp, Clock3, Comma
 import { apiGameRepository } from "../data/apiGameRepository";
 import { gameModes, getGameMode } from "../data/gameModes";
 import { campaignMissions } from "../data/missions";
-import { telegramCommandFeedback } from "../platform/telegramShell";
+import { setTelegramNotificationPreference, telegramCommandFeedback } from "../platform/telegramShell";
 import { useGameStore } from "../store/useGameStore";
 import type { CoOpRoom, DailyReport, GameModeId, LeaderboardEntry, MissionRun, ReplayEvent, SectorId } from "../domain/contracts";
 
@@ -112,11 +112,14 @@ export function CommandApp() {
 }
 
 function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
+  const [notificationState, setNotificationState] = useState<"idle" | "enabled" | "unavailable">("idle");
+  const enableNotifications = async () => setNotificationState(await setTelegramNotificationPreference(import.meta.env.BASE_URL, true) ? "enabled" : "unavailable");
   return <main className="command-app command-app--catalog" aria-label="Shieldline mode selection">
     <header className="catalog-hero">
       <span className="hero-chip"><Radio size={14} /> Telegram-first command sim</span>
       <h1>One city. One night.<br /><em>Your command.</em></h1>
       <p>A mobile strategy simulation built for Telegram Mini App, browser and installable PWA. Every outcome is fictional, abstract and replayable.</p>
+      {typeof window !== "undefined" && window.Telegram?.WebApp?.initData ? <button className="telegram-notification-button" type="button" onClick={enableNotifications} disabled={notificationState === "enabled"}>{notificationState === "enabled" ? "Telegram notifications enabled" : notificationState === "unavailable" ? "Telegram authorization unavailable" : "Enable Telegram reports"}</button> : null}
     </header>
     <section className="mode-catalog" aria-label="Game modes">
       {gameModes.map((mode) => {
