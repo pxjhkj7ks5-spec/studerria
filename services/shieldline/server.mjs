@@ -130,13 +130,22 @@ async function handleGameApi(req, res, pathname) {
   try {
     if (req.method === "GET" && path === "/daily") {
       const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
-      sendJson(res, 200, await gameStore.getDailyReport(query.get("day") || dayKey(), { assetCount: Math.max(0, Math.min(32, Number(query.get("assets") || 0))) }));
+      sendJson(res, 200, await gameStore.getDailyReport(query.get("day") || dayKey(), {}, safeActor(req, res)));
       return;
     }
     if (req.method === "POST" && path === "/daily/resolve") {
       const body = await readRequestJson(req);
       const key = /^\d{4}-\d{2}-\d{2}$/.test(String(body.dayKey || "")) ? body.dayKey : dayKey();
-      sendJson(res, 200, await gameStore.getDailyReport(key, body.plan));
+      sendJson(res, 200, await gameStore.getDailyReport(key, body.plan, safeActor(req, res)));
+      return;
+    }
+    if (req.method === "GET" && path === "/daily/city") {
+      sendJson(res, 200, await gameStore.getDailyCity(safeActor(req, res)));
+      return;
+    }
+    if (req.method === "POST" && path === "/daily/city") {
+      const body = await readRequestJson(req);
+      sendJson(res, 200, await gameStore.saveDailyCity(safeActor(req, res), body.plan));
       return;
     }
     if (req.method === "POST" && path === "/auth/telegram/init") {
@@ -172,8 +181,12 @@ async function handleGameApi(req, res, pathname) {
       const body = await readRequestJson(req);
       const actorId = safeActor(req, res);
       const seed = String(body.seed || `${dayKey()}-${actorId}`).replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
-      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan);
+      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan, String(body.missionId || "campaign-night-01"), String(body.source || "campaign"));
       sendJson(res, 201, run);
+      return;
+    }
+    if (req.method === "GET" && path === "/campaign/state") {
+      sendJson(res, 200, await gameStore.campaignState(safeActor(req, res)));
       return;
     }
     if (req.method === "POST" && path === "/campaign/commands") {
@@ -209,6 +222,16 @@ async function handleGameApi(req, res, pathname) {
       if (!new Set(["north", "south", "east", "west"]).has(sectorId)) { sendJson(res, 400, { error: "Unknown sector." }); return; }
       const viewerId = safeActor(req, res);
       sendJson(res, 201, { ...(await gameStore.appendRoomCommand(commandMatch[1], viewerId, sectorId, String(body.type || "unknown"), body.payload)), viewerId });
+      return;
+    }
+    const resolveRoomMatch = path.match(/^\/rooms\/([^/]+)\/resolve$/);
+    if (req.method === "POST" && resolveRoomMatch) {
+      const viewerId = safeActor(req, res);
+      sendJson(res, 201, await gameStore.resolveCoOpRoom(resolveRoomMatch[1], viewerId));
+      return;
+    }
+    if (req.method === "GET" && path === "/telegram/status") {
+      sendJson(res, 200, { configured: Boolean(telegramBotToken), authMaxAgeSeconds: telegramAuthMaxAgeSeconds });
       return;
     }
     if (req.method === "GET" && path === "/notifications/outbox") {

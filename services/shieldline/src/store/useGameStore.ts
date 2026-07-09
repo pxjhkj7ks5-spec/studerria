@@ -1,10 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { initialCities } from "../data/mapData";
 import { placeBattery, removeBattery, setBatteryMaintenance, tickSimulation } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { togglePlanningAction } from "../game/planningActions";
 import type { CampaignMode, Coordinates, GameState, MapMode, PlanningActionId, UnitKind } from "../types/game";
-import type { GameModeId } from "../domain/contracts";
+import type { GameModeId, PersistentDailyCity } from "../domain/contracts";
 
 const tutorialKey = "shieldline-tutorial-complete-v1";
 
@@ -25,6 +26,7 @@ interface GameStore {
   placementKind: UnitKind | null;
   selectCampaignMode: (mode: CampaignMode) => void;
   launchTacticalMode: (mode: GameModeId) => void;
+  hydrateDailyCity: (city: PersistentDailyCity) => void;
   selectScenario: (scenarioId: string) => void;
   clearScenarioSelection: () => void;
   returnToModeSelect: () => void;
@@ -79,6 +81,22 @@ export const useGameStore = create<GameStore>()(
           selectedBatteryId: null,
           placementKind: null,
         });
+      },
+      hydrateDailyCity: (city) => {
+        let game = createScenarioState(() => 0.5, "crisis", "thirty-days-under-pressure");
+        game = { ...game, resources: { ...game.resources, budget: 999 } };
+        city.assets.forEach((asset, index) => {
+          const fallback = initialCities.find((entry) => entry.id === asset.cityId)?.coordinates || initialCities[0].coordinates;
+          const next = placeBattery(game, asset.kind as UnitKind, asset.position || fallback, () => (index + 1) / 100);
+          const lastBattery = next.batteries.at(-1);
+          game = lastBattery ? { ...next, batteries: next.batteries.map((battery) => battery.id === lastBattery.id ? { ...battery, readiness: asset.readiness, assignedCityId: asset.cityId as typeof battery.assignedCityId } : battery) } : next;
+        });
+        game = {
+          ...game,
+          resources: { ...game.resources, morale: city.morale, energy: city.energy },
+          cities: game.cities.map((entry) => entry.id === "kyiv" ? { ...entry, infrastructure: city.infrastructure, damage: city.damage, morale: city.morale, energy: city.energy } : entry),
+        };
+        set({ campaignMode: "crisis", activeGameMode: "daily-defense", pendingCampaignMode: null, mapMode: "live", game, dailyCityGame: game, selectedBatteryId: null, placementKind: null });
       },
       selectScenario: (scenarioId) => {
         const mode = get().pendingCampaignMode || "crisis";

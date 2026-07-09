@@ -19,7 +19,7 @@ import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { useGameStore } from "./store/useGameStore";
 import type { CampaignStatus, DefenseBattery, MapMode, ThreatKind, UnitDefinition, UnitKind } from "./types/game";
-import type { DailyDefensePlan, RankedResult } from "./domain/contracts";
+import type { CampaignProgress, DailyDefensePlan, RankedResult } from "./domain/contracts";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "live", label: "Live" },
@@ -45,7 +45,7 @@ function coOpSectorForCity(cityId: string) {
 }
 
 function defensePlanFromBatteries(batteries: DefenseBattery[]): DailyDefensePlan {
-  const assets = batteries.map((battery) => ({ kind: battery.kind, cityId: battery.assignedCityId, readiness: battery.readiness }));
+  const assets = batteries.map((battery) => ({ kind: battery.kind, cityId: battery.assignedCityId, readiness: battery.readiness, position: battery.position }));
   return { assetCount: assets.length, radarCount: assets.filter((asset) => asset.kind === "radar").length, kineticCount: assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length, averageReadiness: assets.length ? assets.reduce((sum, asset) => sum + asset.readiness, 0) / assets.length : 0, assets };
 }
 
@@ -110,9 +110,11 @@ export default function App() {
   const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
   const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
   const [authoritativeRun, setAuthoritativeRun] = useState<import("./domain/contracts").MissionRun | null>(null);
-  const rankedSubmissionRef = useRef<string | null>(null);
+  const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
   const coOpSyncedBatteryIds = useRef(new Set<string>());
   const campaignSyncedBatteryIds = useRef(new Set<string>());
+  const dailySavedPlanRef = useRef<string | null>(null);
   const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
   const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
@@ -125,6 +127,7 @@ export default function App() {
     if (typeof window === "undefined" || tacticalMode !== "co-op-command") return null;
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
   })();
+  const activeMission = campaignMissions.find((mission) => mission.id === campaignProgress?.currentMissionId) || campaignMissions[0];
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
     url.search = "";
@@ -132,7 +135,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!campaignMode || tacticalMode === "daily-defense") return undefined;
+    if (!campaignMode || tacticalMode === "daily-defense" || tacticalMode === "campaign" || tacticalMode === "ranked-challenge" || tacticalMode === "co-op-command") return undefined;
     let frameId = 0;
     const frame = (timestamp: number) => {
       if (lastTickRef.current === null) {
@@ -152,13 +155,20 @@ export default function App() {
   }, [campaignMode, tick]);
 
   useEffect(() => {
-    if (tacticalMode !== "ranked-challenge" || !game.latestReportId || rankedSubmissionRef.current === game.latestReportId || !game.batteries.length) return;
-    rankedSubmissionRef.current = game.latestReportId;
+    if (tacticalMode !== "campaign") return;
+    void apiGameRepository.getCampaignProgress().then(setCampaignProgress).catch(() => setCampaignProgress(null));
+  }, [tacticalMode, authoritativeRun?.id]);
+
+  useEffect(() => {
+    if (tacticalMode !== "daily-defense" || !game.batteries.length) return;
     const plan = defensePlanFromBatteries(game.batteries);
-    void apiGameRepository.getRankedChallenge().then((challenge) => apiGameRepository.submitRankedChallenge(challenge.id, plan)).then(setRankedResult).catch(() => {
-      rankedSubmissionRef.current = null;
-    });
-  }, [game.batteries, game.latestReportId, tacticalMode]);
+    const fingerprint = JSON.stringify(plan);
+    if (dailySavedPlanRef.current === fingerprint) return;
+    const timeout = window.setTimeout(() => {
+      void apiGameRepository.saveDailyCity(plan).then(() => { dailySavedPlanRef.current = fingerprint; }).catch(() => undefined);
+    }, 450);
+    return () => window.clearTimeout(timeout);
+  }, [game.batteries, tacticalMode]);
 
   useEffect(() => {
     if (tacticalMode !== "co-op-command" || !coOpSession) return;
@@ -167,7 +177,7 @@ export default function App() {
       const sectorId = coOpSectorForCity(battery.assignedCityId);
       if (sectorId !== coOpSession.sectorId) continue;
       coOpSyncedBatteryIds.current.add(battery.id);
-      void apiGameRepository.sendCoOpCommand(coOpSession.roomId, sectorId as "north" | "south" | "east" | "west", { type: "asset.place", payload: { batteryId: battery.id, kind: battery.kind, cityId: battery.assignedCityId, readiness: Math.round(battery.readiness) } }).catch(() => {
+      void apiGameRepository.sendCoOpCommand(coOpSession.roomId, sectorId as "north" | "south" | "east" | "west", { type: "asset.place", payload: { batteryId: battery.id, kind: battery.kind, cityId: battery.assignedCityId, readiness: Math.round(battery.readiness), position: battery.position } }).catch(() => {
         coOpSyncedBatteryIds.current.delete(battery.id);
       });
     }
@@ -178,16 +188,31 @@ export default function App() {
     for (const battery of game.batteries) {
       if (campaignSyncedBatteryIds.current.has(battery.id)) continue;
       campaignSyncedBatteryIds.current.add(battery.id);
-      void apiGameRepository.recordCampaignCommand({ type: "asset.place", payload: { batteryId: battery.id, kind: battery.kind, cityId: battery.assignedCityId, readiness: Math.round(battery.readiness) } }).catch(() => campaignSyncedBatteryIds.current.delete(battery.id));
+      void apiGameRepository.recordCampaignCommand({ type: "asset.place", payload: { batteryId: battery.id, kind: battery.kind, cityId: battery.assignedCityId, readiness: Math.round(battery.readiness), position: battery.position } }).catch(() => campaignSyncedBatteryIds.current.delete(battery.id));
     }
   }, [game.batteries, tacticalMode]);
 
   const resolveAuthoritativeOperation = async () => {
     if (!game.batteries.length) return;
-    const seed = `${tacticalMode || "campaign"}-${new Date().toISOString().slice(0, 10)}-${game.batteries.map((battery) => battery.id).join("-")}`;
-    const run = await apiGameRepository.runMission(campaignMissions[0], seed, defensePlanFromBatteries(game.batteries));
-    setAuthoritativeRun(run);
-    setActivePanel("report");
+    setIsResolving(true);
+    try {
+      if (tacticalMode === "ranked-challenge") {
+        const challenge = await apiGameRepository.getRankedChallenge();
+        const result = await apiGameRepository.submitRankedChallenge(challenge.id, defensePlanFromBatteries(game.batteries));
+        setRankedResult(result);
+        setAuthoritativeRun(result.run);
+      } else if (tacticalMode === "co-op-command" && coOpSession) {
+        const result = await apiGameRepository.resolveCoOpRoom(coOpSession.roomId);
+        setAuthoritativeRun(result.run);
+      } else {
+        const seed = `${tacticalMode || "campaign"}-${activeMission.id}-${new Date().toISOString().slice(0, 10)}`;
+        const run = await apiGameRepository.runMission(activeMission, seed, defensePlanFromBatteries(game.batteries));
+        setAuthoritativeRun(run);
+      }
+      setActivePanel("report");
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   if (!campaignMode && pendingCampaignMode) {
@@ -234,7 +259,7 @@ export default function App() {
             <Shield size={22} />
             <div>
               <h1>Shieldline</h1>
-              <span>{tacticalMode === "daily-defense" ? "Daily Defense · city planning" : tacticalMode === "co-op-command" && coOpSession ? `Co-op Command · ${coOpSession.sectorId} sector` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
+              <span>{tacticalMode === "daily-defense" ? "Daily Defense · persistent city planning" : tacticalMode === "co-op-command" && coOpSession ? `Co-op Command · ${coOpSession.sectorId} sector · room log` : tacticalMode === "campaign" ? `${activeMission.title} · authoritative command ready` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
             </div>
           </div>
           <ResourceBar game={game} />
@@ -325,7 +350,7 @@ export default function App() {
                 <Menu size={16} />
                 Change Scenario
               </button>
-              {tacticalMode !== "daily-defense" ? <button className="reset-button" type="button" disabled={!game.batteries.length} onClick={() => { void resolveAuthoritativeOperation(); }}><Zap size={16} /> Resolve operation on server</button> : null}
+              {tacticalMode !== "daily-defense" ? <button className="reset-button" type="button" disabled={!game.batteries.length || isResolving} onClick={() => { void resolveAuthoritativeOperation(); }}><Zap size={16} /> {isResolving ? "Resolving authoritative event stream…" : tacticalMode === "campaign" ? `Resolve ${activeMission.title}` : "Resolve operation on server"}</button> : null}
             </section>
           ) : null}
         </aside>

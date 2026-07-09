@@ -24,6 +24,7 @@ export function CommandApp() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [room, setRoom] = useState<CoOpRoom | null>(null);
   const launchTacticalMode = useGameStore((state) => state.launchTacticalMode);
+  const hydrateDailyCity = useGameStore((state) => state.hydrateDailyCity);
   const dailyCityGame = useGameStore((state) => state.dailyCityGame);
   const mission = campaignMissions[0];
   const replayEvent = run?.replay[replayIndex];
@@ -36,6 +37,14 @@ export function CommandApp() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
+  }, [screen]);
+
+  useEffect(() => {
+    if (screen !== "coop") return undefined;
+    const refresh = () => { void apiGameRepository.getCoOpRoom("kyiv-01").then(setRoom).catch(() => undefined); };
+    refresh();
+    const interval = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(interval);
   }, [screen]);
 
   const selectMode = (id: GameModeId) => {
@@ -64,6 +73,8 @@ export function CommandApp() {
     try {
       if (selectedMode === "daily-defense") {
         if (!dailyCityGame || dailyCityGame.batteries.length === 0) {
+          const persistedCity = await apiGameRepository.getDailyCity().catch(() => null);
+          if (persistedCity?.assets.length) hydrateDailyCity(persistedCity);
           launchTacticalMode("daily-defense");
           const url = new URL(window.location.href);
           url.searchParams.set("legacy", "1");

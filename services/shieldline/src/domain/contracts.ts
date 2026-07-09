@@ -116,12 +116,32 @@ export interface DailyReport {
   recommendedAction: string;
 }
 
+export interface PersistentDailyCity {
+  id: string;
+  ownerId: string;
+  revision: number;
+  morale: number;
+  energy: number;
+  infrastructure: number;
+  damage: number;
+  assets: DailyDefensePlan["assets"];
+  lastResolvedDay: string | null;
+  updatedAt: string;
+}
+
+export interface CampaignProgress {
+  currentMissionId: string | null;
+  completedMissionIds: string[];
+  lastRunId: string | null;
+  missions: Array<{ id: string; title: string; index: number; status: "completed" | "active" | "locked" }>;
+}
+
 export interface DailyDefensePlan {
   assetCount: number;
   radarCount: number;
   kineticCount: number;
   averageReadiness: number;
-  assets: Array<{ kind: string; cityId: string; readiness: number }>;
+  assets: Array<{ kind: string; cityId: string; readiness: number; position?: Coordinates }>;
 }
 
 export interface LeaderboardEntry {
@@ -156,6 +176,7 @@ export interface CoOpRoom {
   sectorAssignments: Partial<Record<SectorId, string>>;
   members: Array<{ userId: string; role: SectorId; ready: boolean }>;
   commandLog: SimulationEvent[];
+  assets?: Array<{ id: string; kind: string; cityId: string; readiness: number; sectorId: SectorId; ownerId: string; position?: Coordinates | null }>;
   viewerId?: string;
 }
 
@@ -171,6 +192,10 @@ export interface CommandRepository extends SimulationRepository {
   claimCoOpSector(roomId: string, sectorId: SectorId): Promise<CoOpRoom>;
   getRankedChallenge(dayKey?: string): Promise<RankedChallenge>;
   submitRankedChallenge(challengeId: string, plan: DailyDefensePlan): Promise<RankedResult>;
-  sendCoOpCommand(roomId: string, sectorId: SectorId, command: { type: string; payload: Record<string, string | number> }): Promise<CoOpRoom>;
-  recordCampaignCommand(command: { type: string; payload: Record<string, string | number> }): Promise<void>;
+  sendCoOpCommand(roomId: string, sectorId: SectorId, command: { type: string; payload: Record<string, unknown> }): Promise<CoOpRoom>;
+  recordCampaignCommand(command: { type: string; payload: Record<string, unknown> }): Promise<void>;
+  getCampaignProgress(): Promise<CampaignProgress>;
+  getDailyCity(): Promise<PersistentDailyCity>;
+  saveDailyCity(plan: DailyDefensePlan): Promise<PersistentDailyCity>;
+  resolveCoOpRoom(roomId: string): Promise<{ room: CoOpRoom; run: MissionRun }>;
 }

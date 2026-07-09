@@ -2,16 +2,41 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 
-const DEFAULT_STORE = { version: 1, events: [], runs: {}, dailyReports: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {} };
-const mission = {
-  id: "campaign-night-01",
-  title: "Night 01: Signal Window",
-  waves: [
+const DEFAULT_STORE = { version: 2, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {} };
+const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
+const missions = [
+  {
+    id: "campaign-night-01",
+    title: "Night 01: Signal Window",
+    waves: [
     { id: "wave-01", originSector: "east", targetSector: "east", etaSeconds: 28, size: 8, difficulty: 42, threatKind: "geran2" },
     { id: "wave-02", originSector: "north", targetSector: "north", etaSeconds: 52, size: 3, difficulty: 62, threatKind: "kh101" },
     { id: "wave-03", originSector: "south", targetSector: "west", etaSeconds: 75, size: 6, difficulty: 48, threatKind: "gerbera" },
   ],
-};
+  },
+  {
+    id: "campaign-night-02",
+    title: "Night 02: Blackout Relay",
+    waves: [
+      { id: "wave-01", originSector: "south", targetSector: "south", etaSeconds: 24, size: 10, difficulty: 48, threatKind: "geran2" },
+      { id: "wave-02", originSector: "east", targetSector: "east", etaSeconds: 50, size: 5, difficulty: 67, threatKind: "kalibr" },
+      { id: "wave-03", originSector: "north", targetSector: "east", etaSeconds: 79, size: 4, difficulty: 72, threatKind: "kh101" },
+    ],
+  },
+  {
+    id: "campaign-night-03",
+    title: "Night 03: Last Reserve",
+    waves: [
+      { id: "wave-01", originSector: "east", targetSector: "east", etaSeconds: 20, size: 12, difficulty: 58, threatKind: "gerbera" },
+      { id: "wave-02", originSector: "south", targetSector: "west", etaSeconds: 47, size: 6, difficulty: 78, threatKind: "kalibr" },
+      { id: "wave-03", originSector: "north", targetSector: "north", etaSeconds: 74, size: 5, difficulty: 84, threatKind: "kh101" },
+    ],
+  },
+];
+
+function missionById(missionId) {
+  return missions.find((entry) => entry.id === missionId) || missions[0];
+}
 
 function seededRandom(seed) {
   let state = 2166136261;
@@ -35,7 +60,8 @@ function stableHash(value) {
   return (hash >>> 0).toString(36);
 }
 
-export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0) {
+export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0, missionId = missions[0].id) {
+  const mission = missionById(missionId);
   const random = seededRandom(`${mission.id}:${seed}:v1`);
   const runId = `run-${mission.id}-${seed.slice(0, 18).replace(/[^a-z0-9-]/gi, "-")}-${stableHash(seed)}`;
   const events = [event(runId, 1, "mission.started", 0, "Mission command accepted; authoritative simulation started.", { payload: { seed } })];
@@ -76,12 +102,25 @@ function normalizeDailyPlan(input = {}) {
     kind: String(asset?.kind || "unknown").slice(0, 32),
     cityId: String(asset?.cityId || "unknown").slice(0, 48),
     readiness: Math.max(0, Math.min(100, Number(asset?.readiness || 0))),
-  })) : [];
+    position: Number.isFinite(Number(asset?.position?.lat)) && Number.isFinite(Number(asset?.position?.lng)) ? { lat: Number(asset.position.lat), lng: Number(asset.position.lng) } : undefined,
+  })).filter((asset) => VALID_ASSET_KINDS.has(asset.kind)) : [];
   const assetCount = assets.length;
   const radarCount = assets.filter((asset) => asset.kind === "radar").length;
   const kineticCount = assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length;
   const averageReadiness = assetCount ? assets.reduce((sum, asset) => sum + asset.readiness, 0) / assetCount : 0;
   return { assetCount, radarCount, kineticCount, averageReadiness, assets };
+}
+
+function defenseBonusFor(plan) {
+  return Math.min(0.24, plan.assetCount * 0.012 + plan.radarCount * 0.018 + plan.kineticCount * 0.02 + (plan.averageReadiness / 100) * 0.04);
+}
+
+function emptyDailyCity(actorId) {
+  return { id: `city-${stableHash(actorId)}`, ownerId: actorId, revision: 1, morale: 76, energy: 78, infrastructure: 84, damage: 0, assets: [], lastResolvedDay: null, updatedAt: new Date().toISOString() };
+}
+
+function dailyReportKey(actorId, key) {
+  return `${actorId}:${key}`;
 }
 
 function coOpSectorForCity(cityId) {
@@ -112,10 +151,25 @@ export async function createGameStore(file) {
     return store.runs[run.id];
   }
   return {
-    async runMission(seed, actorId = "web-commander", plan = {}) {
+    async runMission(seed, actorId = "web-commander", plan = {}, missionId = missions[0].id, source = "campaign") {
       const resolvedPlan = normalizeDailyPlan(plan);
-      const defenseBonus = Math.min(0.24, resolvedPlan.assetCount * 0.012 + resolvedPlan.radarCount * 0.018 + resolvedPlan.kineticCount * 0.02 + (resolvedPlan.averageReadiness / 100) * 0.04);
-      return persistRun(simulateMission(seed, new Date().toISOString(), defenseBonus), { source: "command", actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId, plan: resolvedPlan, defenseBonus });
+      if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before resolving the operation.");
+      const defenseBonus = defenseBonusFor(resolvedPlan);
+      const mission = missionById(missionId);
+      const run = await persistRun(simulateMission(seed, new Date().toISOString(), defenseBonus, mission.id), { source, actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId, plan: resolvedPlan, defenseBonus });
+      if (source === "campaign") {
+        const store = await readStore();
+        const current = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
+        if (current.currentMissionId === mission.id && run.result !== "setback") {
+          current.completedMissionIds = [...new Set([...current.completedMissionIds, mission.id])];
+          current.currentMissionId = missions[missions.findIndex((entry) => entry.id === mission.id) + 1]?.id || null;
+        }
+        current.lastRunId = run.id;
+        store.campaigns[actorId] = current;
+        store.events.push(event(`campaign-${actorId}`, store.events.length + 1, "mission.completed", Date.now(), `${actorId} resolved ${mission.id}.`, { payload: { runId: run.id, result: run.result } }));
+        await save(store);
+      }
+      return run;
     },
     async recordCampaignCommand(actorId, type, payload = {}) {
       const store = await readStore();
@@ -124,20 +178,49 @@ export async function createGameStore(file) {
       await save(store);
     },
     async getRun(runId) { return (await readStore()).runs[runId] || null; },
-    async getDailyReport(key = dayKey(), plan = {}) {
+    async getDailyCity(actorId = "web-commander") {
       const store = await readStore();
-      if (store.dailyReports[key]) return { report: store.dailyReports[key], run: store.runs[store.dailyReports[key].runId] };
+      if (!store.dailyCities[actorId]) {
+        store.dailyCities[actorId] = emptyDailyCity(actorId);
+        await save(store);
+      }
+      return store.dailyCities[actorId];
+    },
+    async saveDailyCity(actorId = "web-commander", plan = {}) {
+      const store = await readStore();
+      const previous = store.dailyCities[actorId] || emptyDailyCity(actorId);
       const resolvedPlan = normalizeDailyPlan(plan);
-      if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before resolving the daily attack.");
-      const defenseBonus = Math.min(0.24, resolvedPlan.assetCount * 0.012 + resolvedPlan.radarCount * 0.018 + resolvedPlan.kineticCount * 0.02 + (resolvedPlan.averageReadiness / 100) * 0.04);
-      const run = simulateMission(`daily-${key}-assets-${resolvedPlan.assetCount}-radar-${resolvedPlan.radarCount}-kinetic-${resolvedPlan.kineticCount}`, new Date().toISOString(), defenseBonus);
-      store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key, plan: resolvedPlan, defenseBonus } };
-      store.events.push(...run.events);
-      const report = { id: `daily-${key}`, cityId: "city-01", dayKey: key, runId: run.id, summary: `${run.interceptions} interceptions, ${run.impacts} impacts from ${resolvedPlan.assetCount} prepared defense asset(s).`, replayId: run.id, recommendedAction: run.impacts ? "Reinforce the east sector before the next night." : "Use the stable night to recover readiness." };
-      store.dailyReports[key] = report;
-      store.notificationOutbox.push({ id: `notice-${key}`, type: "daily.report.ready", createdAt: new Date().toISOString(), payload: { dayKey: key, reportId: report.id } });
+      if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before saving the daily plan.");
+      const city = { ...previous, assets: resolvedPlan.assets, revision: previous.revision + 1, updatedAt: new Date().toISOString() };
+      store.dailyCities[actorId] = city;
+      store.events.push(event(`daily-city-${actorId}`, store.events.length + 1, "mission.started", Date.now(), `${actorId} updated the persistent daily city plan.`, { payload: { command: "daily.plan.save", assetCount: resolvedPlan.assetCount } }));
       await save(store);
-      return { report, run: store.runs[run.id] };
+      return city;
+    },
+    async getDailyReport(key = dayKey(), plan = {}, actorId = "web-commander") {
+      const store = await readStore();
+      const reportKey = dailyReportKey(actorId, key);
+      if (store.dailyReports[reportKey]) return { report: store.dailyReports[reportKey], run: store.runs[store.dailyReports[reportKey].runId], city: store.dailyCities[actorId] || emptyDailyCity(actorId) };
+      const suppliedPlan = normalizeDailyPlan(plan);
+      const city = store.dailyCities[actorId] || emptyDailyCity(actorId);
+      const resolvedPlan = suppliedPlan.assetCount ? suppliedPlan : normalizeDailyPlan({ assets: city.assets });
+      if (!resolvedPlan.assetCount) return { report: null, run: null, city };
+      const defenseBonus = defenseBonusFor(resolvedPlan);
+      const run = simulateMission(`daily-${key}-${actorId}`, new Date().toISOString(), defenseBonus);
+      store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key, actorId, plan: resolvedPlan, defenseBonus } };
+      store.events.push(...run.events);
+      const nextCity = { ...city, assets: resolvedPlan.assets.map((asset) => ({ ...asset, readiness: Math.max(35, Math.round(asset.readiness - (run.impacts ? 7 : 2)) ) })), morale: Math.max(0, city.morale - run.impacts * 3), energy: Math.max(0, city.energy - run.impacts * 2), infrastructure: Math.max(0, city.infrastructure - run.impacts * 2), damage: Math.min(100, city.damage + run.impacts * 4), lastResolvedDay: key, revision: city.revision + 1, updatedAt: new Date().toISOString() };
+      const report = { id: `daily-${key}-${stableHash(actorId)}`, cityId: nextCity.id, dayKey: key, runId: run.id, summary: `${run.interceptions} interceptions, ${run.impacts} impacts from ${resolvedPlan.assetCount} prepared defense asset(s).`, replayId: run.id, recommendedAction: run.impacts ? "Reinforce the east sector before the next night." : "Use the stable night to recover readiness." };
+      store.dailyCities[actorId] = nextCity;
+      store.dailyReports[reportKey] = report;
+      store.notificationOutbox.push({ id: `notice-${key}-${stableHash(actorId)}`, type: "daily.report.ready", actorId, createdAt: new Date().toISOString(), payload: { dayKey: key, reportId: report.id } });
+      await save(store);
+      return { report, run: store.runs[run.id], city: nextCity };
+    },
+    async campaignState(actorId = "web-commander") {
+      const store = await readStore();
+      const progress = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
+      return { ...progress, missions: missions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: progress.completedMissionIds.includes(entry.id) ? "completed" : progress.currentMissionId === entry.id ? "active" : "locked" })) };
     },
     async leaderboard() {
       const store = await readStore();
@@ -158,7 +241,7 @@ export async function createGameStore(file) {
       }
       const resolvedPlan = normalizeDailyPlan(plan);
       if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before entering Ranked Challenge.");
-      const defenseBonus = Math.min(0.24, resolvedPlan.assetCount * 0.012 + resolvedPlan.radarCount * 0.018 + resolvedPlan.kineticCount * 0.02 + (resolvedPlan.averageReadiness / 100) * 0.04);
+      const defenseBonus = defenseBonusFor(resolvedPlan);
       const run = simulateMission(`${challenge.seed}-${actorId}`, new Date().toISOString(), defenseBonus);
       store.runs[run.id] = { ...run, metadata: { source: "ranked", challengeId, actorId, displayName: actorId, plan: resolvedPlan, defenseBonus } };
       store.events.push(...run.events);
@@ -170,7 +253,7 @@ export async function createGameStore(file) {
     async getRoom(roomId = "kyiv-01") {
       const store = await readStore();
       if (!store.rooms[roomId]) {
-        store.rooms[roomId] = { id: roomId, mode: "async", cityId: "city-01", revision: 1, sectorAssignments: { hq: "hq" }, members: [{ userId: "hq", role: "hq", ready: true }], commandLog: [] };
+        store.rooms[roomId] = { id: roomId, mode: "async", cityId: "city-01", revision: 1, sectorAssignments: { hq: "hq" }, members: [{ userId: "hq", role: "hq", ready: true }], commandLog: [], assets: [] };
         await save(store);
       }
       return store.rooms[roomId];
@@ -195,8 +278,20 @@ export async function createGameStore(file) {
       if (type === "asset.place" && coOpSectorForCity(String(payload.cityId || "")) !== sectorId) throw new Error("This asset is outside your assigned sector.");
       const sequence = room.commandLog.length + 1;
       const command = event(`room-${roomId}`, sequence, "mission.started", Date.now(), `${actorId} issued ${type} in ${sectorId}.`, { sectorId, payload: { command: type, actorId, ...payload } });
+      if (type === "asset.place") {
+        const asset = { id: String(payload.batteryId || `asset-${sequence}`), kind: String(payload.kind || "unknown"), cityId: String(payload.cityId || "unknown"), readiness: Math.max(0, Math.min(100, Number(payload.readiness || 0))), sectorId, ownerId: actorId, position: payload.position || null };
+        room.assets = (room.assets || []).filter((item) => item.id !== asset.id).concat(asset);
+      }
+      if (type === "asset.remove") room.assets = (room.assets || []).filter((item) => item.id !== String(payload.batteryId || ""));
       room.commandLog.push(command); room.revision += 1; store.rooms[roomId] = room; store.events.push(command); await save(store);
       return room;
+    },
+    async resolveCoOpRoom(roomId, actorId) {
+      const room = await this.getRoom(roomId);
+      if (!room.assets?.length) throw new Error("The co-op room needs at least one deployed defense asset.");
+      const plan = normalizeDailyPlan({ assets: room.assets });
+      const run = await this.runMission(`coop-${roomId}-${room.revision}`, actorId, plan, missions[0].id, "co-op");
+      return { room, run };
     },
     async notificationOutbox() { return (await readStore()).notificationOutbox; },
     async setNotificationPreference(userId, chatId, enabled) {
@@ -207,7 +302,7 @@ export async function createGameStore(file) {
     },
     async pendingNotificationDeliveries() {
       const store = await readStore();
-      return store.notificationOutbox.flatMap((item) => Object.entries(store.notificationPreferences).filter(([, preference]) => preference.enabled && !(item.deliveredTo || []).includes(preference.chatId)).map(([, preference]) => ({ item, chatId: preference.chatId })));
+      return store.notificationOutbox.flatMap((item) => Object.entries(store.notificationPreferences).filter(([userId, preference]) => preference.enabled && (!item.actorId || item.actorId === userId) && !(item.deliveredTo || []).includes(preference.chatId)).map(([, preference]) => ({ item, chatId: preference.chatId })));
     },
     async markNotificationDelivered(notificationId, chatId) {
       const store = await readStore();
