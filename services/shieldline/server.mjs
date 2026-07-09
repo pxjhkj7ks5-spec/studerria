@@ -100,6 +100,12 @@ async function handleGameApi(req, res, pathname) {
       sendJson(res, 200, await gameStore.getDailyReport(query.get("day") || dayKey(), { assetCount: Math.max(0, Math.min(32, Number(query.get("assets") || 0))) }));
       return;
     }
+    if (req.method === "POST" && path === "/daily/resolve") {
+      const body = await readRequestJson(req);
+      const key = /^\d{4}-\d{2}-\d{2}$/.test(String(body.dayKey || "")) ? body.dayKey : dayKey();
+      sendJson(res, 200, await gameStore.getDailyReport(key, body.plan));
+      return;
+    }
     if (req.method === "GET" && path === "/leaderboard") {
       sendJson(res, 200, { entries: await gameStore.leaderboard() });
       return;

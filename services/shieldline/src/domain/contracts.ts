@@ -116,7 +116,13 @@ export interface DailyReport {
   recommendedAction: string;
 }
 
-export interface DailyDefensePlan { assetCount: number; }
+export interface DailyDefensePlan {
+  assetCount: number;
+  radarCount: number;
+  kineticCount: number;
+  averageReadiness: number;
+  assets: Array<{ kind: string; cityId: string; readiness: number }>;
+}
 
 export interface LeaderboardEntry {
   rank: number;

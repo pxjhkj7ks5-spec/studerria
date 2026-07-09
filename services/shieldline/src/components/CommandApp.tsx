@@ -59,7 +59,7 @@ export function CommandApp() {
     setIsRunning(true);
     try {
       if (selectedMode === "daily-defense") {
-        if (!dailyCityGame) {
+        if (!dailyCityGame || dailyCityGame.batteries.length === 0) {
           launchTacticalMode("daily-defense");
           const url = new URL(window.location.href);
           url.searchParams.set("legacy", "1");
@@ -67,7 +67,14 @@ export function CommandApp() {
           window.location.assign(url.toString());
           return;
         }
-        const report = await apiGameRepository.getDailyReport(new Date().toISOString().slice(0, 10), { assetCount: dailyCityGame.batteries.length });
+        const assets = dailyCityGame.batteries.map((battery) => ({ kind: battery.kind, cityId: battery.assignedCityId, readiness: battery.readiness }));
+        const report = await apiGameRepository.getDailyReport(new Date().toISOString().slice(0, 10), {
+          assetCount: assets.length,
+          radarCount: assets.filter((asset) => asset.kind === "radar").length,
+          kineticCount: assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length,
+          averageReadiness: assets.reduce((sum, asset) => sum + asset.readiness, 0) / assets.length,
+          assets,
+        });
         const dailyRun = report ? await apiGameRepository.getRun(report.runId) : null;
         if (report && dailyRun) { setDailyReport(report); setRun(dailyRun); setScreen("daily"); telegramCommandFeedback(); }
         return;

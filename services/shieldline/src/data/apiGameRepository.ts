@@ -19,7 +19,7 @@ export const apiGameRepository: CommandRepository = {
     catch { return localGameRepository.runMission(mission, seed); }
   },
   async getDailyReport(dayKey: string, plan?: DailyDefensePlan): Promise<DailyReport | null> {
-    try { return (await request<{ report: DailyReport }>(`/daily?day=${encodeURIComponent(dayKey)}&assets=${Math.max(0, plan?.assetCount || 0)}`)).report; }
+    try { return (await request<{ report: DailyReport }>("/daily/resolve", { method: "POST", body: JSON.stringify({ dayKey, plan }) })).report; }
     catch { return localGameRepository.getDailyReport(dayKey); }
   },
   async getLeaderboard(): Promise<LeaderboardEntry[]> {

@@ -65,6 +65,19 @@ export function simulateMission(seed, now = new Date().toISOString(), defenseBon
 
 export function dayKey(now = new Date()) { return now.toISOString().slice(0, 10); }
 
+function normalizeDailyPlan(input = {}) {
+  const assets = Array.isArray(input.assets) ? input.assets.slice(0, 32).map((asset) => ({
+    kind: String(asset?.kind || "unknown").slice(0, 32),
+    cityId: String(asset?.cityId || "unknown").slice(0, 48),
+    readiness: Math.max(0, Math.min(100, Number(asset?.readiness || 0))),
+  })) : [];
+  const assetCount = assets.length;
+  const radarCount = assets.filter((asset) => asset.kind === "radar").length;
+  const kineticCount = assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length;
+  const averageReadiness = assetCount ? assets.reduce((sum, asset) => sum + asset.readiness, 0) / assetCount : 0;
+  return { assetCount, radarCount, kineticCount, averageReadiness, assets };
+}
+
 export async function createGameStore(file) {
   async function readStore() {
     if (!existsSync(file)) return structuredClone(DEFAULT_STORE);
@@ -91,11 +104,13 @@ export async function createGameStore(file) {
     async getDailyReport(key = dayKey(), plan = {}) {
       const store = await readStore();
       if (store.dailyReports[key]) return { report: store.dailyReports[key], run: store.runs[store.dailyReports[key].runId] };
-      const defenseBonus = Math.min(0.18, Math.max(0, Number(plan.assetCount || 0)) * 0.025);
-      const run = simulateMission(`daily-${key}-assets-${Number(plan.assetCount || 0)}`, new Date().toISOString(), defenseBonus);
-      store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key, assetCount: Number(plan.assetCount || 0), defenseBonus } };
+      const resolvedPlan = normalizeDailyPlan(plan);
+      if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before resolving the daily attack.");
+      const defenseBonus = Math.min(0.24, resolvedPlan.assetCount * 0.012 + resolvedPlan.radarCount * 0.018 + resolvedPlan.kineticCount * 0.02 + (resolvedPlan.averageReadiness / 100) * 0.04);
+      const run = simulateMission(`daily-${key}-assets-${resolvedPlan.assetCount}-radar-${resolvedPlan.radarCount}-kinetic-${resolvedPlan.kineticCount}`, new Date().toISOString(), defenseBonus);
+      store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key, plan: resolvedPlan, defenseBonus } };
       store.events.push(...run.events);
-      const report = { id: `daily-${key}`, cityId: "city-01", dayKey: key, runId: run.id, summary: `${run.interceptions} interceptions, ${run.impacts} impacts from ${Number(plan.assetCount || 0)} prepared defense asset(s).`, replayId: run.id, recommendedAction: run.impacts ? "Reinforce the east sector before the next night." : "Use the stable night to recover readiness." };
+      const report = { id: `daily-${key}`, cityId: "city-01", dayKey: key, runId: run.id, summary: `${run.interceptions} interceptions, ${run.impacts} impacts from ${resolvedPlan.assetCount} prepared defense asset(s).`, replayId: run.id, recommendedAction: run.impacts ? "Reinforce the east sector before the next night." : "Use the stable night to recover readiness." };
       store.dailyReports[key] = report;
       store.notificationOutbox.push({ id: `notice-${key}`, type: "daily.report.ready", createdAt: new Date().toISOString(), payload: { dayKey: key, reportId: report.id } });
       await save(store);
