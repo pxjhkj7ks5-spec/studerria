@@ -4,8 +4,13 @@ import "leaflet/dist/leaflet.css";
 import "./styles/app.css";
 import App from "./App";
 import { hydrateControlOverlayFromServer } from "./data/controlZones";
+import { initializeTelegramShell } from "./platform/telegramShell";
 
 async function bootstrap() {
+  initializeTelegramShell();
+  if ("serviceWorker" in navigator) {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+  }
   await hydrateControlOverlayFromServer(import.meta.env.BASE_URL);
   createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>

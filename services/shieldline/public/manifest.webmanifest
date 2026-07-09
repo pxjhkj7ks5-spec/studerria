@@ -1,0 +1,9 @@
+{
+  "name": "Shieldline",
+  "short_name": "Shieldline",
+  "start_url": "/shieldline/",
+  "display": "standalone",
+  "background_color": "#09141e",
+  "theme_color": "#09141e",
+  "description": "A fictional Telegram-first city command simulation."
+}

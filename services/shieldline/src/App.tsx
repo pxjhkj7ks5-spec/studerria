@@ -11,6 +11,7 @@ import { ScenarioSelection } from "./components/ScenarioSelection";
 import { TacticalMap } from "./components/TacticalMap";
 import { TutorialOverlay } from "./components/TutorialOverlay";
 import { UnitRail } from "./components/UnitRail";
+import { CommandApp } from "./components/CommandApp";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
@@ -67,6 +68,10 @@ export default function App() {
   const isAdminRoute = typeof window !== "undefined" && window.location.pathname.replace(/\/+$/, "").endsWith("/admin");
   if (isAdminRoute) {
     return <ControlZoneAdmin />;
+  }
+  const legacyRequested = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("legacy") === "1";
+  if (!legacyRequested) {
+    return <CommandApp />;
   }
 
   const game = useGameStore((state) => state.game);
