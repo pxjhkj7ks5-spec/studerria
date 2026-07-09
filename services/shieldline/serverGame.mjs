@@ -112,7 +112,17 @@ export async function createGameStore(file) {
     return store.runs[run.id];
   }
   return {
-    async runMission(seed, actorId = "web-commander") { return persistRun(simulateMission(seed), { source: "command", actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId }); },
+    async runMission(seed, actorId = "web-commander", plan = {}) {
+      const resolvedPlan = normalizeDailyPlan(plan);
+      const defenseBonus = Math.min(0.24, resolvedPlan.assetCount * 0.012 + resolvedPlan.radarCount * 0.018 + resolvedPlan.kineticCount * 0.02 + (resolvedPlan.averageReadiness / 100) * 0.04);
+      return persistRun(simulateMission(seed, new Date().toISOString(), defenseBonus), { source: "command", actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId, plan: resolvedPlan, defenseBonus });
+    },
+    async recordCampaignCommand(actorId, type, payload = {}) {
+      const store = await readStore();
+      const command = event(`campaign-${actorId}`, store.events.length + 1, "mission.started", Date.now(), `${actorId} issued ${type}.`, { payload: { command: type, actorId, ...payload } });
+      store.events.push(command);
+      await save(store);
+    },
     async getRun(runId) { return (await readStore()).runs[runId] || null; },
     async getDailyReport(key = dayKey(), plan = {}) {
       const store = await readStore();

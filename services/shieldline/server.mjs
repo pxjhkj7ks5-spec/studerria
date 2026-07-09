@@ -172,8 +172,14 @@ async function handleGameApi(req, res, pathname) {
       const body = await readRequestJson(req);
       const actorId = safeActor(req, res);
       const seed = String(body.seed || `${dayKey()}-${actorId}`).replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
-      const run = await gameStore.runMission(seed || dayKey(), actorId);
+      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan);
       sendJson(res, 201, run);
+      return;
+    }
+    if (req.method === "POST" && path === "/campaign/commands") {
+      const body = await readRequestJson(req);
+      await gameStore.recordCampaignCommand(safeActor(req, res), String(body.type || "unknown"), body.payload);
+      sendJson(res, 201, { ok: true });
       return;
     }
     if (req.method === "GET" && path.startsWith("/runs/")) {

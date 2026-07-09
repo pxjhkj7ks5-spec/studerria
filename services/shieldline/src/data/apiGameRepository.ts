@@ -14,8 +14,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 /** Uses the authoritative sidecar when available, with a standalone-dev fallback. */
 export const apiGameRepository: CommandRepository = {
-  async runMission(mission: MissionDefinition, seed: string): Promise<MissionRun> {
-    try { return await request<MissionRun>("/missions/run", { method: "POST", body: JSON.stringify({ missionId: mission.id, seed }) }); }
+  async runMission(mission: MissionDefinition, seed: string, plan?: DailyDefensePlan): Promise<MissionRun> {
+    try { return await request<MissionRun>("/missions/run", { method: "POST", body: JSON.stringify({ missionId: mission.id, seed, plan }) }); }
     catch { return localGameRepository.runMission(mission, seed); }
   },
   async getDailyReport(dayKey: string, plan?: DailyDefensePlan): Promise<DailyReport | null> {
@@ -40,5 +40,8 @@ export const apiGameRepository: CommandRepository = {
   },
   async sendCoOpCommand(roomId: string, sectorId: SectorId, command: { type: string; payload: Record<string, string | number> }): Promise<CoOpRoom> {
     return request<CoOpRoom>(`/rooms/${encodeURIComponent(roomId)}/commands`, { method: "POST", body: JSON.stringify({ sectorId, ...command }) });
+  },
+  async recordCampaignCommand(command: { type: string; payload: Record<string, string | number> }): Promise<void> {
+    await request<{ ok: true }>("/campaign/commands", { method: "POST", body: JSON.stringify(command) });
   },
 };

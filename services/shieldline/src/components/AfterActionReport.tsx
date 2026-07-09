@@ -1,14 +1,15 @@
 import { ClipboardList } from "lucide-react";
 import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
-import type { RankedResult } from "../domain/contracts";
+import type { MissionRun, RankedResult } from "../domain/contracts";
 
 interface AfterActionReportProps {
   game: GameState;
   rankedResult?: RankedResult | null;
+  authoritativeRun?: MissionRun | null;
 }
 
-export function AfterActionReport({ game, rankedResult }: AfterActionReportProps) {
+export function AfterActionReport({ game, rankedResult, authoritativeRun }: AfterActionReportProps) {
   const report = game.afterActionReports[0];
   const fallbackRecommendation = game.resources.ammo < 25
     ? "Conserve ammo and restore logistics."
@@ -27,6 +28,7 @@ export function AfterActionReport({ game, rankedResult }: AfterActionReportProps
           <span>{report ? `Cycle ${report.day} · ${report.archetype ? archetypeLabel(report.archetype) : "contact cycle"}` : "Pending first completed cycle"}</span>
         </div>
       </div>
+      {authoritativeRun ? <div className="aar-section aar-section--ranked"><strong>Authoritative server result</strong><span>{authoritativeRun.interceptions} intercepts · {authoritativeRun.impacts} impacts · seed {authoritativeRun.seed.slice(-12)}</span></div> : null}
       {report ? (
         <>
           <p className="aar-summary">{report.situationSummary}</p>

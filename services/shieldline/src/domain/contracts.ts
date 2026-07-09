@@ -160,7 +160,7 @@ export interface CoOpRoom {
 }
 
 export interface SimulationRepository {
-  runMission(mission: MissionDefinition, seed: string): Promise<MissionRun>;
+  runMission(mission: MissionDefinition, seed: string, plan?: DailyDefensePlan): Promise<MissionRun>;
   getDailyReport(dayKey: string, plan?: DailyDefensePlan): Promise<DailyReport | null>;
   getLeaderboard(): Promise<LeaderboardEntry[]>;
 }
@@ -172,4 +172,5 @@ export interface CommandRepository extends SimulationRepository {
   getRankedChallenge(dayKey?: string): Promise<RankedChallenge>;
   submitRankedChallenge(challengeId: string, plan: DailyDefensePlan): Promise<RankedResult>;
   sendCoOpCommand(roomId: string, sectorId: SectorId, command: { type: string; payload: Record<string, string | number> }): Promise<CoOpRoom>;
+  recordCampaignCommand(command: { type: string; payload: Record<string, string | number> }): Promise<void>;
 }
