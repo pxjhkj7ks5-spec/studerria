@@ -39,8 +39,20 @@ export function CommandApp() {
   }, [screen]);
 
   const selectMode = (id: GameModeId) => {
+    if (id !== "daily-defense") {
+      openManualCommand(id);
+      return;
+    }
     setSelectedMode(id);
-    setScreen(id === "campaign" ? "briefing" : "briefing");
+    setScreen("briefing");
+  };
+
+  const openManualCommand = (mode: Exclude<GameModeId, "daily-defense">) => {
+    launchTacticalMode(mode);
+    const url = new URL(window.location.href);
+    url.searchParams.set("legacy", "1");
+    url.searchParams.set("mode", mode);
+    window.location.assign(url.toString());
   };
 
   const runMission = async () => {
@@ -60,11 +72,7 @@ export function CommandApp() {
         if (report && dailyRun) { setDailyReport(report); setRun(dailyRun); setScreen("daily"); telegramCommandFeedback(); }
         return;
       }
-      launchTacticalMode(selectedMode);
-      const url = new URL(window.location.href);
-      url.searchParams.set("legacy", "1");
-      url.searchParams.set("mode", selectedMode);
-      window.location.assign(url.toString());
+      openManualCommand(selectedMode);
     } finally { setIsRunning(false); }
   };
 
@@ -110,7 +118,7 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
           <span className="mode-detail"><b>Resources</b>{mode.resources}</span>
           <span className="mode-detail"><b>Main risk</b>{mode.mainRisk}</span>
           <span className="mode-detail"><b>Victory</b>{mode.victory}</span>
-          <span className="mode-go">Open briefing <ChevronRight size={17} /></span>
+          <span className="mode-go">{mode.id === "daily-defense" ? "Open daily cycle" : "Open command board"} <ChevronRight size={17} /></span>
         </button>;
       })}
     </section>
