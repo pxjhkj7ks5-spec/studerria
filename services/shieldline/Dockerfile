@@ -32,6 +32,7 @@ COPY --chown=shieldline:nodejs --from=builder /app/dist ./dist
 COPY --chown=shieldline:nodejs --from=builder /app/server.mjs ./server.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/serverGame.mjs ./serverGame.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/serverSecurity.mjs ./serverSecurity.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/src/game/simulationCore.mjs ./src/game/simulationCore.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/package.json ./package.json
 
 USER shieldline

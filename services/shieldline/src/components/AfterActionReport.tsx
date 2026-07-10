@@ -1,4 +1,5 @@
 import { ClipboardList } from "lucide-react";
+import type { CSSProperties } from "react";
 import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
 import type { MissionRun, RankedResult } from "../domain/contracts";
@@ -59,15 +60,35 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun }: Afte
           {rankedResult ? <div className="aar-section aar-section--ranked"><strong>Ranked result</strong><span>#{rankedResult.entry.rank} · {rankedResult.entry.score} score · {rankedResult.challenge.title}</span></div> : null}
         </>
       ) : (
-        <>
-          <div className="aar-grid">
-            <span><strong>{game.interceptions}</strong> Intercepts</span>
-            <span><strong>{game.impacts}</strong> Impacts</span>
-            <span><strong>{game.liveThreats.length}</strong> Active tracks</span>
-            <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
-          </div>
-          <p>{fallbackRecommendation}</p>
-        </>
+        authoritativeRun ? (
+          <>
+            <p className="aar-summary">Campaign outcome projected from simulation events sequence 1–{authoritativeRun.events.at(-1)?.sequence || 0}.</p>
+            <div className="aar-grid">
+              <span><strong>{authoritativeRun.interceptions}</strong> Intercepts</span>
+              <span><strong>{authoritativeRun.impacts}</strong> Impacts</span>
+              <span><strong>{authoritativeRun.ammoSpent}</strong> Ammo spent</span>
+              <span><strong>{authoritativeRun.simVersion || "—"}</strong> Sim version</span>
+            </div>
+            <div className="aar-sector-heatmap" aria-label="Campaign sector pressure heatmap">
+              {Object.entries(authoritativeRun.sectorSummary).map(([sector, summary]) => (
+                <span key={sector} style={{ "--sector-risk": `${Math.min(100, summary.pressure + summary.damage * 2)}%` } as CSSProperties}>
+                  <b>{sector}</b><strong>{summary.pressure}%</strong><small>{summary.damage}% damage</small>
+                </span>
+              ))}
+            </div>
+            <p>{authoritativeRun.result === "victory" ? "Coverage held across every campaign sector." : authoritativeRun.result === "contained" ? "The attack was contained; reinforce damaged sectors before the next mission." : "Rebuild coverage and preserve the reserve before retrying this mission."}</p>
+          </>
+        ) : (
+          <>
+            <div className="aar-grid">
+              <span><strong>{game.interceptions}</strong> Intercepts</span>
+              <span><strong>{game.impacts}</strong> Impacts</span>
+              <span><strong>{game.liveThreats.length}</strong> Active tracks</span>
+              <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
+            </div>
+            <p>{fallbackRecommendation}</p>
+          </>
+        )
       )}
     </section>
   );

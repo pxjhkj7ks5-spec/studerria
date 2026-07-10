@@ -4,6 +4,9 @@ import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/ga
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { advanceSimulation, placeBattery, startAttackNow } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
+import { campaignMissions } from "../src/data/missions";
+import { projectCampaignRun } from "../src/game/campaignProjection";
+import { runDeterministicMission } from "../src/game/deterministicMission";
 
 test("the first six modes are live while Daily Defense is scheduled", () => {
   const liveModes = Object.entries(gameModeRuntimePolicies)
@@ -41,4 +44,25 @@ test("a started live operation advances launch sectors and creates threats", () 
   assert.equal(game.cyclePhase, "attack");
   assert.ok(game.liveThreats.length > 0 || game.impacts > 0 || game.interceptions > 0);
   assert.ok(game.log.some((entry) => entry.title === "Track Warning" || entry.title === "Missile Launch"));
+});
+
+test("campaign tactical projection follows the authoritative event timeline", () => {
+  const run = runDeterministicMission(campaignMissions[0], "projection-golden", {
+    assetCount: 2,
+    radarCount: 1,
+    kineticCount: 1,
+    averageReadiness: 90,
+    assets: [
+      { kind: "radar", cityId: "kyiv", readiness: 90 },
+      { kind: "buk", cityId: "kyiv", readiness: 90 },
+    ],
+  });
+  const beforeLaunch = projectCampaignRun(run, 1_000)!;
+  assert.equal(beforeLaunch.liveThreats.length, 0);
+  const inFlight = projectCampaignRun(run, 14_500)!;
+  assert.ok(inFlight.launchSectors.some((sector) => sector.state === "cooldown"));
+  assert.ok(inFlight.liveThreats.some((threat) => threat.revealed));
+  const complete = projectCampaignRun(run, run.events.at(-1)!.occurredAtMs)!;
+  assert.equal(complete.interceptions, run.interceptions);
+  assert.equal(complete.impacts, run.impacts);
 });

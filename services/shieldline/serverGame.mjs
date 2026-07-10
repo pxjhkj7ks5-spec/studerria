@@ -1,8 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
+import { SIM_VERSION, calculateDefenseBonus, simulateOperation, stableHash } from "./src/game/simulationCore.mjs";
 
-const SIM_VERSION = "2.0.0";
 const DEFAULT_STORE = { version: 3, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {} };
 const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
 const missions = [
@@ -35,89 +35,16 @@ const missions = [
   },
 ];
 
-const sectorCoordinates = {
-  north: { lat: 52.0, lng: 31.5 },
-  south: { lat: 45.6, lng: 32.4 },
-  east: { lat: 50.1, lng: 37.4 },
-  west: { lat: 49.2, lng: 23.8 },
-  hq: { lat: 50.45, lng: 30.52 },
-};
-
 function missionById(missionId) {
   return missions.find((entry) => entry.id === missionId) || missions[0];
-}
-
-function seededRandom(seed) {
-  let state = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) state = Math.imul(state ^ seed.charCodeAt(index), 16777619);
-  return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function event(runId, sequence, type, occurredAtMs, message, extras = {}) {
   return { id: `${runId}-evt-${sequence}`, runId, sequence, type, occurredAtMs, tick: occurredAtMs, simVersion: SIM_VERSION, schemaVersion: 1, message, payload: {}, ...extras };
 }
 
-function stableHash(value) {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
-  return (hash >>> 0).toString(36);
-}
-
 export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0, missionId = missions[0].id) {
-  const mission = missionById(missionId);
-  const random = seededRandom(`${mission.id}:${seed}:v1`);
-  const runId = `run-${mission.id}-${seed.slice(0, 18).replace(/[^a-z0-9-]/gi, "-")}-${stableHash(seed)}`;
-  const events = [event(runId, 1, "mission.started", 0, "Mission command accepted; authoritative simulation started.", { payload: { seed } })];
-  const replay = [];
-  let sequence = 2;
-  let interceptions = 0;
-  let impacts = 0;
-  let ammoSpent = 0;
-
-  for (const wave of mission.waves) {
-    const detectedAt = Math.max(500, wave.etaSeconds * 500);
-    const origin = sectorCoordinates[wave.originSector] || sectorCoordinates.east;
-    const target = sectorCoordinates[wave.targetSector] || sectorCoordinates.hq;
-    const warningAt = Math.max(0, detectedAt - 2_000);
-    const launchAt = Math.max(0, detectedAt - 1_000);
-    const warning = event(runId, sequence++, "launch.warning", warningAt, `${wave.originSector} launch sector entered warning state.`, { sectorId: wave.originSector, waveId: wave.id, payload: { threatKind: wave.threatKind, originLat: origin.lat, originLng: origin.lng, targetLat: target.lat, targetLng: target.lng } });
-    const launched = event(runId, sequence++, "threat.launched", launchAt, `${wave.size} ${wave.threatKind} track${wave.size === 1 ? "" : "s"} launched.`, { sectorId: wave.originSector, waveId: wave.id, targetId: wave.targetSector, payload: { tracks: wave.size, threatKind: wave.threatKind, originLat: origin.lat, originLng: origin.lng, targetLat: target.lat, targetLng: target.lng } });
-    events.push(warning, launched);
-    replay.push({ ...warning, replayAtMs: warningAt, route: { from: wave.originSector, to: wave.targetSector } }, { ...launched, replayAtMs: launchAt, route: { from: wave.originSector, to: wave.targetSector } });
-    const detected = event(runId, sequence++, "wave.detected", detectedAt, `${wave.size} tracks detected toward the ${wave.targetSector} sector.`, { sectorId: wave.targetSector, waveId: wave.id, payload: { tracks: wave.size, difficulty: wave.difficulty } });
-    events.push(detected); replay.push({ ...detected, replayAtMs: detectedAt, route: { from: wave.originSector, to: wave.targetSector } });
-    const coverage = Math.min(0.9, 0.38 + random() * 0.42 + defenseBonus);
-    const success = Math.max(0, Math.min(wave.size, Math.round(wave.size * coverage - wave.difficulty / 140 + random() * 1.8)));
-    const missed = wave.size - success;
-    interceptions += success; impacts += missed; ammoSpent += success * (wave.threatKind === "kh101" ? 3 : 1);
-    if (success) {
-      const firedAt = detectedAt + 450;
-      const fired = event(runId, sequence++, "battery.fired", firedAt, `Sector defense fired on ${success} confirmed track${success === 1 ? "" : "s"}.`, { sectorId: wave.targetSector, waveId: wave.id, assetId: "sector-defense", targetId: wave.id, payload: { count: success, threatKind: wave.threatKind } });
-      events.push(fired); replay.push({ ...fired, replayAtMs: firedAt, route: { from: wave.targetSector, to: wave.targetSector } });
-      const interceptionAt = detectedAt + 900;
-      const intercept = event(runId, sequence++, "interception", interceptionAt, `${success} track${success === 1 ? "" : "s"} intercepted over ${wave.targetSector}.`, { sectorId: wave.targetSector, waveId: wave.id, assetId: "sector-defense", payload: { count: success } });
-      events.push(intercept); replay.push({ ...intercept, replayAtMs: interceptionAt, route: { from: wave.originSector, to: wave.targetSector }, interceptPoint: { x: 45 + (random() - .5) * 22, y: 50 + (random() - .5) * 22 } });
-    }
-    if (missed) {
-      const impactAt = detectedAt + 1700;
-      const impact = event(runId, sequence++, "impact", impactAt, `${missed} track${missed === 1 ? "" : "s"} reached the ${wave.targetSector} sector.`, { sectorId: wave.targetSector, waveId: wave.id, payload: { count: missed } });
-      events.push(impact); replay.push({ ...impact, replayAtMs: impactAt, route: { from: wave.originSector, to: wave.targetSector } });
-    }
-  }
-  const result = impacts === 0 ? "victory" : impacts <= 5 ? "contained" : "setback";
-  const completedAtMs = Math.max(7_600, ...events.map((entry) => entry.occurredAtMs)) + 500;
-  events.push(event(runId, sequence, "mission.completed", completedAtMs, result === "victory" ? "Mission complete: all critical tracks contained." : "Mission complete: command report is ready.", { payload: { result, interceptions, impacts } }));
-  const snapshots = [
-    { runId, sequence: 1, tick: 0, simVersion: SIM_VERSION, state: { interceptions: 0, impacts: 0, ammoSpent: 0, status: "running" } },
-    { runId, sequence, tick: completedAtMs, simVersion: SIM_VERSION, state: { interceptions, impacts, ammoSpent, status: "completed", result } },
-  ];
-  return { id: runId, missionId: mission.id, seed, startedAt: now, completedAt: now, events, replay, snapshots, simVersion: SIM_VERSION, revision: 1, status: "completed", result, interceptions, impacts, ammoSpent, sectorSummary: { north: { coverage: 72, pressure: 32, damage: 0 }, south: { coverage: 61, pressure: 44, damage: Math.max(0, impacts - 2) * 3 }, east: { coverage: 68, pressure: 70, damage: impacts * 4 }, west: { coverage: 74, pressure: 36, damage: 0 } } };
+  return simulateOperation({ mission: missionById(missionId), seed, defenseBonus, startedAt: now });
 }
 
 export function dayKey(now = new Date()) { return now.toISOString().slice(0, 10); }
@@ -137,7 +64,7 @@ function normalizeDailyPlan(input = {}) {
 }
 
 function defenseBonusFor(plan) {
-  return Math.min(0.24, plan.assetCount * 0.012 + plan.radarCount * 0.018 + plan.kineticCount * 0.02 + (plan.averageReadiness / 100) * 0.04);
+  return calculateDefenseBonus(plan);
 }
 
 function emptyDailyCity(actorId) {

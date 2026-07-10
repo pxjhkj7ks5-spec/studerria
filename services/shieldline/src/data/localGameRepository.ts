@@ -1,11 +1,11 @@
 import { campaignMissions } from "./missions";
 import { runDeterministicMission } from "../game/deterministicMission";
-import type { DailyReport, LeaderboardEntry, MissionDefinition, MissionRun, SimulationRepository } from "../domain/contracts";
+import type { DailyDefensePlan, DailyReport, LeaderboardEntry, MissionDefinition, MissionRun, SimulationRepository } from "../domain/contracts";
 
 /** Local adapter only. It is deliberately shaped as an async API repository. */
 export const localGameRepository: SimulationRepository = {
-  async runMission(mission: MissionDefinition, seed: string): Promise<MissionRun> {
-    return runDeterministicMission(mission, seed);
+  async runMission(mission: MissionDefinition, seed: string, plan?: DailyDefensePlan): Promise<MissionRun> {
+    return runDeterministicMission(mission, seed, plan);
   },
   async getDailyReport(dayKey: string): Promise<DailyReport | null> {
     const run = runDeterministicMission(campaignMissions[0], `daily-${dayKey}`);

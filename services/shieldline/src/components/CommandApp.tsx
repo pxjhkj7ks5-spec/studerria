@@ -125,15 +125,16 @@ export function CommandApp() {
 function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
   const [notificationState, setNotificationState] = useState<"idle" | "enabled" | "unavailable">("idle");
   const enableNotifications = async () => setNotificationState(await setTelegramNotificationPreference(import.meta.env.BASE_URL, true) ? "enabled" : "unavailable");
+  const campaignMode = gameModes.find((mode) => mode.id === "campaign")!;
   return <main className="command-app command-app--catalog" aria-label="Shieldline mode selection">
     <header className="catalog-hero">
       <span className="hero-chip"><Radio size={14} /> Telegram-first command sim</span>
       <h1>One city. One night.<br /><em>Your command.</em></h1>
-      <p>A mobile strategy simulation built for Telegram Mini App, browser and installable PWA. Every outcome is fictional, abstract and replayable.</p>
+      <p>The Campaign is the active Shieldline experience: plan the defense, command each night, and review the same authoritative battle stream.</p>
       {typeof window !== "undefined" && window.Telegram?.WebApp?.initData ? <button className="telegram-notification-button" type="button" onClick={enableNotifications} disabled={notificationState === "enabled"}>{notificationState === "enabled" ? "Telegram notifications enabled" : notificationState === "unavailable" ? "Telegram authorization unavailable" : "Enable Telegram reports"}</button> : null}
     </header>
-    <section className="mode-catalog" aria-label="Game modes">
-      {gameModes.map((mode) => {
+    <section className="mode-catalog mode-catalog--campaign-only" aria-label="Available game modes">
+      {[campaignMode].map((mode) => {
         const Icon = icons[mode.id];
         return <button className="command-mode-card" type="button" key={mode.id} onClick={() => onSelect(mode.id)}>
           <span className="mode-icon"><Icon size={21} /></span>
@@ -147,6 +148,7 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
         </button>;
       })}
     </section>
+    <p className="catalog-roadmap-note">Training, Sandbox, Ranked, Co-op, Rapid Response and Daily Defense are paused while Campaign reaches production quality.</p>
   </main>;
 }
 

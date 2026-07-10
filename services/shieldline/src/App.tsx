@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle, ClipboardList, Crosshair, FastForward, Layers, Menu, Pause, Play, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
@@ -18,10 +18,11 @@ import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameMo
 import { campaignMissions } from "./data/missions";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
+import { projectCampaignRun } from "./game/campaignProjection";
 import { useGameStore } from "./store/useGameStore";
 import { bindTelegramBackButton, bindTelegramBottomButton } from "./platform/telegramShell";
 import type { CampaignStatus, DefenseBattery, MapMode, ThreatKind, UnitDefinition, UnitKind } from "./types/game";
-import type { CampaignProgress, DailyDefensePlan, GameModeId, RankedResult } from "./domain/contracts";
+import type { CampaignProgress, DailyDefensePlan, GameModeId, MissionRun, OperationPhase, RankedResult, SimulationEvent } from "./domain/contracts";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "live", label: "Live" },
@@ -38,6 +39,16 @@ const threatLabels: Array<{ kind: ThreatKind; label: string }> = [
 ];
 
 const SIMULATION_TICK_MS = 300;
+const CAMPAIGN_SESSION_KEY = "shieldline-campaign-operation-v1";
+
+interface PersistedCampaignOperation {
+  runId: string;
+  missionId: string;
+  phase: OperationPhase;
+  playbackMs: number;
+  updatedAt: number;
+  speed: number;
+}
 
 function coOpSectorForCity(cityId: string) {
   if (["chernihiv", "sumy", "kyiv", "zhytomyr", "rivne", "lutsk"].includes(cityId)) return "north";
@@ -120,9 +131,13 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
   const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
-  const [authoritativeRun, setAuthoritativeRun] = useState<import("./domain/contracts").MissionRun | null>(null);
+  const [authoritativeRun, setAuthoritativeRun] = useState<MissionRun | null>(null);
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const [campaignRuntimePhase, setCampaignRuntimePhase] = useState<OperationPhase>("planning");
+  const [campaignCountdownMs, setCampaignCountdownMs] = useState(0);
+  const [campaignPlaybackMs, setCampaignPlaybackMs] = useState(0);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
   const coOpSyncedBatteryIds = useRef(new Set<string>());
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
@@ -142,10 +157,70 @@ export default function App() {
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
   })();
   const activeMission = campaignMissions.find((mission) => mission.id === campaignProgress?.currentMissionId) || campaignMissions[0];
+  const isAuthoritativeCampaign = tacticalMode === "campaign";
+  const effectiveOperationPhase = isAuthoritativeCampaign ? campaignRuntimePhase : operationPhase;
+  const effectiveCountdownMs = isAuthoritativeCampaign ? campaignCountdownMs : countdownRemainingMs;
+  const campaignEndMs = authoritativeRun?.events.at(-1)?.occurredAtMs || 0;
+  const campaignProjection = useMemo(
+    () => projectCampaignRun(isAuthoritativeCampaign ? authoritativeRun : null, campaignPlaybackMs),
+    [authoritativeRun, campaignPlaybackMs, isAuthoritativeCampaign],
+  );
+  const displayGame = useMemo(
+    () => campaignProjection ? { ...game, interceptions: campaignProjection.interceptions, impacts: campaignProjection.impacts } : game,
+    [campaignProjection, game],
+  );
+  const displayRevealedThreats = campaignProjection ? campaignProjection.liveThreats.filter((threat) => threat.revealed).length : revealedThreats;
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
     url.search = "";
     window.location.assign(url.toString());
+  };
+  const startCampaignOperation = async () => {
+    if (!defenseReadiness.ready || isResolving) return;
+    setCampaignError(null);
+    setIsResolving(true);
+    setCampaignRuntimePhase("countdown");
+    setCampaignCountdownMs(5_000);
+    setCampaignPlaybackMs(0);
+    try {
+      const runSeed = `campaign-${activeMission.id}-${crypto.randomUUID()}`;
+      const result = await apiGameRepository.createOperation({
+        modeId: "campaign",
+        missionId: activeMission.id,
+        seed: runSeed,
+        plan: defensePlanFromBatteries(game.batteries),
+      });
+      setAuthoritativeRun(result.run);
+    } catch (error) {
+      setCampaignRuntimePhase("planning");
+      setCampaignCountdownMs(0);
+      setCampaignError(error instanceof Error ? error.message : "Campaign operation could not start.");
+    } finally {
+      setIsResolving(false);
+    }
+  };
+  const handleStartOperation = () => {
+    if (isAuthoritativeCampaign) void startCampaignOperation();
+    else startOperation();
+  };
+  const handlePauseOperation = () => {
+    if (isAuthoritativeCampaign) setCampaignRuntimePhase((phase) => phase === "running" ? "paused" : phase);
+    else pauseOperation();
+  };
+  const handleResumeOperation = () => {
+    if (isAuthoritativeCampaign) setCampaignRuntimePhase((phase) => phase === "paused" ? "running" : phase);
+    else resumeOperation();
+  };
+  const handleResetOperation = () => {
+    if (isAuthoritativeCampaign) {
+      window.localStorage.removeItem(CAMPAIGN_SESSION_KEY);
+      setAuthoritativeRun(null);
+      setCampaignRuntimePhase("planning");
+      setCampaignCountdownMs(0);
+      setCampaignPlaybackMs(0);
+      setCampaignError(null);
+    }
+    resetCampaign();
   };
 
   useEffect(() => bindTelegramBackButton(returnToCommandModes), []);
@@ -153,12 +228,12 @@ export default function App() {
   useEffect(() => bindTelegramBottomButton({
     text: runtimePolicy.start === "hq-ready" ? "HQ start" : "Start operation",
     enabled: defenseReadiness.ready,
-    visible: runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && operationPhase === "planning",
-    onClick: startOperation,
-  }), [defenseReadiness.ready, operationPhase, runtimePolicy.execution, runtimePolicy.start, startOperation]);
+    visible: runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && effectiveOperationPhase === "planning",
+    onClick: handleStartOperation,
+  }), [defenseReadiness.ready, effectiveOperationPhase, runtimePolicy.execution, runtimePolicy.start, isAuthoritativeCampaign, isResolving, game.batteries, activeMission.id]);
 
   useEffect(() => {
-    if (!campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
+    if (isAuthoritativeCampaign || !campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
     let frameId = 0;
     const frame = (timestamp: number) => {
       if (lastTickRef.current === null) {
@@ -175,12 +250,75 @@ export default function App() {
     };
     frameId = window.requestAnimationFrame(frame);
     return () => window.cancelAnimationFrame(frameId);
-  }, [advanceOperation, campaignMode, operationPhase, runtimePolicy.execution]);
+  }, [advanceOperation, campaignMode, isAuthoritativeCampaign, operationPhase, runtimePolicy.execution]);
 
   useEffect(() => {
     lastTickRef.current = null;
     accumulatorRef.current = 0;
   }, [resolvedMode, operationPhase]);
+
+  useEffect(() => {
+    if (!isAuthoritativeCampaign || (campaignRuntimePhase !== "countdown" && campaignRuntimePhase !== "running")) return undefined;
+    let last = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const delta = Math.max(0, now - last);
+      last = now;
+      if (campaignRuntimePhase === "countdown") {
+        setCampaignCountdownMs((remaining) => {
+          const next = Math.max(0, remaining - delta);
+          if (next === 0 && authoritativeRun) setCampaignRuntimePhase("running");
+          return next;
+        });
+        return;
+      }
+      setCampaignPlaybackMs((current) => Math.min(campaignEndMs, current + delta * simulationSpeed));
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [authoritativeRun, campaignEndMs, campaignRuntimePhase, isAuthoritativeCampaign, simulationSpeed]);
+
+  useEffect(() => {
+    if (!isAuthoritativeCampaign || campaignRuntimePhase !== "running" || !campaignEndMs || campaignPlaybackMs < campaignEndMs) return;
+    setCampaignRuntimePhase("completed");
+    setActivePanel("report");
+  }, [campaignEndMs, campaignPlaybackMs, campaignRuntimePhase, isAuthoritativeCampaign]);
+
+  useEffect(() => {
+    if (!isAuthoritativeCampaign) return;
+    const raw = window.localStorage.getItem(CAMPAIGN_SESSION_KEY);
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as PersistedCampaignOperation;
+      void apiGameRepository.getOperation(saved.runId).then((run) => {
+        if (!run) {
+          window.localStorage.removeItem(CAMPAIGN_SESSION_KEY);
+          return;
+        }
+        const end = run.events.at(-1)?.occurredAtMs || 0;
+        const elapsedSinceSave = saved.phase === "running" ? Math.max(0, Date.now() - saved.updatedAt) * Math.max(1, saved.speed) : 0;
+        const playback = Math.min(end, Math.max(0, saved.playbackMs + elapsedSinceSave));
+        setAuthoritativeRun(run);
+        setCampaignPlaybackMs(playback);
+        setCampaignCountdownMs(0);
+        setCampaignRuntimePhase(playback >= end ? "completed" : saved.phase === "countdown" ? "running" : saved.phase);
+      }).catch(() => undefined);
+    } catch {
+      window.localStorage.removeItem(CAMPAIGN_SESSION_KEY);
+    }
+  }, [isAuthoritativeCampaign]);
+
+  useEffect(() => {
+    if (!isAuthoritativeCampaign || !authoritativeRun) return;
+    const saved: PersistedCampaignOperation = {
+      runId: authoritativeRun.id,
+      missionId: authoritativeRun.missionId,
+      phase: campaignRuntimePhase,
+      playbackMs: campaignPlaybackMs,
+      updatedAt: Date.now(),
+      speed: simulationSpeed,
+    };
+    window.localStorage.setItem(CAMPAIGN_SESSION_KEY, JSON.stringify(saved));
+  }, [authoritativeRun, campaignPlaybackMs, campaignRuntimePhase, isAuthoritativeCampaign, simulationSpeed]);
 
   useEffect(() => {
     if (tacticalMode !== "campaign") return;
@@ -281,7 +419,7 @@ export default function App() {
       </nav>
 
       <section className={`map-stage map-stage--${mapMode} ${placementKind ? "map-stage--placing" : ""}`} aria-label="Live defense map">
-        <TacticalMap />
+        <TacticalMap projection={campaignProjection} />
         <header className="map-status-strip" aria-label="Campaign status">
           <div className="strip-brand">
             <Shield size={22} />
@@ -290,24 +428,24 @@ export default function App() {
               <span>{tacticalMode === "daily-defense" ? "Daily Defense · persistent city planning" : tacticalMode === "co-op-command" && coOpSession ? `Co-op Command · ${coOpSession.sectorId} sector · room log` : tacticalMode === "campaign" ? `${activeMission.title} · authoritative command ready` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
             </div>
           </div>
-          <ResourceBar game={game} simulationSpeed={simulationSpeed} operationPhase={operationPhase} />
+          <ResourceBar game={displayGame} simulationSpeed={simulationSpeed} operationPhase={effectiveOperationPhase} />
         </header>
         <MapLegend mode={mapMode} />
-        <section className={`operation-controls operation-controls--${operationPhase}`} aria-label="Operation controls">
+        <section className={`operation-controls operation-controls--${effectiveOperationPhase}`} aria-label="Operation controls">
           <div className="operation-state">
-            <span>{runtimePolicy.execution === "daily-scheduled" ? "Daily schedule" : operationPhase}</span>
-            <strong>{operationPhase === "countdown" ? `Launch in ${Math.max(1, Math.ceil(countdownRemainingMs / 1000))}s` : runtimePolicy.execution === "daily-scheduled" ? "The city resolves once per day" : defenseReadiness.message}</strong>
+            <span>{runtimePolicy.execution === "daily-scheduled" ? "Daily schedule" : effectiveOperationPhase}</span>
+            <strong>{effectiveOperationPhase === "countdown" ? authoritativeRun ? `Launch in ${Math.max(1, Math.ceil(effectiveCountdownMs / 1000))}s` : "Synchronizing operation…" : runtimePolicy.execution === "daily-scheduled" ? "The city resolves once per day" : campaignError || defenseReadiness.message}</strong>
           </div>
           {runtimePolicy.execution === "live" ? (
             <div className="operation-actions">
-              {operationPhase === "planning" ? (
-                <button type="button" onClick={startOperation} disabled={!defenseReadiness.ready && runtimePolicy.start !== "sandbox-controls"}>
-                  <Play size={16} /> {runtimePolicy.start === "hq-ready" ? "HQ start" : runtimePolicy.start === "auto-checklist" ? "Start training now" : "Start operation"}
+              {effectiveOperationPhase === "planning" ? (
+                <button type="button" onClick={handleStartOperation} disabled={isResolving || (!defenseReadiness.ready && runtimePolicy.start !== "sandbox-controls")}>
+                  <Play size={16} /> {isResolving ? "Synchronizing…" : runtimePolicy.start === "hq-ready" ? "HQ start" : runtimePolicy.start === "auto-checklist" ? "Start training now" : "Start operation"}
                 </button>
               ) : null}
-              {operationPhase === "completed" ? <button type="button" onClick={resetCampaign}><RotateCcw size={16} /> Reset operation</button> : null}
-              {operationPhase === "running" ? <button type="button" onClick={pauseOperation}><Pause size={16} /> Pause</button> : null}
-              {operationPhase === "paused" ? <button type="button" onClick={resumeOperation}><Play size={16} /> Resume</button> : null}
+              {effectiveOperationPhase === "completed" ? <button type="button" onClick={handleResetOperation}><RotateCcw size={16} /> New operation</button> : null}
+              {effectiveOperationPhase === "running" ? <button type="button" onClick={handlePauseOperation}><Pause size={16} /> Pause</button> : null}
+              {effectiveOperationPhase === "paused" ? <button type="button" onClick={handleResumeOperation}><Play size={16} /> Resume</button> : null}
               {resolvedMode === "sandbox" ? <button type="button" onClick={triggerNextWave} disabled={game.cyclePhase === "attack"}><FastForward size={16} /> Next wave</button> : null}
               {runtimePolicy.availableSpeeds.length > 1 ? <div className="speed-controls" aria-label="Simulation speed">{runtimePolicy.availableSpeeds.map((speed) => <button className={simulationSpeed === speed ? "is-active" : ""} type="button" key={speed} onClick={() => setSimulationSpeed(speed)}>x{speed}</button>)}</div> : null}
             </div>
@@ -342,9 +480,9 @@ export default function App() {
               </div>
               <div className="live-stats live-stats--drawer" aria-label="Live defense telemetry">
                 <span><strong>{game.day}</strong> Cycle</span>
-                <span><strong>{revealedThreats}</strong> Revealed</span>
-                <span><strong>{game.interceptions}</strong> Interceptions</span>
-                <span><strong>{game.impacts}</strong> Impacts</span>
+                <span><strong>{displayRevealedThreats}</strong> Revealed</span>
+                <span><strong>{displayGame.interceptions}</strong> Interceptions</span>
+                <span><strong>{displayGame.impacts}</strong> Impacts</span>
                 <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
                 <span><strong>{game.logistics.resupplyDelayDays}</strong> Supply delay</span>
               </div>
@@ -369,13 +507,14 @@ export default function App() {
           ) : null}
           {activePanel === "intel" ? (
             <section className="drawer-section">
-              <IntelLog game={game} />
+              {campaignProjection ? <CampaignEventLog events={campaignProjection.visibleEvents} /> : <IntelLog game={game} />}
               {game.status !== "active" ? <CampaignStatusCard status={game.status} statusReason={game.statusReason} /> : null}
             </section>
           ) : null}
           {activePanel === "report" ? (
             <section className="drawer-section">
               <AfterActionReport game={game} rankedResult={rankedResult} authoritativeRun={authoritativeRun} />
+              {isAuthoritativeCampaign && authoritativeRun ? <CampaignReplayScrubber run={authoritativeRun} value={campaignPlaybackMs} onChange={(value) => { setCampaignPlaybackMs(value); setCampaignRuntimePhase("paused"); }} /> : null}
             </section>
           ) : null}
           {activePanel === "settings" ? (
@@ -398,7 +537,7 @@ export default function App() {
                 <Menu size={16} />
                 Change Scenario
               </button>
-              {tacticalMode !== "daily-defense" ? <button className="reset-button" type="button" disabled={!game.batteries.length || isResolving} onClick={() => { void resolveAuthoritativeOperation(); }}><Zap size={16} /> {isResolving ? "Resolving authoritative event stream…" : tacticalMode === "campaign" ? `Resolve ${activeMission.title}` : "Resolve operation on server"}</button> : null}
+              {tacticalMode !== "daily-defense" && tacticalMode !== "campaign" ? <button className="reset-button" type="button" disabled={!game.batteries.length || isResolving} onClick={() => { void resolveAuthoritativeOperation(); }}><Zap size={16} /> {isResolving ? "Resolving authoritative event stream…" : "Resolve operation on server"}</button> : null}
             </section>
           ) : null}
         </aside>
@@ -415,7 +554,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  resetCampaign();
+                  handleResetOperation();
                   setConfirmReset(false);
                 }}
               >
@@ -426,6 +565,41 @@ export default function App() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+function CampaignEventLog({ events }: { events: SimulationEvent[] }) {
+  return (
+    <section className="campaign-event-stream" aria-label="Authoritative campaign events">
+      <div className="campaign-event-stream__heading">
+        <span>Authoritative stream</span>
+        <strong>{events.length ? `Sequence ${events.at(-1)?.sequence}` : "Awaiting launch"}</strong>
+      </div>
+      <ol>
+        {events.slice(-24).reverse().map((event) => (
+          <li key={event.id} className={`campaign-event campaign-event--${event.type.replace(".", "-")}`}>
+            <time>{Math.round(event.occurredAtMs / 1000)}s</time>
+            <div><strong>{event.type.replace(".", " ")}</strong><span>{event.message}</span></div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function CampaignReplayScrubber({ run, value, onChange }: { run: MissionRun; value: number; onChange: (value: number) => void }) {
+  const end = run.events.at(-1)?.occurredAtMs || 0;
+  const current = [...run.events].reverse().find((event) => event.occurredAtMs <= value);
+  return (
+    <section className="campaign-replay-controls" aria-label="Campaign tactical replay">
+      <div>
+        <span>Tactical replay</span>
+        <strong>{Math.round(value / 1000)}s / {Math.round(end / 1000)}s</strong>
+      </div>
+      <input type="range" min="0" max={end} step="100" value={Math.min(value, end)} onChange={(event) => onChange(Number(event.target.value))} aria-label="Campaign replay timeline" />
+      <p>{current?.message || "Move the timeline to inspect the operation."}</p>
+      <button type="button" className="reset-button reset-button--secondary" onClick={() => onChange(0)}><RotateCcw size={15} /> Replay from launch warning</button>
+    </section>
   );
 }
 

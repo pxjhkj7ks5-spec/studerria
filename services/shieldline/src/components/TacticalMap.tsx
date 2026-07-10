@@ -7,6 +7,7 @@ import { darkMapTiles } from "../data/mapTiles";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { useGameStore } from "../store/useGameStore";
+import type { CampaignMapProjection } from "../game/campaignProjection";
 import type {
   City,
   CarrierTrack,
@@ -658,7 +659,7 @@ function PerformanceOverlay({ stats, counts }: { stats: PerformanceStats; counts
   );
 }
 
-export function TacticalMap() {
+export function TacticalMap({ projection }: { projection?: CampaignMapProjection | null }) {
   const game = useGameStore((state) => state.game);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const mapMode = useGameStore((state) => state.mapMode);
@@ -669,6 +670,11 @@ export function TacticalMap() {
   const radiusOverlayRenderer = useMemo(() => L.svg({ padding: 0.6 }), []);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
+  const liveThreats = projection?.liveThreats ?? game.liveThreats;
+  const interceptorShots = projection?.interceptorShots ?? game.interceptorShots;
+  const impactMarkers = projection?.impactMarkers ?? game.impactMarkers;
+  const launchSectors = projection ? [...game.launchSectors, ...projection.launchSectors] : game.launchSectors;
+  const elapsedMs = projection?.elapsedMs ?? game.elapsedMs;
   const controlOverlay = useMemo(() => getControlOverlay(), []);
   const occupiedZonePolygons = useMemo(
     () => controlOverlay.occupiedPolygons.map((polygon) => ({
@@ -694,8 +700,8 @@ export function TacticalMap() {
     [occupiedZonePolygons, renderBounds],
   );
   const visibleLaunchSectors = useMemo(
-    () => game.launchSectors.filter((sector) => pointInBounds(sector.coordinates, renderBounds)),
-    [game.launchSectors, renderBounds],
+    () => launchSectors.filter((sector) => pointInBounds(sector.coordinates, renderBounds)),
+    [launchSectors, renderBounds],
   );
   const visibleCarriers = useMemo(
     () => game.carriers.filter((carrier) => pointInBounds(carrier.position, renderBounds)),
@@ -714,16 +720,16 @@ export function TacticalMap() {
     [game.logistics.routes, mapMode, renderBounds],
   );
   const visibleThreats = useMemo(
-    () => game.liveThreats.filter((threat) => threat.revealed && lineInBounds(threatPosition(threat), threat.target, renderBounds)),
-    [game.liveThreats, renderBounds],
+    () => liveThreats.filter((threat) => threat.revealed && lineInBounds(threatPosition(threat), threat.target, renderBounds)),
+    [liveThreats, renderBounds],
   );
   const visibleShots = useMemo(
-    () => game.interceptorShots.filter((shot) => lineInBounds(shot.from, shotPosition(shot), renderBounds)),
-    [game.interceptorShots, renderBounds],
+    () => interceptorShots.filter((shot) => lineInBounds(shot.from, shotPosition(shot), renderBounds)),
+    [interceptorShots, renderBounds],
   );
   const visibleImpactMarkers = useMemo(
-    () => game.impactMarkers.filter((marker) => pointInBounds(marker.position, renderBounds)),
-    [game.impactMarkers, renderBounds],
+    () => impactMarkers.filter((marker) => pointInBounds(marker.position, renderBounds)),
+    [impactMarkers, renderBounds],
   );
   useEffect(() => {
     if (!renderBounds) return;
@@ -734,12 +740,12 @@ export function TacticalMap() {
   }, [renderBounds?.key]);
   const renderCounts = useMemo<RenderCounts>(() => {
     const activeObjects = game.cities.length
-      + game.launchSectors.length
+      + launchSectors.length
       + game.carriers.length
       + game.batteries.length
-      + game.liveThreats.length
-      + game.interceptorShots.length
-      + game.impactMarkers.length
+      + liveThreats.length
+      + interceptorShots.length
+      + impactMarkers.length
       + (mapMode === "logistics" ? game.logistics.routes.length : 0);
     const renderedObjects = visibleCities.length
       + visibleLaunchSectors.length
@@ -760,12 +766,12 @@ export function TacticalMap() {
   }, [
     cachedChunkCount,
     game.cities.length,
-    game.launchSectors.length,
+    launchSectors.length,
     game.carriers.length,
     game.batteries.length,
-    game.liveThreats.length,
-    game.interceptorShots.length,
-    game.impactMarkers.length,
+    liveThreats.length,
+    interceptorShots.length,
+    impactMarkers.length,
     game.logistics.routes.length,
     mapMode,
     renderBounds,
@@ -813,7 +819,7 @@ export function TacticalMap() {
           threats={visibleThreats}
           shots={visibleShots}
           impacts={visibleImpactMarkers}
-          elapsedMs={game.elapsedMs}
+          elapsedMs={elapsedMs}
           mapMode={mapMode}
           reducedQuality={reducedQuality}
         />
