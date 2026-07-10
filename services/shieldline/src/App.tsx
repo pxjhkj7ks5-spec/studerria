@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, ClipboardList, Crosshair, FastForward, Layers, Menu, Pause, Play, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ClipboardList, Crosshair, Layers, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
 import { IntelLog } from "./components/IntelLog";
@@ -84,11 +84,6 @@ const panelTitle: Record<ActivePanel, string> = {
   settings: t("panel.settings"),
 };
 
-function operationPhaseLabel(phase: OperationPhase) {
-  const keys = { planning: "operation.planning", countdown: "operation.countdown", running: "operation.running", paused: "operation.paused", completed: "operation.completed" } as const;
-  return t(keys[phase]);
-}
-
 function formatAmmo(current: number | "infinite", capacity: number | "infinite") {
   if (capacity === "infinite" || current === "infinite") return "inf";
   return `${current}/${capacity}`;
@@ -123,17 +118,12 @@ export default function App() {
   const resetCampaign = useGameStore((state) => state.resetCampaign);
   const advanceOperation = useGameStore((state) => state.advanceOperation);
   const startOperation = useGameStore((state) => state.startOperation);
-  const pauseOperation = useGameStore((state) => state.pauseOperation);
-  const resumeOperation = useGameStore((state) => state.resumeOperation);
-  const triggerNextWave = useGameStore((state) => state.triggerNextWave);
-  const setSimulationSpeed = useGameStore((state) => state.setSimulationSpeed);
   const removeSelectedBattery = useGameStore((state) => state.removeSelectedBattery);
   const startSelectedBatteryMaintenance = useGameStore((state) => state.startSelectedBatteryMaintenance);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const placementKind = useGameStore((state) => state.placementKind);
   const activeGameMode = useGameStore((state) => state.activeGameMode);
   const operationPhase = useGameStore((state) => state.operationPhase);
-  const countdownRemainingMs = useGameStore((state) => state.countdownRemainingMs);
   const simulationSpeed = useGameStore((state) => state.simulationSpeed);
   const [confirmReset, setConfirmReset] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
@@ -144,7 +134,6 @@ export default function App() {
   const [campaignRuntimePhase, setCampaignRuntimePhase] = useState<OperationPhase>("planning");
   const [campaignCountdownMs, setCampaignCountdownMs] = useState(0);
   const [campaignPlaybackMs, setCampaignPlaybackMs] = useState(0);
-  const [campaignError, setCampaignError] = useState<string | null>(null);
   const coOpSyncedBatteryIds = useRef(new Set<string>());
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
@@ -160,7 +149,6 @@ export default function App() {
   const resolvedMode = (activeGameMode || tacticalMode || "training") as GameModeId;
   const runtimePolicy = getGameModeRuntimePolicy(resolvedMode);
   const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
-  const readinessMessage = !defenseReadiness.radarReady ? t("readiness.radar") : !defenseReadiness.kineticReady ? t("readiness.kinetic") : t("readiness.ready");
   const coOpSession = (() => {
     if (typeof window === "undefined" || tacticalMode !== "co-op-command") return null;
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
@@ -169,7 +157,6 @@ export default function App() {
   const activeMissionTitle = t(activeMission.id === "campaign-night-02" ? "mission.2" : activeMission.id === "campaign-night-03" ? "mission.3" : "mission.1");
   const isAuthoritativeCampaign = tacticalMode === "campaign";
   const effectiveOperationPhase = isAuthoritativeCampaign ? campaignRuntimePhase : operationPhase;
-  const effectiveCountdownMs = isAuthoritativeCampaign ? campaignCountdownMs : countdownRemainingMs;
   const campaignEndMs = authoritativeRun?.events.at(-1)?.occurredAtMs || 0;
   const campaignProjection = useMemo(
     () => projectCampaignRun(isAuthoritativeCampaign ? authoritativeRun : null, campaignPlaybackMs),
@@ -187,7 +174,6 @@ export default function App() {
   };
   const startCampaignOperation = async () => {
     if (!defenseReadiness.ready || isResolving) return;
-    setCampaignError(null);
     setIsResolving(true);
     setCampaignRuntimePhase("countdown");
     setCampaignCountdownMs(5_000);
@@ -202,10 +188,9 @@ export default function App() {
       });
       setAuthoritativeRun(result.run);
       trackAnalytics("campaign.operation.started", { runId: result.runId, missionId: activeMission.id, simVersion: result.simVersion });
-    } catch (error) {
+    } catch {
       setCampaignRuntimePhase("planning");
       setCampaignCountdownMs(0);
-      setCampaignError(error instanceof Error ? error.message : "Campaign operation could not start.");
     } finally {
       setIsResolving(false);
     }
@@ -214,14 +199,6 @@ export default function App() {
     if (isAuthoritativeCampaign) void startCampaignOperation();
     else startOperation();
   };
-  const handlePauseOperation = () => {
-    if (isAuthoritativeCampaign) setCampaignRuntimePhase((phase) => phase === "running" ? "paused" : phase);
-    else pauseOperation();
-  };
-  const handleResumeOperation = () => {
-    if (isAuthoritativeCampaign) setCampaignRuntimePhase((phase) => phase === "paused" ? "running" : phase);
-    else resumeOperation();
-  };
   const handleResetOperation = () => {
     if (isAuthoritativeCampaign) {
       window.localStorage.removeItem(CAMPAIGN_SESSION_KEY);
@@ -229,7 +206,6 @@ export default function App() {
       setCampaignRuntimePhase("planning");
       setCampaignCountdownMs(0);
       setCampaignPlaybackMs(0);
-      setCampaignError(null);
     }
     resetCampaign();
   };
@@ -451,26 +427,6 @@ export default function App() {
           <ResourceBar game={displayGame} simulationSpeed={simulationSpeed} operationPhase={effectiveOperationPhase} />
         </header>
         <MapLegend mode={mapMode} />
-        <section className={`operation-controls operation-controls--${effectiveOperationPhase}`} aria-label="Operation controls">
-          <div className="operation-state">
-            <span>{operationPhaseLabel(effectiveOperationPhase)}</span>
-            <strong>{effectiveOperationPhase === "countdown" ? authoritativeRun ? t("operation.launchIn", { seconds: formatNumber(Math.max(1, Math.ceil(effectiveCountdownMs / 1000))) }) : t("operation.syncing") : campaignError || readinessMessage}</strong>
-          </div>
-          {runtimePolicy.execution === "live" ? (
-            <div className="operation-actions">
-              {effectiveOperationPhase === "planning" ? (
-                <button type="button" onClick={handleStartOperation} disabled={isResolving || (!defenseReadiness.ready && runtimePolicy.start !== "sandbox-controls")}>
-                  <Play size={16} /> {isResolving ? t("operation.syncing") : t("operation.start")}
-                </button>
-              ) : null}
-              {effectiveOperationPhase === "completed" ? <button type="button" onClick={handleResetOperation}><RotateCcw size={16} /> {t("operation.new")}</button> : null}
-              {effectiveOperationPhase === "running" ? <button type="button" onClick={handlePauseOperation}><Pause size={16} /> {t("operation.pause")}</button> : null}
-              {effectiveOperationPhase === "paused" ? <button type="button" onClick={handleResumeOperation}><Play size={16} /> {t("operation.resume")}</button> : null}
-              {resolvedMode === "sandbox" ? <button type="button" onClick={triggerNextWave} disabled={game.cyclePhase === "attack"}><FastForward size={16} /> Next wave</button> : null}
-              {runtimePolicy.availableSpeeds.length > 1 ? <div className="speed-controls" aria-label="Simulation speed">{runtimePolicy.availableSpeeds.map((speed) => <button className={simulationSpeed === speed ? "is-active" : ""} type="button" key={speed} onClick={() => setSimulationSpeed(speed)}>x{speed}</button>)}</div> : null}
-            </div>
-          ) : null}
-        </section>
       </section>
 
       {activePanel ? (
