@@ -404,6 +404,7 @@ export default function App() {
                 className={`rail-button ${activePanel === item.id ? "rail-button--active" : ""}`}
                 type="button"
                 key={item.id}
+                data-testid={`panel-${item.id}`}
                 onClick={() => {
                   if (item.id === "report" && authoritativeRun) trackAnalytics("campaign.replay.opened", { runId: authoritativeRun.id, source: "navigation" });
                   setActivePanel((current) => (current === item.id ? null : item.id));

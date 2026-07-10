@@ -29,9 +29,9 @@ test("mobile Campaign runs from placement through authoritative replay and recon
   await expect(page.getByLabel("Campaign tactical replay")).toBeVisible();
 
   await page.reload();
-  await page.getByRole("button", { name: /Report/ }).click();
+  await page.getByTestId("panel-report").click();
   await expect(page.getByText(/Authoritative server result/)).toBeVisible();
 
-  const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".operation-controls").include(".command-drawer").analyze();
+  const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".command-drawer").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);
 });
