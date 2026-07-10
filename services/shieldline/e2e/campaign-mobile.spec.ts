@@ -4,8 +4,8 @@ import { expect, test } from "@playwright/test";
 test("mobile Campaign runs from placement through authoritative replay and reconnect", async ({ page }) => {
   await page.goto("/shieldline/");
   await page.getByRole("button", { name: /Campaign/ }).click();
-  const tutorialButton = page.getByRole("button", { name: /Begin watch/ });
-  if (await tutorialButton.isVisible()) await tutorialButton.click();
+  const tutorial = page.locator(".tutorial-overlay");
+  if (await tutorial.isVisible()) await tutorial.getByRole("button").last().click();
 
   const drawer = page.getByRole("complementary", { name: /Defense units/ });
   const controls = page.getByRole("region", { name: "Operation controls" });
