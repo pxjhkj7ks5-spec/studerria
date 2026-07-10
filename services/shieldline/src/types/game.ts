@@ -76,6 +76,7 @@ export type LaunchAreaState = "idle" | "warning" | "launching" | "cooldown";
 export type CityAlertState = "calm" | "launch-corridor" | "probable-target" | "air-raid";
 
 export type IntelTone = "info" | "success" | "warning" | "danger";
+export type BattleNoticeType = "launch" | "detection";
 
 export type CampaignStatus = "active" | "won" | "lost";
 
@@ -226,6 +227,8 @@ export interface IntelEntry {
   title: string;
   body: string;
   tone: IntelTone;
+  eventType?: BattleNoticeType;
+  locationLabel?: string;
 }
 
 export interface Threat {

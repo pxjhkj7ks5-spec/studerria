@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { initialCities } from "../data/mapData";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "../data/gameModes";
 import { createDeterministicRandom } from "../game/deterministicRandom";
-import { advanceSimulation, placeBattery, removeBattery, setBatteryMaintenance, startAttackNow } from "../game/liveSimulation";
+import { advanceSimulation, placeBattery, startAttackNow } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
@@ -48,7 +48,6 @@ interface GameStore {
   pendingCampaignMode: CampaignMode | null;
   mapMode: MapMode;
   tutorialDismissed: boolean;
-  selectedBatteryId: string | null;
   placementKind: UnitKind | null;
   operationPhase: OperationPhase;
   countdownRemainingMs: number;
@@ -63,12 +62,9 @@ interface GameStore {
   returnToModeSelect: () => void;
   setMapMode: (mode: MapMode) => void;
   dismissTutorial: () => void;
-  setSelectedBattery: (batteryId: string | null) => void;
   beginPlacement: (kind: UnitKind) => void;
   cancelPlacement: () => void;
   placeSelectedBattery: (position: Coordinates) => void;
-  removeSelectedBattery: () => void;
-  startSelectedBatteryMaintenance: () => void;
   togglePlanningAction: (actionId: PlanningActionId) => void;
   startOperation: () => void;
   pauseOperation: () => void;
@@ -92,7 +88,6 @@ export const useGameStore = create<GameStore>()(
       pendingCampaignMode: null,
       mapMode: "live",
       tutorialDismissed: readTutorialDismissed(),
-      selectedBatteryId: null,
       placementKind: null,
       operationPhase: "planning",
       countdownRemainingMs: 0,
@@ -107,7 +102,7 @@ export const useGameStore = create<GameStore>()(
         const seed = createSimulationSeed(mode);
         if (mode === "daily-defense") {
           const dailyGame = get().dailyCityGame || createScenarioState(Math.random, "crisis", "thirty-days-under-pressure");
-          set({ campaignMode: "crisis", activeGameMode: mode, pendingCampaignMode: null, mapMode: "live", game: dailyGame, selectedBatteryId: null, placementKind: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: policy.defaultSpeed, simulationSeed: seed, simulationRandomCursor: 0 });
+          set({ campaignMode: "crisis", activeGameMode: mode, pendingCampaignMode: null, mapMode: "live", game: dailyGame, placementKind: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: policy.defaultSpeed, simulationSeed: seed, simulationRandomCursor: 0 });
           return;
         }
         const profile = {
@@ -125,7 +120,6 @@ export const useGameStore = create<GameStore>()(
           pendingCampaignMode: null,
           mapMode: "live",
           game: seeded.game,
-          selectedBatteryId: null,
           placementKind: null,
           operationPhase: "planning",
           countdownRemainingMs: 0,
@@ -148,7 +142,7 @@ export const useGameStore = create<GameStore>()(
           resources: { ...game.resources, morale: city.morale, energy: city.energy },
           cities: game.cities.map((entry) => entry.id === "kyiv" ? { ...entry, infrastructure: city.infrastructure, damage: city.damage, morale: city.morale, energy: city.energy } : entry),
         };
-        set({ campaignMode: "crisis", activeGameMode: "daily-defense", pendingCampaignMode: null, mapMode: "live", game, dailyCityGame: game, selectedBatteryId: null, placementKind: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: 1 });
+        set({ campaignMode: "crisis", activeGameMode: "daily-defense", pendingCampaignMode: null, mapMode: "live", game, dailyCityGame: game, placementKind: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: 1 });
       },
       selectScenario: (scenarioId) => {
         const mode = get().pendingCampaignMode || "crisis";
@@ -159,7 +153,6 @@ export const useGameStore = create<GameStore>()(
           pendingCampaignMode: null,
           mapMode: "live",
           game: seeded.game,
-          selectedBatteryId: null,
           placementKind: null,
           operationPhase: "planning",
           countdownRemainingMs: 0,
@@ -168,7 +161,7 @@ export const useGameStore = create<GameStore>()(
         });
       },
       clearScenarioSelection: () => set({ pendingCampaignMode: null }),
-      returnToModeSelect: () => set({ campaignMode: null, activeGameMode: null, pendingCampaignMode: null, placementKind: null, selectedBatteryId: null, operationPhase: "planning", countdownRemainingMs: 0 }),
+      returnToModeSelect: () => set({ campaignMode: null, activeGameMode: null, pendingCampaignMode: null, placementKind: null, operationPhase: "planning", countdownRemainingMs: 0 }),
       setMapMode: (mode) => set({ mapMode: mode }),
       dismissTutorial: () => {
         if (typeof window !== "undefined") {
@@ -176,8 +169,7 @@ export const useGameStore = create<GameStore>()(
         }
         set({ tutorialDismissed: true });
       },
-      setSelectedBattery: (batteryId) => set({ selectedBatteryId: batteryId, placementKind: null }),
-      beginPlacement: (kind) => set({ placementKind: kind, selectedBatteryId: null }),
+      beginPlacement: (kind) => set({ placementKind: kind }),
       cancelPlacement: () => set({ placementKind: null }),
       placeSelectedBattery: (position) => {
         const { game, placementKind, simulationSeed, simulationRandomCursor, activeGameMode, operationPhase } = get();
@@ -189,21 +181,6 @@ export const useGameStore = create<GameStore>()(
         const readiness = defenseReadinessForMode(mode, nextGame.batteries.map((battery) => battery.kind));
         const shouldAutoStart = policy.start === "auto-checklist" && readiness.ready && operationPhase === "planning";
         set({ game: nextGame, dailyCityGame: mode === "daily-defense" ? nextGame : get().dailyCityGame, placementKind: nextGame.placementWarning ? placementKind : null, simulationRandomCursor: random.cursor(), operationPhase: shouldAutoStart ? "countdown" : operationPhase, countdownRemainingMs: shouldAutoStart ? policy.countdownMs : get().countdownRemainingMs });
-      },
-      removeSelectedBattery: () => {
-        const { game, selectedBatteryId } = get();
-        if (!selectedBatteryId) return;
-        const nextGame = removeBattery(game, selectedBatteryId);
-        const mode = get().activeGameMode || "training";
-        const readiness = defenseReadinessForMode(mode, nextGame.batteries.map((battery) => battery.kind));
-        const cancelCountdown = get().operationPhase === "countdown" && !readiness.ready;
-        set({ game: nextGame, dailyCityGame: mode === "daily-defense" ? nextGame : get().dailyCityGame, selectedBatteryId: null, operationPhase: cancelCountdown ? "planning" : get().operationPhase, countdownRemainingMs: cancelCountdown ? 0 : get().countdownRemainingMs });
-      },
-      startSelectedBatteryMaintenance: () => {
-        const { game, selectedBatteryId } = get();
-        if (!selectedBatteryId) return;
-        const nextGame = setBatteryMaintenance(game, selectedBatteryId);
-        set({ game: nextGame, dailyCityGame: get().activeGameMode === "daily-defense" ? nextGame : get().dailyCityGame });
       },
       togglePlanningAction: (actionId) => set((state) => { const game = togglePlanningAction(state.game, actionId); return { game, dailyCityGame: state.activeGameMode === "daily-defense" ? game : state.dailyCityGame }; }),
       startOperation: () => set((state) => {
@@ -248,14 +225,14 @@ export const useGameStore = create<GameStore>()(
         const mode = get().activeGameMode || "training";
         const seed = createSimulationSeed(mode);
         const seeded = createSeededScenario(seed, get().campaignMode || "crisis", get().game.scenarioId);
-        set({ game: seeded.game, dailyCityGame: mode === "daily-defense" ? seeded.game : get().dailyCityGame, selectedBatteryId: null, placementKind: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: getGameModeRuntimePolicy(mode).defaultSpeed, simulationSeed: seed, simulationRandomCursor: seeded.cursor });
+        set({ game: seeded.game, dailyCityGame: mode === "daily-defense" ? seeded.game : get().dailyCityGame, placementKind: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: getGameModeRuntimePolicy(mode).defaultSpeed, simulationSeed: seed, simulationRandomCursor: seeded.cursor });
       },
     }),
     {
       name: "shieldline-live-v7",
-      version: 10,
+      version: 11,
       migrate: (persistedState) => {
-        const state = persistedState as Partial<GameStore>;
+        const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         return {
           ...state,
           game: migrateLegacyLaunchPoints(state.game || null) || undefined,
@@ -269,7 +246,6 @@ export const useGameStore = create<GameStore>()(
         dailyCityGame: state.dailyCityGame,
         pendingCampaignMode: state.pendingCampaignMode,
         mapMode: state.mapMode,
-        selectedBatteryId: state.selectedBatteryId,
         operationPhase: state.operationPhase,
         countdownRemainingMs: state.countdownRemainingMs,
         simulationSpeed: state.simulationSpeed,

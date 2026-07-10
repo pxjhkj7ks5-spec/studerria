@@ -6,36 +6,36 @@ interface TutorialOverlayProps {
 
 export function TutorialOverlay({ onDismiss }: TutorialOverlayProps) {
   return (
-    <div className="tutorial-overlay" role="dialog" aria-modal="true" aria-label="Shieldline quick start">
+    <div className="tutorial-overlay" role="dialog" aria-modal="true" aria-label="Швидкий старт Shieldline">
       <section className="tutorial-card">
-        <button className="tutorial-close" type="button" onClick={onDismiss} aria-label="Close tutorial">
+        <button className="tutorial-close" type="button" onClick={onDismiss} aria-label="Закрити навчання">
           <X size={18} />
         </button>
         <div className="tutorial-heading">
           <RadioTower size={24} />
           <div>
-            <strong>First run briefing</strong>
-            <span>Survive by reading uncertainty, placing coverage, and protecting cities.</span>
+            <strong>Перше бойове зведення</strong>
+            <span>Оцінюйте непевні контакти, розміщуйте прикриття та захищайте міста.</span>
           </div>
         </div>
         <div className="tutorial-steps">
           <article>
             <Map size={20} />
-            <strong>Resources</strong>
-            <p>Budget buys units, ammo fuels engagements, energy and morale are national stability.</p>
+            <strong>Ресурси</strong>
+            <p>Бюджет купує установки, БК потрібен для перехоплень, а енергія й мораль підтримують стійкість.</p>
           </article>
           <article>
             <Crosshair size={20} />
-            <strong>Placement</strong>
-            <p>Pick a unit card, then click the map. Land units use allowed Ukrainian territory; boats use water zones.</p>
+            <strong>Розміщення</strong>
+            <p>Оберіть установку, поверніться на мапу й торкніться дозволеної ділянки. Катери розміщуються на воді.</p>
           </article>
           <article>
             <Eye size={20} />
-            <strong>Fog of war</strong>
-            <p>Low confidence tracks can be decoys or misclassified until radar contact improves certainty.</p>
+            <strong>Туман війни</strong>
+            <p>Непевні контакти можуть бути хибними цілями, доки радар не уточнить інформацію.</p>
           </article>
         </div>
-        <button className="tutorial-primary" type="button" onClick={onDismiss}>Begin watch</button>
+        <button className="tutorial-primary" type="button" onClick={onDismiss}>Почати спостереження</button>
       </section>
     </div>
   );

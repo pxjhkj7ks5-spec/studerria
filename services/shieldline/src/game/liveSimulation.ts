@@ -156,13 +156,21 @@ export function formatClock(elapsedMs: number) {
   return `T+${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function pushLog(entries: IntelEntry[], elapsedMs: number, title: string, body: string, tone: IntelEntry["tone"]) {
+function pushLog(
+  entries: IntelEntry[],
+  elapsedMs: number,
+  title: string,
+  body: string,
+  tone: IntelEntry["tone"],
+  metadata: Pick<IntelEntry, "eventType" | "locationLabel"> = {},
+) {
   entries.unshift({
     id: `${Math.floor(elapsedMs)}-${entries.length}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     time: formatClock(elapsedMs),
     title,
     body,
     tone,
+    ...metadata,
   });
   entries.splice(30);
 }
@@ -199,8 +207,8 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
   const next = cloneState(state);
   const placement = validateBatteryPlacement(kind, position, next.cities);
   if (!placement.allowed) {
-    next.placementWarning = placement.reason || "Placement blocked by control constraints.";
-    pushLog(next.log, next.elapsedMs, "Placement Blocked", next.placementWarning, "warning");
+    next.placementWarning = placement.reason || "Розміщення заборонене умовами сценарію.";
+    pushLog(next.log, next.elapsedMs, "Розміщення неможливе", next.placementWarning, "warning");
     return next;
   }
   const tier = batteryTier(unit);
@@ -435,11 +443,12 @@ function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () =>
     };
     state.pendingLaunches.push(pending);
     markLaunchSector(state, launchSector.id, "warning", warningMs, { cityId: city.id, coordinates: city.coordinates });
-    pushLog(state.log, state.elapsedMs, "Launch Warning", `${launchSector.name} shows abstract OTRK launch preparation.`, "warning");
+    pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Зафіксовано підготовку в секторі «${launchSector.name}».`, "warning", { eventType: "launch", locationLabel: launchSector.name });
     return;
   }
   markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates });
   state.liveThreats.push(spawnThreat(state, random, kind, city.id, launchSector.id));
+  pushLog(state.log, state.elapsedMs, "Пуски", `Зафіксовано пуски: ${launchSector.name}.`, "danger", { eventType: "launch", locationLabel: launchSector.name });
 }
 
 function resolvePendingLaunches(state: GameState, random: () => number) {
@@ -458,7 +467,8 @@ function resolvePendingLaunches(state: GameState, random: () => number) {
       targetCity ? { cityId: targetCity.id, coordinates: targetCity.coordinates } : undefined,
     );
     state.liveThreats.push(spawnThreat(state, random, launch.kind, launch.targetCityId, launch.sectorId));
-    pushLog(state.log, state.elapsedMs, "Missile Launch", "A prepared ballistic launch entered the battlespace.", "danger");
+    const launchSector = state.launchSectors.find((sector) => sector.id === launch.sectorId);
+    pushLog(state.log, state.elapsedMs, "Ракетний пуск", "Підготовлена балістична ціль увійшла в повітряний простір.", "danger", { eventType: "launch", locationLabel: launchSector?.name || "невідомий напрямок" });
   }
   state.pendingLaunches = remaining;
 }
@@ -529,7 +539,7 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
       const firstContactBoost = wasRevealed ? 0 : 8 + random() * 8;
       threat.confidence = clamp(threat.confidence + (bestRadarChance / 100) * 8 + firstContactBoost + (intelFocus ? 6 : 0), 0, 100);
       if (!wasRevealed) {
-        pushLog(state.log, state.elapsedMs, "Radar Contact", `${threat.isFalseTrack ? "Low-confidence" : threat.kind} track entered radar coverage.`, "info");
+        pushLog(state.log, state.elapsedMs, "Радарний контакт", `${threat.isFalseTrack ? "Ціль із низькою достовірністю" : "Ціль"} увійшла в зону радіолокаційного покриття.`, "info", { eventType: "detection", locationLabel: threat.targetCityId });
       }
     }
   }

@@ -6,6 +6,7 @@ import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
+import { batteryCoverageUnavailable } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { useGameStore } from "../store/useGameStore";
 import type { CampaignMapProjection } from "../game/campaignProjection";
@@ -220,24 +221,23 @@ function threatRouteColor(tone: ReturnType<typeof threatTone>) {
   return "#ff3535";
 }
 
-function coverageTone(unit: ReturnType<typeof getUnitDefinition>, selected: boolean) {
-  if (unit.engagementMode === "detect") {
-    return selected
-      ? { color: "#72ff9d", fill: "#52e980", fillOpacity: 0.14, opacity: 0.82, weight: 2.4 }
-      : { color: "#52e980", fill: "#36d977", fillOpacity: 0.075, opacity: 0.58, weight: 1.5 };
+function coverageTone(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery) {
+  if (batteryCoverageUnavailable(battery)) {
+    return { color: "#ffad42", fill: "#ff8f1f", fillOpacity: 0.1, opacity: 0.78, weight: 2 };
   }
-  return selected
-    ? { color: "#73e4ff", fill: "#55d7ff", fillOpacity: 0.13, opacity: 0.78, weight: 2.2 }
-    : { color: "#55d7ff", fill: "#27bfff", fillOpacity: 0.06, opacity: 0.48, weight: 1.35 };
+  if (unit.engagementMode === "detect") {
+    return { color: "#52e980", fill: "#36d977", fillOpacity: 0.075, opacity: 0.58, weight: 1.5 };
+  }
+  return { color: "#55d7ff", fill: "#27bfff", fillOpacity: 0.06, opacity: 0.48, weight: 1.35 };
 }
 
-function makeBatteryIcon(battery: DefenseBattery, selected: boolean) {
-  const key = `${battery.kind}:${battery.status}:${selected}`;
+function makeBatteryIcon(battery: DefenseBattery) {
+  const key = `${battery.kind}:${battery.status}`;
   const cached = batteryIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: imageMarkerHtml(unitSprites[battery.kind], `map-marker--battery map-marker--unit-${battery.status} ${selected ? "map-marker--selected" : ""}`),
+    html: imageMarkerHtml(unitSprites[battery.kind], `map-marker--battery map-marker--unit-${battery.status}`),
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   });
@@ -339,10 +339,8 @@ function MapClickPlacement() {
 
 function MapViewportTracker({
   onChange,
-  onZoomingChange,
 }: {
   onChange: (bounds: RenderBounds) => void;
-  onZoomingChange: (zooming: boolean) => void;
 }) {
   const frameRef = useRef(0);
   const moveTimeoutRef = useRef<number | null>(null);
@@ -355,7 +353,6 @@ function MapViewportTracker({
     },
     zoomstart() {
       zoomingRef.current = true;
-      onZoomingChange(true);
       clearMoveTimeout();
     },
     moveend() {
@@ -363,7 +360,6 @@ function MapViewportTracker({
     },
     zoomend() {
       zoomingRef.current = false;
-      onZoomingChange(false);
       scheduleImmediateUpdate();
     },
     resize() {
@@ -660,12 +656,9 @@ function PerformanceOverlay({ stats, counts }: { stats: PerformanceStats; counts
 
 export function TacticalMap({ projection }: { projection?: CampaignMapProjection | null }) {
   const game = useGameStore((state) => state.game);
-  const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const mapMode = useGameStore((state) => state.mapMode);
   const placementKind = useGameStore((state) => state.placementKind);
-  const setSelectedBattery = useGameStore((state) => state.setSelectedBattery);
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
-  const [isMapZooming, setIsMapZooming] = useState(false);
   const radiusOverlayRenderer = useMemo(() => L.svg({ padding: 0.6 }), []);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
@@ -711,8 +704,8 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
     [game.batteries, renderBounds],
   );
   const visibleCoverageBatteries = useMemo(
-    () => mapMode === "threats" ? [] : game.batteries.filter((battery) => pointInBounds(battery.position, renderBounds, battery.coverageRadius)),
-    [game.batteries, mapMode, renderBounds],
+    () => mapMode === "threats" ? [] : game.batteries,
+    [game.batteries, mapMode],
   );
   const visibleRoutes = useMemo(
     () => mapMode === "logistics" ? game.logistics.routes.filter((route) => lineInBounds(route.from, route.to, renderBounds)) : [],
@@ -813,10 +806,10 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
         wheelDebounceTime={35}
         zoomAnimationThreshold={4}
         fadeAnimation={false}
-        className={isMapZooming ? "leaflet-stage leaflet-stage--zooming" : "leaflet-stage"}
+        className="leaflet-stage"
         scrollWheelZoom
       >
-        <MapViewportTracker onChange={setRenderBounds} onZoomingChange={setIsMapZooming} />
+        <MapViewportTracker onChange={setRenderBounds} />
         <MapClickPlacement />
         <MovingObjectsLayer
           threats={visibleThreats}
@@ -841,7 +834,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
             pathOptions={occupiedZoneStyle}
           />
         ))}
-        {placementKind && placementKind !== "boat" ? visibleCities.map((city) => (
+        {placementKind && placementKind !== "boat" ? game.cities.map((city) => (
           <Circle
             key={`city-exclusion-${city.id}`}
             center={[city.coordinates.lat, city.coordinates.lng]}
@@ -891,8 +884,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
         ))}
         {visibleCoverageBatteries.map((battery) => {
           const unit = getUnitDefinition(battery.kind);
-          const selected = battery.id === selectedBatteryId;
-          const coverage = coverageTone(unit, selected);
+          const coverage = coverageTone(unit, battery);
           return (
             <Fragment key={`coverage-wrap-${battery.id}`}>
               <Circle
@@ -938,8 +930,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
           <Marker
             key={battery.id}
             position={[battery.position.lat, battery.position.lng]}
-            icon={makeBatteryIcon(battery, battery.id === selectedBatteryId)}
-            eventHandlers={{ click: () => setSelectedBattery(battery.id) }}
+            icon={makeBatteryIcon(battery)}
           >
             <Tooltip direction="top" offset={[0, -14]}>
               {(() => {

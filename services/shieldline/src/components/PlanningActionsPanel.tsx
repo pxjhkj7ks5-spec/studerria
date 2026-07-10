@@ -19,10 +19,10 @@ export function PlanningActionsPanel() {
   const planning = game.cyclePhase === "planning";
 
   return (
-    <section className="planning-card" aria-label="Planning phase actions">
+    <section className="planning-card" aria-label="Дії етапу планування">
       <div className="planning-heading">
-        <strong>Planning Phase</strong>
-        <span>{planning ? `${game.planningActions.selected.length}/2 actions selected` : "Locked during attack cycle"}</span>
+        <strong>Етап планування</strong>
+        <span>{planning ? `Обрано дій: ${game.planningActions.selected.length}/2` : "Недоступно під час атаки"}</span>
       </div>
       <div className="planning-actions">
         {planningActionDefinitions.map((action) => {
@@ -41,7 +41,7 @@ export function PlanningActionsPanel() {
             >
               <Icon size={15} />
               <span>{action.title}</span>
-              <small>{cooldown > 0 ? `CD ${cooldown}` : costLabel(action.cost)}</small>
+              <small>{cooldown > 0 ? `Очікування: ${cooldown}` : costLabel(action.cost)}</small>
             </button>
           );
         })}
@@ -52,6 +52,7 @@ export function PlanningActionsPanel() {
 
 function costLabel(cost: Record<string, number | undefined>) {
   const entries = Object.entries(cost).filter(([, value]) => value);
-  if (!entries.length) return "No cost";
-  return entries.map(([key, value]) => `${key.slice(0, 3)} ${value}`).join(" · ");
+  if (!entries.length) return "Без витрат";
+  const labels: Record<string, string> = { budget: "бюджет", ammo: "БК", energy: "енергія", morale: "мораль", political: "політресурс" };
+  return entries.map(([key, value]) => `${labels[key] || key} ${value}`).join(" · ");
 }

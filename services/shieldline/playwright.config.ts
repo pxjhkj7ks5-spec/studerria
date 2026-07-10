@@ -12,7 +12,15 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
-  projects: [{ name: "mobile-chromium", use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 } } }],
+  projects: [
+    { name: "mobile-chromium", use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 } } },
+    { name: "mobile-webkit", use: { ...devices["iPhone 13"], browserName: "webkit", viewport: { width: 390, height: 844 } } },
+    {
+      name: "mobile-live-landscape",
+      testMatch: /mobile-live\.spec\.ts/,
+      use: { ...devices["iPhone 13 landscape"], browserName: "chromium", viewport: { width: 844, height: 390 } },
+    },
+  ],
   webServer: {
     command: "npm run dev -- --port 4174",
     url: "http://127.0.0.1:4174/shieldline/",

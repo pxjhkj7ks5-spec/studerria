@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, ClipboardList, Crosshair, Layers, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
+import { Activity, AlertTriangle, BookOpen, ClipboardList, Crosshair, HelpCircle, Layers, LogOut, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
 import { IntelLog } from "./components/IntelLog";
@@ -19,25 +19,19 @@ import { campaignMissions } from "./data/missions";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { projectCampaignRun } from "./game/campaignProjection";
+import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice } from "./game/battleNotices";
 import { useGameStore } from "./store/useGameStore";
 import { bindTelegramBackButton, bindTelegramBottomButton } from "./platform/telegramShell";
 import { formatNumber, formatSimulationEvent, t } from "./platform/i18n";
 import { trackAnalytics } from "./platform/analytics";
-import type { CampaignStatus, DefenseBattery, MapMode, ThreatKind, UnitDefinition, UnitKind } from "./types/game";
+import type { CampaignStatus, DefenseBattery, IntelEntry, MapMode, UnitKind } from "./types/game";
 import type { CampaignProgress, DailyDefensePlan, GameModeId, MissionRun, OperationPhase, RankedResult, SimulationEvent } from "./domain/contracts";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
-  { id: "live", label: t("layer.live") },
-  { id: "threats", label: t("layer.threats") },
-  { id: "coverage", label: t("layer.coverage") },
-  { id: "logistics", label: t("layer.logistics") },
-];
-
-const threatLabels: Array<{ kind: ThreatKind; label: string }> = [
-  { kind: "geran2", label: "Geran" },
-  { kind: "gerbera", label: "Gerbera" },
-  { kind: "kh101", label: "X-101" },
-  { kind: "iskander", label: "OTRK" },
+  { id: "live", label: "Бій" },
+  { id: "threats", label: "Загрози" },
+  { id: "coverage", label: "Покриття" },
+  { id: "logistics", label: "Логістика" },
 ];
 
 const SIMULATION_TICK_MS = 300;
@@ -64,9 +58,9 @@ function defensePlanFromBatteries(batteries: DefenseBattery[]): DailyDefensePlan
   return { assetCount: assets.length, radarCount: assets.filter((asset) => asset.kind === "radar").length, kineticCount: assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length, averageReadiness: assets.length ? assets.reduce((sum, asset) => sum + asset.readiness, 0) / assets.length : 0, assets };
 }
 
-type ActivePanel = "layers" | "units" | "planning" | "intel" | "report" | "settings";
+type ActivePanel = "menu" | "layers" | "units" | "planning" | "intel" | "report" | "settings";
 
-const panelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }> = [
+const desktopPanelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }> = [
   { id: "layers", label: t("panel.layers"), icon: Layers },
   { id: "units", label: t("panel.units"), icon: Crosshair },
   { id: "planning", label: t("panel.planning"), icon: SlidersHorizontal },
@@ -75,23 +69,64 @@ const panelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }>
   { id: "settings", label: t("panel.settings"), icon: Settings },
 ];
 
+const mobilePanelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }> = [
+  { id: "menu", label: "Меню", icon: Menu },
+  { id: "units", label: "ППО", icon: Crosshair },
+  { id: "planning", label: "План", icon: SlidersHorizontal },
+  { id: "intel", label: "Розвідка", icon: Radio },
+  { id: "settings", label: "Налаштування", icon: Settings },
+];
+
 const panelTitle: Record<ActivePanel, string> = {
-  layers: t("panel.layers"),
-  units: t("panel.units"),
-  planning: t("panel.planning"),
-  intel: t("panel.intel"),
-  report: t("panel.report"),
-  settings: t("panel.settings"),
+  menu: "Меню",
+  layers: "Шари",
+  units: "ППО",
+  planning: "План",
+  intel: "Розвідка",
+  report: "Післяопераційний звіт",
+  settings: "Налаштування",
 };
 
-function formatAmmo(current: number | "infinite", capacity: number | "infinite") {
-  if (capacity === "infinite" || current === "infinite") return "inf";
-  return `${current}/${capacity}`;
+const cityLabelsUk: Record<string, string> = {
+  kyiv: "Київ",
+  lviv: "Львів",
+  odesa: "Одеса",
+  dnipro: "Дніпро",
+  kharkiv: "Харків",
+  zaporizhzhia: "Запоріжжя",
+  mykolaiv: "Миколаїв",
+  chernihiv: "Чернігів",
+  sumy: "Суми",
+  poltava: "Полтава",
+  cherkasy: "Черкаси",
+  kropyvnytskyi: "Кропивницький",
+  "kryvyi-rih": "Кривий Ріг",
+  zhytomyr: "Житомир",
+  vinnytsia: "Вінниця",
+  khmelnytskyi: "Хмельницький",
+  ternopil: "Тернопіль",
+  rivne: "Рівне",
+  lutsk: "Луцьк",
+  "ivano-frankivsk": "Івано-Франківськ",
+  uzhhorod: "Ужгород",
+  chernivtsi: "Чернівці",
+};
+
+function useMobileViewport() {
+  const queryText = "(max-width: 820px), (max-width: 920px) and (max-height: 520px)";
+  const [mobile, setMobile] = useState(() => typeof window !== "undefined" && window.matchMedia(queryText).matches);
+  useEffect(() => {
+    const query = window.matchMedia(queryText);
+    const update = () => setMobile(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, [queryText]);
+  return mobile;
 }
 
-function formatSeconds(ms: number) {
-  if (ms <= 0) return "ready";
-  return `${Math.ceil(ms / 1000)}s`;
+function noticeCopy(entry: IntelEntry) {
+  const location = cityLabelsUk[entry.locationLabel || ""] || entry.locationLabel || "невідомий напрямок";
+  return entry.eventType === "launch" ? `Пуски: ${location}` : `Ціль виявлено: напрямок на ${location}`;
 }
 
 export default function App() {
@@ -118,15 +153,17 @@ export default function App() {
   const resetCampaign = useGameStore((state) => state.resetCampaign);
   const advanceOperation = useGameStore((state) => state.advanceOperation);
   const startOperation = useGameStore((state) => state.startOperation);
-  const removeSelectedBattery = useGameStore((state) => state.removeSelectedBattery);
-  const startSelectedBatteryMaintenance = useGameStore((state) => state.startSelectedBatteryMaintenance);
-  const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const placementKind = useGameStore((state) => state.placementKind);
+  const cancelPlacement = useGameStore((state) => state.cancelPlacement);
   const activeGameMode = useGameStore((state) => state.activeGameMode);
   const operationPhase = useGameStore((state) => state.operationPhase);
   const simulationSpeed = useGameStore((state) => state.simulationSpeed);
+  const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+  const isMobileViewport = useMobileViewport();
+  const isMobileLive = isMobileViewport && tacticalMode !== "campaign";
   const [confirmReset, setConfirmReset] = useState(false);
-  const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
+  const [activePanel, setActivePanel] = useState<ActivePanel | null>(() => isMobileLive ? null : "units");
+  const [battleNotice, setBattleNotice] = useState<IntelEntry | null>(null);
   const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
   const [authoritativeRun, setAuthoritativeRun] = useState<MissionRun | null>(null);
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null);
@@ -138,14 +175,13 @@ export default function App() {
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
   const completedTrackedRunRef = useRef<string | null>(null);
-  const selectedBattery = game.batteries.find((battery) => battery.id === selectedBatteryId) || null;
-  const selectedUnit = selectedBattery ? getUnitDefinition(selectedBattery.kind) : null;
+  const latestNoticeIdRef = useRef<string | null>(null);
+  const latestReportIdRef = useRef(game.latestReportId);
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
   const scenario = getScenario(game.scenarioId);
   const lastTickRef = useRef<number | null>(null);
   const accumulatorRef = useRef(0);
   const revealedThreats = game.liveThreats.filter((threat) => threat.revealed).length;
-  const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
   const resolvedMode = (activeGameMode || tacticalMode || "training") as GameModeId;
   const runtimePolicy = getGameModeRuntimePolicy(resolvedMode);
   const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
@@ -218,6 +254,30 @@ export default function App() {
     visible: !isAuthoritativeCampaign && runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && effectiveOperationPhase === "planning",
     onClick: handleStartOperation,
   }), [defenseReadiness.ready, effectiveOperationPhase, runtimePolicy.execution, runtimePolicy.start, isAuthoritativeCampaign, isResolving, game.batteries, activeMission.id]);
+
+  useEffect(() => {
+    if (!isMobileLive) return;
+    const latest = game.log.find((entry) => entry.eventType === "launch" || entry.eventType === "detection");
+    if (!latest || latest.id === latestNoticeIdRef.current) return;
+    latestNoticeIdRef.current = latest.id;
+    setBattleNotice((current) => preferBattleNotice(current, latest));
+  }, [game.log, isMobileLive]);
+
+  useEffect(() => {
+    if (!battleNotice) return undefined;
+    const timeout = window.setTimeout(() => setBattleNotice(null), BATTLE_NOTICE_DURATION_MS);
+    return () => window.clearTimeout(timeout);
+  }, [battleNotice]);
+
+  useEffect(() => {
+    if (!isMobileLive || !game.latestReportId || game.latestReportId === latestReportIdRef.current) return;
+    latestReportIdRef.current = game.latestReportId;
+    setActivePanel("report");
+  }, [game.latestReportId, isMobileLive]);
+
+  useEffect(() => {
+    if (isMobileLive && activePanel === "layers") setActivePanel("menu");
+  }, [activePanel, isMobileLive]);
 
   useEffect(() => {
     if (!isAuthoritativeCampaign || campaignRuntimePhase !== "planning" || !defenseReadiness.ready || isResolving) return;
@@ -387,12 +447,20 @@ export default function App() {
     return <ModeSelection onSelect={selectCampaignMode} />;
   }
 
+  const panelItems = isMobileLive ? mobilePanelItems : desktopPanelItems;
+  const placementUnit = placementKind ? getUnitDefinition(placementKind) : null;
+  const activePanelTitle = activePanel
+    ? isMobileLive
+      ? panelTitle[activePanel]
+      : desktopPanelItems.find((item) => item.id === activePanel)?.label || panelTitle[activePanel]
+    : "";
+
   return (
-    <main className={`shell shell--map-first ${activePanel ? "shell--drawer-open" : "shell--drawer-closed"}`} aria-label="Shieldline real-time defense simulation">
-      <nav className="app-rail" aria-label="Shieldline panels">
-        <button className="rail-button rail-button--menu" type="button" aria-label="Back to command modes" onClick={returnToCommandModes}>
+    <main className={`shell shell--map-first ${isMobileLive ? "shell--mobile-live" : ""} ${activePanel ? "shell--drawer-open shell--panel-open" : "shell--drawer-closed"}`} aria-label="Симуляція протиповітряної оборони Shieldline">
+      <nav className="app-rail" aria-label={isMobileLive ? "Панелі Shieldline" : "Shieldline panels"}>
+        {!isMobileLive ? <button className="rail-button rail-button--menu" type="button" aria-label="До вибору режиму" onClick={returnToCommandModes}>
           <Menu size={24} />
-        </button>
+        </button> : null}
         <div className="rail-brand" aria-hidden="true">
           <Shield size={24} />
         </div>
@@ -414,15 +482,16 @@ export default function App() {
                 title={item.label}
               >
                 <Icon size={21} />
+                <span className="rail-label">{item.label}</span>
               </button>
             );
           })}
         </div>
       </nav>
 
-      <section className={`map-stage map-stage--${mapMode} ${placementKind ? "map-stage--placing" : ""}`} aria-label="Live defense map">
+      <section className={`map-stage map-stage--${mapMode} ${placementKind ? "map-stage--placing" : ""}`} aria-label="Мапа протиповітряної оборони" aria-hidden={isMobileLive && Boolean(activePanel)}>
         <TacticalMap projection={campaignProjection} />
-        <header className="map-status-strip" aria-label="Campaign status">
+        <header className="map-status-strip" aria-label="Стан операції">
           <div className="strip-brand">
             <Shield size={22} />
             <div>
@@ -430,22 +499,62 @@ export default function App() {
               <span>{tacticalMode === "campaign" ? `${activeMissionTitle} · ${t("stream.title")}` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
             </div>
           </div>
-          <ResourceBar game={displayGame} simulationSpeed={simulationSpeed} operationPhase={effectiveOperationPhase} />
+          <ResourceBar game={displayGame} simulationSpeed={simulationSpeed} operationPhase={effectiveOperationPhase} mobile={isMobileLive} />
         </header>
+        {isMobileLive && (battleNotice || placementUnit) ? (
+          <div className={`map-feedback-slot ${battleNotice ? `map-feedback-slot--${battleNotice.eventType}` : "map-feedback-slot--placement"}`} role="status" aria-live="assertive">
+            {battleNotice ? (
+              <>
+                {battleNotice.eventType === "launch" ? <AlertTriangle size={17} /> : <Radio size={17} />}
+                <strong>{noticeCopy(battleNotice)}</strong>
+              </>
+            ) : placementUnit ? (
+              <>
+                <Crosshair size={17} />
+                <div><strong>Розмістіть: {placementUnit.shortName}</strong>{game.placementWarning ? <span>{game.placementWarning}</span> : null}</div>
+                <button type="button" onClick={cancelPlacement}>Скасувати</button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
         <MapLegend mode={mapMode} />
       </section>
 
       {activePanel ? (
-        <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={`${panelTitle[activePanel]} panel`}>
+        <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={isMobileLive ? `Панель «${activePanelTitle}»` : `${activePanelTitle} panel`}>
           <div className="drawer-header">
             <div>
               <span>Shieldline</span>
-              <strong>{panelTitle[activePanel]}</strong>
+              <strong>{activePanelTitle}</strong>
             </div>
-            <button className="drawer-close" type="button" aria-label={t("action.close")} onClick={() => setActivePanel(null)}>
+            <button className="drawer-close" type="button" aria-label="Закрити" onClick={() => setActivePanel(null)}>
               <X size={18} />
             </button>
           </div>
+          {activePanel === "menu" ? (
+            <section className="drawer-section mobile-menu-panel">
+              <div className="mobile-menu-intro">
+                <BookOpen size={24} />
+                <div><strong>Командний центр</strong><span>Оберіть шар мапи, перегляньте позначення або поверніться до режимів.</span></div>
+              </div>
+              <section className="menu-group" aria-labelledby="mobile-layer-heading">
+                <h2 id="mobile-layer-heading">Шар мапи</h2>
+                <div className="panel-layer-list">
+                  {mapModes.map((mode) => (
+                    <button className={`nav-pill ${mapMode === mode.id ? "nav-pill--active" : ""}`} type="button" key={mode.id} onClick={() => setMapMode(mode.id)}>{mode.label}</button>
+                  ))}
+                </div>
+              </section>
+              <section className="menu-group">
+                <MapLegend mode={mapMode} embedded />
+              </section>
+              <section className="menu-group menu-help">
+                <HelpCircle size={21} />
+                <div><strong>Як керувати</strong><span>Масштабуйте мапу двома пальцями. Виберіть ППО з каталогу, поверніться на мапу й торкніться дозволеної ділянки.</span></div>
+              </section>
+              <button className="reset-button reset-button--secondary menu-exit-button" type="button" onClick={returnToCommandModes}><LogOut size={17} /> До вибору режиму</button>
+            </section>
+          ) : null}
           {activePanel === "layers" ? (
             <section className="drawer-section">
               <div className="panel-layer-list">
@@ -468,19 +577,10 @@ export default function App() {
                 <span><strong>{formatNumber(Math.round(game.wavePressure))}</strong> {t("stats.pressure")}</span>
                 <span><strong>{formatNumber(game.logistics.resupplyDelayDays)}</strong> {t("stats.supply")}</span>
               </div>
-              {selectedBattery ? (
-                <SelectedUnitPanel
-                  selectedBattery={selectedBattery}
-                  selectedUnit={selectedUnit}
-                  onMaintain={startSelectedBatteryMaintenance}
-                  onRecall={removeSelectedBattery}
-                />
-              ) : (
-                <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
-              )}
+              <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
             </section>
           ) : null}
-          {activePanel === "units" ? <UnitRail /> : null}
+          {activePanel === "units" ? <UnitRail onPlacementStart={() => { if (isMobileLive) setActivePanel(null); }} /> : null}
           {activePanel === "planning" ? (
             <section className="drawer-section">
               <PlanningActionsPanel />
@@ -501,25 +601,16 @@ export default function App() {
           ) : null}
           {activePanel === "settings" ? (
             <section className="drawer-section">
-              {selectedBattery ? (
-                <SelectedUnitPanel
-                  selectedBattery={selectedBattery}
-                  selectedUnit={selectedUnit}
-                  onMaintain={startSelectedBatteryMaintenance}
-                  onRecall={removeSelectedBattery}
-                />
-              ) : (
-                <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
-              )}
+              <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
               <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
                 <RotateCcw size={16} />
-                {t("action.reset")}
+                Скинути операцію
               </button>
               <button className="reset-button reset-button--secondary" type="button" onClick={returnToCommandModes}>
                 <Menu size={16} />
-                Change Scenario
+                До вибору режиму
               </button>
-              {tacticalMode !== "daily-defense" && tacticalMode !== "campaign" ? <button className="reset-button" type="button" disabled={!game.batteries.length || isResolving} onClick={() => { void resolveAuthoritativeOperation(); }}><Zap size={16} /> {isResolving ? "Resolving authoritative event stream…" : "Resolve operation on server"}</button> : null}
+              {tacticalMode !== "daily-defense" && tacticalMode !== "campaign" ? <button className="reset-button" type="button" disabled={!game.batteries.length || isResolving} onClick={() => { void resolveAuthoritativeOperation(); }}><Zap size={16} /> {isResolving ? "Опрацьовуємо події…" : "Завершити операцію"}</button> : null}
             </section>
           ) : null}
         </aside>
@@ -527,12 +618,12 @@ export default function App() {
 
       {!tutorialDismissed ? <TutorialOverlay onDismiss={dismissTutorial} /> : null}
       {confirmReset ? (
-        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Reset campaign confirmation">
+        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Підтвердження скидання операції">
           <section className="confirm-card">
-            <strong>Reset campaign?</strong>
-            <span>This clears live threats, placements, and current resource state for this scenario.</span>
+            <strong>Скинути операцію?</strong>
+            <span>Буде очищено поточні загрози, розміщені установки та ресурси цього сценарію.</span>
             <div>
-              <button type="button" onClick={() => setConfirmReset(false)}>Cancel</button>
+              <button type="button" onClick={() => setConfirmReset(false)}>Скасувати</button>
               <button
                 type="button"
                 onClick={() => {
@@ -540,7 +631,7 @@ export default function App() {
                   setConfirmReset(false);
                 }}
               >
-                Reset
+                Скинути
               </button>
             </div>
           </section>
@@ -587,11 +678,11 @@ function CampaignReplayScrubber({ run, value, onChange }: { run: MissionRun; val
 
 function LiveStatusPanel({ placementKind, placementWarning }: { placementKind: UnitKind | null; placementWarning: string | null }) {
   return (
-    <section className="live-card" aria-label="Live simulation status">
+    <section className="live-card" aria-label="Стан симуляції">
       <Zap size={22} />
       <div>
-        <strong>{placementKind ? "Click an allowed area to place unit" : "Live Defense Active"}</strong>
-        <span>{placementWarning || "Targets stay hidden until radar scan reveals them."}</span>
+        <strong>{placementKind ? "Торкніться дозволеної ділянки на мапі" : "Живий режим активний"}</strong>
+        <span>{placementWarning || "Цілі залишаються прихованими, доки їх не виявить радар."}</span>
       </div>
     </section>
   );
@@ -614,60 +705,9 @@ function AmmoLowCard() {
     <div className="status-card status-card--lost">
       <AlertTriangle size={20} />
       <div>
-        <strong>Ammo Low</strong>
-        <span>Coverage remains active, but engagements are limited.</span>
+        <strong>Мало боєкомплекту</strong>
+        <span>Зона прикриття активна, але кількість перехоплень обмежена.</span>
       </div>
     </div>
-  );
-}
-
-function SelectedUnitPanel({
-  selectedBattery,
-  selectedUnit,
-  onMaintain,
-  onRecall,
-}: {
-  selectedBattery: DefenseBattery;
-  selectedUnit: UnitDefinition | null;
-  onMaintain: () => void;
-  onRecall: () => void;
-}) {
-  return (
-    <section className="selected-unit-card" aria-label="Selected defense unit">
-      <div className="selected-unit-card__head">
-        <Crosshair size={22} />
-        <div>
-          <strong>{selectedUnit?.name || "Selected PPO"}</strong>
-          <span>{selectedBattery.status} · {selectedBattery.supplyStatus} · last: {selectedBattery.lastEngagementResult}</span>
-        </div>
-      </div>
-      {selectedUnit ? (
-        <>
-          <div className="selected-unit-grid">
-            <span><b>{selectedUnit.primaryRangeKm} km</b> primary</span>
-            <span><b>{selectedUnit.outerRangeKm} km</b> outer</span>
-            <span><b>{formatAmmo(selectedBattery.currentAmmo, selectedUnit.ammoCapacity)}</b> ammo</span>
-            <span><b>{formatSeconds(selectedBattery.reloadRemainingMs)}</b> reload</span>
-            <span><b>{formatSeconds(selectedBattery.cooldownMs)}</b> cooldown</span>
-            <span><b>{Math.round(selectedBattery.readiness)}%</b> readiness</span>
-            <span><b>{Math.round(selectedBattery.fatigue)}%</b> fatigue</span>
-            <span><b>{selectedUnit.primaryAccuracy}%</b> primary acc</span>
-            <span><b>{selectedUnit.outerAccuracy}%</b> outer acc</span>
-          </div>
-          <div className="chance-grid" aria-label="Threat-specific hit chances">
-            {threatLabels.map(({ kind, label }) => (
-              <span key={kind}>
-                <b>{Math.round(selectedUnit.engagementChanceByThreat[kind])}%</b>
-                {label}
-              </span>
-            ))}
-          </div>
-        </>
-      ) : null}
-      <div className="selected-unit-card__actions">
-        <button type="button" onClick={onMaintain} disabled={selectedBattery.status === "maintenance" || selectedBattery.status === "reloading"}>Maintain</button>
-        <button type="button" onClick={onRecall}>Recall</button>
-      </div>
-    </section>
   );
 }

@@ -3,27 +3,28 @@ import type { MapMode } from "../types/game";
 
 interface MapLegendProps {
   mode: MapMode;
+  embedded?: boolean;
 }
 
 const modeCopy: Record<MapMode, string> = {
-  live: "Radar-covered tracks, cities, sectors, and active engagements.",
-  threats: "Approximate corridors and radar-contact state. No real routing data.",
-  coverage: "Abstract ППО coverage tiers and readiness pulses.",
-  logistics: "Supply pressure, city readiness, route delays, and repair priorities.",
+  live: "Міста, сектори, радарні контакти та активні перехоплення.",
+  threats: "Орієнтовні коридори руху та стан радарних контактів.",
+  coverage: "Зони прикриття ППО та стан готовності установок.",
+  logistics: "Постачання, готовність міст, затримки маршрутів і ремонти.",
 };
 
-export function MapLegend({ mode }: MapLegendProps) {
+export function MapLegend({ mode, embedded = false }: MapLegendProps) {
   return (
-    <aside className="map-legend" aria-label="Map legend">
+    <aside className={`map-legend ${embedded ? "map-legend--embedded" : ""}`} aria-label="Умовні позначення">
       <div className="legend-heading">
-        <strong>{mode.toUpperCase()} LAYER</strong>
+        <strong>Умовні позначення</strong>
         <span>{modeCopy[mode]}</span>
       </div>
       <div className="legend-grid">
-        <LegendItem icon={RadioTower} tone="uncertain" label="Radar contact" />
-        <LegendItem icon={Siren} tone="confirmed" label="Confirmed" />
-        <LegendItem icon={ShieldCheck} tone="intercepted" label="Intercepted" />
-        <LegendItem icon={Zap} tone="impact" label="Impact" />
+        <LegendItem icon={RadioTower} tone="uncertain" label="Радарний контакт" />
+        <LegendItem icon={Siren} tone="confirmed" label="Підтверджена ціль" />
+        <LegendItem icon={ShieldCheck} tone="intercepted" label="Перехоплено" />
+        <LegendItem icon={Zap} tone="impact" label="Влучання" />
       </div>
     </aside>
   );

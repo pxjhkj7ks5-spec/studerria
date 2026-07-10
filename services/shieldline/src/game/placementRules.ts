@@ -38,20 +38,20 @@ export function validateBatteryPlacement(kind: UnitKind, position: Coordinates, 
     const onWater = overlay.waterPlacementPolygons.some((polygon) => pointInPolygon(position, polygon));
     return onWater
       ? { allowed: true }
-      : { allowed: false, reason: "Boats can be placed only on water areas." };
+      : { allowed: false, reason: "Катери можна розміщувати лише на воді." };
   }
 
   const insideUkraine = overlay.ukrainePlacementPolygons.some((polygon) => pointInPolygon(position, polygon));
   if (!insideUkraine) {
-    return { allowed: false, reason: "PPO placement is allowed only inside Ukraine." };
+    return { allowed: false, reason: "ППО можна розміщувати лише в межах України." };
   }
   const insideOccupied = overlay.occupiedPolygons.some((polygon) => pointInPolygon(position, polygon));
   if (insideOccupied) {
-    return { allowed: false, reason: "Placement is blocked inside occupied territory." };
+    return { allowed: false, reason: "На окупованій території розміщення заборонене." };
   }
   const blockedCity = cities.find((city) => distanceKm(city.coordinates, position) < CITY_PLACEMENT_EXCLUSION_KM);
   if (blockedCity) {
-    return { allowed: false, reason: `PPO placement is blocked within 10 km of ${blockedCity.name}.` };
+    return { allowed: false, reason: `ППО не можна розміщувати ближче ніж за 10 км від міста ${blockedCity.name}.` };
   }
   return { allowed: true };
 }

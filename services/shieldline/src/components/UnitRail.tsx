@@ -13,15 +13,15 @@ const chanceKinds: Array<{ kind: ThreatKind; label: string }> = [
 ];
 
 function maintenanceRisk(readiness: number) {
-  if (readiness < 70) return "Elevated";
-  if (readiness < 84) return "Moderate";
-  return "Low";
+  if (readiness < 70) return "високий";
+  if (readiness < 84) return "помірний";
+  return "низький";
 }
 
 function fatigueLabel(fatigue: number) {
-  if (fatigue > 80) return "Exhausted";
-  if (fatigue > 55) return "Strained";
-  return "Nominal";
+  if (fatigue > 80) return "виснажена";
+  if (fatigue > 55) return "напружена";
+  return "нормальна";
 }
 
 function ammoLabel(unit: UnitDefinition, current?: number | "infinite") {
@@ -34,7 +34,7 @@ function seconds(ms: number) {
   return `${(ms / 1000).toFixed(ms < 2000 ? 1 : 0)}s`;
 }
 
-export function UnitRail() {
+export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }) {
   const game = useGameStore((state) => state.game);
   const placementKind = useGameStore((state) => state.placementKind);
   const beginPlacement = useGameStore((state) => state.beginPlacement);
@@ -47,9 +47,9 @@ export function UnitRail() {
       <div className="unit-actions">
         <button className="redeploy-button" type="button" onClick={cancelPlacement} disabled={!placementKind}>
           <RadioTower size={16} />
-          Cancel placement
+          Скасувати розміщення
         </button>
-        <span>{game.batteries.length} placed PPO units</span>
+        <span>Розміщено ППО: {game.batteries.length}</span>
         {game.placementWarning ? <strong className="placement-warning">{game.placementWarning}</strong> : null}
       </div>
       <div className="unit-list">
@@ -72,12 +72,12 @@ export function UnitRail() {
               role="button"
               aria-disabled={disabled}
               onClick={() => {
-                if (!disabled) beginPlacement(unit.kind);
+                if (!disabled) { beginPlacement(unit.kind); onPlacementStart?.(); }
               }}
               onKeyDown={(event) => {
                 if ((event.key === "Enter" || event.key === " ") && !disabled) {
                   event.preventDefault();
-                  beginPlacement(unit.kind);
+                  beginPlacement(unit.kind); onPlacementStart?.();
                 }
               }}
             >
@@ -87,7 +87,7 @@ export function UnitRail() {
               </div>
               <strong>{unit.name}</strong>
               <p>{unit.description}</p>
-              <small>{unit.costLabel} · {unit.primaryRangeKm}/{unit.outerRangeKm} km · {localBattery?.status || "ready"}</small>
+              <small>{unit.costLabel} · {unit.primaryRangeKm}/{unit.outerRangeKm} км · {localBattery?.status || "готова"}</small>
               <div className="unit-chance-row" aria-label={`${unit.name} hit chances`}>
                 {chanceKinds.map(({ kind, label }) => (
                   <span key={kind} className={unit.engagementChanceByThreat[kind] <= 0 ? "unit-chance--muted" : ""}>
@@ -97,12 +97,12 @@ export function UnitRail() {
                 ))}
               </div>
               <div className="unit-hover-card" role="tooltip">
-                <strong>{unit.shortName} detail</strong>
-                <span>Primary {unit.primaryRangeKm} km · Outer {unit.outerRangeKm} km</span>
-                <span>Ammo {ammoText} · Reload {reloadText} · Shot pause {seconds(unit.shotCooldownMs)}</span>
-                <span>Primary acc {unit.primaryAccuracy}% · Outer acc {unit.outerAccuracy}%</span>
-                <span>Mobility {unit.mobility}/4 · Maintenance risk {maintenanceRisk(readiness)}</span>
-                <span>Fatigue {Math.round(fatigue)}% · {fatigueLabel(fatigue)} · {localBattery?.supplyStatus || "not placed"}</span>
+                <strong>Дані {unit.shortName}</strong>
+                <span>Основна зона {unit.primaryRangeKm} км · зовнішня {unit.outerRangeKm} км</span>
+                <span>БК {ammoText} · перезаряджання {reloadText} · пауза {seconds(unit.shotCooldownMs)}</span>
+                <span>Точність: {unit.primaryAccuracy}% · зовнішня зона {unit.outerAccuracy}%</span>
+                <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
+                <span>Втома {Math.round(fatigue)}% · {fatigueLabel(fatigue)} · {localBattery?.supplyStatus || "не розміщена"}</span>
               </div>
               <div className="readiness-track" aria-label={`${unit.name} readiness`}>
                 <i style={{ width: `${Math.round(readiness)}%` }} />
@@ -111,8 +111,8 @@ export function UnitRail() {
                 <i style={{ width: `${Math.round(fatigue)}%` }} />
               </div>
               <div className="unit-card__meta">
-                <span>{unit.cost} mln</span>
-                <span>{allowed ? selected ? "selected" : affordable ? "click to place" : "no budget" : "locked"}</span>
+                <span>{unit.cost} млн</span>
+                <span>{allowed ? selected ? "обрано" : affordable ? "обрати" : "бракує бюджету" : "недоступно"}</span>
               </div>
             </article>
           );
