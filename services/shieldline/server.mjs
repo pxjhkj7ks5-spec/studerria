@@ -70,14 +70,16 @@ function normalizeBasePath(value) {
 function sendFile(res, filePath) {
   const ext = extname(filePath).toLowerCase();
   const fileName = filePath.split(/[\\/]/).at(-1);
-  const cacheControl = ext === ".html" || fileName === "sw.js"
-    ? "no-store"
+  const mutableShell = ext === ".html" || fileName === "sw.js";
+  const cacheControl = mutableShell
+    ? "no-store, no-cache, must-revalidate"
     : fileName === "manifest.webmanifest"
-      ? "public, max-age=3600"
+      ? "no-cache, must-revalidate"
       : "public, max-age=31536000, immutable";
   res.writeHead(200, {
     "Content-Type": contentTypes.get(ext) || "application/octet-stream",
     "Cache-Control": cacheControl,
+    ...(mutableShell ? { Pragma: "no-cache", Expires: "0" } : {}),
     ...securityHeaders,
   });
   createReadStream(filePath).pipe(res);

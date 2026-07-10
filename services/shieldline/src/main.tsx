@@ -12,7 +12,10 @@ async function bootstrap() {
   void initializeOfflinePersistence(import.meta.env.BASE_URL);
   void initializeTelegramSession(import.meta.env.BASE_URL);
   if ("serviceWorker" in navigator) {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+    void navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, { updateViaCache: "none" })
+      .then((registration) => registration.update())
+      .catch(() => undefined);
   }
   await hydrateControlOverlayFromServer(import.meta.env.BASE_URL);
   createRoot(document.getElementById("root") as HTMLElement).render(
