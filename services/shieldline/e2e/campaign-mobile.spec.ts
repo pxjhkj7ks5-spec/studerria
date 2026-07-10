@@ -5,15 +5,17 @@ test("mobile Campaign runs from placement through authoritative replay and recon
   await page.goto("/shieldline/");
   await page.getByRole("button", { name: /Campaign/ }).click();
   const tutorial = page.locator(".tutorial-overlay");
-  if (await tutorial.isVisible()) await tutorial.getByRole("button").last().click();
+  const tutorialAppeared = await tutorial.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+  if (tutorialAppeared) {
+    await tutorial.getByRole("button").last().click();
+    await tutorial.waitFor({ state: "hidden" });
+  }
 
   const drawer = page.getByRole("complementary", { name: /Defense units/ });
-  const controls = page.getByRole("region", { name: "Operation controls" });
   await expect(drawer).toBeVisible();
-  await expect(controls).toBeVisible();
   const drawerBox = await drawer.boundingBox();
-  const controlsBox = await controls.boundingBox();
-  expect(drawerBox && controlsBox && drawerBox.y + drawerBox.height <= controlsBox.y + 2).toBeTruthy();
+  const navigationBox = await page.getByRole("navigation", { name: "Shieldline panels" }).boundingBox();
+  expect(drawerBox && navigationBox && drawerBox.y + drawerBox.height <= navigationBox.y + 2).toBeTruthy();
 
   const map = page.locator(".leaflet-stage");
   const mapBox = await map.boundingBox();
@@ -23,14 +25,10 @@ test("mobile Campaign runs from placement through authoritative replay and recon
   await page.getByRole("button", { name: /МВГ/ }).click();
   await page.mouse.click(mapBox.x + 175, mapBox.y + 275);
 
-  await expect(page.getByRole("button", { name: /Start operation/ })).toBeEnabled();
-  await page.getByRole("button", { name: "x60" }).click();
-  await page.getByRole("button", { name: /Start operation/ }).click();
   await expect(page.getByText(/Authoritative server result/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByLabel("Campaign tactical replay")).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole("button", { name: /New operation/ })).toBeVisible();
   await page.getByRole("button", { name: /Report/ }).click();
   await expect(page.getByText(/Authoritative server result/)).toBeVisible();
 

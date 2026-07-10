@@ -215,9 +215,14 @@ export default function App() {
   useEffect(() => bindTelegramBottomButton({
     text: t("operation.start"),
     enabled: defenseReadiness.ready,
-    visible: runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && effectiveOperationPhase === "planning",
+    visible: !isAuthoritativeCampaign && runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && effectiveOperationPhase === "planning",
     onClick: handleStartOperation,
   }), [defenseReadiness.ready, effectiveOperationPhase, runtimePolicy.execution, runtimePolicy.start, isAuthoritativeCampaign, isResolving, game.batteries, activeMission.id]);
+
+  useEffect(() => {
+    if (!isAuthoritativeCampaign || campaignRuntimePhase !== "planning" || !defenseReadiness.ready || isResolving) return;
+    void startCampaignOperation();
+  }, [activeMission.id, campaignRuntimePhase, defenseReadiness.ready, isAuthoritativeCampaign, isResolving]);
 
   useEffect(() => {
     if (isAuthoritativeCampaign || !campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
