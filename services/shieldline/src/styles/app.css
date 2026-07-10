@@ -824,6 +824,54 @@ button {
     0 0 26px rgba(120, 221, 154, 0.3);
 }
 
+.launch-sector-marker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  pointer-events: none;
+}
+
+.launch-sector-marker::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(255, 139, 104, 0.58);
+  border-radius: 999px;
+  opacity: 0.48;
+  box-shadow: 0 0 18px rgba(255, 92, 70, 0.3);
+}
+
+.launch-sector-marker--warning::before,
+.launch-sector-marker--launching::before {
+  animation: launch-sector-pulse 1.8s ease-in-out infinite;
+}
+
+.launch-sector-marker--warning::before {
+  border-color: rgba(255, 211, 92, 0.76);
+  box-shadow: 0 0 20px rgba(255, 205, 74, 0.38);
+}
+
+.launch-sector-marker--cooldown {
+  opacity: 0.58;
+}
+
+.map-marker--launch-sector {
+  position: relative;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  opacity: 0.88;
+  background: radial-gradient(circle, rgba(88, 20, 18, 0.7), rgba(7, 18, 27, 0.42));
+  box-shadow: 0 0 0 2px rgba(255, 110, 110, 0.16), 0 0 14px rgba(255, 110, 110, 0.28);
+}
+
+.map-marker--launch-sector img {
+  width: 24px !important;
+  height: 24px !important;
+}
+
 .map-marker--carrier {
   width: 20px;
   height: 20px;
@@ -2415,6 +2463,11 @@ button {
 .shell--map-first .topbar,
 .shell--map-first .left-rail {
   display: none;
+}
+
+@keyframes launch-sector-pulse {
+  0%, 100% { opacity: 0.36; transform: scale(0.88); }
+  50% { opacity: 0.92; transform: scale(1.18); }
 }
 
 .unit-card button {

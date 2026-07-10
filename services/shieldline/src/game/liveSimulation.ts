@@ -2,6 +2,7 @@ import { getScenario } from "../data/scenarios";
 import { getUnitDefinition } from "../data/units";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
 import { buildLogisticsState } from "./logistics";
+import { SHOW_LAUNCH_DEBUG, launchSectorCenter, pickWeightedSector, randomPointInSector, sectorSupportsThreat } from "./launchSystem.mjs";
 import { clamp, createId, pick, weightedChance } from "./math";
 import { applyPlanningActionCosts, applyPlanningRecoveryEffects, closePlanningDay } from "./planningActions";
 import { distanceKm, validateBatteryPlacement } from "./placementRules";
@@ -102,9 +103,8 @@ function cloneState(state: GameState): GameState {
     infrastructure: state.infrastructure.map((node) => ({ ...node })),
     launchSectors: state.launchSectors.map((sector) => ({
       ...sector,
-      coordinates: { ...sector.coordinates },
       targetCoordinates: sector.targetCoordinates ? { ...sector.targetCoordinates } : undefined,
-      supports: [...sector.supports],
+      threats: [...sector.threats],
     })),
     units: state.units.map((unit) => ({ ...unit })),
     batteries: state.batteries.map((battery) => ({ ...battery, position: { ...battery.position } })),
@@ -301,9 +301,10 @@ function stableHash(value: string) {
 
 function cityInLaunchCone(city: Coordinates, sector: LaunchSector) {
   if (sector.targetHeadingDeg === undefined) return false;
-  const distance = mapDistanceKm(sector.coordinates, city);
+  const center = launchSectorCenter(sector);
+  const distance = mapDistanceKm(center, city);
   if (distance > LAUNCH_CONE_RANGE_KM) return false;
-  return angleDeltaDeg(bearingDeg(sector.coordinates, city), sector.targetHeadingDeg) <= LAUNCH_CONE_HALF_ANGLE_DEG;
+  return angleDeltaDeg(bearingDeg(center, city), sector.targetHeadingDeg) <= LAUNCH_CONE_HALF_ANGLE_DEG;
 }
 
 function activeLaunchCorridors(state: GameState) {
@@ -322,9 +323,7 @@ function isMissileClass(kind: ThreatKind) {
 }
 
 function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () => number): LaunchSector {
-  const matching = sectors.filter((sector) => sector.supports.includes(kind));
-  if (matching.length) return pick(matching, random);
-  return pick(sectors, random);
+  return pickWeightedSector(sectors, kind, random);
 }
 
 function pickTargetCity(state: GameState, kind: ThreatKind, random: () => number) {
@@ -350,7 +349,7 @@ function createCarrierForThreat(state: GameState, kind: ThreatKind, launchSector
   const carrier = {
     id: createId("carrier", Math.floor(state.elapsedMs), random),
     kind: kind === "kh101" ? "tu95" as const : "black-sea-ship" as const,
-    position: launchSector.coordinates,
+    position: launchSectorCenter(launchSector),
     launchSectorId: launchSector.id,
     headingDeg: kind === "kh101" ? 275 : 330,
     ttlMs: 32000,
@@ -366,13 +365,14 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     ? state.cities.find((item) => item.id === forcedTargetCityId) || pickTargetCity(state, kind, random)
     : pickTargetCity(state, kind, random);
   const launchSector = forcedSectorId
-    ? state.launchSectors.find((sector) => sector.id === forcedSectorId) || pickLaunchSector(state.launchSectors, kind, random)
+    ? state.launchSectors.find((sector) => sector.id === forcedSectorId && sectorSupportsThreat(sector, kind)) || pickLaunchSector(state.launchSectors, kind, random)
     : pickLaunchSector(state.launchSectors, kind, random);
   const carrierId = createCarrierForThreat(state, kind, launchSector, random);
   const durationWindow = threatFlightDurationMs[kind];
   const flightDurationMs = durationWindow[0] + random() * (durationWindow[1] - durationWindow[0]);
   const falseTrack = kind === "decoy" || kind === "parodiya" || random() < (plan?.deception || 0) * 0.045;
-  const origin = launchSector.coordinates;
+  const origin = randomPointInSector(launchSector, random);
+  if (SHOW_LAUNCH_DEBUG) console.debug("[Shieldline live launch]", { threatType: kind, sector: launchSector.id, point: origin });
   const heading = bearingDeg(origin, city.coordinates);
   return {
     id: createId("live-threat", Math.floor(state.elapsedMs), random),
@@ -385,7 +385,7 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     launchSectorName: launchSector.name,
     progress: 0,
     speed: 1 / flightDurationMs,
-    difficulty: threatBaseDifficulty[kind] * launchSector.pressure + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
+    difficulty: threatBaseDifficulty[kind] * (1 + Math.max(-0.06, Math.min(0.08, (launchSector.weight - 3) * 0.025))) + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
     damage: falseTrack ? 0 : threatDamage[kind],
     confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,
     saturation: kind === "saturation" || kind === "geran2" ? 1.25 : kind === "combined" ? 1.35 : 1,
@@ -414,9 +414,10 @@ function markLaunchSector(
   sector.stateUntilMs = state.elapsedMs + durationMs;
   if (status === "warning") sector.warningStartedAtMs = state.elapsedMs;
   if (target) {
+    const center = launchSectorCenter(sector);
     sector.targetCityId = target.cityId;
     sector.targetCoordinates = { ...target.coordinates };
-    sector.targetHeadingDeg = bearingDeg(sector.coordinates, target.coordinates);
+    sector.targetHeadingDeg = bearingDeg(center, target.coordinates);
   }
 }
 
@@ -736,7 +737,7 @@ function updateCityAlerts(state: GameState) {
       .map((city) => ({
         city,
         score: (targetCoordinates ? abstractDistanceKm(city.coordinates, targetCoordinates) : 0)
-          + angleDeltaDeg(bearingDeg(sector.coordinates, city.coordinates), sector.targetHeadingDeg!) * 8
+          + angleDeltaDeg(bearingDeg(launchSectorCenter(sector), city.coordinates), sector.targetHeadingDeg!) * 8
           - city.importance * 2,
       }))
       .sort((left, right) => left.score - right.score);

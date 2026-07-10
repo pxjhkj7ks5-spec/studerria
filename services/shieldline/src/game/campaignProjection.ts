@@ -1,12 +1,24 @@
 import type { MissionRun, SimulationEvent } from "../domain/contracts";
-import type { ImpactMarker, InterceptorShot, LaunchSector, LiveThreat, ThreatKind } from "../types/game";
+import type { Coordinates, ImpactMarker, InterceptorShot, LaunchAreaState, LiveThreat, ThreatKind } from "../types/game";
+
+interface CampaignLaunchCorridor {
+  id: string;
+  name: string;
+  coordinates: Coordinates;
+  supports: ThreatKind[];
+  pressure: number;
+  category: "drone" | "ballistic" | "cruise" | "carrier";
+  state: LaunchAreaState;
+  targetCoordinates: Coordinates;
+  targetHeadingDeg: number;
+}
 
 export interface CampaignMapProjection {
   elapsedMs: number;
   liveThreats: LiveThreat[];
   interceptorShots: InterceptorShot[];
   impactMarkers: ImpactMarker[];
-  launchSectors: LaunchSector[];
+  launchSectors: CampaignLaunchCorridor[];
   visibleEvents: SimulationEvent[];
   interceptions: number;
   impacts: number;
@@ -24,7 +36,7 @@ function threatKind(event: SimulationEvent | undefined): ThreatKind {
   return ["drone", "ballistic", "cruise", "decoy", "combined", "saturation", "geran2", "gerbera", "parodiya", "kh101", "kalibr", "iskander"].includes(value) ? value : "drone";
 }
 
-function categoryFor(kind: ThreatKind): LaunchSector["category"] {
+function categoryFor(kind: ThreatKind): CampaignLaunchCorridor["category"] {
   if (["kh101", "kalibr", "cruise"].includes(kind)) return "cruise";
   if (["iskander", "ballistic"].includes(kind)) return "ballistic";
   return "drone";
@@ -46,7 +58,7 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
   const liveThreats: LiveThreat[] = [];
   const interceptorShots: InterceptorShot[] = [];
   const impactMarkers: ImpactMarker[] = [];
-  const launchSectors: LaunchSector[] = [];
+  const launchSectors: CampaignLaunchCorridor[] = [];
 
   for (const wave of waveEvents(run)) {
     const warning = wave.events.find((event) => event.type === "launch.warning");

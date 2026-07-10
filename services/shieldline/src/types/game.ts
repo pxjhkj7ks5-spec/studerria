@@ -52,6 +52,23 @@ export type ThreatKind =
   | "kalibr"
   | "iskander";
 
+export type LaunchThreatProfile =
+  | "shahed"
+  | "gerbera"
+  | "parodiya"
+  | "iskander_m"
+  | "s400_ballistic"
+  | "s300_ballistic"
+  | "decoy_ballistic"
+  | "italmas"
+  | "decoy"
+  | "kh59"
+  | "kalibr"
+  | "kh31p"
+  | "decoy_cruise"
+  | "kh101"
+  | "kh555";
+
 export type CarrierKind = "tu95" | "black-sea-ship";
 
 export type LaunchAreaState = "idle" | "warning" | "launching" | "cooldown";
@@ -181,10 +198,12 @@ export interface DefenseBattery {
 export interface LaunchSector {
   id: string;
   name: string;
-  coordinates: Coordinates;
-  supports: ThreatKind[];
-  pressure: number;
-  category?: "drone" | "ballistic" | "cruise" | "carrier";
+  lat: number;
+  lng: number;
+  radiusKm: number;
+  weight: number;
+  threats: LaunchThreatProfile[];
+  role: string;
   state?: LaunchAreaState;
   stateUntilMs?: number;
   warningStartedAtMs?: number;

@@ -5,6 +5,7 @@ import { defenseReadinessForMode, getGameModeRuntimePolicy } from "../data/gameM
 import { createDeterministicRandom } from "../game/deterministicRandom";
 import { advanceSimulation, placeBattery, removeBattery, setBatteryMaintenance, startAttackNow } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
+import { createLaunchSectorState } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
 import type { CampaignMode, Coordinates, GameState, MapMode, PlanningActionId, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
@@ -26,6 +27,17 @@ function createSimulationSeed(mode: GameModeId | "legacy") {
 function createSeededScenario(seed: string, mode: CampaignMode, scenarioId: string) {
   const random = createDeterministicRandom(seed);
   return { game: createScenarioState(() => random.next(), mode, scenarioId), cursor: random.cursor() };
+}
+
+function migrateLegacyLaunchPoints(game: GameState | null) {
+  if (!game || (Array.isArray(game.launchSectors) && game.launchSectors.every((sector) => Number.isFinite(sector.radiusKm) && sector.radiusKm > 0))) return game;
+  return {
+    ...game,
+    launchSectors: createLaunchSectorState(),
+    pendingLaunches: [],
+    carriers: [],
+    liveThreats: [],
+  };
 }
 
 interface GameStore {
@@ -241,7 +253,15 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 9,
+      version: 10,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<GameStore>;
+        return {
+          ...state,
+          game: migrateLegacyLaunchPoints(state.game || null) || undefined,
+          dailyCityGame: migrateLegacyLaunchPoints(state.dailyCityGame || null),
+        } as GameStore;
+      },
       partialize: (state) => ({
         game: state.game,
         campaignMode: state.campaignMode,

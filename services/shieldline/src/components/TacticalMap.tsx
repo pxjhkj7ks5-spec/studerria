@@ -1,11 +1,12 @@
 import L from "leaflet";
-import { Circle, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
+import { Circle, CircleMarker, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { carrierSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
+import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
+import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { useGameStore } from "../store/useGameStore";
 import type { CampaignMapProjection } from "../game/campaignProjection";
 import type {
@@ -14,6 +15,7 @@ import type {
   DefenseBattery,
   ImpactMarker,
   InterceptorShot,
+  LaunchSector,
   LiveThreat,
   SupplyRoute,
 } from "../types/game";
@@ -54,6 +56,7 @@ const cityIconCache = new Map<string, L.DivIcon>();
 const batteryIconCache = new Map<string, L.DivIcon>();
 const shotIconCache = new Map<string, L.DivIcon>();
 const impactIconCache = new Map<string, L.DivIcon>();
+const launchSectorIconCache = new Map<string, L.DivIcon>();
 const carrierIconCache = new Map<string, L.DivIcon>();
 const threatIconCache = new Map<string, L.DivIcon>();
 
@@ -282,6 +285,22 @@ function makeImpactIcon(marker: ImpactMarker) {
     iconAnchor: [10, 10],
   });
   impactIconCache.set(key, icon);
+  return icon;
+}
+
+function makeLaunchSectorIcon(sector: LaunchSector) {
+  const category = launchSectorCategory(sector);
+  const state = sector.state || "idle";
+  const key = `${category}:${state}`;
+  const cached = launchSectorIconCache.get(key);
+  if (cached) return cached;
+  const icon = L.divIcon({
+    className: "",
+    html: `<span class="launch-sector-marker launch-sector-marker--${state}">${imageMarkerHtml(launchSprites[category], "map-marker--launch-sector")}</span>`,
+    iconSize: [46, 46],
+    iconAnchor: [23, 23],
+  });
+  launchSectorIconCache.set(key, icon);
   return icon;
 }
 
@@ -653,6 +672,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
   const liveThreats = projection?.liveThreats ?? game.liveThreats;
   const interceptorShots = projection?.interceptorShots ?? game.interceptorShots;
   const impactMarkers = projection?.impactMarkers ?? game.impactMarkers;
+  const sectorActivity = projection ? [] : game.launchSectors;
   const elapsedMs = projection?.elapsedMs ?? game.elapsedMs;
   const controlOverlay = useMemo(() => getControlOverlay(), []);
   const occupiedZonePolygons = useMemo(
@@ -678,8 +698,12 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
     () => occupiedZonePolygons.filter((polygon) => boundsIntersect(polygon.bounds, renderBounds)),
     [occupiedZonePolygons, renderBounds],
   );
+  const visibleLaunchSectors = useMemo(
+    () => sectorActivity.filter((sector) => (SHOW_LAUNCH_DEBUG || (sector.state && sector.state !== "idle")) && pointInBounds(launchSectorCenter(sector), renderBounds, sector.radiusKm / 85)),
+    [sectorActivity, renderBounds],
+  );
   const visibleCarriers = useMemo(
-    () => game.carriers.filter((carrier) => pointInBounds(carrier.position, renderBounds)),
+    () => SHOW_LAUNCH_DEBUG ? game.carriers.filter((carrier) => pointInBounds(carrier.position, renderBounds)) : [],
     [game.carriers, renderBounds],
   );
   const visibleBatteries = useMemo(
@@ -706,6 +730,10 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
     () => impactMarkers.filter((marker) => pointInBounds(marker.position, renderBounds)),
     [impactMarkers, renderBounds],
   );
+  const visibleDebugLaunchPoints = useMemo(
+    () => SHOW_LAUNCH_DEBUG ? liveThreats.filter((threat) => pointInBounds(threat.origin, renderBounds)) : [],
+    [liveThreats, renderBounds],
+  );
   useEffect(() => {
     if (!renderBounds) return;
     for (const key of renderBounds.chunkKeys) {
@@ -722,6 +750,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
       + impactMarkers.length
       + (mapMode === "logistics" ? game.logistics.routes.length : 0);
     const renderedObjects = visibleCities.length
+      + visibleLaunchSectors.length
       + visibleCarriers.length
       + visibleBatteries.length
       + visibleThreats.length
@@ -729,7 +758,8 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
       + visibleImpactMarkers.length
       + visibleCoverageBatteries.length
       + visibleRoutes.length
-      + visibleOccupiedZonePolygons.length;
+      + visibleOccupiedZonePolygons.length
+      + visibleDebugLaunchPoints.length;
     return {
       activeObjects,
       renderedObjects,
@@ -752,6 +782,8 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
     visibleCities.length,
     visibleCoverageBatteries.length,
     visibleImpactMarkers.length,
+    visibleLaunchSectors.length,
+    visibleDebugLaunchPoints.length,
     visibleOccupiedZonePolygons.length,
     visibleRoutes.length,
     visibleShots.length,
@@ -826,6 +858,30 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
             }}
           />
         )) : null}
+        {visibleLaunchSectors.map((sector) => {
+          const center = launchSectorCenter(sector);
+          return (
+            <Fragment key={`launch-sector-${sector.id}`}>
+              {SHOW_LAUNCH_DEBUG ? (
+                <Circle
+                  center={[center.lat, center.lng]}
+                  radius={sector.radiusKm * 1000}
+                  pathOptions={{ color: "#ff9b72", fillColor: "#ff6f61", fillOpacity: 0.035, opacity: 0.28, weight: 1, dashArray: "5 7", className: "launch-sector-debug-radius" }}
+                />
+              ) : null}
+              <Marker position={[center.lat, center.lng]} icon={makeLaunchSectorIcon(sector)}>
+                <Tooltip direction="left" offset={[-8, 0]}>
+                  {sector.name} · {sector.role}
+                </Tooltip>
+              </Marker>
+            </Fragment>
+          );
+        })}
+        {visibleDebugLaunchPoints.map((threat) => (
+          <CircleMarker key={`debug-launch-${threat.id}`} center={[threat.origin.lat, threat.origin.lng]} radius={4} pathOptions={{ color: "#fff4d0", fillColor: "#ff5f57", fillOpacity: 0.9, weight: 1 }}>
+            <Tooltip>{threat.launchSectorName} · exact debug spawn</Tooltip>
+          </CircleMarker>
+        ))}
         {visibleCarriers.map((carrier) => (
           <Marker key={carrier.id} position={[carrier.position.lat, carrier.position.lng]} icon={makeCarrierIcon(carrier)}>
             <Tooltip direction="top" offset={[0, -10]}>
