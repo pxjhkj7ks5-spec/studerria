@@ -1,4 +1,4 @@
-import type { GameModeId } from "../domain/contracts";
+import type { GameModeId, GameModeRuntimePolicy } from "../domain/contracts";
 
 export interface GameModeDefinition {
   id: GameModeId;
@@ -39,6 +39,32 @@ export const gameModes: GameModeDefinition[] = [
     description: "One persistent city. After you place and improve defense assets, one server-side night is resolved per day; then you review the report and return to planning.", mainRisk: "Slow infrastructure attrition", victory: "Keep morale and essential systems stable", availability: "available",
   },
 ];
+
+export const gameModeRuntimePolicies: Record<GameModeId, GameModeRuntimePolicy> = {
+  campaign: { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8, 60], requiresRadar: true, requiresKinetic: true },
+  "rapid-response": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 60, availableSpeeds: [1, 8, 60], requiresRadar: true, requiresKinetic: true },
+  "ranked-challenge": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8], requiresRadar: true, requiresKinetic: true },
+  "co-op-command": { execution: "live", start: "hq-ready", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8], requiresRadar: true, requiresKinetic: true },
+  sandbox: { execution: "live", start: "sandbox-controls", countdownMs: 0, defaultSpeed: 600, availableSpeeds: [1, 8, 60, 600], requiresRadar: false, requiresKinetic: false },
+  training: { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 600, availableSpeeds: [1, 8, 60, 600], requiresRadar: true, requiresKinetic: true },
+  "daily-defense": { execution: "daily-scheduled", start: "scheduled", countdownMs: 0, defaultSpeed: 1, availableSpeeds: [1], requiresRadar: false, requiresKinetic: false },
+};
+
+export function getGameModeRuntimePolicy(id: GameModeId | null | undefined) {
+  return gameModeRuntimePolicies[id || "campaign"];
+}
+
+export function defenseReadinessForMode(id: GameModeId, kinds: string[]) {
+  const policy = gameModeRuntimePolicies[id];
+  const radarReady = !policy.requiresRadar || kinds.includes("radar");
+  const kineticReady = !policy.requiresKinetic || kinds.some((kind) => kind !== "radar" && kind !== "ew");
+  return {
+    ready: radarReady && kineticReady,
+    radarReady,
+    kineticReady,
+    message: !radarReady ? "Place at least one radar." : !kineticReady ? "Place at least one combat air-defense unit." : "Defense plan ready.",
+  };
+}
 
 export function getGameMode(id: GameModeId) {
   return gameModes.find((mode) => mode.id === id) || gameModes[0];

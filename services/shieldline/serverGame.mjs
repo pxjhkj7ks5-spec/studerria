@@ -2,7 +2,8 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 
-const DEFAULT_STORE = { version: 2, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {} };
+const SIM_VERSION = "2.0.0";
+const DEFAULT_STORE = { version: 3, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {} };
 const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
 const missions = [
   {
@@ -34,6 +35,14 @@ const missions = [
   },
 ];
 
+const sectorCoordinates = {
+  north: { lat: 52.0, lng: 31.5 },
+  south: { lat: 45.6, lng: 32.4 },
+  east: { lat: 50.1, lng: 37.4 },
+  west: { lat: 49.2, lng: 23.8 },
+  hq: { lat: 50.45, lng: 30.52 },
+};
+
 function missionById(missionId) {
   return missions.find((entry) => entry.id === missionId) || missions[0];
 }
@@ -51,7 +60,7 @@ function seededRandom(seed) {
 }
 
 function event(runId, sequence, type, occurredAtMs, message, extras = {}) {
-  return { id: `${runId}-evt-${sequence}`, runId, sequence, type, occurredAtMs, message, payload: {}, ...extras };
+  return { id: `${runId}-evt-${sequence}`, runId, sequence, type, occurredAtMs, tick: occurredAtMs, simVersion: SIM_VERSION, schemaVersion: 1, message, payload: {}, ...extras };
 }
 
 function stableHash(value) {
@@ -73,6 +82,14 @@ export function simulateMission(seed, now = new Date().toISOString(), defenseBon
 
   for (const wave of mission.waves) {
     const detectedAt = Math.max(500, wave.etaSeconds * 500);
+    const origin = sectorCoordinates[wave.originSector] || sectorCoordinates.east;
+    const target = sectorCoordinates[wave.targetSector] || sectorCoordinates.hq;
+    const warningAt = Math.max(0, detectedAt - 2_000);
+    const launchAt = Math.max(0, detectedAt - 1_000);
+    const warning = event(runId, sequence++, "launch.warning", warningAt, `${wave.originSector} launch sector entered warning state.`, { sectorId: wave.originSector, waveId: wave.id, payload: { threatKind: wave.threatKind, originLat: origin.lat, originLng: origin.lng, targetLat: target.lat, targetLng: target.lng } });
+    const launched = event(runId, sequence++, "threat.launched", launchAt, `${wave.size} ${wave.threatKind} track${wave.size === 1 ? "" : "s"} launched.`, { sectorId: wave.originSector, waveId: wave.id, targetId: wave.targetSector, payload: { tracks: wave.size, threatKind: wave.threatKind, originLat: origin.lat, originLng: origin.lng, targetLat: target.lat, targetLng: target.lng } });
+    events.push(warning, launched);
+    replay.push({ ...warning, replayAtMs: warningAt, route: { from: wave.originSector, to: wave.targetSector } }, { ...launched, replayAtMs: launchAt, route: { from: wave.originSector, to: wave.targetSector } });
     const detected = event(runId, sequence++, "wave.detected", detectedAt, `${wave.size} tracks detected toward the ${wave.targetSector} sector.`, { sectorId: wave.targetSector, waveId: wave.id, payload: { tracks: wave.size, difficulty: wave.difficulty } });
     events.push(detected); replay.push({ ...detected, replayAtMs: detectedAt, route: { from: wave.originSector, to: wave.targetSector } });
     const coverage = Math.min(0.9, 0.38 + random() * 0.42 + defenseBonus);
@@ -80,6 +97,9 @@ export function simulateMission(seed, now = new Date().toISOString(), defenseBon
     const missed = wave.size - success;
     interceptions += success; impacts += missed; ammoSpent += success * (wave.threatKind === "kh101" ? 3 : 1);
     if (success) {
+      const firedAt = detectedAt + 450;
+      const fired = event(runId, sequence++, "battery.fired", firedAt, `Sector defense fired on ${success} confirmed track${success === 1 ? "" : "s"}.`, { sectorId: wave.targetSector, waveId: wave.id, assetId: "sector-defense", targetId: wave.id, payload: { count: success, threatKind: wave.threatKind } });
+      events.push(fired); replay.push({ ...fired, replayAtMs: firedAt, route: { from: wave.targetSector, to: wave.targetSector } });
       const interceptionAt = detectedAt + 900;
       const intercept = event(runId, sequence++, "interception", interceptionAt, `${success} track${success === 1 ? "" : "s"} intercepted over ${wave.targetSector}.`, { sectorId: wave.targetSector, waveId: wave.id, assetId: "sector-defense", payload: { count: success } });
       events.push(intercept); replay.push({ ...intercept, replayAtMs: interceptionAt, route: { from: wave.originSector, to: wave.targetSector }, interceptPoint: { x: 45 + (random() - .5) * 22, y: 50 + (random() - .5) * 22 } });
@@ -91,8 +111,13 @@ export function simulateMission(seed, now = new Date().toISOString(), defenseBon
     }
   }
   const result = impacts === 0 ? "victory" : impacts <= 5 ? "contained" : "setback";
-  events.push(event(runId, sequence, "mission.completed", 7600, result === "victory" ? "Mission complete: all critical tracks contained." : "Mission complete: command report is ready.", { payload: { result, interceptions, impacts } }));
-  return { id: runId, missionId: mission.id, seed, startedAt: now, completedAt: now, events, replay, result, interceptions, impacts, ammoSpent, sectorSummary: { north: { coverage: 72, pressure: 32, damage: 0 }, south: { coverage: 61, pressure: 44, damage: Math.max(0, impacts - 2) * 3 }, east: { coverage: 68, pressure: 70, damage: impacts * 4 }, west: { coverage: 74, pressure: 36, damage: 0 } } };
+  const completedAtMs = Math.max(7_600, ...events.map((entry) => entry.occurredAtMs)) + 500;
+  events.push(event(runId, sequence, "mission.completed", completedAtMs, result === "victory" ? "Mission complete: all critical tracks contained." : "Mission complete: command report is ready.", { payload: { result, interceptions, impacts } }));
+  const snapshots = [
+    { runId, sequence: 1, tick: 0, simVersion: SIM_VERSION, state: { interceptions: 0, impacts: 0, ammoSpent: 0, status: "running" } },
+    { runId, sequence, tick: completedAtMs, simVersion: SIM_VERSION, state: { interceptions, impacts, ammoSpent, status: "completed", result } },
+  ];
+  return { id: runId, missionId: mission.id, seed, startedAt: now, completedAt: now, events, replay, snapshots, simVersion: SIM_VERSION, revision: 1, status: "completed", result, interceptions, impacts, ammoSpent, sectorSummary: { north: { coverage: 72, pressure: 32, damage: 0 }, south: { coverage: 61, pressure: 44, damage: Math.max(0, impacts - 2) * 3 }, east: { coverage: 68, pressure: 70, damage: impacts * 4 }, west: { coverage: 74, pressure: 36, damage: 0 } } };
 }
 
 export function dayKey(now = new Date()) { return now.toISOString().slice(0, 10); }
@@ -178,6 +203,32 @@ export async function createGameStore(file) {
       await save(store);
     },
     async getRun(runId) { return (await readStore()).runs[runId] || null; },
+    async getRunEvents(runId, after = 0) {
+      const run = (await readStore()).runs[runId];
+      return run ? run.events.filter((entry) => entry.sequence > after) : null;
+    },
+    async getRunSnapshots(runId, tick = Number.POSITIVE_INFINITY) {
+      const run = (await readStore()).runs[runId];
+      return run ? (run.snapshots || []).filter((snapshot) => snapshot.tick <= tick) : null;
+    },
+    async appendOperationCommand(runId, actorId, input = {}) {
+      const store = await readStore();
+      if (!store.runs[runId]) throw Object.assign(new Error("Operation not found."), { statusCode: 404 });
+      const commandId = String(input.commandId || "").slice(0, 96);
+      if (!commandId) throw new Error("commandId is required.");
+      const commands = store.operationCommands[runId] || [];
+      const existing = commands.find((entry) => entry.commandId === commandId);
+      if (existing) return { command: existing, revision: store.operationRevisions[runId] || 1, duplicate: true };
+      const revision = store.operationRevisions[runId] || 1;
+      if (Number(input.baseRevision) !== revision) {
+        throw Object.assign(new Error("Operation revision conflict."), { statusCode: 409, latestPatch: { revision, commands: commands.slice(-20) } });
+      }
+      const command = { commandId, runId, actorId, revision: revision + 1, scope: input.scope || { type: "operation" }, type: String(input.type || "unknown").slice(0, 64), payload: input.payload || {}, acceptedAt: new Date().toISOString() };
+      store.operationCommands[runId] = [...commands, command];
+      store.operationRevisions[runId] = revision + 1;
+      await save(store);
+      return { command, revision: revision + 1, duplicate: false };
+    },
     async getDailyCity(actorId = "web-commander") {
       const store = await readStore();
       if (!store.dailyCities[actorId]) {

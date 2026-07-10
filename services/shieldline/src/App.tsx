@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, AlertTriangle, ClipboardList, Crosshair, Layers, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ClipboardList, Crosshair, FastForward, Layers, Menu, Pause, Play, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
 import { IntelLog } from "./components/IntelLog";
@@ -14,12 +14,14 @@ import { UnitRail } from "./components/UnitRail";
 import { CommandApp } from "./components/CommandApp";
 import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
+import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
 import { campaignMissions } from "./data/missions";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { useGameStore } from "./store/useGameStore";
+import { bindTelegramBackButton, bindTelegramBottomButton } from "./platform/telegramShell";
 import type { CampaignStatus, DefenseBattery, MapMode, ThreatKind, UnitDefinition, UnitKind } from "./types/game";
-import type { CampaignProgress, DailyDefensePlan, RankedResult } from "./domain/contracts";
+import type { CampaignProgress, DailyDefensePlan, GameModeId, RankedResult } from "./domain/contracts";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "live", label: "Live" },
@@ -101,11 +103,20 @@ export default function App() {
   const setMapMode = useGameStore((state) => state.setMapMode);
   const dismissTutorial = useGameStore((state) => state.dismissTutorial);
   const resetCampaign = useGameStore((state) => state.resetCampaign);
-  const tick = useGameStore((state) => state.tick);
+  const advanceOperation = useGameStore((state) => state.advanceOperation);
+  const startOperation = useGameStore((state) => state.startOperation);
+  const pauseOperation = useGameStore((state) => state.pauseOperation);
+  const resumeOperation = useGameStore((state) => state.resumeOperation);
+  const triggerNextWave = useGameStore((state) => state.triggerNextWave);
+  const setSimulationSpeed = useGameStore((state) => state.setSimulationSpeed);
   const removeSelectedBattery = useGameStore((state) => state.removeSelectedBattery);
   const startSelectedBatteryMaintenance = useGameStore((state) => state.startSelectedBatteryMaintenance);
   const selectedBatteryId = useGameStore((state) => state.selectedBatteryId);
   const placementKind = useGameStore((state) => state.placementKind);
+  const activeGameMode = useGameStore((state) => state.activeGameMode);
+  const operationPhase = useGameStore((state) => state.operationPhase);
+  const countdownRemainingMs = useGameStore((state) => state.countdownRemainingMs);
+  const simulationSpeed = useGameStore((state) => state.simulationSpeed);
   const [confirmReset, setConfirmReset] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel | null>("units");
   const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
@@ -123,6 +134,9 @@ export default function App() {
   const accumulatorRef = useRef(0);
   const revealedThreats = game.liveThreats.filter((threat) => threat.revealed).length;
   const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+  const resolvedMode = (activeGameMode || tacticalMode || "training") as GameModeId;
+  const runtimePolicy = getGameModeRuntimePolicy(resolvedMode);
+  const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
   const coOpSession = (() => {
     if (typeof window === "undefined" || tacticalMode !== "co-op-command") return null;
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
@@ -134,8 +148,17 @@ export default function App() {
     window.location.assign(url.toString());
   };
 
+  useEffect(() => bindTelegramBackButton(returnToCommandModes), []);
+
+  useEffect(() => bindTelegramBottomButton({
+    text: runtimePolicy.start === "hq-ready" ? "HQ start" : "Start operation",
+    enabled: defenseReadiness.ready,
+    visible: runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && operationPhase === "planning",
+    onClick: startOperation,
+  }), [defenseReadiness.ready, operationPhase, runtimePolicy.execution, runtimePolicy.start, startOperation]);
+
   useEffect(() => {
-    if (!campaignMode || tacticalMode === "daily-defense" || tacticalMode === "campaign" || tacticalMode === "ranked-challenge" || tacticalMode === "co-op-command") return undefined;
+    if (!campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
     let frameId = 0;
     const frame = (timestamp: number) => {
       if (lastTickRef.current === null) {
@@ -145,14 +168,19 @@ export default function App() {
       lastTickRef.current = timestamp;
       accumulatorRef.current += delta;
       if (accumulatorRef.current >= SIMULATION_TICK_MS) {
-        tick(accumulatorRef.current);
+        advanceOperation(accumulatorRef.current);
         accumulatorRef.current = 0;
       }
       frameId = window.requestAnimationFrame(frame);
     };
     frameId = window.requestAnimationFrame(frame);
     return () => window.cancelAnimationFrame(frameId);
-  }, [campaignMode, tick]);
+  }, [advanceOperation, campaignMode, operationPhase, runtimePolicy.execution]);
+
+  useEffect(() => {
+    lastTickRef.current = null;
+    accumulatorRef.current = 0;
+  }, [resolvedMode, operationPhase]);
 
   useEffect(() => {
     if (tacticalMode !== "campaign") return;
@@ -262,9 +290,29 @@ export default function App() {
               <span>{tacticalMode === "daily-defense" ? "Daily Defense · persistent city planning" : tacticalMode === "co-op-command" && coOpSession ? `Co-op Command · ${coOpSession.sectorId} sector · room log` : tacticalMode === "campaign" ? `${activeMission.title} · authoritative command ready` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
             </div>
           </div>
-          <ResourceBar game={game} />
+          <ResourceBar game={game} simulationSpeed={simulationSpeed} operationPhase={operationPhase} />
         </header>
         <MapLegend mode={mapMode} />
+        <section className={`operation-controls operation-controls--${operationPhase}`} aria-label="Operation controls">
+          <div className="operation-state">
+            <span>{runtimePolicy.execution === "daily-scheduled" ? "Daily schedule" : operationPhase}</span>
+            <strong>{operationPhase === "countdown" ? `Launch in ${Math.max(1, Math.ceil(countdownRemainingMs / 1000))}s` : runtimePolicy.execution === "daily-scheduled" ? "The city resolves once per day" : defenseReadiness.message}</strong>
+          </div>
+          {runtimePolicy.execution === "live" ? (
+            <div className="operation-actions">
+              {operationPhase === "planning" ? (
+                <button type="button" onClick={startOperation} disabled={!defenseReadiness.ready && runtimePolicy.start !== "sandbox-controls"}>
+                  <Play size={16} /> {runtimePolicy.start === "hq-ready" ? "HQ start" : runtimePolicy.start === "auto-checklist" ? "Start training now" : "Start operation"}
+                </button>
+              ) : null}
+              {operationPhase === "completed" ? <button type="button" onClick={resetCampaign}><RotateCcw size={16} /> Reset operation</button> : null}
+              {operationPhase === "running" ? <button type="button" onClick={pauseOperation}><Pause size={16} /> Pause</button> : null}
+              {operationPhase === "paused" ? <button type="button" onClick={resumeOperation}><Play size={16} /> Resume</button> : null}
+              {resolvedMode === "sandbox" ? <button type="button" onClick={triggerNextWave} disabled={game.cyclePhase === "attack"}><FastForward size={16} /> Next wave</button> : null}
+              {runtimePolicy.availableSpeeds.length > 1 ? <div className="speed-controls" aria-label="Simulation speed">{runtimePolicy.availableSpeeds.map((speed) => <button className={simulationSpeed === speed ? "is-active" : ""} type="button" key={speed} onClick={() => setSimulationSpeed(speed)}>x{speed}</button>)}</div> : null}
+            </div>
+          ) : null}
+        </section>
       </section>
 
       {activePanel ? (

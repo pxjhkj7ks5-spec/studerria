@@ -7,7 +7,28 @@ import type { Coordinates, Resources, ThreatKind, UnitKind } from "../types/game
  */
 export type GameModeId = "campaign" | "rapid-response" | "ranked-challenge" | "co-op-command" | "sandbox" | "training" | "daily-defense";
 export type SectorId = "north" | "south" | "east" | "west" | "hq";
-export type SimulationEventType = "mission.started" | "wave.detected" | "interception" | "impact" | "mission.completed";
+export type OperationPhase = "planning" | "countdown" | "running" | "paused" | "completed";
+export type SimulationSpeed = 1 | 8 | 60 | 600;
+export type SimulationEventType =
+  | "mission.started"
+  | "launch.warning"
+  | "threat.launched"
+  | "wave.detected"
+  | "track.detected"
+  | "battery.fired"
+  | "interception"
+  | "impact"
+  | "mission.completed";
+
+export interface GameModeRuntimePolicy {
+  execution: "live" | "daily-scheduled";
+  start: "auto-checklist" | "manual" | "sandbox-controls" | "hq-ready" | "scheduled";
+  countdownMs: number;
+  defaultSpeed: SimulationSpeed;
+  availableSpeeds: SimulationSpeed[];
+  requiresRadar: boolean;
+  requiresKinetic: boolean;
+}
 
 export interface ShieldlineUser {
   id: string;
@@ -78,17 +99,29 @@ export interface SimulationEvent {
   sequence: number;
   type: SimulationEventType;
   occurredAtMs: number;
+  tick?: number;
+  simVersion?: string;
+  schemaVersion?: number;
   sectorId?: SectorId;
   waveId?: string;
   assetId?: string;
   message: string;
-  payload: Record<string, number | string | boolean>;
+  targetId?: string;
+  payload: Record<string, number | string | boolean | null>;
 }
 
 export interface ReplayEvent extends SimulationEvent {
   replayAtMs: number;
   route?: { from: SectorId; to: SectorId };
   interceptPoint?: { x: number; y: number };
+}
+
+export interface ReplaySnapshot {
+  runId: string;
+  sequence: number;
+  tick: number;
+  simVersion: string;
+  state: Record<string, number | string | boolean | null>;
 }
 
 export interface MissionRun {
@@ -99,6 +132,10 @@ export interface MissionRun {
   completedAt: string;
   events: SimulationEvent[];
   replay: ReplayEvent[];
+  snapshots?: ReplaySnapshot[];
+  simVersion?: string;
+  revision?: number;
+  status?: "completed";
   result: "victory" | "contained" | "setback";
   interceptions: number;
   impacts: number;
@@ -168,6 +205,23 @@ export interface RankedResult {
   entry: LeaderboardEntry;
 }
 
+export interface OperationCommandInput {
+  commandId: string;
+  baseRevision: number;
+  scope: { type: "operation" | "sector"; sectorId?: SectorId };
+  type: string;
+  payload: Record<string, unknown>;
+}
+
+export interface OperationCreateResult {
+  runId: string;
+  revision: number;
+  status: "completed";
+  seed: string;
+  simVersion: string;
+  run: MissionRun;
+}
+
 export interface CoOpRoom {
   id: string;
   mode: "async" | "live";
@@ -187,6 +241,11 @@ export interface SimulationRepository {
 }
 
 export interface CommandRepository extends SimulationRepository {
+  createOperation(input: { modeId: Exclude<GameModeId, "daily-defense">; missionId: string; seed: string; plan: DailyDefensePlan }): Promise<OperationCreateResult>;
+  getOperation(runId: string): Promise<MissionRun | null>;
+  getOperationEvents(runId: string, after?: number): Promise<SimulationEvent[]>;
+  getOperationSnapshots(runId: string, tick?: number): Promise<ReplaySnapshot[]>;
+  sendOperationCommand(runId: string, command: OperationCommandInput): Promise<{ command: OperationCommandInput; revision: number; duplicate: boolean }>;
   getRun(runId: string): Promise<MissionRun | null>;
   getCoOpRoom(roomId: string): Promise<CoOpRoom>;
   claimCoOpSector(roomId: string, sectorId: SectorId): Promise<CoOpRoom>;

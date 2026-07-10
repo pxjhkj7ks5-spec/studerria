@@ -4,6 +4,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
 import { createGameStore, dayKey } from "./serverGame.mjs";
+import { createFixedWindowRateLimiter, createSessionCodec, readCookie } from "./serverSecurity.mjs";
 
 const port = Number(process.env.PORT || 8080);
 const basePath = normalizeBasePath(process.env.SHIELDLINE_BASE_PATH || "/shieldline");
@@ -14,12 +15,28 @@ const adminPassword = process.env.SHIELDLINE_ADMIN_PASSWORD || "";
 const gameStore = await createGameStore(process.env.SHIELDLINE_GAME_STORE_FILE || "/data/game-store.json");
 const telegramBotToken = process.env.SHIELDLINE_TELEGRAM_BOT_TOKEN || "";
 const telegramAuthMaxAgeSeconds = Number(process.env.SHIELDLINE_TELEGRAM_AUTH_MAX_AGE_SECONDS || 86400);
+const production = process.env.NODE_ENV === "production";
+const sessionCodec = createSessionCodec({
+  secret: process.env.SHIELDLINE_SESSION_SECRET || "shieldline-development-session-secret",
+  basePath: basePath || "/",
+  secure: production,
+  ttlSeconds: Number(process.env.SHIELDLINE_SESSION_MAX_AGE_SECONDS || 2_592_000),
+});
+const apiRateLimiter = createFixedWindowRateLimiter({ limit: Number(process.env.SHIELDLINE_API_RATE_LIMIT_PER_MINUTE || 180) });
+
+const securityHeaders = {
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+};
 
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
+  [".webmanifest", "application/manifest+json; charset=utf-8"],
   [".svg", "image/svg+xml"],
   [".png", "image/png"],
   [".jpg", "image/jpeg"],
@@ -39,10 +56,16 @@ function normalizeBasePath(value) {
 
 function sendFile(res, filePath) {
   const ext = extname(filePath).toLowerCase();
+  const fileName = filePath.split(/[\\/]/).at(-1);
+  const cacheControl = ext === ".html" || fileName === "sw.js"
+    ? "no-store"
+    : fileName === "manifest.webmanifest"
+      ? "public, max-age=3600"
+      : "public, max-age=31536000, immutable";
   res.writeHead(200, {
     "Content-Type": contentTypes.get(ext) || "application/octet-stream",
-    "Cache-Control": ext === ".html" ? "no-store" : "public, max-age=31536000, immutable",
-    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": cacheControl,
+    ...securityHeaders,
   });
   createReadStream(filePath).pipe(res);
 }
@@ -63,7 +86,7 @@ function sendJson(res, status, payload) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
+    ...securityHeaders,
   });
   res.end(JSON.stringify(payload));
 }
@@ -87,15 +110,15 @@ function gameApiPath(pathname) {
 }
 
 function safeActor(req, res) {
-  const existing = String(req.headers.cookie || "").match(/(?:^|;\s*)shieldline_sid=([a-z0-9_-]{8,64})/i)?.[1];
+  const existing = sessionCodec.verify(readCookie(req.headers.cookie, "shieldline_sid"));
   if (existing) return existing;
   const issued = `guest-${randomUUID().slice(0, 18)}`;
-  res.setHeader("Set-Cookie", `shieldline_sid=${issued}; Path=${basePath || "/"}; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+  res.setHeader("Set-Cookie", sessionCodec.header(issued));
   return issued;
 }
 
 function issueActorCookie(res, actorId) {
-  res.setHeader("Set-Cookie", `shieldline_sid=${actorId}; Path=${basePath || "/"}; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+  res.setHeader("Set-Cookie", sessionCodec.header(actorId));
 }
 
 function validateTelegramInitData(initData) {
@@ -128,6 +151,48 @@ async function deliverTelegramNotifications() {
 async function handleGameApi(req, res, pathname) {
   const path = gameApiPath(pathname);
   try {
+    if (req.method === "POST" && path === "/operations") {
+      const body = await readRequestJson(req);
+      const actorId = safeActor(req, res);
+      const modeId = String(body.modeId || "training");
+      if (!new Set(["campaign", "rapid-response", "ranked-challenge", "co-op-command", "sandbox", "training"]).has(modeId)) throw new Error("Unknown live operation mode.");
+      if (production && actorId.startsWith("guest-") && (modeId === "ranked-challenge" || modeId === "co-op-command")) throw Object.assign(new Error("Telegram authorization is required for competitive modes."), { statusCode: 401 });
+      const seed = String(body.seed || `${modeId}-${dayKey()}-${actorId}`).replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
+      const source = modeId === "ranked-challenge" ? "ranked" : modeId === "co-op-command" ? "co-op" : modeId === "campaign" ? "campaign" : "command";
+      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan, String(body.missionId || "campaign-night-01"), source);
+      sendJson(res, 201, { runId: run.id, revision: run.revision || 1, status: run.status || "completed", seed: run.seed, simVersion: run.simVersion || "1.0.0", run });
+      return;
+    }
+    const operationEventsMatch = path.match(/^\/operations\/([^/]+)\/events$/);
+    if (req.method === "GET" && operationEventsMatch) {
+      const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
+      const events = await gameStore.getRunEvents(operationEventsMatch[1], Math.max(0, Number(query.get("after") || 0)));
+      if (!events) { sendJson(res, 404, { error: "Operation not found." }); return; }
+      sendJson(res, 200, { events });
+      return;
+    }
+    const operationSnapshotsMatch = path.match(/^\/operations\/([^/]+)\/snapshots$/);
+    if (req.method === "GET" && operationSnapshotsMatch) {
+      const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
+      const requestedTick = query.has("tick") ? Number(query.get("tick")) : Number.POSITIVE_INFINITY;
+      const snapshots = await gameStore.getRunSnapshots(operationSnapshotsMatch[1], requestedTick);
+      if (!snapshots) { sendJson(res, 404, { error: "Operation not found." }); return; }
+      sendJson(res, 200, { snapshots });
+      return;
+    }
+    const operationCommandsMatch = path.match(/^\/operations\/([^/]+)\/commands$/);
+    if (req.method === "POST" && operationCommandsMatch) {
+      const body = await readRequestJson(req);
+      sendJson(res, 201, await gameStore.appendOperationCommand(operationCommandsMatch[1], safeActor(req, res), body));
+      return;
+    }
+    const operationMatch = path.match(/^\/operations\/([^/]+)$/);
+    if (req.method === "GET" && operationMatch) {
+      const run = await gameStore.getRun(operationMatch[1]);
+      if (!run) { sendJson(res, 404, { error: "Operation not found." }); return; }
+      sendJson(res, 200, run);
+      return;
+    }
     if (req.method === "GET" && path === "/daily") {
       const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
       sendJson(res, 200, await gameStore.getDailyReport(query.get("day") || dayKey(), {}, safeActor(req, res)));
@@ -153,6 +218,11 @@ async function handleGameApi(req, res, pathname) {
       const actorId = `tg-${user.id}`;
       issueActorCookie(res, actorId);
       sendJson(res, 200, { user: { id: actorId, displayName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "Telegram commander", platform: "telegram" } });
+      return;
+    }
+    if (req.method === "POST" && path === "/auth/logout") {
+      res.setHeader("Set-Cookie", sessionCodec.clearHeader());
+      sendJson(res, 200, { ok: true });
       return;
     }
     if (req.method === "POST" && path === "/notifications/preferences") {
@@ -240,7 +310,8 @@ async function handleGameApi(req, res, pathname) {
     }
     sendJson(res, 404, { error: "Unknown Shieldline game API route." });
   } catch (error) {
-    sendJson(res, 400, { error: error instanceof Error ? error.message : "Game command could not be processed." });
+    const status = Number(error?.statusCode) || 400;
+    sendJson(res, status, { error: error instanceof Error ? error.message : "Game command could not be processed.", ...(error?.latestPatch ? { latestPatch: error.latestPatch } : {}) });
   }
 }
 
@@ -347,6 +418,12 @@ createServer(async (req, res) => {
   }
 
   if (isGameApi(pathname)) {
+    const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+    const clientKey = forwarded || req.socket.remoteAddress || "unknown";
+    if (!apiRateLimiter.allow(clientKey)) {
+      sendJson(res, 429, { error: "Too many Shieldline API requests." });
+      return;
+    }
     await handleGameApi(req, res, pathname);
     return;
   }

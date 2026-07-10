@@ -191,7 +191,7 @@ function coverageRadiusFromUnit(unit: ReturnType<typeof getUnitDefinition>) {
   return clamp(unit.outerRangeKm / ABSTRACT_KM_PER_DEGREE, 0.1, 2.1);
 }
 
-export function placeBattery(state: GameState, kind: UnitKind, position: Coordinates, random: () => number = Math.random): GameState {
+export function placeBattery(state: GameState, kind: UnitKind, position: Coordinates, random: () => number): GameState {
   const scenario = getScenario(state.scenarioId);
   const unit = getUnitDefinition(kind);
   if (state.status !== "active" || state.resources.budget < unit.cost || !scenario.allowedUnits.includes(kind)) return state;
@@ -534,7 +534,7 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
   }
 }
 
-function updateShots(state: GameState, deltaMs: number) {
+function updateShots(state: GameState, deltaMs: number, random: () => number) {
   const resolvedThreatIds = new Set<string>();
   const threatById = new Map(state.liveThreats.map((threat) => [threat.id, threat]));
   const nextShots: InterceptorShot[] = [];
@@ -548,7 +548,7 @@ function updateShots(state: GameState, deltaMs: number) {
         state.interceptions += 1;
         state.resources.budget = clamp(state.resources.budget + threat.reward, 0, 999);
         state.impactMarkers.push({
-          id: createId("intercept", Math.floor(state.elapsedMs), Math.random),
+          id: createId("intercept", Math.floor(state.elapsedMs), random),
           position: threatPosition(threat),
           tone: "intercept",
           ttlMs: 1800,
@@ -691,7 +691,7 @@ function engageThreats(state: GameState, random: () => number) {
   }
 }
 
-function applyImpact(state: GameState, threat: LiveThreat) {
+function applyImpact(state: GameState, threat: LiveThreat, random: () => number) {
   const city = state.cities.find((item) => item.id === threat.targetCityId);
   if (!city) return;
 
@@ -702,11 +702,11 @@ function applyImpact(state: GameState, threat: LiveThreat) {
   state.resources.energy = clamp(state.resources.energy - damage * 0.1);
   state.resources.morale = clamp(state.resources.morale - (city.importance * 0.5 + 0.8));
   state.impacts += 1;
-  state.impactMarkers.push({ id: createId("impact", Math.floor(state.elapsedMs), Math.random), position: city.coordinates, tone: "impact", ttlMs: 2600 });
+  state.impactMarkers.push({ id: createId("impact", Math.floor(state.elapsedMs), random), position: city.coordinates, tone: "impact", ttlMs: 2600 });
   pushLog(state.log, state.elapsedMs, "Impact", `${city.name} was hit by an unresolved ${threat.kind} track.`, "danger");
 }
 
-function updateThreats(state: GameState, deltaMs: number) {
+function updateThreats(state: GameState, deltaMs: number, random: () => number) {
   const remaining: LiveThreat[] = [];
   for (const threat of state.liveThreats) {
     const next = { ...threat, progress: threat.progress + threat.speed * deltaMs };
@@ -715,7 +715,7 @@ function updateThreats(state: GameState, deltaMs: number) {
       next.headingDeg = bearingDeg(next.origin, next.target);
     }
     if (next.progress >= 1) {
-      applyImpact(state, next);
+      applyImpact(state, next, random);
     } else {
       remaining.push(next);
     }
@@ -890,10 +890,17 @@ function evaluateLiveStatus(state: GameState) {
   }
 }
 
-export function tickSimulation(current: GameState, deltaMs: number, random: () => number = Math.random): GameState {
+export function startAttackNow(current: GameState, random: () => number): GameState {
+  if (current.status !== "active" || current.cyclePhase === "attack") return current;
+  const state = cloneState(current);
+  startAttackCycle(state, random);
+  return state;
+}
+
+export function tickSimulation(current: GameState, deltaMs: number, random: () => number): GameState {
   if (current.status !== "active") return current;
   const state = cloneState(current);
-  const safeDelta = clamp(deltaMs, 0, 1000);
+  const safeDelta = clamp(deltaMs, 0, 10_000);
   const previousElapsedMs = state.elapsedMs;
   state.elapsedMs += safeDelta;
   updateResourcesAndTimers(state, safeDelta);
@@ -903,9 +910,20 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   maybeSpawnThreat(state, safeDelta, random);
   detectThreats(state, random, Math.floor(previousElapsedMs / 1000) !== Math.floor(state.elapsedMs / 1000));
   engageThreats(state, random);
-  updateShots(state, safeDelta);
-  updateThreats(state, safeDelta);
+  updateShots(state, safeDelta, random);
+  updateThreats(state, safeDelta, random);
   updateCityAlerts(state);
   evaluateLiveStatus(state);
+  return state;
+}
+
+export function advanceSimulation(current: GameState, deltaMs: number, random: () => number): GameState {
+  let state = current;
+  let remaining = clamp(deltaMs, 0, 180_000);
+  while (remaining > 0 && state.status === "active") {
+    const step = Math.min(10_000, remaining);
+    state = tickSimulation(state, step, random);
+    remaining -= step;
+  }
   return state;
 }
