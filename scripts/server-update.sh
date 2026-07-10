@@ -192,6 +192,10 @@ backup_stateful_data() {
     osix)
       backup_compose_volume_mount osix /data osix-data
       ;;
+    shieldline)
+      backup_postgres_database
+      backup_compose_volume_mount shieldline /data shieldline-legacy-data
+      ;;
     *)
       ;;
   esac
@@ -225,8 +229,13 @@ git pull --rebase
 
 cd "$ROOT_DIR/docker/local"
 
+update_targets=("$SERVICE")
+if [ "$SERVICE" = "shieldline" ]; then
+  update_targets=(shieldline shieldline-projection-worker shieldline-notification-worker)
+fi
+
 if [ "$PULL" -eq 1 ]; then
-  docker compose pull "$SERVICE" || echo "No pullable image for $SERVICE; continuing with local Compose update."
+  docker compose pull "${update_targets[@]}" || echo "No pullable image for $SERVICE; continuing with local Compose update."
 fi
 
 backup_stateful_data
@@ -235,12 +244,12 @@ compose_up=(docker compose up -d)
 if [ "$BUILD" -eq 1 ]; then
   compose_up+=(--build)
 fi
-compose_up+=("$SERVICE")
+compose_up+=("${update_targets[@]}")
 
-echo "Updating Docker Compose service: $SERVICE"
+echo "Updating Docker Compose service set: ${update_targets[*]}"
 "${compose_up[@]}"
-docker compose ps "$SERVICE"
+docker compose ps "${update_targets[@]}"
 
 if [ "$SHOW_LOGS" -eq 1 ]; then
-  docker compose logs --tail="$LOG_TAIL" "$SERVICE"
+  docker compose logs --tail="$LOG_TAIL" "${update_targets[@]}"
 fi

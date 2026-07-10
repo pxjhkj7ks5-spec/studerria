@@ -330,6 +330,7 @@ services:
       start_period: 30s
 
   shieldline:
+    image: kma-local-shieldline
     build:
       context: ../../services/shieldline
       dockerfile: Dockerfile
@@ -349,7 +350,21 @@ services:
       SHIELDLINE_TELEGRAM_AUTH_MAX_AGE_SECONDS: ${SHIELDLINE_TELEGRAM_AUTH_MAX_AGE_SECONDS:-86400}
       SHIELDLINE_SESSION_SECRET: ${SHIELDLINE_SESSION_SECRET:-change-me-shieldline-session-secret}
       SHIELDLINE_SESSION_MAX_AGE_SECONDS: ${SHIELDLINE_SESSION_MAX_AGE_SECONDS:-2592000}
+      SHIELDLINE_SESSION_ROTATION_SECONDS: ${SHIELDLINE_SESSION_ROTATION_SECONDS:-86400}
       SHIELDLINE_API_RATE_LIMIT_PER_MINUTE: ${SHIELDLINE_API_RATE_LIMIT_PER_MINUTE:-180}
+      SHIELDLINE_STORAGE_DRIVER: ${SHIELDLINE_STORAGE_DRIVER:-postgres}
+      SHIELDLINE_DB_HOST: db
+      SHIELDLINE_DB_PORT: 5432
+      SHIELDLINE_DB_USER: ${POSTGRES_USER:-studerria}
+      SHIELDLINE_DB_PASSWORD: ${POSTGRES_PASSWORD:-studerria_local}
+      SHIELDLINE_DB_NAME: ${POSTGRES_DB:-student_portal}
+      SHIELDLINE_DB_POOL_MAX: ${SHIELDLINE_DB_POOL_MAX:-10}
+      SHIELDLINE_REDIS_URL: ${SHIELDLINE_REDIS_URL:-redis://redis:6379}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - shieldline_control_data:/data
     read_only: true
@@ -363,12 +378,63 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:8080/shieldline').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:8080/shieldline/api/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
         ]
       interval: 10s
       timeout: 5s
       retries: 20
       start_period: 30s
+
+  shieldline-projection-worker:
+    image: kma-local-shieldline
+    init: true
+    restart: unless-stopped
+    command: ["node", "worker.mjs"]
+    environment:
+      SHIELDLINE_WORKER_ROLE: projection
+      SHIELDLINE_WORKER_INTERVAL_MS: ${SHIELDLINE_PROJECTION_INTERVAL_MS:-10000}
+      SHIELDLINE_DB_HOST: db
+      SHIELDLINE_DB_PORT: 5432
+      SHIELDLINE_DB_USER: ${POSTGRES_USER:-studerria}
+      SHIELDLINE_DB_PASSWORD: ${POSTGRES_PASSWORD:-studerria_local}
+      SHIELDLINE_DB_NAME: ${POSTGRES_DB:-student_portal}
+      SHIELDLINE_DB_POOL_MAX: ${SHIELDLINE_WORKER_DB_POOL_MAX:-4}
+    depends_on:
+      shieldline:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  shieldline-notification-worker:
+    image: kma-local-shieldline
+    init: true
+    restart: unless-stopped
+    command: ["node", "worker.mjs"]
+    environment:
+      SHIELDLINE_WORKER_ROLE: notification
+      SHIELDLINE_WORKER_INTERVAL_MS: ${SHIELDLINE_NOTIFICATION_INTERVAL_MS:-30000}
+      SHIELDLINE_TELEGRAM_BOT_TOKEN: ${SHIELDLINE_TELEGRAM_BOT_TOKEN:-}
+      SHIELDLINE_DB_HOST: db
+      SHIELDLINE_DB_PORT: 5432
+      SHIELDLINE_DB_USER: ${POSTGRES_USER:-studerria}
+      SHIELDLINE_DB_PASSWORD: ${POSTGRES_PASSWORD:-studerria_local}
+      SHIELDLINE_DB_NAME: ${POSTGRES_DB:-student_portal}
+      SHIELDLINE_DB_POOL_MAX: ${SHIELDLINE_WORKER_DB_POOL_MAX:-4}
+    depends_on:
+      shieldline:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   app:
     build:

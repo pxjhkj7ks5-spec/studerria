@@ -29,9 +29,14 @@ RUN groupadd --system --gid 1001 nodejs \
   && chown -R shieldline:nodejs /data
 
 COPY --chown=shieldline:nodejs --from=builder /app/dist ./dist
+COPY --chown=shieldline:nodejs --from=deps /app/node_modules ./node_modules
 COPY --chown=shieldline:nodejs --from=builder /app/server.mjs ./server.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/serverGame.mjs ./serverGame.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/serverSecurity.mjs ./serverSecurity.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/serverSchemas.mjs ./serverSchemas.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/serverPostgresStore.mjs ./serverPostgresStore.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/worker.mjs ./worker.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/scripts ./scripts
 COPY --chown=shieldline:nodejs --from=builder /app/src/game/simulationCore.mjs ./src/game/simulationCore.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/package.json ./package.json
 
