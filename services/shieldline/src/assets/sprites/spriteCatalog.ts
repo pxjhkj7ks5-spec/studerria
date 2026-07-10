@@ -28,9 +28,6 @@ import s300Unit from "./units/s300.png";
 import droneOperatorsUnit from "./units/drone-operators.png";
 import tu95Carrier from "./carriers/tu95.png";
 import blackSeaShipCarrier from "./carriers/black-sea-ship.png";
-import droneLaunch from "./launch/drone-launch.png";
-import ballisticLaunch from "./launch/ballistic-launch.png";
-import cruiseLaunch from "./launch/cruise-launch.png";
 import type { CarrierKind, ThreatKind, UnitKind } from "../../types/game";
 
 export const threatSprites: Record<ThreatKind, string> = {
@@ -66,13 +63,6 @@ export const unitSprites: Record<UnitKind, string> = {
 export const carrierSprites: Record<CarrierKind, string> = {
   tu95: tu95Carrier,
   "black-sea-ship": blackSeaShipCarrier,
-};
-
-export const launchSprites = {
-  drone: droneLaunch,
-  ballistic: ballisticLaunch,
-  cruise: cruiseLaunch,
-  carrier: cruiseLaunch,
 };
 
 export const markerSprites = {
