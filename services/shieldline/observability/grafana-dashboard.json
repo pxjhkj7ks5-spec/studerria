@@ -1,0 +1,40 @@
+{
+  "title": "Shieldline Campaign SLO",
+  "uid": "shieldline-campaign",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "API request rate",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum(rate(shieldline_http_requests_total[5m])) by (route, status)", "legendFormat": "{{route}} {{status}}" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP p95 latency",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(shieldline_http_request_duration_seconds_bucket[5m])) by (le, route))", "legendFormat": "{{route}}" }]
+    },
+    {
+      "type": "stat",
+      "title": "Campaign activation",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 6 },
+      "targets": [{ "expr": "sum(increase(shieldline_analytics_events_total{event_name=\"campaign.operation.started\"}[24h])) / clamp_min(sum(increase(shieldline_analytics_events_total{event_name=\"app.open\"}[24h])), 1)", "legendFormat": "activation" }]
+    },
+    {
+      "type": "stat",
+      "title": "Reconnect success proxy",
+      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 6 },
+      "targets": [{ "expr": "sum(increase(shieldline_analytics_events_total{event_name=\"campaign.reconnected\"}[24h]))", "legendFormat": "reconnects" }]
+    },
+    {
+      "type": "stat",
+      "title": "Campaign completions",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 6 },
+      "targets": [{ "expr": "sum(increase(shieldline_analytics_events_total{event_name=\"campaign.operation.completed\"}[24h]))", "legendFormat": "completed" }]
+    }
+  ]
+}

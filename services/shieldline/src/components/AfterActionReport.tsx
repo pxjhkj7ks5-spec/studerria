@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
 import type { MissionRun, RankedResult } from "../domain/contracts";
+import { formatNumber, t } from "../platform/i18n";
 
 interface AfterActionReportProps {
   game: GameState;
@@ -25,11 +26,11 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun }: Afte
       <div className="aar-heading">
         <ClipboardList size={20} />
         <div>
-          <strong>After-action report</strong>
-          <span>{report ? `Cycle ${report.day} · ${report.archetype ? archetypeLabel(report.archetype) : "contact cycle"}` : "Pending first completed cycle"}</span>
+          <strong>{t("aar.title")}</strong>
+          <span>{report ? `Cycle ${formatNumber(report.day)} · ${report.archetype ? archetypeLabel(report.archetype) : "contact cycle"}` : t("aar.pending")}</span>
         </div>
       </div>
-      {authoritativeRun ? <div className="aar-section aar-section--ranked"><strong>Authoritative server result</strong><span>{authoritativeRun.interceptions} intercepts · {authoritativeRun.impacts} impacts · seed {authoritativeRun.seed.slice(-12)}</span></div> : null}
+      {authoritativeRun ? <div className="aar-section aar-section--ranked"><strong>{t("aar.server")}</strong><span>{formatNumber(authoritativeRun.interceptions)} {t("aar.intercepts")} · {formatNumber(authoritativeRun.impacts)} {t("aar.impacts")} · seed {authoritativeRun.seed.slice(-12)}</span></div> : null}
       {report ? (
         <>
           <p className="aar-summary">{report.situationSummary}</p>
@@ -64,15 +65,15 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun }: Afte
           <>
             <p className="aar-summary">Campaign outcome projected from simulation events sequence 1–{authoritativeRun.events.at(-1)?.sequence || 0}.</p>
             <div className="aar-grid">
-              <span><strong>{authoritativeRun.interceptions}</strong> Intercepts</span>
-              <span><strong>{authoritativeRun.impacts}</strong> Impacts</span>
-              <span><strong>{authoritativeRun.ammoSpent}</strong> Ammo spent</span>
-              <span><strong>{authoritativeRun.simVersion || "—"}</strong> Sim version</span>
+              <span><strong>{formatNumber(authoritativeRun.interceptions)}</strong> {t("aar.intercepts")}</span>
+              <span><strong>{formatNumber(authoritativeRun.impacts)}</strong> {t("aar.impacts")}</span>
+              <span><strong>{formatNumber(authoritativeRun.ammoSpent)}</strong> {t("aar.ammo")}</span>
+              <span><strong>{authoritativeRun.simVersion || "—"}</strong> {t("aar.version")}</span>
             </div>
             <div className="aar-sector-heatmap" aria-label="Campaign sector pressure heatmap">
               {Object.entries(authoritativeRun.sectorSummary).map(([sector, summary]) => (
                 <span key={sector} style={{ "--sector-risk": `${Math.min(100, summary.pressure + summary.damage * 2)}%` } as CSSProperties}>
-                  <b>{sector}</b><strong>{summary.pressure}%</strong><small>{summary.damage}% damage</small>
+                  <b>{sector}</b><strong>{formatNumber(summary.pressure)}%</strong><small>{formatNumber(summary.damage)}% {t("aar.damage")}</small>
                 </span>
               ))}
             </div>

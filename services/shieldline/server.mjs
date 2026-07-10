@@ -6,7 +6,8 @@ import { dirname, extname, join, normalize, resolve } from "node:path";
 import { createGameStore, dayKey } from "./serverGame.mjs";
 import { createConfiguredPostgresStore } from "./serverPostgresStore.mjs";
 import { createFixedWindowRateLimiter, createPersistentSessionCodec, createSessionCodec, readCookie } from "./serverSecurity.mjs";
-import { parseCampaignCommand, parseOperationCommand, parseOperationInput } from "./serverSchemas.mjs";
+import { parseAnalyticsEvent, parseCampaignCommand, parseOperationCommand, parseOperationInput } from "./serverSchemas.mjs";
+import { instrumentHttpHandler, recordAnalyticsMetric, renderPrometheusMetrics, shutdownTelemetry } from "./serverTelemetry.mjs";
 
 const port = Number(process.env.PORT || 8080);
 const basePath = normalizeBasePath(process.env.SHIELDLINE_BASE_PATH || "/shieldline");
@@ -176,6 +177,20 @@ async function handleGameApi(req, res, pathname) {
   try {
     if (req.method === "GET" && path === "/health") {
       sendJson(res, 200, { ok: true, simVersion: "2.1.0", ...(gameStore.health ? await gameStore.health() : { storage: "json", redis: "disabled" }) });
+      return;
+    }
+    if (req.method === "GET" && path === "/metrics") {
+      res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8", "Cache-Control": "no-store", ...securityHeaders });
+      res.end(renderPrometheusMetrics());
+      return;
+    }
+    if (req.method === "POST" && path === "/analytics") {
+      const event = parseAnalyticsEvent(await readRequestJson(req));
+      const actorId = await safeActor(req, res);
+      if (gameStore.recordAnalytics) await gameStore.recordAnalytics(actorId, event);
+      else console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: "info", component: "shieldline.analytics", actorId, ...event }));
+      recordAnalyticsMetric(event.eventName, event.channel);
+      sendJson(res, 202, { accepted: true });
       return;
     }
     if (req.method === "POST" && path === "/operations") {
@@ -430,7 +445,7 @@ function handleControlOverlayAuth(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
-createServer(async (req, res) => {
+const handleHttpRequest = async (req, res) => {
   const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
   const pathname = requestUrl.pathname.replace(/\/+$/, "") || "/";
 
@@ -474,9 +489,14 @@ createServer(async (req, res) => {
   }
 
   sendFile(res, indexPath);
-}).listen(port, "0.0.0.0", () => {
+};
+
+createServer(instrumentHttpHandler(handleHttpRequest)).listen(port, "0.0.0.0", () => {
   console.log(`Shieldline listening on 0.0.0.0:${port}${basePath || "/"}`);
 });
 
-const notificationTimer = setInterval(() => { void deliverTelegramNotifications(); }, 30_000);
-notificationTimer.unref();
+if (storageDriver === "json") {
+  const notificationTimer = setInterval(() => { void deliverTelegramNotifications(); }, 30_000);
+  notificationTimer.unref();
+}
+process.once("SIGTERM", () => { void shutdownTelemetry(); });

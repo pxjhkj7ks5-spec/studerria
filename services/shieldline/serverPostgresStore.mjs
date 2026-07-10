@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { createClient } from "redis";
+import { simulateMission } from "./serverGame.mjs";
+import { calculateDefenseBonus, stableHash } from "./src/game/simulationCore.mjs";
 
 const { Pool } = pg;
 const CAMPAIGN_MISSIONS = [
@@ -25,6 +27,30 @@ CREATE TABLE IF NOT EXISTS shieldline_sessions (
   revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS shieldline_cities (
+  id text PRIMARY KEY,
+  actor_id text NOT NULL UNIQUE REFERENCES shieldline_users(id) ON DELETE CASCADE,
+  name text NOT NULL DEFAULT 'Campaign City',
+  revision integer NOT NULL DEFAULT 1,
+  state jsonb NOT NULL DEFAULT '{}'::jsonb,
+  import_id text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS shieldline_assets (
+  id text PRIMARY KEY,
+  city_id text NOT NULL REFERENCES shieldline_cities(id) ON DELETE CASCADE,
+  actor_id text NOT NULL REFERENCES shieldline_users(id) ON DELETE CASCADE,
+  kind text NOT NULL,
+  assigned_city_id text NOT NULL,
+  readiness numeric(5,2) NOT NULL,
+  position jsonb,
+  state jsonb NOT NULL DEFAULT '{}'::jsonb,
+  import_id text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shieldline_assets_city_idx ON shieldline_assets(city_id, kind);
+ALTER TABLE shieldline_cities ADD COLUMN IF NOT EXISTS import_id text;
+ALTER TABLE shieldline_assets ADD COLUMN IF NOT EXISTS import_id text;
 CREATE INDEX IF NOT EXISTS shieldline_sessions_actor_idx ON shieldline_sessions(actor_id, expires_at DESC);
 CREATE TABLE IF NOT EXISTS shieldline_runs (
   id text PRIMARY KEY,
@@ -133,6 +159,17 @@ CREATE TABLE IF NOT EXISTS shieldline_audit_log (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS shieldline_audit_log_created_idx ON shieldline_audit_log(created_at DESC);
+CREATE TABLE IF NOT EXISTS shieldline_analytics_events (
+  id bigserial PRIMARY KEY,
+  actor_id text,
+  event_name text NOT NULL,
+  channel text NOT NULL,
+  session_id text NOT NULL,
+  occurred_at timestamptz NOT NULL,
+  properties jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shieldline_analytics_event_time_idx ON shieldline_analytics_events(event_name, occurred_at DESC);
 `;
 
 export async function ensureShieldlineSchema(pool) {
@@ -180,6 +217,24 @@ async function persistCampaignRun(pool, redis, run, { actorId, source, plan }) {
   try {
     await client.query("BEGIN");
     await upsertUser(client, actorId);
+    const cityId = `campaign-city-${stableHash(actorId)}`;
+    await client.query(
+      `INSERT INTO shieldline_cities (id, actor_id, state) VALUES ($1,$2,$3::jsonb)
+       ON CONFLICT (actor_id) DO UPDATE SET revision = shieldline_cities.revision + 1, state = EXCLUDED.state, updated_at = now()`,
+      [cityId, actorId, JSON.stringify({ missionId: run.missionId, lastRunId: run.id, result: run.result })],
+    );
+    const activeAssetIds = [];
+    for (const [index, asset] of (plan?.assets || []).entries()) {
+      const assetId = String(asset.id || `${cityId}-asset-${index + 1}`).slice(0, 120);
+      activeAssetIds.push(assetId);
+      await client.query(
+        `INSERT INTO shieldline_assets (id, city_id, actor_id, kind, assigned_city_id, readiness, position, state)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb)
+         ON CONFLICT (id) DO UPDATE SET kind = EXCLUDED.kind, assigned_city_id = EXCLUDED.assigned_city_id, readiness = EXCLUDED.readiness, position = EXCLUDED.position, state = EXCLUDED.state, updated_at = now()`,
+        [assetId, cityId, actorId, asset.kind, asset.cityId, asset.readiness, JSON.stringify(asset.position || null), JSON.stringify({ source: "campaign-plan", runId: run.id })],
+      );
+    }
+    if (activeAssetIds.length) await client.query("DELETE FROM shieldline_assets WHERE city_id = $1 AND NOT (id = ANY($2::text[]))", [cityId, activeAssetIds]);
     const inserted = await client.query(
       `INSERT INTO shieldline_runs
        (id, actor_id, mission_id, source, seed, sim_version, status, result, revision, started_at, completed_at, plan, summary, run_document)
@@ -241,7 +296,7 @@ export async function createPostgresGameStore({ legacyStore, pool, redis = null 
     storageDriver: "postgres",
     async runMission(seed, actorId = "web-commander", plan = {}, missionId = CAMPAIGN_MISSIONS[0].id, source = "campaign") {
       if (source !== "campaign") return legacyStore.runMission(seed, actorId, plan, missionId, source);
-      const run = await legacyStore.runMission(seed, actorId, plan, missionId, source);
+      const run = simulateMission(seed, new Date().toISOString(), calculateDefenseBonus(plan), missionId);
       return persistCampaignRun(pool, redis, run, { actorId, source, plan });
     },
     async getRun(runId) {
@@ -346,6 +401,9 @@ export async function createPostgresGameStore({ legacyStore, pool, redis = null 
     },
     async auditRejectedCommand({ actorId = null, method, path, reason, details = {} }) {
       await pool.query("INSERT INTO shieldline_audit_log (actor_id, method, path, reason, details) VALUES ($1,$2,$3,$4,$5::jsonb)", [actorId, method, path, reason, JSON.stringify(details)]);
+    },
+    async recordAnalytics(actorId, event) {
+      await pool.query("INSERT INTO shieldline_analytics_events (actor_id, event_name, channel, session_id, occurred_at, properties) VALUES ($1,$2,$3,$4,$5,$6::jsonb)", [actorId, event.eventName, event.channel, event.sessionId, event.occurredAt, JSON.stringify(event.properties || {})]);
     },
     async health() {
       await pool.query("SELECT 1");

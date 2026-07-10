@@ -3285,7 +3285,7 @@ button {
   .command-drawer {
     top: auto;
     right: max(8px, env(safe-area-inset-right));
-    bottom: calc(204px + max(8px, var(--tg-content-safe-area-bottom, env(safe-area-inset-bottom))));
+    bottom: calc(246px + max(8px, var(--tg-content-safe-area-bottom, env(safe-area-inset-bottom))));
     left: max(8px, env(safe-area-inset-left));
     width: auto;
     max-height: min(54dvh, 560px);

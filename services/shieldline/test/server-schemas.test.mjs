@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseOperationCommand, parseOperationInput } from "../serverSchemas.mjs";
+import { parseAnalyticsEvent, parseOperationCommand, parseOperationInput } from "../serverSchemas.mjs";
 
 test("operation schemas accept versioned campaign plans and reject inconsistent counts", () => {
   const valid = {
@@ -26,4 +26,10 @@ test("operation schemas accept versioned campaign plans and reject inconsistent 
 test("operation command schema enforces idempotency and revision fields", () => {
   assert.deepEqual(parseOperationCommand({ commandId: "command-123", baseRevision: 1, scope: { type: "operation" }, type: "asset.place", payload: {} }).commandId, "command-123");
   assert.throws(() => parseOperationCommand({ commandId: "x", baseRevision: 0, scope: { type: "operation" }, type: "asset.place", payload: {} }));
+});
+
+test("analytics contract limits event names and platform dimensions", () => {
+  const event = parseAnalyticsEvent({ eventName: "campaign.operation.completed", channel: "pwa", sessionId: "session-123", occurredAt: "2026-07-10T12:00:00.000Z", properties: { result: "victory", impacts: 0 } });
+  assert.equal(event.channel, "pwa");
+  assert.throws(() => parseAnalyticsEvent({ ...event, eventName: "unknown.event" }));
 });

@@ -178,7 +178,7 @@ export interface DailyDefensePlan {
   radarCount: number;
   kineticCount: number;
   averageReadiness: number;
-  assets: Array<{ kind: string; cityId: string; readiness: number; position?: Coordinates }>;
+  assets: Array<{ id?: string; kind: string; cityId: string; readiness: number; position?: Coordinates }>;
 }
 
 export interface LeaderboardEntry {

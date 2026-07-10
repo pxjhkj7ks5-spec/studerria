@@ -1,0 +1,20 @@
+service: shieldline
+window: 30d
+slos:
+  - name: api_availability
+    objective: 99.9
+    good: shieldline_http_requests_total{status!~"5.."}
+    total: shieldline_http_requests_total
+  - name: replay_latency
+    objective: 95
+    threshold: 2s
+    metric: shieldline_http_request_duration_seconds
+    route: /shieldline/api/operations/:id/events
+  - name: campaign_reconnect
+    objective: 98
+    good_event: campaign.reconnected
+    total_event: campaign.operation.started
+  - name: campaign_activation
+    objective: 70
+    good_event: campaign.operation.started
+    total_event: app.open

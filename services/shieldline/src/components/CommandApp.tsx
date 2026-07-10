@@ -4,6 +4,8 @@ import { apiGameRepository } from "../data/apiGameRepository";
 import { gameModes, getGameMode } from "../data/gameModes";
 import { campaignMissions } from "../data/missions";
 import { setTelegramNotificationPreference, telegramCommandFeedback } from "../platform/telegramShell";
+import { t } from "../platform/i18n";
+import { trackAnalytics } from "../platform/analytics";
 import { useGameStore } from "../store/useGameStore";
 import type { CoOpRoom, DailyReport, GameModeId, LeaderboardEntry, MissionRun, ReplayEvent, SectorId } from "../domain/contracts";
 
@@ -28,6 +30,8 @@ export function CommandApp() {
   const dailyCityGame = useGameStore((state) => state.dailyCityGame);
   const mission = campaignMissions[0];
   const replayEvent = run?.replay[replayIndex];
+
+  useEffect(() => { trackAnalytics("app.open", { surface: "campaign-catalog" }); }, []);
 
   useEffect(() => {
     if (screen !== "replay" || !run) return undefined;
@@ -128,9 +132,9 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
   const campaignMode = gameModes.find((mode) => mode.id === "campaign")!;
   return <main className="command-app command-app--catalog" aria-label="Shieldline mode selection">
     <header className="catalog-hero">
-      <span className="hero-chip"><Radio size={14} /> Telegram-first command sim</span>
-      <h1>One city. One night.<br /><em>Your command.</em></h1>
-      <p>The Campaign is the active Shieldline experience: plan the defense, command each night, and review the same authoritative battle stream.</p>
+      <span className="hero-chip"><Radio size={14} /> {t("catalog.eyebrow")}</span>
+      <h1>{t("catalog.title")}</h1>
+      <p>{t("catalog.lead")}</p>
       {typeof window !== "undefined" && window.Telegram?.WebApp?.initData ? <button className="telegram-notification-button" type="button" onClick={enableNotifications} disabled={notificationState === "enabled"}>{notificationState === "enabled" ? "Telegram notifications enabled" : notificationState === "unavailable" ? "Telegram authorization unavailable" : "Enable Telegram reports"}</button> : null}
     </header>
     <section className="mode-catalog mode-catalog--campaign-only" aria-label="Available game modes">
@@ -139,16 +143,16 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
         return <button className="command-mode-card" type="button" key={mode.id} onClick={() => onSelect(mode.id)}>
           <span className="mode-icon"><Icon size={21} /></span>
           <span className="mode-card-top"><small>{mode.eyebrow}</small>{mode.availability === "preview" ? <i>Foundation ready</i> : <i className="mode-live">Play</i>}</span>
-          <strong>{mode.title}</strong><p>{mode.description}</p>
+          <strong>{t("catalog.campaign")}</strong><p>{t("catalog.campaignDesc")}</p>
           <span className="mode-facts"><b><Clock3 size={14} />{mode.duration}</b><b><Activity size={14} />{mode.difficulty}</b></span>
-          <span className="mode-detail"><b>Resources</b>{mode.resources}</span>
-          <span className="mode-detail"><b>Main risk</b>{mode.mainRisk}</span>
-          <span className="mode-detail"><b>Victory</b>{mode.victory}</span>
-          <span className="mode-go">{mode.id === "daily-defense" ? "Open daily cycle" : "Open command board"} <ChevronRight size={17} /></span>
+          <span className="mode-detail"><b>{t("catalog.resources")}</b>{mode.resources}</span>
+          <span className="mode-detail"><b>{t("catalog.risk")}</b>{mode.mainRisk}</span>
+          <span className="mode-detail"><b>{t("catalog.victory")}</b>{mode.victory}</span>
+          <span className="mode-go">{t("catalog.open")} <ChevronRight size={17} /></span>
         </button>;
       })}
     </section>
-    <p className="catalog-roadmap-note">Training, Sandbox, Ranked, Co-op, Rapid Response and Daily Defense are paused while Campaign reaches production quality.</p>
+    <p className="catalog-roadmap-note">{t("catalog.paused")}</p>
   </main>;
 }
 

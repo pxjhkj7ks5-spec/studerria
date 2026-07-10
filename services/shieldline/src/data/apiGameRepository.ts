@@ -2,6 +2,7 @@ import { localGameRepository } from "./localGameRepository";
 import { campaignMissions } from "./missions";
 import { runDeterministicMission } from "../game/deterministicMission";
 import { cacheOperationRun, enqueuePendingCommand, getCachedOperationRun } from "../platform/offlineStore";
+import { trackAnalytics } from "../platform/analytics";
 import type { CampaignProgress, CoOpRoom, CommandRepository, DailyDefensePlan, DailyReport, LeaderboardEntry, MissionDefinition, MissionRun, OperationCommandInput, OperationCreateResult, PersistentDailyCity, RankedChallenge, RankedResult, ReplaySnapshot, SectorId, SimulationEvent } from "../domain/contracts";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -27,6 +28,7 @@ export const apiGameRepository: CommandRepository = {
       const run = await localGameRepository.runMission(mission, input.seed, input.plan);
       await cacheOperationRun(run);
       await enqueuePendingCommand({ path: "/operations", method: "POST", body });
+      trackAnalytics("pwa.offline.queued", { command: "campaign.operation.create", runId: run.id });
       return { runId: run.id, revision: run.revision || 1, status: "completed", seed: run.seed, simVersion: run.simVersion || "2.1.0", run };
     }
   },

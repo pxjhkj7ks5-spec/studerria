@@ -3,6 +3,7 @@ import { z } from "zod";
 const coordinates = z.object({ lat: z.number().min(43).max(53.5), lng: z.number().min(20).max(41.5) }).strict();
 const assetKind = z.enum(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
 const asset = z.object({
+  id: z.string().min(1).max(120).regex(/^[a-z0-9_-]+$/i).optional(),
   kind: assetKind,
   cityId: z.string().min(1).max(48).regex(/^[a-z0-9-]+$/),
   readiness: z.number().min(0).max(100),
@@ -41,6 +42,13 @@ const campaignCommandSchema = z.object({
   type: z.string().min(1).max(64).regex(/^[a-z0-9._-]+$/i),
   payload: z.record(z.string(), z.unknown()).default({}),
 }).strict();
+const analyticsSchema = z.object({
+  eventName: z.enum(["app.open", "telegram.authenticated", "campaign.asset.placed", "campaign.operation.started", "campaign.operation.completed", "campaign.replay.opened", "campaign.reconnected", "pwa.offline.queued"]),
+  channel: z.enum(["telegram", "pwa", "web"]),
+  sessionId: z.string().min(8).max(96),
+  occurredAt: z.string().datetime(),
+  properties: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}),
+}).strict();
 
 function parse(schema, value) {
   const result = schema.safeParse(value);
@@ -54,3 +62,4 @@ function parse(schema, value) {
 export function parseOperationInput(value) { return parse(operationSchema, value); }
 export function parseOperationCommand(value) { return parse(commandSchema, value); }
 export function parseCampaignCommand(value) { return parse(campaignCommandSchema, value); }
+export function parseAnalyticsEvent(value) { return parse(analyticsSchema, value); }

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { copyFile, readFile } from "node:fs/promises";
 import pg from "pg";
 import { ensureShieldlineSchema } from "../serverPostgresStore.mjs";
+import { stableHash } from "../src/game/simulationCore.mjs";
 
 const { Pool } = pg;
 const args = new Set(process.argv.slice(2));
@@ -39,6 +40,8 @@ async function rollback(importId) {
     await client.query("DELETE FROM shieldline_outbox WHERE import_id = $1", [importId]);
     await client.query("DELETE FROM shieldline_campaigns WHERE import_id = $1", [importId]);
     await client.query("DELETE FROM shieldline_runs WHERE import_id = $1", [importId]);
+    await client.query("DELETE FROM shieldline_assets WHERE import_id = $1", [importId]);
+    await client.query("DELETE FROM shieldline_cities WHERE import_id = $1", [importId]);
     const updated = await client.query("UPDATE shieldline_import_jobs SET status = 'rolled_back', completed_at = now() WHERE id = $1 RETURNING backup_file", [importId]);
     if (!updated.rowCount) throw new Error(`Import ${importId} was not found.`);
     await client.query("COMMIT");
@@ -65,6 +68,15 @@ async function applyImport(store, checksum, source) {
     for (const run of Object.values(store.runs || {})) {
       const actorId = run.metadata?.actorId || "web-commander";
       await ensureUser(client, actorId);
+      const cityId = `campaign-city-${stableHash(actorId)}`;
+      await client.query("INSERT INTO shieldline_cities (id, actor_id, state, import_id) VALUES ($1,$2,$3::jsonb,$4) ON CONFLICT (actor_id) DO NOTHING", [cityId, actorId, JSON.stringify({ importedRunId: run.id }), importId]);
+      for (const [index, asset] of (run.metadata?.plan?.assets || []).entries()) {
+        await client.query(
+          `INSERT INTO shieldline_assets (id, city_id, actor_id, kind, assigned_city_id, readiness, position, state, import_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9) ON CONFLICT (id) DO NOTHING`,
+          [String(asset.id || `${cityId}-asset-${index + 1}`), cityId, actorId, asset.kind, asset.cityId || "unknown", asset.readiness || 0, JSON.stringify(asset.position || null), JSON.stringify({ imported: true, importId }), importId],
+        );
+      }
       await client.query(
         `INSERT INTO shieldline_runs (id, actor_id, mission_id, source, seed, sim_version, status, result, revision, started_at, completed_at, plan, summary, run_document, import_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15)

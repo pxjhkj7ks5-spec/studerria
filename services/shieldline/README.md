@@ -59,6 +59,14 @@ docker compose run --rm shieldline npm run import:json -- --rollback <import-id>
 
 The importer is checksum-idempotent and creates a source backup before its transaction.
 
+## Localization and observability
+
+The active Campaign shell uses key-based Ukrainian, Russian and English dictionaries. Ukrainian is the default, Russian follows Telegram locale, and English is the fallback for English clients. Campaign numbers and timeline values use `Intl` formatting.
+
+`GET /shieldline/api/metrics` exposes Prometheus counters and latency histograms. Set `SHIELDLINE_OTEL_TRACES_ENDPOINT` to enable OTLP/HTTP trace export; request logs always include the OpenTelemetry trace ID. Campaign activation, completion, replay, reconnect and offline-queue events use the validated `/api/analytics` contract and are stored in PostgreSQL. Importable SLO definitions and a Grafana dashboard live in `observability/`.
+
+CI runs unit/contract tests, the production build, a Docker build and the mobile Campaign Playwright flow, including reconnect, critical accessibility checks and layout overlap assertions.
+
 The versioned operations API is available at `POST /shieldline/api/operations`, with `GET /operations/:id`, `/events?after=<sequence>`, `/snapshots?tick=<tick>` and idempotent revision-checked `/commands`. Existing mission endpoints remain available as compatibility adapters.
 
 ## Telegram auth and reports
