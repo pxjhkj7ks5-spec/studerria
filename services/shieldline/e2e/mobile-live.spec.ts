@@ -3,6 +3,18 @@ import { expect, test } from "@playwright/test";
 
 async function openTrainingLive(page: import("@playwright/test").Page) {
   await page.addInitScript(() => {
+    const testWindow = window as typeof window & { __telegramBottomShowCount?: number };
+    testWindow.__telegramBottomShowCount = 0;
+    testWindow.Telegram = {
+      WebApp: {
+        ready: () => undefined,
+        expand: () => undefined,
+        onEvent: () => undefined,
+        offEvent: () => undefined,
+        BackButton: { show: () => undefined, hide: () => undefined },
+        BottomButton: { show: () => { testWindow.__telegramBottomShowCount = (testWindow.__telegramBottomShowCount || 0) + 1; } },
+      },
+    } as typeof testWindow.Telegram;
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
       state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
@@ -15,6 +27,7 @@ async function openTrainingLive(page: import("@playwright/test").Page) {
 
 test("mobile live mode is map-first and uses full-screen panels", async ({ page }, testInfo) => {
   await openTrainingLive(page);
+  expect(await page.evaluate(() => (window as typeof window & { __telegramBottomShowCount?: number }).__telegramBottomShowCount)).toBe(0);
 
   const navigation = page.getByRole("navigation", { name: "Панелі Shieldline" });
   await expect(navigation).toBeVisible();
@@ -92,6 +105,13 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
 
   await page.locator(".map-marker--battery").click({ force: true });
   await expect(page.locator(".map-marker--selected, .selected-unit-card")).toHaveCount(0);
+
+  await navigation.getByRole("button", { name: "ППО" }).click();
+  await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ 6 млн/ }).click();
+  await page.mouse.click(mapBox.x + mapBox.width * .5, mapBox.y + mapBox.height * .62);
+  await expect(page.locator(".map-marker--battery")).toHaveCount(2);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.operationPhase)).toBe("countdown");
+  expect(await page.evaluate(() => (window as typeof window & { __telegramBottomShowCount?: number }).__telegramBottomShowCount)).toBe(0);
 
   const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".map-status-strip").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);

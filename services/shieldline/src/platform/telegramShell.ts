@@ -9,8 +9,6 @@ type TelegramWebApp = {
   offEvent?: (event: string, callback: () => void) => void;
   HapticFeedback?: { notificationOccurred?: (type: "success" | "error" | "warning") => void };
   BackButton?: { show?: () => void; hide?: () => void };
-  BottomButton?: { setText?: (text: string) => void; show?: () => void; hide?: () => void; enable?: () => void; disable?: () => void };
-  MainButton?: { setText?: (text: string) => void; show?: () => void; hide?: () => void; enable?: () => void; disable?: () => void };
   initData?: string;
 };
 
@@ -60,20 +58,6 @@ export function bindTelegramBackButton(handler: () => void) {
   return () => {
     app.offEvent?.("backButtonClicked", handler);
     app.BackButton?.hide?.();
-  };
-}
-
-export function bindTelegramBottomButton({ text, enabled, visible, onClick }: { text: string; enabled: boolean; visible: boolean; onClick: () => void }) {
-  const app = window.Telegram?.WebApp;
-  const button = app?.BottomButton || app?.MainButton;
-  if (!app || !button) return () => undefined;
-  button.setText?.(text);
-  if (enabled) button.enable?.(); else button.disable?.();
-  if (visible) button.show?.(); else button.hide?.();
-  app.onEvent?.("mainButtonClicked", onClick);
-  return () => {
-    app.offEvent?.("mainButtonClicked", onClick);
-    button.hide?.();
   };
 }
 

@@ -5,7 +5,7 @@ import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/ga
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { advanceSimulation, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
-import { campaignCycleCompleted } from "../src/store/useGameStore";
+import { campaignCycleCompleted, useGameStore } from "../src/store/useGameStore";
 import type { GameState, LiveThreat } from "../src/types/game";
 
 function testThreat(): LiveThreat {
@@ -65,6 +65,21 @@ test("combat readiness requires a radar and a kinetic asset", () => {
   assert.equal(defenseReadinessForMode("campaign", ["radar", "ew"]).ready, false);
   assert.equal(defenseReadinessForMode("campaign", ["radar", "buk"]).ready, true);
   assert.equal(defenseReadinessForMode("sandbox", []).ready, true);
+});
+
+test("combat modes auto-start only after radar and kinetic air defense are deployed", () => {
+  const automaticModes = ["campaign", "rapid-response", "ranked-challenge", "co-op-command", "training"] as const;
+  assert.ok(automaticModes.every((mode) => gameModeRuntimePolicies[mode].start === "auto-checklist"));
+
+  const store = useGameStore.getState();
+  store.launchTacticalMode("campaign");
+  useGameStore.getState().beginPlacement("radar");
+  useGameStore.getState().placeSelectedBattery({ lat: 49.2, lng: 29.4 });
+  assert.equal(useGameStore.getState().operationPhase, "planning");
+  useGameStore.getState().beginPlacement("buk");
+  useGameStore.getState().placeSelectedBattery({ lat: 49.1, lng: 29.7 });
+  assert.equal(useGameStore.getState().operationPhase, "countdown");
+  assert.equal(useGameStore.getState().countdownRemainingMs, 5_000);
 });
 
 test("the deterministic cursor reproduces the same random sequence", () => {

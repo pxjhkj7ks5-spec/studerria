@@ -41,10 +41,10 @@ export const gameModes: GameModeDefinition[] = [
 ];
 
 export const gameModeRuntimePolicies: Record<GameModeId, GameModeRuntimePolicy> = {
-  campaign: { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
-  "rapid-response": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
-  "ranked-challenge": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
-  "co-op-command": { execution: "live", start: "hq-ready", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  campaign: { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  "rapid-response": { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  "ranked-challenge": { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  "co-op-command": { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
   sandbox: { execution: "live", start: "sandbox-controls", countdownMs: 0, defaultSpeed: 1, requiresRadar: false, requiresKinetic: false },
   training: { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
   "daily-defense": { execution: "daily-scheduled", start: "scheduled", countdownMs: 0, defaultSpeed: 1, requiresRadar: false, requiresKinetic: false },

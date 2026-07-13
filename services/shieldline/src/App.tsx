@@ -14,13 +14,13 @@ import { UnitRail } from "./components/UnitRail";
 import { CommandApp } from "./components/CommandApp";
 import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
-import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
+import { getGameModeRuntimePolicy } from "./data/gameModes";
 import { campaignMissions } from "./data/missions";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice } from "./game/battleNotices";
 import { useGameStore } from "./store/useGameStore";
-import { bindTelegramBackButton, bindTelegramBottomButton } from "./platform/telegramShell";
+import { bindTelegramBackButton } from "./platform/telegramShell";
 import { formatNumber, t } from "./platform/i18n";
 import { trackAnalytics } from "./platform/analytics";
 import type { CampaignStatus, DefenseBattery, IntelEntry, MapMode, UnitKind } from "./types/game";
@@ -140,7 +140,6 @@ export default function App() {
   const dismissTutorial = useGameStore((state) => state.dismissTutorial);
   const resetCampaign = useGameStore((state) => state.resetCampaign);
   const advanceOperation = useGameStore((state) => state.advanceOperation);
-  const startOperation = useGameStore((state) => state.startOperation);
   const placementKind = useGameStore((state) => state.placementKind);
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
   const activeGameMode = useGameStore((state) => state.activeGameMode);
@@ -167,7 +166,6 @@ export default function App() {
   const revealedThreats = game.liveThreats.filter((threat) => threat.revealed).length;
   const resolvedMode = (activeGameMode || tacticalMode || "training") as GameModeId;
   const runtimePolicy = getGameModeRuntimePolicy(resolvedMode);
-  const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
   const coOpSession = (() => {
     if (typeof window === "undefined" || tacticalMode !== "co-op-command") return null;
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
@@ -179,20 +177,12 @@ export default function App() {
     url.search = "";
     window.location.assign(url.toString());
   };
-  const handleStartOperation = () => startOperation();
   const handleResetOperation = () => {
     if (tacticalMode === "campaign") window.localStorage.removeItem("shieldline-campaign-operation-v1");
     resetCampaign();
   };
 
   useEffect(() => bindTelegramBackButton(returnToCommandModes), []);
-
-  useEffect(() => bindTelegramBottomButton({
-    text: t("operation.start"),
-    enabled: defenseReadiness.ready,
-    visible: runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && operationPhase === "planning",
-    onClick: handleStartOperation,
-  }), [defenseReadiness.ready, operationPhase, runtimePolicy.execution, runtimePolicy.start]);
 
   useEffect(() => {
     if (!isMobileLive) return;
@@ -217,11 +207,6 @@ export default function App() {
   useEffect(() => {
     if (isMobileLive && activePanel === "layers") setActivePanel("menu");
   }, [activePanel, isMobileLive]);
-
-  useEffect(() => {
-    if (tacticalMode !== "campaign" || operationPhase !== "planning" || !defenseReadiness.ready) return;
-    startOperation();
-  }, [defenseReadiness.ready, operationPhase, startOperation, tacticalMode]);
 
   useEffect(() => {
     if (!campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
