@@ -15,7 +15,7 @@ test("authoritative mission output is stable for a golden seed", () => {
   assert.ok(left.events.some((event) => event.type === "threat.launched"));
   assert.ok(left.events.some((event) => event.type === "track.detected"));
   assert.ok(left.events.some((event) => event.type === "battery.fired"));
-  assert.equal(left.simVersion, "2.1.0");
+  assert.equal(left.simVersion, "2.2.0");
   assert.equal(left.snapshots.length, 2);
 });
 

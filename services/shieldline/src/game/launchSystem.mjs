@@ -23,6 +23,28 @@ export const launchSectors = [
   { id: "vologda_air_corridor", name: "Вологодський повітряний коридор", lat: 59.20, lng: 39.90, radiusKm: 150, weight: 2, threats: ["kh101", "kh555"], role: "Північний далекий пуск Х-101 / Х-555" },
 ];
 
+export const FIRST_NIGHT_LAUNCH_SECTOR_IDS = [
+  "kursk_north",
+  "bryansk_north",
+  "millerovo_rostov",
+  "primorsko_akhtarsk",
+  "occupied_donetsk",
+  "hvardiiske_crimea",
+  "chauda_crimea",
+  "belgorod_tactical",
+];
+
+export const SECOND_NIGHT_LAUNCH_SECTOR_IDS = [
+  ...FIRST_NIGHT_LAUNCH_SECTOR_IDS,
+  "occupied_azov",
+  "dzhankoi_crimea",
+  "sevastopol_black_sea",
+  "novorossiysk_black_sea",
+  "astrakhan_air_corridor",
+];
+
+export const ALL_LAUNCH_SECTOR_IDS = launchSectors.map((sector) => sector.id);
+
 const threatAliases = {
   drone: ["shahed", "gerbera", "italmas"],
   ballistic: ["s300_ballistic", "s400_ballistic", "iskander_m", "decoy_ballistic"],

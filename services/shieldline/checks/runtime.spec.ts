@@ -62,6 +62,14 @@ test("campaign tactical projection follows the authoritative event timeline", ()
   const inFlight = projectCampaignRun(run, 14_500)!;
   assert.ok(inFlight.launchSectors.some((sector) => sector.state === "cooldown"));
   assert.ok(inFlight.liveThreats.some((threat) => threat.revealed));
+  const launched = run.events.find((event) => event.type === "threat.launched")!;
+  const projectedSector = inFlight.launchSectors.find((sector) => sector.id === launched.sectorId)!;
+  assert.ok(projectedSector);
+  assert.notDeepEqual(
+    { lat: projectedSector.lat, lng: projectedSector.lng },
+    { lat: Number(launched.payload.originLat), lng: Number(launched.payload.originLng) },
+  );
+  assert.ok(!projectedSector.id.startsWith("authoritative-"));
   const complete = projectCampaignRun(run, run.events.at(-1)!.occurredAtMs)!;
   assert.equal(complete.interceptions, run.interceptions);
   assert.equal(complete.impacts, run.impacts);

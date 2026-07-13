@@ -1,24 +1,13 @@
 import type { MissionRun, SimulationEvent } from "../domain/contracts";
-import type { Coordinates, ImpactMarker, InterceptorShot, LaunchAreaState, LiveThreat, ThreatKind } from "../types/game";
-
-interface CampaignLaunchCorridor {
-  id: string;
-  name: string;
-  coordinates: Coordinates;
-  supports: ThreatKind[];
-  pressure: number;
-  category: "drone" | "ballistic" | "cruise" | "carrier";
-  state: LaunchAreaState;
-  targetCoordinates: Coordinates;
-  targetHeadingDeg: number;
-}
+import type { ImpactMarker, InterceptorShot, LaunchAreaState, LaunchSector, LiveThreat, ThreatKind } from "../types/game";
+import { launchSectors as launchSectorCatalogue, threatProfilesForKind } from "./launchSystem.mjs";
 
 export interface CampaignMapProjection {
   elapsedMs: number;
   liveThreats: LiveThreat[];
   interceptorShots: InterceptorShot[];
   impactMarkers: ImpactMarker[];
-  launchSectors: CampaignLaunchCorridor[];
+  launchSectors: LaunchSector[];
   visibleEvents: SimulationEvent[];
   interceptions: number;
   impacts: number;
@@ -34,12 +23,6 @@ function numberPayload(event: SimulationEvent | undefined, key: string, fallback
 function threatKind(event: SimulationEvent | undefined): ThreatKind {
   const value = String(event?.payload.threatKind || "drone") as ThreatKind;
   return ["drone", "ballistic", "cruise", "decoy", "combined", "saturation", "geran2", "gerbera", "parodiya", "kh101", "kalibr", "iskander"].includes(value) ? value : "drone";
-}
-
-function categoryFor(kind: ThreatKind): CampaignLaunchCorridor["category"] {
-  if (["kh101", "kalibr", "cruise"].includes(kind)) return "cruise";
-  if (["iskander", "ballistic"].includes(kind)) return "ballistic";
-  return "drone";
 }
 
 function heading(from: { lat: number; lng: number }, to: { lat: number; lng: number }) {
@@ -58,7 +41,7 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
   const liveThreats: LiveThreat[] = [];
   const interceptorShots: InterceptorShot[] = [];
   const impactMarkers: ImpactMarker[] = [];
-  const launchSectors: CampaignLaunchCorridor[] = [];
+  const projectedLaunchSectors = new Map<string, LaunchSector>();
 
   for (const wave of waveEvents(run)) {
     const warning = wave.events.find((event) => event.type === "launch.warning");
@@ -72,23 +55,36 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
     const origin = { lat: numberPayload(launched, "originLat"), lng: numberPayload(launched, "originLng") };
     const target = { lat: numberPayload(launched, "targetLat"), lng: numberPayload(launched, "targetLng") };
     const kind = threatKind(launched);
+    const launchSectorId = String(launched.payload.launchSectorId || warning.sectorId || "unknown-sector");
+    const launchSector = launchSectorCatalogue.find((sector) => sector.id === launchSectorId) || {
+      id: launchSectorId,
+      name: String(launched.payload.launchSectorName || warning.sectorId || "Archived launch corridor"),
+      lat: numberPayload(launched, "launchSectorLat", origin.lat),
+      lng: numberPayload(launched, "launchSectorLng", origin.lng),
+      radiusKm: numberPayload(launched, "launchSectorRadiusKm", 80),
+      weight: 1,
+      threats: threatProfilesForKind(kind),
+      role: "Archived broad launch corridor",
+    };
     const outcomeAt = Math.min(intercepted?.occurredAtMs ?? Number.POSITIVE_INFINITY, impact?.occurredAtMs ?? Number.POSITIVE_INFINITY);
     const flightEnd = Number.isFinite(outcomeAt) ? outcomeAt : launched.occurredAtMs + 12_000;
     const progress = Math.max(0, Math.min(1, (elapsedMs - launched.occurredAtMs) / Math.max(1, flightEnd - launched.occurredAtMs)));
 
-    if (elapsedMs >= warning.occurredAtMs) {
+    if (elapsedMs >= warning.occurredAtMs && elapsedMs < flightEnd + 9_000) {
       const state = elapsedMs < launched.occurredAtMs ? "warning" : elapsedMs < (detected?.occurredAtMs ?? flightEnd) ? "launching" : "cooldown";
-      launchSectors.push({
-        id: `authoritative-${wave.waveId}`,
-        name: `${String(warning.sectorId || "east").toUpperCase()} launch corridor`,
-        coordinates: origin,
-        supports: [kind],
-        pressure: 80,
-        category: categoryFor(kind),
+      const activeThreats = threatProfilesForKind(kind).filter((profile) => launchSector.threats.includes(profile));
+      const projectedSector: LaunchSector = {
+        ...launchSector,
+        threats: activeThreats.length ? activeThreats : [...launchSector.threats],
         state,
         targetCoordinates: target,
         targetHeadingDeg: heading(origin, target),
-      });
+      };
+      const current = projectedLaunchSectors.get(projectedSector.id);
+      const priority: Record<LaunchAreaState, number> = { idle: 0, cooldown: 1, warning: 2, launching: 3 };
+      if (!current || priority[projectedSector.state || "idle"] >= priority[current.state || "idle"]) {
+        projectedLaunchSectors.set(projectedSector.id, projectedSector);
+      }
     }
 
     if (elapsedMs >= launched.occurredAtMs && elapsedMs < flightEnd) {
@@ -100,8 +96,8 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
         origin,
         target,
         targetCityId: sectorCity[targetSector] || "kyiv",
-        launchSectorId: `authoritative-${wave.waveId}`,
-        launchSectorName: String(warning.sectorId || "launch corridor"),
+        launchSectorId: launchSector.id,
+        launchSectorName: launchSector.name,
         progress,
         speed: 1 / Math.max(1, flightEnd - launched.occurredAtMs),
         difficulty: numberPayload(detected, "difficulty", 50),
@@ -151,7 +147,7 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
     liveThreats,
     interceptorShots,
     impactMarkers,
-    launchSectors,
+    launchSectors: [...projectedLaunchSectors.values()],
     visibleEvents,
     interceptions: visibleEvents.filter((event) => event.type === "interception").reduce((sum, event) => sum + numberPayload(event, "count"), 0),
     impacts: visibleEvents.filter((event) => event.type === "impact").reduce((sum, event) => sum + numberPayload(event, "count"), 0),

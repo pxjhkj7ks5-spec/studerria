@@ -357,6 +357,7 @@ export default function App() {
         setCampaignPlaybackMs(playback);
         setCampaignCountdownMs(0);
         setCampaignRuntimePhase(playback >= end ? "completed" : saved.phase === "countdown" ? "running" : saved.phase);
+        if (playback >= end) setActivePanel("report");
         trackAnalytics("campaign.reconnected", { runId: run.id, phase: saved.phase, playbackMs: Math.round(playback) });
       }).catch(() => undefined);
     } catch {

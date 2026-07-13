@@ -95,7 +95,7 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions) 
 
 export function formatSimulationEvent(event: SimulationEvent) {
   const count = formatNumber(Number(event.payload.count || event.payload.tracks || 0));
-  const values = { count, sector: String(event.sectorId || event.targetId || "—") };
+  const values = { count, sector: String(event.payload.launchSectorName || event.sectorId || event.targetId || "—") };
   if (event.type === "mission.started") return t("event.started", values);
   if (event.type === "launch.warning") return t("event.warning", values);
   if (event.type === "threat.launched") return t("event.launched", values);

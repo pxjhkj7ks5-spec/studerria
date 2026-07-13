@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { SIM_VERSION, calculateDefenseBonus, simulateOperation, stableHash } from "./src/game/simulationCore.mjs";
+import { ALL_LAUNCH_SECTOR_IDS, FIRST_NIGHT_LAUNCH_SECTOR_IDS, SECOND_NIGHT_LAUNCH_SECTOR_IDS } from "./src/game/launchSystem.mjs";
 
 const DEFAULT_STORE = { version: 3, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {} };
 const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
@@ -9,15 +10,17 @@ const missions = [
   {
     id: "campaign-night-01",
     title: "Night 01: Signal Window",
+    launchSectorIds: FIRST_NIGHT_LAUNCH_SECTOR_IDS,
     waves: [
     { id: "wave-01", originSector: "east", targetSector: "east", etaSeconds: 28, size: 8, difficulty: 42, threatKind: "geran2" },
-    { id: "wave-02", originSector: "north", targetSector: "north", etaSeconds: 52, size: 3, difficulty: 62, threatKind: "kh101" },
+    { id: "wave-02", originSector: "north", targetSector: "north", etaSeconds: 52, size: 3, difficulty: 62, threatKind: "iskander" },
     { id: "wave-03", originSector: "south", targetSector: "west", etaSeconds: 75, size: 6, difficulty: 48, threatKind: "gerbera" },
   ],
   },
   {
     id: "campaign-night-02",
     title: "Night 02: Blackout Relay",
+    launchSectorIds: SECOND_NIGHT_LAUNCH_SECTOR_IDS,
     waves: [
       { id: "wave-01", originSector: "south", targetSector: "south", etaSeconds: 24, size: 10, difficulty: 48, threatKind: "geran2" },
       { id: "wave-02", originSector: "east", targetSector: "east", etaSeconds: 50, size: 5, difficulty: 67, threatKind: "kalibr" },
@@ -27,6 +30,7 @@ const missions = [
   {
     id: "campaign-night-03",
     title: "Night 03: Last Reserve",
+    launchSectorIds: ALL_LAUNCH_SECTOR_IDS,
     waves: [
       { id: "wave-01", originSector: "east", targetSector: "east", etaSeconds: 20, size: 12, difficulty: 58, threatKind: "gerbera" },
       { id: "wave-02", originSector: "south", targetSector: "west", etaSeconds: 47, size: 6, difficulty: 78, threatKind: "kalibr" },

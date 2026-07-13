@@ -665,7 +665,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
   const liveThreats = projection?.liveThreats ?? game.liveThreats;
   const interceptorShots = projection?.interceptorShots ?? game.interceptorShots;
   const impactMarkers = projection?.impactMarkers ?? game.impactMarkers;
-  const sectorActivity = projection ? [] : game.launchSectors;
+  const sectorActivity = projection?.launchSectors ?? game.launchSectors;
   const elapsedMs = projection?.elapsedMs ?? game.elapsedMs;
   const controlOverlay = useMemo(() => getControlOverlay(), []);
   const occupiedZonePolygons = useMemo(
@@ -871,7 +871,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
           );
         })}
         {visibleDebugLaunchPoints.map((threat) => (
-          <CircleMarker key={`debug-launch-${threat.id}`} center={[threat.origin.lat, threat.origin.lng]} radius={4} pathOptions={{ color: "#fff4d0", fillColor: "#ff5f57", fillOpacity: 0.9, weight: 1 }}>
+          <CircleMarker key={`debug-launch-${threat.id}`} center={[threat.origin.lat, threat.origin.lng]} radius={4} pathOptions={{ color: "#fff4d0", fillColor: "#ff5f57", fillOpacity: 0.9, weight: 1, className: "launch-point-debug" }}>
             <Tooltip>{threat.launchSectorName} · exact debug spawn</Tooltip>
           </CircleMarker>
         ))}

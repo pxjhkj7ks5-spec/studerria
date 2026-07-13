@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createInitialState } from "../src/game/initialState.ts";
 import { createDeterministicRandom } from "../src/game/deterministicRandom.ts";
+import { campaignMissions } from "../src/data/missions.ts";
+import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 import {
+  FIRST_NIGHT_LAUNCH_SECTOR_IDS,
   SHOW_LAUNCH_DEBUG,
   createLaunchSectorState,
+  generateLaunchOrigin,
   launchSectors,
   pickWeightedSector,
   randomPointInSector,
@@ -58,17 +61,35 @@ test("weighted selection filters incompatible sectors before choosing", () => {
 test("separate live operations receive different compatible launch origins", () => {
   const leftRandom = createDeterministicRandom("live-operation-left");
   const rightRandom = createDeterministicRandom("live-operation-right");
-  const left = createInitialState(() => leftRandom.next());
-  const right = createInitialState(() => rightRandom.next());
-  const leftThreat = left.liveThreats[0];
-  const rightThreat = right.liveThreats[0];
-  const leftSector = left.launchSectors.find((sector) => sector.id === leftThreat.launchSectorId);
-  const rightSector = right.launchSectors.find((sector) => sector.id === rightThreat.launchSectorId);
+  const left = generateLaunchOrigin(createLaunchSectorState(), "geran2", () => leftRandom.next());
+  const right = generateLaunchOrigin(createLaunchSectorState(), "geran2", () => rightRandom.next());
 
-  assert.ok(leftSector && rightSector);
-  assert.equal(sectorSupportsThreat(leftSector, leftThreat.kind), true);
-  assert.equal(sectorSupportsThreat(rightSector, rightThreat.kind), true);
-  assert.ok(distanceKm({ lat: leftSector.lat, lng: leftSector.lng }, leftThreat.origin) <= leftSector.radiusKm + 0.001);
-  assert.ok(distanceKm({ lat: rightSector.lat, lng: rightSector.lng }, rightThreat.origin) <= rightSector.radiusKm + 0.001);
-  assert.notDeepEqual(leftThreat.origin, rightThreat.origin);
+  assert.equal(sectorSupportsThreat(left.sector, "geran2"), true);
+  assert.equal(sectorSupportsThreat(right.sector, "geran2"), true);
+  assert.ok(distanceKm({ lat: left.sector.lat, lng: left.sector.lng }, left.point) <= left.sector.radiusKm + 0.001);
+  assert.ok(distanceKm({ lat: right.sector.lat, lng: right.sector.lng }, right.point) <= right.sector.radiusKm + 0.001);
+  assert.notDeepEqual(left.point, right.point);
+});
+
+test("campaign Night 01 uses only its starter sectors and randomizes exact origins per operation", () => {
+  const mission = campaignMissions[0];
+  assert.deepEqual(mission.launchSectorIds, FIRST_NIGHT_LAUNCH_SECTOR_IDS);
+  const left = runDeterministicMission(mission, "campaign-sector-left");
+  const right = runDeterministicMission(mission, "campaign-sector-right");
+  const leftLaunches = left.events.filter((event) => event.type === "threat.launched");
+  const rightLaunches = right.events.filter((event) => event.type === "threat.launched");
+
+  assert.equal(leftLaunches.length, mission.waves.length);
+  for (const launch of leftLaunches) {
+    const sector = launchSectors.find((item) => item.id === launch.sectorId);
+    assert.ok(sector);
+    assert.ok(FIRST_NIGHT_LAUNCH_SECTOR_IDS.includes(sector.id));
+    assert.equal(sectorSupportsThreat(sector, String(launch.payload.threatKind)), true);
+    const point = { lat: Number(launch.payload.originLat), lng: Number(launch.payload.originLng) };
+    assert.ok(distanceKm({ lat: sector.lat, lng: sector.lng }, point) <= sector.radiusKm + 0.001);
+  }
+  assert.notDeepEqual(
+    leftLaunches.map((event) => [event.payload.originLat, event.payload.originLng]),
+    rightLaunches.map((event) => [event.payload.originLat, event.payload.originLng]),
+  );
 });

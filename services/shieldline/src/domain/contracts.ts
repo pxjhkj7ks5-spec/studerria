@@ -90,6 +90,7 @@ export interface MissionDefinition {
   mainRisk: string;
   victoryCondition: string;
   briefing: string;
+  launchSectorIds?: string[];
   waves: ThreatWave[];
 }
 
@@ -102,7 +103,7 @@ export interface SimulationEvent {
   tick?: number;
   simVersion?: string;
   schemaVersion?: number;
-  sectorId?: SectorId;
+  sectorId?: string;
   waveId?: string;
   assetId?: string;
   message: string;

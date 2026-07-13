@@ -1,6 +1,10 @@
-export const SIM_VERSION = "2.1.0";
+import { createLaunchSectorState, launchSectorCategory, pickWeightedSector, randomPointInSector } from "./launchSystem.mjs";
 
-const sectorCoordinates = {
+export const SIM_VERSION = "2.2.0";
+// Geography changes must not silently rebalance established mission outcomes.
+const OUTCOME_RANDOM_VERSION = "2.1.0";
+
+const targetSectorCoordinates = {
   north: { lat: 52.0, lng: 31.5 },
   south: { lat: 45.6, lng: 32.4 },
   east: { lat: 50.1, lng: 37.4 },
@@ -99,7 +103,9 @@ function completedAt(startedAt, elapsedMs) {
 export function simulateOperation({ mission, seed, plan = {}, defenseBonus, startedAt = "2026-07-09T00:00:00.000Z" }) {
   if (!mission?.id || !Array.isArray(mission.waves)) throw new Error("A versioned mission definition is required.");
   const normalizedSeed = String(seed || "campaign-seed");
-  const random = seededRandom(`${SIM_VERSION}:${mission.id}:${normalizedSeed}`);
+  const random = seededRandom(`${OUTCOME_RANDOM_VERSION}:${mission.id}:${normalizedSeed}`);
+  const launchRandom = seededRandom(`${SIM_VERSION}:${mission.id}:${normalizedSeed}:launch-sectors`);
+  const missionLaunchSectors = createLaunchSectorState(mission.launchSectorIds);
   const safeSeed = normalizedSeed.slice(0, 18).replace(/[^a-z0-9-]/gi, "-") || "seed";
   const runId = `run-${mission.id}-${safeSeed}-${stableHash(normalizedSeed)}`;
   const events = [];
@@ -116,8 +122,9 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
 
   for (const wave of mission.waves) {
     const detectedAt = Math.max(500, Number(wave.etaSeconds || 0) * 500);
-    const origin = sectorCoordinates[wave.originSector] || sectorCoordinates.east;
-    const target = sectorCoordinates[wave.targetSector] || sectorCoordinates.hq;
+    const launchSector = pickWeightedSector(missionLaunchSectors, wave.threatKind, launchRandom);
+    const origin = randomPointInSector(launchSector, launchRandom);
+    const target = targetSectorCoordinates[wave.targetSector] || targetSectorCoordinates.hq;
     const route = { from: wave.originSector, to: wave.targetSector };
     const commonPayload = {
       tracks: wave.size,
@@ -126,15 +133,21 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
       originLng: origin.lng,
       targetLat: target.lat,
       targetLng: target.lng,
+      launchSectorId: launchSector.id,
+      launchSectorName: launchSector.name,
+      launchSectorLat: launchSector.lat,
+      launchSectorLng: launchSector.lng,
+      launchSectorRadiusKm: launchSector.radiusKm,
+      launchSectorCategory: launchSectorCategory(launchSector),
     };
-    const warning = event(runId, sequence++, "launch.warning", Math.max(0, detectedAt - 2_000), `${wave.originSector} launch sector entered warning state.`, {
-      sectorId: wave.originSector,
+    const warning = event(runId, sequence++, "launch.warning", Math.max(0, detectedAt - 2_000), `${launchSector.name} entered warning state.`, {
+      sectorId: launchSector.id,
       waveId: wave.id,
       targetId: wave.targetSector,
       payload: commonPayload,
     });
     const launched = event(runId, sequence++, "threat.launched", Math.max(0, detectedAt - 1_000), `${wave.size} ${wave.threatKind} track${wave.size === 1 ? "" : "s"} launched.`, {
-      sectorId: wave.originSector,
+      sectorId: launchSector.id,
       waveId: wave.id,
       targetId: wave.targetSector,
       payload: commonPayload,

@@ -29,7 +29,7 @@ export const apiGameRepository: CommandRepository = {
       await cacheOperationRun(run);
       await enqueuePendingCommand({ path: "/operations", method: "POST", body });
       trackAnalytics("pwa.offline.queued", { command: "campaign.operation.create", runId: run.id });
-      return { runId: run.id, revision: run.revision || 1, status: "completed", seed: run.seed, simVersion: run.simVersion || "2.1.0", run };
+      return { runId: run.id, revision: run.revision || 1, status: "completed", seed: run.seed, simVersion: run.simVersion || "2.2.0", run };
     }
   },
   async getOperation(runId: string): Promise<MissionRun | null> {
