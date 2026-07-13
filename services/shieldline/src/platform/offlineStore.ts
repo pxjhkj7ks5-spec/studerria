@@ -4,7 +4,7 @@ import type { MissionRun } from "../domain/contracts";
 const DATABASE_NAME = "shieldline-offline-v1";
 const DATABASE_VERSION = 3;
 const PROJECTION_KEY = "current-game";
-const PROJECTION_SCHEMA_VERSION = 2;
+const PROJECTION_SCHEMA_VERSION = 3;
 
 interface PendingCommand {
   id?: number;

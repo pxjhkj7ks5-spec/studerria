@@ -5,9 +5,9 @@ import { defenseReadinessForMode, getGameModeRuntimePolicy } from "../data/gameM
 import { createDeterministicRandom } from "../game/deterministicRandom";
 import { advanceSimulation, placeBattery, startAttackNow } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
-import { createLaunchSectorState } from "../game/launchSystem.mjs";
+import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
-import type { CampaignMode, Coordinates, GameState, MapMode, PlanningActionId, UnitKind } from "../types/game";
+import type { CampaignMode, Coordinates, GameState, LaunchAreaState, MapMode, PlanningActionId, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
 
 const tutorialKey = "shieldline-tutorial-complete-v1";
@@ -36,36 +36,51 @@ function validCoordinates(value: unknown): value is Coordinates {
 
 export function normalizePersistedGame(game: GameState | null) {
   if (!game) return game;
-  const withoutSyntheticOpeningTrack = game.liveThreats?.filter((threat) => threat.id !== "opening-track-1") || [];
-  const validLaunchSectors = Array.isArray(game.launchSectors)
-    && game.launchSectors.every((sector) => Number.isFinite(sector.lat) && Number.isFinite(sector.lng) && Number.isFinite(sector.radiusKm) && sector.radiusKm > 0 && Array.isArray(sector.threats));
-  if (validLaunchSectors) {
-    const sectorById = new Map(game.launchSectors.map((sector) => [sector.id, sector]));
+  const persistedSectorById = new Map((Array.isArray(game.launchSectors) ? game.launchSectors : []).map((sector) => [sector.id, sector]));
+  const launchSectors = createLaunchSectorState().map((sector) => {
+    const persisted = persistedSectorById.get(sector.id);
+    if (!persisted) return sector;
+    const persistedState = persisted.state;
+    const state: LaunchAreaState = persistedState === "warning" || persistedState === "launching" || persistedState === "cooldown" ? persistedState : "idle";
     return {
-      ...game,
-      launchSectors: game.launchSectors.map((sector) => ({
-        ...sector,
-        threats: [...sector.threats],
-        lastLaunchCoordinates: validCoordinates(sector.lastLaunchCoordinates) ? { ...sector.lastLaunchCoordinates } : undefined,
-      })),
-      pendingLaunches: (game.pendingLaunches || []).map((launch) => {
-        const sector = sectorById.get(launch.sectorId);
-        return {
-          ...launch,
-          origin: validCoordinates(launch.origin)
-            ? { ...launch.origin }
-            : { lat: sector?.lat || 0, lng: sector?.lng || 0 },
-        };
-      }),
-      liveThreats: withoutSyntheticOpeningTrack,
+      ...sector,
+      state,
+      stateUntilMs: Number.isFinite(persisted.stateUntilMs) ? persisted.stateUntilMs : undefined,
+      warningStartedAtMs: Number.isFinite(persisted.warningStartedAtMs) ? persisted.warningStartedAtMs : undefined,
+      targetCityId: persisted.targetCityId,
+      targetCoordinates: validCoordinates(persisted.targetCoordinates) ? { ...persisted.targetCoordinates } : undefined,
+      targetHeadingDeg: Number.isFinite(persisted.targetHeadingDeg) ? persisted.targetHeadingDeg : undefined,
+      lastLaunchCoordinates: validCoordinates(persisted.lastLaunchCoordinates) ? { ...persisted.lastLaunchCoordinates } : undefined,
     };
-  }
+  });
+  const authoritativeSectorById = new Map(launchSectors.map((sector) => [sector.id, sector]));
+  const pendingLaunches = (Array.isArray(game.pendingLaunches) ? game.pendingLaunches : [])
+    .filter((launch) => {
+      const sector = authoritativeSectorById.get(launch.sectorId);
+      return Boolean(sector && validCoordinates(launch.origin) && sectorSupportsThreat(sector, launch.kind));
+    })
+    .map((launch) => ({ ...launch, origin: { ...launch.origin } }));
+  const liveThreats = (Array.isArray(game.liveThreats) ? game.liveThreats : [])
+    .filter((threat) => threat.id !== "opening-track-1"
+      && validCoordinates(threat.origin)
+      && validCoordinates(threat.target)
+      && Number.isFinite(threat.progress)
+      && threat.progress >= 0
+      && threat.progress < 1
+      && Number.isFinite(threat.speed)
+      && threat.speed > 0)
+    .map((threat) => ({
+      ...threat,
+      origin: { ...threat.origin },
+      target: { ...threat.target },
+      lastKnownPosition: validCoordinates(threat.lastKnownPosition) ? { ...threat.lastKnownPosition } : undefined,
+    }));
   return {
     ...game,
-    launchSectors: createLaunchSectorState(),
-    pendingLaunches: [],
-    carriers: [],
-    liveThreats: [],
+    launchSectors,
+    pendingLaunches,
+    carriers: Array.isArray(game.carriers) ? game.carriers : [],
+    liveThreats,
   };
 }
 
@@ -234,25 +249,32 @@ export const useGameStore = create<GameStore>()(
         const random = createDeterministicRandom(state.simulationSeed, state.simulationRandomCursor);
         return { ...state, game: startAttackNow(state.game, () => random.next()), operationPhase: "running", simulationRandomCursor: random.cursor() };
       }),
-      advanceOperation: (deltaMs) => set((state) => {
-        const mode = state.activeGameMode || "training";
-        const policy = getGameModeRuntimePolicy(mode);
-        if (policy.execution !== "live") return state;
-        const random = createDeterministicRandom(state.simulationSeed, state.simulationRandomCursor);
-        if (state.operationPhase === "countdown") {
-          const remaining = state.countdownRemainingMs - deltaMs;
-          if (remaining > 0) return { countdownRemainingMs: remaining };
-          let game = startAttackNow(state.game, () => random.next());
-          const overflowMs = Math.max(0, -remaining) * state.simulationSpeed;
-          if (overflowMs > 0) game = advanceSimulation(game, overflowMs, () => random.next());
-          const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
-          return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", countdownRemainingMs: 0, simulationRandomCursor: random.cursor() };
+      advanceOperation: (deltaMs) => {
+        try {
+          set((state) => {
+            const mode = state.activeGameMode || "training";
+            const policy = getGameModeRuntimePolicy(mode);
+            if (policy.execution !== "live") return state;
+            const random = createDeterministicRandom(state.simulationSeed, state.simulationRandomCursor);
+            if (state.operationPhase === "countdown") {
+              const remaining = state.countdownRemainingMs - deltaMs;
+              if (remaining > 0) return { countdownRemainingMs: remaining };
+              let game = startAttackNow(state.game, () => random.next());
+              const overflowMs = Math.max(0, -remaining) * state.simulationSpeed;
+              if (overflowMs > 0) game = advanceSimulation(game, overflowMs, () => random.next());
+              const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
+              return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", countdownRemainingMs: 0, simulationRandomCursor: random.cursor() };
+            }
+            if (state.operationPhase !== "running") return state;
+            const game = advanceSimulation(state.game, deltaMs * state.simulationSpeed, () => random.next());
+            const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
+            return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", simulationRandomCursor: random.cursor() };
+          });
+        } catch (error) {
+          console.error("Shieldline simulation tick recovered", error);
+          set((state) => ({ game: normalizePersistedGame(state.game) || state.game }));
         }
-        if (state.operationPhase !== "running") return state;
-        const game = advanceSimulation(state.game, deltaMs * state.simulationSpeed, () => random.next());
-        const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
-        return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", simulationRandomCursor: random.cursor() };
-      }),
+      },
       resetCampaign: () => {
         const mode = get().activeGameMode || "training";
         const seed = createSimulationSeed(mode);
@@ -262,7 +284,7 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 13,
+      version: 14,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         return {

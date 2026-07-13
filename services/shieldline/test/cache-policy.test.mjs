@@ -61,7 +61,7 @@ test("stale offline projections cannot overwrite the migrated game state", async
     readSource("../src/main.tsx"),
   ]);
 
-  assert.match(offlineStore, /PROJECTION_SCHEMA_VERSION = 2/);
+  assert.match(offlineStore, /PROJECTION_SCHEMA_VERSION = 3/);
   assert.match(offlineStore, /projection\.schemaVersion !== PROJECTION_SCHEMA_VERSION/);
   assert.match(offlineStore, /normalizePersistedGame/);
   assert.match(main, /AppErrorBoundary/);

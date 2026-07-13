@@ -6,7 +6,8 @@ import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
 import { advanceSimulation, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
-import { campaignCycleCompleted, useGameStore } from "../src/store/useGameStore";
+import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
+import { campaignCycleCompleted, normalizePersistedGame, useGameStore } from "../src/store/useGameStore";
 import type { GameState, LiveThreat } from "../src/types/game";
 
 function testThreat(): LiveThreat {
@@ -93,6 +94,23 @@ test("the deterministic cursor reproduces the same random sequence", () => {
   const right = createDeterministicRandom("golden-seed");
   assert.deepEqual(Array.from({ length: 32 }, () => left.next()), Array.from({ length: 32 }, () => right.next()));
   assert.equal(left.cursor(), 32);
+});
+
+test("persisted operations reconcile stale launch data with the current catalog", () => {
+  const currentSectors = createLaunchSectorState();
+  const game = createScenarioState(() => 0.5, "training", "first-night");
+  game.launchSectors = [
+    { ...currentSectors[0], threats: ["kh101"] },
+    { ...currentSectors[0], id: "legacy-sector", name: "Legacy sector" },
+  ];
+  game.liveThreats = [{ ...testThreat(), progress: 1 }];
+
+  const normalized = normalizePersistedGame(game);
+  assert.ok(normalized);
+  assert.deepEqual(normalized.launchSectors.map((sector) => sector.id), currentSectors.map((sector) => sector.id));
+  assert.deepEqual(normalized.launchSectors[0].threats, currentSectors[0].threats);
+  assert.equal(normalized.launchSectors.some((sector) => sector.id === "legacy-sector"), false);
+  assert.equal(normalized.liveThreats.length, 0);
 });
 
 test("a started live operation advances launch sectors and creates threats", () => {

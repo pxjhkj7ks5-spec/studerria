@@ -34,6 +34,7 @@ const mapModes: Array<{ id: MapMode; label: string }> = [
 ];
 
 const SIMULATION_TICK_MS = 300;
+const MAX_SIMULATION_FRAME_DELTA_MS = 1_000;
 function coOpSectorForCity(cityId: string) {
   if (["chernihiv", "sumy", "kyiv", "zhytomyr", "rivne", "lutsk"].includes(cityId)) return "north";
   if (["kharkiv", "dnipro", "zaporizhzhia", "poltava", "kryvyi-rih"].includes(cityId)) return "east";
@@ -211,21 +212,49 @@ export default function App() {
   useEffect(() => {
     if (!campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
     let frameId = 0;
-    const frame = (timestamp: number) => {
-      if (lastTickRef.current === null) {
-        lastTickRef.current = timestamp;
-      }
-      const delta = timestamp - lastTickRef.current;
-      lastTickRef.current = timestamp;
-      accumulatorRef.current += delta;
-      if (accumulatorRef.current >= SIMULATION_TICK_MS) {
-        advanceOperation(accumulatorRef.current);
-        accumulatorRef.current = 0;
-      }
-      frameId = window.requestAnimationFrame(frame);
+    let active = true;
+    const resetSimulationClock = () => {
+      lastTickRef.current = null;
+      accumulatorRef.current = 0;
     };
+    const frame = (timestamp: number) => {
+      try {
+        if (document.hidden) {
+          resetSimulationClock();
+          return;
+        }
+        if (lastTickRef.current === null) {
+          lastTickRef.current = timestamp;
+          return;
+        }
+        const delta = Math.min(Math.max(0, timestamp - lastTickRef.current), MAX_SIMULATION_FRAME_DELTA_MS);
+        lastTickRef.current = timestamp;
+        accumulatorRef.current += delta;
+        if (accumulatorRef.current >= SIMULATION_TICK_MS) {
+          advanceOperation(accumulatorRef.current);
+          accumulatorRef.current = 0;
+        }
+      } catch (error) {
+        console.error("Shieldline animation frame recovered", error);
+        resetSimulationClock();
+      } finally {
+        if (active) frameId = window.requestAnimationFrame(frame);
+      }
+    };
+    const handleVisibilityChange = () => resetSimulationClock();
+    const handlePageLifecycle = () => resetSimulationClock();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageLifecycle);
+    window.addEventListener("pageshow", handlePageLifecycle);
     frameId = window.requestAnimationFrame(frame);
-    return () => window.cancelAnimationFrame(frameId);
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frameId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageLifecycle);
+      window.removeEventListener("pageshow", handlePageLifecycle);
+      resetSimulationClock();
+    };
   }, [advanceOperation, campaignMode, operationPhase, runtimePolicy.execution]);
 
   useEffect(() => {
