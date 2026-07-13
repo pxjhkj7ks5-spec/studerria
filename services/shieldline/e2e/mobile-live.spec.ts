@@ -59,12 +59,12 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await navigation.getByRole("button", { name: "ППО" }).click();
   await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /Radar 35D6/ }).click();
   await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
-  await expect(page.locator(".coverage-ring")).toHaveCount(1);
-  await page.locator(".coverage-ring").first().evaluate((node) => node.setAttribute("data-stability-id", "stable-radius"));
-  const pinchGeometry = testInfo.project.name === "mobile-webkit" ? null : await page.evaluate(async () => {
+  await expect(page.locator(".map-marker--battery")).toHaveCount(1);
+  await expect(page.locator(".leaflet-overlay-pane canvas").first()).toBeVisible();
+  await page.locator(".map-marker--battery").first().evaluate((node) => node.setAttribute("data-stability-id", "stable-battery"));
+  if (testInfo.project.name !== "mobile-webkit") await page.evaluate(async () => {
     const mapElement = document.querySelector<HTMLElement>(".leaflet-stage");
-    const ring = document.querySelector<SVGElement>(".coverage-ring");
-    if (!mapElement || !ring || typeof Touch !== "function") return null;
+    if (!mapElement || typeof Touch !== "function") return;
     const mapBounds = mapElement.getBoundingClientRect();
     const centerX = mapBounds.left + mapBounds.width / 2;
     const centerY = mapBounds.top + mapBounds.height / 2;
@@ -81,15 +81,10 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
     const movedTouches = [touch(1, centerX - 65), touch(2, centerX + 65)];
     dispatch(document, "touchmove", movedTouches);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const duringPinch = ring.getBoundingClientRect().width;
     dispatch(document, "touchend", []);
     await new Promise((resolve) => window.setTimeout(resolve, 350));
-    return { duringPinch, afterPinch: ring.getBoundingClientRect().width };
   });
-  if (pinchGeometry) {
-    expect(Math.abs(pinchGeometry.afterPinch / pinchGeometry.duringPinch - 1)).toBeLessThan(.02);
-  }
-  await expect(page.locator('[data-stability-id="stable-radius"]')).toHaveCount(1);
+  await expect(page.locator('[data-stability-id="stable-battery"]')).toHaveCount(1);
 
   await page.locator(".map-marker--battery").click({ force: true });
   await expect(page.locator(".map-marker--selected, .selected-unit-card")).toHaveCount(0);

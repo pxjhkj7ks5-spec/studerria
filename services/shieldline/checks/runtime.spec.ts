@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
@@ -7,6 +8,19 @@ import { createScenarioState } from "../src/game/initialState";
 import { campaignMissions } from "../src/data/missions";
 import { projectCampaignRun } from "../src/game/campaignProjection";
 import { runDeterministicMission } from "../src/game/deterministicMission";
+
+test("coverage circles use Leaflet's shared renderer and meter radii", async () => {
+  const source = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
+  const coverageStart = source.indexOf("{visibleCoverageBatteries.map");
+  const coverageEnd = source.indexOf("{visibleRoutes.map", coverageStart);
+  const coverageLayer = source.slice(coverageStart, coverageEnd);
+
+  assert.ok(coverageStart >= 0 && coverageEnd > coverageStart);
+  assert.match(source, /preferCanvas/);
+  assert.match(coverageLayer, /radius=\{unit\.outerRangeKm \* 1000\}/);
+  assert.doesNotMatch(coverageLayer, /renderer=/);
+  assert.doesNotMatch(source, /L\.svg\(\{ padding: 0\.6 \}\)/);
+});
 
 test("the first six modes are live while Daily Defense is scheduled", () => {
   const liveModes = Object.entries(gameModeRuntimePolicies)

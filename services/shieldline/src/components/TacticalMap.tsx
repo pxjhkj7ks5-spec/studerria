@@ -660,7 +660,6 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
   const mapMode = useGameStore((state) => state.mapMode);
   const placementKind = useGameStore((state) => state.placementKind);
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
-  const radiusOverlayRenderer = useMemo(() => L.svg({ padding: 0.6 }), []);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
   const liveThreats = projection?.liveThreats ?? game.liveThreats;
@@ -840,7 +839,6 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
             key={`city-exclusion-${city.id}`}
             center={[city.coordinates.lat, city.coordinates.lng]}
             radius={CITY_PLACEMENT_EXCLUSION_KM * 1000}
-            renderer={radiusOverlayRenderer}
             pathOptions={{
               color: "#ff8b6e",
               fillColor: "#ff4f4f",
@@ -891,8 +889,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
               <Circle
                 key={`coverage-${battery.id}`}
                 center={[battery.position.lat, battery.position.lng]}
-                radius={battery.coverageRadius * 72000}
-                renderer={radiusOverlayRenderer}
+                radius={unit.outerRangeKm * 1000}
                 pathOptions={{
                   color: coverage.color,
                   fillColor: coverage.fill,
