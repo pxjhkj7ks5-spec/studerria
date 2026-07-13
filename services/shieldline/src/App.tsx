@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Activity, AlertTriangle, BookOpen, ClipboardList, Crosshair, HelpCircle, Layers, LogOut, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
@@ -18,15 +18,13 @@ import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameMo
 import { campaignMissions } from "./data/missions";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
-import { projectCampaignRun } from "./game/campaignProjection";
-import { SIM_VERSION } from "./game/simulationCore.mjs";
 import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice } from "./game/battleNotices";
 import { useGameStore } from "./store/useGameStore";
 import { bindTelegramBackButton, bindTelegramBottomButton } from "./platform/telegramShell";
-import { formatNumber, formatSimulationEvent, t } from "./platform/i18n";
+import { formatNumber, t } from "./platform/i18n";
 import { trackAnalytics } from "./platform/analytics";
 import type { CampaignStatus, DefenseBattery, IntelEntry, MapMode, UnitKind } from "./types/game";
-import type { CampaignProgress, DailyDefensePlan, GameModeId, MissionRun, OperationPhase, RankedResult, SimulationEvent } from "./domain/contracts";
+import type { DailyDefensePlan, GameModeId, MissionRun, RankedResult } from "./domain/contracts";
 
 const mapModes: Array<{ id: MapMode; label: string }> = [
   { id: "live", label: "Бій" },
@@ -36,17 +34,6 @@ const mapModes: Array<{ id: MapMode; label: string }> = [
 ];
 
 const SIMULATION_TICK_MS = 300;
-const CAMPAIGN_SESSION_KEY = "shieldline-campaign-operation-v1";
-
-interface PersistedCampaignOperation {
-  runId: string;
-  missionId: string;
-  phase: OperationPhase;
-  elapsedMs?: number;
-  playbackMs?: number;
-  updatedAt: number;
-}
-
 function coOpSectorForCity(cityId: string) {
   if (["chernihiv", "sumy", "kyiv", "zhytomyr", "rivne", "lutsk"].includes(cityId)) return "north";
   if (["kharkiv", "dnipro", "zaporizhzhia", "poltava", "kryvyi-rih"].includes(cityId)) return "east";
@@ -166,15 +153,11 @@ export default function App() {
   const [battleNotice, setBattleNotice] = useState<IntelEntry | null>(null);
   const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
   const [authoritativeRun, setAuthoritativeRun] = useState<MissionRun | null>(null);
-  const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null);
   const [isResolving, setIsResolving] = useState(false);
-  const [campaignRuntimePhase, setCampaignRuntimePhase] = useState<OperationPhase>("planning");
-  const [campaignCountdownMs, setCampaignCountdownMs] = useState(0);
-  const [campaignElapsedMs, setCampaignElapsedMs] = useState(0);
   const coOpSyncedBatteryIds = useRef(new Set<string>());
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
-  const completedTrackedRunRef = useRef<string | null>(null);
+  const completedCampaignReportRef = useRef<string | null>(null);
   const latestNoticeIdRef = useRef<string | null>(null);
   const latestReportIdRef = useRef(game.latestReportId);
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
@@ -189,60 +172,16 @@ export default function App() {
     if (typeof window === "undefined" || tacticalMode !== "co-op-command") return null;
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
   })();
-  const activeMission = campaignMissions.find((mission) => mission.id === campaignProgress?.currentMissionId) || campaignMissions[0];
+  const activeMission = campaignMissions[0];
   const activeMissionTitle = t("mission.1");
-  const isAuthoritativeCampaign = tacticalMode === "campaign";
-  const effectiveOperationPhase = isAuthoritativeCampaign ? campaignRuntimePhase : operationPhase;
-  const campaignEndMs = authoritativeRun?.events.at(-1)?.occurredAtMs || 0;
-  const campaignProjection = useMemo(
-    () => projectCampaignRun(isAuthoritativeCampaign ? authoritativeRun : null, campaignElapsedMs),
-    [authoritativeRun, campaignElapsedMs, isAuthoritativeCampaign],
-  );
-  const displayGame = useMemo(
-    () => campaignProjection ? { ...game, elapsedMs: campaignProjection.elapsedMs, interceptions: campaignProjection.interceptions, impacts: campaignProjection.impacts } : game,
-    [campaignProjection, game],
-  );
-  const displayRevealedThreats = campaignProjection ? campaignProjection.liveThreats.filter((threat) => threat.revealed).length : revealedThreats;
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
     url.search = "";
     window.location.assign(url.toString());
   };
-  const startCampaignOperation = async () => {
-    if (!defenseReadiness.ready || isResolving) return;
-    setIsResolving(true);
-    setCampaignRuntimePhase("countdown");
-    setCampaignCountdownMs(5_000);
-    setCampaignElapsedMs(0);
-    try {
-      const runSeed = `campaign-${activeMission.id}-${crypto.randomUUID()}`;
-      const result = await apiGameRepository.createOperation({
-        modeId: "campaign",
-        missionId: activeMission.id,
-        seed: runSeed,
-        plan: defensePlanFromBatteries(game.batteries),
-      });
-      setAuthoritativeRun(result.run);
-      trackAnalytics("campaign.operation.started", { runId: result.runId, missionId: activeMission.id, simVersion: result.simVersion });
-    } catch {
-      setCampaignRuntimePhase("planning");
-      setCampaignCountdownMs(0);
-    } finally {
-      setIsResolving(false);
-    }
-  };
-  const handleStartOperation = () => {
-    if (isAuthoritativeCampaign) void startCampaignOperation();
-    else startOperation();
-  };
+  const handleStartOperation = () => startOperation();
   const handleResetOperation = () => {
-    if (isAuthoritativeCampaign) {
-      window.localStorage.removeItem(CAMPAIGN_SESSION_KEY);
-      setAuthoritativeRun(null);
-      setCampaignRuntimePhase("planning");
-      setCampaignCountdownMs(0);
-      setCampaignElapsedMs(0);
-    }
+    if (tacticalMode === "campaign") window.localStorage.removeItem("shieldline-campaign-operation-v1");
     resetCampaign();
   };
 
@@ -251,9 +190,9 @@ export default function App() {
   useEffect(() => bindTelegramBottomButton({
     text: t("operation.start"),
     enabled: defenseReadiness.ready,
-    visible: !isAuthoritativeCampaign && runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && effectiveOperationPhase === "planning",
+    visible: runtimePolicy.execution === "live" && runtimePolicy.start !== "auto-checklist" && operationPhase === "planning",
     onClick: handleStartOperation,
-  }), [defenseReadiness.ready, effectiveOperationPhase, runtimePolicy.execution, runtimePolicy.start, isAuthoritativeCampaign, isResolving, game.batteries, activeMission.id]);
+  }), [defenseReadiness.ready, operationPhase, runtimePolicy.execution, runtimePolicy.start]);
 
   useEffect(() => {
     if (!isMobileLive) return;
@@ -280,12 +219,12 @@ export default function App() {
   }, [activePanel, isMobileLive]);
 
   useEffect(() => {
-    if (!isAuthoritativeCampaign || campaignRuntimePhase !== "planning" || !defenseReadiness.ready || isResolving) return;
-    void startCampaignOperation();
-  }, [activeMission.id, campaignRuntimePhase, defenseReadiness.ready, isAuthoritativeCampaign, isResolving]);
+    if (tacticalMode !== "campaign" || operationPhase !== "planning" || !defenseReadiness.ready) return;
+    startOperation();
+  }, [defenseReadiness.ready, operationPhase, startOperation, tacticalMode]);
 
   useEffect(() => {
-    if (isAuthoritativeCampaign || !campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
+    if (!campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
     let frameId = 0;
     const frame = (timestamp: number) => {
       if (lastTickRef.current === null) {
@@ -302,7 +241,7 @@ export default function App() {
     };
     frameId = window.requestAnimationFrame(frame);
     return () => window.cancelAnimationFrame(frameId);
-  }, [advanceOperation, campaignMode, isAuthoritativeCampaign, operationPhase, runtimePolicy.execution]);
+  }, [advanceOperation, campaignMode, operationPhase, runtimePolicy.execution]);
 
   useEffect(() => {
     lastTickRef.current = null;
@@ -310,78 +249,12 @@ export default function App() {
   }, [resolvedMode, operationPhase]);
 
   useEffect(() => {
-    if (!isAuthoritativeCampaign || (campaignRuntimePhase !== "countdown" && campaignRuntimePhase !== "running")) return undefined;
-    let last = performance.now();
-    const timer = window.setInterval(() => {
-      const now = performance.now();
-      const delta = Math.max(0, now - last);
-      last = now;
-      if (campaignRuntimePhase === "countdown") {
-        setCampaignCountdownMs((remaining) => {
-          const next = Math.max(0, remaining - delta);
-          if (next === 0 && authoritativeRun) setCampaignRuntimePhase("running");
-          return next;
-        });
-        return;
-      }
-      setCampaignElapsedMs((current) => Math.min(campaignEndMs, current + delta));
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [authoritativeRun, campaignEndMs, campaignRuntimePhase, isAuthoritativeCampaign]);
-
-  useEffect(() => {
-    if (!isAuthoritativeCampaign || campaignRuntimePhase !== "running" || !campaignEndMs || campaignElapsedMs < campaignEndMs) return;
-    setCampaignRuntimePhase("completed");
+    if (tacticalMode !== "campaign" || operationPhase !== "completed" || !game.latestReportId) return;
     setActivePanel("report");
-    if (authoritativeRun && completedTrackedRunRef.current !== authoritativeRun.id) {
-      completedTrackedRunRef.current = authoritativeRun.id;
-      trackAnalytics("campaign.operation.completed", { runId: authoritativeRun.id, missionId: authoritativeRun.missionId, result: authoritativeRun.result, interceptions: authoritativeRun.interceptions, impacts: authoritativeRun.impacts });
-    }
-  }, [authoritativeRun, campaignEndMs, campaignElapsedMs, campaignRuntimePhase, isAuthoritativeCampaign]);
-
-  useEffect(() => {
-    if (!isAuthoritativeCampaign) return;
-    const raw = window.localStorage.getItem(CAMPAIGN_SESSION_KEY);
-    if (!raw) return;
-    try {
-      const saved = JSON.parse(raw) as PersistedCampaignOperation;
-      void apiGameRepository.getOperation(saved.runId).then((run) => {
-        if (!run || run.simVersion !== SIM_VERSION) {
-          window.localStorage.removeItem(CAMPAIGN_SESSION_KEY);
-          return;
-        }
-        const end = run.events.at(-1)?.occurredAtMs || 0;
-        const elapsedSinceSave = saved.phase === "running" ? Math.max(0, Date.now() - saved.updatedAt) : 0;
-        const savedElapsedMs = Number(saved.elapsedMs ?? saved.playbackMs ?? 0);
-        const elapsed = Math.min(end, Math.max(0, savedElapsedMs + elapsedSinceSave));
-        setAuthoritativeRun(run);
-        setCampaignElapsedMs(elapsed);
-        setCampaignCountdownMs(0);
-        setCampaignRuntimePhase(elapsed >= end ? "completed" : saved.phase === "countdown" ? "running" : saved.phase);
-        if (elapsed >= end) setActivePanel("report");
-        trackAnalytics("campaign.reconnected", { runId: run.id, phase: saved.phase, elapsedMs: Math.round(elapsed) });
-      }).catch(() => undefined);
-    } catch {
-      window.localStorage.removeItem(CAMPAIGN_SESSION_KEY);
-    }
-  }, [isAuthoritativeCampaign]);
-
-  useEffect(() => {
-    if (!isAuthoritativeCampaign || !authoritativeRun) return;
-    const saved: PersistedCampaignOperation = {
-      runId: authoritativeRun.id,
-      missionId: authoritativeRun.missionId,
-      phase: campaignRuntimePhase,
-      elapsedMs: campaignElapsedMs,
-      updatedAt: Date.now(),
-    };
-    window.localStorage.setItem(CAMPAIGN_SESSION_KEY, JSON.stringify(saved));
-  }, [authoritativeRun, campaignElapsedMs, campaignRuntimePhase, isAuthoritativeCampaign]);
-
-  useEffect(() => {
-    if (tacticalMode !== "campaign") return;
-    void apiGameRepository.getCampaignProgress().then(setCampaignProgress).catch(() => setCampaignProgress(null));
-  }, [tacticalMode, authoritativeRun?.id]);
+    if (completedCampaignReportRef.current === game.latestReportId) return;
+    completedCampaignReportRef.current = game.latestReportId;
+    trackAnalytics("campaign.operation.completed", { reportId: game.latestReportId, interceptions: game.interceptions, impacts: game.impacts });
+  }, [game.impacts, game.interceptions, game.latestReportId, operationPhase, tacticalMode]);
 
   useEffect(() => {
     if (tacticalMode !== "daily-defense" || !game.batteries.length) return;
@@ -490,16 +363,16 @@ export default function App() {
       </nav>
 
       <section className={`map-stage map-stage--${mapMode} ${placementKind ? "map-stage--placing" : ""}`} aria-label="Мапа протиповітряної оборони" aria-hidden={isMobileLive && Boolean(activePanel)}>
-        <TacticalMap projection={campaignProjection} />
+        <TacticalMap />
         <header className="map-status-strip" aria-label="Стан операції">
           <div className="strip-brand">
             <Shield size={22} />
             <div>
               <h1>Shieldline</h1>
-              <span>{tacticalMode === "campaign" ? `${activeMissionTitle} · ${t("stream.title")}` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
+              <span>{tacticalMode === "campaign" ? `${activeMissionTitle} · жива операція` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
             </div>
           </div>
-          <ResourceBar game={displayGame} operationPhase={effectiveOperationPhase} mobile={isMobileLive} />
+          <ResourceBar game={game} operationPhase={operationPhase} mobile={isMobileLive} />
         </header>
         {isMobileLive && (battleNotice || placementUnit) ? (
           <div className={`map-feedback-slot ${battleNotice ? `map-feedback-slot--${battleNotice.eventType}` : "map-feedback-slot--placement"}`} role="status" aria-live="assertive">
@@ -571,9 +444,9 @@ export default function App() {
               </div>
               <div className="live-stats live-stats--drawer" aria-label="Live defense telemetry">
                 <span><strong>{formatNumber(game.day)}</strong> {t("stats.cycle")}</span>
-                <span><strong>{formatNumber(displayRevealedThreats)}</strong> {t("stats.revealed")}</span>
-                <span><strong>{formatNumber(displayGame.interceptions)}</strong> {t("stats.interceptions")}</span>
-                <span><strong>{formatNumber(displayGame.impacts)}</strong> {t("stats.impacts")}</span>
+                <span><strong>{formatNumber(revealedThreats)}</strong> {t("stats.revealed")}</span>
+                <span><strong>{formatNumber(game.interceptions)}</strong> {t("stats.interceptions")}</span>
+                <span><strong>{formatNumber(game.impacts)}</strong> {t("stats.impacts")}</span>
                 <span><strong>{formatNumber(Math.round(game.wavePressure))}</strong> {t("stats.pressure")}</span>
                 <span><strong>{formatNumber(game.logistics.resupplyDelayDays)}</strong> {t("stats.supply")}</span>
               </div>
@@ -589,13 +462,13 @@ export default function App() {
           ) : null}
           {activePanel === "intel" ? (
             <section className="drawer-section">
-              {campaignProjection ? <CampaignEventLog events={campaignProjection.visibleEvents} /> : <IntelLog game={game} />}
+              <IntelLog game={game} />
               {game.status !== "active" ? <CampaignStatusCard status={game.status} statusReason={game.statusReason} /> : null}
             </section>
           ) : null}
           {activePanel === "report" ? (
             <section className="drawer-section">
-              <AfterActionReport game={game} rankedResult={rankedResult} authoritativeRun={authoritativeRun} />
+              <AfterActionReport game={game} rankedResult={rankedResult} authoritativeRun={tacticalMode === "campaign" ? null : authoritativeRun} />
             </section>
           ) : null}
           {activePanel === "settings" ? (
@@ -637,25 +510,6 @@ export default function App() {
         </div>
       ) : null}
     </main>
-  );
-}
-
-function CampaignEventLog({ events }: { events: SimulationEvent[] }) {
-  return (
-    <section className="campaign-event-stream" aria-label="Authoritative campaign events">
-      <div className="campaign-event-stream__heading">
-        <span>{t("stream.title")}</span>
-        <strong>{events.length ? t("stream.sequence", { sequence: formatNumber(events.at(-1)?.sequence || 0) }) : t("stream.waiting")}</strong>
-      </div>
-      <ol>
-        {events.slice(-24).reverse().map((event) => (
-          <li key={event.id} className={`campaign-event campaign-event--${event.type.replace(".", "-")}`}>
-            <time>{formatNumber(Math.round(event.occurredAtMs / 1000))}с</time>
-            <div><strong>{event.type.replace(".", " ")}</strong><span>{formatSimulationEvent(event)}</span></div>
-          </li>
-        ))}
-      </ol>
-    </section>
   );
 }
 

@@ -6,7 +6,7 @@ async function openTrainingLive(page: import("@playwright/test").Page) {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
       state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
-      version: 12,
+      version: 13,
     }));
   });
   await page.goto("/shieldline/?legacy=1&mode=training");

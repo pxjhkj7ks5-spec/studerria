@@ -1,9 +1,10 @@
-import { useGameStore } from "../store/useGameStore";
+import { normalizePersistedGame, useGameStore } from "../store/useGameStore";
 import type { MissionRun } from "../domain/contracts";
 
 const DATABASE_NAME = "shieldline-offline-v1";
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const PROJECTION_KEY = "current-game";
+const PROJECTION_SCHEMA_VERSION = 2;
 
 interface PendingCommand {
   id?: number;
@@ -82,11 +83,15 @@ export async function initializeOfflinePersistence(basePath: string) {
   const channel = "BroadcastChannel" in window ? new BroadcastChannel("shieldline-game-state") : null;
   const restoreProjection = async () => {
     const projection = await transact<Record<string, unknown> | undefined>("projections", "readonly", (store) => store.get(PROJECTION_KEY));
+    if (projection && projection.schemaVersion !== PROJECTION_SCHEMA_VERSION) {
+      await transact("projections", "readwrite", (store) => store.delete(PROJECTION_KEY));
+      return;
+    }
     const updatedAt = typeof projection?.updatedAt === "string" ? projection.updatedAt : "";
     if (!projection || updatedAt <= latestProjectionAt) return;
     latestProjectionAt = updatedAt;
     useGameStore.setState({
-      ...(projection.game ? { game: projection.game } : {}),
+      ...(projection.game ? { game: normalizePersistedGame(projection.game as ReturnType<typeof useGameStore.getState>["game"]) } : {}),
       ...(projection.activeGameMode ? { activeGameMode: projection.activeGameMode } : {}),
       ...(projection.operationPhase ? { operationPhase: projection.operationPhase } : {}),
       simulationSpeed: 1,
@@ -102,7 +107,7 @@ export async function initializeOfflinePersistence(basePath: string) {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       const projection = {
-        schemaVersion: 1,
+        schemaVersion: PROJECTION_SCHEMA_VERSION,
         updatedAt: new Date().toISOString(),
         game: state.game,
         activeGameMode: state.activeGameMode,
@@ -118,4 +123,16 @@ export async function initializeOfflinePersistence(basePath: string) {
   const flush = () => { void flushPendingCommands(basePath); };
   window.addEventListener("online", flush);
   flush();
+}
+
+export async function clearShieldlineLocalState() {
+  window.localStorage.removeItem("shieldline-live-v7");
+  window.localStorage.removeItem("shieldline-campaign-operation-v1");
+  if (!("indexedDB" in window)) return;
+  await new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase(DATABASE_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+    request.onblocked = () => resolve();
+  });
 }

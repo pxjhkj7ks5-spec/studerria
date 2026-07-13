@@ -9,7 +9,6 @@ import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageUnavailable } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { useGameStore } from "../store/useGameStore";
-import type { CampaignMapProjection } from "../game/campaignProjection";
 import type {
   City,
   CarrierTrack,
@@ -655,18 +654,18 @@ function PerformanceOverlay({ stats, counts }: { stats: PerformanceStats; counts
   );
 }
 
-export function TacticalMap({ projection }: { projection?: CampaignMapProjection | null }) {
+export function TacticalMap() {
   const game = useGameStore((state) => state.game);
   const mapMode = useGameStore((state) => state.mapMode);
   const placementKind = useGameStore((state) => state.placementKind);
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
-  const liveThreats = projection?.liveThreats ?? game.liveThreats;
-  const interceptorShots = projection?.interceptorShots ?? game.interceptorShots;
-  const impactMarkers = projection?.impactMarkers ?? game.impactMarkers;
-  const sectorActivity = projection?.launchSectors ?? game.launchSectors;
-  const elapsedMs = projection?.elapsedMs ?? game.elapsedMs;
+  const liveThreats = game.liveThreats;
+  const interceptorShots = game.interceptorShots;
+  const impactMarkers = game.impactMarkers;
+  const sectorActivity = game.launchSectors;
+  const elapsedMs = game.elapsedMs;
   const controlOverlay = useMemo(() => getControlOverlay(), []);
   const occupiedZonePolygons = useMemo(
     () => controlOverlay.occupiedPolygons.map((polygon) => ({
@@ -692,7 +691,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
     [occupiedZonePolygons, renderBounds],
   );
   const visibleLaunchSectors = useMemo(
-    () => sectorActivity.filter((sector) => (SHOW_LAUNCH_DEBUG || (sector.state && sector.state !== "idle")) && pointInBounds(launchSectorCenter(sector), renderBounds, sector.radiusKm / 85)),
+    () => sectorActivity.filter((sector) => pointInBounds(launchSectorCenter(sector), renderBounds, sector.radiusKm / 85)),
     [sectorActivity, renderBounds],
   );
   const visibleCarriers = useMemo(
@@ -866,6 +865,14 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
                   {sector.name} · {sector.role}
                 </Tooltip>
               </Marker>
+              {sector.lastLaunchCoordinates ? (
+                <Marker
+                  position={[sector.lastLaunchCoordinates.lat, sector.lastLaunchCoordinates.lng]}
+                  icon={makeLaunchSectorIcon({ ...sector, id: `campaign-launch-${sector.id}`, lat: sector.lastLaunchCoordinates.lat, lng: sector.lastLaunchCoordinates.lng, radiusKm: 1 })}
+                >
+                  <Tooltip direction="left" offset={[-8, 0]}>Точна точка пуску · {sector.name}</Tooltip>
+                </Marker>
+              ) : null}
             </Fragment>
           );
         })}

@@ -1,4 +1,4 @@
-const CACHE = "shieldline-runtime-v5";
+const CACHE = "shieldline-runtime-v6";
 const SHELL = ["./", "./index.html", "./offline.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));

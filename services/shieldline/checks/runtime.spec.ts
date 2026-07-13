@@ -3,11 +3,38 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
-import { advanceSimulation, placeBattery, startAttackNow } from "../src/game/liveSimulation";
+import { advanceSimulation, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
-import { campaignMissions } from "../src/data/missions";
-import { projectCampaignRun } from "../src/game/campaignProjection";
-import { runDeterministicMission } from "../src/game/deterministicMission";
+import { campaignCycleCompleted } from "../src/store/useGameStore";
+import type { GameState, LiveThreat } from "../src/types/game";
+
+function testThreat(): LiveThreat {
+  return {
+    id: "test-threat",
+    kind: "geran2",
+    status: "inbound",
+    origin: { lat: 49.2, lng: 29.4 },
+    target: { lat: 49.2, lng: 30.4 },
+    targetCityId: "kyiv",
+    launchSectorId: "test-sector",
+    launchSectorName: "Test sector",
+    progress: 0,
+    speed: 1 / 120_000,
+    difficulty: 10,
+    damage: 3,
+    confidence: 95,
+    saturation: 1,
+    headingDeg: 90,
+    revealed: true,
+    trackQuality: 95,
+    reward: 2,
+  };
+}
+
+function combatState(): GameState {
+  const game = createScenarioState(() => 0.5, "training", "first-night");
+  return { ...game, cyclePhase: "attack", cycleDurationMs: 999_999, liveThreats: [testThreat()] };
+}
 
 test("coverage circles use Leaflet's shared renderer and meter radii", async () => {
   const source = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
@@ -59,39 +86,54 @@ test("a started live operation advances launch sectors and creates threats", () 
   assert.equal(game.cyclePhase, "attack");
   assert.ok(game.liveThreats.length > 0 || game.impacts > 0 || game.interceptions > 0);
   assert.ok(game.log.some((entry) => entry.title === "Track Warning" || entry.title === "Missile Launch"));
+  const launchedSector = game.launchSectors.find((sector) => sector.lastLaunchCoordinates);
+  assert.ok(launchedSector);
+  const launchedThreat = game.liveThreats.find((threat) => threat.launchSectorId === launchedSector.id);
+  const pendingLaunch = game.pendingLaunches.find((launch) => launch.sectorId === launchedSector.id);
+  assert.deepEqual(launchedSector.lastLaunchCoordinates, launchedThreat?.origin || pendingLaunch?.origin);
 });
 
-test("campaign tactical projection follows the authoritative event timeline", () => {
-  const run = runDeterministicMission(campaignMissions[0], "projection-golden", {
-    assetCount: 2,
-    radarCount: 1,
-    kineticCount: 1,
-    averageReadiness: 90,
-    assets: [
-      { kind: "radar", cityId: "kyiv", readiness: 90 },
-      { kind: "buk", cityId: "kyiv", readiness: 90 },
-    ],
-  });
-  const beforeLaunch = projectCampaignRun(run, 1_000)!;
-  assert.equal(beforeLaunch.liveThreats.length, 0);
-  const launched = run.events.find((event) => event.type === "threat.launched")!;
-  const detected = run.events.find((event) => event.waveId === launched.waveId && event.type === "track.detected")!;
-  const inFlight = projectCampaignRun(run, detected.occurredAtMs + 1_000)!;
-  assert.ok(inFlight.launchSectors.some((sector) => sector.state === "cooldown"));
-  assert.ok(inFlight.liveThreats.some((threat) => threat.revealed));
-  const projectedThreat = inFlight.liveThreats.find((threat) => threat.id === `${launched.waveId}-track`)!;
-  assert.ok(projectedThreat.progress > 0.2 && projectedThreat.progress < 0.4);
-  assert.ok(Number(launched.payload.flightDurationMs) >= 20_000);
-  const projectedSector = inFlight.launchSectors.find((sector) => sector.id === `campaign-launch-${launched.waveId}`)!;
-  assert.ok(projectedSector);
-  assert.deepEqual(
-    { lat: projectedSector.lat, lng: projectedSector.lng },
-    { lat: Number(launched.payload.originLat), lng: Number(launched.payload.originLng) },
-  );
-  assert.equal(projectedSector.radiusKm, 1);
-  const complete = projectCampaignRun(run, run.events.at(-1)!.occurredAtMs)!;
-  assert.ok(complete.launchSectors.length > 0);
-  assert.ok(complete.launchSectors.every((sector) => sector.state === "cooldown"));
-  assert.equal(complete.interceptions, run.interceptions);
-  assert.equal(complete.impacts, run.impacts);
+test("radars and absent defenses never create mystery interceptions", () => {
+  const noDefense = tickSimulation(combatState(), 100, () => 0.999);
+  assert.equal(noDefense.interceptorShots.length, 0);
+  assert.equal(noDefense.interceptions, 0);
+
+  let radarOnly = combatState();
+  radarOnly = placeBattery(radarOnly, "radar", { lat: 49.2, lng: 29.4 }, () => 0.5);
+  radarOnly = tickSimulation(radarOnly, 100, () => 0.999);
+  assert.equal(radarOnly.interceptorShots.length, 0);
+  assert.equal(radarOnly.interceptions, 0);
+});
+
+test("only an in-range real battery launches and resolves an interceptor", () => {
+  let outOfRange = combatState();
+  outOfRange = placeBattery(outOfRange, "mvg", { lat: 49.2, lng: 29.4 }, () => 0.5);
+  outOfRange.batteries[0].position = { lat: 45, lng: 22 };
+  outOfRange = tickSimulation(outOfRange, 100, () => 0.999);
+  assert.equal(outOfRange.interceptorShots.length, 0);
+
+  let game = combatState();
+  game = placeBattery(game, "radar", { lat: 49.25, lng: 29.45 }, () => 0.5);
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => 0.5);
+  const battery = game.batteries[1];
+  const ammoBefore = battery.currentAmmo;
+  let cursor = 0;
+  game = tickSimulation(game, 100, () => cursor++ === 0 ? 0.999 : 0);
+  assert.equal(game.interceptorShots.length, 1);
+  assert.equal(game.interceptorShots[0].batteryId, battery.id);
+  assert.deepEqual(game.interceptorShots[0].from, battery.position);
+  assert.ok(typeof ammoBefore === "number" && typeof game.batteries[1].currentAmmo === "number" && game.batteries[1].currentAmmo < ammoBefore);
+  game = tickSimulation(game, 1_000, () => 0.999);
+  assert.equal(game.interceptions, 1);
+  assert.equal(game.liveThreats.some((threat) => threat.id === "test-threat"), false);
+});
+
+test("campaign completes after its first live attack cycle", () => {
+  const previous = combatState();
+  const next = {
+    ...previous,
+    cyclePhase: "planning" as const,
+    afterActionReports: [{ id: "report-1" }, ...previous.afterActionReports] as GameState["afterActionReports"],
+  };
+  assert.equal(campaignCycleCompleted(previous, next), true);
 });

@@ -211,6 +211,7 @@ export interface LaunchSector {
   targetCityId?: CityId;
   targetCoordinates?: Coordinates;
   targetHeadingDeg?: number;
+  lastLaunchCoordinates?: Coordinates;
 }
 
 export interface Resources {
@@ -360,6 +361,7 @@ export interface PendingLaunch {
   kind: ThreatKind;
   sectorId: string;
   targetCityId: CityId;
+  origin: Coordinates;
   launchesAtMs: number;
 }
 

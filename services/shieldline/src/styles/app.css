@@ -29,6 +29,22 @@ body,
   margin: 0;
 }
 
+.app-recovery {
+  display: grid;
+  min-height: 100svh;
+  place-content: center;
+  justify-items: start;
+  gap: 14px;
+  padding: 28px;
+  color: #edf7fb;
+  background: #061018;
+}
+
+.app-recovery h1,
+.app-recovery p { margin: 0; }
+.app-recovery p { max-width: 520px; color: rgba(224, 239, 247, .68); line-height: 1.55; }
+.app-recovery button { display: inline-flex; min-height: 46px; align-items: center; gap: 8px; padding: 0 16px; border: 1px solid rgba(123, 214, 255, .3); border-radius: 14px; color: #edf7fb; background: rgba(123, 214, 255, .12); font-weight: 750; }
+
 button {
   font: inherit;
 }
@@ -854,6 +870,11 @@ button {
 
 .launch-sector-marker--cooldown {
   opacity: 0.58;
+}
+
+.launch-sector-marker--idle {
+  opacity: 0.32;
+  transform: scale(0.72);
 }
 
 .launch-point-marker::after {

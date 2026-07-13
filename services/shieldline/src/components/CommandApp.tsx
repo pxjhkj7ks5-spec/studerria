@@ -156,10 +156,6 @@ function Briefing({ modeId, onBack, onStart, isRunning }: { modeId: GameModeId; 
       <span className="hero-chip"><Waves size={14} /> {mission.subtitle}</span>
       <h1>{modeId === "campaign" ? mission.title : mode.title}</h1>
       <p className="briefing-lead">{modeId === "campaign" ? mission.briefing : mode.description}</p>
-      <section className="briefing-sector-map" aria-label="City sector map">
-        <span className="sector sector--north">North <b>72%</b></span><span className="sector sector--west">West <b>74%</b></span><span className="sector sector--hq">HQ <Shield size={18} /></span><span className="sector sector--east sector--risk">East <b>68%</b></span><span className="sector sector--south">South <b>61%</b></span>
-        <i className="route route--east" /><i className="route route--north" /><i className="route route--south" />
-      </section>
       <section className="briefing-facts"><Fact label="Duration" value={`${mission.durationMinutes} min`} /><Fact label="Difficulty" value={mission.difficulty} /><Fact label="Main risk" value={mission.mainRisk} /><Fact label="Win condition" value={mission.victoryCondition} /></section>
       <section className="reserve-bar"><span>Reserve</span><b>Ammo {mission.resources.ammo}</b><b>Morale {mission.resources.morale}%</b><b>Energy {mission.resources.energy}%</b></section>
       <button className="primary-command" type="button" onClick={onStart} disabled={isRunning}><Play size={19} />{isRunning ? "Synchronizing command…" : modeId === "daily-defense" ? "Open daily report" : "Open manual command board"}</button>

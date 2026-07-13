@@ -15,6 +15,8 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
     await tutorial.waitFor({ state: "hidden" });
   }
 
+  await expect(page.locator(".launch-sector-marker--idle").first()).toBeVisible();
+
   await page.getByRole("navigation", { name: "Панелі Shieldline" }).getByRole("button", { name: "ППО" }).click();
   const drawer = page.getByRole("complementary", { name: /ППО/ });
   await expect(drawer).toBeVisible();
@@ -34,6 +36,8 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);
 
   await expect(page.locator(".launch-point-marker").first()).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator(".campaign-event-stream")).toHaveCount(0);
+  await expect(page.getByText(/North|South|East|West/, { exact: true })).toHaveCount(0);
   await expect(page.locator(".launch-sector-debug-radius, .launch-point-debug")).toHaveCount(0);
   await expect(page.getByLabel("Campaign tactical replay")).toHaveCount(0);
 
@@ -42,4 +46,33 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
 
   const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".command-drawer").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);
+});
+
+test("Safari discards an outdated IndexedDB projection instead of showing a blank screen", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-webkit");
+  await page.goto("/shieldline/offline.html");
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open("shieldline-offline-v1", 2);
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains("projections")) database.createObjectStore("projections");
+        if (!database.objectStoreNames.contains("pendingCommands")) database.createObjectStore("pendingCommands", { keyPath: "id", autoIncrement: true });
+        if (!database.objectStoreNames.contains("replayChunks")) database.createObjectStore("replayChunks");
+        if (!database.objectStoreNames.contains("preferences")) database.createObjectStore("preferences");
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction("projections", "readwrite");
+        transaction.objectStore("projections").put({ schemaVersion: 1, updatedAt: "9999-01-01T00:00:00.000Z", game: { launchSectors: [{ id: "stale" }] } }, "current-game");
+        transaction.oncomplete = () => { database.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error);
+      };
+    });
+  });
+  await page.goto("/shieldline/");
+  await page.getByRole("button", { name: /Campaign/ }).click();
+  await expect(page.locator(".leaflet-stage")).toBeVisible();
+  await expect(page.locator(".app-recovery")).toHaveCount(0);
 });

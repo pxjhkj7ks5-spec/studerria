@@ -29,11 +29,36 @@ function createSeededScenario(seed: string, mode: CampaignMode, scenarioId: stri
   return { game: createScenarioState(() => random.next(), mode, scenarioId), cursor: random.cursor() };
 }
 
-function migrateLegacyLaunchPoints(game: GameState | null) {
+function validCoordinates(value: unknown): value is Coordinates {
+  const point = value as Partial<Coordinates> | null;
+  return Boolean(point && Number.isFinite(point.lat) && Number.isFinite(point.lng));
+}
+
+export function normalizePersistedGame(game: GameState | null) {
   if (!game) return game;
   const withoutSyntheticOpeningTrack = game.liveThreats?.filter((threat) => threat.id !== "opening-track-1") || [];
-  if (Array.isArray(game.launchSectors) && game.launchSectors.every((sector) => Number.isFinite(sector.radiusKm) && sector.radiusKm > 0)) {
-    return { ...game, liveThreats: withoutSyntheticOpeningTrack };
+  const validLaunchSectors = Array.isArray(game.launchSectors)
+    && game.launchSectors.every((sector) => Number.isFinite(sector.lat) && Number.isFinite(sector.lng) && Number.isFinite(sector.radiusKm) && sector.radiusKm > 0 && Array.isArray(sector.threats));
+  if (validLaunchSectors) {
+    const sectorById = new Map(game.launchSectors.map((sector) => [sector.id, sector]));
+    return {
+      ...game,
+      launchSectors: game.launchSectors.map((sector) => ({
+        ...sector,
+        threats: [...sector.threats],
+        lastLaunchCoordinates: validCoordinates(sector.lastLaunchCoordinates) ? { ...sector.lastLaunchCoordinates } : undefined,
+      })),
+      pendingLaunches: (game.pendingLaunches || []).map((launch) => {
+        const sector = sectorById.get(launch.sectorId);
+        return {
+          ...launch,
+          origin: validCoordinates(launch.origin)
+            ? { ...launch.origin }
+            : { lat: sector?.lat || 0, lng: sector?.lng || 0 },
+        };
+      }),
+      liveThreats: withoutSyntheticOpeningTrack,
+    };
   }
   return {
     ...game,
@@ -42,6 +67,12 @@ function migrateLegacyLaunchPoints(game: GameState | null) {
     carriers: [],
     liveThreats: [],
   };
+}
+
+export function campaignCycleCompleted(previous: GameState, next: GameState) {
+  return previous.cyclePhase === "attack"
+    && next.cyclePhase === "planning"
+    && next.afterActionReports.length > previous.afterActionReports.length;
 }
 
 interface GameStore {
@@ -214,11 +245,13 @@ export const useGameStore = create<GameStore>()(
           let game = startAttackNow(state.game, () => random.next());
           const overflowMs = Math.max(0, -remaining) * state.simulationSpeed;
           if (overflowMs > 0) game = advanceSimulation(game, overflowMs, () => random.next());
-          return { game, operationPhase: game.status === "active" ? "running" : "completed", countdownRemainingMs: 0, simulationRandomCursor: random.cursor() };
+          const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
+          return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", countdownRemainingMs: 0, simulationRandomCursor: random.cursor() };
         }
         if (state.operationPhase !== "running") return state;
         const game = advanceSimulation(state.game, deltaMs * state.simulationSpeed, () => random.next());
-        return { game, operationPhase: game.status === "active" ? "running" : "completed", simulationRandomCursor: random.cursor() };
+        const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
+        return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", simulationRandomCursor: random.cursor() };
       }),
       resetCampaign: () => {
         const mode = get().activeGameMode || "training";
@@ -229,13 +262,13 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 12,
+      version: 13,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         return {
           ...state,
-          game: migrateLegacyLaunchPoints(state.game || null) || undefined,
-          dailyCityGame: migrateLegacyLaunchPoints(state.dailyCityGame || null),
+          game: normalizePersistedGame(state.game || null) || undefined,
+          dailyCityGame: normalizePersistedGame(state.dailyCityGame || null),
           simulationSpeed: 1,
         } as GameStore;
       },

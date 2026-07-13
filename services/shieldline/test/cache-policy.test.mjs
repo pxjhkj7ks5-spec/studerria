@@ -18,7 +18,7 @@ test("service worker navigations bypass Safari's HTTP cache", async () => {
   const source = await readSource("../public/sw.js");
 
   assert.match(source, /new Request\(event\.request, \{ cache: "no-store" \}\)/);
-  assert.match(source, /shieldline-runtime-v5/);
+  assert.match(source, /shieldline-runtime-v6/);
   assert.match(source, /caches\.open\(CACHE\)/);
   assert.doesNotMatch(source, /caches\.match\(/);
 });
@@ -53,4 +53,16 @@ test("Telegram safe-area changes keep the mobile HUD below native controls", asy
   assert.match(shell, /onEvent\?\.\("contentSafeAreaChanged", sync\)/);
   assert.match(styles, /--tg-content-safe-area-inset-top/);
   assert.match(styles, /\.shell--mobile-live \.strip-brand \{\s*display: flex/);
+});
+
+test("stale offline projections cannot overwrite the migrated game state", async () => {
+  const [offlineStore, main] = await Promise.all([
+    readSource("../src/platform/offlineStore.ts"),
+    readSource("../src/main.tsx"),
+  ]);
+
+  assert.match(offlineStore, /PROJECTION_SCHEMA_VERSION = 2/);
+  assert.match(offlineStore, /projection\.schemaVersion !== PROJECTION_SCHEMA_VERSION/);
+  assert.match(offlineStore, /normalizePersistedGame/);
+  assert.match(main, /AppErrorBoundary/);
 });
