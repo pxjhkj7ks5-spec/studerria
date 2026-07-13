@@ -160,7 +160,7 @@ export default function App() {
   const simulationSpeed = useGameStore((state) => state.simulationSpeed);
   const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
   const isMobileViewport = useMobileViewport();
-  const isMobileLive = isMobileViewport && tacticalMode !== "campaign";
+  const isMobileLive = isMobileViewport;
   const [confirmReset, setConfirmReset] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel | null>(() => isMobileLive ? null : "units");
   const [battleNotice, setBattleNotice] = useState<IntelEntry | null>(null);
