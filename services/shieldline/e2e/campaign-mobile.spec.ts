@@ -1,8 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-test("mobile Campaign runs from placement through authoritative replay and reconnect", async ({ page }) => {
-  test.setTimeout(70_000);
+test("mobile Campaign runs at real-time speed and reconnects without replay controls", async ({ page }) => {
+  test.setTimeout(85_000);
   await page.addInitScript(() => {
     Object.defineProperty(globalThis.crypto, "randomUUID", { value: () => "e2e", configurable: true });
   });
@@ -33,13 +33,12 @@ test("mobile Campaign runs from placement through authoritative replay and recon
   await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);
 
-  await expect(page.locator(".launch-sector-marker").first()).toBeVisible({ timeout: 25_000 });
+  await expect(page.locator(".launch-sector-marker").first()).toBeVisible({ timeout: 40_000 });
   await expect(page.locator(".launch-sector-debug-radius, .launch-point-debug")).toHaveCount(0);
-  await expect(page.getByText(/Авторитетний результат сервера|Authoritative server result/)).toBeVisible({ timeout: 55_000 });
-  await expect(page.getByLabel("Campaign tactical replay")).toBeVisible();
+  await expect(page.getByLabel("Campaign tactical replay")).toHaveCount(0);
 
   await page.reload();
-  await expect(page.getByText(/Авторитетний результат сервера|Authoritative server result/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".launch-sector-marker").first()).toBeVisible({ timeout: 15_000 });
 
   const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".command-drawer").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);

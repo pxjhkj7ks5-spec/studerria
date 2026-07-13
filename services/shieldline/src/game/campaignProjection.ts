@@ -66,9 +66,11 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
       threats: threatProfilesForKind(kind),
       role: "Archived broad launch corridor",
     };
-    const outcomeAt = Math.min(intercepted?.occurredAtMs ?? Number.POSITIVE_INFINITY, impact?.occurredAtMs ?? Number.POSITIVE_INFINITY);
-    const flightEnd = Number.isFinite(outcomeAt) ? outcomeAt : launched.occurredAtMs + 12_000;
-    const progress = Math.max(0, Math.min(1, (elapsedMs - launched.occurredAtMs) / Math.max(1, flightEnd - launched.occurredAtMs)));
+    const travelDurationMs = numberPayload(launched, "flightDurationMs", 120_000);
+    // Missed tracks continue after a partial interception; a fully intercepted
+    // wave disappears at the actual intercept point instead of racing to its target.
+    const flightEnd = impact?.occurredAtMs ?? intercepted?.occurredAtMs ?? launched.occurredAtMs + travelDurationMs;
+    const progress = Math.max(0, Math.min(1, (elapsedMs - launched.occurredAtMs) / Math.max(1, travelDurationMs)));
 
     if (elapsedMs >= warning.occurredAtMs) {
       const state = elapsedMs < launched.occurredAtMs ? "warning" : elapsedMs < (detected?.occurredAtMs ?? flightEnd) ? "launching" : "cooldown";
@@ -92,14 +94,14 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
       liveThreats.push({
         id: `${wave.waveId}-track`,
         kind,
-        status: fired && elapsedMs >= fired.occurredAtMs ? "engaged" : "inbound",
+        status: fired && intercepted && elapsedMs >= fired.occurredAtMs && elapsedMs < intercepted.occurredAtMs ? "engaged" : "inbound",
         origin,
         target,
         targetCityId: sectorCity[targetSector] || "kyiv",
         launchSectorId: launchSector.id,
         launchSectorName: launchSector.name,
         progress,
-        speed: 1 / Math.max(1, flightEnd - launched.occurredAtMs),
+        speed: 1 / Math.max(1, travelDurationMs),
         difficulty: numberPayload(detected, "difficulty", 50),
         damage: numberPayload(launched, "tracks", 1) * 4,
         confidence: detected && elapsedMs >= detected.occurredAtMs ? 97 : 42,

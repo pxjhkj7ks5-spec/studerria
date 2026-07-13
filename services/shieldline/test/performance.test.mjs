@@ -5,7 +5,7 @@ import { campaignMissions } from "../src/data/missions.ts";
 import { projectCampaignRun } from "../src/game/campaignProjection.ts";
 import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 
-test("campaign replay projection stays below the two-second acceptance budget", () => {
+test("campaign live projection stays below the two-second acceptance budget", () => {
   const run = runDeterministicMission(campaignMissions[2], "performance-golden", {
     assetCount: 8,
     radarCount: 2,
@@ -17,5 +17,5 @@ test("campaign replay projection stays below the two-second acceptance budget", 
   const started = performance.now();
   for (let index = 0; index < 5_000; index += 1) projectCampaignRun(run, (index / 4_999) * end);
   const elapsed = performance.now() - started;
-  assert.ok(elapsed < 2_000, `5,000 replay projections took ${elapsed.toFixed(1)}ms`);
+  assert.ok(elapsed < 2_000, `5,000 live projections took ${elapsed.toFixed(1)}ms`);
 });

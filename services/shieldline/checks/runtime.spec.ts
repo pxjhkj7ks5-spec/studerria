@@ -15,6 +15,7 @@ test("the first six modes are live while Daily Defense is scheduled", () => {
     .sort();
   assert.deepEqual(liveModes, ["campaign", "co-op-command", "ranked-challenge", "rapid-response", "sandbox", "training"]);
   assert.equal(gameModeRuntimePolicies["daily-defense"].execution, "daily-scheduled");
+  assert.ok(Object.values(gameModeRuntimePolicies).every((policy) => policy.defaultSpeed === 1));
 });
 
 test("combat readiness requires a radar and a kinetic asset", () => {
@@ -59,10 +60,15 @@ test("campaign tactical projection follows the authoritative event timeline", ()
   });
   const beforeLaunch = projectCampaignRun(run, 1_000)!;
   assert.equal(beforeLaunch.liveThreats.length, 0);
-  const inFlight = projectCampaignRun(run, 14_500)!;
+  const launched = run.events.find((event) => event.type === "threat.launched")!;
+  const detected = run.events.find((event) => event.waveId === launched.waveId && event.type === "track.detected")!;
+  const inFlight = projectCampaignRun(run, detected.occurredAtMs + 1_000)!;
   assert.ok(inFlight.launchSectors.some((sector) => sector.state === "cooldown"));
   assert.ok(inFlight.liveThreats.some((threat) => threat.revealed));
-  const launched = run.events.find((event) => event.type === "threat.launched")!;
+  const projectedThreat = inFlight.liveThreats.find((threat) => threat.id === `${launched.waveId}-track`)!;
+  assert.ok(projectedThreat.progress > 0.2 && projectedThreat.progress < 0.4);
+  assert.ok(Number(launched.payload.flightDurationMs) >= 120_000);
+  assert.equal(launched.occurredAtMs, campaignMissions[0].waves[0].etaSeconds * 1_000);
   const projectedSector = inFlight.launchSectors.find((sector) => sector.id === launched.sectorId)!;
   assert.ok(projectedSector);
   assert.notDeepEqual(

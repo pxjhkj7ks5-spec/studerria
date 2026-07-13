@@ -22,8 +22,21 @@ test("authoritative mission output is stable for a golden seed", () => {
   assert.ok(left.events.some((event) => event.type === "threat.launched"));
   assert.ok(left.events.some((event) => event.type === "track.detected"));
   assert.ok(left.events.some((event) => event.type === "battery.fired"));
-  assert.equal(left.simVersion, "2.2.0");
+  assert.equal(left.simVersion, "2.3.0");
   assert.equal(left.snapshots.length, 2);
+  const windows = { geran2: [120_000, 180_000], gerbera: [120_000, 180_000], kh101: [70_000, 110_000], kalibr: [70_000, 110_000], iskander: [20_000, 40_000] };
+  for (const launched of left.events.filter((event) => event.type === "threat.launched")) {
+    const duration = Number(launched.payload.flightDurationMs);
+    const [minimum, maximum] = windows[launched.payload.threatKind];
+    assert.ok(duration >= minimum && duration <= maximum);
+    const impact = left.events.find((event) => event.waveId === launched.waveId && event.type === "impact");
+    if (impact) assert.equal(impact.occurredAtMs - launched.occurredAtMs, duration);
+    const interception = left.events.find((event) => event.waveId === launched.waveId && event.type === "interception");
+    if (interception) {
+      const interceptProgress = (interception.occurredAtMs - launched.occurredAtMs) / duration;
+      assert.ok(interceptProgress >= 0.62 && interceptProgress <= 0.74);
+    }
+  }
 });
 
 test("browser offline and server adapters emit byte-identical campaign events", () => {

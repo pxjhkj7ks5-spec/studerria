@@ -15,7 +15,7 @@ export interface GameModeDefinition {
 
 export const gameModes: GameModeDefinition[] = [
   {
-    id: "campaign", eyebrow: "Core operation", title: "Campaign", duration: "30-120 min · x8", difficulty: "Adaptive", resources: "Ammo · morale · reserves",
+    id: "campaign", eyebrow: "Core operation", title: "Campaign", duration: "30-120 min", difficulty: "Adaptive", resources: "Ammo · morale · reserves",
     description: "A sequence of night operations. Each mission preserves the city state and sharpens the next decision.", mainRisk: "Cascading pressure across sectors", victory: "Protect critical city systems through the operation", availability: "available",
   },
   {
@@ -32,7 +32,7 @@ export const gameModes: GameModeDefinition[] = [
     id: "sandbox", eyebrow: "No ranking", title: "Sandbox", duration: "Open-ended", difficulty: "Player set", resources: "Unlimited test reserve", description: "Test sector layouts and doctrines with no progression or leaderboard impact.", mainRisk: "None", victory: "Learn the tools and validate a plan", availability: "available",
   },
   {
-    id: "training", eyebrow: "Guided", title: "Training", duration: "10 min", difficulty: "Guided", resources: "Protected reserve", description: "A short guided operation that explains sectors, readiness, reports and replay without punishment.", mainRisk: "Low", victory: "Complete the command checklist", availability: "available",
+    id: "training", eyebrow: "Guided", title: "Training", duration: "10 min", difficulty: "Guided", resources: "Protected reserve", description: "A short guided operation that explains sectors, readiness and reports without punishment.", mainRisk: "Low", victory: "Complete the command checklist", availability: "available",
   },
   {
     id: "daily-defense", eyebrow: "Mode 7 · Daily farm", title: "Daily Defense", duration: "2-8 min", difficulty: "Daily adaptive", resources: "Repair · supply · readiness",
@@ -41,13 +41,13 @@ export const gameModes: GameModeDefinition[] = [
 ];
 
 export const gameModeRuntimePolicies: Record<GameModeId, GameModeRuntimePolicy> = {
-  campaign: { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, availableSpeeds: [1], requiresRadar: true, requiresKinetic: true },
-  "rapid-response": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 60, availableSpeeds: [1, 8, 60], requiresRadar: true, requiresKinetic: true },
-  "ranked-challenge": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8], requiresRadar: true, requiresKinetic: true },
-  "co-op-command": { execution: "live", start: "hq-ready", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8], requiresRadar: true, requiresKinetic: true },
-  sandbox: { execution: "live", start: "sandbox-controls", countdownMs: 0, defaultSpeed: 600, availableSpeeds: [1, 8, 60, 600], requiresRadar: false, requiresKinetic: false },
-  training: { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 600, availableSpeeds: [1, 8, 60, 600], requiresRadar: true, requiresKinetic: true },
-  "daily-defense": { execution: "daily-scheduled", start: "scheduled", countdownMs: 0, defaultSpeed: 1, availableSpeeds: [1], requiresRadar: false, requiresKinetic: false },
+  campaign: { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  "rapid-response": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  "ranked-challenge": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  "co-op-command": { execution: "live", start: "hq-ready", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  sandbox: { execution: "live", start: "sandbox-controls", countdownMs: 0, defaultSpeed: 1, requiresRadar: false, requiresKinetic: false },
+  training: { execution: "live", start: "auto-checklist", countdownMs: 5_000, defaultSpeed: 1, requiresRadar: true, requiresKinetic: true },
+  "daily-defense": { execution: "daily-scheduled", start: "scheduled", countdownMs: 0, defaultSpeed: 1, requiresRadar: false, requiresKinetic: false },
 };
 
 export function getGameModeRuntimePolicy(id: GameModeId | null | undefined) {

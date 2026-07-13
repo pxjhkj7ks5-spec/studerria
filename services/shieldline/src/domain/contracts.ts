@@ -8,7 +8,7 @@ import type { Coordinates, Resources, ThreatKind, UnitKind } from "../types/game
 export type GameModeId = "campaign" | "rapid-response" | "ranked-challenge" | "co-op-command" | "sandbox" | "training" | "daily-defense";
 export type SectorId = "north" | "south" | "east" | "west" | "hq";
 export type OperationPhase = "planning" | "countdown" | "running" | "paused" | "completed";
-export type SimulationSpeed = 1 | 8 | 60 | 600;
+export type SimulationSpeed = 1;
 export type SimulationEventType =
   | "mission.started"
   | "launch.warning"
@@ -25,7 +25,6 @@ export interface GameModeRuntimePolicy {
   start: "auto-checklist" | "manual" | "sandbox-controls" | "hq-ready" | "scheduled";
   countdownMs: number;
   defaultSpeed: SimulationSpeed;
-  availableSpeeds: SimulationSpeed[];
   requiresRadar: boolean;
   requiresKinetic: boolean;
 }
@@ -84,7 +83,6 @@ export interface MissionDefinition {
   title: string;
   subtitle: string;
   durationMinutes: number;
-  simulationSpeed: number;
   difficulty: "guided" | "standard" | "hard" | "expert";
   resources: Pick<Resources, "budget" | "ammo" | "morale" | "energy">;
   mainRisk: string;

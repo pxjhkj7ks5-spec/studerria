@@ -1,5 +1,5 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowLeft, BarChart3, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Play, Radio, RotateCcw, Shield, ShieldCheck, Swords, Trophy, Users, Waves, Zap } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Activity, ArrowLeft, BarChart3, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Play, Radio, Shield, ShieldCheck, Swords, Trophy, Users, Waves, Zap } from "lucide-react";
 import { apiGameRepository } from "../data/apiGameRepository";
 import { gameModes, getGameMode } from "../data/gameModes";
 import { campaignMissions } from "../data/missions";
@@ -7,9 +7,9 @@ import { setTelegramNotificationPreference, telegramCommandFeedback } from "../p
 import { t } from "../platform/i18n";
 import { trackAnalytics } from "../platform/analytics";
 import { useGameStore } from "../store/useGameStore";
-import type { CoOpRoom, DailyReport, GameModeId, LeaderboardEntry, MissionRun, ReplayEvent, SectorId } from "../domain/contracts";
+import type { CoOpRoom, DailyReport, GameModeId, LeaderboardEntry, MissionRun, SectorId } from "../domain/contracts";
 
-type Screen = "modes" | "briefing" | "operation" | "report" | "replay" | "daily" | "ranking" | "coop";
+type Screen = "modes" | "briefing" | "operation" | "report" | "daily" | "ranking" | "coop";
 type Tab = "city" | "operations" | "squad" | "rating" | "reports";
 
 const icons: Record<GameModeId, typeof Shield> = { campaign: Swords, "rapid-response": Zap, "daily-defense": Home, "ranked-challenge": Trophy, "co-op-command": Users, sandbox: Gamepad2, training: CircleHelp };
@@ -20,7 +20,6 @@ export function CommandApp() {
   const [selectedMode, setSelectedMode] = useState<GameModeId>("campaign");
   const [run, setRun] = useState<MissionRun | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("operations");
-  const [replayIndex, setReplayIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -29,15 +28,8 @@ export function CommandApp() {
   const hydrateDailyCity = useGameStore((state) => state.hydrateDailyCity);
   const dailyCityGame = useGameStore((state) => state.dailyCityGame);
   const mission = campaignMissions[0];
-  const replayEvent = run?.replay[replayIndex];
 
   useEffect(() => { trackAnalytics("app.open", { surface: "campaign-catalog" }); }, []);
-
-  useEffect(() => {
-    if (screen !== "replay" || !run) return undefined;
-    const timer = window.setInterval(() => setReplayIndex((value) => (value + 1) % run.replay.length), 1200);
-    return () => window.clearInterval(timer);
-  }, [screen, run]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -106,7 +98,7 @@ export function CommandApp() {
   if (screen === "briefing") return <Briefing modeId={selectedMode} onBack={() => setScreen("modes")} onStart={runMission} isRunning={isRunning} />;
   if (screen === "ranking") return <CommandFrame onBack={() => setScreen("modes")}><Ranking entries={leaderboard} /></CommandFrame>;
   if (screen === "coop") return <CommandFrame onBack={() => setScreen("modes")}><Coop room={room} onClaim={async (sectorId) => setRoom(await apiGameRepository.claimCoOpSector("kyiv-01", sectorId))} onEnter={(sectorId) => { window.sessionStorage.setItem("shieldline-coop-session", JSON.stringify({ roomId: "kyiv-01", sectorId })); openManualCommand("co-op-command"); }} /></CommandFrame>;
-  if (screen === "daily") return <CommandFrame onBack={() => setScreen("modes")}><DailyDefense report={dailyReport} run={run} onReplay={() => { setReplayIndex(0); setScreen("replay"); }} /></CommandFrame>;
+  if (screen === "daily") return <CommandFrame onBack={() => setScreen("modes")}><DailyDefense report={dailyReport} run={run} /></CommandFrame>;
   if (!run) return null;
 
   return (
@@ -118,8 +110,7 @@ export function CommandApp() {
       </header>
       <section className="command-content">
         {screen === "operation" ? <OperationLoading /> : null}
-        {screen === "report" ? <AfterAction run={run} onReplay={() => { setReplayIndex(0); setScreen("replay"); }} /> : null}
-        {screen === "replay" ? <Replay run={run} current={replayEvent} index={replayIndex} onChange={setReplayIndex} onBack={() => setScreen("report")} /> : null}
+        {screen === "report" ? <AfterAction run={run} /> : null}
       </section>
       <BottomNav active={activeTab} onChange={setActiveTab} />
     </main>
@@ -169,7 +160,7 @@ function Briefing({ modeId, onBack, onStart, isRunning }: { modeId: GameModeId; 
         <span className="sector sector--north">North <b>72%</b></span><span className="sector sector--west">West <b>74%</b></span><span className="sector sector--hq">HQ <Shield size={18} /></span><span className="sector sector--east sector--risk">East <b>68%</b></span><span className="sector sector--south">South <b>61%</b></span>
         <i className="route route--east" /><i className="route route--north" /><i className="route route--south" />
       </section>
-      <section className="briefing-facts"><Fact label="Duration" value={`${mission.durationMinutes} min at x${mission.simulationSpeed}`} /><Fact label="Difficulty" value={mission.difficulty} /><Fact label="Main risk" value={mission.mainRisk} /><Fact label="Win condition" value={mission.victoryCondition} /></section>
+      <section className="briefing-facts"><Fact label="Duration" value={`${mission.durationMinutes} min`} /><Fact label="Difficulty" value={mission.difficulty} /><Fact label="Main risk" value={mission.mainRisk} /><Fact label="Win condition" value={mission.victoryCondition} /></section>
       <section className="reserve-bar"><span>Reserve</span><b>Ammo {mission.resources.ammo}</b><b>Morale {mission.resources.morale}%</b><b>Energy {mission.resources.energy}%</b></section>
       <button className="primary-command" type="button" onClick={onStart} disabled={isRunning}><Play size={19} />{isRunning ? "Synchronizing command…" : modeId === "daily-defense" ? "Open daily report" : "Open manual command board"}</button>
       <small className="briefing-note">All primary modes start with your manual placement and planning. Only Daily Defense resolves its prepared city automatically once per day.</small>
@@ -181,22 +172,16 @@ function OperationLoading() { return <section className="operation-loading"><div
 
 function CommandFrame({ onBack, children }: { onBack: () => void; children: ReactNode }) { return <main className="command-app" aria-label="Shieldline command center"><header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back to modes"><ArrowLeft size={20} /></button><div className="command-brand"><ShieldCheck size={22} /><span>Shieldline</span><small>City 01 · command view</small></div></header><section className="command-content">{children}</section><BottomNav active="operations" onChange={() => undefined} /></main>; }
 
-function DailyDefense({ report, run, onReplay }: { report: DailyReport | null; run: MissionRun | null; onReplay: () => void }) { const launchDailyBoard = () => { const state = useGameStore.getState(); state.launchTacticalMode("daily-defense"); const url = new URL(window.location.href); url.searchParams.set("legacy", "1"); url.searchParams.set("mode", "daily-defense"); window.location.assign(url.toString()); }; return <section className="report-screen" aria-label="Daily defense report"><span className="hero-chip"><Home size={14} /> Daily Defense · city persists</span><h1>Morning report</h1><p>{report?.summary || "The daily command report is being prepared."} Your repair and doctrine decisions are ready for the next night.</p>{run ? <><SectorMap summary={run.sectorSummary} /><section className="recommendation"><Flag size={19} /><div><strong>Daily command</strong><span>{report?.recommendedAction}</span></div></section><button className="primary-command" type="button" onClick={launchDailyBoard}><Shield size={19} /> Open city planning board</button><button className="secondary-command daily-replay-button" type="button" onClick={onReplay}><Play size={16} /> Review nightly replay</button></> : null}</section>; }
+function DailyDefense({ report, run }: { report: DailyReport | null; run: MissionRun | null }) { const launchDailyBoard = () => { const state = useGameStore.getState(); state.launchTacticalMode("daily-defense"); const url = new URL(window.location.href); url.searchParams.set("legacy", "1"); url.searchParams.set("mode", "daily-defense"); window.location.assign(url.toString()); }; return <section className="report-screen" aria-label="Daily defense report"><span className="hero-chip"><Home size={14} /> Daily Defense · city persists</span><h1>Morning report</h1><p>{report?.summary || "The daily command report is being prepared."} Your repair and doctrine decisions are ready for the next night.</p>{run ? <><SectorMap summary={run.sectorSummary} /><section className="recommendation"><Flag size={19} /><div><strong>Daily command</strong><span>{report?.recommendedAction}</span></div></section><button className="primary-command" type="button" onClick={launchDailyBoard}><Shield size={19} /> Open city planning board</button></> : null}</section>; }
 function Ranking({ entries }: { entries: LeaderboardEntry[] }) { return <section className="report-screen ranking-screen" aria-label="Ranked challenge leaderboard"><span className="hero-chip"><Trophy size={14} /> Ranked Challenge · shared results</span><h1>Daily ranking</h1><p>Each run is scored from its server-side event stream. Cosmetic and convenience features never change combat power.</p><ol>{entries.length ? entries.map((entry) => <li key={`${entry.userId}-${entry.rank}`}><b>#{entry.rank}</b><span>{entry.displayName}</span><em>{entry.result}</em><strong>{entry.score}</strong></li>) : <li><span>No completed ranked runs yet.</span></li>}</ol></section>; }
 function Coop({ room, onClaim, onEnter }: { room: CoOpRoom | null; onClaim: (sectorId: SectorId) => void; onEnter: (sectorId: SectorId) => void }) { const sectors: SectorId[] = ["north", "south", "east", "west"]; const viewerRole = room?.members.find((member) => member.userId === room.viewerId)?.role; return <section className="report-screen coop-screen" aria-label="Async co-op command room"><span className="hero-chip"><Users size={14} /> Co-op Command · async room</span><h1>Kyiv-01</h1><p>Claim one sector. Every placement on the tactical map is validated against that role and appended to the HQ log.</p><div className="coop-grid">{sectors.map((sector) => <button key={sector} type="button" onClick={() => onClaim(sector)} disabled={Boolean(room?.sectorAssignments[sector])}><span>{sector}</span><b>{room?.sectorAssignments[sector] || "Claim sector"}</b></button>)}</div>{viewerRole && viewerRole !== "hq" ? <button className="primary-command" type="button" onClick={() => onEnter(viewerRole)}><Shield size={19} /> Enter {viewerRole} command board</button> : null}<section className="recommendation"><Command size={19} /><div><strong>HQ feed · revision {room?.revision || 0}</strong><span>{room?.commandLog.at(-1)?.message || "Awaiting sector commands."}</span></div></section></section>; }
 
-function AfterAction({ run, onReplay }: { run: MissionRun; onReplay: () => void }) {
+function AfterAction({ run }: { run: MissionRun }) {
   const title = run.result === "victory" ? "Night held" : run.result === "contained" ? "Pressure contained" : "Defense setback";
-  return <section className="report-screen" aria-label="After-action report"><span className="hero-chip"><FileText size={14} /> After-action report · deterministic run</span><h1>{title}</h1><p>{run.interceptions} intercepts and {run.impacts} impacts were resolved from one reproducible seed. The next campaign decision can build on this result.</p><div className="result-grid"><Result icon={Crosshair} value={run.interceptions} label="Intercepts" /><Result icon={Zap} value={run.impacts} label="Impacts" /><Result icon={Command} value={run.ammoSpent} label="Ammo spent" /></div><SectorMap summary={run.sectorSummary} /><section className="recommendation"><Flag size={19} /><div><strong>Command recommendation</strong><span>Reinforce East before the next night; keep the HQ reserve available for mixed tracks.</span></div></section><button className="primary-command" type="button" onClick={onReplay}><Play size={19} /> Watch event replay</button><small className="briefing-note">Replay is generated from the same append-only events that create this report.</small></section>;
-}
-
-function Replay({ run, current, index, onChange, onBack }: { run: MissionRun; current?: ReplayEvent; index: number; onChange: (value: number) => void; onBack: () => void }) {
-  const progress = run.replay.length ? ((index + 1) / run.replay.length) * 100 : 0;
-  return <section className="replay-screen" aria-label="Mission replay"><div className="replay-heading"><div><span className="hero-chip"><RotateCcw size={14} /> Replay · seed {run.seed.slice(-10)}</span><h1>Route & intercept timeline</h1></div><button className="secondary-command" type="button" onClick={onBack}>Report</button></div><ReplayMap current={current} /><div className="timeline"><input aria-label="Replay timeline" type="range" min="0" max={Math.max(0, run.replay.length - 1)} value={index} onChange={(event) => onChange(Number(event.target.value))} style={{ "--progress": `${progress}%` } as CSSProperties} /><span>{current ? `${Math.round(current.replayAtMs / 1000)}s · ${current.message}` : "No replay events"}</span></div><ol className="event-log">{run.replay.map((entry, entryIndex) => <li className={entryIndex === index ? "event-log__active" : ""} key={entry.id}><b>{entry.type.replace(".", " ")}</b><span>{entry.message}</span></li>)}</ol></section>;
+  return <section className="report-screen" aria-label="After-action report"><span className="hero-chip"><FileText size={14} /> After-action report · deterministic run</span><h1>{title}</h1><p>{run.interceptions} intercepts and {run.impacts} impacts were resolved from one reproducible seed. The next campaign decision can build on this result.</p><div className="result-grid"><Result icon={Crosshair} value={run.interceptions} label="Intercepts" /><Result icon={Zap} value={run.impacts} label="Impacts" /><Result icon={Command} value={run.ammoSpent} label="Ammo spent" /></div><SectorMap summary={run.sectorSummary} /><section className="recommendation"><Flag size={19} /><div><strong>Command recommendation</strong><span>Reinforce East before the next night; keep the HQ reserve available for mixed tracks.</span></div></section></section>;
 }
 
 function SectorMap({ summary }: { summary: MissionRun["sectorSummary"] }) { return <section className="sector-report-map" aria-label="Sector result map">{(Object.keys(summary) as Array<keyof typeof summary>).map((id) => <div className={`sector-result sector-result--${id}`} key={id}><span>{sectorNames[id]}</span><b>{summary[id].coverage}% cover</b><small>{summary[id].damage ? `${summary[id].damage}% damage` : "stable"}</small></div>)}<div className="sector-result sector-result--center"><Shield size={20} /><b>HQ</b></div></section>; }
-function ReplayMap({ current }: { current?: ReplayEvent }) { const route = current?.route; return <section className="replay-map"><span className="replay-sector replay-sector--north">N</span><span className="replay-sector replay-sector--west">W</span><span className="replay-sector replay-sector--hq"><Shield size={20} /></span><span className="replay-sector replay-sector--east">E</span><span className="replay-sector replay-sector--south">S</span>{route ? <><i className={`replay-route replay-route--${route.from}-to-${route.to}`} /><span className="replay-track">{route.from.toUpperCase()} → {route.to.toUpperCase()}</span></> : null}{current?.interceptPoint ? <i className="intercept-dot" style={{ left: `${current.interceptPoint.x}%`, top: `${current.interceptPoint.y}%` }} /> : null}</section>; }
 function Fact({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><b>{value}</b></div>; }
 function Result({ icon: Icon, value, label }: { icon: typeof Crosshair; value: number; label: string }) { return <div><Icon size={18} /><strong>{value}</strong><span>{label}</span></div>; }
 function BottomNav({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void }) { const items: Array<{ id: Tab; label: string; icon: typeof Home }> = [{ id: "city", label: "City", icon: Home }, { id: "operations", label: "Ops", icon: Swords }, { id: "squad", label: "Squad", icon: Users }, { id: "rating", label: "Rating", icon: BarChart3 }, { id: "reports", label: "Reports", icon: FileText }]; return <nav className="bottom-command-nav" aria-label="Command sections">{items.map(({ id, label, icon: Icon }) => <button className={active === id ? "bottom-command-nav__active" : ""} type="button" key={id} onClick={() => onChange(id)}><Icon size={18} /><span>{label}</span></button>)}</nav>; }

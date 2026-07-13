@@ -74,7 +74,6 @@ interface GameStore {
   pauseOperation: () => void;
   resumeOperation: () => void;
   triggerNextWave: () => void;
-  setSimulationSpeed: (speed: SimulationSpeed) => void;
   advanceOperation: (deltaMs: number) => void;
   resetCampaign: () => void;
 }
@@ -95,7 +94,7 @@ export const useGameStore = create<GameStore>()(
       placementKind: null,
       operationPhase: "planning",
       countdownRemainingMs: 0,
-      simulationSpeed: 600,
+      simulationSpeed: 1,
       simulationSeed: initialSeed,
       simulationRandomCursor: initialRandom.cursor(),
       selectCampaignMode: (mode) => set({
@@ -204,10 +203,6 @@ export const useGameStore = create<GameStore>()(
         const random = createDeterministicRandom(state.simulationSeed, state.simulationRandomCursor);
         return { ...state, game: startAttackNow(state.game, () => random.next()), operationPhase: "running", simulationRandomCursor: random.cursor() };
       }),
-      setSimulationSpeed: (speed) => set((state) => {
-        const policy = getGameModeRuntimePolicy(state.activeGameMode);
-        return policy.availableSpeeds.includes(speed) ? { simulationSpeed: speed } : state;
-      }),
       advanceOperation: (deltaMs) => set((state) => {
         const mode = state.activeGameMode || "training";
         const policy = getGameModeRuntimePolicy(mode);
@@ -241,7 +236,7 @@ export const useGameStore = create<GameStore>()(
           ...state,
           game: migrateLegacyLaunchPoints(state.game || null) || undefined,
           dailyCityGame: migrateLegacyLaunchPoints(state.dailyCityGame || null),
-          simulationSpeed: state.activeGameMode === "campaign" ? 1 : state.simulationSpeed,
+          simulationSpeed: 1,
         } as GameStore;
       },
       partialize: (state) => ({

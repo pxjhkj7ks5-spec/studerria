@@ -43,7 +43,7 @@ const campaignCommandSchema = z.object({
   payload: z.record(z.string(), z.unknown()).default({}),
 }).strict();
 const analyticsSchema = z.object({
-  eventName: z.enum(["app.open", "telegram.authenticated", "campaign.asset.placed", "campaign.operation.started", "campaign.operation.completed", "campaign.replay.opened", "campaign.reconnected", "pwa.offline.queued"]),
+  eventName: z.enum(["app.open", "telegram.authenticated", "campaign.asset.placed", "campaign.operation.started", "campaign.operation.completed", "campaign.reconnected", "pwa.offline.queued"]),
   channel: z.enum(["telegram", "pwa", "web"]),
   sessionId: z.string().min(8).max(96),
   occurredAt: z.string().datetime(),

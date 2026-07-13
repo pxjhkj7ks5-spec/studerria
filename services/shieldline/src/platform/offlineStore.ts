@@ -89,7 +89,7 @@ export async function initializeOfflinePersistence(basePath: string) {
       ...(projection.game ? { game: projection.game } : {}),
       ...(projection.activeGameMode ? { activeGameMode: projection.activeGameMode } : {}),
       ...(projection.operationPhase ? { operationPhase: projection.operationPhase } : {}),
-      ...(projection.simulationSpeed ? { simulationSpeed: projection.simulationSpeed } : {}),
+      simulationSpeed: 1,
       ...(projection.simulationSeed ? { simulationSeed: projection.simulationSeed } : {}),
       ...(typeof projection.simulationRandomCursor === "number" ? { simulationRandomCursor: projection.simulationRandomCursor } : {}),
     } as Partial<ReturnType<typeof useGameStore.getState>>);
@@ -107,7 +107,6 @@ export async function initializeOfflinePersistence(basePath: string) {
         game: state.game,
         activeGameMode: state.activeGameMode,
         operationPhase: state.operationPhase,
-        simulationSpeed: state.simulationSpeed,
         simulationSeed: state.simulationSeed,
         simulationRandomCursor: state.simulationRandomCursor,
       };

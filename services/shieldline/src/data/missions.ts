@@ -3,7 +3,7 @@ import { ALL_LAUNCH_SECTOR_IDS, FIRST_NIGHT_LAUNCH_SECTOR_IDS, SECOND_NIGHT_LAUN
 
 export const campaignMissions: MissionDefinition[] = [
   {
-    id: "campaign-night-01", modeId: "campaign", title: "Night 01: Signal Window", subtitle: "Campaign · Mission 1 of 3", durationMinutes: 45, simulationSpeed: 8, difficulty: "standard",
+    id: "campaign-night-01", modeId: "campaign", title: "Night 01: Signal Window", subtitle: "Campaign · Mission 1 of 3", durationMinutes: 45, difficulty: "standard",
     resources: { budget: 120, ammo: 82, morale: 76, energy: 78 }, mainRisk: "East sector saturation", victoryCondition: "Contain at least two waves and keep city morale above 55%.",
     briefing: "Intermittent tracks are building along the eastern corridor. Keep the reserve flexible: certainty will arrive late, but the window to react is short.",
     launchSectorIds: [...FIRST_NIGHT_LAUNCH_SECTOR_IDS],
@@ -14,7 +14,7 @@ export const campaignMissions: MissionDefinition[] = [
     ],
   },
   {
-    id: "campaign-night-02", modeId: "campaign", title: "Night 02: Blackout Relay", subtitle: "Campaign · Mission 2 of 3", durationMinutes: 60, simulationSpeed: 8, difficulty: "hard",
+    id: "campaign-night-02", modeId: "campaign", title: "Night 02: Blackout Relay", subtitle: "Campaign · Mission 2 of 3", durationMinutes: 60, difficulty: "hard",
     resources: { budget: 118, ammo: 76, morale: 72, energy: 69 }, mainRisk: "Southern decoys masking a grid strike", victoryCondition: "Hold energy above 55% and contain two critical waves.",
     briefing: "A rolling blackout masks a mixed southern approach. Preserve radar coverage long enough to separate decoys from the relay strike.",
     launchSectorIds: [...SECOND_NIGHT_LAUNCH_SECTOR_IDS],
@@ -25,7 +25,7 @@ export const campaignMissions: MissionDefinition[] = [
     ],
   },
   {
-    id: "campaign-night-03", modeId: "campaign", title: "Night 03: Last Reserve", subtitle: "Campaign · Mission 3 of 3", durationMinutes: 90, simulationSpeed: 8, difficulty: "expert",
+    id: "campaign-night-03", modeId: "campaign", title: "Night 03: Last Reserve", subtitle: "Campaign · Mission 3 of 3", durationMinutes: 90, difficulty: "expert",
     resources: { budget: 112, ammo: 68, morale: 66, energy: 62 }, mainRisk: "Multi-sector saturation", victoryCondition: "Protect the HQ and finish with morale above 45%.",
     briefing: "The final pressure wave is broad and fast. Allocate the reserve deliberately: a perfect sector defense is less valuable than a city that keeps functioning.",
     launchSectorIds: [...ALL_LAUNCH_SECTOR_IDS],

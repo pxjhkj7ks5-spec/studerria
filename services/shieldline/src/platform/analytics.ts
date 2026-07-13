@@ -1,4 +1,4 @@
-type AnalyticsEventName = "app.open" | "telegram.authenticated" | "campaign.asset.placed" | "campaign.operation.started" | "campaign.operation.completed" | "campaign.replay.opened" | "campaign.reconnected" | "pwa.offline.queued";
+type AnalyticsEventName = "app.open" | "telegram.authenticated" | "campaign.asset.placed" | "campaign.operation.started" | "campaign.operation.completed" | "campaign.reconnected" | "pwa.offline.queued";
 type AnalyticsProperties = Record<string, string | number | boolean | null>;
 
 function sessionId() {

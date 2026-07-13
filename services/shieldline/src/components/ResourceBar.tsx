@@ -1,11 +1,10 @@
 import { CalendarDays, Coins, Landmark, Users, Zap } from "lucide-react";
 import { formatClock } from "../game/liveSimulation";
 import type { GameState } from "../types/game";
-import type { OperationPhase, SimulationSpeed } from "../domain/contracts";
+import type { OperationPhase } from "../domain/contracts";
 
 interface ResourceBarProps {
   game: GameState;
-  simulationSpeed: SimulationSpeed;
   operationPhase: OperationPhase;
   mobile?: boolean;
 }
@@ -17,7 +16,7 @@ export function ResourceBar({ game, operationPhase, mobile = false }: ResourceBa
     { label: "Енергія", value: `${Math.round(game.resources.energy)}%`, icon: Zap, delta: "стабільність" },
     { label: "Мораль", value: `${Math.round(game.resources.morale)}%`, icon: Users, delta: "цивільні" },
     { label: "Політичний ресурс", value: Math.round(game.resources.political), icon: Landmark, delta: "капітал" },
-    { label: "Час", value: formatClock(game.elapsedMs), icon: CalendarDays, delta: operationPhase === "paused" ? "пауза" : "x8" },
+    { label: "Час", value: formatClock(game.elapsedMs), icon: CalendarDays, delta: operationPhase === "paused" ? "пауза" : "реальний час" },
   ];
 
   return (
