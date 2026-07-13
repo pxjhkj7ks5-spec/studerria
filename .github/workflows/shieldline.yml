@@ -1,12 +1,7 @@
 name: Shieldline
 
 on:
-  push:
-    paths:
-      - "services/shieldline/**"
-      - "docker/local/docker-compose.yml"
-      - "scripts/server-update.sh"
-      - ".github/workflows/shieldline.yml"
+  workflow_dispatch:
   pull_request:
     paths:
       - "services/shieldline/**"
