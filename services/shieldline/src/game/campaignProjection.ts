@@ -70,7 +70,7 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
     const flightEnd = Number.isFinite(outcomeAt) ? outcomeAt : launched.occurredAtMs + 12_000;
     const progress = Math.max(0, Math.min(1, (elapsedMs - launched.occurredAtMs) / Math.max(1, flightEnd - launched.occurredAtMs)));
 
-    if (elapsedMs >= warning.occurredAtMs && elapsedMs < flightEnd + 9_000) {
+    if (elapsedMs >= warning.occurredAtMs) {
       const state = elapsedMs < launched.occurredAtMs ? "warning" : elapsedMs < (detected?.occurredAtMs ?? flightEnd) ? "launching" : "cooldown";
       const activeThreats = threatProfilesForKind(kind).filter((profile) => launchSector.threats.includes(profile));
       const projectedSector: LaunchSector = {

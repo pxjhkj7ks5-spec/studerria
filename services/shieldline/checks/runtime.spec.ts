@@ -71,6 +71,8 @@ test("campaign tactical projection follows the authoritative event timeline", ()
   );
   assert.ok(!projectedSector.id.startsWith("authoritative-"));
   const complete = projectCampaignRun(run, run.events.at(-1)!.occurredAtMs)!;
+  assert.ok(complete.launchSectors.length > 0);
+  assert.ok(complete.launchSectors.every((sector) => sector.state === "cooldown"));
   assert.equal(complete.interceptions, run.interceptions);
   assert.equal(complete.impacts, run.impacts);
 });
