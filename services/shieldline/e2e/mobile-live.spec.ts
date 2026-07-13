@@ -86,6 +86,28 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
   await expect(page.locator(".map-marker--battery")).toHaveCount(1);
   await expect(page.locator(".coverage-ring")).toHaveCount(1);
+
+  await navigation.getByRole("button", { name: "ППО" }).click();
+  await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ 6 млн/ }).click();
+  await page.mouse.click(mapBox.x + mapBox.width * .5, mapBox.y + mapBox.height * .62);
+  await expect(page.locator(".map-marker--battery")).toHaveCount(2);
+  const operationPhase = () => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.operationPhase);
+  await expect.poll(operationPhase).toBe("countdown");
+  await expect.poll(operationPhase, { timeout: 8_000 }).toBe("running");
+  expect(await page.evaluate(() => (window as typeof window & { __telegramBottomShowCount?: number }).__telegramBottomShowCount)).toBe(0);
+
+  const runtimeGeometryMutations = await page.locator(".coverage-ring").first().evaluate(async (ring) => {
+    let changes = 0;
+    const observer = new MutationObserver((mutations) => {
+      changes += mutations.filter((mutation) => mutation.attributeName === "d").length;
+    });
+    observer.observe(ring, { attributes: true, attributeFilter: ["d"] });
+    await new Promise((resolve) => window.setTimeout(resolve, 750));
+    observer.disconnect();
+    return changes;
+  });
+  expect(runtimeGeometryMutations).toBe(0);
+
   const zoomSamplesPromise = page.evaluate(async () => {
     const ring = document.querySelector<SVGElement>(".coverage-ring");
     const marker = document.querySelector<HTMLElement>(".map-marker--battery");
@@ -115,15 +137,8 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   const backwardsJump = Math.max(0, ...widths.slice(1).map((width, index) => widths[index] - width));
   expect(backwardsJump).toBeLessThan(1.5);
 
-  await page.locator(".map-marker--battery").click({ force: true });
+  await page.locator(".map-marker--battery").first().click({ force: true });
   await expect(page.locator(".map-marker--selected, .selected-unit-card")).toHaveCount(0);
-
-  await navigation.getByRole("button", { name: "ППО" }).click();
-  await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ 6 млн/ }).click();
-  await page.mouse.click(mapBox.x + mapBox.width * .5, mapBox.y + mapBox.height * .62);
-  await expect(page.locator(".map-marker--battery")).toHaveCount(2);
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.operationPhase)).toBe("countdown");
-  expect(await page.evaluate(() => (window as typeof window & { __telegramBottomShowCount?: number }).__telegramBottomShowCount)).toBe(0);
 
   const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".map-status-strip").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);

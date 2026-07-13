@@ -1,6 +1,6 @@
 import L from "leaflet";
 import { Circle, CircleMarker, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
@@ -229,6 +229,32 @@ function coverageTone(unit: ReturnType<typeof getUnitDefinition>, battery: Defen
   }
   return { color: "#55d7ff", fill: "#27bfff", fillOpacity: 0.06, opacity: 0.48, weight: 1.35 };
 }
+
+interface CoverageCircleProps {
+  lat: number;
+  lng: number;
+  radius: number;
+  color: string;
+  fillColor: string;
+  fillOpacity: number;
+  opacity: number;
+  weight: number;
+  radar: boolean;
+}
+
+const CoverageCircle = memo(function CoverageCircle({ lat, lng, radius, color, fillColor, fillOpacity, opacity, weight, radar }: CoverageCircleProps) {
+  const center = useMemo<[number, number]>(() => [lat, lng], [lat, lng]);
+  const pathOptions = useMemo(() => ({
+    color,
+    fillColor,
+    fillOpacity,
+    opacity,
+    weight,
+    className: radar ? "coverage-ring coverage-ring--radar" : "coverage-ring",
+  }), [color, fillColor, fillOpacity, opacity, radar, weight]);
+
+  return <Circle center={center} radius={radius} pathOptions={pathOptions} />;
+});
 
 function makeBatteryIcon(battery: DefenseBattery) {
   const key = `${battery.kind}:${battery.status}`;
@@ -890,23 +916,18 @@ export function TacticalMap() {
         {visibleCoverageBatteries.map((battery) => {
           const unit = getUnitDefinition(battery.kind);
           const coverage = coverageTone(unit, battery);
-          return (
-            <Fragment key={`coverage-wrap-${battery.id}`}>
-              <Circle
-                key={`coverage-${battery.id}`}
-                center={[battery.position.lat, battery.position.lng]}
-                radius={unit.outerRangeKm * 1000}
-                pathOptions={{
-                  color: coverage.color,
-                  fillColor: coverage.fill,
-                  fillOpacity: reducedQuality ? coverage.fillOpacity * 0.62 : coverage.fillOpacity,
-                  opacity: reducedQuality ? coverage.opacity * 0.72 : coverage.opacity,
-                  weight: reducedQuality ? Math.max(1, coverage.weight - 0.35) : coverage.weight,
-                  className: unit.engagementMode === "detect" ? "coverage-ring coverage-ring--radar" : "coverage-ring",
-                }}
-              />
-            </Fragment>
-          );
+          return <CoverageCircle
+            key={`coverage-${battery.id}`}
+            lat={battery.position.lat}
+            lng={battery.position.lng}
+            radius={unit.outerRangeKm * 1000}
+            color={coverage.color}
+            fillColor={coverage.fill}
+            fillOpacity={reducedQuality ? coverage.fillOpacity * 0.62 : coverage.fillOpacity}
+            opacity={reducedQuality ? coverage.opacity * 0.72 : coverage.opacity}
+            weight={reducedQuality ? Math.max(1, coverage.weight - 0.35) : coverage.weight}
+            radar={unit.engagementMode === "detect"}
+          />;
         })}
         {visibleRoutes.map((route) => (
           <Polyline
