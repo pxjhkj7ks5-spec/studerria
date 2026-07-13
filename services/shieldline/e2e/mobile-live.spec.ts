@@ -31,6 +31,18 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
 
   const navigation = page.getByRole("navigation", { name: "Панелі Shieldline" });
   await expect(navigation).toBeVisible();
+  const resourceBar = page.locator(".map-status-strip .resource-bar");
+  await expect(resourceBar.locator(".resource-card")).toHaveCount(4);
+  for (const label of ["Бюджет", "БК", "Мораль", "Час"]) await expect(resourceBar.getByText(label, { exact: true })).toBeVisible();
+  await expect(resourceBar.getByText("Енергія", { exact: true })).toHaveCount(0);
+  await expect(resourceBar.getByText("Політичний ресурс", { exact: true })).toHaveCount(0);
+  const resourceLayout = await resourceBar.evaluate((bar) => ({
+    clientWidth: bar.clientWidth,
+    scrollWidth: bar.scrollWidth,
+    backgroundColor: getComputedStyle(bar).backgroundColor,
+  }));
+  expect(resourceLayout.scrollWidth).toBeLessThanOrEqual(resourceLayout.clientWidth);
+  expect(resourceLayout.backgroundColor).toBe("rgba(0, 0, 0, 0)");
   for (const label of ["Меню", "ППО", "План", "Розвідка", "Налаштування"]) {
     const button = navigation.getByRole("button", { name: label });
     await expect(button).toBeVisible();
