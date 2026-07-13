@@ -39,6 +39,7 @@ COPY --chown=shieldline:nodejs --from=builder /app/serverPostgresStore.mjs ./ser
 COPY --chown=shieldline:nodejs --from=builder /app/worker.mjs ./worker.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/scripts ./scripts
 COPY --chown=shieldline:nodejs --from=builder /app/src/game/simulationCore.mjs ./src/game/simulationCore.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/src/game/launchSystem.mjs ./src/game/launchSystem.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/package.json ./package.json
 
 USER shieldline

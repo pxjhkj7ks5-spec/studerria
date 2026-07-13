@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { simulateMission } from "../serverGame.mjs";
 import { campaignMissions } from "../src/data/missions.ts";
 import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 import { calculateDefenseBonus } from "../src/game/simulationCore.mjs";
+
+test("production image includes every authoritative simulation runtime module", async () => {
+  const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(dockerfile, /src\/game\/simulationCore\.mjs/);
+  assert.match(dockerfile, /src\/game\/launchSystem\.mjs/);
+});
 
 test("authoritative mission output is stable for a golden seed", () => {
   const left = simulateMission("golden-seed", "2026-07-10T00:00:00.000Z", 0.14, "campaign-night-01");
