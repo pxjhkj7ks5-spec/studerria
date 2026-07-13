@@ -793,7 +793,6 @@ export function TacticalMap() {
         maxZoom={12}
         zoomControl={false}
         attributionControl
-        preferCanvas
         zoomAnimation
         markerZoomAnimation
         inertia

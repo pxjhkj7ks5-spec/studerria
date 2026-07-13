@@ -60,31 +60,35 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /Radar 35D6/ }).click();
   await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
   await expect(page.locator(".map-marker--battery")).toHaveCount(1);
-  await expect(page.locator(".leaflet-overlay-pane canvas").first()).toBeVisible();
-  await page.locator(".map-marker--battery").first().evaluate((node) => node.setAttribute("data-stability-id", "stable-battery"));
-  if (testInfo.project.name !== "mobile-webkit") await page.evaluate(async () => {
-    const mapElement = document.querySelector<HTMLElement>(".leaflet-stage");
-    if (!mapElement || typeof Touch !== "function") return;
-    const mapBounds = mapElement.getBoundingClientRect();
-    const centerX = mapBounds.left + mapBounds.width / 2;
-    const centerY = mapBounds.top + mapBounds.height / 2;
-    const touch = (identifier: number, x: number) => new Touch({ identifier, target: mapElement, clientX: x, clientY: centerY });
-    const dispatch = (target: EventTarget, type: string, touches: Touch[]) => target.dispatchEvent(new TouchEvent(type, {
-      bubbles: true,
-      cancelable: true,
-      touches,
-      targetTouches: touches,
-      changedTouches: touches,
-    }));
-    const startTouches = [touch(1, centerX - 50), touch(2, centerX + 50)];
-    dispatch(mapElement, "touchstart", startTouches);
-    const movedTouches = [touch(1, centerX - 65), touch(2, centerX + 65)];
-    dispatch(document, "touchmove", movedTouches);
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    dispatch(document, "touchend", []);
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
+  await expect(page.locator(".coverage-ring")).toHaveCount(1);
+  const zoomSamplesPromise = page.evaluate(async () => {
+    const ring = document.querySelector<SVGElement>(".coverage-ring");
+    const marker = document.querySelector<HTMLElement>(".map-marker--battery");
+    if (!ring || !marker) return [];
+    const samples: Array<{ width: number; centerDelta: number }> = [];
+    const started = performance.now();
+    while (performance.now() - started < 650) {
+      const ringBox = ring.getBoundingClientRect();
+      const markerBox = marker.getBoundingClientRect();
+      samples.push({
+        width: ringBox.width,
+        centerDelta: Math.hypot(
+          ringBox.left + ringBox.width / 2 - (markerBox.left + markerBox.width / 2),
+          ringBox.top + ringBox.height / 2 - (markerBox.top + markerBox.height / 2),
+        ),
+      });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+    return samples;
   });
-  await expect(page.locator('[data-stability-id="stable-battery"]')).toHaveCount(1);
+  await map.focus();
+  await page.keyboard.press("+");
+  const zoomSamples = await zoomSamplesPromise;
+  expect(zoomSamples.length).toBeGreaterThan(10);
+  expect(Math.max(...zoomSamples.map((sample) => sample.centerDelta))).toBeLessThan(3);
+  const widths = zoomSamples.map((sample) => sample.width).filter((width) => width > 0);
+  const backwardsJump = Math.max(0, ...widths.slice(1).map((width, index) => widths[index] - width));
+  expect(backwardsJump).toBeLessThan(1.5);
 
   await page.locator(".map-marker--battery").click({ force: true });
   await expect(page.locator(".map-marker--selected, .selected-unit-card")).toHaveCount(0);

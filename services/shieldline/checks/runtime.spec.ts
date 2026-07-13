@@ -36,16 +36,16 @@ function combatState(): GameState {
   return { ...game, cyclePhase: "attack", cycleDurationMs: 999_999, liveThreats: [testThreat()] };
 }
 
-test("coverage circles use Leaflet's shared renderer and meter radii", async () => {
+test("coverage circles and occupied polygons use Leaflet's shared SVG renderer", async () => {
   const source = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
   const coverageStart = source.indexOf("{visibleCoverageBatteries.map");
   const coverageEnd = source.indexOf("{visibleRoutes.map", coverageStart);
   const coverageLayer = source.slice(coverageStart, coverageEnd);
 
   assert.ok(coverageStart >= 0 && coverageEnd > coverageStart);
-  assert.match(source, /preferCanvas/);
   assert.match(coverageLayer, /radius=\{unit\.outerRangeKm \* 1000\}/);
   assert.doesNotMatch(coverageLayer, /renderer=/);
+  assert.doesNotMatch(source, /preferCanvas/);
   assert.doesNotMatch(source, /L\.svg\(\{ padding: 0\.6 \}\)/);
 });
 
