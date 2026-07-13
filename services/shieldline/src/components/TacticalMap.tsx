@@ -860,7 +860,7 @@ export function TacticalMap() {
                 />
               ) : null}
               <Marker position={[center.lat, center.lng]} icon={makeLaunchSectorIcon(sector)}>
-                <Tooltip direction="left" offset={[-8, 0]}>
+                <Tooltip className="launch-sector-tooltip" direction="auto" offset={[8, 0]}>
                   {sector.name} · {sector.role}
                 </Tooltip>
               </Marker>
@@ -869,7 +869,7 @@ export function TacticalMap() {
                   position={[sector.lastLaunchCoordinates.lat, sector.lastLaunchCoordinates.lng]}
                   icon={makeLaunchSectorIcon({ ...sector, id: `campaign-launch-${sector.id}`, lat: sector.lastLaunchCoordinates.lat, lng: sector.lastLaunchCoordinates.lng, radiusKm: 1 })}
                 >
-                  <Tooltip direction="left" offset={[-8, 0]}>Точна точка пуску · {sector.name}</Tooltip>
+                  <Tooltip className="launch-sector-tooltip" direction="auto" offset={[8, 0]}>Точна точка пуску · {sector.name}</Tooltip>
                 </Marker>
               ) : null}
             </Fragment>

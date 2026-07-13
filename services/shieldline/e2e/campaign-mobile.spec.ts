@@ -16,6 +16,19 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
   }
 
   await expect(page.locator(".launch-sector-marker--idle").first()).toBeVisible();
+  const launchMarkers = page.locator(".leaflet-marker-icon").filter({ has: page.locator(".launch-sector-marker--idle") });
+  const visibleLaunchMarkerIndex = await launchMarkers.evaluateAll((markers) => markers.findIndex((marker) => {
+    const box = marker.getBoundingClientRect();
+    return box.left >= 0 && box.right <= window.innerWidth && box.top >= 180 && box.bottom <= window.innerHeight - 90;
+  }));
+  expect(visibleLaunchMarkerIndex).toBeGreaterThanOrEqual(0);
+  await launchMarkers.nth(visibleLaunchMarkerIndex).dispatchEvent("mouseover");
+  const launchTooltip = page.locator(".launch-sector-tooltip:visible");
+  await expect(launchTooltip).toBeVisible();
+  const tooltipBox = await launchTooltip.boundingBox();
+  const viewport = page.viewportSize();
+  expect(tooltipBox && viewport && tooltipBox.x >= 8 && tooltipBox.x + tooltipBox.width <= viewport.width - 8).toBeTruthy();
+  expect(tooltipBox && tooltipBox.width <= 260).toBeTruthy();
 
   await page.getByRole("navigation", { name: "Панелі Shieldline" }).getByRole("button", { name: "ППО" }).click();
   const drawer = page.getByRole("complementary", { name: /ППО/ });
@@ -36,6 +49,8 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);
 
   await expect(page.locator(".launch-point-marker").first()).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator(".launch-sector-marker--launching").first()).toHaveCSS("opacity", "1");
+  await expect(page.locator(".launch-sector-marker--cooldown").first()).toHaveCSS("opacity", "0.88", { timeout: 22_000 });
   await expect(page.locator(".campaign-event-stream")).toHaveCount(0);
   await expect(page.getByText(/North|South|East|West/, { exact: true })).toHaveCount(0);
   await expect(page.locator(".launch-sector-debug-radius, .launch-point-debug")).toHaveCount(0);
