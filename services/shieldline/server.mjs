@@ -37,7 +37,7 @@ const persistentSessionCodec = gameStore.createSession ? createPersistentSession
 const apiRateLimiter = createFixedWindowRateLimiter({ limit: Number(process.env.SHIELDLINE_API_RATE_LIMIT_PER_MINUTE || 180) });
 
 const securityHeaders = {
-  "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.telegram.org; frame-ancestors 'self' https://*.telegram.org",
+  "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' https://telegram.org; connect-src 'self' https://api.telegram.org; frame-ancestors 'self' https://*.telegram.org",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "SAMEORIGIN",

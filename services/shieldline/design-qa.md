@@ -36,3 +36,39 @@ The implementation follows the reference's map-first hierarchy: a compact resour
 5. Re-ran the affected browser flows and confirmed the final state.
 
 Final result: **passed**.
+
+## 2026-07-13 Telegram top safe-area adjustment
+
+- Source visual truth: `/tmp/codex-remote-attachments/019f5bc3-17cd-7730-b2ac-0afc6dfd2702/FD2444F5-D7A0-427F-B04A-D1064EA19015/1-Photo-1.jpg`
+- Implementation screenshot: `/tmp/shieldline-design-qa-telegram-safe-area.png`
+- Full-view comparison: `/tmp/shieldline-design-qa-safe-area-comparison.png`
+- Focused top-region comparison: `/tmp/shieldline-design-qa-top-comparison.png`
+- Viewport: `390 × 844`, portrait mobile
+- State: training live map, drawer closed, Telegram content safe-area top simulated at `78 px`
+
+### Findings and fidelity surfaces
+
+- No remaining P0, P1, or P2 findings in the requested top-HUD scope.
+- Fonts and typography: the existing compact resource labels are preserved; the centered brand uses the existing heading family and weight.
+- Spacing and layout rhythm: the HUD now begins below Telegram's content safe area, with a centered `26 px` brand row followed by the existing `52 px` resource row. The bottom navigation remains unobstructed.
+- Colors and visual tokens: the new brand capsule reuses Shieldline's existing dark glass, blue border, white text, and icon colors.
+- Image quality and asset fidelity: no raster asset was substituted or degraded; the existing Lucide Shield icon is reused as the product mark.
+- Copy and content: resource copy is unchanged; the added centered label is the existing product name, `Shieldline`.
+
+### Comparison history
+
+1. Initial P1: Telegram native controls overlapped the HUD because the Telegram Mini Apps SDK was not loaded, leaving content-safe-area values unavailable.
+2. Fix: loaded the official SDK without blocking app startup, allowed it in CSP, subscribed to safe-area events, and positioned the HUD from the reported content safe area.
+3. Initial P2: after reserving native-control space, the mobile HUD had no centered product identity.
+4. Fix: restored a compact centered Shieldline logo row using the existing Shield icon and visual tokens.
+5. Post-fix evidence: the safe-area capture and side-by-side comparison show a clear native-control reserve above the logo and resource row, with no HUD overlap.
+
+### Interaction and runtime checks
+
+- Opened the live mobile map in the Codex in-app browser.
+- Verified that `Меню` opens the full-screen menu panel.
+- Checked captured browser console errors: none.
+- Focused comparison was required because the requested change is concentrated in the top HUD and Telegram safe-area boundary.
+- The mobile Chromium e2e remains blocked by the pre-existing persisted-state fixture error `latestReportId`; it occurs before the HUD renders and is outside this scoped layout change.
+
+final result: passed

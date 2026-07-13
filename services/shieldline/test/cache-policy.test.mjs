@@ -29,3 +29,28 @@ test("mutable shell files are served with revalidation headers", async () => {
   assert.match(source, /no-store, no-cache, must-revalidate/);
   assert.match(source, /Pragma: "no-cache", Expires: "0"/);
 });
+
+test("the Telegram shell loads before the app and may execute under CSP", async () => {
+  const [html, server] = await Promise.all([
+    readSource("../index.html"),
+    readSource("../server.mjs"),
+  ]);
+
+  const telegramScript = html.indexOf("https://telegram.org/js/telegram-web-app.js");
+  const appScript = html.indexOf('src="/src/main.tsx"');
+  assert.ok(telegramScript >= 0 && telegramScript < appScript);
+  assert.match(html, /id="telegram-web-app-sdk" async/);
+  assert.match(server, /script-src 'self' https:\/\/telegram\.org/);
+});
+
+test("Telegram safe-area changes keep the mobile HUD below native controls", async () => {
+  const [shell, styles] = await Promise.all([
+    readSource("../src/platform/telegramShell.ts"),
+    readSource("../src/styles/app.css"),
+  ]);
+
+  assert.match(shell, /onEvent\?\.\("safeAreaChanged", sync\)/);
+  assert.match(shell, /onEvent\?\.\("contentSafeAreaChanged", sync\)/);
+  assert.match(styles, /--tg-content-safe-area-inset-top/);
+  assert.match(styles, /\.shell--mobile-live \.strip-brand \{\s*display: flex/);
+});
