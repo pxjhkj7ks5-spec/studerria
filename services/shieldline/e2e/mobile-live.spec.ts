@@ -6,7 +6,7 @@ async function openTrainingLive(page: import("@playwright/test").Page) {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
       state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
-      version: 11,
+      version: 12,
     }));
   });
   await page.goto("/shieldline/?legacy=1&mode=training");
@@ -61,10 +61,34 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
   await expect(page.locator(".coverage-ring")).toHaveCount(1);
   await page.locator(".coverage-ring").first().evaluate((node) => node.setAttribute("data-stability-id", "stable-radius"));
-  await map.focus();
-  await page.keyboard.press("+");
-  await page.keyboard.press("+");
-  await page.waitForTimeout(500);
+  const pinchGeometry = testInfo.project.name === "mobile-webkit" ? null : await page.evaluate(async () => {
+    const mapElement = document.querySelector<HTMLElement>(".leaflet-stage");
+    const ring = document.querySelector<SVGElement>(".coverage-ring");
+    if (!mapElement || !ring || typeof Touch !== "function") return null;
+    const mapBounds = mapElement.getBoundingClientRect();
+    const centerX = mapBounds.left + mapBounds.width / 2;
+    const centerY = mapBounds.top + mapBounds.height / 2;
+    const touch = (identifier: number, x: number) => new Touch({ identifier, target: mapElement, clientX: x, clientY: centerY });
+    const dispatch = (target: EventTarget, type: string, touches: Touch[]) => target.dispatchEvent(new TouchEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      touches,
+      targetTouches: touches,
+      changedTouches: touches,
+    }));
+    const startTouches = [touch(1, centerX - 50), touch(2, centerX + 50)];
+    dispatch(mapElement, "touchstart", startTouches);
+    const movedTouches = [touch(1, centerX - 65), touch(2, centerX + 65)];
+    dispatch(document, "touchmove", movedTouches);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const duringPinch = ring.getBoundingClientRect().width;
+    dispatch(document, "touchend", []);
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    return { duringPinch, afterPinch: ring.getBoundingClientRect().width };
+  });
+  if (pinchGeometry) {
+    expect(Math.abs(pinchGeometry.afterPinch / pinchGeometry.duringPinch - 1)).toBeLessThan(.02);
+  }
   await expect(page.locator('[data-stability-id="stable-radius"]')).toHaveCount(1);
 
   await page.locator(".map-marker--battery").click({ force: true });

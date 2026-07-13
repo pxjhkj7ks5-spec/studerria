@@ -800,7 +800,7 @@ export function TacticalMap({ projection }: { projection?: CampaignMapProjection
         inertia
         inertiaDeceleration={2400}
         easeLinearity={0.18}
-        zoomSnap={0.25}
+        zoomSnap={0}
         zoomDelta={0.5}
         wheelPxPerZoomLevel={160}
         wheelDebounceTime={35}
