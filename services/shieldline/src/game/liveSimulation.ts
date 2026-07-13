@@ -2,6 +2,7 @@ import { getScenario } from "../data/scenarios";
 import { getUnitDefinition } from "../data/units";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
 import { buildLogisticsState } from "./logistics";
+import { createGuidedCampaignSchedule, guidedStageForElapsed, guidedStageLaunchCount, guidedThreatKind, nextGuidedLaunchDelayMs, sectorIdsForDirection } from "./campaignPacing.mjs";
 import { SHOW_LAUNCH_DEBUG, launchSectorCenter, pickWeightedSector, randomPointInSector, sectorSupportsThreat } from "./launchSystem.mjs";
 import { clamp, createId, pick, weightedChance } from "./math";
 import { applyPlanningActionCosts, applyPlanningRecoveryEffects, closePlanningDay } from "./planningActions";
@@ -123,6 +124,7 @@ function cloneState(state: GameState): GameState {
     log: state.log.map((entry) => ({ ...entry })),
     forecast: { ...state.forecast },
     currentAttackPlan: state.currentAttackPlan ? { ...state.currentAttackPlan, targetPriorities: [...state.currentAttackPlan.targetPriorities], threatMix: [...state.currentAttackPlan.threatMix] } : null,
+    campaignAttackSchedule: state.campaignAttackSchedule ? { ...state.campaignAttackSchedule, directions: [...state.campaignAttackSchedule.directions] } : null,
     attackPlanHistory: state.attackPlanHistory.map((plan) => ({ ...plan, targetPriorities: [...plan.targetPriorities], threatMix: [...plan.threatMix] })),
     cycleSnapshot: state.cycleSnapshot ? {
       ...state.cycleSnapshot,
@@ -459,11 +461,13 @@ function markLaunchSector(
   durationMs: number,
   target?: { cityId: CityId; coordinates: Coordinates },
   origin?: Coordinates,
+  activeThreatKind?: ThreatKind,
 ) {
   const sector = state.launchSectors.find((item) => item.id === sectorId);
   if (!sector) return;
   sector.state = status;
   sector.stateUntilMs = state.elapsedMs + durationMs;
+  if (activeThreatKind) sector.activeThreatKind = activeThreatKind;
   if (status === "warning") sector.warningStartedAtMs = state.elapsedMs;
   if (origin) sector.lastLaunchCoordinates = { ...origin };
   if (target) {
@@ -474,9 +478,11 @@ function markLaunchSector(
   }
 }
 
-function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () => number) {
+function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () => number, allowedSectorIds?: readonly string[]) {
   const city = pickTargetCity(state, kind, random);
-  const launchSector = pickLaunchSector(state.launchSectors, kind, random);
+  const allowed = allowedSectorIds?.length ? new Set(allowedSectorIds) : null;
+  const compatibleSectors = allowed ? state.launchSectors.filter((sector) => allowed.has(sector.id)) : state.launchSectors;
+  const launchSector = pickLaunchSector(compatibleSectors, kind, random);
   const origin = randomPointInSector(launchSector, random);
   const warningMs = kind === "iskander" ? 15000 : 0;
   if (warningMs > 0) {
@@ -489,11 +495,11 @@ function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () =>
       launchesAtMs: state.elapsedMs + warningMs,
     };
     state.pendingLaunches.push(pending);
-    markLaunchSector(state, launchSector.id, "warning", warningMs, { cityId: city.id, coordinates: city.coordinates }, origin);
+    markLaunchSector(state, launchSector.id, "warning", warningMs, { cityId: city.id, coordinates: city.coordinates }, origin, kind);
     pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Зафіксовано підготовку в секторі «${launchSector.name}».`, "warning", { eventType: "launch", locationLabel: launchSector.name });
     return;
   }
-  markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates }, origin);
+  markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates }, origin, kind);
   state.liveThreats.push(spawnThreat(state, random, kind, city.id, launchSector.id, origin));
   pushLog(state.log, state.elapsedMs, "Пуски", `Зафіксовано пуски: ${launchSector.name}.`, "danger", { eventType: "launch", locationLabel: launchSector.name });
 }
@@ -513,6 +519,7 @@ function resolvePendingLaunches(state: GameState, random: () => number) {
       18000,
       targetCity ? { cityId: targetCity.id, coordinates: targetCity.coordinates } : undefined,
       launch.origin,
+      launch.kind,
     );
     state.liveThreats.push(spawnThreat(state, random, launch.kind, launch.targetCityId, launch.sectorId, launch.origin));
     const launchSector = state.launchSectors.find((sector) => sector.id === launch.sectorId);
@@ -534,6 +541,7 @@ function updateLaunchSectors(state: GameState) {
         sector.targetCoordinates = undefined;
         sector.targetHeadingDeg = undefined;
         sector.lastLaunchCoordinates = undefined;
+        sector.activeThreatKind = undefined;
       }
     }
   }
@@ -541,6 +549,27 @@ function updateLaunchSectors(state: GameState) {
 
 function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => number) {
   if (state.cyclePhase !== "attack" || state.liveThreats.length >= MAX_LIVE_THREATS) return;
+  const scenario = getScenario(state.scenarioId);
+  if (scenario.pacingProfile === "guided-three-stage") {
+    const schedule = state.campaignAttackSchedule || createGuidedCampaignSchedule(state.cycleStartedAtMs, random);
+    state.campaignAttackSchedule = schedule;
+    const phaseElapsed = state.elapsedMs - state.cycleStartedAtMs;
+    const currentStage = guidedStageForElapsed(phaseElapsed);
+    if (currentStage >= 3 || schedule.ballisticLaunched) return;
+    if (currentStage > schedule.stageIndex) {
+      schedule.stageIndex = currentStage;
+      schedule.stageLaunchCount = 0;
+      schedule.nextLaunchAtMs = Math.max(state.elapsedMs, state.cycleStartedAtMs + currentStage * 60_000);
+    }
+    if (state.elapsedMs < schedule.nextLaunchAtMs || schedule.stageLaunchCount >= guidedStageLaunchCount(schedule.stageIndex)) return;
+    const direction = schedule.directions[schedule.stageIndex];
+    const kind = guidedThreatKind(schedule.stageIndex, schedule.stageLaunchCount, direction, random);
+    schedulePendingLaunch(state, kind, random, sectorIdsForDirection(direction));
+    schedule.stageLaunchCount += 1;
+    schedule.ballisticLaunched = kind === "iskander";
+    schedule.nextLaunchAtMs = state.elapsedMs + nextGuidedLaunchDelayMs(random);
+    return;
+  }
   const plan = state.currentAttackPlan;
   const pressure = 0.000035 + state.wavePressure * 0.00000055 + (plan?.intensity || 1) * 0.000018;
   if (random() < pressure * deltaMs) {
@@ -889,6 +918,9 @@ function startAttackCycle(state: GameState, random: () => number) {
   const context = createThreatDirectorContext(state, scenario);
   const plan = chooseAttackPlan(context, random);
   state.currentAttackPlan = plan;
+  state.campaignAttackSchedule = scenario.pacingProfile === "guided-three-stage"
+    ? createGuidedCampaignSchedule(state.elapsedMs, random)
+    : null;
   state.attackPlanHistory = [...state.attackPlanHistory, plan].slice(-8);
   state.cycleSnapshot = createCycleSnapshot(state);
   state.cyclePhase = "attack";
@@ -913,6 +945,7 @@ function finishAttackCycle(state: GameState) {
   }
   closePlanningDay(state);
   state.currentAttackPlan = null;
+  state.campaignAttackSchedule = null;
   state.cycleSnapshot = null;
   state.cyclePhase = "planning";
   state.cycleStartedAtMs = state.elapsedMs;
@@ -923,10 +956,16 @@ function updateCycle(state: GameState, random: () => number) {
   if (state.cyclePhase === "planning" && phaseElapsed >= PLANNING_WINDOW_MS) {
     startAttackCycle(state, random);
   }
+  const guidedCampaign = getScenario(state.scenarioId).pacingProfile === "guided-three-stage";
+  const minimumAttackWindow = guidedCampaign ? 160_000 : MIN_ATTACK_WINDOW_MS;
+  const attackResolved = guidedCampaign
+    ? state.liveThreats.length === 0
+    : phaseElapsed >= state.cycleDurationMs || state.liveThreats.length === 0;
   if (
     state.cyclePhase === "attack"
-    && phaseElapsed >= MIN_ATTACK_WINDOW_MS
-    && (phaseElapsed >= state.cycleDurationMs || state.liveThreats.length === 0)
+    && phaseElapsed >= minimumAttackWindow
+    && state.pendingLaunches.length === 0
+    && attackResolved
   ) {
     finishAttackCycle(state);
   }
@@ -980,8 +1019,9 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
 export function advanceSimulation(current: GameState, deltaMs: number, random: () => number): GameState {
   let state = current;
   let remaining = clamp(deltaMs, 0, 180_000);
+  const stepSizeMs = getScenario(current.scenarioId).pacingProfile === "guided-three-stage" ? 1_000 : 10_000;
   while (remaining > 0 && state.status === "active") {
-    const step = Math.min(10_000, remaining);
+    const step = Math.min(stepSizeMs, remaining);
     state = tickSimulation(state, step, random);
     remaining -= step;
   }

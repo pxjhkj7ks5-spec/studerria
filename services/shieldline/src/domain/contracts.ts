@@ -1,4 +1,4 @@
-import type { Coordinates, Resources, ThreatKind, UnitKind } from "../types/game";
+import type { Coordinates, LaunchDirection, Resources, ThreatKind, UnitKind } from "../types/game";
 
 /**
  * The client contracts intentionally mirror the API boundary.  Local adapters use
@@ -75,6 +75,7 @@ export interface ThreatWave {
   etaSeconds: number;
   size: number;
   difficulty: number;
+  launchDirection?: LaunchDirection;
 }
 
 export interface MissionDefinition {
@@ -90,6 +91,7 @@ export interface MissionDefinition {
   briefing: string;
   launchSectorIds?: string[];
   randomWaveCount?: number;
+  pacingProfile?: "guided-three-stage";
   waves: ThreatWave[];
 }
 

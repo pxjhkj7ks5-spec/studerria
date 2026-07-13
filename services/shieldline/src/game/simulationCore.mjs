@@ -1,6 +1,7 @@
 import { createLaunchSectorState, launchSectorCategory, pickWeightedSector, randomPointInSector } from "./launchSystem.mjs";
+import { createGuidedOperationWaves, GUIDED_THREE_STAGE_PROFILE, sectorIdsForDirection } from "./campaignPacing.mjs";
 
-export const SIM_VERSION = "2.4.0";
+export const SIM_VERSION = "2.5.0";
 // Geography changes must not silently rebalance established mission outcomes.
 const OUTCOME_RANDOM_VERSION = "2.1.0";
 
@@ -26,6 +27,7 @@ function randomWaveSize(kind, random) {
 }
 
 function createOperationWaves(mission, random) {
+  if (mission.pacingProfile === GUIDED_THREE_STAGE_PROFILE) return createGuidedOperationWaves(random);
   const count = Math.max(1, Math.min(12, Number(mission.randomWaveCount || 0)));
   if (!mission.randomWaveCount) return mission.waves;
   let etaSeconds = 16 + Math.round(random() * 8);
@@ -200,9 +202,13 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
     const interceptedAt = launchedAt + Math.round(flightDurationMs * interceptProgress);
     const firedAt = Math.max(detectedAt + 800, interceptedAt - 1_200);
     const impactAt = launchedAt + flightDurationMs;
-    const launchSector = pickWeightedSector(missionLaunchSectors, wave.threatKind, launchRandom);
+    const allowedDirectionSectors = wave.launchDirection ? new Set(sectorIdsForDirection(wave.launchDirection)) : null;
+    const directionalSectors = allowedDirectionSectors
+      ? missionLaunchSectors.filter((sector) => allowedDirectionSectors.has(sector.id))
+      : missionLaunchSectors;
+    const launchSector = pickWeightedSector(directionalSectors, wave.threatKind, launchRandom);
     const origin = randomPointInSector(launchSector, launchRandom);
-    const target = mission.randomWaveCount ? targetPointForSector(wave.targetSector, targetRandom) : targetSectorCoordinates[wave.targetSector] || targetSectorCoordinates.hq;
+    const target = mission.randomWaveCount || mission.pacingProfile ? targetPointForSector(wave.targetSector, targetRandom) : targetSectorCoordinates[wave.targetSector] || targetSectorCoordinates.hq;
     const originSector = originSectorForPoint(origin);
     const route = { from: originSector, to: wave.targetSector };
     const commonPayload = {
@@ -218,9 +224,11 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
       launchSectorLng: launchSector.lng,
       launchSectorRadiusKm: launchSector.radiusKm,
       launchSectorCategory: launchSectorCategory(launchSector),
+      launchDirection: wave.launchDirection || originSectorForPoint(origin),
       flightDurationMs,
     };
-    const warning = event(runId, sequence++, "launch.warning", Math.max(0, launchedAt - 5_000), `${launchSector.name} entered warning state.`, {
+    const warningLeadMs = wave.threatKind === "iskander" ? 15_000 : 5_000;
+    const warning = event(runId, sequence++, "launch.warning", Math.max(0, launchedAt - warningLeadMs), `${launchSector.name} entered warning state.`, {
       sectorId: launchSector.id,
       waveId: wave.id,
       targetId: wave.targetSector,

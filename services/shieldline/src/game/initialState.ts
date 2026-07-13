@@ -64,6 +64,7 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
     cycleStartedAtMs: 0,
     cycleDurationMs: 180000,
     currentAttackPlan: null,
+    campaignAttackSchedule: null,
     attackPlanHistory: [],
     cycleSnapshot: null,
     afterActionReports: [],

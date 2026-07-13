@@ -32,8 +32,8 @@ function toPositions(points: Coordinates[]): [number, number][] {
   return points.map((point) => [point.lat, point.lng]);
 }
 
-const ukrainePlacementStyle = { color: "#5edc8b", fillColor: "#5edc8b", fillOpacity: 0.025, opacity: 0.22, weight: 1 };
-const waterPlacementStyle = { color: "#5ad8ff", fillColor: "#2aa8ff", fillOpacity: 0.085, opacity: 0.36, weight: 1.2, dashArray: "4 7" };
+const ukrainePlacementStyle = { color: "#f6c547", fillColor: "#f6c547", fillOpacity: 0.025, opacity: 0.22, weight: 1 };
+const waterPlacementStyle = { color: "#718796", fillColor: "#586f80", fillOpacity: 0.085, opacity: 0.4, weight: 1.2, dashArray: "4 7" };
 const occupiedZoneStyle = { color: "#ff4f4f", fillColor: "#ff4f4f", fillOpacity: 0.16, opacity: 0.56, weight: 1.4, dashArray: "6 5" };
 
 function pointFromEvent(event: { latlng: { lat: number; lng: number } }): Coordinates {
@@ -61,7 +61,7 @@ interface AdminMapProps {
 }
 
 function AdminZoneMap({ mode, overlay, draftPolygon, onMapClick }: AdminMapProps) {
-  const draftColor = mode === "water" ? "#5ad8ff" : "#ff6e6e";
+  const draftColor = mode === "water" ? "#718796" : "#ff625a";
   const ukrainePlacementPositions = useMemo(
     () => overlay.ukrainePlacementPolygons.map((polygon) => toPositions(polygon)),
     [overlay.ukrainePlacementPolygons],

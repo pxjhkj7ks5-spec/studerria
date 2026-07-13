@@ -31,6 +31,13 @@ import blackSeaShipCarrier from "./carriers/black-sea-ship.png";
 import droneLaunch from "./launch/drone-launch.png";
 import ballisticLaunch from "./launch/ballistic-launch.png";
 import cruiseLaunch from "./launch/cruise-launch.png";
+import droneMobileLaunch from "./launch/drone-mobile.png";
+import droneFieldLaunch from "./launch/drone-field.png";
+import ballisticTacticalTelLaunch from "./launch/ballistic-tactical-tel.png";
+import ballisticHeavyTelLaunch from "./launch/ballistic-heavy-tel.png";
+import cruiseGroundLaunch from "./launch/cruise-ground.png";
+import cruiseNavalLaunch from "./launch/cruise-naval.png";
+import cruiseAirLaunch from "./launch/cruise-air.png";
 import type { CarrierKind, ThreatKind, UnitKind } from "../../types/game";
 
 export const threatSprites: Record<ThreatKind, string> = {
@@ -73,6 +80,16 @@ export const launchSprites = {
   ballistic: ballisticLaunch,
   cruise: cruiseLaunch,
 };
+
+export const launcherVariantSprites = {
+  "drone-mobile": droneMobileLaunch,
+  "drone-field": droneFieldLaunch,
+  "ballistic-tactical-tel": ballisticTacticalTelLaunch,
+  "ballistic-heavy-tel": ballisticHeavyTelLaunch,
+  "cruise-ground": cruiseGroundLaunch,
+  "cruise-naval": cruiseNavalLaunch,
+  "cruise-air": cruiseAirLaunch,
+} as const;
 
 export const markerSprites = {
   unknownTrack,

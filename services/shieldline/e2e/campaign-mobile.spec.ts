@@ -50,7 +50,7 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
 
   await expect(page.locator(".launch-point-marker").first()).toBeVisible({ timeout: 40_000 });
   await expect(page.locator(".launch-sector-marker--launching").first()).toHaveCSS("opacity", "1");
-  await expect(page.locator(".launch-sector-marker--cooldown").first()).toHaveCSS("opacity", "0.88", { timeout: 22_000 });
+  await expect(page.locator(".launch-sector-marker--cooldown").first()).toHaveCSS("opacity", "0.74", { timeout: 22_000 });
   await expect(page.locator(".campaign-event-stream")).toHaveCount(0);
   await expect(page.getByText(/North|South|East|West/, { exact: true })).toHaveCount(0);
   await expect(page.locator(".launch-sector-debug-radius, .launch-point-debug")).toHaveCount(0);

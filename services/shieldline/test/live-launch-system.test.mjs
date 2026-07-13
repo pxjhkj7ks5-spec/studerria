@@ -71,18 +71,35 @@ test("separate live operations receive different compatible launch origins", () 
   assert.notDeepEqual(left.point, right.point);
 });
 
-test("the single campaign mission randomizes launch points, threats and targets per operation", () => {
+test("the single campaign mission follows guided stages while randomizing launch points and targets", () => {
   const mission = campaignMissions[0];
   assert.equal(campaignMissions.length, 1);
   assert.deepEqual(mission.launchSectorIds, CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS);
   assert.equal(mission.waves.length, 0);
-  assert.equal(mission.randomWaveCount, 6);
+  assert.equal(mission.randomWaveCount, 8);
+  assert.equal(mission.pacingProfile, "guided-three-stage");
   const left = runDeterministicMission(mission, "campaign-sector-left");
   const right = runDeterministicMission(mission, "campaign-sector-right");
   const leftLaunches = left.events.filter((event) => event.type === "threat.launched");
   const rightLaunches = right.events.filter((event) => event.type === "threat.launched");
 
   assert.equal(leftLaunches.length, mission.randomWaveCount);
+  assert.deepEqual(leftLaunches.slice(0, 3).map((event) => event.payload.threatKind).every((kind) => ["geran2", "gerbera", "parodiya"].includes(kind)), true);
+  assert.ok(["kh101", "kalibr"].includes(leftLaunches[3].payload.threatKind));
+  assert.equal(leftLaunches[6].payload.threatKind === "kh101" || leftLaunches[6].payload.threatKind === "kalibr", true);
+  assert.equal(leftLaunches[7].payload.threatKind, "iskander");
+  assert.equal(leftLaunches[7].occurredAtMs - left.events.find((event) => event.type === "launch.warning" && event.waveId === leftLaunches[7].waveId).occurredAtMs, 15_000);
+  const launchDirections = leftLaunches.map((event) => event.payload.launchDirection).filter(Boolean);
+  assert.equal(new Set([launchDirections[0], launchDirections[3], launchDirections[6]]).size, 3);
+  assert.ok(leftLaunches.slice(0, 3).every((event) => event.occurredAtMs >= 10_000 && event.occurredAtMs < 60_000));
+  assert.ok(leftLaunches.slice(3, 6).every((event) => event.occurredAtMs >= 60_000 && event.occurredAtMs < 120_000));
+  assert.ok(leftLaunches.slice(6).every((event) => event.occurredAtMs >= 120_000 && event.occurredAtMs <= 160_000));
+  for (const stage of [leftLaunches.slice(0, 3), leftLaunches.slice(3, 6), leftLaunches.slice(6)]) {
+    for (let index = 1; index < stage.length; index += 1) {
+      const gap = stage[index].occurredAtMs - stage[index - 1].occurredAtMs;
+      assert.ok(gap >= 16_000 && gap <= 24_000);
+    }
+  }
   for (const launch of leftLaunches) {
     const sector = launchSectors.find((item) => item.id === launch.sectorId);
     assert.ok(sector);

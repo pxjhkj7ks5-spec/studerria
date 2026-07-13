@@ -44,7 +44,7 @@ export const SECOND_NIGHT_LAUNCH_SECTOR_IDS = [
 ];
 
 export const ALL_LAUNCH_SECTOR_IDS = launchSectors.map((sector) => sector.id);
-export const CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS = ALL_LAUNCH_SECTOR_IDS.filter((id) => !["astrakhan_air_corridor", "vologda_air_corridor"].includes(id));
+export const CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS = [...ALL_LAUNCH_SECTOR_IDS];
 
 const threatAliases = {
   drone: ["shahed", "gerbera", "italmas"],

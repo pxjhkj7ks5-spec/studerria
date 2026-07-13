@@ -7,7 +7,7 @@ import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBat
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
-import type { CampaignMode, Coordinates, GameState, LaunchAreaState, MapMode, PlanningActionId, UnitKind } from "../types/game";
+import type { CampaignAttackSchedule, CampaignMode, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
 
 const tutorialKey = "shieldline-tutorial-complete-v1";
@@ -34,6 +34,28 @@ function validCoordinates(value: unknown): value is Coordinates {
   return Boolean(point && Number.isFinite(point.lat) && Number.isFinite(point.lng));
 }
 
+const launchDirections: LaunchDirection[] = ["north", "east", "south"];
+
+function normalizeCampaignSchedule(game: GameState): CampaignAttackSchedule | null {
+  if (game.cyclePhase !== "attack" || game.scenarioId !== "thirty-days-under-pressure") return null;
+  const persisted = game.campaignAttackSchedule;
+  const directions = Array.isArray(persisted?.directions)
+    ? persisted.directions.filter((direction): direction is LaunchDirection => launchDirections.includes(direction as LaunchDirection))
+    : [];
+  const uniqueDirections = [...new Set(directions)];
+  for (const direction of launchDirections) if (!uniqueDirections.includes(direction)) uniqueDirections.push(direction);
+  const phaseElapsed = Math.max(0, game.elapsedMs - game.cycleStartedAtMs);
+  const inferredStage = Math.min(2, Math.floor(phaseElapsed / 60_000));
+  return {
+    profile: "guided-three-stage",
+    directions: uniqueDirections.slice(0, 3),
+    stageIndex: Number.isInteger(persisted?.stageIndex) ? Math.max(0, Math.min(2, persisted!.stageIndex)) : inferredStage,
+    stageLaunchCount: Number.isInteger(persisted?.stageLaunchCount) ? Math.max(0, Math.min(3, persisted!.stageLaunchCount)) : 0,
+    nextLaunchAtMs: Number.isFinite(persisted?.nextLaunchAtMs) ? persisted!.nextLaunchAtMs : game.elapsedMs + 1_000,
+    ballisticLaunched: Boolean(persisted?.ballisticLaunched),
+  };
+}
+
 export function normalizePersistedGame(game: GameState | null) {
   if (!game) return game;
   const persistedSectorById = new Map((Array.isArray(game.launchSectors) ? game.launchSectors : []).map((sector) => [sector.id, sector]));
@@ -51,6 +73,7 @@ export function normalizePersistedGame(game: GameState | null) {
       targetCoordinates: validCoordinates(persisted.targetCoordinates) ? { ...persisted.targetCoordinates } : undefined,
       targetHeadingDeg: Number.isFinite(persisted.targetHeadingDeg) ? persisted.targetHeadingDeg : undefined,
       lastLaunchCoordinates: validCoordinates(persisted.lastLaunchCoordinates) ? { ...persisted.lastLaunchCoordinates } : undefined,
+      activeThreatKind: persisted.activeThreatKind && sectorSupportsThreat(sector, persisted.activeThreatKind) ? persisted.activeThreatKind : undefined,
     };
   });
   const authoritativeSectorById = new Map(launchSectors.map((sector) => [sector.id, sector]));
@@ -77,6 +100,7 @@ export function normalizePersistedGame(game: GameState | null) {
     }));
   return {
     ...game,
+    campaignAttackSchedule: normalizeCampaignSchedule(game),
     launchSectors,
     pendingLaunches,
     carriers: Array.isArray(game.carriers) ? game.carriers : [],
@@ -304,12 +328,13 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 15,
+      version: 16,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
+        const migratedGame = normalizePersistedGame(state.game || null);
         return {
           ...state,
-          game: normalizePersistedGame(state.game || null) || undefined,
+          ...(migratedGame ? { game: migratedGame } : {}),
           dailyCityGame: normalizePersistedGame(state.dailyCityGame || null),
           simulationSpeed: 1,
         } as GameStore;

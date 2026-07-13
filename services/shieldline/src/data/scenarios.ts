@@ -78,6 +78,7 @@ export const scenarios: ScenarioDefinition[] = [
     specialRules: ["Late-cycle combined attacks unlock sooner", "Fatigue management is decisive"],
     winConditions: ["Survive all operation cycles with morale, energy, and city services intact."],
     lossConditions: ["Morale, energy, or city services collapse."],
+    pacingProfile: "guided-three-stage",
   },
 ];
 

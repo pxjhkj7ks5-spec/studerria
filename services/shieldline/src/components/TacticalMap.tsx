@@ -1,13 +1,14 @@
 import L from "leaflet";
 import { Circle, CircleMarker, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
+import { carrierSprites, launchSprites, launcherVariantSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageUnavailable } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
+import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile } from "../game/mapZoom";
 import { useGameStore } from "../store/useGameStore";
 import type {
@@ -216,9 +217,9 @@ function threatTone(threat: LiveThreat) {
 }
 
 function threatRouteColor(tone: ReturnType<typeof threatTone>) {
-  if (tone === "confirmed") return "#ff3535";
-  if (tone === "decoy") return "#b997ff";
-  return "#ff3535";
+  if (tone === "confirmed") return "#ff625a";
+  if (tone === "decoy") return "#b79af4";
+  return "#d8d3c7";
 }
 
 function coverageTone(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery) {
@@ -226,9 +227,9 @@ function coverageTone(unit: ReturnType<typeof getUnitDefinition>, battery: Defen
     return { color: "#ffad42", fill: "#ff8f1f", fillOpacity: 0.1, opacity: 0.78, weight: 2 };
   }
   if (unit.engagementMode === "detect") {
-    return { color: "#52e980", fill: "#36d977", fillOpacity: 0.075, opacity: 0.58, weight: 1.5 };
+    return { color: "#f6c547", fill: "#f6c547", fillOpacity: 0.065, opacity: 0.62, weight: 1.5 };
   }
-  return { color: "#55d7ff", fill: "#27bfff", fillOpacity: 0.06, opacity: 0.48, weight: 1.35 };
+  return { color: "#f6c547", fill: "#f6c547", fillOpacity: 0.06, opacity: 0.56, weight: 1.35 };
 }
 
 interface CoverageCircleProps {
@@ -316,14 +317,15 @@ function makeImpactIcon(marker: ImpactMarker) {
 
 function makeLaunchSectorIcon(sector: LaunchSector) {
   const category = launchSectorCategory(sector);
+  const variant = launcherVariantForSector(sector);
   const state = sector.state || "idle";
   const exactPoint = sector.id.startsWith("campaign-launch-");
-  const key = `${category}:${state}:${exactPoint ? "point" : "sector"}`;
+  const key = `${variant}:${state}:${exactPoint ? "point" : "sector"}`;
   const cached = launchSectorIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="launch-sector-marker ${exactPoint ? "launch-point-marker" : ""} launch-sector-marker--${state}">${imageMarkerHtml(launchSprites[category], "map-marker--launch-sector")}</span>`,
+    html: `<span class="launch-sector-marker ${exactPoint ? "launch-point-marker" : ""} launch-sector-marker--${state}">${imageMarkerHtml(launcherVariantSprites[variant] || launchSprites[category], "map-marker--launch-sector")}</span>`,
     iconSize: [46, 46],
     iconAnchor: [23, 23],
   });
@@ -589,7 +591,7 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
       let pooled = shotPoolRef.current.get(shot.id);
       const current = interpolatedShotPosition(shot, elapsedSinceSync);
       const pathOptions = {
-        color: shot.style === "gun" ? "#ffd466" : shot.style === "drone" ? "#7ee7ff" : shot.style === "ew" ? "#b58cff" : "#ffef9a",
+        color: shot.style === "gun" ? "#ffd466" : shot.style === "drone" ? "#f6c547" : shot.style === "ew" ? "#b79af4" : "#ffef9a",
         weight: shot.style === "gun" ? 2 : 1,
         opacity: reducedQuality ? 0.52 : 0.74,
         dashArray: shot.style === "missile" ? "8 5" : shot.style === "gun" ? "2 7" : "4 5",

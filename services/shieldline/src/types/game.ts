@@ -212,6 +212,18 @@ export interface LaunchSector {
   targetCoordinates?: Coordinates;
   targetHeadingDeg?: number;
   lastLaunchCoordinates?: Coordinates;
+  activeThreatKind?: ThreatKind;
+}
+
+export type LaunchDirection = "north" | "east" | "south";
+
+export interface CampaignAttackSchedule {
+  profile: "guided-three-stage";
+  directions: LaunchDirection[];
+  stageIndex: number;
+  stageLaunchCount: number;
+  nextLaunchAtMs: number;
+  ballisticLaunched: boolean;
 }
 
 export interface Resources {
@@ -388,6 +400,7 @@ export interface ScenarioDefinition {
   specialRules: string[];
   winConditions: string[];
   lossConditions: string[];
+  pacingProfile?: "guided-three-stage";
 }
 
 export interface AfterActionReport {
@@ -453,6 +466,7 @@ export interface GameState {
   cycleStartedAtMs: number;
   cycleDurationMs: number;
   currentAttackPlan: AttackPlan | null;
+  campaignAttackSchedule: CampaignAttackSchedule | null;
   attackPlanHistory: AttackPlan[];
   cycleSnapshot: CycleSnapshot | null;
   afterActionReports: AfterActionReport[];

@@ -11,7 +11,8 @@ const missions = [
     id: "campaign-night-01",
     title: "Random Threat Night",
     launchSectorIds: CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS,
-    randomWaveCount: 6,
+    randomWaveCount: 8,
+    pacingProfile: "guided-three-stage",
     waves: [],
   },
 ];
