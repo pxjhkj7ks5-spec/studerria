@@ -4,7 +4,7 @@ import { createDeterministicRandom } from "../src/game/deterministicRandom.ts";
 import { campaignMissions } from "../src/data/missions.ts";
 import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 import {
-  FIRST_NIGHT_LAUNCH_SECTOR_IDS,
+  CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS,
   SHOW_LAUNCH_DEBUG,
   createLaunchSectorState,
   generateLaunchOrigin,
@@ -71,19 +71,22 @@ test("separate live operations receive different compatible launch origins", () 
   assert.notDeepEqual(left.point, right.point);
 });
 
-test("campaign Night 01 uses only its starter sectors and randomizes exact origins per operation", () => {
+test("the single campaign mission randomizes launch points, threats and targets per operation", () => {
   const mission = campaignMissions[0];
-  assert.deepEqual(mission.launchSectorIds, FIRST_NIGHT_LAUNCH_SECTOR_IDS);
+  assert.equal(campaignMissions.length, 1);
+  assert.deepEqual(mission.launchSectorIds, CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS);
+  assert.equal(mission.waves.length, 0);
+  assert.equal(mission.randomWaveCount, 6);
   const left = runDeterministicMission(mission, "campaign-sector-left");
   const right = runDeterministicMission(mission, "campaign-sector-right");
   const leftLaunches = left.events.filter((event) => event.type === "threat.launched");
   const rightLaunches = right.events.filter((event) => event.type === "threat.launched");
 
-  assert.equal(leftLaunches.length, mission.waves.length);
+  assert.equal(leftLaunches.length, mission.randomWaveCount);
   for (const launch of leftLaunches) {
     const sector = launchSectors.find((item) => item.id === launch.sectorId);
     assert.ok(sector);
-    assert.ok(FIRST_NIGHT_LAUNCH_SECTOR_IDS.includes(sector.id));
+    assert.ok(CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS.includes(sector.id));
     assert.equal(sectorSupportsThreat(sector, String(launch.payload.threatKind)), true);
     const point = { lat: Number(launch.payload.originLat), lng: Number(launch.payload.originLng) };
     assert.ok(distanceKm({ lat: sector.lat, lng: sector.lng }, point) <= sector.radiusKm + 0.001);
@@ -91,5 +94,9 @@ test("campaign Night 01 uses only its starter sectors and randomizes exact origi
   assert.notDeepEqual(
     leftLaunches.map((event) => [event.payload.originLat, event.payload.originLng]),
     rightLaunches.map((event) => [event.payload.originLat, event.payload.originLng]),
+  );
+  assert.notDeepEqual(
+    leftLaunches.map((event) => [event.payload.threatKind, event.payload.targetLat, event.payload.targetLng]),
+    rightLaunches.map((event) => [event.payload.threatKind, event.payload.targetLat, event.payload.targetLng]),
   );
 });

@@ -2,40 +2,17 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { SIM_VERSION, calculateDefenseBonus, simulateOperation, stableHash } from "./src/game/simulationCore.mjs";
-import { ALL_LAUNCH_SECTOR_IDS, FIRST_NIGHT_LAUNCH_SECTOR_IDS, SECOND_NIGHT_LAUNCH_SECTOR_IDS } from "./src/game/launchSystem.mjs";
+import { CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS } from "./src/game/launchSystem.mjs";
 
 const DEFAULT_STORE = { version: 3, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {} };
 const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
 const missions = [
   {
     id: "campaign-night-01",
-    title: "Night 01: Signal Window",
-    launchSectorIds: FIRST_NIGHT_LAUNCH_SECTOR_IDS,
-    waves: [
-    { id: "wave-01", originSector: "east", targetSector: "east", etaSeconds: 28, size: 8, difficulty: 42, threatKind: "geran2" },
-    { id: "wave-02", originSector: "north", targetSector: "north", etaSeconds: 52, size: 3, difficulty: 62, threatKind: "iskander" },
-    { id: "wave-03", originSector: "south", targetSector: "west", etaSeconds: 75, size: 6, difficulty: 48, threatKind: "gerbera" },
-  ],
-  },
-  {
-    id: "campaign-night-02",
-    title: "Night 02: Blackout Relay",
-    launchSectorIds: SECOND_NIGHT_LAUNCH_SECTOR_IDS,
-    waves: [
-      { id: "wave-01", originSector: "south", targetSector: "south", etaSeconds: 24, size: 10, difficulty: 48, threatKind: "geran2" },
-      { id: "wave-02", originSector: "east", targetSector: "east", etaSeconds: 50, size: 5, difficulty: 67, threatKind: "kalibr" },
-      { id: "wave-03", originSector: "north", targetSector: "east", etaSeconds: 79, size: 4, difficulty: 72, threatKind: "kh101" },
-    ],
-  },
-  {
-    id: "campaign-night-03",
-    title: "Night 03: Last Reserve",
-    launchSectorIds: ALL_LAUNCH_SECTOR_IDS,
-    waves: [
-      { id: "wave-01", originSector: "east", targetSector: "east", etaSeconds: 20, size: 12, difficulty: 58, threatKind: "gerbera" },
-      { id: "wave-02", originSector: "south", targetSector: "west", etaSeconds: 47, size: 6, difficulty: 78, threatKind: "kalibr" },
-      { id: "wave-03", originSector: "north", targetSector: "north", etaSeconds: 74, size: 5, difficulty: 84, threatKind: "kh101" },
-    ],
+    title: "Random Threat Night",
+    launchSectorIds: CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS,
+    randomWaveCount: 6,
+    waves: [],
   },
 ];
 
@@ -116,10 +93,8 @@ export async function createGameStore(file) {
       if (source === "campaign") {
         const store = await readStore();
         const current = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
-        if (current.currentMissionId === mission.id && run.result !== "setback") {
-          current.completedMissionIds = [...new Set([...current.completedMissionIds, mission.id])];
-          current.currentMissionId = missions[missions.findIndex((entry) => entry.id === mission.id) + 1]?.id || null;
-        }
+        current.currentMissionId = missions[0].id;
+        current.completedMissionIds = [];
         current.lastRunId = run.id;
         store.campaigns[actorId] = current;
         store.events.push(event(`campaign-${actorId}`, store.events.length + 1, "mission.completed", Date.now(), `${actorId} resolved ${mission.id}.`, { payload: { runId: run.id, result: run.result } }));
@@ -202,7 +177,7 @@ export async function createGameStore(file) {
     async campaignState(actorId = "web-commander") {
       const store = await readStore();
       const progress = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
-      return { ...progress, missions: missions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: progress.completedMissionIds.includes(entry.id) ? "completed" : progress.currentMissionId === entry.id ? "active" : "locked" })) };
+      return { ...progress, currentMissionId: missions[0].id, completedMissionIds: [], missions: missions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: "active" })) };
     },
     async leaderboard() {
       const store = await readStore();

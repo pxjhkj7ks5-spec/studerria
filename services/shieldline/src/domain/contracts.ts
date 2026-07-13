@@ -89,6 +89,7 @@ export interface MissionDefinition {
   victoryCondition: string;
   briefing: string;
   launchSectorIds?: string[];
+  randomWaveCount?: number;
   waves: ThreatWave[];
 }
 

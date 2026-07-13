@@ -5,6 +5,7 @@ export const launchSectors: readonly LaunchSector[];
 export const FIRST_NIGHT_LAUNCH_SECTOR_IDS: readonly string[];
 export const SECOND_NIGHT_LAUNCH_SECTOR_IDS: readonly string[];
 export const ALL_LAUNCH_SECTOR_IDS: readonly string[];
+export const CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS: readonly string[];
 export function threatProfilesForKind(kind: ThreatKind | string): LaunchThreatProfile[];
 export function sectorSupportsThreat(sector: LaunchSector, threatType: ThreatKind | string | null): boolean;
 export function createLaunchSectorState(ids?: readonly string[]): LaunchSector[];

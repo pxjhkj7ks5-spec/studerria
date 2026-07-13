@@ -33,12 +33,12 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
   await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);
 
-  await expect(page.locator(".launch-sector-marker").first()).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator(".launch-point-marker").first()).toBeVisible({ timeout: 40_000 });
   await expect(page.locator(".launch-sector-debug-radius, .launch-point-debug")).toHaveCount(0);
   await expect(page.getByLabel("Campaign tactical replay")).toHaveCount(0);
 
   await page.reload();
-  await expect(page.locator(".launch-sector-marker").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".launch-point-marker").first()).toBeVisible({ timeout: 15_000 });
 
   const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".command-drawer").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);

@@ -21,7 +21,9 @@ test("PostgreSQL adapter persists campaign runs, events, snapshots and progress"
   assert.equal((await store.getRunSnapshots(run.id)).length, run.snapshots.length);
   const progress = await store.campaignState("tg-42");
   assert.equal(progress.lastRunId, run.id);
-  assert.equal(progress.currentMissionId, "campaign-night-02");
+  assert.equal(progress.currentMissionId, "campaign-night-01");
+  assert.equal(progress.missions.length, 1);
+  assert.equal(progress.missions[0].status, "active");
   assert.equal(Number((await pool.query("SELECT count(*) AS count FROM shieldline_cities")).rows[0].count), 1);
   assert.equal(Number((await pool.query("SELECT count(*) AS count FROM shieldline_assets")).rows[0].count), 2);
   await pool.end();

@@ -67,15 +67,14 @@ test("campaign tactical projection follows the authoritative event timeline", ()
   assert.ok(inFlight.liveThreats.some((threat) => threat.revealed));
   const projectedThreat = inFlight.liveThreats.find((threat) => threat.id === `${launched.waveId}-track`)!;
   assert.ok(projectedThreat.progress > 0.2 && projectedThreat.progress < 0.4);
-  assert.ok(Number(launched.payload.flightDurationMs) >= 120_000);
-  assert.equal(launched.occurredAtMs, campaignMissions[0].waves[0].etaSeconds * 1_000);
-  const projectedSector = inFlight.launchSectors.find((sector) => sector.id === launched.sectorId)!;
+  assert.ok(Number(launched.payload.flightDurationMs) >= 20_000);
+  const projectedSector = inFlight.launchSectors.find((sector) => sector.id === `campaign-launch-${launched.waveId}`)!;
   assert.ok(projectedSector);
-  assert.notDeepEqual(
+  assert.deepEqual(
     { lat: projectedSector.lat, lng: projectedSector.lng },
     { lat: Number(launched.payload.originLat), lng: Number(launched.payload.originLng) },
   );
-  assert.ok(!projectedSector.id.startsWith("authoritative-"));
+  assert.equal(projectedSector.radiusKm, 1);
   const complete = projectCampaignRun(run, run.events.at(-1)!.occurredAtMs)!;
   assert.ok(complete.launchSectors.length > 0);
   assert.ok(complete.launchSectors.every((sector) => sector.state === "cooldown"));

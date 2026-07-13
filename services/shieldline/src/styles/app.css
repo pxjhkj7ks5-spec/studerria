@@ -856,6 +856,17 @@ button {
   opacity: 0.58;
 }
 
+.launch-point-marker::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 2px solid rgba(255, 248, 220, 0.96);
+  border-radius: 50%;
+  background: #ff634f;
+  box-shadow: 0 0 0 5px rgba(255, 99, 79, 0.18), 0 0 18px rgba(255, 99, 79, 0.72);
+}
+
 .map-marker--launch-sector {
   position: relative;
   z-index: 1;

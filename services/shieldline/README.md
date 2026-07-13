@@ -6,13 +6,13 @@ It is intentionally isolated as a sidecar service:
 
 - Vite + React + TypeScript
 - Telegram-aware React/PWA command shell with an optional tactical map view (`?legacy=1`)
-- deterministic Campaign missions projected from one browser/server simulation core
+- one repeatable Campaign mission with seeded random launch points, air threats and defended directions
 - PostgreSQL-backed runs, events, snapshots, commands and Campaign progress with Redis read-through caching
 - a cache-first PWA shell; a server-issued guest cookie supports standalone development while verified Telegram identity is used in production
 
 ## Campaign runtime
 
-Campaign is the active production mode. Other modes remain in the codebase as paused foundations but are hidden from the primary catalog while Campaign reaches production quality.
+Campaign is the active production mode. It currently runs as one repeatable randomized mission. Other modes remain in the codebase as paused foundations but are hidden from the primary catalog while Campaign reaches production quality.
 
 Campaign state follows `planning -> countdown -> running -> completed`. The tactical map, reconnect and AAR all project the same `simVersion` event stream. Offline Campaign startup uses the same core and queues the authoritative operation for synchronization.
 

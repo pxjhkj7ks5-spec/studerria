@@ -1,6 +1,6 @@
 import { createLaunchSectorState, launchSectorCategory, pickWeightedSector, randomPointInSector } from "./launchSystem.mjs";
 
-export const SIM_VERSION = "2.3.0";
+export const SIM_VERSION = "2.4.0";
 // Geography changes must not silently rebalance established mission outcomes.
 const OUTCOME_RANDOM_VERSION = "2.1.0";
 
@@ -11,6 +11,52 @@ const targetSectorCoordinates = {
   west: { lat: 49.2, lng: 23.8 },
   hq: { lat: 50.45, lng: 30.52 },
 };
+
+const randomThreatKinds = ["geran2", "gerbera", "parodiya", "kalibr", "iskander"];
+const randomTargetSectors = ["north", "south", "east", "west", "hq"];
+
+function pick(values, random) {
+  return values[Math.min(values.length - 1, Math.floor(random() * values.length))];
+}
+
+function randomWaveSize(kind, random) {
+  if (kind === "iskander") return 1 + Math.floor(random() * 3);
+  if (kind === "kh101" || kind === "kalibr") return 2 + Math.floor(random() * 5);
+  return 4 + Math.floor(random() * 8);
+}
+
+function createOperationWaves(mission, random) {
+  const count = Math.max(1, Math.min(12, Number(mission.randomWaveCount || 0)));
+  if (!mission.randomWaveCount) return mission.waves;
+  let etaSeconds = 16 + Math.round(random() * 8);
+  return Array.from({ length: count }, (_, index) => {
+    const threatKind = pick(randomThreatKinds, random);
+    const targetSector = pick(randomTargetSectors, random);
+    const wave = {
+      id: `wave-${String(index + 1).padStart(2, "0")}`,
+      index: index + 1,
+      threatKind,
+      targetSector,
+      etaSeconds,
+      size: randomWaveSize(threatKind, random),
+      difficulty: 38 + Math.round(random() * 42),
+    };
+    etaSeconds += 22 + Math.round(random() * 16);
+    return wave;
+  });
+}
+
+function targetPointForSector(sectorId, random) {
+  const center = targetSectorCoordinates[sectorId] || targetSectorCoordinates.hq;
+  return randomPointInSector({ ...center, radiusKm: sectorId === "hq" ? 55 : 90 }, random);
+}
+
+function originSectorForPoint(point) {
+  if (point.lat < 46.2) return "south";
+  if (point.lat > 52.5) return "north";
+  if (point.lng < 28) return "west";
+  return "east";
+}
 
 // Restored from the original live simulation. Campaign targets now travel at
 // the same real-time pace instead of resolving within a couple of seconds.
@@ -128,7 +174,10 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
   const random = seededRandom(`${OUTCOME_RANDOM_VERSION}:${mission.id}:${normalizedSeed}`);
   const launchRandom = seededRandom(`${SIM_VERSION}:${mission.id}:${normalizedSeed}:launch-sectors`);
   const timingRandom = seededRandom(`${SIM_VERSION}:${mission.id}:${normalizedSeed}:flight-timing`);
+  const scenarioRandom = seededRandom(`${SIM_VERSION}:${mission.id}:${normalizedSeed}:random-waves`);
+  const targetRandom = seededRandom(`${SIM_VERSION}:${mission.id}:${normalizedSeed}:random-targets`);
   const missionLaunchSectors = createLaunchSectorState(mission.launchSectorIds);
+  const operationWaves = createOperationWaves(mission, scenarioRandom);
   const safeSeed = normalizedSeed.slice(0, 18).replace(/[^a-z0-9-]/gi, "-") || "seed";
   const runId = `run-${mission.id}-${safeSeed}-${stableHash(`${SIM_VERSION}:${normalizedSeed}`)}`;
   const events = [];
@@ -143,7 +192,7 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
     payload: { missionId: mission.id, seed: normalizedSeed, simVersion: SIM_VERSION },
   }));
 
-  for (const wave of mission.waves) {
+  for (const wave of operationWaves) {
     const launchedAt = Math.max(1_000, Number(wave.etaSeconds || 0) * 1_000);
     const flightDurationMs = flightDurationFor(wave.threatKind, timingRandom);
     const detectedAt = launchedAt + Math.round(flightDurationMs * (0.2 + timingRandom() * 0.08));
@@ -153,8 +202,9 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
     const impactAt = launchedAt + flightDurationMs;
     const launchSector = pickWeightedSector(missionLaunchSectors, wave.threatKind, launchRandom);
     const origin = randomPointInSector(launchSector, launchRandom);
-    const target = targetSectorCoordinates[wave.targetSector] || targetSectorCoordinates.hq;
-    const route = { from: wave.originSector, to: wave.targetSector };
+    const target = mission.randomWaveCount ? targetPointForSector(wave.targetSector, targetRandom) : targetSectorCoordinates[wave.targetSector] || targetSectorCoordinates.hq;
+    const originSector = originSectorForPoint(origin);
+    const route = { from: originSector, to: wave.targetSector };
     const commonPayload = {
       tracks: wave.size,
       threatKind: wave.threatKind,
@@ -207,7 +257,7 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
         targetId: wave.id,
         payload: { ...commonPayload, count: successful, ammoSpent: waveAmmo },
       });
-      const fromPoint = sectorPoints[wave.originSector] || sectorPoints.east;
+      const fromPoint = sectorPoints[originSector] || sectorPoints.east;
       const toPoint = sectorPoints[wave.targetSector] || sectorPoints.hq;
       const interceptPoint = {
         x: (fromPoint.x + toPoint.x) / 2 + (random() - 0.5) * 14,

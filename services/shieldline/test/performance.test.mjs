@@ -6,7 +6,7 @@ import { projectCampaignRun } from "../src/game/campaignProjection.ts";
 import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 
 test("campaign live projection stays below the two-second acceptance budget", () => {
-  const run = runDeterministicMission(campaignMissions[2], "performance-golden", {
+  const run = runDeterministicMission(campaignMissions[0], "performance-golden", {
     assetCount: 8,
     radarCount: 2,
     kineticCount: 6,

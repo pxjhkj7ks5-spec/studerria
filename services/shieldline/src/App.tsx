@@ -190,7 +190,7 @@ export default function App() {
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
   })();
   const activeMission = campaignMissions.find((mission) => mission.id === campaignProgress?.currentMissionId) || campaignMissions[0];
-  const activeMissionTitle = t(activeMission.id === "campaign-night-02" ? "mission.2" : activeMission.id === "campaign-night-03" ? "mission.3" : "mission.1");
+  const activeMissionTitle = t("mission.1");
   const isAuthoritativeCampaign = tacticalMode === "campaign";
   const effectiveOperationPhase = isAuthoritativeCampaign ? campaignRuntimePhase : operationPhase;
   const campaignEndMs = authoritativeRun?.events.at(-1)?.occurredAtMs || 0;

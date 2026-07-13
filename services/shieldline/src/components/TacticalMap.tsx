@@ -291,12 +291,13 @@ function makeImpactIcon(marker: ImpactMarker) {
 function makeLaunchSectorIcon(sector: LaunchSector) {
   const category = launchSectorCategory(sector);
   const state = sector.state || "idle";
-  const key = `${category}:${state}`;
+  const exactPoint = sector.id.startsWith("campaign-launch-");
+  const key = `${category}:${state}:${exactPoint ? "point" : "sector"}`;
   const cached = launchSectorIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="launch-sector-marker launch-sector-marker--${state}">${imageMarkerHtml(launchSprites[category], "map-marker--launch-sector")}</span>`,
+    html: `<span class="launch-sector-marker ${exactPoint ? "launch-point-marker" : ""} launch-sector-marker--${state}">${imageMarkerHtml(launchSprites[category], "map-marker--launch-sector")}</span>`,
     iconSize: [46, 46],
     iconAnchor: [23, 23],
   });

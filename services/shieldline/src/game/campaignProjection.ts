@@ -77,6 +77,12 @@ export function projectCampaignRun(run: MissionRun | null, elapsedMs: number): C
       const activeThreats = threatProfilesForKind(kind).filter((profile) => launchSector.threats.includes(profile));
       const projectedSector: LaunchSector = {
         ...launchSector,
+        id: `campaign-launch-${wave.waveId}`,
+        name: "Точка пуску",
+        lat: origin.lat,
+        lng: origin.lng,
+        radiusKm: 1,
+        role: `${launchSector.name} · ${kind}`,
         threats: activeThreats.length ? activeThreats : [...launchSector.threats],
         state,
         targetCoordinates: target,
