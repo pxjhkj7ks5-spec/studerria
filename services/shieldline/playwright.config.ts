@@ -20,6 +20,16 @@ export default defineConfig({
       testMatch: /mobile-live\.spec\.ts/,
       use: { ...devices["iPhone 13 landscape"], browserName: "chromium", viewport: { width: 844, height: 390 } },
     },
+    {
+      name: "desktop-chromium-zoom",
+      testMatch: /desktop-zoom\.spec\.ts/,
+      use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
+    },
+    {
+      name: "desktop-webkit-zoom",
+      testMatch: /desktop-zoom\.spec\.ts/,
+      use: { browserName: "webkit", viewport: { width: 1440, height: 900 } },
+    },
   ],
   webServer: {
     command: "npm run dev -- --port 4174",

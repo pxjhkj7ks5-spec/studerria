@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
+import { mapZoomInputProfile } from "../src/game/mapZoom";
 import { advanceSimulation, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { campaignCycleCompleted, useGameStore } from "../src/store/useGameStore";
@@ -47,6 +48,11 @@ test("coverage circles and occupied polygons use Leaflet's shared SVG renderer",
   assert.doesNotMatch(coverageLayer, /renderer=/);
   assert.doesNotMatch(source, /preferCanvas/);
   assert.doesNotMatch(source, /L\.svg\(\{ padding: 0\.6 \}\)/);
+});
+
+test("desktop wheel zoom is responsive while touch zoom keeps its existing profile", () => {
+  assert.deepEqual(mapZoomInputProfile(true), { zoomDelta: 0.35, wheelPxPerZoomLevel: 70, wheelDebounceTime: 18 });
+  assert.deepEqual(mapZoomInputProfile(false), { zoomDelta: 0.5, wheelPxPerZoomLevel: 160, wheelDebounceTime: 35 });
 });
 
 test("the first six modes are live while Daily Defense is scheduled", () => {

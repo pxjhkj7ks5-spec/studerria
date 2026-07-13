@@ -8,6 +8,7 @@ import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageUnavailable } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
+import { mapZoomInputProfile } from "../game/mapZoom";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -809,6 +810,10 @@ export function TacticalMap() {
   ]);
   const performanceStats = usePerformanceStats(renderCounts);
   const reducedQuality = performanceStats.quality === "reduced";
+  const zoomInput = useMemo(
+    () => mapZoomInputProfile(typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches),
+    [],
+  );
 
   return (
     <>
@@ -825,9 +830,9 @@ export function TacticalMap() {
         inertiaDeceleration={2400}
         easeLinearity={0.18}
         zoomSnap={0}
-        zoomDelta={0.5}
-        wheelPxPerZoomLevel={160}
-        wheelDebounceTime={35}
+        zoomDelta={zoomInput.zoomDelta}
+        wheelPxPerZoomLevel={zoomInput.wheelPxPerZoomLevel}
+        wheelDebounceTime={zoomInput.wheelDebounceTime}
         zoomAnimationThreshold={4}
         fadeAnimation={false}
         className="leaflet-stage"
