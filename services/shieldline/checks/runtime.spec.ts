@@ -4,7 +4,7 @@ import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
-import { advanceSimulation, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
+import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
 import { campaignCycleCompleted, normalizePersistedGame, useGameStore } from "../src/store/useGameStore";
@@ -104,6 +104,7 @@ test("persisted operations reconcile stale launch data with the current catalog"
     { ...currentSectors[0], id: "legacy-sector", name: "Legacy sector" },
   ];
   game.liveThreats = [{ ...testThreat(), progress: 1 }];
+  delete (game as Partial<GameState>).storedBatteries;
 
   const normalized = normalizePersistedGame(game);
   assert.ok(normalized);
@@ -111,6 +112,29 @@ test("persisted operations reconcile stale launch data with the current catalog"
   assert.deepEqual(normalized.launchSectors[0].threats, currentSectors[0].threats);
   assert.equal(normalized.launchSectors.some((sector) => sector.id === "legacy-sector"), false);
   assert.equal(normalized.liveThreats.length, 0);
+  assert.deepEqual(normalized.storedBatteries, []);
+});
+
+test("a battery keeps its condition and costs nothing when redeployed from storage", () => {
+  let game = createScenarioState(() => 0.5, "training", "first-night");
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => 0.5);
+  const purchased = game.batteries[0];
+  purchased.currentAmmo = 2;
+  purchased.readiness = 73;
+  const budgetAfterPurchase = game.resources.budget;
+
+  game = moveBatteryToStorage(game, purchased.id);
+  assert.equal(game.batteries.length, 0);
+  assert.equal(game.storedBatteries.length, 1);
+  assert.equal(game.resources.budget, budgetAfterPurchase);
+
+  game = deployStoredBattery(game, purchased.id, { lat: 48.7, lng: 29.7 });
+  assert.equal(game.storedBatteries.length, 0);
+  assert.equal(game.batteries.length, 1);
+  assert.equal(game.batteries[0].id, purchased.id);
+  assert.equal(game.batteries[0].currentAmmo, 2);
+  assert.equal(game.batteries[0].readiness, 73);
+  assert.equal(game.resources.budget, budgetAfterPurchase);
 });
 
 test("a started live operation advances launch sectors and creates threats", () => {

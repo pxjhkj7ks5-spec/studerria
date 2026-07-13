@@ -5,7 +5,7 @@ test("desktop mouse and trackpad wheel zoom respond around the pointer", async (
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
       state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
-      version: 14,
+      version: 15,
     }));
   });
   await page.goto("/shieldline/?legacy=1&mode=training");

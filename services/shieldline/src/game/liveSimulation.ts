@@ -109,6 +109,7 @@ function cloneState(state: GameState): GameState {
     })),
     units: state.units.map((unit) => ({ ...unit })),
     batteries: state.batteries.map((battery) => ({ ...battery, position: { ...battery.position } })),
+    storedBatteries: (state.storedBatteries || []).map((battery) => ({ ...battery, position: { ...battery.position } })),
     carriers: state.carriers.map((carrier) => ({ ...carrier, position: { ...carrier.position } })),
     pendingLaunches: state.pendingLaunches.map((launch) => ({ ...launch, origin: { ...launch.origin } })),
     liveThreats: state.liveThreats.map((threat) => ({
@@ -253,6 +254,45 @@ export function removeBattery(state: GameState, batteryId: string): GameState {
   next.resources.budget = clamp(next.resources.budget + Math.round(unit.cost * 0.45), 0, 999);
   next.logistics = buildLogisticsState(next);
   pushLog(next.log, next.elapsedMs, `${unit.shortName} Recalled`, "A defense unit was recalled and partial budget was recovered.", "info");
+  return next;
+}
+
+export function moveBatteryToStorage(state: GameState, batteryId: string): GameState {
+  const next = cloneState(state);
+  const battery = next.batteries.find((item) => item.id === batteryId);
+  if (!battery) return next;
+  const unit = getUnitDefinition(battery.kind);
+  next.batteries = next.batteries.filter((item) => item.id !== batteryId);
+  next.storedBatteries.push({ ...battery, position: { ...battery.position }, lastAction: "stored" });
+  next.placementWarning = null;
+  next.logistics = buildLogisticsState(next);
+  pushLog(next.log, next.elapsedMs, `${unit.shortName} переміщено на склад`, "Одиницю знято з позиції без повернення коштів.", "info");
+  return next;
+}
+
+export function deployStoredBattery(state: GameState, batteryId: string, position: Coordinates): GameState {
+  const next = cloneState(state);
+  const battery = next.storedBatteries.find((item) => item.id === batteryId);
+  if (!battery || next.status !== "active") return next;
+  const scenario = getScenario(next.scenarioId);
+  const unit = getUnitDefinition(battery.kind);
+  if (!scenario.allowedUnits.includes(battery.kind)) return next;
+  const placement = validateBatteryPlacement(battery.kind, position, next.cities);
+  if (!placement.allowed) {
+    next.placementWarning = placement.reason || "Розміщення заборонене умовами сценарію.";
+    pushLog(next.log, next.elapsedMs, "Розміщення неможливе", next.placementWarning, "warning");
+    return next;
+  }
+  next.storedBatteries = next.storedBatteries.filter((item) => item.id !== batteryId);
+  next.batteries.push({
+    ...battery,
+    position: { ...position },
+    assignedCityId: nearestCityId(next, position),
+    lastAction: "redeployed from storage",
+  });
+  next.placementWarning = null;
+  next.logistics = buildLogisticsState(next);
+  pushLog(next.log, next.elapsedMs, `${unit.shortName} повернуто зі складу`, `${unit.name} безкоштовно розміщено на новій позиції.`, "success");
   return next;
 }
 

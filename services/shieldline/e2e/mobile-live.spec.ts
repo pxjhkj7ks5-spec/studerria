@@ -18,7 +18,7 @@ async function openTrainingLive(page: import("@playwright/test").Page) {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
       state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
-      version: 14,
+      version: 15,
     }));
   });
   await page.goto("/shieldline/?legacy=1&mode=training");
@@ -137,8 +137,24 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   const backwardsJump = Math.max(0, ...widths.slice(1).map((width, index) => widths[index] - width));
   expect(backwardsJump).toBeLessThan(1.5);
 
-  await page.locator(".map-marker--battery").first().click({ force: true });
+  const firstBattery = page.locator(".map-marker--battery").first();
+  const storedPosition = await firstBattery.boundingBox();
+  const budgetBeforeStorage = await page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.game?.resources?.budget);
+  await firstBattery.click({ force: true });
+  await expect(page.getByRole("button", { name: "Перемістити на склад" })).toBeVisible();
   await expect(page.locator(".map-marker--selected, .selected-unit-card")).toHaveCount(0);
+  await page.getByRole("button", { name: "Перемістити на склад" }).click();
+  await expect(page.locator(".map-marker--battery")).toHaveCount(1);
+
+  await navigation.getByRole("button", { name: "ППО" }).click();
+  const storedRadar = page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /Radar 35D6/ });
+  await expect(storedRadar.getByText("На складі: 1 · розміщення безкоштовне")).toBeVisible();
+  await storedRadar.click();
+  if (!storedPosition) throw new Error("Stored battery position is unavailable.");
+  await page.mouse.click(storedPosition.x + storedPosition.width / 2, storedPosition.y + storedPosition.height / 2);
+  await expect(page.locator(".map-marker--battery")).toHaveCount(2);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.game?.storedBatteries?.length)).toBe(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.game?.resources?.budget)).toBeGreaterThanOrEqual(budgetBeforeStorage);
 
   const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".map-status-strip").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);

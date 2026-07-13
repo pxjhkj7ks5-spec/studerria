@@ -7,7 +7,7 @@ test("a running operation recovers after backgrounding and a stale offline proje
     if (!localStorage.getItem("shieldline-live-v7")) {
       localStorage.setItem("shieldline-live-v7", JSON.stringify({
         state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
-        version: 14,
+        version: 15,
       }));
     }
   });

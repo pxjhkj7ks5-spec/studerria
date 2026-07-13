@@ -471,6 +471,7 @@ export interface GameState {
   pendingLaunches: PendingLaunch[];
   units: DeployedUnit[];
   batteries: DefenseBattery[];
+  storedBatteries: DefenseBattery[];
   liveThreats: LiveThreat[];
   interceptorShots: InterceptorShot[];
   impactMarkers: ImpactMarker[];

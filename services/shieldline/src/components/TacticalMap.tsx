@@ -1,5 +1,5 @@
 import L from "leaflet";
-import { Circle, CircleMarker, Marker, Polygon, Polyline, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
+import { Circle, CircleMarker, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { carrierSprites, launchSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
@@ -685,6 +685,7 @@ export function TacticalMap() {
   const game = useGameStore((state) => state.game);
   const mapMode = useGameStore((state) => state.mapMode);
   const placementKind = useGameStore((state) => state.placementKind);
+  const moveBatteryToStorage = useGameStore((state) => state.moveBatteryToStorage);
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
@@ -962,6 +963,17 @@ export function TacticalMap() {
             position={[battery.position.lat, battery.position.lng]}
             icon={makeBatteryIcon(battery)}
           >
+            <Popup className="battery-action-popup" closeButton>
+              {(() => {
+                const unit = getUnitDefinition(battery.kind);
+                return <div className="battery-action-popup__content">
+                  <span>Встановлена одиниця</span>
+                  <strong>{unit.name}</strong>
+                  <small>{Math.round(battery.readiness)}% готовності · БК {battery.currentAmmo === "infinite" ? "∞" : battery.currentAmmo}</small>
+                  <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Перемістити на склад</button>
+                </div>;
+              })()}
+            </Popup>
             <Tooltip direction="top" offset={[0, -14]}>
               {(() => {
                 const unit = getUnitDefinition(battery.kind);

@@ -41,6 +41,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
   const active = game.status === "active";
   const scenario = getScenario(game.scenarioId);
+  const storedBatteries = game.storedBatteries || [];
 
   return (
     <>
@@ -55,14 +56,17 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
       <div className="unit-list">
         {unitDefinitions.map((unit) => {
           const allowed = scenario.allowedUnits.includes(unit.kind);
-          const affordable = game.resources.budget >= unit.cost;
+          const storedUnits = storedBatteries.filter((item) => item.kind === unit.kind);
+          const storedBattery = storedUnits[0];
+          const affordable = storedUnits.length > 0 || game.resources.budget >= unit.cost;
           const selected = placementKind === unit.kind;
           const disabled = !active || !affordable || !allowed;
           const localBattery = game.batteries.find((item) => item.kind === unit.kind);
-          const readiness = localBattery ? localBattery.readiness : unit.readiness;
-          const fatigue = localBattery ? localBattery.fatigue : 0;
-          const reloadText = localBattery?.reloadRemainingMs ? seconds(localBattery.reloadRemainingMs) : seconds(unit.reloadMs);
-          const ammoText = ammoLabel(unit, localBattery?.currentAmmo);
+          const referenceBattery = localBattery || storedBattery;
+          const readiness = referenceBattery ? referenceBattery.readiness : unit.readiness;
+          const fatigue = referenceBattery ? referenceBattery.fatigue : 0;
+          const reloadText = referenceBattery?.reloadRemainingMs ? seconds(referenceBattery.reloadRemainingMs) : seconds(unit.reloadMs);
+          const ammoText = ammoLabel(unit, referenceBattery?.currentAmmo);
 
           return (
             <article
@@ -86,8 +90,9 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <span className="ammo-badge">{ammoText}</span>
               </div>
               <strong>{unit.name}</strong>
+              {storedUnits.length ? <span className="unit-card__storage">На складі: {storedUnits.length} · розміщення безкоштовне</span> : null}
               <p>{unit.description}</p>
-              <small>{unit.costLabel} · {unit.primaryRangeKm}/{unit.outerRangeKm} км · {localBattery?.status || "готова"}</small>
+              <small>{storedUnits.length ? "Зі складу · 0 ₴" : unit.costLabel} · {unit.primaryRangeKm}/{unit.outerRangeKm} км · {referenceBattery?.status || "готова"}</small>
               <div className="unit-chance-row" aria-label={`${unit.name} hit chances`}>
                 {chanceKinds.map(({ kind, label }) => (
                   <span key={kind} className={unit.engagementChanceByThreat[kind] <= 0 ? "unit-chance--muted" : ""}>
@@ -102,7 +107,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <span>БК {ammoText} · перезаряджання {reloadText} · пауза {seconds(unit.shotCooldownMs)}</span>
                 <span>Точність: {unit.primaryAccuracy}% · зовнішня зона {unit.outerAccuracy}%</span>
                 <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
-                <span>Втома {Math.round(fatigue)}% · {fatigueLabel(fatigue)} · {localBattery?.supplyStatus || "не розміщена"}</span>
+                <span>Втома {Math.round(fatigue)}% · {fatigueLabel(fatigue)} · {storedBattery ? "на складі" : localBattery?.supplyStatus || "не розміщена"}</span>
               </div>
               <div className="readiness-track" aria-label={`${unit.name} readiness`}>
                 <i style={{ width: `${Math.round(readiness)}%` }} />
@@ -111,8 +116,8 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <i style={{ width: `${Math.round(fatigue)}%` }} />
               </div>
               <div className="unit-card__meta">
-                <span>{unit.cost} млн</span>
-                <span>{allowed ? selected ? "обрано" : affordable ? "обрати" : "бракує бюджету" : "недоступно"}</span>
+                <span>{storedUnits.length ? "зі складу" : `${unit.cost} млн`}</span>
+                <span>{allowed ? selected ? "обрано" : storedUnits.length ? "розмістити" : affordable ? "обрати" : "бракує бюджету" : "недоступно"}</span>
               </div>
             </article>
           );
