@@ -1,4 +1,4 @@
-const CACHE = "shieldline-runtime-v4";
+const CACHE = "shieldline-runtime-v5";
 const SHELL = ["./", "./index.html", "./offline.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));
@@ -14,13 +14,20 @@ self.addEventListener("fetch", (event) => {
       const copy = response.clone();
       void caches.open(CACHE).then((cache) => cache.put("./index.html", copy));
       return response;
-    }).catch(async () => (await caches.match("./index.html")) || caches.match("./offline.html")));
+    }).catch(async () => {
+      const cache = await caches.open(CACHE);
+      return (await cache.match("./index.html")) || cache.match("./offline.html");
+    }));
     return;
   }
-  event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-    if (response.ok && (/\/assets\//.test(event.request.url) || /\.(?:js|css|png|webp|svg|woff2?)$/i.test(new URL(event.request.url).pathname))) {
-      void caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
-    }
-    return response;
-  }).catch(() => caches.match("./"))));
+  event.respondWith(caches.open(CACHE).then(async (cache) => {
+    const cached = await cache.match(event.request);
+    if (cached) return cached;
+    return fetch(event.request).then((response) => {
+      if (response.ok && (/\/assets\//.test(event.request.url) || /\.(?:js|css|png|webp|svg|woff2?)$/i.test(new URL(event.request.url).pathname))) {
+        void cache.put(event.request, response.clone());
+      }
+      return response;
+    }).catch(() => cache.match("./"));
+  }));
 });

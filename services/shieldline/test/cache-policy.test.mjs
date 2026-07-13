@@ -9,13 +9,18 @@ test("the app checks for service worker updates without the HTTP cache", async (
 
   assert.match(source, /updateViaCache:\s*"none"/);
   assert.match(source, /registration\.update\(\)/);
+  assert.match(source, /Boolean\(navigator\.serviceWorker\.controller\)/);
+  assert.match(source, /addEventListener\("controllerchange"/);
+  assert.match(source, /window\.location\.reload\(\)/);
 });
 
 test("service worker navigations bypass Safari's HTTP cache", async () => {
   const source = await readSource("../public/sw.js");
 
   assert.match(source, /new Request\(event\.request, \{ cache: "no-store" \}\)/);
-  assert.match(source, /shieldline-runtime-v4/);
+  assert.match(source, /shieldline-runtime-v5/);
+  assert.match(source, /caches\.open\(CACHE\)/);
+  assert.doesNotMatch(source, /caches\.match\(/);
 });
 
 test("mutable shell files are served with revalidation headers", async () => {
