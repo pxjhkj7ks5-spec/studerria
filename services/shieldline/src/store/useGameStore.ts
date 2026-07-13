@@ -30,7 +30,11 @@ function createSeededScenario(seed: string, mode: CampaignMode, scenarioId: stri
 }
 
 function migrateLegacyLaunchPoints(game: GameState | null) {
-  if (!game || (Array.isArray(game.launchSectors) && game.launchSectors.every((sector) => Number.isFinite(sector.radiusKm) && sector.radiusKm > 0))) return game;
+  if (!game) return game;
+  const withoutSyntheticOpeningTrack = game.liveThreats?.filter((threat) => threat.id !== "opening-track-1") || [];
+  if (Array.isArray(game.launchSectors) && game.launchSectors.every((sector) => Number.isFinite(sector.radiusKm) && sector.radiusKm > 0)) {
+    return { ...game, liveThreats: withoutSyntheticOpeningTrack };
+  }
   return {
     ...game,
     launchSectors: createLaunchSectorState(),
@@ -230,13 +234,14 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 11,
+      version: 12,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         return {
           ...state,
           game: migrateLegacyLaunchPoints(state.game || null) || undefined,
           dailyCityGame: migrateLegacyLaunchPoints(state.dailyCityGame || null),
+          simulationSpeed: state.activeGameMode === "campaign" ? 1 : state.simulationSpeed,
         } as GameStore;
       },
       partialize: (state) => ({

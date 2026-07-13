@@ -41,7 +41,7 @@ export const gameModes: GameModeDefinition[] = [
 ];
 
 export const gameModeRuntimePolicies: Record<GameModeId, GameModeRuntimePolicy> = {
-  campaign: { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8, 60], requiresRadar: true, requiresKinetic: true },
+  campaign: { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 1, availableSpeeds: [1], requiresRadar: true, requiresKinetic: true },
   "rapid-response": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 60, availableSpeeds: [1, 8, 60], requiresRadar: true, requiresKinetic: true },
   "ranked-challenge": { execution: "live", start: "manual", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8], requiresRadar: true, requiresKinetic: true },
   "co-op-command": { execution: "live", start: "hq-ready", countdownMs: 5_000, defaultSpeed: 8, availableSpeeds: [1, 8], requiresRadar: true, requiresKinetic: true },

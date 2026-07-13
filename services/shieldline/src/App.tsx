@@ -199,7 +199,7 @@ export default function App() {
     [authoritativeRun, campaignPlaybackMs, isAuthoritativeCampaign],
   );
   const displayGame = useMemo(
-    () => campaignProjection ? { ...game, interceptions: campaignProjection.interceptions, impacts: campaignProjection.impacts } : game,
+    () => campaignProjection ? { ...game, elapsedMs: campaignProjection.elapsedMs, interceptions: campaignProjection.interceptions, impacts: campaignProjection.impacts } : game,
     [campaignProjection, game],
   );
   const displayRevealedThreats = campaignProjection ? campaignProjection.liveThreats.filter((threat) => threat.revealed).length : revealedThreats;
@@ -351,7 +351,7 @@ export default function App() {
           return;
         }
         const end = run.events.at(-1)?.occurredAtMs || 0;
-        const elapsedSinceSave = saved.phase === "running" ? Math.max(0, Date.now() - saved.updatedAt) * Math.max(1, saved.speed) : 0;
+        const elapsedSinceSave = saved.phase === "running" ? Math.max(0, Date.now() - saved.updatedAt) : 0;
         const playback = Math.min(end, Math.max(0, saved.playbackMs + elapsedSinceSave));
         setAuthoritativeRun(run);
         setCampaignPlaybackMs(playback);

@@ -150,10 +150,12 @@ function cloneState(state: GameState): GameState {
 }
 
 export function formatClock(elapsedMs: number) {
-  const simulatedMinutes = Math.floor((elapsedMs / 1000) * 10);
-  const hours = Math.floor(simulatedMinutes / 60);
-  const minutes = simulatedMinutes % 60;
-  return `T+${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  const nightDurationMinutes = 10 * 60;
+  const simulatedMinutes = Math.min(nightDurationMinutes, Math.floor((elapsedMs / 1000 / 60) * 8));
+  const clockMinutes = (20 * 60 + simulatedMinutes) % (24 * 60);
+  const hours = Math.floor(clockMinutes / 60);
+  const minutes = clockMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function pushLog(

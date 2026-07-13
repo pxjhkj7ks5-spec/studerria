@@ -3,8 +3,8 @@ import { getCampaignModeDefinition } from "../data/campaignModes";
 import { getScenario } from "../data/scenarios";
 import { unitDefinitions } from "../data/units";
 import { buildLogisticsState } from "./logistics";
-import { createLaunchSectorState, generateLaunchOrigin } from "./launchSystem.mjs";
-import type { CampaignMode, City, DailyForecast, DeployedUnit, GameState, IntelEntry, LiveThreat } from "../types/game";
+import { createLaunchSectorState } from "./launchSystem.mjs";
+import type { CampaignMode, City, DailyForecast, DeployedUnit, GameState, IntelEntry } from "../types/game";
 
 const initialUnits: DeployedUnit[] = [
   { id: "seed-radar-kyiv", kind: "radar", cityId: "kyiv", readiness: 86 },
@@ -29,31 +29,6 @@ const openingLog: IntelEntry[] = [
     tone: "info",
   },
 ];
-
-function createOpeningThreat(random: () => number, launchSectors: GameState["launchSectors"]): LiveThreat {
-  const targetCity = initialCities.find((city) => city.id === "kyiv") || initialCities[0];
-  const launch = generateLaunchOrigin(launchSectors, "geran2", random);
-  return {
-    id: "opening-track-1",
-    kind: "geran2",
-    status: "inbound",
-    origin: launch.point,
-    target: targetCity.coordinates,
-    targetCityId: targetCity.id,
-    launchSectorId: launch.sector.id,
-    launchSectorName: launch.sector.name,
-    progress: 0.02,
-    speed: 0.0000055,
-    difficulty: 28,
-    damage: 3,
-    confidence: 32,
-    saturation: 1,
-    headingDeg: 240,
-    revealed: false,
-    trackQuality: 0,
-    reward: 2,
-  };
-}
 
 export function createForecast(day: number, random: () => number): DailyForecast {
   const roll = random();
@@ -120,7 +95,7 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
     pendingLaunches: [],
     units: initialUnits.map((unit) => ({ ...unit })),
     batteries: [],
-    liveThreats: [createOpeningThreat(random, launchSectors)],
+    liveThreats: [],
     interceptorShots: [],
     impactMarkers: [],
     interceptions: 0,
@@ -140,7 +115,7 @@ export function createScenarioState(random: () => number = Math.random, mode: Ca
   state.difficulty = scenario.difficulty;
   state.resources = { ...scenario.startingResources };
   state.cities = initialCities.map((city) => applyCityModifier(city, scenario.initialCityStateModifiers[city.id]));
-  state.liveThreats = [createOpeningThreat(random, state.launchSectors)];
+  state.liveThreats = [];
   state.logistics = buildLogisticsState(state);
   state.log.unshift({
     id: `scenario-${scenario.id}`,

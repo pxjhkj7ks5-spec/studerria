@@ -10,14 +10,14 @@ interface ResourceBarProps {
   mobile?: boolean;
 }
 
-export function ResourceBar({ game, simulationSpeed, operationPhase, mobile = false }: ResourceBarProps) {
+export function ResourceBar({ game, operationPhase, mobile = false }: ResourceBarProps) {
   const items = [
     { label: "Бюджет", value: Math.round(game.resources.budget), icon: Coins, delta: "постачання" },
     { label: "БК", value: Math.round(game.resources.ammo), icon: Landmark, delta: "запас" },
     { label: "Енергія", value: `${Math.round(game.resources.energy)}%`, icon: Zap, delta: "стабільність" },
     { label: "Мораль", value: `${Math.round(game.resources.morale)}%`, icon: Users, delta: "цивільні" },
     { label: "Політичний ресурс", value: Math.round(game.resources.political), icon: Landmark, delta: "капітал" },
-    { label: "Час", value: formatClock(game.elapsedMs), icon: CalendarDays, delta: operationPhase === "paused" ? "пауза" : `x${simulationSpeed}` },
+    { label: "Час", value: formatClock(game.elapsedMs), icon: CalendarDays, delta: operationPhase === "paused" ? "пауза" : "x8" },
   ];
 
   return (
