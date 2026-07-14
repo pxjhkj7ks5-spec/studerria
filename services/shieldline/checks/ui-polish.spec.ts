@@ -45,6 +45,14 @@ test("combat results use tactical effects and desktop unit details keep readable
   assert.match(styles, /\.combat-result-marker__ring/);
   assert.match(styles, /@keyframes combat-result-ring/);
   assert.match(styles, /\.command-drawer \.unit-card > strong/);
-  assert.match(styles, /min-height: 150px;[\s\S]*?max-height: 180px;/);
+  assert.match(styles, /--unit-details-height/);
+  assert.match(rail, /details\?\.scrollHeight/);
+  assert.doesNotMatch(styles, /min-height: 150px;[\s\S]*?max-height: 180px;/);
   assert.match(rail, /keepExpandedCardVisible/);
+  assert.match(rail, /showStatus = tacticalStatus\.label !== "READY"/);
+  assert.match(rail, /!isRadar \? <span><small>БК<\/small>/);
+  assert.match(rail, /Радіус виявлення/);
+  assert.match(map, /#63c7d4/);
+  assert.match(map, /placement-preview-ring--radar/);
+  assert.match(styles, /\.coverage-ring--radar[\s\S]*?99, 199, 212/);
 });

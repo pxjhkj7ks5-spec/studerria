@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RadioTower } from "lucide-react";
 import { unitSprites } from "../assets/sprites/spriteCatalog";
 import { getScenario } from "../data/scenarios";
@@ -35,7 +36,7 @@ function seconds(ms: number) {
 }
 
 function keepExpandedCardVisible(card: HTMLElement) {
-  window.requestAnimationFrame(() => {
+  const alignCard = () => {
     const list = card.parentElement;
     if (!list) return;
     const cardRect = card.getBoundingClientRect();
@@ -43,7 +44,10 @@ function keepExpandedCardVisible(card: HTMLElement) {
     const overflow = cardRect.bottom - listRect.bottom + 8;
     const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
     if (overflow > 0) list.scrollBy({ top: overflow, behavior });
-  });
+  };
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.requestAnimationFrame(alignCard);
+  window.setTimeout(alignCard, reducedMotion ? 0 : 240);
 }
 
 type TacticalUnitStatus = { label: "READY" | "ENGAGING" | "RELOADING" | "NO AMMO" | "DAMAGED" | "OFFLINE"; tone: "ready" | "engaging" | "warning" | "danger" | "offline" };
@@ -59,6 +63,7 @@ function tacticalUnitStatus(unit: UnitDefinition, battery?: ReturnType<typeof us
 }
 
 export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }) {
+  const [expandedKind, setExpandedKind] = useState<UnitDefinition["kind"] | null>(null);
   const game = useGameStore((state) => state.game);
   const placementKind = useGameStore((state) => state.placementKind);
   const beginPlacement = useGameStore((state) => state.beginPlacement);
@@ -66,6 +71,12 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
   const active = game.status === "active";
   const scenario = getScenario(game.scenarioId);
   const storedBatteries = game.storedBatteries || [];
+  const expandCard = (card: HTMLElement, kind: UnitDefinition["kind"]) => {
+    const details = card.querySelector<HTMLElement>(".unit-hover-card__content");
+    card.style.setProperty("--unit-details-height", `${(details?.scrollHeight || 0) + 24}px`);
+    setExpandedKind(kind);
+    keepExpandedCardVisible(card);
+  };
 
   return (
     <>
@@ -92,16 +103,22 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
           const reloadText = referenceBattery?.reloadRemainingMs ? seconds(referenceBattery.reloadRemainingMs) : seconds(unit.reloadMs);
           const ammoText = ammoLabel(unit, referenceBattery?.currentAmmo);
           const tacticalStatus = tacticalUnitStatus(unit, referenceBattery);
+          const isRadar = unit.engagementMode === "detect";
+          const showStatus = tacticalStatus.label !== "READY";
 
           return (
             <article
-              className={`unit-card unit-card--state-${tacticalStatus.tone} ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
+              className={`unit-card unit-card--state-${tacticalStatus.tone} ${isRadar ? "unit-card--radar" : ""} ${showStatus ? "unit-card--has-status" : ""} ${expandedKind === unit.kind ? "unit-card--expanded" : ""} ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
               key={unit.kind}
               tabIndex={0}
               role="button"
               aria-disabled={disabled}
-              onMouseEnter={(event) => keepExpandedCardVisible(event.currentTarget)}
-              onFocus={(event) => keepExpandedCardVisible(event.currentTarget)}
+              onMouseEnter={(event) => expandCard(event.currentTarget, unit.kind)}
+              onMouseLeave={() => setExpandedKind((current) => current === unit.kind ? null : current)}
+              onFocus={(event) => expandCard(event.currentTarget, unit.kind)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setExpandedKind((current) => current === unit.kind ? null : current);
+              }}
               onClick={() => {
                 if (!disabled) { beginPlacement(unit.kind); onPlacementStart?.(); }
               }}
@@ -114,15 +131,15 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
             >
               <div className="unit-card__top">
                 <img className="unit-sprite" src={unitSprites[unit.kind]} alt="" draggable="false" />
-                <span className={`unit-status unit-status--${tacticalStatus.tone}`}>{tacticalStatus.label}</span>
+                {showStatus ? <span className={`unit-status unit-status--${tacticalStatus.tone}`}>{tacticalStatus.label}</span> : null}
               </div>
               <strong>{unit.name}</strong>
               <span className="unit-card__code">{unit.technicalCode}</span>
               {storedUnits.length ? <span className="unit-card__storage">На складі: {storedUnits.length} · розміщення безкоштовне</span> : null}
               <p>{unit.description}</p>
-              <div className="unit-card__telemetry">
-                <span><small>БК</small><b>{ammoText}</b></span>
-                <span><small>Зона</small><b>{unit.primaryRangeKm}/{unit.outerRangeKm} км</b></span>
+              <div className={`unit-card__telemetry ${isRadar ? "unit-card__telemetry--radar" : ""}`}>
+                {!isRadar ? <span><small>БК</small><b>{ammoText}</b></span> : null}
+                <span><small>{isRadar ? "Радіус" : "Зона"}</small><b>{isRadar ? `${unit.outerRangeKm} км` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</b></span>
                 <span><small>Вартість</small><b>{storedUnits.length ? "0 ₴" : unit.costLabel}</b></span>
               </div>
               <div className="unit-chance-row" aria-label={`Імовірність ураження для ${unit.name}`}>
@@ -134,12 +151,24 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 ))}
               </div>
               <div className="unit-hover-card" role="tooltip">
-                <strong>Дані {unit.shortName}</strong>
-                <span>Основна зона {unit.primaryRangeKm} км · зовнішня {unit.outerRangeKm} км</span>
-                <span>БК {ammoText} · перезаряджання {reloadText} · пауза {seconds(unit.shotCooldownMs)}</span>
-                <span>Точність: {unit.primaryAccuracy}% · зовнішня зона {unit.outerAccuracy}%</span>
-                <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
-                <span>Втома {Math.round(fatigue)}% · {fatigueLabel(fatigue)} · {storedBattery ? "на складі" : localBattery?.supplyStatus || "не розміщена"}</span>
+                <div className="unit-hover-card__content">
+                  <strong>Дані {unit.shortName}</strong>
+                  {isRadar ? (
+                    <>
+                      <span>Радіус виявлення {unit.outerRangeKm} км</span>
+                      <span>Бонус виявлення {unit.detectionBonus}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Основна зона {unit.primaryRangeKm} км · зовнішня {unit.outerRangeKm} км</span>
+                      <span>БК {ammoText} · перезаряджання {reloadText} · пауза {seconds(unit.shotCooldownMs)}</span>
+                      <span>Точність: {unit.primaryAccuracy}% · зовнішня зона {unit.outerAccuracy}%</span>
+                    </>
+                  )}
+                  <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
+                  <span>Готовність {Math.round(readiness)}% · втома {Math.round(fatigue)}% ({fatigueLabel(fatigue)})</span>
+                  <span>{storedBattery ? "На складі" : localBattery?.supplyStatus || "Не розміщена"}</span>
+                </div>
               </div>
               <div className="readiness-track" aria-label={`Готовність ${unit.name}`}>
                 <i style={{ width: `${Math.round(readiness)}%` }} />

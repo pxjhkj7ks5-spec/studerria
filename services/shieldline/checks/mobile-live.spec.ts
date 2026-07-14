@@ -13,9 +13,11 @@ test("empty kinetic batteries use a distinct danger state while maintenance rema
   assert.equal(batteryCoverageState({ status: "ready", currentAmmo: 4 }), "ready");
 });
 
-test("infinite-ammo radars are orange only during maintenance", () => {
-  assert.equal(batteryCoverageUnavailable({ status: "ready", currentAmmo: "infinite" }), false);
-  assert.equal(batteryCoverageUnavailable({ status: "maintenance", currentAmmo: "infinite" }), true);
+test("zero-ammo sensors remain available and only switch tone during maintenance", () => {
+  assert.equal(batteryCoverageState({ status: "ready", currentAmmo: 0 }, 0), "ready");
+  assert.equal(batteryCoverageUnavailable({ status: "ready", currentAmmo: 0 }, 0), false);
+  assert.equal(batteryCoverageState({ status: "maintenance", currentAmmo: 0 }, 0), "maintenance");
+  assert.equal(batteryCoverageUnavailable({ status: "maintenance", currentAmmo: 0 }, 0), true);
 });
 
 test("launch notifications replace detections and remain visible for four seconds", () => {

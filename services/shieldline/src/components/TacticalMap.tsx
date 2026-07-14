@@ -235,15 +235,15 @@ function threatRouteColor(tone: ReturnType<typeof threatTone>) {
 }
 
 function coverageTone(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery) {
-  const state = batteryCoverageState(battery);
-  if (state === "empty") {
-    return { color: "#ff625a", fill: "#ff3f38", fillOpacity: 0.13, opacity: 0.88, weight: 2.1 };
-  }
+  const state = batteryCoverageState(battery, unit.ammoCapacity);
   if (state === "maintenance") {
     return { color: "#ffad42", fill: "#ff8f1f", fillOpacity: 0.1, opacity: 0.78, weight: 2 };
   }
   if (unit.engagementMode === "detect") {
-    return { color: "#f6c547", fill: "#f6c547", fillOpacity: 0.065, opacity: 0.62, weight: 1.5 };
+    return { color: "#63c7d4", fill: "#4fb5c4", fillOpacity: 0.045, opacity: 0.78, weight: 1.45 };
+  }
+  if (state === "empty") {
+    return { color: "#ff625a", fill: "#ff3f38", fillOpacity: 0.13, opacity: 0.88, weight: 2.1 };
   }
   return { color: "#f6c547", fill: "#f6c547", fillOpacity: 0.06, opacity: 0.56, weight: 1.35 };
 }
@@ -418,20 +418,23 @@ function DesktopPlacementPreview() {
     if (!placementKind || !window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 821px)").matches) return undefined;
 
     const unit = getUnitDefinition(placementKind);
+    const isRadar = unit.engagementMode === "detect";
+    const previewColor = isRadar ? "#63c7d4" : "#f6c547";
+    const previewFill = isRadar ? "#4fb5c4" : "#f6c547";
     const initial = map.getCenter();
     const group = L.layerGroup();
     const outerCircle = L.circle(initial, {
       radius: unit.outerRangeKm * 1000,
-      color: "#f6c547",
-      fillColor: "#f6c547",
-      fillOpacity: 0.035,
-      opacity: 0.56,
-      weight: 1.4,
-      dashArray: "7 7",
+      color: previewColor,
+      fillColor: previewFill,
+      fillOpacity: isRadar ? 0.045 : 0.035,
+      opacity: isRadar ? 0.78 : 0.56,
+      weight: isRadar ? 1.45 : 1.4,
+      dashArray: isRadar ? undefined : "7 7",
       interactive: false,
-      className: "placement-preview-ring placement-preview-ring--outer",
+      className: `placement-preview-ring placement-preview-ring--outer ${isRadar ? "placement-preview-ring--radar" : ""}`,
     }).addTo(group);
-    const primaryCircle = L.circle(initial, {
+    const primaryCircle = isRadar ? null : L.circle(initial, {
       radius: unit.primaryRangeKm * 1000,
       color: "#ffd76a",
       fillColor: "#f6c547",
@@ -458,7 +461,7 @@ function DesktopPlacementPreview() {
       zIndexOffset: 910,
       icon: L.divIcon({
         className: "",
-        html: `<span class="placement-preview-card"><small>${unit.technicalCode}</small><b>${unit.name}</b><span>${unit.costLabel} · ${unit.primaryRangeKm}/${unit.outerRangeKm} км</span><span>БК ${unit.ammoCapacity === "infinite" ? "∞" : unit.ammoCapacity} · <i>READY</i></span></span>`,
+        html: `<span class="placement-preview-card"><small>${unit.technicalCode}</small><b>${unit.name}</b><span>${unit.costLabel} · ${isRadar ? `${unit.outerRangeKm} км виявлення` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</span>${isRadar ? "" : `<span>БК ${unit.ammoCapacity === "infinite" ? "∞" : unit.ammoCapacity}</span>`}</span>`,
         iconSize: [190, 72],
         iconAnchor: [-18, 82],
       }),
@@ -467,7 +470,7 @@ function DesktopPlacementPreview() {
     let visible = false;
     const showAt = (event: L.LeafletMouseEvent) => {
       outerCircle.setLatLng(event.latlng);
-      primaryCircle.setLatLng(event.latlng);
+      primaryCircle?.setLatLng(event.latlng);
       ghost.setLatLng(event.latlng);
       info.setLatLng(event.latlng);
       if (!visible) {

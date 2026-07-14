@@ -30,3 +30,41 @@ test("desktop mouse and trackpad wheel zoom respond around the pointer", async (
   await page.mouse.wheel(0, -240);
   await expect.poll(markerDistance).toBeGreaterThan(before * 1.05);
 });
+
+test("desktop defense cards expand in flow and radar telemetry stays sensor-specific", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("shieldline-tutorial-complete-v1", "true");
+    localStorage.setItem("shieldline-live-v7", JSON.stringify({
+      state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
+      version: 15,
+    }));
+  });
+  await page.goto("/shieldline/?legacy=1&mode=training");
+
+  const drawer = page.getByRole("complementary", { name: /ППО/ });
+  await expect(drawer).toBeVisible();
+  const cards = drawer.locator(".unit-card");
+  const radar = cards.filter({ hasText: "Radar 35D6" });
+  const nextCard = cards.nth(1);
+  await expect(radar.locator(":scope > strong")).toHaveText("Radar 35D6");
+  await expect(radar.getByText("Радіус", { exact: true })).toBeVisible();
+  await expect(radar.getByText("БК", { exact: true })).toHaveCount(0);
+  await expect(drawer.getByText("READY", { exact: true })).toHaveCount(0);
+
+  await radar.hover();
+  await expect(radar.getByText(/Радіус виявлення/)).toBeVisible();
+  await expect.poll(async () => (await radar.boundingBox())?.height || 0).toBeGreaterThan(108);
+  const radarBox = await radar.boundingBox();
+  const nextBox = await nextCard.boundingBox();
+  expect(radarBox && nextBox && radarBox.y + radarBox.height <= nextBox.y).toBeTruthy();
+
+  const list = drawer.locator(".unit-list");
+  const lastCard = cards.last();
+  await lastCard.hover();
+  await expect.poll(async () => (await lastCard.boundingBox())?.height || 0).toBeGreaterThan(108);
+  await expect.poll(async () => {
+    const listBox = await list.boundingBox();
+    const cardBox = await lastCard.boundingBox();
+    return Boolean(listBox && cardBox && cardBox.y + cardBox.height <= listBox.y + listBox.height + 1);
+  }).toBe(true);
+});
