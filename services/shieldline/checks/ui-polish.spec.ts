@@ -34,3 +34,17 @@ test("intel panel reuses the existing log and placement preview stays Leaflet-na
   assert.match(styles, /\.placement-preview-ring--outer/);
   assert.match(styles, /\.intel-panel__metrics/);
 });
+
+test("combat results use tactical effects and desktop unit details keep readable layout", async () => {
+  const map = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
+  const rail = await readFile(new URL("../src/components/UnitRail.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../src/styles/app.css", import.meta.url), "utf8");
+
+  assert.match(map, /combat-result-marker--\$\{marker\.tone\}/);
+  assert.doesNotMatch(map, /markerSprites\.(impactEvent|interceptedThreat)/);
+  assert.match(styles, /\.combat-result-marker__ring/);
+  assert.match(styles, /@keyframes combat-result-ring/);
+  assert.match(styles, /\.command-drawer \.unit-card > strong/);
+  assert.match(styles, /min-height: 150px;[\s\S]*?max-height: 180px;/);
+  assert.match(rail, /keepExpandedCardVisible/);
+});

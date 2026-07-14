@@ -34,6 +34,18 @@ function seconds(ms: number) {
   return `${(ms / 1000).toFixed(ms < 2000 ? 1 : 0)} с`;
 }
 
+function keepExpandedCardVisible(card: HTMLElement) {
+  window.requestAnimationFrame(() => {
+    const list = card.parentElement;
+    if (!list) return;
+    const cardRect = card.getBoundingClientRect();
+    const listRect = list.getBoundingClientRect();
+    const overflow = cardRect.bottom - listRect.bottom + 8;
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    if (overflow > 0) list.scrollBy({ top: overflow, behavior });
+  });
+}
+
 type TacticalUnitStatus = { label: "READY" | "ENGAGING" | "RELOADING" | "NO AMMO" | "DAMAGED" | "OFFLINE"; tone: "ready" | "engaging" | "warning" | "danger" | "offline" };
 
 function tacticalUnitStatus(unit: UnitDefinition, battery?: ReturnType<typeof useGameStore.getState>["game"]["batteries"][number]): TacticalUnitStatus {
@@ -88,6 +100,8 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
               tabIndex={0}
               role="button"
               aria-disabled={disabled}
+              onMouseEnter={(event) => keepExpandedCardVisible(event.currentTarget)}
+              onFocus={(event) => keepExpandedCardVisible(event.currentTarget)}
               onClick={() => {
                 if (!disabled) { beginPlacement(unit.kind); onPlacementStart?.(); }
               }}

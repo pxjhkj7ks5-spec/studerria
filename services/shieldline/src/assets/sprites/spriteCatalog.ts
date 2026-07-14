@@ -9,11 +9,6 @@ import threatKalibr from "./threats/kalibr.png";
 import threatKh101 from "./threats/kh101.png";
 import threatParodiya from "./threats/parodiya.png";
 import threatSaturation from "./threats/saturation.png";
-import confirmedThreat from "./icons/confirmed-threat.png";
-import impactEvent from "./icons/impact-event.png";
-import interceptedThreat from "./icons/intercepted-threat.png";
-import interceptorShot from "./icons/interceptor-shot.png";
-import unknownTrack from "./icons/unknown-track.png";
 import boatUnit from "./units/boat.png";
 import bukUnit from "./units/buk.png";
 import ewUnit from "./units/ew.png";
@@ -90,11 +85,3 @@ export const launcherVariantSprites = {
   "cruise-naval": cruiseNavalLaunch,
   "cruise-air": cruiseAirLaunch,
 } as const;
-
-export const markerSprites = {
-  unknownTrack,
-  confirmedThreat,
-  interceptedThreat,
-  impactEvent,
-  interceptorShot,
-};

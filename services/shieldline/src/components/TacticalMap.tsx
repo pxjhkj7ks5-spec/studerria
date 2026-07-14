@@ -1,7 +1,7 @@
 import L from "leaflet";
 import { Circle, CircleMarker, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { carrierSprites, launchSprites, launcherVariantSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
+import { carrierSprites, launchSprites, launcherVariantSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { formatThreatAltitude, formatThreatSpeed, threatDisplayName } from "../data/threatFlightProfiles";
@@ -348,11 +348,12 @@ function makeImpactIcon(marker: ImpactMarker) {
   const key = marker.tone;
   const cached = impactIconCache.get(key);
   if (cached) return cached;
+  const label = marker.tone === "impact" ? "Влучання" : "Збито";
   const icon = L.divIcon({
     className: "",
-    html: imageMarkerHtml(marker.tone === "impact" ? markerSprites.impactEvent : markerSprites.interceptedThreat, `map-marker--${marker.tone}`),
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
+    html: `<span class="combat-result-marker combat-result-marker--${marker.tone}" aria-label="${label}"><i class="combat-result-marker__ring"></i><i class="combat-result-marker__axis"></i><i class="combat-result-marker__core"></i></span>`,
+    iconSize: [52, 52],
+    iconAnchor: [26, 26],
   });
   impactIconCache.set(key, icon);
   return icon;
