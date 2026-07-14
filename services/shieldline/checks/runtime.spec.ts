@@ -49,6 +49,8 @@ test("coverage circles and occupied polygons use Leaflet's shared SVG renderer",
   assert.doesNotMatch(coverageLayer, /renderer=/);
   assert.doesNotMatch(source, /preferCanvas/);
   assert.doesNotMatch(source, /L\.svg\(\{ padding: 0\.6 \}\)/);
+  assert.match(source, /state === "empty"[\s\S]*?color: "#ff625a"/);
+  assert.match(source, /state === "maintenance"[\s\S]*?color: "#ffad42"/);
 });
 
 test("desktop wheel zoom is responsive while touch zoom keeps its existing profile", () => {

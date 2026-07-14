@@ -6,7 +6,7 @@ import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
-import { batteryCoverageUnavailable } from "../game/coverageVisuals";
+import { batteryCoverageState } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile } from "../game/mapZoom";
@@ -222,7 +222,11 @@ function threatRouteColor(tone: ReturnType<typeof threatTone>) {
 }
 
 function coverageTone(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery) {
-  if (batteryCoverageUnavailable(battery)) {
+  const state = batteryCoverageState(battery);
+  if (state === "empty") {
+    return { color: "#ff625a", fill: "#ff3f38", fillOpacity: 0.13, opacity: 0.88, weight: 2.1 };
+  }
+  if (state === "maintenance") {
     return { color: "#ffad42", fill: "#ff8f1f", fillOpacity: 0.1, opacity: 0.78, weight: 2 };
   }
   if (unit.engagementMode === "detect") {
