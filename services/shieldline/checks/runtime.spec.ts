@@ -56,6 +56,19 @@ test("desktop wheel zoom is responsive while touch zoom keeps its existing profi
   assert.deepEqual(mapZoomInputProfile(false), { zoomDelta: 0.5, wheelPxPerZoomLevel: 160, wheelDebounceTime: 35 });
 });
 
+test("map panning defers React culling and tile updates until movement settles", async () => {
+  const source = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
+  const trackerStart = source.indexOf("function MapViewportTracker");
+  const trackerEnd = source.indexOf("interface MovingObjectsLayerProps", trackerStart);
+  const tracker = source.slice(trackerStart, trackerEnd);
+
+  assert.ok(trackerStart >= 0 && trackerEnd > trackerStart);
+  assert.doesNotMatch(tracker, /\bmove\(\)\s*\{/);
+  assert.match(tracker, /moveend\(\)\s*\{\s*scheduleViewportFrame\(\)/);
+  assert.match(source, /keepBuffer=\{4\}[\s\S]*?updateWhenIdle[\s\S]*?updateWhenZooming/);
+  assert.doesNotMatch(source, /updateWhenIdle=\{false\}/);
+});
+
 test("the first six modes are live while Daily Defense is scheduled", () => {
   const liveModes = Object.entries(gameModeRuntimePolicies)
     .filter(([, policy]) => policy.execution === "live")

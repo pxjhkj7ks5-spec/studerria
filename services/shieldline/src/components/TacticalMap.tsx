@@ -25,7 +25,6 @@ import type {
 const mapCenter: [number, number] = [48.7, 31.4];
 const CHUNK_SIZE_DEG = 2;
 const VIEWPORT_PAD_RATIO = 0.42;
-const VIEWPORT_MOVE_UPDATE_MS = 280;
 const LOW_FPS_THRESHOLD = 42;
 const RECOVERED_FPS_THRESHOLD = 52;
 const MAX_RENDERED_IMPACTS_LOW_FPS = 10;
@@ -372,50 +371,18 @@ function MapViewportTracker({
   onChange: (bounds: RenderBounds) => void;
 }) {
   const frameRef = useRef(0);
-  const moveTimeoutRef = useRef<number | null>(null);
-  const lastMoveUpdateRef = useRef(0);
-  const zoomingRef = useRef(false);
   const lastKeyRef = useRef("");
   const map = useMapEvents({
-    move() {
-      scheduleMoveUpdate();
-    },
-    zoomstart() {
-      zoomingRef.current = true;
-      clearMoveTimeout();
-    },
     moveend() {
-      scheduleImmediateUpdate();
+      scheduleViewportFrame();
     },
     zoomend() {
-      zoomingRef.current = false;
-      scheduleImmediateUpdate();
+      scheduleViewportFrame();
     },
     resize() {
-      scheduleImmediateUpdate();
+      scheduleViewportFrame();
     },
   });
-
-  function clearMoveTimeout() {
-    if (moveTimeoutRef.current === null) return;
-    window.clearTimeout(moveTimeoutRef.current);
-    moveTimeoutRef.current = null;
-  }
-
-  function scheduleMoveUpdate() {
-    if (zoomingRef.current || moveTimeoutRef.current !== null) return;
-    const elapsed = performance.now() - lastMoveUpdateRef.current;
-    const delay = Math.max(0, VIEWPORT_MOVE_UPDATE_MS - elapsed);
-    moveTimeoutRef.current = window.setTimeout(() => {
-      moveTimeoutRef.current = null;
-      scheduleViewportFrame();
-    }, delay);
-  }
-
-  function scheduleImmediateUpdate() {
-    clearMoveTimeout();
-    scheduleViewportFrame();
-  }
 
   function scheduleViewportFrame() {
     window.cancelAnimationFrame(frameRef.current);
@@ -423,15 +390,13 @@ function MapViewportTracker({
       const next = createRenderBounds(map);
       if (next.key === lastKeyRef.current) return;
       lastKeyRef.current = next.key;
-      lastMoveUpdateRef.current = performance.now();
       onChange(next);
     });
   }
 
   useEffect(() => {
-    scheduleImmediateUpdate();
+    scheduleViewportFrame();
     return () => {
-      clearMoveTimeout();
       window.cancelAnimationFrame(frameRef.current);
     };
   }, []);
@@ -856,7 +821,7 @@ export function TacticalMap() {
           attribution={darkMapTiles.attribution}
           className={darkMapTiles.className}
           keepBuffer={4}
-          updateWhenIdle={false}
+          updateWhenIdle
           updateWhenZooming
         />
         {visibleOccupiedZonePolygons.map((polygon, index) => (
