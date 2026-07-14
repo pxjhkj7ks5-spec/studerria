@@ -65,17 +65,7 @@ const ru: Record<TranslationKey, string> = {
   "action.close": "Закрыть", "action.back": "Назад", "action.cancelPlacement": "Отменить размещение", "action.reset": "Сбросить кампанию",
 };
 
-function languageCode() {
-  const telegram = (window as unknown as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: { language_code?: string } } } } }).Telegram?.WebApp;
-  const telegramCode = telegram?.initDataUnsafe?.user?.language_code;
-  return String(telegramCode || navigator.language || "uk").toLowerCase();
-}
-
 export function resolveLocale(): ShieldlineLocale {
-  if (typeof window === "undefined") return "uk";
-  const code = languageCode();
-  if (code.startsWith("ru")) return "ru";
-  if (code.startsWith("en")) return "en";
   return "uk";
 }
 

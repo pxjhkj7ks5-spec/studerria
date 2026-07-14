@@ -395,6 +395,89 @@ function MapClickPlacement() {
   return null;
 }
 
+function DesktopPlacementPreview() {
+  const map = useMap();
+  const placementKind = useGameStore((state) => state.placementKind);
+
+  useEffect(() => {
+    if (!placementKind || !window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 821px)").matches) return undefined;
+
+    const unit = getUnitDefinition(placementKind);
+    const initial = map.getCenter();
+    const group = L.layerGroup();
+    const outerCircle = L.circle(initial, {
+      radius: unit.outerRangeKm * 1000,
+      color: "#f6c547",
+      fillColor: "#f6c547",
+      fillOpacity: 0.035,
+      opacity: 0.56,
+      weight: 1.4,
+      dashArray: "7 7",
+      interactive: false,
+      className: "placement-preview-ring placement-preview-ring--outer",
+    }).addTo(group);
+    const primaryCircle = L.circle(initial, {
+      radius: unit.primaryRangeKm * 1000,
+      color: "#ffd76a",
+      fillColor: "#f6c547",
+      fillOpacity: 0.07,
+      opacity: 0.92,
+      weight: 1.8,
+      interactive: false,
+      className: "placement-preview-ring placement-preview-ring--primary",
+    }).addTo(group);
+    const ghost = L.marker(initial, {
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 900,
+      icon: L.divIcon({
+        className: "",
+        html: `<span class="placement-ghost"><img src="${unitSprites[unit.kind]}" alt="" draggable="false" /></span>`,
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
+      }),
+    }).addTo(group);
+    const info = L.marker(initial, {
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 910,
+      icon: L.divIcon({
+        className: "",
+        html: `<span class="placement-preview-card"><small>${unit.technicalCode}</small><b>${unit.name}</b><span>${unit.costLabel} · ${unit.primaryRangeKm}/${unit.outerRangeKm} км</span><span>БК ${unit.ammoCapacity === "infinite" ? "∞" : unit.ammoCapacity} · <i>READY</i></span></span>`,
+        iconSize: [190, 72],
+        iconAnchor: [-18, 82],
+      }),
+    }).addTo(group);
+
+    let visible = false;
+    const showAt = (event: L.LeafletMouseEvent) => {
+      outerCircle.setLatLng(event.latlng);
+      primaryCircle.setLatLng(event.latlng);
+      ghost.setLatLng(event.latlng);
+      info.setLatLng(event.latlng);
+      if (!visible) {
+        group.addTo(map);
+        visible = true;
+      }
+    };
+    const hide = () => {
+      if (!visible) return;
+      group.removeFrom(map);
+      visible = false;
+    };
+
+    map.on("mousemove", showAt);
+    map.getContainer().addEventListener("pointerleave", hide);
+    return () => {
+      map.off("mousemove", showAt);
+      map.getContainer().removeEventListener("pointerleave", hide);
+      group.removeFrom(map);
+    };
+  }, [map, placementKind]);
+
+  return null;
+}
+
 function MapViewportTracker({
   onChange,
 }: {
@@ -863,6 +946,7 @@ export function TacticalMap() {
         <MapViewportTracker onChange={setRenderBounds} />
         <ThreatLabelZoomMode />
         <MapClickPlacement />
+        <DesktopPlacementPreview />
         <MovingObjectsLayer
           threats={visibleThreats}
           shots={visibleShots}
@@ -937,7 +1021,7 @@ export function TacticalMap() {
         {visibleCarriers.map((carrier) => (
           <Marker key={carrier.id} position={[carrier.position.lat, carrier.position.lng]} icon={makeCarrierIcon(carrier)}>
             <Tooltip direction="top" offset={[0, -10]}>
-              {carrier.kind === "tu95" ? "Aviation carrier marker" : "Naval carrier marker"} - fictional UI entity
+              {carrier.kind === "tu95" ? "Авіаційний носій" : "Морський носій"} · умовна бойова позначка
             </Tooltip>
           </Marker>
         ))}
@@ -964,7 +1048,7 @@ export function TacticalMap() {
             pathOptions={{ color: routeColor(route), weight: reducedQuality ? 1.35 : 2, opacity: reducedQuality ? 0.42 : 0.62, dashArray: route.status === "well-supplied" ? "3 7" : "8 5" }}
           >
             <Tooltip direction="top" offset={[0, -8]}>
-              {route.label} - delay {route.delayDays} cycle(s)
+              {route.label} · затримка {route.delayDays} цикл.
             </Tooltip>
           </Polyline>
         ))}
@@ -975,7 +1059,7 @@ export function TacticalMap() {
             icon={icon}
           >
             <Tooltip direction="top" offset={[0, -16]}>
-              {city.name} - city services {Math.round(city.infrastructure)}%
+              {city.name} · міські служби {Math.round(city.infrastructure)}%
             </Tooltip>
           </Marker>
         ))}

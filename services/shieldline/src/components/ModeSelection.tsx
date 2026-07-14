@@ -15,7 +15,7 @@ interface ModeSelectionProps {
 
 export function ModeSelection({ onSelect }: ModeSelectionProps) {
   return (
-    <section className="mode-screen" aria-label="Shieldline campaign mode selection">
+    <section className="mode-screen" aria-label="Вибір режиму кампанії Shieldline">
       <div className="mode-shell">
         <div className="mode-heading">
           <div className="mode-mark">
@@ -23,7 +23,7 @@ export function ModeSelection({ onSelect }: ModeSelectionProps) {
           </div>
           <div>
             <h1>Shieldline</h1>
-            <p>Choose a crisis profile. All scenarios use fictional sectors, abstract ranges, and game-balanced outcomes.</p>
+            <p>Оберіть профіль операції. Усі сценарії використовують умовні сектори, абстрактні дальності та ігровий баланс.</p>
           </div>
         </div>
         <div className="mode-grid">
@@ -37,7 +37,7 @@ export function ModeSelection({ onSelect }: ModeSelectionProps) {
                 <em>{mode.posture}</em>
                 <span>{mode.description}</span>
                 <small>
-                  Budget {mode.resources.budget} · Ammo {mode.resources.ammo} · Morale {mode.resources.morale}%
+                  Бюджет {mode.resources.budget} · БК {mode.resources.ammo} · Мораль {mode.resources.morale}%
                 </small>
               </button>
             );

@@ -146,6 +146,7 @@ export interface UnitDefinition {
   kind: UnitKind;
   name: string;
   shortName: string;
+  technicalCode: string;
   cost: number;
   costLabel: string;
   upkeep: number;

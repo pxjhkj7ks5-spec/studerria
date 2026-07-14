@@ -25,13 +25,24 @@ function fatigueLabel(fatigue: number) {
 }
 
 function ammoLabel(unit: UnitDefinition, current?: number | "infinite") {
-  if (unit.ammoCapacity === "infinite") return "inf";
+  if (unit.ammoCapacity === "infinite") return "∞";
   if (typeof current === "number") return `${current}/${unit.ammoCapacity}`;
   return `${unit.ammoCapacity}`;
 }
 
 function seconds(ms: number) {
-  return `${(ms / 1000).toFixed(ms < 2000 ? 1 : 0)}s`;
+  return `${(ms / 1000).toFixed(ms < 2000 ? 1 : 0)} с`;
+}
+
+type TacticalUnitStatus = { label: "READY" | "RELOADING" | "NO AMMO" | "DAMAGED" | "OFFLINE"; tone: "ready" | "warning" | "danger" | "offline" };
+
+function tacticalUnitStatus(unit: UnitDefinition, battery?: ReturnType<typeof useGameStore.getState>["game"]["batteries"][number]): TacticalUnitStatus {
+  if (!battery) return { label: "READY", tone: "ready" };
+  if (battery.status === "maintenance") return { label: "OFFLINE", tone: "offline" };
+  if (battery.readiness < 50 || battery.status === "exhausted") return { label: "DAMAGED", tone: "danger" };
+  if (unit.ammoCapacity !== 0 && unit.ammoCapacity !== "infinite" && battery.currentAmmo === 0) return { label: "NO AMMO", tone: "danger" };
+  if (battery.reloadRemainingMs > 0 || battery.status === "reloading") return { label: "RELOADING", tone: "warning" };
+  return { label: "READY", tone: "ready" };
 }
 
 export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }) {
@@ -67,10 +78,11 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
           const fatigue = referenceBattery ? referenceBattery.fatigue : 0;
           const reloadText = referenceBattery?.reloadRemainingMs ? seconds(referenceBattery.reloadRemainingMs) : seconds(unit.reloadMs);
           const ammoText = ammoLabel(unit, referenceBattery?.currentAmmo);
+          const tacticalStatus = tacticalUnitStatus(unit, referenceBattery);
 
           return (
             <article
-              className={`unit-card ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
+              className={`unit-card unit-card--state-${tacticalStatus.tone} ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
               key={unit.kind}
               tabIndex={0}
               role="button"
@@ -87,13 +99,18 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
             >
               <div className="unit-card__top">
                 <img className="unit-sprite" src={unitSprites[unit.kind]} alt="" draggable="false" />
-                <span className="ammo-badge">{ammoText}</span>
+                <span className={`unit-status unit-status--${tacticalStatus.tone}`}>{tacticalStatus.label}</span>
               </div>
               <strong>{unit.name}</strong>
+              <span className="unit-card__code">{unit.technicalCode}</span>
               {storedUnits.length ? <span className="unit-card__storage">На складі: {storedUnits.length} · розміщення безкоштовне</span> : null}
               <p>{unit.description}</p>
-              <small>{storedUnits.length ? "Зі складу · 0 ₴" : unit.costLabel} · {unit.primaryRangeKm}/{unit.outerRangeKm} км · {referenceBattery?.status || "готова"}</small>
-              <div className="unit-chance-row" aria-label={`${unit.name} hit chances`}>
+              <div className="unit-card__telemetry">
+                <span><small>БК</small><b>{ammoText}</b></span>
+                <span><small>Зона</small><b>{unit.primaryRangeKm}/{unit.outerRangeKm} км</b></span>
+                <span><small>Вартість</small><b>{storedUnits.length ? "0 ₴" : unit.costLabel}</b></span>
+              </div>
+              <div className="unit-chance-row" aria-label={`Імовірність ураження для ${unit.name}`}>
                 {chanceKinds.map(({ kind, label }) => (
                   <span key={kind} className={unit.engagementChanceByThreat[kind] <= 0 ? "unit-chance--muted" : ""}>
                     <b>{Math.round(unit.engagementChanceByThreat[kind])}%</b>
@@ -109,10 +126,11 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
                 <span>Втома {Math.round(fatigue)}% · {fatigueLabel(fatigue)} · {storedBattery ? "на складі" : localBattery?.supplyStatus || "не розміщена"}</span>
               </div>
-              <div className="readiness-track" aria-label={`${unit.name} readiness`}>
+              <div className="readiness-track" aria-label={`Готовність ${unit.name}`}>
                 <i style={{ width: `${Math.round(readiness)}%` }} />
               </div>
-              <div className={`fatigue-track fatigue-track--${fatigue > 70 ? "danger" : fatigue > 45 ? "warning" : "stable"}`} aria-label={`${unit.name} fatigue`}>
+              <span className="readiness-caption">Готовність {Math.round(readiness)}%</span>
+              <div className={`fatigue-track fatigue-track--${fatigue > 70 ? "danger" : fatigue > 45 ? "warning" : "stable"}`} aria-label={`Втома ${unit.name}`}>
                 <i style={{ width: `${Math.round(fatigue)}%` }} />
               </div>
               <div className="unit-card__meta">

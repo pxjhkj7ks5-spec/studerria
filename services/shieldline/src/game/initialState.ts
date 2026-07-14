@@ -17,15 +17,15 @@ const openingLog: IntelEntry[] = [
   {
     id: "briefing-1",
     time: "T+00:00",
-    title: "Intel Briefing",
-    body: "Multiple disruptions are possible this week. Preserve energy, morale, and repair capacity.",
+    title: "Розвідувальне зведення",
+    body: "Протягом операції можливі численні загрози. Зберігайте енергію, мораль і ремонтний резерв.",
     tone: "info",
   },
   {
     id: "safety-1",
     time: "T+00:00",
-    title: "Simulation Scope",
-    body: "Shieldline uses fictional, abstract mechanics. It does not model real deployments or ranges.",
+    title: "Межі симуляції",
+    body: "Shieldline використовує умовні абстрактні механіки й не моделює реальні позиції або дальності.",
     tone: "info",
   },
 ];
@@ -36,10 +36,10 @@ export function createForecast(day: number, random: () => number): DailyForecast
   const supportDelay = random() > 0.78;
   const pressure = Math.round(10 + random() * 25 + day * 0.7);
   const warningBank = [
-    "Signals suggest a mixed pressure campaign, but target confidence is low.",
-    "Analysts report unusual routing patterns near major cities.",
-    "Support teams expect a difficult maintenance window.",
-    "Several warnings appear contradictory. Keep reserves flexible.",
+    "Сигнали вказують на змішану атаку, але достовірність цілей залишається низькою.",
+    "Аналітики фіксують незвичні маршрути поблизу великих міст.",
+    "Групи підтримки очікують складний період технічного обслуговування.",
+    "Кілька попереджень суперечать одне одному. Зберігайте гнучкий резерв.",
   ];
 
   return {
@@ -122,7 +122,7 @@ export function createScenarioState(random: () => number = Math.random, mode: Ca
   state.log.unshift({
     id: `scenario-${scenario.id}`,
     time: "T+00:00",
-    title: "Scenario Selected",
+    title: "Сценарій обрано",
     body: `${scenario.title}: ${scenario.description}`,
     tone: "info",
   });

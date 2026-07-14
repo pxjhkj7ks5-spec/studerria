@@ -345,7 +345,7 @@ export default function App() {
 
   return (
     <main className={`shell shell--map-first ${isMobileLive ? "shell--mobile-live" : ""} ${activePanel ? "shell--drawer-open shell--panel-open" : "shell--drawer-closed"}`} aria-label="Симуляція протиповітряної оборони Shieldline">
-      <nav className="app-rail" aria-label={isMobileLive ? "Панелі Shieldline" : "Shieldline panels"}>
+      <nav className="app-rail" aria-label="Панелі Shieldline">
         {!isMobileLive ? <button className="rail-button rail-button--menu" type="button" aria-label="До вибору режиму" onClick={returnToCommandModes}>
           <Menu size={24} />
         </button> : null}
@@ -383,7 +383,7 @@ export default function App() {
             <Shield size={22} />
             <div>
               <h1>Shieldline</h1>
-              <span>{tacticalMode === "campaign" ? `${activeMissionTitle} · жива операція` : `${scenario.title} · ${modeDefinition?.title || "Live defense"} · ${game.cyclePhase}`}</span>
+              <span>{tacticalMode === "campaign" ? `${activeMissionTitle} · жива операція` : `${scenario.title} · ${modeDefinition?.title || "Живий захист"} · ${t(`operation.${operationPhase}`)}`}</span>
             </div>
           </div>
           <ResourceBar game={game} operationPhase={operationPhase} mobile={isMobileLive} />
@@ -404,11 +404,11 @@ export default function App() {
             ) : null}
           </div>
         ) : null}
-        <MapLegend mode={mapMode} />
+        <MapLegend mode={mapMode} game={game} />
       </section>
 
       {activePanel ? (
-        <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={isMobileLive ? `Панель «${activePanelTitle}»` : `${activePanelTitle} panel`}>
+        <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={`Панель «${activePanelTitle}»`}>
           <div className="drawer-header">
             <div>
               <span>Shieldline</span>
@@ -433,7 +433,7 @@ export default function App() {
                 </div>
               </section>
               <section className="menu-group">
-                <MapLegend mode={mapMode} embedded />
+                <MapLegend mode={mapMode} game={game} embedded />
               </section>
               <section className="menu-group menu-help">
                 <HelpCircle size={21} />
@@ -456,7 +456,7 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <div className="live-stats live-stats--drawer" aria-label="Live defense telemetry">
+              <div className="live-stats live-stats--drawer" aria-label="Телеметрія протиповітряної оборони">
                 <span><strong>{formatNumber(game.day)}</strong> {t("stats.cycle")}</span>
                 <span><strong>{formatNumber(revealedThreats)}</strong> {t("stats.revealed")}</span>
                 <span><strong>{formatNumber(game.interceptions)}</strong> {t("stats.interceptions")}</span>
