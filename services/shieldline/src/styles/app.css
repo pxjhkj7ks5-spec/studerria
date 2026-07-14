@@ -958,7 +958,7 @@ button {
   backdrop-filter: blur(18px) saturate(1.25);
 }
 
-.leaflet-popup.battery-action-popup .leaflet-popup-tip { background: rgba(7, 17, 26, 0.96); }
+.leaflet-popup.battery-action-popup .leaflet-popup-tip { background: rgba(13, 14, 13, 0.98); }
 .leaflet-popup.battery-action-popup .leaflet-popup-content { width: 220px !important; margin: 14px; }
 .leaflet-popup.battery-action-popup .leaflet-popup-close-button { color: rgba(238, 248, 255, 0.64); }
 
@@ -2536,13 +2536,14 @@ button {
 .command-drawer .unit-card {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
-  grid-template-rows: auto auto 5px;
+  grid-template-rows: auto auto auto auto;
   gap: 3px 9px;
   min-height: 56px;
   padding: 9px 9px;
   border-color: rgba(114, 161, 190, 0.16);
   background: rgba(20, 31, 42, 0.92);
   box-shadow: none;
+  transition: min-height 180ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 .command-drawer .unit-card--disabled {
@@ -2613,6 +2614,7 @@ button {
 
 .command-drawer .readiness-track {
   grid-column: 1 / 4;
+  grid-row: 3;
   height: 5px;
   margin-top: 5px;
 }
@@ -2626,9 +2628,39 @@ button {
 }
 
 .command-drawer .unit-hover-card {
-  left: 44px;
-  right: 8px;
-  bottom: calc(100% + 5px);
+  position: static;
+  grid-column: 1 / 4;
+  grid-row: 4;
+  height: 0;
+  margin: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  border-width: 0;
+  opacity: 0;
+  transform: none;
+  transition: height 180ms ease, margin 180ms ease, padding 180ms ease, opacity 140ms ease;
+}
+
+.command-drawer .unit-hover-card strong,
+.command-drawer .unit-hover-card span {
+  grid-column: 1;
+  padding-right: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.command-drawer .unit-card:hover .unit-hover-card,
+.command-drawer .unit-card:focus-within .unit-hover-card {
+  height: 124px;
+  margin-top: 6px;
+  padding: 10px;
+  border-width: 1px;
+  opacity: 1;
+}
+
+.command-drawer .unit-card:hover,
+.command-drawer .unit-card:focus-within {
+  min-height: 192px;
 }
 
 .command-drawer .unit-card--selected {

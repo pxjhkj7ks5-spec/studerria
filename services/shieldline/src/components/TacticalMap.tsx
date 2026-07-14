@@ -968,22 +968,18 @@ export function TacticalMap() {
             <Popup className="battery-action-popup" closeButton>
               {(() => {
                 const unit = getUnitDefinition(battery.kind);
+                const ammo = battery.currentAmmo === "infinite" ? "∞" : `${battery.currentAmmo}/${unit.ammoCapacity}`;
+                const reload = battery.reloadRemainingMs > 0 ? `${Math.ceil(battery.reloadRemainingMs / 1000)} с` : "готова";
                 return <div className="battery-action-popup__content">
                   <span>Встановлена одиниця</span>
                   <strong>{unit.name}</strong>
-                  <small>{Math.round(battery.readiness)}% готовності · БК {battery.currentAmmo === "infinite" ? "∞" : battery.currentAmmo}</small>
+                  <small>Зона дії {unit.primaryRangeKm}/{unit.outerRangeKm} км</small>
+                  <small>Готовність {Math.round(battery.readiness)}% · {battery.status}</small>
+                  <small>БК {ammo} · перезаряджання {reload}</small>
                   <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Перемістити на склад</button>
                 </div>;
               })()}
             </Popup>
-            <Tooltip direction="top" offset={[0, -14]}>
-              {(() => {
-                const unit = getUnitDefinition(battery.kind);
-                const ammo = battery.currentAmmo === "infinite" ? "∞" : `${battery.currentAmmo}/${unit.ammoCapacity}`;
-                const reload = battery.reloadRemainingMs > 0 ? ` - reload ${Math.ceil(battery.reloadRemainingMs / 1000)}s` : "";
-                return `${unit.shortName} - ${unit.primaryRangeKm}/${unit.outerRangeKm} км - БК ${ammo} - ${Math.round(battery.readiness)}% - ${battery.status}${reload}`;
-              })()}
-            </Tooltip>
           </Marker>
         ))}
       </MapContainer>
