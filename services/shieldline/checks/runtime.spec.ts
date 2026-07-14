@@ -22,6 +22,8 @@ function testThreat(): LiveThreat {
     launchSectorName: "Test sector",
     progress: 0,
     speed: 1 / 120_000,
+    speedKph: 180,
+    altitudeM: 120,
     difficulty: 10,
     damage: 3,
     confidence: 95,
@@ -118,7 +120,10 @@ test("persisted operations reconcile stale launch data with the current catalog"
     { ...currentSectors[0], threats: ["kh101"] },
     { ...currentSectors[0], id: "legacy-sector", name: "Legacy sector" },
   ];
-  game.liveThreats = [{ ...testThreat(), progress: 1 }];
+  const legacyThreat = { ...testThreat(), id: "legacy-live-threat", progress: 0.4 };
+  delete (legacyThreat as Partial<LiveThreat>).speedKph;
+  delete (legacyThreat as Partial<LiveThreat>).altitudeM;
+  game.liveThreats = [{ ...testThreat(), progress: 1 }, legacyThreat];
   delete (game as Partial<GameState>).storedBatteries;
 
   const normalized = normalizePersistedGame(game);
@@ -126,7 +131,9 @@ test("persisted operations reconcile stale launch data with the current catalog"
   assert.deepEqual(normalized.launchSectors.map((sector) => sector.id), currentSectors.map((sector) => sector.id));
   assert.deepEqual(normalized.launchSectors[0].threats, currentSectors[0].threats);
   assert.equal(normalized.launchSectors.some((sector) => sector.id === "legacy-sector"), false);
-  assert.equal(normalized.liveThreats.length, 0);
+  assert.equal(normalized.liveThreats.length, 1);
+  assert.ok(normalized.liveThreats[0].speedKph > 0);
+  assert.ok(normalized.liveThreats[0].altitudeM > 0);
   assert.deepEqual(normalized.storedBatteries, []);
 });
 

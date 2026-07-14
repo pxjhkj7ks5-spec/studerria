@@ -266,6 +266,8 @@ export interface LiveThreat {
   launchSectorName: string;
   progress: number;
   speed: number;
+  speedKph: number;
+  altitudeM: number;
   difficulty: number;
   damage: number;
   confidence: number;

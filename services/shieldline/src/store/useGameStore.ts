@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { initialCities } from "../data/mapData";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "../data/gameModes";
+import { threatTelemetryFor } from "../data/threatFlightProfiles";
 import { createDeterministicRandom } from "../game/deterministicRandom";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBatteryToStorageState, placeBattery, startAttackNow } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
@@ -94,6 +95,13 @@ export function normalizePersistedGame(game: GameState | null) {
       && threat.speed > 0)
     .map((threat) => ({
       ...threat,
+      ...(() => {
+        const fallback = threatTelemetryFor(threat.kind, threat.id);
+        return {
+          speedKph: Number.isFinite(threat.speedKph) && threat.speedKph > 0 ? threat.speedKph : fallback.speedKph,
+          altitudeM: Number.isFinite(threat.altitudeM) && threat.altitudeM > 0 ? threat.altitudeM : fallback.altitudeM,
+        };
+      })(),
       origin: { ...threat.origin },
       target: { ...threat.target },
       lastKnownPosition: validCoordinates(threat.lastKnownPosition) ? { ...threat.lastKnownPosition } : undefined,
@@ -328,7 +336,7 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 16,
+      version: 17,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         const migratedGame = normalizePersistedGame(state.game || null);

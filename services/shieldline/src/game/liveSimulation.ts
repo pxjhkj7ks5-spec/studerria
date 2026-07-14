@@ -1,5 +1,6 @@
 import { getScenario } from "../data/scenarios";
 import { getUnitDefinition } from "../data/units";
+import { threatTelemetryFor } from "../data/threatFlightProfiles";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
 import { buildLogisticsState } from "./logistics";
 import { createGuidedCampaignSchedule, guidedStageForElapsed, guidedStageLaunchCount, guidedThreatKind, nextGuidedLaunchDelayMs, sectorIdsForDirection } from "./campaignPacing.mjs";
@@ -427,8 +428,10 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
   const origin = forcedOrigin ? { ...forcedOrigin } : randomPointInSector(launchSector, random);
   if (SHOW_LAUNCH_DEBUG) console.debug("[Shieldline live launch]", { threatType: kind, sector: launchSector.id, point: origin });
   const heading = bearingDeg(origin, city.coordinates);
+  const id = createId("live-threat", Math.floor(state.elapsedMs), random);
+  const telemetry = threatTelemetryFor(kind, id);
   return {
-    id: createId("live-threat", Math.floor(state.elapsedMs), random),
+    id,
     kind,
     status: "inbound",
     origin,
@@ -438,6 +441,8 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     launchSectorName: launchSector.name,
     progress: 0,
     speed: 1 / flightDurationMs,
+    speedKph: telemetry.speedKph,
+    altitudeM: telemetry.altitudeM,
     difficulty: threatBaseDifficulty[kind] * (1 + Math.max(-0.06, Math.min(0.08, (launchSector.weight - 3) * 0.025))) + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
     damage: falseTrack ? 0 : threatDamage[kind],
     confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,

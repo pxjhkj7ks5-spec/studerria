@@ -4,6 +4,7 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { carrierSprites, launchSprites, launcherVariantSprites, markerSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
+import { formatThreatAltitude, formatThreatSpeed, threatDisplayName } from "../data/threatFlightProfiles";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageState } from "../game/coverageVisuals";
@@ -215,6 +216,22 @@ function threatTone(threat: LiveThreat) {
   return "uncertain";
 }
 
+type TargetLabelStatus = "radar" | "confirmed" | "intercepted" | "hit";
+
+function targetLabelStatus(threat: LiveThreat): TargetLabelStatus {
+  if (threat.status === "impact") return "hit";
+  if (threat.status === "intercepted") return "intercepted";
+  if (threat.status === "engaged" || threat.confidence >= 58) return "confirmed";
+  return "radar";
+}
+
+function targetLabelStatusText(status: TargetLabelStatus) {
+  if (status === "confirmed") return "CONFIRMED";
+  if (status === "intercepted") return "INTERCEPTED";
+  if (status === "hit") return "HIT";
+  return "RADAR";
+}
+
 function threatRouteColor(tone: ReturnType<typeof threatTone>) {
   if (tone === "confirmed") return "#ff625a";
   if (tone === "decoy") return "#b79af4";
@@ -275,15 +292,24 @@ function makeBatteryIcon(battery: DefenseBattery) {
   return icon;
 }
 
+function threatMarkerIconKey(threat: LiveThreat) {
+  const tone = threatTone(threat);
+  const labelStatus = targetLabelStatus(threat);
+  const targetHeading = Math.round(threat.headingDeg - 90);
+  return `${threat.kind}:${tone}:${labelStatus}:${targetHeading}:${threat.speedKph}:${threat.altitudeM}`;
+}
+
 function makeThreatIcon(threat: LiveThreat) {
   const tone = threatTone(threat);
+  const labelStatus = targetLabelStatus(threat);
   const targetHeading = Math.round(threat.headingDeg - 90);
-  const key = `${threat.kind}:${tone}:${Math.round(threat.confidence / 10)}:${targetHeading}`;
+  const course = String(Math.round(threat.headingDeg) % 360).padStart(3, "0");
+  const key = threatMarkerIconKey(threat);
   const cached = threatIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span></span>`,
+    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span><span class="target-label target-label--${labelStatus}" aria-hidden="true"><span class="target-label__head"><b>${threatDisplayName(threat.kind)}</b><i>${targetLabelStatusText(labelStatus)}</i></span><span class="target-label__metrics"><span>${formatThreatSpeed(threat.speedKph)}</span><span>${formatThreatAltitude(threat.altitudeM)}</span></span><span class="target-label__course">КУРС ${course}°</span></span></span>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
@@ -408,6 +434,27 @@ function MapViewportTracker({
   return null;
 }
 
+function ThreatLabelZoomMode() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    const syncDetail = () => {
+      const zoom = map.getZoom();
+      container.classList.toggle("threat-labels--far", zoom < 6);
+      container.classList.toggle("threat-labels--close", zoom >= 8);
+    };
+    syncDetail();
+    map.on("zoom", syncDetail);
+    return () => {
+      map.off("zoom", syncDetail);
+      container.classList.remove("threat-labels--far", "threat-labels--close");
+    };
+  }, [map]);
+
+  return null;
+}
+
 interface MovingObjectsLayerProps {
   threats: LiveThreat[];
   shots: InterceptorShot[];
@@ -422,7 +469,7 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
   const threatGroupRef = useRef<L.LayerGroup | null>(null);
   const shotGroupRef = useRef<L.LayerGroup | null>(null);
   const impactGroupRef = useRef<L.LayerGroup | null>(null);
-  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null }>());
+  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null; iconKey: string }>());
   const shotPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline }>());
   const impactPoolRef = useRef(new Map<string, L.Marker>());
   const latestRef = useRef({ threats, shots, impacts, elapsedMs, mapMode, reducedQuality });
@@ -518,14 +565,17 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
       const routeAllowed = threat.confidence >= (reducedQuality ? 72 : 58) && (!reducedQuality || mapMode === "threats");
       let pooled = threatPoolRef.current.get(threat.id);
       const current = interpolatedThreatPosition(threat, elapsedSinceSync);
+      const iconKey = threatMarkerIconKey(threat);
       if (!pooled) {
         pooled = {
           marker: L.marker([current.lat, current.lng], { icon: makeThreatIcon(threat), interactive: false }).addTo(threatGroup),
           route: null,
+          iconKey,
         };
         threatPoolRef.current.set(threat.id, pooled);
-      } else {
+      } else if (pooled.iconKey !== iconKey) {
         pooled.marker.setIcon(makeThreatIcon(threat));
+        pooled.iconKey = iconKey;
       }
       if (routeAllowed && !pooled.route) {
         pooled.route = L.polyline([[current.lat, current.lng], [threat.target.lat, threat.target.lng]], {
@@ -811,6 +861,7 @@ export function TacticalMap() {
         scrollWheelZoom
       >
         <MapViewportTracker onChange={setRenderBounds} />
+        <ThreatLabelZoomMode />
         <MapClickPlacement />
         <MovingObjectsLayer
           threats={visibleThreats}
