@@ -109,7 +109,7 @@ export type PlanningActionId =
   | "rapid-redeployment"
   | "intelligence-focus";
 
-export type UnitStatus = "ready" | "strained" | "exhausted" | "maintenance" | "redeploying" | "reloading";
+export type UnitStatus = "ready" | "engaging" | "strained" | "exhausted" | "maintenance" | "redeploying" | "reloading";
 
 export type SupplyStatus = "well-supplied" | "strained" | "undersupplied";
 
@@ -285,16 +285,25 @@ export interface LiveThreat {
   carrierId?: string;
 }
 
-export interface InterceptorShot {
+export type EngagementResult = "success" | "miss" | "detected";
+
+export interface EngagementEvent {
   id: string;
-  batteryId: string;
-  threatId: string;
-  from: Coordinates;
-  to: Coordinates;
+  unitId: string;
+  targetId: string;
+  unitType: UnitKind;
+  startPosition: Coordinates;
+  targetStartPosition: Coordinates;
+  targetPredictedPosition: Coordinates;
+  result: EngagementResult;
+  startedAtMs: number;
+  durationMs: number;
   progress: number;
-  speed: number;
-  style?: ShotStyle;
+  resolved: boolean;
+  style: ShotStyle | "radar";
 }
+
+export type InterceptorShot = EngagementEvent;
 
 export interface ImpactMarker {
   id: string;
@@ -490,7 +499,7 @@ export interface GameState {
   batteries: DefenseBattery[];
   storedBatteries: DefenseBattery[];
   liveThreats: LiveThreat[];
-  interceptorShots: InterceptorShot[];
+  engagementEvents: EngagementEvent[];
   impactMarkers: ImpactMarker[];
   interceptions: number;
   impacts: number;

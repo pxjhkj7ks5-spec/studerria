@@ -24,7 +24,7 @@ test("intel panel reuses the existing log and placement preview stays Leaflet-na
   assert.equal((app.match(/<IntelLog game=\{game\} \/>/g) || []).length, 1);
   assert.match(legend, /Оперативна обстановка/);
   assert.match(legend, /game\.liveThreats/);
-  assert.match(legend, /game\.interceptorShots\.length/);
+  assert.match(legend, /game\.engagementEvents/);
   assert.match(legend, /game\.impacts/);
   assert.match(preview, /\(hover: hover\) and \(pointer: fine\) and \(min-width: 821px\)/);
   assert.match(preview, /L\.layerGroup\(\)/);

@@ -4,7 +4,7 @@ import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
-import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
+import { advanceSimulation, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
 import { campaignCycleCompleted, normalizePersistedGame, useGameStore } from "../src/store/useGameStore";
@@ -180,14 +180,33 @@ test("a started live operation advances launch sectors and creates threats", () 
 
 test("radars and absent defenses never create mystery interceptions", () => {
   const noDefense = tickSimulation(combatState(), 100, () => 0.999);
-  assert.equal(noDefense.interceptorShots.length, 0);
+  assert.equal(noDefense.engagementEvents.length, 0);
   assert.equal(noDefense.interceptions, 0);
 
   let radarOnly = combatState();
   radarOnly = placeBattery(radarOnly, "radar", { lat: 49.2, lng: 29.4 }, () => 0.5);
   radarOnly = tickSimulation(radarOnly, 100, () => 0.999);
-  assert.equal(radarOnly.interceptorShots.length, 0);
+  assert.equal(radarOnly.engagementEvents.length, 0);
   assert.equal(radarOnly.interceptions, 0);
+});
+
+test("combat roles use distinct lightweight engagement visuals", () => {
+  assert.equal(engagementStyleForUnit("patriot"), "missile");
+  assert.equal(engagementStyleForUnit("gepard"), "gun");
+  assert.equal(engagementStyleForUnit("ew"), "ew");
+  assert.equal(engagementStyleForUnit("drone-operators"), "drone");
+});
+
+test("first radar contact creates a detection-only engagement event", () => {
+  let game = combatState();
+  game.elapsedMs = 900;
+  game.liveThreats[0].revealed = false;
+  game = placeBattery(game, "radar", { lat: 49.2, lng: 29.4 }, () => 0.5);
+  game = tickSimulation(game, 100, () => 0.5);
+  assert.equal(game.engagementEvents.length, 1);
+  assert.equal(game.engagementEvents[0].style, "radar");
+  assert.equal(game.engagementEvents[0].result, "detected");
+  assert.equal(game.interceptions, 0);
 });
 
 test("only an in-range real battery launches and resolves an interceptor", () => {
@@ -195,7 +214,7 @@ test("only an in-range real battery launches and resolves an interceptor", () =>
   outOfRange = placeBattery(outOfRange, "mvg", { lat: 49.2, lng: 29.4 }, () => 0.5);
   outOfRange.batteries[0].position = { lat: 45, lng: 22 };
   outOfRange = tickSimulation(outOfRange, 100, () => 0.999);
-  assert.equal(outOfRange.interceptorShots.length, 0);
+  assert.equal(outOfRange.engagementEvents.length, 0);
 
   let game = combatState();
   game = placeBattery(game, "radar", { lat: 49.25, lng: 29.45 }, () => 0.5);
@@ -204,13 +223,28 @@ test("only an in-range real battery launches and resolves an interceptor", () =>
   const ammoBefore = battery.currentAmmo;
   let cursor = 0;
   game = tickSimulation(game, 100, () => cursor++ === 0 ? 0.999 : 0);
-  assert.equal(game.interceptorShots.length, 1);
-  assert.equal(game.interceptorShots[0].batteryId, battery.id);
-  assert.deepEqual(game.interceptorShots[0].from, battery.position);
+  assert.equal(game.engagementEvents.length, 1);
+  assert.equal(game.engagementEvents[0].unitId, battery.id);
+  assert.deepEqual(game.engagementEvents[0].startPosition, battery.position);
+  assert.equal(game.engagementEvents[0].result, "success");
   assert.ok(typeof ammoBefore === "number" && typeof game.batteries[1].currentAmmo === "number" && game.batteries[1].currentAmmo < ammoBefore);
   game = tickSimulation(game, 1_000, () => 0.999);
   assert.equal(game.interceptions, 1);
   assert.equal(game.liveThreats.some((threat) => threat.id === "test-threat"), false);
+});
+
+test("a failed engagement is animated and logged without removing the target", () => {
+  let game = combatState();
+  game = placeBattery(game, "radar", { lat: 49.25, lng: 29.45 }, () => 0.5);
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => 0.5);
+  game = tickSimulation(game, 100, () => 0.999);
+  assert.equal(game.engagementEvents.length, 1);
+  assert.equal(game.engagementEvents[0].result, "miss");
+  assert.equal(game.liveThreats[0].status, "engaged");
+  game = tickSimulation(game, 1_000, () => 0.999);
+  assert.equal(game.interceptions, 0);
+  assert.equal(game.liveThreats.some((threat) => threat.id === "test-threat"), true);
+  assert.ok(game.log.some((entry) => entry.title === "Промах"));
 });
 
 test("campaign completes after its first live attack cycle", () => {

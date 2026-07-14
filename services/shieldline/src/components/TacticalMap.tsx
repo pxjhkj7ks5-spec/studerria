@@ -16,8 +16,8 @@ import type {
   City,
   CarrierTrack,
   DefenseBattery,
+  EngagementEvent,
   ImpactMarker,
-  InterceptorShot,
   LaunchSector,
   LiveThreat,
   SupplyRoute,
@@ -56,7 +56,7 @@ interface PerformanceStats {
 
 const cityIconCache = new Map<string, L.DivIcon>();
 const batteryIconCache = new Map<string, L.DivIcon>();
-const shotIconCache = new Map<string, L.DivIcon>();
+const engagementIconCache = new Map<string, L.DivIcon>();
 const impactIconCache = new Map<string, L.DivIcon>();
 const launchSectorIconCache = new Map<string, L.DivIcon>();
 const carrierIconCache = new Map<string, L.DivIcon>();
@@ -77,19 +77,15 @@ function interpolatedThreatPosition(threat: LiveThreat, elapsedSinceSyncMs: numb
   };
 }
 
-function shotPosition(shot: InterceptorShot) {
+function engagementPosition(event: EngagementEvent, progress = event.progress) {
   return {
-    lat: shot.from.lat + (shot.to.lat - shot.from.lat) * shot.progress,
-    lng: shot.from.lng + (shot.to.lng - shot.from.lng) * shot.progress,
+    lat: event.startPosition.lat + (event.targetPredictedPosition.lat - event.startPosition.lat) * progress,
+    lng: event.startPosition.lng + (event.targetPredictedPosition.lng - event.startPosition.lng) * progress,
   };
 }
 
-function interpolatedShotPosition(shot: InterceptorShot, elapsedSinceSyncMs: number) {
-  const progress = Math.min(1, shot.progress + shot.speed * elapsedSinceSyncMs);
-  return {
-    lat: shot.from.lat + (shot.to.lat - shot.from.lat) * progress,
-    lng: shot.from.lng + (shot.to.lng - shot.from.lng) * progress,
-  };
+function interpolatedEngagementProgress(event: EngagementEvent, elapsedSinceSyncMs: number) {
+  return Math.min(1, event.progress + elapsedSinceSyncMs / event.durationMs);
 }
 
 function toPositions(points: Array<{ lat: number; lng: number }>): [number, number][] {
@@ -317,16 +313,34 @@ function makeThreatIcon(threat: LiveThreat) {
   return icon;
 }
 
-function makeShotIcon() {
-  const cached = shotIconCache.get("shot");
+type EngagementVisualPhase = "lock" | "travel" | "success" | "miss" | "detected";
+
+function makeEngagementProjectileIcon(style: EngagementEvent["style"], simplified: boolean) {
+  const key = `projectile:${style}:${simplified ? "simple" : "full"}`;
+  const cached = engagementIconCache.get(key);
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: imageMarkerHtml(markerSprites.interceptorShot, "map-marker--shot"),
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    html: `<span class="engagement-projectile engagement-projectile--${style} ${simplified ? "engagement-projectile--simple" : ""}"><i></i></span>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
   });
-  shotIconCache.set("shot", icon);
+  engagementIconCache.set(key, icon);
+  return icon;
+}
+
+function makeEngagementEffectIcon(style: EngagementEvent["style"], phase: EngagementVisualPhase, simplified: boolean) {
+  const key = `effect:${style}:${phase}:${simplified ? "simple" : "full"}`;
+  const cached = engagementIconCache.get(key);
+  if (cached) return cached;
+  const label = phase === "success" ? "INTERCEPTED" : phase === "miss" ? "MISS" : phase === "detected" ? "TRACK" : phase === "lock" ? "LOCK" : "ENGAGING";
+  const icon = L.divIcon({
+    className: "",
+    html: `<span class="engagement-effect engagement-effect--${style} engagement-effect--${phase} ${simplified ? "engagement-effect--simple" : ""}"><i></i><b>${label}</b></span>`,
+    iconSize: [86, 44],
+    iconAnchor: [43, 22],
+  });
+  engagementIconCache.set(key, icon);
   return icon;
 }
 
@@ -538,24 +552,93 @@ function ThreatLabelZoomMode() {
   return null;
 }
 
+interface PooledEngagementVisual {
+  projectile: L.Marker;
+  routes: L.Polyline[];
+  effect: L.Marker;
+  phase: EngagementVisualPhase;
+  simplified: boolean;
+}
+
+function clampNumber(value: number, minimum: number, maximum: number) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function coordinateBetween(from: { lat: number; lng: number }, to: { lat: number; lng: number }, progress: number) {
+  return {
+    lat: from.lat + (to.lat - from.lat) * progress,
+    lng: from.lng + (to.lng - from.lng) * progress,
+  };
+}
+
+function engagementVisualPhase(event: EngagementEvent, progress: number): EngagementVisualPhase {
+  if (event.style === "radar") return progress >= 0.58 ? "detected" : "lock";
+  if (progress < 0.16) return "lock";
+  if (progress < 0.82) return "travel";
+  return event.result === "success" ? "success" : "miss";
+}
+
+function updateEngagementVisual(map: L.Map, event: EngagementEvent, pooled: PooledEngagementVisual, progress: number) {
+  const phase = engagementVisualPhase(event, progress);
+  if (phase !== pooled.phase) {
+    pooled.phase = phase;
+    pooled.effect.setIcon(makeEngagementEffectIcon(event.style, phase, pooled.simplified));
+  }
+  pooled.effect.setLatLng([event.targetPredictedPosition.lat, event.targetPredictedPosition.lng]);
+
+  if (event.style === "radar") {
+    pooled.projectile.setOpacity(0);
+    for (const route of pooled.routes) route.setStyle({ opacity: 0 });
+    return;
+  }
+
+  const travelProgress = clampNumber((progress - 0.13) / 0.69, 0, 1);
+  const activeTravel = phase === "travel";
+  pooled.projectile.setOpacity(activeTravel && event.style !== "gun" ? 1 : 0);
+
+  if (event.style === "gun") {
+    const targetPoint = map.latLngToLayerPoint([event.targetPredictedPosition.lat, event.targetPredictedPosition.lng]);
+    pooled.routes.forEach((route, index) => {
+      const center = (pooled.routes.length - 1) / 2;
+      const offset = index - center;
+      const aimed = map.layerPointToLatLng(targetPoint.add(L.point(offset * 4.5, offset * -2.2 + (index % 2 ? 3 : -2))));
+      const tracerProgress = clampNumber((travelProgress - index * 0.055) / 0.72, 0, 1);
+      const current = coordinateBetween(event.startPosition, aimed, tracerProgress);
+      const tail = coordinateBetween(event.startPosition, aimed, Math.max(0, tracerProgress - 0.16));
+      route.setLatLngs([[tail.lat, tail.lng], [current.lat, current.lng]]);
+      route.setStyle({ opacity: activeTravel && tracerProgress > 0 && tracerProgress < 1 ? (pooled.simplified ? 0.58 : 0.86) : 0 });
+    });
+    pooled.projectile.setLatLng([event.targetPredictedPosition.lat, event.targetPredictedPosition.lng]);
+    return;
+  }
+
+  const current = coordinateBetween(event.startPosition, event.targetPredictedPosition, travelProgress);
+  const trailLength = pooled.simplified ? 0.1 : event.style === "missile" ? 0.2 : 0.14;
+  const tail = coordinateBetween(event.startPosition, event.targetPredictedPosition, Math.max(0, travelProgress - trailLength));
+  pooled.projectile.setLatLng([current.lat, current.lng]);
+  const route = pooled.routes[0];
+  route.setLatLngs([[tail.lat, tail.lng], [current.lat, current.lng]]);
+  route.setStyle({ opacity: activeTravel ? (pooled.simplified ? 0.5 : 0.8) : 0 });
+}
+
 interface MovingObjectsLayerProps {
   threats: LiveThreat[];
-  shots: InterceptorShot[];
+  engagements: EngagementEvent[];
   impacts: ImpactMarker[];
   elapsedMs: number;
   mapMode: string;
   reducedQuality: boolean;
 }
 
-function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reducedQuality }: MovingObjectsLayerProps) {
+function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode, reducedQuality }: MovingObjectsLayerProps) {
   const map = useMap();
   const threatGroupRef = useRef<L.LayerGroup | null>(null);
-  const shotGroupRef = useRef<L.LayerGroup | null>(null);
+  const engagementGroupRef = useRef<L.LayerGroup | null>(null);
   const impactGroupRef = useRef<L.LayerGroup | null>(null);
   const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null; iconKey: string }>());
-  const shotPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline }>());
+  const engagementPoolRef = useRef(new Map<string, PooledEngagementVisual>());
   const impactPoolRef = useRef(new Map<string, L.Marker>());
-  const latestRef = useRef({ threats, shots, impacts, elapsedMs, mapMode, reducedQuality });
+  const latestRef = useRef({ threats, engagements, impacts, elapsedMs, mapMode, reducedQuality });
   const syncAtRef = useRef(0);
   const lastSyncedElapsedMsRef = useRef<number | null>(null);
   const mapMovingRef = useRef(false);
@@ -563,10 +646,10 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
 
   useEffect(() => {
     const threatGroup = L.layerGroup().addTo(map);
-    const shotGroup = L.layerGroup().addTo(map);
+    const engagementGroup = L.layerGroup().addTo(map);
     const impactGroup = L.layerGroup().addTo(map);
     threatGroupRef.current = threatGroup;
-    shotGroupRef.current = shotGroup;
+    engagementGroupRef.current = engagementGroup;
     impactGroupRef.current = impactGroup;
 
     const pauseMapAnimation = () => {
@@ -593,12 +676,10 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
             pooled.route.setLatLngs([[current.lat, current.lng], [threat.target.lat, threat.target.lng]]);
           }
         }
-        for (const shot of latest.shots) {
-          const pooled = shotPoolRef.current.get(shot.id);
+        for (const event of latest.engagements) {
+          const pooled = engagementPoolRef.current.get(event.id);
           if (!pooled) continue;
-          const current = interpolatedShotPosition(shot, elapsedSinceSync);
-          pooled.marker.setLatLng([current.lat, current.lng]);
-          pooled.route.setLatLngs([[shot.from.lat, shot.from.lng], [current.lat, current.lng]]);
+          updateEngagementVisual(map, event, pooled, interpolatedEngagementProgress(event, elapsedSinceSync));
         }
       }
       frameRef.current = window.requestAnimationFrame(animate);
@@ -612,28 +693,28 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
       map.off("moveend", resumeMapAnimation);
       map.off("zoomend", resumeMapAnimation);
       threatGroup.remove();
-      shotGroup.remove();
+      engagementGroup.remove();
       impactGroup.remove();
       threatPoolRef.current.clear();
-      shotPoolRef.current.clear();
+      engagementPoolRef.current.clear();
       impactPoolRef.current.clear();
       threatGroupRef.current = null;
-      shotGroupRef.current = null;
+      engagementGroupRef.current = null;
       impactGroupRef.current = null;
     };
   }, [map]);
 
   useEffect(() => {
-    latestRef.current = { threats, shots, impacts, elapsedMs, mapMode, reducedQuality };
+    latestRef.current = { threats, engagements, impacts, elapsedMs, mapMode, reducedQuality };
     if (lastSyncedElapsedMsRef.current !== elapsedMs) {
       lastSyncedElapsedMsRef.current = elapsedMs;
       syncAtRef.current = performance.now();
     }
     const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
     const threatGroup = threatGroupRef.current;
-    const shotGroup = shotGroupRef.current;
+    const engagementGroup = engagementGroupRef.current;
     const impactGroup = impactGroupRef.current;
-    if (!threatGroup || !shotGroup || !impactGroup) return;
+    if (!threatGroup || !engagementGroup || !impactGroup) return;
 
     const threatIds = new Set(threats.map((threat) => threat.id));
     for (const [id, pooled] of threatPoolRef.current) {
@@ -681,33 +762,45 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
       }
     }
 
-    const shotIds = new Set(shots.map((shot) => shot.id));
-    for (const [id, pooled] of shotPoolRef.current) {
-      if (!shotIds.has(id)) {
-        pooled.marker.remove();
-        pooled.route.remove();
-        shotPoolRef.current.delete(id);
+    const engagementIds = new Set(engagements.map((event) => event.id));
+    for (const [id, pooled] of engagementPoolRef.current) {
+      if (!engagementIds.has(id)) {
+        pooled.projectile.remove();
+        pooled.effect.remove();
+        pooled.routes.forEach((route) => route.remove());
+        engagementPoolRef.current.delete(id);
       }
     }
-    for (const shot of shots) {
-      let pooled = shotPoolRef.current.get(shot.id);
-      const current = interpolatedShotPosition(shot, elapsedSinceSync);
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const touchLike = window.matchMedia("(pointer: coarse)").matches;
+    for (const [engagementIndex, event] of engagements.entries()) {
+      let pooled = engagementPoolRef.current.get(event.id);
+      const simplified = reducedQuality || touchLike || prefersReducedMotion || engagementIndex >= 10;
+      const current = engagementPosition(event);
       const pathOptions = {
-        color: shot.style === "gun" ? "#ffd466" : shot.style === "drone" ? "#f6c547" : shot.style === "ew" ? "#b79af4" : "#ffef9a",
-        weight: shot.style === "gun" ? 2 : 1,
-        opacity: reducedQuality ? 0.52 : 0.74,
-        dashArray: shot.style === "missile" ? "8 5" : shot.style === "gun" ? "2 7" : "4 5",
+        color: event.style === "gun" ? "#ffd466" : event.style === "ew" ? "#b79af4" : event.style === "drone" ? "#f6c547" : "#ffef9a",
+        weight: event.style === "gun" ? (simplified ? 1.25 : 1.8) : event.style === "ew" ? 1.4 : 1.2,
+        opacity: 0,
+        dashArray: event.style === "ew" ? "4 6" : undefined,
         interactive: false,
       };
       if (!pooled) {
+        const routeCount = event.style === "gun" ? (simplified ? 3 : 5) : 1;
+        const routes = Array.from({ length: routeCount }, () => L.polyline(
+          [[event.startPosition.lat, event.startPosition.lng], [current.lat, current.lng]],
+          pathOptions,
+        ).addTo(engagementGroup));
+        const phase = engagementVisualPhase(event, event.progress);
         pooled = {
-          marker: L.marker([current.lat, current.lng], { icon: makeShotIcon(), interactive: false }).addTo(shotGroup),
-          route: L.polyline([[shot.from.lat, shot.from.lng], [current.lat, current.lng]], pathOptions).addTo(shotGroup),
+          projectile: L.marker([current.lat, current.lng], { icon: makeEngagementProjectileIcon(event.style, simplified), interactive: false, keyboard: false, zIndexOffset: 820 }).addTo(engagementGroup),
+          routes,
+          effect: L.marker([event.targetPredictedPosition.lat, event.targetPredictedPosition.lng], { icon: makeEngagementEffectIcon(event.style, phase, simplified), interactive: false, keyboard: false, zIndexOffset: 830 }).addTo(engagementGroup),
+          phase,
+          simplified,
         };
-        shotPoolRef.current.set(shot.id, pooled);
-      } else {
-        pooled.route.setStyle(pathOptions);
+        engagementPoolRef.current.set(event.id, pooled);
       }
+      updateEngagementVisual(map, event, pooled, interpolatedEngagementProgress(event, elapsedSinceSync));
     }
 
     const renderedImpacts = reducedQuality ? impacts.slice(0, MAX_RENDERED_IMPACTS_LOW_FPS) : impacts;
@@ -726,7 +819,7 @@ function MovingObjectsLayer({ threats, shots, impacts, elapsedMs, mapMode, reduc
         );
       }
     }
-  }, [threats, shots, impacts, elapsedMs, mapMode, reducedQuality]);
+  }, [threats, engagements, impacts, elapsedMs, mapMode, reducedQuality]);
 
   return null;
 }
@@ -794,7 +887,7 @@ export function TacticalMap() {
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
   const liveThreats = game.liveThreats;
-  const interceptorShots = game.interceptorShots;
+  const engagementEvents = game.engagementEvents;
   const impactMarkers = game.impactMarkers;
   const sectorActivity = game.launchSectors;
   const elapsedMs = game.elapsedMs;
@@ -846,9 +939,12 @@ export function TacticalMap() {
     () => liveThreats.filter((threat) => threat.revealed && lineInBounds(threatPosition(threat), threat.target, renderBounds)),
     [liveThreats, renderBounds],
   );
-  const visibleShots = useMemo(
-    () => interceptorShots.filter((shot) => lineInBounds(shot.from, shotPosition(shot), renderBounds)),
-    [interceptorShots, renderBounds],
+  const visibleEngagements = useMemo(
+    () => engagementEvents
+      .filter((event) => lineInBounds(event.startPosition, event.targetPredictedPosition, renderBounds))
+      .sort((left, right) => Number(left.style === "radar") - Number(right.style === "radar") || right.startedAtMs - left.startedAtMs)
+      .slice(0, 32),
+    [engagementEvents, renderBounds],
   );
   const visibleImpactMarkers = useMemo(
     () => impactMarkers.filter((marker) => pointInBounds(marker.position, renderBounds)),
@@ -870,7 +966,7 @@ export function TacticalMap() {
       + game.carriers.length
       + game.batteries.length
       + liveThreats.length
-      + interceptorShots.length
+      + engagementEvents.length
       + impactMarkers.length
       + (mapMode === "logistics" ? game.logistics.routes.length : 0);
     const renderedObjects = visibleCities.length
@@ -878,7 +974,7 @@ export function TacticalMap() {
       + visibleCarriers.length
       + visibleBatteries.length
       + visibleThreats.length
-      + visibleShots.length
+      + visibleEngagements.length
       + visibleImpactMarkers.length
       + visibleCoverageBatteries.length
       + visibleRoutes.length
@@ -896,7 +992,7 @@ export function TacticalMap() {
     game.carriers.length,
     game.batteries.length,
     liveThreats.length,
-    interceptorShots.length,
+    engagementEvents.length,
     impactMarkers.length,
     game.logistics.routes.length,
     mapMode,
@@ -910,7 +1006,7 @@ export function TacticalMap() {
     visibleDebugLaunchPoints.length,
     visibleOccupiedZonePolygons.length,
     visibleRoutes.length,
-    visibleShots.length,
+    visibleEngagements.length,
     visibleThreats.length,
   ]);
   const performanceStats = usePerformanceStats(renderCounts);
@@ -949,7 +1045,7 @@ export function TacticalMap() {
         <DesktopPlacementPreview />
         <MovingObjectsLayer
           threats={visibleThreats}
-          shots={visibleShots}
+          engagements={visibleEngagements}
           impacts={visibleImpactMarkers}
           elapsedMs={elapsedMs}
           mapMode={mapMode}

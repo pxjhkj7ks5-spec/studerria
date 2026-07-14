@@ -22,12 +22,12 @@ export default defineConfig({
     },
     {
       name: "desktop-chromium-zoom",
-      testMatch: /desktop-zoom\.spec\.ts/,
+      testMatch: /(desktop-zoom|engagement-animations)\.spec\.ts/,
       use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
     },
     {
       name: "desktop-webkit-zoom",
-      testMatch: /desktop-zoom\.spec\.ts/,
+      testMatch: /(desktop-zoom|engagement-animations)\.spec\.ts/,
       use: { browserName: "webkit", viewport: { width: 1440, height: 900 } },
     },
   ],

@@ -14,10 +14,10 @@ import type {
   CityId,
   Coordinates,
   DefenseBattery,
+  EngagementEvent,
   GameState,
   ImpactMarker,
   IntelEntry,
-  InterceptorShot,
   LaunchSector,
   LiveThreat,
   PendingLaunch,
@@ -120,7 +120,12 @@ function cloneState(state: GameState): GameState {
       target: { ...threat.target },
       lastKnownPosition: threat.lastKnownPosition ? { ...threat.lastKnownPosition } : undefined,
     })),
-    interceptorShots: state.interceptorShots.map((shot) => ({ ...shot, from: { ...shot.from }, to: { ...shot.to } })),
+    engagementEvents: state.engagementEvents.map((event) => ({
+      ...event,
+      startPosition: { ...event.startPosition },
+      targetStartPosition: { ...event.targetStartPosition },
+      targetPredictedPosition: { ...event.targetPredictedPosition },
+    })),
     impactMarkers: state.impactMarkers.map((marker) => ({ ...marker, position: { ...marker.position } })),
     log: state.log.map((entry) => ({ ...entry })),
     forecast: { ...state.forecast },
@@ -591,6 +596,7 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
     const position = threatPosition(threat);
     const wasRevealed = threat.revealed;
     let bestRadarChance = 0;
+    let bestRadar: DefenseBattery | null = null;
     for (const battery of state.batteries) {
       const unit = getUnitDefinition(battery.kind);
       if (unit.engagementMode !== "detect" || battery.status === "maintenance") continue;
@@ -601,7 +607,10 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
       const readinessFactor = 0.58 + (battery.readiness / 100) * 0.42;
       const planningBoost = (highAlert ? 8 : 0) + (intelFocus ? 6 : 0);
       const chance = clamp(bandChance * statusPenalty * readinessFactor + planningBoost - threat.difficulty * 0.08, 5, 98);
-      bestRadarChance = Math.max(bestRadarChance, chance);
+      if (chance > bestRadarChance) {
+        bestRadarChance = chance;
+        bestRadar = battery;
+      }
     }
 
     threat.revealed = bestRadarChance > 0;
@@ -622,21 +631,25 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
       const firstContactBoost = wasRevealed ? 0 : 8 + random() * 8;
       threat.confidence = clamp(threat.confidence + (bestRadarChance / 100) * 8 + firstContactBoost + (intelFocus ? 6 : 0), 0, 100);
       if (!wasRevealed) {
+        if (bestRadar) queueEngagementEvent(state, random, bestRadar, threat, "radar", "detected");
         pushLog(state.log, state.elapsedMs, "Радарний контакт", `${threat.isFalseTrack ? "Ціль із низькою достовірністю" : "Ціль"} увійшла в зону радіолокаційного покриття.`, "info", { eventType: "detection", locationLabel: threat.targetCityId });
       }
     }
   }
 }
 
-function updateShots(state: GameState, deltaMs: number, random: () => number) {
+function updateEngagements(state: GameState, deltaMs: number, random: () => number) {
   const resolvedThreatIds = new Set<string>();
   const threatById = new Map(state.liveThreats.map((threat) => [threat.id, threat]));
-  const nextShots: InterceptorShot[] = [];
-  for (const shot of state.interceptorShots) {
-    const nextProgress = shot.progress + shot.speed * deltaMs;
-    if (nextProgress >= 1) {
-      const threat = threatById.get(shot.threatId);
-      if (threat) {
+  const nextEvents: EngagementEvent[] = [];
+  for (const event of state.engagementEvents) {
+    const nextProgress = clamp(event.progress + deltaMs / event.durationMs, 0, 1);
+    const nextEvent = { ...event, progress: nextProgress };
+    if (!event.resolved && nextProgress >= 0.82) {
+      nextEvent.resolved = true;
+      const threat = threatById.get(event.targetId);
+      const battery = state.batteries.find((item) => item.id === event.unitId);
+      if (event.result === "success" && threat) {
         threat.status = "intercepted";
         resolvedThreatIds.add(threat.id);
         state.interceptions += 1;
@@ -647,13 +660,26 @@ function updateShots(state: GameState, deltaMs: number, random: () => number) {
           tone: "intercept",
           ttlMs: 1800,
         });
-        pushLog(state.log, state.elapsedMs, "Intercept Confirmed", `A defense unit neutralized ${threat.kind}. Reward +${threat.reward} mln UAH.`, "success");
+        pushLog(state.log, state.elapsedMs, "Перехоплення успішне", `Повітряну ціль нейтралізовано. Винагорода +${threat.reward} млн ₴.`, "success");
+      } else if (event.result === "miss" && threat) {
+        threat.status = "inbound";
+        pushLog(state.log, state.elapsedMs, "Промах", "Перехоплювач не уразив ціль. Ціль продовжує рух.", "warning");
+      } else if (event.result !== "detected") {
+        pushLog(state.log, state.elapsedMs, "Втрачено супровід", "Контакт вийшов із супроводу до завершення відпрацювання.", "warning");
       }
-    } else {
-      nextShots.push({ ...shot, progress: nextProgress });
+      if (battery && battery.status === "engaging") {
+        const unit = getUnitDefinition(battery.kind);
+        if (unit.ammoCapacity !== "infinite" && unit.ammoCapacity !== 0 && battery.currentAmmo === 0) {
+          battery.status = "reloading";
+          battery.lastAction = "reloading";
+        } else {
+          battery.status = battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
+        }
+      }
     }
+    if (nextProgress < 1) nextEvents.push(nextEvent);
   }
-  state.interceptorShots = nextShots;
+  state.engagementEvents = nextEvents;
   if (resolvedThreatIds.size) {
     state.liveThreats = state.liveThreats.filter((threat) => !resolvedThreatIds.has(threat.id));
   }
@@ -675,10 +701,8 @@ function consumeLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: D
   }
   battery.currentAmmo = Math.max(0, battery.currentAmmo - Math.max(1, unit.salvoSize));
   if (battery.currentAmmo === 0) {
-    battery.status = "reloading";
     battery.reloadRemainingMs = unit.reloadMs;
-    battery.lastAction = "reloading";
-    battery.lastEngagementResult = "empty - reloading";
+    battery.lastEngagementResult = "empty after engagement";
   }
 }
 
@@ -698,11 +722,54 @@ function threatPriority(kind: ThreatKind) {
   return 8;
 }
 
-function shotStyleForUnit(kind: UnitKind) {
+export function engagementStyleForUnit(kind: UnitKind) {
   if (kind === "mvg" || kind === "boat" || kind === "gepard") return "gun" as const;
   if (kind === "drone-operators") return "drone" as const;
   if (kind === "ew") return "ew" as const;
   return "missile" as const;
+}
+
+function engagementDurationMs(style: EngagementEvent["style"]) {
+  if (style === "radar") return 900;
+  if (style === "gun") return 1_050;
+  if (style === "ew") return 1_250;
+  if (style === "drone") return 1_450;
+  return 1_650;
+}
+
+function predictedThreatPosition(threat: LiveThreat, durationMs: number) {
+  const predictedProgress = clamp(threat.progress + threat.speed * durationMs * 0.82, 0, 1);
+  return {
+    lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * predictedProgress,
+    lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * predictedProgress,
+  };
+}
+
+function queueEngagementEvent(
+  state: GameState,
+  random: () => number,
+  battery: DefenseBattery,
+  threat: LiveThreat,
+  style: EngagementEvent["style"],
+  result: EngagementEvent["result"],
+) {
+  const durationMs = engagementDurationMs(style);
+  const targetStartPosition = threatPosition(threat);
+  state.engagementEvents.push({
+    id: createId("engagement", Math.floor(state.elapsedMs), random),
+    unitId: battery.id,
+    targetId: threat.id,
+    unitType: battery.kind,
+    startPosition: { ...battery.position },
+    targetStartPosition,
+    targetPredictedPosition: predictedThreatPosition(threat, durationMs),
+    result,
+    startedAtMs: state.elapsedMs,
+    durationMs,
+    progress: 0,
+    resolved: false,
+    style,
+  });
 }
 
 function engagementChance(
@@ -759,29 +826,20 @@ function engageThreats(state: GameState, random: () => number) {
     }
     if (!candidate) continue;
 
+    const style = engagementStyleForUnit(battery.kind);
     consumeLocalAmmo(unit, battery);
     setShotCooldown(battery, unit, random, candidate.outerBand);
-    if (!weightedChance(candidate.chance, random)) {
-      battery.lastEngagementResult = `missed ${candidate.threat.kind} (${Math.round(candidate.chance)}%)`;
-      applyEngagementFatigue(battery, unit.engagementMode === "disrupt" ? 0 : unit.salvoSize, false);
-      continue;
-    }
-
+    const success = weightedChance(candidate.chance, random);
     candidate.threat.status = "engaged";
     candidate.threat.confidence = clamp(candidate.threat.confidence + 18, 0, 100);
-    battery.lastEngagementResult = `${unit.engagementMode === "disrupt" ? "suppressed" : "hit"} ${candidate.threat.kind} (${Math.round(candidate.chance)}%)`;
-    applyEngagementFatigue(battery, unit.engagementMode === "disrupt" ? 0 : unit.salvoSize, true);
-    state.interceptorShots.push({
-      id: createId("shot", Math.floor(state.elapsedMs), random),
-      batteryId: battery.id,
-      threatId: candidate.threat.id,
-      from: battery.position,
-      to: threatPosition(candidate.threat),
-      progress: 0,
-      speed: 0.0017,
-      style: shotStyleForUnit(battery.kind),
-    });
-    pushLog(state.log, state.elapsedMs, "Engagement", `${unit.shortName} engaged a ${candidate.threat.kind} track at ${Math.round(candidate.chance)}% confidence-adjusted chance.`, "info");
+    battery.status = "engaging";
+    battery.lastAction = "engaging target";
+    battery.lastEngagementResult = `${success ? "pending intercept" : "pending miss"} ${candidate.threat.kind} (${Math.round(candidate.chance)}%)`;
+    applyEngagementFatigue(battery, unit.engagementMode === "disrupt" ? 0 : unit.salvoSize, success);
+    battery.status = "engaging";
+    queueEngagementEvent(state, random, battery, candidate.threat, style, success ? "success" : "miss");
+    const action = style === "gun" ? "Черга по цілі" : style === "ew" ? "РЕБ взяла ціль у роботу" : "Пуск перехоплювача";
+    pushLog(state.log, state.elapsedMs, action, `${unit.shortName}: ціль у супроводі, розрахункова ймовірність ${Math.round(candidate.chance)}%.`, style === "ew" ? "warning" : "info");
   }
 }
 
@@ -1014,7 +1072,7 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   maybeSpawnThreat(state, safeDelta, random);
   detectThreats(state, random, Math.floor(previousElapsedMs / 1000) !== Math.floor(state.elapsedMs / 1000));
   engageThreats(state, random);
-  updateShots(state, safeDelta, random);
+  updateEngagements(state, safeDelta, random);
   updateThreats(state, safeDelta, random);
   updateCityAlerts(state);
   evaluateLiveStatus(state);

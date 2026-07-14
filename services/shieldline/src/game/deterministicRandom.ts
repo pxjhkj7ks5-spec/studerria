@@ -1,4 +1,4 @@
-export const SIM_VERSION = "2.0.0";
+export const SIM_VERSION = "2.1.0";
 
 function hash32(value: string) {
   let hash = 2166136261;

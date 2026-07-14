@@ -98,7 +98,7 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
     batteries: [],
     storedBatteries: [],
     liveThreats: [],
-    interceptorShots: [],
+    engagementEvents: [],
     impactMarkers: [],
     interceptions: 0,
     impacts: 0,

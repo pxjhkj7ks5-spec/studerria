@@ -84,6 +84,23 @@ export function normalizePersistedGame(game: GameState | null) {
       return Boolean(sector && validCoordinates(launch.origin) && sectorSupportsThreat(sector, launch.kind));
     })
     .map((launch) => ({ ...launch, origin: { ...launch.origin } }));
+  const engagementEvents = (Array.isArray(game.engagementEvents) ? game.engagementEvents : [])
+    .filter((event) => event
+      && validCoordinates(event.startPosition)
+      && validCoordinates(event.targetStartPosition)
+      && validCoordinates(event.targetPredictedPosition)
+      && Number.isFinite(event.durationMs)
+      && event.durationMs > 0
+      && Number.isFinite(event.progress)
+      && event.progress >= 0
+      && event.progress < 1)
+    .map((event) => ({
+      ...event,
+      startPosition: { ...event.startPosition },
+      targetStartPosition: { ...event.targetStartPosition },
+      targetPredictedPosition: { ...event.targetPredictedPosition },
+    }));
+  const engagedTargetIds = new Set(engagementEvents.filter((event) => event.style !== "radar" && !event.resolved).map((event) => event.targetId));
   const liveThreats = (Array.isArray(game.liveThreats) ? game.liveThreats : [])
     .filter((threat) => threat.id !== "opening-track-1"
       && validCoordinates(threat.origin)
@@ -95,6 +112,7 @@ export function normalizePersistedGame(game: GameState | null) {
       && threat.speed > 0)
     .map((threat) => ({
       ...threat,
+      status: threat.status === "engaged" && !engagedTargetIds.has(threat.id) ? "inbound" as const : threat.status,
       ...(() => {
         const fallback = threatTelemetryFor(threat.kind, threat.id);
         return {
@@ -114,6 +132,7 @@ export function normalizePersistedGame(game: GameState | null) {
     carriers: Array.isArray(game.carriers) ? game.carriers : [],
     storedBatteries: (Array.isArray(game.storedBatteries) ? game.storedBatteries : []).map((battery) => ({ ...battery, position: { ...battery.position } })),
     liveThreats,
+    engagementEvents,
   };
 }
 
@@ -336,7 +355,7 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 17,
+      version: 18,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         const migratedGame = normalizePersistedGame(state.game || null);

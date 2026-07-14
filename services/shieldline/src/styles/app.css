@@ -3488,6 +3488,9 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .command-drawer { animation: none; }
+  .map-marker--unit-engaging,
+  .engagement-effect i { animation: none !important; }
+  .engagement-effect i { width: 18px; height: 18px; opacity: .72; }
 }
 
 /* Tactical operations polish: live intel, combat modules and desktop placement preview. */
@@ -3623,6 +3626,7 @@ button {
   border-left-color: var(--unit-state);
 }
 .unit-card--state-ready { --unit-state: rgba(114, 214, 154, .55); }
+.unit-card--state-engaging { --unit-state: rgba(255, 158, 66, .78); }
 .unit-card--state-warning { --unit-state: rgba(246, 197, 71, .72); }
 .unit-card--state-danger { --unit-state: rgba(255, 98, 90, .8); }
 .unit-card--state-offline { --unit-state: rgba(167, 165, 156, .38); }
@@ -3640,6 +3644,7 @@ button {
   background: rgba(0, 0, 0, .22);
 }
 .unit-status--ready { color: var(--green) !important; }
+.unit-status--engaging { color: #ff9e42 !important; }
 .unit-status--warning { color: var(--amber) !important; }
 .unit-status--danger { color: var(--red) !important; }
 .unit-status--offline { color: var(--muted) !important; }
@@ -3691,6 +3696,7 @@ button {
 .log-entry--launch { --event-tone: #ff9e42; }
 .log-entry--hit { --event-tone: #ff625a; }
 .log-entry--intercept { --event-tone: #72d69a; }
+.log-entry--miss { --event-tone: #dc8e66; }
 .log-entry--report { --event-tone: #a7b7c6; }
 .log-entry > svg { width: 17px; color: var(--event-tone, var(--muted)); }
 .log-entry > span { align-self: start; color: var(--muted); font: 9px/1.2 "SFMono-Regular", Consolas, monospace; }
@@ -3726,10 +3732,95 @@ button {
 .placement-preview-ring--primary { filter: drop-shadow(0 0 3px rgba(246, 197, 71, .34)); }
 .placement-preview-ring--outer { opacity: .82; }
 
+.map-marker--unit-engaging {
+  filter: brightness(1.28) drop-shadow(0 0 7px rgba(255, 158, 66, .78));
+  animation: unit-engaging-pulse .58s ease-in-out infinite alternate;
+}
+
+.engagement-projectile,
+.engagement-effect {
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.engagement-projectile { position: relative; width: 18px; height: 18px; }
+.engagement-projectile i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border: 1px solid rgba(255, 255, 255, .88);
+  border-radius: 50%;
+  background: #ffef9a;
+  box-shadow: 0 0 5px #fff2ad, 0 0 11px rgba(255, 158, 66, .78);
+  transform: translate(-50%, -50%);
+}
+.engagement-projectile--gun i,
+.engagement-projectile--radar i { opacity: 0; }
+.engagement-projectile--drone i { border-radius: 2px; background: #f6c547; }
+.engagement-projectile--ew i { width: 8px; height: 8px; border-color: #d8c5ff; background: rgba(183, 154, 244, .3); box-shadow: 0 0 10px rgba(183, 154, 244, .78); }
+
+.engagement-effect {
+  position: relative;
+  width: 86px;
+  height: 44px;
+  color: #f6c547;
+  font: 800 8px/1 "SFMono-Regular", Consolas, monospace;
+  letter-spacing: .08em;
+  text-align: center;
+}
+.engagement-effect i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 19px;
+  height: 19px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: .8;
+  transform: translate(-50%, -50%);
+}
+.engagement-effect b {
+  position: absolute;
+  top: calc(50% + 13px);
+  left: 50%;
+  padding: 2px 4px;
+  border: 1px solid color-mix(in srgb, currentColor 42%, transparent);
+  border-radius: 3px;
+  background: rgba(7, 8, 8, .86);
+  font: inherit;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.engagement-effect--lock i { animation: engagement-lock 650ms ease-out infinite; }
+.engagement-effect--travel { color: #ff9e42; }
+.engagement-effect--travel i { width: 12px; height: 12px; border-style: dashed; animation: engagement-spin 900ms linear infinite; }
+.engagement-effect--success { color: #72d69a; }
+.engagement-effect--success i { animation: engagement-shock 420ms ease-out both; box-shadow: 0 0 9px rgba(114, 214, 154, .55); }
+.engagement-effect--miss { color: #dc8e66; }
+.engagement-effect--miss i { border-style: dashed; animation: engagement-miss 420ms ease-out both; }
+.engagement-effect--detected { color: #f6c547; }
+.engagement-effect--detected i { animation: radar-contact-pulse 520ms ease-out both; }
+.engagement-effect--ew.engagement-effect--travel,
+.engagement-effect--ew.engagement-effect--lock { color: #b79af4; }
+.engagement-effect--ew i { border-radius: 30% 70% 45% 55%; }
+
+@keyframes unit-engaging-pulse { to { filter: brightness(1.6) drop-shadow(0 0 10px rgba(255, 158, 66, .92)); } }
+@keyframes engagement-lock { from { width: 10px; height: 10px; opacity: .9; } to { width: 30px; height: 30px; opacity: 0; } }
+@keyframes engagement-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes engagement-shock { from { width: 8px; height: 8px; opacity: 1; background: rgba(255, 255, 255, .72); } to { width: 38px; height: 38px; opacity: 0; background: transparent; } }
+@keyframes engagement-miss { from { width: 13px; height: 13px; opacity: .9; } to { width: 28px; height: 28px; opacity: 0; transform: translate(-42%, -58%); } }
+@keyframes radar-contact-pulse { from { width: 8px; height: 8px; opacity: 1; } to { width: 34px; height: 34px; opacity: 0; } }
+
 @media (hover: none), (pointer: coarse), (max-width: 820px) {
   .placement-ghost,
   .placement-preview-card,
   .placement-preview-ring { display: none !important; }
+  .engagement-effect { transform: scale(.82); }
+  .engagement-effect b { font-size: 7px; }
+  .engagement-projectile i { box-shadow: 0 0 5px rgba(255, 239, 154, .7); }
 }
 
 @media (max-width: 820px), (max-width: 920px) and (max-height: 520px) {

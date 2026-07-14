@@ -20,7 +20,8 @@ const weatherLabel: Record<GameState["forecast"]["weather"], string> = {
 
 function eventVisual(entry: GameState["log"][number]) {
   const key = entry.title.toLowerCase();
-  if (entry.eventType === "launch" || key.includes("пуск") || key.includes("launch")) return { kind: "launch", Icon: Rocket };
+  if (key.includes("промах") || key.includes("втрачено супровід")) return { kind: "miss", Icon: Target };
+  if (entry.eventType === "launch" || key.includes("пуск") || key.includes("launch") || key.includes("черга")) return { kind: "launch", Icon: Rocket };
   if (entry.eventType === "detection" || key.includes("радар") || key.includes("track") || key.includes("ціль")) return { kind: "radar", Icon: Radio };
   if (key.includes("intercept") || key.includes("перехоп")) return { kind: "intercept", Icon: ShieldCheck };
   if (key.includes("impact") || key.includes("влуч")) return { kind: "hit", Icon: Target };

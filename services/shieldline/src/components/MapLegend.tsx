@@ -37,7 +37,7 @@ export function MapLegend({ mode, game, embedded = false }: MapLegendProps) {
       <div className="intel-panel__metrics">
         <IntelMetric label="Контакти" value={activeContacts} tone="radar" />
         <IntelMetric label="Підтверджено" value={confirmedTargets} tone="confirmed" />
-        <IntelMetric label="Перехоплення" value={game.interceptorShots.length} tone="intercepted" />
+        <IntelMetric label="Перехоплення" value={game.engagementEvents.filter((event) => event.style !== "radar" && !event.resolved).length} tone="intercepted" />
         <IntelMetric label="Влучання" value={game.impacts} tone="impact" />
       </div>
       <div className="intel-panel__safety">
