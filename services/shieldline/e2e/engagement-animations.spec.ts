@@ -27,6 +27,27 @@ async function setEngagement(page: import("@playwright/test").Page, result: "suc
   }, { result, progress });
 }
 
+async function setBattleNotice(page: import("@playwright/test").Page) {
+  await page.evaluate(async () => {
+    const { useGameStore } = await import("/shieldline/src/store/useGameStore.ts");
+    const current = useGameStore.getState().game;
+    useGameStore.setState({
+      game: {
+        ...current,
+        log: [{
+          id: "desktop-launch-notice",
+          time: "T+00:01",
+          title: "Missile Launch",
+          body: "Launch detected.",
+          tone: "danger",
+          eventType: "launch",
+          locationLabel: "kharkiv",
+        }, ...current.log],
+      },
+    });
+  });
+}
+
 test("engagement visuals stay Leaflet-native and distinguish success from miss", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
@@ -54,4 +75,23 @@ test("engagement visuals stay Leaflet-native and distinguish success from miss",
   await expect(page.locator(".engagement-effect--success")).toBeVisible();
   const after = await page.locator(".engagement-effect--success").boundingBox();
   expect(before && after && Number.isFinite(after.x) && Number.isFinite(after.y)).toBeTruthy();
+});
+
+test("desktop shows the same live battle notices as mobile", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("shieldline-tutorial-complete-v1", "true");
+    localStorage.setItem("shieldline-live-v7", JSON.stringify({
+      state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
+      version: 18,
+    }));
+  });
+  await page.goto("/shieldline/?legacy=1&mode=training");
+  await expect(page.locator(".shell--mobile-live")).toHaveCount(0);
+
+  await setBattleNotice(page);
+
+  const notice = page.locator(".map-feedback-slot--launch");
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText("Пуски: Харків");
+  await expect(notice).toBeHidden({ timeout: 6_000 });
 });

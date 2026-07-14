@@ -186,12 +186,11 @@ export default function App() {
   useEffect(() => bindTelegramBackButton(returnToCommandModes), []);
 
   useEffect(() => {
-    if (!isMobileLive) return;
     const latest = game.log.find((entry) => entry.eventType === "launch" || entry.eventType === "detection");
     if (!latest || latest.id === latestNoticeIdRef.current) return;
     latestNoticeIdRef.current = latest.id;
     setBattleNotice((current) => preferBattleNotice(current, latest));
-  }, [game.log, isMobileLive]);
+  }, [game.log]);
 
   useEffect(() => {
     if (!battleNotice) return undefined;
@@ -388,7 +387,7 @@ export default function App() {
           </div>
           <ResourceBar game={game} operationPhase={operationPhase} mobile={isMobileLive} />
         </header>
-        {isMobileLive && (battleNotice || placementUnit) ? (
+        {battleNotice || (isMobileLive && placementUnit) ? (
           <div className={`map-feedback-slot ${battleNotice ? `map-feedback-slot--${battleNotice.eventType}` : "map-feedback-slot--placement"}`} role="status" aria-live="assertive">
             {battleNotice ? (
               <>
