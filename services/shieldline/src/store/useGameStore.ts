@@ -8,7 +8,7 @@ import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBat
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
-import { advanceCampaignMission as advanceCampaignMissionState, applyCampaignMissionOpening, createCampaignState, serviceCampaignBattery } from "../game/campaignMeta";
+import { advanceCampaignMission as advanceCampaignMissionState, applyCampaignMissionOpening, createCampaignState, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../game/campaignMeta";
 import type { CampaignAttackSchedule, CampaignMode, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
 
@@ -171,6 +171,7 @@ interface GameStore {
   simulationRandomCursor: number;
   selectCampaignMode: (mode: CampaignMode) => void;
   launchTacticalMode: (mode: GameModeId) => void;
+  openCampaignMission: (missionIndex: number) => void;
   hydrateDailyCity: (city: PersistentDailyCity) => void;
   selectScenario: (scenarioId: string) => void;
   clearScenarioSelection: () => void;
@@ -250,6 +251,32 @@ export const useGameStore = create<GameStore>()(
           simulationSpeed: policy.defaultSpeed,
           simulationSeed: seed,
           simulationRandomCursor: seeded.cursor,
+        });
+      },
+      openCampaignMission: (missionIndex) => {
+        const current = get();
+        if (!current.game.campaign) {
+          if (missionIndex === 1) current.launchTacticalMode("campaign");
+          return;
+        }
+        if (missionIndex < 1 || missionIndex > unlockedCampaignMissionIndex(current.game.campaign)) return;
+        const game = structuredClone(current.game);
+        if (game.campaign?.intermission && !game.campaign.completed && missionIndex === game.campaign.missionIndex + 1) {
+          advanceCampaignMissionState(game);
+        }
+        if (!game.campaign || game.campaign.missionIndex !== missionIndex || game.campaign.intermission) return;
+        const readiness = defenseReadinessForMode("campaign", game.batteries.map((battery) => battery.kind));
+        const keepPhase = current.activeGameMode === "campaign" && current.game.campaign?.missionIndex === missionIndex;
+        set({
+          campaignMode: "crisis",
+          activeGameMode: "campaign",
+          pendingCampaignMode: null,
+          mapMode: "live",
+          game,
+          placementKind: null,
+          placementStoredBatteryId: null,
+          operationPhase: keepPhase ? current.operationPhase : readiness.ready ? "countdown" : "planning",
+          countdownRemainingMs: keepPhase ? current.countdownRemainingMs : readiness.ready ? getGameModeRuntimePolicy("campaign").countdownMs : 0,
         });
       },
       hydrateDailyCity: (city) => {

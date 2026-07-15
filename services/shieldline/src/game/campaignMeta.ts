@@ -52,6 +52,12 @@ export function createCampaignState(missionIndex = 1, wallet = 0): CampaignState
   };
 }
 
+export function unlockedCampaignMissionIndex(campaign: CampaignState | null | undefined) {
+  if (!campaign) return 1;
+  if (campaign.completed) return 5;
+  return Math.min(5, campaign.missionIndex + (campaign.intermission ? 1 : 0));
+}
+
 export function applyCampaignMissionOpening(state: GameState) {
   if (!state.campaign || state.campaign.missionGrantApplied) return;
   const mission = getCampaignMission(state.campaign.missionIndex);

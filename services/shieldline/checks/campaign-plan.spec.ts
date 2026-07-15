@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, getCampaignMission, missionTargetCount } from "../src/data/campaignPlan";
-import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery } from "../src/game/campaignMeta";
+import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
 import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/game/campaignLaunchZones";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
@@ -17,6 +17,18 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [29, 41, 58, 78, 103]);
   assert.equal(campaignMissionsPlan.slice(0, 3).some((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), false);
   assert.equal(campaignMissionsPlan.slice(3).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
+});
+
+test("campaign mission selection unlocks only the next sequential mission", () => {
+  const campaign = createCampaignState();
+  assert.equal(unlockedCampaignMissionIndex(campaign), 1);
+  campaign.intermission = true;
+  assert.equal(unlockedCampaignMissionIndex(campaign), 2);
+  campaign.missionIndex = 4;
+  assert.equal(unlockedCampaignMissionIndex(campaign), 5);
+  campaign.missionIndex = 5;
+  campaign.completed = true;
+  assert.equal(unlockedCampaignMissionIndex(campaign), 5);
 });
 
 test("authored waves expand to deterministic individual spawn events with grouping metadata", () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, ArrowLeft, BarChart3, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Play, Radio, Shield, ShieldCheck, Swords, Trophy, UserRound, Users, Waves, Zap } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, Check, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Lock, Play, Radio, Shield, ShieldCheck, Swords, Trophy, UserRound, Users, Waves, Zap } from "lucide-react";
 import { AccountSettings } from "./AccountSettings";
 import { useAuth } from "./AuthGate";
 import { apiGameRepository } from "../data/apiGameRepository";
@@ -9,6 +9,7 @@ import { setTelegramNotificationPreference, telegramCommandFeedback } from "../p
 import { t } from "../platform/i18n";
 import { trackAnalytics } from "../platform/analytics";
 import { useGameStore } from "../store/useGameStore";
+import { unlockedCampaignMissionIndex } from "../game/campaignMeta";
 import type { CoOpRoom, DailyReport, GameModeId, LeaderboardEntry, MissionRun, SectorId } from "../domain/contracts";
 
 type Screen = "modes" | "briefing" | "operation" | "report" | "daily" | "ranking" | "coop";
@@ -20,6 +21,7 @@ const sectorNames: Record<Exclude<SectorId, "hq">, string> = { north: "North", s
 export function CommandApp() {
   const [screen, setScreen] = useState<Screen>("modes");
   const [selectedMode, setSelectedMode] = useState<GameModeId>("campaign");
+  const [selectedCampaignMission, setSelectedCampaignMission] = useState(1);
   const [run, setRun] = useState<MissionRun | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("operations");
   const [isRunning, setIsRunning] = useState(false);
@@ -27,9 +29,15 @@ export function CommandApp() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [room, setRoom] = useState<CoOpRoom | null>(null);
   const launchTacticalMode = useGameStore((state) => state.launchTacticalMode);
+  const openCampaignMission = useGameStore((state) => state.openCampaignMission);
+  const campaign = useGameStore((state) => state.game.campaign);
   const hydrateDailyCity = useGameStore((state) => state.hydrateDailyCity);
   const dailyCityGame = useGameStore((state) => state.dailyCityGame);
-  const mission = campaignMissions[0];
+  const unlockedMissionIndex = unlockedCampaignMissionIndex(campaign);
+
+  useEffect(() => {
+    setSelectedCampaignMission(unlockedMissionIndex);
+  }, [unlockedMissionIndex]);
 
   useEffect(() => { trackAnalytics("app.open", { surface: "campaign-catalog" }); }, []);
 
@@ -45,13 +53,14 @@ export function CommandApp() {
     return () => window.clearInterval(interval);
   }, [screen]);
 
-  const selectMode = (id: GameModeId) => {
+  const selectMode = (id: GameModeId, missionIndex = 1) => {
     if (id === "co-op-command") {
       void apiGameRepository.getCoOpRoom("kyiv-01").then((nextRoom) => { setRoom(nextRoom); setScreen("coop"); });
       return;
     }
     if (id === "campaign") {
       setSelectedMode(id);
+      setSelectedCampaignMission(missionIndex);
       setScreen("briefing");
       return;
     }
@@ -63,8 +72,9 @@ export function CommandApp() {
     setScreen("briefing");
   };
 
-  const openManualCommand = (mode: Exclude<GameModeId, "daily-defense">) => {
-    launchTacticalMode(mode);
+  const openManualCommand = (mode: Exclude<GameModeId, "daily-defense">, missionIndex = 1) => {
+    if (mode === "campaign") openCampaignMission(missionIndex);
+    else launchTacticalMode(mode);
     const url = new URL(window.location.href);
     url.searchParams.set("legacy", "1");
     url.searchParams.set("mode", mode);
@@ -97,12 +107,12 @@ export function CommandApp() {
         if (report && dailyRun) { setDailyReport(report); setRun(dailyRun); setScreen("daily"); telegramCommandFeedback(); }
         return;
       }
-      openManualCommand(selectedMode);
+      openManualCommand(selectedMode, selectedCampaignMission);
     } finally { setIsRunning(false); }
   };
 
-  if (screen === "modes") return <ModeCatalog onSelect={selectMode} />;
-  if (screen === "briefing") return <Briefing modeId={selectedMode} onBack={() => setScreen("modes")} onStart={runMission} isRunning={isRunning} />;
+  if (screen === "modes") return <ModeCatalog onSelect={selectMode} campaign={campaign} unlockedMissionIndex={unlockedMissionIndex} />;
+  if (screen === "briefing") return <Briefing modeId={selectedMode} missionIndex={selectedCampaignMission} onBack={() => setScreen("modes")} onStart={runMission} isRunning={isRunning} />;
   if (screen === "ranking") return <CommandFrame onBack={() => setScreen("modes")}><Ranking entries={leaderboard} /></CommandFrame>;
   if (screen === "coop") return <CommandFrame onBack={() => setScreen("modes")}><Coop room={room} onClaim={async (sectorId) => setRoom(await apiGameRepository.claimCoOpSector("kyiv-01", sectorId))} onEnter={(sectorId) => { window.sessionStorage.setItem("shieldline-coop-session", JSON.stringify({ roomId: "kyiv-01", sectorId })); openManualCommand("co-op-command"); }} /></CommandFrame>;
   if (screen === "daily") return <CommandFrame onBack={() => setScreen("modes")}><DailyDefense report={dailyReport} run={run} /></CommandFrame>;
@@ -124,7 +134,7 @@ export function CommandApp() {
   );
 }
 
-function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
+function ModeCatalog({ onSelect, campaign, unlockedMissionIndex }: { onSelect: (id: GameModeId, missionIndex?: number) => void; campaign: ReturnType<typeof useGameStore.getState>["game"]["campaign"]; unlockedMissionIndex: number }) {
   const { profile } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationState, setNotificationState] = useState<"idle" | "enabled" | "unavailable">("idle");
@@ -141,7 +151,7 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
     <section className="mode-catalog mode-catalog--campaign-only" aria-label="Available game modes">
       {[campaignMode].map((mode) => {
         const Icon = icons[mode.id];
-        return <button className="command-mode-card" type="button" key={mode.id} onClick={() => onSelect(mode.id)}>
+        return <div className="command-mode-stack" key={mode.id}><button className="command-mode-card" type="button" onClick={() => onSelect(mode.id, unlockedMissionIndex)}>
           <span className="mode-icon"><Icon size={21} /></span>
           <span className="mode-card-top"><small>{mode.eyebrow}</small>{mode.availability === "preview" ? <i>Foundation ready</i> : <i className="mode-live">Play</i>}</span>
           <strong>{t("catalog.campaign")}</strong><p>{t("catalog.campaignDesc")}</p>
@@ -150,7 +160,13 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
           <span className="mode-detail"><b>{t("catalog.risk")}</b>{mode.mainRisk}</span>
           <span className="mode-detail"><b>{t("catalog.victory")}</b>{mode.victory}</span>
           <span className="mode-go">{t("catalog.open")} <ChevronRight size={17} /></span>
-        </button>;
+        </button><section className="campaign-mission-picker" aria-label="Вибір місії кампанії"><header><strong>Місії кампанії</strong><span>Прогрес зберігається автоматично</span></header><div>{campaignMissions.map((mission, index) => {
+          const missionIndex = index + 1;
+          const completed = Boolean(campaign?.previousMissionResults.some((result) => result.missionIndex === missionIndex));
+          const available = missionIndex === unlockedMissionIndex && !completed;
+          const locked = missionIndex > unlockedMissionIndex;
+          return <button className={completed ? "is-completed" : available ? "is-available" : ""} type="button" key={mission.id} disabled={!available} onClick={() => onSelect("campaign", missionIndex)}><span>{completed ? <Check size={15} /> : locked ? <Lock size={14} /> : <Play size={14} />} Місія {missionIndex}</span><strong>{mission.title}</strong><small>{completed ? "Пройдена" : available ? campaign ? "Продовжити" : "Доступна" : "Заблокована"}</small></button>;
+        })}</div></section></div>;
       })}
     </section>
     <p className="catalog-roadmap-note">{t("catalog.paused")}</p>
@@ -158,9 +174,9 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
   </main>;
 }
 
-function Briefing({ modeId, onBack, onStart, isRunning }: { modeId: GameModeId; onBack: () => void; onStart: () => void; isRunning: boolean }) {
+function Briefing({ modeId, missionIndex, onBack, onStart, isRunning }: { modeId: GameModeId; missionIndex: number; onBack: () => void; onStart: () => void; isRunning: boolean }) {
   const mode = getGameMode(modeId);
-  const mission = campaignMissions[0];
+  const mission = modeId === "campaign" ? campaignMissions[missionIndex - 1] || campaignMissions[0] : campaignMissions[0];
   return <main className="command-app" aria-label="Mission briefing">
     <header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back"><ArrowLeft size={20} /></button><div className="command-brand"><ShieldCheck size={22} /><span>Mission briefing</span><small>{mode.title}</small></div></header>
     <section className="briefing-screen">

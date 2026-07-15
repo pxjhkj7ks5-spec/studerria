@@ -123,6 +123,8 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
           {game.campaign?.intermission && !game.campaign.completed && onContinueCampaign ? <button type="button" onClick={onContinueCampaign}><ArrowRight size={17} /> До місії {game.campaign.missionIndex + 1}</button> : null}
           <button type="button" onClick={onExit}><LogOut size={17} /> До вибору режимів</button>
         </footer>
+      ) : game.campaign?.intermission && !game.campaign.completed && onContinueCampaign ? (
+        <footer className="aar-actions aar-actions--inline"><button type="button" onClick={onContinueCampaign}><ArrowRight size={17} /> До місії {game.campaign.missionIndex + 1}</button></footer>
       ) : null}
     </section>
   );

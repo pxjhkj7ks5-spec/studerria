@@ -194,6 +194,11 @@ export default function App() {
     setFullscreenReportOpen(false);
     setActivePanel(null);
   }, []);
+  const continueCampaignMission = useCallback(() => {
+    advanceCampaignMission();
+    setFullscreenReportOpen(false);
+    setActivePanel(isMobileLive ? null : "units");
+  }, [advanceCampaignMission, isMobileLive]);
   const handleResetOperation = () => {
     if (tacticalMode === "campaign") window.localStorage.removeItem("shieldline-campaign-operation-v1");
     resetCampaign();
@@ -359,7 +364,11 @@ export default function App() {
     return <ModeSelection onSelect={selectCampaignMode} />;
   }
 
-  const panelItems = isMobileLive ? mobilePanelItems : desktopPanelItems;
+  const panelItems = isMobileLive
+    ? game.campaign?.intermission && !game.campaign.completed
+      ? [mobilePanelItems[0], mobilePanelItems[1], { id: "report" as const, label: "Звіт", icon: ClipboardList }, mobilePanelItems[3], mobilePanelItems[4]]
+      : mobilePanelItems
+    : desktopPanelItems;
   const placementUnit = placementKind ? getUnitDefinition(placementKind) : null;
   const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
   const ownedBatteryKinds = [...game.batteries, ...(game.storedBatteries || [])].map((battery) => battery.kind);
@@ -486,6 +495,7 @@ export default function App() {
                 <HelpCircle size={21} />
                 <div><strong>Як керувати</strong><span>Масштабуйте мапу двома пальцями. Виберіть ППО з каталогу, поверніться на мапу й торкніться дозволеної ділянки.</span></div>
               </section>
+              {game.campaign?.intermission && !game.campaign.completed ? <section className="campaign-next-mission-card"><span>Наступна операція відкрита</span><strong>Місія {game.campaign.missionIndex + 1}</strong><button type="button" onClick={continueCampaignMission}>Перейти до місії {game.campaign.missionIndex + 1}</button></section> : null}
               <button className="reset-button reset-button--secondary menu-exit-button" type="button" onClick={returnToCommandModes}><LogOut size={17} /> До вибору режиму</button>
             </section>
           ) : null}
@@ -529,7 +539,7 @@ export default function App() {
           ) : null}
           {activePanel === "report" ? (
             <section className="drawer-section">
-              <AfterActionReport game={game} rankedResult={rankedResult} authoritativeRun={tacticalMode === "campaign" ? null : authoritativeRun} />
+              <AfterActionReport game={game} rankedResult={rankedResult} authoritativeRun={tacticalMode === "campaign" ? null : authoritativeRun} onContinueCampaign={continueCampaignMission} />
             </section>
           ) : null}
           {activePanel === "settings" ? (
@@ -560,7 +570,7 @@ export default function App() {
             variant="fullscreen"
             onInspectMap={inspectCompletedMap}
             onExit={returnToCommandModes}
-            onContinueCampaign={() => { advanceCampaignMission(); setFullscreenReportOpen(false); setActivePanel("units"); }}
+            onContinueCampaign={continueCampaignMission}
           />
         </div>
       ) : null}
