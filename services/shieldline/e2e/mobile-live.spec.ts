@@ -28,6 +28,8 @@ async function openTrainingLive(page: import("@playwright/test").Page) {
 test("mobile live mode is map-first and uses full-screen panels", async ({ page }, testInfo) => {
   await openTrainingLive(page);
   expect(await page.evaluate(() => (window as typeof window & { __telegramBottomShowCount?: number }).__telegramBottomShowCount)).toBe(0);
+  const setupGuidance = page.locator(".map-feedback-slot--guidance");
+  await expect(setupGuidance).toContainText("Спочатку встановіть радар");
 
   const navigation = page.getByRole("navigation", { name: "Панелі Shieldline" });
   await expect(navigation).toBeVisible();
@@ -80,12 +82,14 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await expect(page.getByText(/ППО можна розміщувати лише в межах України/)).toBeVisible();
   await page.getByRole("button", { name: "Скасувати" }).click();
   await expect(page.getByText(/Розмістіть:/)).toBeHidden();
+  await expect(setupGuidance).toContainText("Спочатку встановіть радар");
 
   await navigation.getByRole("button", { name: "ППО" }).click();
   await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /Radar 35D6/ }).click();
   await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
   await expect(page.locator(".map-marker--battery")).toHaveCount(1);
   await expect(page.locator(".coverage-ring")).toHaveCount(1);
+  await expect(setupGuidance).toContainText("Тепер встановіть бойову ППО");
 
   await navigation.getByRole("button", { name: "ППО" }).click();
   await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ/ }).click();
@@ -93,6 +97,7 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);
   const operationPhase = () => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.operationPhase);
   await expect.poll(operationPhase).toBe("countdown");
+  await expect(setupGuidance).toBeHidden();
   await expect.poll(operationPhase, { timeout: 8_000 }).toBe("running");
   expect(await page.evaluate(() => (window as typeof window & { __telegramBottomShowCount?: number }).__telegramBottomShowCount)).toBe(0);
 

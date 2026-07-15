@@ -172,10 +172,6 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                   <span>{storedBattery ? "На складі" : localBattery?.supplyStatus || "Не розміщена"}</span>
                 </div>
               </div>
-              <div className="readiness-track" aria-label={`Готовність ${unit.name}`}>
-                <i style={{ width: `${Math.round(readiness)}%` }} />
-              </div>
-              <span className="readiness-caption">Готовність {Math.round(readiness)}%</span>
               <div className={`fatigue-track fatigue-track--${fatigue > 70 ? "danger" : fatigue > 45 ? "warning" : "stable"}`} aria-label={`Втома ${unit.name}`}>
                 <i style={{ width: `${Math.round(fatigue)}%` }} />
               </div>

@@ -15,7 +15,7 @@ import { UnitRail } from "./components/UnitRail";
 import { CommandApp } from "./components/CommandApp";
 import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
-import { getGameModeRuntimePolicy } from "./data/gameModes";
+import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
 import { campaignMissions } from "./data/missions";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
@@ -342,6 +342,12 @@ export default function App() {
 
   const panelItems = isMobileLive ? mobilePanelItems : desktopPanelItems;
   const placementUnit = placementKind ? getUnitDefinition(placementKind) : null;
+  const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
+  const setupGuidance = operationPhase === "planning" && runtimePolicy.start === "auto-checklist" && !defenseReadiness.ready
+    ? defenseReadiness.radarReady
+      ? { kind: "kinetic" as const, text: "Тепер встановіть бойову ППО" }
+      : { kind: "radar" as const, text: "Спочатку встановіть радар" }
+    : null;
   const activePanelTitle = activePanel
     ? isMobileLive
       ? panelTitle[activePanel]
@@ -393,24 +399,34 @@ export default function App() {
           </div>
           <ResourceBar game={game} operationPhase={operationPhase} mobile={isMobileLive} />
         </header>
-        {battleNotice || (isMobileLive && placementUnit) ? (
-          <div className={`map-feedback-slot ${battleNotice ? `map-feedback-slot--${battleNotice.eventType}` : "map-feedback-slot--placement"}`} role="status" aria-live="assertive">
-            {battleNotice ? (
-              <>
-                {battleNotice.eventType === "launch" ? <AlertTriangle size={17} /> : <Radio size={17} />}
-                <strong>{noticeCopy(battleNotice)}</strong>
-              </>
-            ) : placementUnit ? (
-              <>
-                <Crosshair size={17} />
-                <div><strong>Розмістіть: {placementUnit.shortName}</strong>{game.placementWarning ? <span>{game.placementWarning}</span> : null}</div>
-                <button type="button" onClick={cancelPlacement}>Скасувати</button>
-              </>
-            ) : null}
-          </div>
-        ) : null}
         <MapLegend mode={mapMode} game={game} />
       </section>
+
+      {battleNotice || placementUnit || setupGuidance ? (
+        <div
+          className={`map-feedback-slot ${battleNotice ? `map-feedback-slot--${battleNotice.eventType}` : placementUnit ? "map-feedback-slot--placement" : "map-feedback-slot--guidance"}`}
+          role="status"
+          aria-live={battleNotice ? "assertive" : "polite"}
+        >
+          {battleNotice ? (
+            <>
+              {battleNotice.eventType === "launch" ? <AlertTriangle size={17} /> : <Radio size={17} />}
+              <strong>{noticeCopy(battleNotice)}</strong>
+            </>
+          ) : placementUnit ? (
+            <>
+              <Crosshair size={17} />
+              <div><strong>Розмістіть: {placementUnit.shortName}</strong>{game.placementWarning ? <span>{game.placementWarning}</span> : null}</div>
+              <button type="button" onClick={cancelPlacement}>Скасувати</button>
+            </>
+          ) : setupGuidance ? (
+            <>
+              {setupGuidance.kind === "radar" ? <Radio size={17} /> : <Shield size={17} />}
+              <strong>{setupGuidance.text}</strong>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {activePanel ? (
         <aside className={`command-drawer command-drawer--${activePanel}`} aria-label={`Панель «${activePanelTitle}»`}>

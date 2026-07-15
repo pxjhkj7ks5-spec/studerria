@@ -2140,20 +2140,6 @@ button {
   opacity: 0.38;
 }
 
-.readiness-track {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.readiness-track i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--cyan), var(--green));
-}
-
 .fatigue-track {
   height: 5px;
   margin-top: 5px;
@@ -2527,8 +2513,8 @@ button {
 }
 
 .map-feedback-slot {
-  position: absolute;
-  z-index: 670;
+  position: fixed;
+  z-index: 970;
   top: 84px;
   left: 50%;
   display: flex;
@@ -2553,6 +2539,8 @@ button {
 .map-feedback-slot--launch { border-color: rgba(255, 108, 86, .48); }
 .map-feedback-slot--launch svg { color: #ff7a68; }
 .map-feedback-slot--detection svg { color: #f6c547; }
+.map-feedback-slot--guidance { border-color: rgba(246, 197, 71, .4); pointer-events: none; }
+.map-feedback-slot--guidance svg { color: #f6c547; }
 
 .mobile-menu-panel { align-content: start; }
 .mobile-menu-intro,
@@ -2867,13 +2855,6 @@ button {
 
 .command-drawer .unit-chance-row {
   display: none;
-}
-
-.command-drawer .readiness-track {
-  grid-column: 1 / 4;
-  grid-row: 3;
-  height: 5px;
-  margin-top: 5px;
 }
 
 .command-drawer .fatigue-track {
@@ -3807,7 +3788,6 @@ button {
 .unit-card__telemetry b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .unit-card__telemetry small { margin: 0 0 2px; color: var(--muted); font: 8px/1.3 Inter, sans-serif; text-transform: uppercase; }
 .unit-card__telemetry b { color: var(--text); font: 9px/1.35 "SFMono-Regular", Consolas, monospace; }
-.readiness-caption { margin-top: 3px; color: var(--muted); font: 8px/1 "SFMono-Regular", Consolas, monospace; text-align: right; }
 
 .command-drawer .unit-card {
   border-left-width: 2px;
@@ -3829,8 +3809,6 @@ button {
 .command-drawer .unit-card__telemetry b { overflow: visible; text-overflow: clip; }
 .command-drawer .unit-card__telemetry small { font-size: 9px; line-height: 1.35; }
 .command-drawer .unit-card__telemetry b { font-size: 12px; line-height: 1.35; }
-.command-drawer .readiness-track { grid-row: auto; margin-top: 4px; }
-.command-drawer .readiness-caption { grid-column: 1 / 4; }
 .command-drawer .unit-hover-card { grid-row: auto; }
 
 .log-entry {

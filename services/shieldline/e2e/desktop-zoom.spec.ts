@@ -43,6 +43,7 @@ test("desktop defense cards expand in flow and radar telemetry stays sensor-spec
 
   const drawer = page.getByRole("complementary", { name: /ППО/ });
   await expect(drawer).toBeVisible();
+  await expect(page.locator(".map-feedback-slot--guidance")).toContainText("Спочатку встановіть радар");
   const cards = drawer.locator(".unit-card");
   const radar = cards.filter({ hasText: "Radar 35D6" });
   const nextCard = cards.nth(1);
@@ -50,6 +51,7 @@ test("desktop defense cards expand in flow and radar telemetry stays sensor-spec
   await expect(radar.getByText("Радіус", { exact: true })).toBeVisible();
   await expect(radar.getByText("БК", { exact: true })).toHaveCount(0);
   await expect(drawer.getByText("READY", { exact: true })).toHaveCount(0);
+  await expect(drawer.locator(".readiness-track, .readiness-caption")).toHaveCount(0);
 
   await radar.hover();
   await expect(radar.getByText(/Радіус виявлення/)).toBeVisible();
