@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice } from "../src/game/battleNotices";
+import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice, selectBattleNotice } from "../src/game/battleNotices";
 import { batteryCoverageState, batteryCoverageUnavailable } from "../src/game/coverageVisuals";
 import type { IntelEntry } from "../src/types/game";
 
@@ -27,4 +27,12 @@ test("launch notifications replace detections and remain visible for four second
   assert.equal(BATTLE_NOTICE_DURATION_MS, 4_000);
   assert.equal(preferBattleNotice(detection, launch), launch);
   assert.equal(preferBattleNotice(launch, detection), launch);
+});
+
+test("launch notifications win when offline simulation emits a launch and detection in one frame", () => {
+  const launch = { id: "launch", eventType: "launch", locationLabel: "kursk" } as IntelEntry;
+  const detection = { id: "detection", eventType: "detection", locationLabel: "kharkiv" } as IntelEntry;
+
+  assert.equal(selectBattleNotice([detection, launch]), launch);
+  assert.equal(selectBattleNotice([launch, detection]), launch);
 });

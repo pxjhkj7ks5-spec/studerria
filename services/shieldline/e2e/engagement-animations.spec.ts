@@ -35,6 +35,14 @@ async function setBattleNotice(page: import("@playwright/test").Page) {
       game: {
         ...current,
         log: [{
+          id: "desktop-detection-notice",
+          time: "T+00:01",
+          title: "Radar Contact",
+          body: "Target detected.",
+          tone: "warning",
+          eventType: "detection",
+          locationLabel: "kyiv",
+        }, {
           id: "desktop-launch-notice",
           time: "T+00:01",
           title: "Missile Launch",
@@ -77,7 +85,8 @@ test("engagement visuals stay Leaflet-native and distinguish success from miss",
   expect(before && after && Number.isFinite(after.x) && Number.isFinite(after.y)).toBeTruthy();
 });
 
-test("desktop shows the same live battle notices as mobile", async ({ page }) => {
+test("desktop shows the same live battle notices as mobile", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "Desktop-only placement check");
   await page.addInitScript(() => {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
@@ -87,6 +96,7 @@ test("desktop shows the same live battle notices as mobile", async ({ page }) =>
   });
   await page.goto("/shieldline/?legacy=1&mode=training");
   await expect(page.locator(".shell--mobile-live")).toHaveCount(0);
+  await expect(page.locator(".map-stage")).toBeVisible();
 
   await setBattleNotice(page);
 

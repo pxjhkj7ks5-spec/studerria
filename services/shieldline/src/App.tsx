@@ -19,7 +19,7 @@ import { getGameModeRuntimePolicy } from "./data/gameModes";
 import { campaignMissions } from "./data/missions";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
-import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice } from "./game/battleNotices";
+import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice, selectBattleNotice } from "./game/battleNotices";
 import { useGameStore } from "./store/useGameStore";
 import { bindTelegramBackButton } from "./platform/telegramShell";
 import { formatNumber, t } from "./platform/i18n";
@@ -159,7 +159,7 @@ export default function App() {
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
   const completedCampaignReportRef = useRef<string | null>(null);
-  const latestNoticeIdRef = useRef<string | null>(null);
+  const latestBattleNoticeIdRef = useRef<string | null>(null);
   const latestReportIdRef = useRef(game.latestReportId);
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
   const scenario = getScenario(game.scenarioId);
@@ -187,10 +187,15 @@ export default function App() {
   useEffect(() => bindTelegramBackButton(returnToCommandModes), []);
 
   useEffect(() => {
-    const latest = game.log.find((entry) => entry.eventType === "launch" || entry.eventType === "detection");
-    if (!latest || latest.id === latestNoticeIdRef.current) return;
-    latestNoticeIdRef.current = latest.id;
-    setBattleNotice((current) => preferBattleNotice(current, latest));
+    const battleEntries = game.log.filter((entry) => entry.eventType === "launch" || entry.eventType === "detection");
+    const previousLatestIndex = latestBattleNoticeIdRef.current
+      ? battleEntries.findIndex((entry) => entry.id === latestBattleNoticeIdRef.current)
+      : -1;
+    const unseenEntries = previousLatestIndex >= 0 ? battleEntries.slice(0, previousLatestIndex) : battleEntries;
+    latestBattleNoticeIdRef.current = battleEntries[0]?.id || null;
+    const incoming = selectBattleNotice(unseenEntries);
+    if (!incoming) return;
+    setBattleNotice((current) => preferBattleNotice(current, incoming));
   }, [game.log]);
 
   useEffect(() => {

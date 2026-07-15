@@ -6,3 +6,7 @@ export function preferBattleNotice(current: IntelEntry | null, incoming: IntelEn
   if (current?.eventType === "launch" && incoming.eventType === "detection") return current;
   return incoming;
 }
+
+export function selectBattleNotice(entries: IntelEntry[]) {
+  return [...entries].reverse().reduce<IntelEntry | null>(preferBattleNotice, null);
+}
