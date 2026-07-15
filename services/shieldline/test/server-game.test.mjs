@@ -11,6 +11,7 @@ test("production image includes every authoritative simulation runtime module", 
   assert.match(dockerfile, /src\/game\/simulationCore\.mjs/);
   assert.match(dockerfile, /src\/game\/launchSystem\.mjs/);
   assert.match(dockerfile, /src\/game\/campaignPacing\.mjs/);
+  assert.match(dockerfile, /serverTelegramAuth\.mjs/);
 });
 
 test("authoritative mission output is stable for a golden seed", () => {
