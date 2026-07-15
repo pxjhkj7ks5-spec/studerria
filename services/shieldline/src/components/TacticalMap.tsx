@@ -11,6 +11,9 @@ import { batteryCoverageState } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile } from "../game/mapZoom";
+import { classifyThreatRoute, predictedRouteEndpoint, type ThreatRouteVisual } from "../game/threatRouteVisuals";
+import { unitMarkerStatusClass } from "../game/unitMarkerVisuals";
+import { resolveReducedQuality } from "../platform/displayPreferences";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -208,7 +211,7 @@ function imageMarkerHtml(src: string, className: string) {
 
 function threatTone(threat: LiveThreat) {
   if (threat.kind === "decoy") return "decoy";
-  if (threat.status === "engaged") return "confirmed";
+  if (threat.status === "engaged" || threat.confidence >= 58) return "confirmed";
   return "uncertain";
 }
 
@@ -280,9 +283,9 @@ function makeBatteryIcon(battery: DefenseBattery) {
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: imageMarkerHtml(unitSprites[battery.kind], `map-marker--battery map-marker--unit-${battery.status}`),
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    html: `<span class="map-marker map-marker--image map-marker--battery ${unitMarkerStatusClass(battery.status)}"><i class="unit-status-ring" aria-hidden="true"></i><img src="${unitSprites[battery.kind]}" alt="" draggable="false" /></span>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
   });
   batteryIconCache.set(key, icon);
   return icon;
@@ -639,7 +642,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
   const threatGroupRef = useRef<L.LayerGroup | null>(null);
   const engagementGroupRef = useRef<L.LayerGroup | null>(null);
   const impactGroupRef = useRef<L.LayerGroup | null>(null);
-  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null; iconKey: string }>());
+  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null; routeVisual: ThreatRouteVisual; iconKey: string }>());
   const engagementPoolRef = useRef(new Map<string, PooledEngagementVisual>());
   const impactPoolRef = useRef(new Map<string, L.Marker>());
   const latestRef = useRef({ threats, engagements, impacts, elapsedMs, mapMode, reducedQuality });
@@ -677,7 +680,8 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
           const current = interpolatedThreatPosition(threat, elapsedSinceSync);
           pooled.marker.setLatLng([current.lat, current.lng]);
           if (pooled.route) {
-            pooled.route.setLatLngs([[current.lat, current.lng], [threat.target.lat, threat.target.lng]]);
+            const endpoint = pooled.routeVisual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
+            pooled.route.setLatLngs([[current.lat, current.lng], [endpoint.lat, endpoint.lng]]);
           }
         }
         for (const event of latest.engagements) {
@@ -730,14 +734,17 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
     }
     for (const threat of threats) {
       const tone = threatTone(threat);
-      const routeAllowed = threat.confidence >= (reducedQuality ? 72 : 58) && (!reducedQuality || mapMode === "threats");
+      const routeVisual = classifyThreatRoute(threat, reducedQuality);
       let pooled = threatPoolRef.current.get(threat.id);
       const current = interpolatedThreatPosition(threat, elapsedSinceSync);
+      const routeEndpoint = routeVisual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
       const iconKey = threatMarkerIconKey(threat);
+      const previousRouteVisual = pooled?.routeVisual;
       if (!pooled) {
         pooled = {
           marker: L.marker([current.lat, current.lng], { icon: makeThreatIcon(threat), interactive: false }).addTo(threatGroup),
           route: null,
+          routeVisual,
           iconKey,
         };
         threatPoolRef.current.set(threat.id, pooled);
@@ -745,23 +752,29 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
         pooled.marker.setIcon(makeThreatIcon(threat));
         pooled.iconKey = iconKey;
       }
-      if (routeAllowed && !pooled.route) {
-        pooled.route = L.polyline([[current.lat, current.lng], [threat.target.lat, threat.target.lng]], {
-          color: threatRouteColor(tone),
-          weight: mapMode === "threats" ? 3 : 2,
-          opacity: mapMode === "coverage" ? 0.44 : 0.72,
-          dashArray: tone === "confirmed" ? "10 4" : "6 6",
+      if (pooled.route && previousRouteVisual && previousRouteVisual !== routeVisual) {
+        pooled.route.remove();
+        pooled.route = null;
+      }
+      pooled.routeVisual = routeVisual;
+      if (routeVisual !== "hidden" && !pooled.route) {
+        pooled.route = L.polyline([[current.lat, current.lng], [routeEndpoint.lat, routeEndpoint.lng]], {
+          color: routeVisual === "predicted" ? "#d8d3c7" : threatRouteColor(tone),
+          weight: routeVisual === "predicted" ? 1.5 : mapMode === "threats" ? 3 : 2,
+          opacity: routeVisual === "predicted" ? 0.48 : mapMode === "coverage" ? 0.44 : 0.78,
+          dashArray: routeVisual === "predicted" ? "5 7" : undefined,
           interactive: false,
         }).addTo(threatGroup);
-      } else if (!routeAllowed && pooled.route) {
+      } else if (routeVisual === "hidden" && pooled.route) {
         pooled.route.remove();
         pooled.route = null;
       } else if (pooled.route) {
+        pooled.route.setLatLngs([[current.lat, current.lng], [routeEndpoint.lat, routeEndpoint.lng]]);
         pooled.route.setStyle({
-          color: threatRouteColor(tone),
-          weight: mapMode === "threats" ? 3 : 2,
-          opacity: mapMode === "coverage" ? 0.44 : 0.72,
-          dashArray: tone === "confirmed" ? "10 4" : "6 6",
+          color: routeVisual === "predicted" ? "#d8d3c7" : threatRouteColor(tone),
+          weight: routeVisual === "predicted" ? 1.5 : mapMode === "threats" ? 3 : 2,
+          opacity: routeVisual === "predicted" ? 0.48 : mapMode === "coverage" ? 0.44 : 0.78,
+          dashArray: routeVisual === "predicted" ? "5 7" : undefined,
         });
       }
     }
@@ -882,7 +895,7 @@ function PerformanceOverlay({ stats, counts }: { stats: PerformanceStats; counts
   );
 }
 
-export function TacticalMap() {
+export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQuality?: boolean }) {
   const game = useGameStore((state) => state.game);
   const mapMode = useGameStore((state) => state.mapMode);
   const placementKind = useGameStore((state) => state.placementKind);
@@ -1014,7 +1027,7 @@ export function TacticalMap() {
     visibleThreats.length,
   ]);
   const performanceStats = usePerformanceStats(renderCounts);
-  const reducedQuality = performanceStats.quality === "reduced";
+  const reducedQuality = resolveReducedQuality(performanceStats.quality === "reduced", forcedReducedQuality);
   const zoomInput = useMemo(
     () => mapZoomInputProfile(typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches),
     [],
@@ -1187,7 +1200,7 @@ export function TacticalMap() {
           </Marker>
         ))}
       </MapContainer>
-      <PerformanceOverlay stats={performanceStats} counts={renderCounts} />
+      <PerformanceOverlay stats={{ ...performanceStats, quality: reducedQuality ? "reduced" : "full" }} counts={renderCounts} />
     </>
   );
 }

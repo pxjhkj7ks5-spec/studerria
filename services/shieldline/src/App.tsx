@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Activity, AlertTriangle, BookOpen, ClipboardList, Crosshair, HelpCircle, Layers, LogOut, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { AccountSettings } from "./components/AccountSettings";
@@ -13,6 +13,7 @@ import { TacticalMap } from "./components/TacticalMap";
 import { TutorialOverlay } from "./components/TutorialOverlay";
 import { UnitRail } from "./components/UnitRail";
 import { CommandApp } from "./components/CommandApp";
+import { DisplaySettings } from "./components/DisplaySettings";
 import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
@@ -24,6 +25,7 @@ import { useGameStore } from "./store/useGameStore";
 import { bindTelegramBackButton } from "./platform/telegramShell";
 import { formatNumber, t } from "./platform/i18n";
 import { trackAnalytics } from "./platform/analytics";
+import { readDisplayPreferences, writeDisplayPreferences } from "./platform/displayPreferences";
 import type { CampaignStatus, DefenseBattery, IntelEntry, MapMode, UnitKind } from "./types/game";
 import type { DailyDefensePlan, GameModeId, MissionRun, RankedResult } from "./domain/contracts";
 
@@ -155,12 +157,14 @@ export default function App() {
   const [rankedResult, setRankedResult] = useState<RankedResult | null>(null);
   const [authoritativeRun, setAuthoritativeRun] = useState<MissionRun | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const [displayPreferences, setDisplayPreferences] = useState(readDisplayPreferences);
+  const [fullscreenReportOpen, setFullscreenReportOpen] = useState(false);
   const coOpSyncedBatteryIds = useRef(new Set<string>());
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
   const completedCampaignReportRef = useRef<string | null>(null);
   const latestBattleNoticeIdRef = useRef<string | null>(null);
-  const latestReportIdRef = useRef(game.latestReportId);
+  const latestReportIdRef = useRef<string | null>(null);
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
   const scenario = getScenario(game.scenarioId);
   const lastTickRef = useRef<number | null>(null);
@@ -179,12 +183,20 @@ export default function App() {
     url.search = "";
     window.location.assign(url.toString());
   };
+  const inspectCompletedMap = useCallback(() => {
+    setFullscreenReportOpen(false);
+    setActivePanel(null);
+  }, []);
   const handleResetOperation = () => {
     if (tacticalMode === "campaign") window.localStorage.removeItem("shieldline-campaign-operation-v1");
     resetCampaign();
   };
 
   useEffect(() => bindTelegramBackButton(returnToCommandModes), []);
+
+  useEffect(() => {
+    writeDisplayPreferences(displayPreferences);
+  }, [displayPreferences]);
 
   useEffect(() => {
     const battleEntries = game.log.filter((entry) => entry.eventType === "launch" || entry.eventType === "detection");
@@ -205,10 +217,10 @@ export default function App() {
   }, [battleNotice]);
 
   useEffect(() => {
-    if (!isMobileLive || !game.latestReportId || game.latestReportId === latestReportIdRef.current) return;
+    if (operationPhase !== "completed" || !game.latestReportId || game.latestReportId === latestReportIdRef.current) return;
     latestReportIdRef.current = game.latestReportId;
-    setActivePanel("report");
-  }, [game.latestReportId, isMobileLive]);
+    setFullscreenReportOpen(true);
+  }, [game.latestReportId, operationPhase]);
 
   useEffect(() => {
     if (isMobileLive && activePanel === "layers") setActivePanel("menu");
@@ -269,7 +281,7 @@ export default function App() {
 
   useEffect(() => {
     if (tacticalMode !== "campaign" || operationPhase !== "completed" || !game.latestReportId) return;
-    setActivePanel("report");
+    setFullscreenReportOpen(true);
     if (completedCampaignReportRef.current === game.latestReportId) return;
     completedCampaignReportRef.current = game.latestReportId;
     trackAnalytics("campaign.operation.completed", { reportId: game.latestReportId, interceptions: game.interceptions, impacts: game.impacts });
@@ -326,7 +338,7 @@ export default function App() {
         const run = await apiGameRepository.runMission(activeMission, seed, defensePlanFromBatteries(game.batteries));
         setAuthoritativeRun(run);
       }
-      setActivePanel("report");
+      setFullscreenReportOpen(true);
     } finally {
       setIsResolving(false);
     }
@@ -355,7 +367,7 @@ export default function App() {
     : "";
 
   return (
-    <main className={`shell shell--map-first ${isMobileLive ? "shell--mobile-live" : ""} ${activePanel ? "shell--drawer-open shell--panel-open" : "shell--drawer-closed"}`} aria-label="Симуляція протиповітряної оборони Shieldline">
+    <main className={`shell shell--map-first environment--${displayPreferences.environmentTime} weather--${displayPreferences.environmentWeather} ${displayPreferences.performanceMode ? "shell--performance-mode" : ""} ${isMobileLive ? "shell--mobile-live" : ""} ${activePanel ? "shell--drawer-open shell--panel-open" : "shell--drawer-closed"}`} aria-label="Симуляція протиповітряної оборони Shieldline">
       <nav className="app-rail" aria-label="Панелі Shieldline">
         {!isMobileLive ? <button className="rail-button rail-button--menu" type="button" aria-label="До вибору режиму" onClick={returnToCommandModes}>
           <Menu size={24} />
@@ -387,8 +399,9 @@ export default function App() {
         </div>
       </nav>
 
-      <section className={`map-stage map-stage--${mapMode} ${placementKind ? "map-stage--placing" : ""}`} aria-label="Мапа протиповітряної оборони" aria-hidden={isMobileLive && Boolean(activePanel)}>
-        <TacticalMap />
+      <section className={`map-stage map-stage--${mapMode} ${placementKind ? "map-stage--placing" : ""}`} aria-label="Мапа протиповітряної оборони" aria-hidden={fullscreenReportOpen || (isMobileLive && Boolean(activePanel))}>
+        <TacticalMap forcedReducedQuality={displayPreferences.performanceMode} />
+        <div className="environment-overlay" aria-hidden="true"><i /><b /></div>
         <header className="map-status-strip" aria-label="Стан операції">
           <div className="strip-brand">
             <Shield size={22} />
@@ -509,6 +522,7 @@ export default function App() {
           {activePanel === "settings" ? (
             <section className="drawer-section">
               <AccountSettings />
+              <DisplaySettings preferences={displayPreferences} onChange={setDisplayPreferences} />
               <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
               <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
                 <RotateCcw size={16} />
@@ -522,6 +536,19 @@ export default function App() {
             </section>
           ) : null}
         </aside>
+      ) : null}
+
+      {fullscreenReportOpen ? (
+        <div className="aar-fullscreen" role="dialog" aria-modal="true" aria-label="Післяопераційний звіт">
+          <AfterActionReport
+            game={game}
+            rankedResult={rankedResult}
+            authoritativeRun={tacticalMode === "campaign" ? null : authoritativeRun}
+            variant="fullscreen"
+            onInspectMap={inspectCompletedMap}
+            onExit={returnToCommandModes}
+          />
+        </div>
       ) : null}
 
       {!tutorialDismissed ? <TutorialOverlay onDismiss={dismissTutorial} /> : null}

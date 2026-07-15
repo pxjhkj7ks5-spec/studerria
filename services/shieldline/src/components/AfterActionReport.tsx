@@ -1,5 +1,5 @@
-import { ClipboardList } from "lucide-react";
-import type { CSSProperties } from "react";
+import { ArrowLeft, ClipboardList, LogOut } from "lucide-react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
 import type { MissionRun, RankedResult } from "../domain/contracts";
@@ -9,24 +9,47 @@ interface AfterActionReportProps {
   game: GameState;
   rankedResult?: RankedResult | null;
   authoritativeRun?: MissionRun | null;
+  variant?: "panel" | "fullscreen";
+  onInspectMap?: () => void;
+  onExit?: () => void;
 }
 
-export function AfterActionReport({ game, rankedResult, authoritativeRun }: AfterActionReportProps) {
+export function AfterActionReport({ game, rankedResult, authoritativeRun, variant = "panel", onInspectMap, onExit }: AfterActionReportProps) {
   const report = game.afterActionReports[0];
+  const reportRef = useRef<HTMLElement | null>(null);
+  const outcomeTitle = authoritativeRun
+    ? authoritativeRun.result === "victory" ? "Оборону втримано" : authoritativeRun.result === "contained" ? "Атаку локалізовано" : "Оборона зазнала втрат"
+    : game.status === "won" ? "Операцію завершено успішно" : game.status === "lost" ? "Операцію завершено з втратами" : "Операцію завершено";
   const fallbackRecommendation = game.resources.ammo < 25
     ? "Conserve ammo and restore logistics."
     : game.resources.energy < 45
       ? "Prioritize energy resilience."
       : game.liveThreats.length > 6
         ? "Expand detection coverage."
-        : "Maintain layered coverage.";
+      : "Maintain layered coverage.";
+
+  useEffect(() => {
+    if (variant !== "fullscreen") return undefined;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    reportRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !onInspectMap) return;
+      event.preventDefault();
+      onInspectMap();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [onInspectMap, variant]);
 
   return (
-    <section className="aar-card" aria-label="After action report">
+    <section ref={reportRef} tabIndex={variant === "fullscreen" ? -1 : undefined} className={`aar-card aar-card--${variant}`} aria-label="After action report">
       <div className="aar-heading">
         <ClipboardList size={20} />
         <div>
-          <strong>{t("aar.title")}</strong>
+          {variant === "fullscreen" ? <><span className="aar-eyebrow">{t("aar.title")}</span><h1>{outcomeTitle}</h1></> : <strong>{t("aar.title")}</strong>}
           <span>{report ? `Cycle ${formatNumber(report.day)} · ${report.archetype ? archetypeLabel(report.archetype) : "contact cycle"}` : t("aar.pending")}</span>
         </div>
       </div>
@@ -91,6 +114,12 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun }: Afte
           </>
         )
       )}
+      {variant === "fullscreen" ? (
+        <footer className="aar-actions">
+          <button type="button" onClick={onInspectMap}><ArrowLeft size={17} /> Оглянути мапу</button>
+          <button type="button" onClick={onExit}><LogOut size={17} /> До вибору режимів</button>
+        </footer>
+      ) : null}
     </section>
   );
 }
