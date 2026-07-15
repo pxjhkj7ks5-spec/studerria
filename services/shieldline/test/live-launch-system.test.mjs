@@ -77,7 +77,7 @@ test("the five-mission campaign follows the authored escalation while launch ori
   assert.deepEqual(campaignMissions.map((entry) => entry.durationMinutes), [15, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissions.map((entry) => entry.grant), [38, 32, 48, 70, 100]);
   assert.deepEqual(campaignMissions.map((entry) => entry.rewardCap), [18, 35, 55, 80, 120]);
-  assert.equal(mission.waves.reduce((sum, wave) => sum + wave.size, 0), 16);
+  assert.equal(mission.waves.reduce((sum, wave) => sum + wave.size, 0), 28);
   assert.equal(campaignMissions[3].waves.some((wave) => wave.threatKind === "iskander"), true);
   assert.equal(campaignMissions[4].waves.reduce((sum, wave) => sum + wave.size, 0), 103);
   const left = runDeterministicMission(mission, "campaign-sector-left");

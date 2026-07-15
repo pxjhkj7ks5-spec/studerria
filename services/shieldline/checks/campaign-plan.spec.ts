@@ -14,7 +14,7 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [15, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [38, 32, 48, 70, 100]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.rewardCap), [18, 35, 55, 80, 120]);
-  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [16, 41, 58, 78, 103]);
+  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [28, 41, 58, 78, 103]);
   assert.equal(campaignMissionsPlan.slice(0, 3).some((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), false);
   assert.equal(campaignMissionsPlan.slice(3).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
 });
@@ -28,6 +28,19 @@ test("authored waves expand to deterministic individual spawn events with groupi
   }
   const merged = buildCampaignSpawnEvents(3).find((event) => event.mergeRouteId && event.routeId !== event.mergeRouteId);
   assert.ok(merged?.rallyRatio && merged.rallyRatio >= .35 && merged.rallyRatio <= .6);
+});
+
+test("first contact keeps pressure active without doubling damaging targets", () => {
+  const events = buildCampaignSpawnEvents(1);
+  const gaps = events.slice(1).map((event, index) => event.dueMs - events[index].dueMs);
+  assert.equal(events.length, 28);
+  assert.ok(Math.max(...gaps) <= 55_000);
+  assert.equal(events.filter((event) => event.threatKind !== "parodiya").length, 14);
+  for (const groupId of new Set(events.map((event) => event.groupId))) {
+    const group = events.filter((event) => event.groupId === groupId);
+    assert.equal(group.length, 2);
+    assert.equal(new Set(group.map((event) => event.routeId)).size, 2);
+  }
 });
 
 test("seeded route generation curves drones and keeps ballistic tracks direct", () => {
@@ -84,7 +97,7 @@ test("campaign economy credits exact capped kill rewards immediately and preserv
   for (let index = 0; index < 30; index += 1) recordCampaignKill(game, "parodiya", 1);
   assert.equal(game.resources.budget, 25);
   assert.equal(game.campaign?.campaignWallet, 25);
-  game.interceptions = 16;
+  game.interceptions = 28;
   const result = finalizeCampaignMission(game)!;
   assert.equal(result.killReward, getCampaignMission(1).rewardCap);
   assert.equal(result.bonusRewards, 25);
@@ -118,7 +131,12 @@ test("live campaign launches from and animates a real launch zone", () => {
   game.campaign = createCampaignState();
   applyCampaignMissionOpening(game);
   game = startAttackNow(game, () => random.next());
-  game = advanceSimulation(game, 46_000, () => random.next());
+  game = advanceSimulation(game, 31_000, () => random.next());
+  const warningSector = game.launchSectors.find((sector) => sector.state === "warning");
+  assert.ok(warningSector);
+  assert.ok(warningSector.lastLaunchCoordinates);
+  assert.equal(game.liveThreats.length, 0);
+  game = advanceSimulation(game, 15_000, () => random.next());
   const threat = game.liveThreats[0];
   assert.ok(threat);
   assert.notEqual(threat.launchSectorId, threat.routeId);
@@ -159,9 +177,9 @@ test("the live campaign director resolves every authored target before opening i
   applyCampaignMissionOpening(game);
   game = startAttackNow(game, () => random.next());
   for (let step = 0; step < 8 && !game.campaign?.intermission; step += 1) game = advanceSimulation(game, 180_000, () => random.next());
-  assert.equal(game.campaign?.spawnCursor, 16);
+  assert.equal(game.campaign?.spawnCursor, 28);
   assert.equal(game.campaign?.intermission, true);
   assert.equal(game.campaign?.previousMissionResults.length, 1);
-  assert.equal(game.campaign?.previousMissionResults[0].totalTargets, 16);
+  assert.equal(game.campaign?.previousMissionResults[0].totalTargets, 28);
   assert.equal(game.liveThreats.length, 0);
 });

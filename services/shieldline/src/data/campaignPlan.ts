@@ -87,7 +87,20 @@ const w = (time: string, threatKind: ThreatKind, count: number, routeIds: string
 
 export const campaignMissionsPlan: CampaignMissionDefinition[] = [
   { id: "first-contact", index: 1, title: "Перший контакт", durationMinutes: 15, focusRegion: "Столичний кластер", grant: 38, rewardCap: 18, objective: "Навчитися виявляти, класифікувати й пріоритезувати загрози без марної витрати дорогого БК.", expectedThreatClasses: ["Parody", "Gerbera", "Shahed"], broadAzimuth: "північ і північний схід", unlocks: ["radar", "mvg", "manpads"], waves: [
-    w("00:45", "parodiya", 2, ["R01"], 1, "none", "Столичний кластер", 0, 35, "low"), w("03:00", "gerbera", 3, ["R02", "R29"], 1, "none", "Столичний / енергетичний", .33, 55, "low"), w("06:30", "geran2", 2, ["R02", "R06"], 1, "softMerge", "Столичний кластер", 0, 40, "medium"), w("09:30", "parodiya", 2, ["R01", "R29"], 1, "splitFeint", "Столичний / енергетичний", .5, 25, "low"), w("10:00", "gerbera", 2, ["R02"], 1, "trailPreviousWave", "Столичний кластер", 0, 20, "low"), w("13:00", "geran2", 3, ["R01"], 3, "fullGroup", "Столичний кластер", 0, 30, "high"), w("14:20", "gerbera", 2, ["R03"], 1, "none", "Столичний кластер", 0, 20, "low"),
+    w("00:45", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("01:35", "gerbera", 2, ["R02", "R03"], 2, "twoAxisScreen", "Столичний кластер", .25, 5, "low"),
+    w("02:30", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("03:25", "gerbera", 2, ["R02", "R29"], 2, "crossingScreen", "Столичний / енергетичний", .25, 5, "low"),
+    w("04:20", "parodiya", 2, ["R03", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("05:15", "geran2", 2, ["R02", "R06"], 2, "softMerge", "Столичний кластер", 0, 5, "medium"),
+    w("06:15", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("07:10", "gerbera", 2, ["R02", "R03"], 2, "twoAxisScreen", "Столичний кластер", .25, 5, "low"),
+    w("08:05", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("09:00", "geran2", 2, ["R01", "R02"], 2, "softMerge", "Столичний кластер", 0, 5, "medium"),
+    w("10:00", "parodiya", 2, ["R03", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("11:00", "gerbera", 2, ["R02", "R06"], 2, "crossingScreen", "Столичний / енергетичний", .25, 5, "low"),
+    w("12:00", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("13:00", "geran2", 2, ["R01", "R02"], 2, "fullGroup", "Столичний кластер", 0, 5, "high"),
   ] },
   { id: "southern-corridor", index: 2, title: "Південний коридор", durationMinutes: 35, focusRegion: "Південний портовий кластер", grant: 32, rewardCap: 35, objective: "Передислокувати частину мережі на новий театр, не оголюючи попередній рубіж.", expectedThreatClasses: ["Decoy", "Shahed", "Cruise"], broadAzimuth: "морський південь і південний схід", unlocks: ["boat", "ew", "gepard", "drone-operators"], waves: [
     w("02:00", "gerbera", 4, ["R10", "R30"], 1, "none", "Портовий", .25, 70, "low"), w("06:00", "parodiya", 5, ["R10", "R14"], 2, "splitFeint", "Портовий / логістичний", .4, 60, "low"), w("11:00", "geran2", 4, ["R12", "R15"], 2, "rallyMerge", "Портовий", 0, 50, "medium"), w("15:30", "gerbera", 3, ["R13"], 3, "screenForNext", "Портовий", 0, 25, "low"), w("16:00", "geran2", 6, ["R10", "R12"], 3, "rallyMerge", "Портовий", 0, 55, "high"), w("21:30", "parodiya", 3, ["R14"], 1, "diversionOnly", "Логістичний", 1, 40, "low"), w("23:00", "kalibr", 1, ["R23"], 1, "independent", "Портовий", 0, 0, "veryHigh"), w("28:00", "geran2", 8, ["R11", "R15"], 5, "corridorMerge", "Портовий", .15, 65, "high"), w("32:30", "gerbera", 2, ["R30"], 1, "falseTerminal", "Південний вузол", 1, 20, "low"), w("33:00", "geran2", 5, ["R13"], 5, "fullGroup", "Портовий", 0, 30, "high"),

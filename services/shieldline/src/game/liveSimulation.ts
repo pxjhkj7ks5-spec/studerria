@@ -31,6 +31,7 @@ import type {
 
 const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
+const CAMPAIGN_LAUNCH_WARNING_MS = 15000;
 const MIN_ATTACK_WINDOW_MS = 90000;
 const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
 const LAUNCH_CONE_RANGE_KM = 900;
@@ -495,11 +496,16 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   if (!event || event.dueMs > state.elapsedMs - state.cycleStartedAtMs) return false;
   const route = getCampaignRoute(event.routeId);
   if (!route) { campaign.spawnCursor += 1; return true; }
-  const launchSector = pickCampaignLaunchSector(state.launchSectors, route.launchSector, event.threatKind, random);
-  const launchOrigin = randomPointInSector(launchSector, random);
-  const waypoints = generateCampaignRoute(event, random, launchOrigin);
   const targetCityId = event.targetRegion.toLowerCase().includes("столич") ? "kyiv" : route.targetCityId;
   const city = state.cities.find((item) => item.id === targetCityId) || state.cities[0];
+  const preparedSector = state.launchSectors.find((sector) => sector.state === "warning"
+    && sector.activeThreatKind === event.threatKind
+    && sector.targetCityId === city.id
+    && sectorSupportsThreat(sector, event.threatKind));
+  const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
+  const launchSector = preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random);
+  const launchOrigin = preparedSector?.lastLaunchCoordinates || randomPointInSector(launchSector, random);
+  const waypoints = generateCampaignRoute(event, random, launchOrigin);
   const threat = spawnThreat(state, random, event.threatKind, city.id, launchSector.id, launchOrigin);
   if (waypoints.length) waypoints[waypoints.length - 1] = { ...city.coordinates };
   threat.target = waypoints.at(-1) || city.coordinates;
@@ -517,6 +523,28 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   const launchPointLabel = `${launchSector.name} · маршрут ${event.routeId}`;
   pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Пуск БПЛА", `Пускова точка ${launchPointLabel}. Цільовий сектор: ${event.targetRegion} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: launchPointLabel });
   return true;
+}
+
+function prepareCampaignLaunch(state: GameState, random: () => number) {
+  const campaign = state.campaign;
+  if (!campaign) return;
+  const event = campaign.spawnEvents[campaign.spawnCursor];
+  if (!event) return;
+  const untilLaunchMs = event.dueMs - (state.elapsedMs - state.cycleStartedAtMs);
+  if (untilLaunchMs <= 0 || untilLaunchMs > CAMPAIGN_LAUNCH_WARNING_MS) return;
+  const route = getCampaignRoute(event.routeId);
+  if (!route) return;
+  const targetCityId = event.targetRegion.toLowerCase().includes("столич") ? "kyiv" : route.targetCityId;
+  const city = state.cities.find((item) => item.id === targetCityId) || state.cities[0];
+  const existing = state.launchSectors.some((sector) => sector.state === "warning"
+    && sector.activeThreatKind === event.threatKind
+    && sector.targetCityId === city.id);
+  if (existing) return;
+  const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
+  const sector = pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random);
+  const origin = randomPointInSector(sector, random);
+  markLaunchSector(state, sector.id, "warning", untilLaunchMs + 1000, { cityId: city.id, coordinates: city.coordinates }, origin, event.threatKind);
+  pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Активність у секторі «${sector.name}». До можливого пуску менше 15 секунд.`, "warning", { eventType: "launch", locationLabel: sector.name });
 }
 
 function markLaunchSector(
@@ -615,6 +643,7 @@ function updateLaunchSectors(state: GameState) {
 function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => number) {
   if (state.cyclePhase !== "attack" || state.liveThreats.length >= MAX_LIVE_THREATS) return;
   if (state.campaign) {
+    prepareCampaignLaunch(state, random);
     while (state.liveThreats.length < MAX_LIVE_THREATS && spawnCampaignThreat(state, random)) { /* drain due targets */ }
     return;
   }
