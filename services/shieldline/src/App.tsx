@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Activity, AlertTriangle, BookOpen, ClipboardList, Crosshair, HelpCircle, Layers, LogOut, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { AccountSettings } from "./components/AccountSettings";
-import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
+import { AdminApp } from "./components/AdminApp";
 import { IntelLog } from "./components/IntelLog";
 import { MapLegend } from "./components/MapLegend";
 import { ModeSelection } from "./components/ModeSelection";
@@ -122,7 +122,7 @@ function noticeCopy(entry: IntelEntry) {
 export default function App() {
   const isAdminRoute = typeof window !== "undefined" && window.location.pathname.replace(/\/+$/, "").endsWith("/admin");
   if (isAdminRoute) {
-    return <ControlZoneAdmin />;
+    return <AdminApp />;
   }
   const legacyRequested = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("legacy") === "1";
   if (!legacyRequested) {

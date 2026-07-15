@@ -22,6 +22,13 @@ ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS nickname_normalized text;
 ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS registration_completed_at timestamptz;
 ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS consent_version text;
 ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS consent_accepted_at timestamptz;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS suspension_reason text;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS admin_note text;
+CREATE INDEX IF NOT EXISTS shieldline_users_status_seen_idx ON shieldline_users(status, last_seen_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS shieldline_users_nickname_unique ON shieldline_users(nickname_normalized) WHERE nickname_normalized IS NOT NULL;
 CREATE TABLE IF NOT EXISTS shieldline_sessions (
   token_hash text PRIMARY KEY,
@@ -161,6 +168,12 @@ CREATE TABLE IF NOT EXISTS shieldline_outbox (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS shieldline_outbox_pending_idx ON shieldline_outbox(available_at) WHERE delivered_at IS NULL;
+CREATE TABLE IF NOT EXISTS shieldline_notification_preferences (
+  actor_id text PRIMARY KEY REFERENCES shieldline_users(id) ON DELETE CASCADE,
+  chat_id text NOT NULL,
+  enabled boolean NOT NULL DEFAULT false,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS shieldline_campaign_projection (
   actor_id text PRIMARY KEY REFERENCES shieldline_users(id),
   current_mission_id text,
@@ -326,7 +339,8 @@ export async function createPostgresGameStore({ legacyStore, pool, redis = null 
     storageDriver: "postgres",
     async getAuthProfile(actorId) {
       await upsertUser(pool, actorId);
-      const userResult = await pool.query("SELECT id, platform, display_name, nickname, registration_completed_at, consent_version, consent_accepted_at FROM shieldline_users WHERE id = $1", [actorId]);
+      await pool.query("UPDATE shieldline_users SET last_seen_at = now(), last_login_at = COALESCE(last_login_at, now()) WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '5 minutes')", [actorId]);
+      const userResult = await pool.query("SELECT id, platform, display_name, nickname, registration_completed_at, consent_version, consent_accepted_at, status, suspension_reason FROM shieldline_users WHERE id = $1", [actorId]);
       const identityResult = await pool.query("SELECT provider_user_id, profile FROM shieldline_identities WHERE actor_id = $1 AND provider = 'telegram'", [actorId]);
       const deviceResult = await pool.query("SELECT count(*) AS count FROM shieldline_devices WHERE actor_id = $1 AND revoked_at IS NULL", [actorId]);
       const user = userResult.rows[0];
@@ -342,6 +356,8 @@ export async function createPostgresGameStore({ legacyStore, pool, redis = null 
         consentAcceptedAt: user.consent_accepted_at?.toISOString?.() || user.consent_accepted_at || null,
         telegram: identity ? { id: identity.provider_user_id, ...(identity.profile || {}) } : null,
         deviceCount: Number(deviceResult.rows[0]?.count || 0),
+        status: user.status || "active",
+        suspensionReason: user.suspension_reason || null,
       };
     },
     async nicknameAvailable(nicknameNormalized, actorId = null) {
@@ -519,6 +535,31 @@ export async function createPostgresGameStore({ legacyStore, pool, redis = null 
     async revokeActorSessions(actorId) {
       const hashes = await pool.query("UPDATE shieldline_sessions SET revoked_at = now() WHERE actor_id = $1 AND revoked_at IS NULL RETURNING token_hash", [actorId]);
       if (redis?.isReady && hashes.rowCount) await redis.del(hashes.rows.map((row) => `shieldline:session:${row.token_hash}`)).catch(() => undefined);
+    },
+    async setNotificationPreference(actorId, chatId, enabled) {
+      await upsertUser(pool, actorId);
+      const result = await pool.query(
+        `INSERT INTO shieldline_notification_preferences (actor_id, chat_id, enabled) VALUES ($1,$2,$3)
+         ON CONFLICT (actor_id) DO UPDATE SET chat_id = EXCLUDED.chat_id, enabled = EXCLUDED.enabled, updated_at = now()
+         RETURNING actor_id, chat_id, enabled, updated_at`,
+        [actorId, String(chatId), Boolean(enabled)],
+      );
+      return result.rows[0];
+    },
+    async notificationOutbox() {
+      const result = await pool.query("SELECT id, actor_id, type, payload, attempts, available_at, delivered_at, created_at FROM shieldline_outbox ORDER BY created_at DESC LIMIT 100");
+      return result.rows;
+    },
+    async pendingNotificationDeliveries() {
+      const result = await pool.query(
+        `SELECT o.id, o.actor_id, o.type, o.payload, o.attempts, p.chat_id
+         FROM shieldline_outbox o JOIN shieldline_notification_preferences p ON p.actor_id = o.actor_id
+         WHERE o.delivered_at IS NULL AND o.available_at <= now() AND p.enabled = true ORDER BY o.created_at LIMIT 50`,
+      );
+      return result.rows.map((row) => ({ item: row, chatId: row.chat_id }));
+    },
+    async markNotificationDelivered(notificationId) {
+      await pool.query("UPDATE shieldline_outbox SET delivered_at = now(), attempts = attempts + 1 WHERE id = $1", [notificationId]);
     },
     async auditRejectedCommand({ actorId = null, method, path, reason, details = {} }) {
       await pool.query("INSERT INTO shieldline_audit_log (actor_id, method, path, reason, details) VALUES ($1,$2,$3,$4,$5::jsonb)", [actorId, method, path, reason, JSON.stringify(details)]);

@@ -231,7 +231,7 @@ cd "$ROOT_DIR/docker/local"
 
 update_targets=("$SERVICE")
 if [ "$SERVICE" = "shieldline" ]; then
-  update_targets=(shieldline shieldline-projection-worker shieldline-notification-worker)
+  update_targets=(shieldline shieldline-projection-worker shieldline-notification-worker shieldline-admin-bot-worker)
 fi
 
 if [ "$PULL" -eq 1 ]; then

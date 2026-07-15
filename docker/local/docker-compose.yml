@@ -344,6 +344,7 @@ services:
       PORT: 8080
       SHIELDLINE_BASE_PATH: /shieldline
       SHIELDLINE_ADMIN_PASSWORD: ${SHIELDLINE_ADMIN_PASSWORD:-change-me-shieldline-admin}
+      SHIELDLINE_ADMIN_LABEL: ${SHIELDLINE_ADMIN_LABEL:-owner}
       SHIELDLINE_CONTROL_OVERLAY_FILE: ${SHIELDLINE_CONTROL_OVERLAY_FILE:-/data/control-overlay.json}
       SHIELDLINE_GAME_STORE_FILE: ${SHIELDLINE_GAME_STORE_FILE:-/data/game-store.json}
       SHIELDLINE_TELEGRAM_BOT_TOKEN: ${SHIELDLINE_TELEGRAM_BOT_TOKEN:-}
@@ -432,6 +433,35 @@ services:
       SHIELDLINE_DB_PASSWORD: ${POSTGRES_PASSWORD:-studerria_local}
       SHIELDLINE_DB_NAME: ${POSTGRES_DB:-student_portal}
       SHIELDLINE_DB_POOL_MAX: ${SHIELDLINE_WORKER_DB_POOL_MAX:-4}
+    depends_on:
+      shieldline:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  shieldline-admin-bot-worker:
+    image: kma-local-shieldline
+    init: true
+    restart: unless-stopped
+    command: ["node", "adminBotWorker.mjs"]
+    environment:
+      SHIELDLINE_ADMIN_BOT_ENABLED: ${SHIELDLINE_ADMIN_BOT_ENABLED:-false}
+      SHIELDLINE_ADMIN_BOT_DROP_PENDING_UPDATES: ${SHIELDLINE_ADMIN_BOT_DROP_PENDING_UPDATES:-true}
+      SHIELDLINE_ADMIN_TELEGRAM_IDS: ${SHIELDLINE_ADMIN_TELEGRAM_IDS:-}
+      SHIELDLINE_ADMIN_LABEL: ${SHIELDLINE_ADMIN_LABEL:-owner}
+      SHIELDLINE_PUBLIC_URL: ${SHIELDLINE_PUBLIC_URL:-https://studerria.com/shieldline}
+      SHIELDLINE_TELEGRAM_BOT_TOKEN: ${SHIELDLINE_TELEGRAM_BOT_TOKEN:-}
+      SHIELDLINE_DB_HOST: db
+      SHIELDLINE_DB_PORT: 5432
+      SHIELDLINE_DB_USER: ${POSTGRES_USER:-studerria}
+      SHIELDLINE_DB_PASSWORD: ${POSTGRES_PASSWORD:-studerria_local}
+      SHIELDLINE_DB_NAME: ${POSTGRES_DB:-student_portal}
+      SHIELDLINE_ADMIN_DB_POOL_MAX: ${SHIELDLINE_ADMIN_DB_POOL_MAX:-5}
     depends_on:
       shieldline:
         condition: service_healthy

@@ -156,10 +156,6 @@ function apiUrl(basePath: string) {
   return `${normalized}/api/control-overlay`;
 }
 
-function adminAuthUrl(basePath: string) {
-  return `${apiUrl(basePath)}/auth`;
-}
-
 export async function hydrateControlOverlayFromServer(basePath: string) {
   try {
     const response = await fetch(apiUrl(basePath), { cache: "no-store" });
@@ -177,12 +173,12 @@ export async function hydrateControlOverlayFromServer(basePath: string) {
   }
 }
 
-export async function saveControlOverlayToServer(basePath: string, overlay: ControlOverlay, password: string) {
-  const response = await fetch(apiUrl(basePath), {
+export async function saveControlOverlayToServer(basePath: string, overlay: ControlOverlay, _password = "") {
+  const response = await fetch(`${(basePath || "/shieldline/").replace(/\/+$/, "")}/api/admin/zones`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      "X-Shieldline-Admin-Password": password,
+      "X-Shieldline-Admin-CSRF": document.cookie.split(";").map((value) => value.trim()).find((value) => value.startsWith("shieldline_admin_csrf="))?.split("=").slice(1).join("=") || "",
     },
     body: JSON.stringify({ overlay }),
   });
@@ -193,13 +189,8 @@ export async function saveControlOverlayToServer(basePath: string, overlay: Cont
   }
 }
 
-export async function verifyControlOverlayAdminPassword(basePath: string, password: string) {
-  const response = await fetch(adminAuthUrl(basePath), {
-    method: "POST",
-    headers: {
-      "X-Shieldline-Admin-Password": password,
-    },
-  });
+export async function verifyControlOverlayAdminPassword(basePath: string, _password = "") {
+  const response = await fetch(`${(basePath || "/shieldline/").replace(/\/+$/, "")}/api/admin/me`);
   if (!response.ok) {
     if (response.status === 404) throw new Error("Server API is not available.");
     const payload = await response.json().catch(() => ({} as { error?: string }));

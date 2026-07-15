@@ -19,10 +19,12 @@ export type AuthProfile = {
   consentAcceptedAt: string | null;
   telegram: TelegramProfile | null;
   deviceCount: number;
+  status: "active" | "suspended" | "anonymized";
+  suspensionReason?: string | null;
 };
 
 export type AuthBootstrap = {
-  status: "authenticated" | "onboarding_required";
+  status: "authenticated" | "onboarding_required" | "suspended" | "anonymized";
   authRequired: boolean;
   consentVersion: string;
   user: AuthProfile;

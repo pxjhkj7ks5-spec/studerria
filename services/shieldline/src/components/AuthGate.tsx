@@ -45,6 +45,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setBootstrap((current) => current ? { ...current, status: "authenticated", user: profile } : current);
     }} />;
   }
+  if (bootstrap.status === "suspended" || bootstrap.status === "anonymized") {
+    return <AuthSuspended reason={bootstrap.status === "anonymized" ? "Цей профіль було анонімізовано. Створіть новий профіль, щоб повернутися до ShieldLine." : bootstrap.user.suspensionReason || "Доступ до ShieldLine призупинено адміністратором."} onRetry={refresh} />;
+  }
 
   return <AuthContext.Provider value={{ profile: bootstrap.user, bootstrap, refresh, setProfile: (profile) => setBootstrap((current) => current ? { ...current, user: profile } : current) }}>{children}</AuthContext.Provider>;
 }
@@ -55,6 +58,10 @@ function AuthLoading() {
 
 function AuthOffline({ message, onRetry }: { message: string; onRetry: () => Promise<void> }) {
   return <main className="auth-shell auth-shell--center"><section className="auth-card auth-offline"><AlertTriangle size={28} /><h1>Немає зв’язку</h1><p>{message}</p><button className="auth-primary" type="button" onClick={() => void onRetry()}><RotateCcw size={17} /> Спробувати ще раз</button></section></main>;
+}
+
+function AuthSuspended({ reason, onRetry }: { reason: string; onRetry: () => Promise<void> }) {
+  return <main className="auth-shell auth-shell--center"><section className="auth-card auth-offline"><LockKeyhole size={30} /><span className="auth-kicker">ДОСТУП ОБМЕЖЕНО</span><h1>Профіль призупинено</h1><p>{reason}</p><button className="auth-primary" type="button" onClick={() => void onRetry()}><RotateCcw size={17} /> Перевірити статус</button></section></main>;
 }
 
 function Onboarding({ bootstrap, onAuthenticated }: { bootstrap: AuthBootstrap; onAuthenticated: (profile: AuthProfile) => void }) {

@@ -5,6 +5,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
 import { createGameStore, dayKey } from "./serverGame.mjs";
 import { createConfiguredPostgresStore } from "./serverPostgresStore.mjs";
+import { createConfiguredAdminStore } from "./serverAdminStore.mjs";
+import { createAdminApi } from "./serverAdminApi.mjs";
 import { createFixedWindowRateLimiter, createPersistentSessionCodec, createSessionCodec, hashSessionToken, readCookie } from "./serverSecurity.mjs";
 import { normalizeNickname, parseAnalyticsEvent, parseAuthBootstrap, parseAuthRegistration, parseCampaignCommand, parseNicknameAvailability, parseOperationCommand, parseOperationInput, parseTelegramLink, parseTransferRedeem } from "./serverSchemas.mjs";
 import { instrumentHttpHandler, recordAnalyticsMetric, renderPrometheusMetrics, shutdownTelemetry } from "./serverTelemetry.mjs";
@@ -19,6 +21,7 @@ const adminPassword = process.env.SHIELDLINE_ADMIN_PASSWORD || "";
 const legacyGameStore = await createGameStore(process.env.SHIELDLINE_GAME_STORE_FILE || "/data/game-store.json");
 const storageDriver = process.env.SHIELDLINE_STORAGE_DRIVER || "json";
 const gameStore = storageDriver === "postgres" ? await createConfiguredPostgresStore({ legacyStore: legacyGameStore }) : legacyGameStore;
+const adminStore = storageDriver === "postgres" ? await createConfiguredAdminStore() : null;
 const telegramBotToken = process.env.SHIELDLINE_TELEGRAM_BOT_TOKEN || "";
 const telegramAuthMaxAgeSeconds = Number(process.env.SHIELDLINE_TELEGRAM_AUTH_MAX_AGE_SECONDS || 86400);
 const authRequired = !["0", "false", "off"].includes(String(process.env.SHIELDLINE_AUTH_REQUIRED || "true").toLowerCase());
@@ -157,6 +160,8 @@ async function gameActor(req, res) {
   const actorId = await safeActor(req, res);
   if (!authRequired) return actorId;
   const profile = await gameStore.getAuthProfile(actorId);
+  if (profile.status === "suspended") throw Object.assign(new Error(profile.suspensionReason ? `Доступ призупинено: ${profile.suspensionReason}` : "Доступ до ShieldLine призупинено адміністратором."), { statusCode: 403 });
+  if (profile.status === "anonymized") throw Object.assign(new Error("Цей профіль було анонімізовано."), { statusCode: 403 });
   if (!profile.registrationCompleted || profile.consentVersion !== consentVersion) throw Object.assign(new Error("Завершіть реєстрацію ShieldLine."), { statusCode: 401 });
   return actorId;
 }
@@ -189,6 +194,8 @@ function devicePlatform(req, telegramUser = null) {
 }
 
 function authStatus(profile) {
+  if (profile.status === "suspended") return "suspended";
+  if (profile.status === "anonymized") return "anonymized";
   return profile.registrationCompleted && profile.consentVersion === consentVersion ? "authenticated" : "onboarding_required";
 }
 
@@ -500,19 +507,6 @@ async function handleGameApi(req, res, pathname) {
   }
 }
 
-function hasAdminAccess(req) {
-  if (!adminPassword) return false;
-  if (req.headers["x-shieldline-admin-password"] === adminPassword) return true;
-  const authorization = String(req.headers.authorization || "");
-  if (!authorization.startsWith("Basic ")) return false;
-  try {
-    const decoded = Buffer.from(authorization.slice(6), "base64").toString("utf8");
-    return decoded === `admin:${adminPassword}`;
-  } catch {
-    return false;
-  }
-}
-
 function readRequestJson(req) {
   return new Promise((resolveRequest, rejectRequest) => {
     let body = "";
@@ -534,6 +528,28 @@ function readRequestJson(req) {
   });
 }
 
+async function readControlOverlay() {
+  if (!existsSync(controlOverlayFile)) return null;
+  return JSON.parse(await readFile(controlOverlayFile, "utf8"));
+}
+
+async function writeControlOverlay(overlay) {
+  await mkdir(dirname(controlOverlayFile), { recursive: true });
+  await writeFile(controlOverlayFile, `${JSON.stringify(overlay, null, 2)}\n`, "utf8");
+}
+
+const handleAdminApi = adminStore ? createAdminApi({
+  store: adminStore,
+  adminPassword,
+  adminLabel: process.env.SHIELDLINE_ADMIN_LABEL || "owner",
+  basePath: basePath || "",
+  secure: production,
+  sendJson,
+  readJson: readRequestJson,
+  readOverlay: readControlOverlay,
+  writeOverlay: writeControlOverlay,
+}) : null;
+
 async function handleControlOverlayApi(req, res) {
   if (req.method === "GET") {
     try {
@@ -550,18 +566,7 @@ async function handleControlOverlayApi(req, res) {
   }
 
   if (req.method === "PUT") {
-    if (!hasAdminAccess(req)) {
-      sendJson(res, 401, { error: "Admin password is required." });
-      return;
-    }
-    try {
-      const payload = await readRequestJson(req);
-      await mkdir(dirname(controlOverlayFile), { recursive: true });
-      await writeFile(controlOverlayFile, `${JSON.stringify(payload.overlay || payload, null, 2)}\n`, "utf8");
-      sendJson(res, 200, { ok: true });
-    } catch (error) {
-      sendJson(res, 400, { error: error instanceof Error ? error.message : "Could not save control overlay." });
-    }
+    sendJson(res, 410, { error: "Use the authenticated /api/admin/zones endpoint." });
     return;
   }
 
@@ -575,11 +580,7 @@ function handleControlOverlayAuth(req, res) {
     res.end();
     return;
   }
-  if (!hasAdminAccess(req)) {
-    sendJson(res, 401, { error: "Admin password is required." });
-    return;
-  }
-  sendJson(res, 200, { ok: true });
+  sendJson(res, 410, { error: "Password headers were replaced by secure admin sessions." });
 }
 
 const handleHttpRequest = async (req, res) => {
@@ -596,6 +597,8 @@ const handleHttpRequest = async (req, res) => {
     await handleControlOverlayApi(req, res);
     return;
   }
+
+  if (handleAdminApi && await handleAdminApi(req, res, pathname, requestUrl)) return;
 
   if (isControlOverlayAuthApi(pathname)) {
     handleControlOverlayAuth(req, res);

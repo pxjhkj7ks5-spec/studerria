@@ -54,12 +54,14 @@ async function deliverOutbox() {
   try {
     await client.query("BEGIN");
     const pending = await client.query(
-      `SELECT id, actor_id, type, payload, attempts FROM shieldline_outbox
-       WHERE delivered_at IS NULL AND available_at <= now()
-       ORDER BY created_at LIMIT 20 FOR UPDATE SKIP LOCKED`,
+      `SELECT o.id, o.actor_id, o.type, o.payload, o.attempts, p.chat_id, i.provider_user_id AS telegram_id FROM shieldline_outbox o
+       LEFT JOIN shieldline_notification_preferences p ON p.actor_id = o.actor_id AND p.enabled = true
+       LEFT JOIN shieldline_identities i ON i.actor_id = o.actor_id AND i.provider = 'telegram'
+       WHERE o.delivered_at IS NULL AND o.available_at <= now()
+       ORDER BY o.created_at LIMIT 20 FOR UPDATE OF o SKIP LOCKED`,
     );
     for (const item of pending.rows) {
-      const chatId = item.actor_id?.startsWith("tg-") ? item.actor_id.slice(3) : null;
+      const chatId = item.type === "admin.test" ? item.telegram_id : item.chat_id || (item.actor_id?.startsWith("tg-") ? item.actor_id.slice(3) : null);
       if (!chatId) {
         await client.query("UPDATE shieldline_outbox SET delivered_at = now(), attempts = attempts + 1 WHERE id = $1", [item.id]);
         continue;
@@ -73,6 +75,18 @@ async function deliverOutbox() {
       if (response?.ok) await client.query("UPDATE shieldline_outbox SET delivered_at = now(), attempts = attempts + 1 WHERE id = $1", [item.id]);
       else await client.query("UPDATE shieldline_outbox SET attempts = attempts + 1, available_at = now() + make_interval(secs => LEAST(3600, 30 * power(2, attempts))) WHERE id = $1", [item.id]);
     }
+    await client.query(`UPDATE shieldline_admin_broadcasts b SET
+      delivered_count = stats.delivered,
+      failed_count = stats.failed,
+      status = CASE WHEN stats.pending = 0 THEN 'completed' ELSE 'sending' END,
+      completed_at = CASE WHEN stats.pending = 0 THEN COALESCE(b.completed_at, now()) ELSE NULL END
+      FROM (
+        SELECT payload->>'broadcastId' AS id,
+          count(*) FILTER (WHERE delivered_at IS NOT NULL)::integer AS delivered,
+          count(*) FILTER (WHERE delivered_at IS NULL AND attempts >= 5)::integer AS failed,
+          count(*) FILTER (WHERE delivered_at IS NULL AND attempts < 5)::integer AS pending
+        FROM shieldline_outbox WHERE type = 'admin.broadcast' GROUP BY payload->>'broadcastId'
+      ) stats WHERE b.id = stats.id`);
     await client.query("COMMIT");
     log("info", "notification outbox processed", { rows: pending.rowCount });
   } catch (error) {
@@ -85,6 +99,8 @@ async function runWorker() {
   if (role === "projection") await rebuildCampaignProjection();
   else if (role === "notification") await deliverOutbox();
   else throw new Error(`Unknown Shieldline worker role: ${role}`);
+  await pool.query(`INSERT INTO shieldline_worker_heartbeats (role, status, details) VALUES ($1,'ready',$2::jsonb)
+    ON CONFLICT (role) DO UPDATE SET status = EXCLUDED.status, details = EXCLUDED.details, updated_at = now()`, [role, JSON.stringify({ intervalMs })]);
 }
 
 let stopping = false;

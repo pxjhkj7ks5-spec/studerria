@@ -37,7 +37,10 @@ COPY --chown=shieldline:nodejs --from=builder /app/serverSchemas.mjs ./serverSch
 COPY --chown=shieldline:nodejs --from=builder /app/serverTelemetry.mjs ./serverTelemetry.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/serverTelegramAuth.mjs ./serverTelegramAuth.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/serverPostgresStore.mjs ./serverPostgresStore.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/serverAdminStore.mjs ./serverAdminStore.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/serverAdminApi.mjs ./serverAdminApi.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/worker.mjs ./worker.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/adminBotWorker.mjs ./adminBotWorker.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/scripts ./scripts
 COPY --chown=shieldline:nodejs --from=builder /app/src/game/simulationCore.mjs ./src/game/simulationCore.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/src/game/launchSystem.mjs ./src/game/launchSystem.mjs
