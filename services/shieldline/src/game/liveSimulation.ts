@@ -13,6 +13,7 @@ import { threatCourseAtProgress, threatPositionAtProgress } from "./threatRouteV
 import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recoverReadiness } from "./unitReadiness";
 import { applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
 import { campaignKillRewards, campaignTutorialSteps, getCampaignRoute } from "../data/campaignPlan";
+import { pickCampaignLaunchSector } from "./campaignLaunchZones";
 import type {
   CityId,
   Coordinates,
@@ -494,25 +495,26 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   if (!event || event.dueMs > state.elapsedMs - state.cycleStartedAtMs) return false;
   const route = getCampaignRoute(event.routeId);
   if (!route) { campaign.spawnCursor += 1; return true; }
-  const waypoints = generateCampaignRoute(event, random);
+  const launchSector = pickCampaignLaunchSector(state.launchSectors, route.launchSector, event.threatKind, random);
+  const launchOrigin = randomPointInSector(launchSector, random);
+  const waypoints = generateCampaignRoute(event, random, launchOrigin);
   const targetCityId = event.targetRegion.toLowerCase().includes("столич") ? "kyiv" : route.targetCityId;
   const city = state.cities.find((item) => item.id === targetCityId) || state.cities[0];
-  const threat = spawnThreat(state, random, event.threatKind, city.id, undefined, waypoints[0] || route.baseWaypoints[0]);
+  const threat = spawnThreat(state, random, event.threatKind, city.id, launchSector.id, launchOrigin);
   if (waypoints.length) waypoints[waypoints.length - 1] = { ...city.coordinates };
   threat.target = waypoints.at(-1) || city.coordinates;
   threat.routeId = event.routeId;
   threat.routeWaypoints = waypoints;
   threat.campaignPriority = event.priority;
   threat.campaignGroupId = event.groupId;
-  threat.launchSectorId = event.routeId;
-  threat.launchSectorName = `${route.launchSector} · ${event.routeId}`;
   threat.plannedTargetPriority = event.targetRegion;
   threat.reward = campaignKillRewards[event.threatKind] ?? threat.reward;
   threat.headingDeg = bearingDeg(threat.origin, threat.target);
   state.liveThreats.push(threat);
   campaign.spawnCursor += 1;
+  markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates }, launchOrigin, event.threatKind);
   const missile = isMissileClass(event.threatKind);
-  const launchPointLabel = `${route.launchSector} · ${event.routeId}`;
+  const launchPointLabel = `${launchSector.name} · маршрут ${event.routeId}`;
   pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Пуск БПЛА", `Пускова точка ${launchPointLabel}. Цільовий сектор: ${event.targetRegion} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: launchPointLabel });
   return true;
 }

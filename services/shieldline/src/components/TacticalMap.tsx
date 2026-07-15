@@ -8,7 +8,6 @@ import { formatThreatAltitude, formatThreatSpeed, threatDisplayName } from "../d
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageState } from "../game/coverageVisuals";
-import { campaignLaunchPointsForThreats } from "../game/campaignLaunchPoints";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile, wheelZoomDelta, type MapZoomInputProfile } from "../game/mapZoom";
@@ -1048,10 +1047,6 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
     () => SHOW_LAUNCH_DEBUG ? liveThreats.filter((threat) => pointInBounds(threat.origin, renderBounds)) : [],
     [liveThreats, renderBounds],
   );
-  const visibleCampaignLaunchPoints = useMemo(
-    () => campaignLaunchPointsForThreats(liveThreats).filter((point) => pointInBounds(point.position, renderBounds)),
-    [liveThreats, renderBounds],
-  );
   useEffect(() => {
     if (!renderBounds) return;
     for (const key of renderBounds.chunkKeys) {
@@ -1077,8 +1072,7 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
       + visibleCoverageBatteries.length
       + visibleRoutes.length
       + visibleOccupiedZonePolygons.length
-      + visibleDebugLaunchPoints.length
-      + visibleCampaignLaunchPoints.length;
+      + visibleDebugLaunchPoints.length;
     return {
       activeObjects,
       renderedObjects,
@@ -1103,7 +1097,6 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
     visibleImpactMarkers.length,
     visibleLaunchSectors.length,
     visibleDebugLaunchPoints.length,
-    visibleCampaignLaunchPoints.length,
     visibleOccupiedZonePolygons.length,
     visibleRoutes.length,
     visibleEngagements.length,
@@ -1211,20 +1204,6 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
           <CircleMarker key={`debug-launch-${threat.id}`} center={[threat.origin.lat, threat.origin.lng]} radius={4} pathOptions={{ color: "#fff4d0", fillColor: "#ff5f57", fillOpacity: 0.9, weight: 1, className: "launch-point-debug" }}>
             <Tooltip>{threat.launchSectorName} · exact debug spawn</Tooltip>
           </CircleMarker>
-        ))}
-        {visibleCampaignLaunchPoints.map((point) => (
-          <Fragment key={`campaign-launch-${point.routeId}`}>
-            <Circle
-              center={[point.position.lat, point.position.lng]}
-              radius={18000}
-              pathOptions={{ color: "#ff765f", fillColor: "#ff4f4f", fillOpacity: .08, opacity: .72, weight: 2, className: "campaign-launch-point-halo" }}
-            />
-            <CircleMarker center={[point.position.lat, point.position.lng]} radius={6} pathOptions={{ color: "#fff2d0", fillColor: "#ff574b", fillOpacity: 1, weight: 2, className: "campaign-launch-point" }}>
-              <Tooltip permanent className="campaign-launch-point-label" direction="right" offset={[9, 0]}>
-                ПУСК {point.sectorLabel} · {point.routeId} · {threatDisplayName(point.threatKind)}{point.activeTracks > 1 ? ` ×${point.activeTracks}` : ""}
-              </Tooltip>
-            </CircleMarker>
-          </Fragment>
         ))}
         {visibleCarriers.map((carrier) => (
           <Marker key={carrier.id} position={[carrier.position.lat, carrier.position.lng]} icon={makeCarrierIcon(carrier)}>

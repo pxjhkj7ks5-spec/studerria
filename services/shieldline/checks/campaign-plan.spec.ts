@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, getCampaignMission, missionTargetCount } from "../src/data/campaignPlan";
-import { campaignLaunchPointsForThreats } from "../src/game/campaignLaunchPoints";
 import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery } from "../src/game/campaignMeta";
+import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/game/campaignLaunchZones";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
+import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, placeBattery, startAttackNow } from "../src/game/liveSimulation";
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
@@ -43,6 +44,28 @@ test("seeded route generation curves drones and keeps ballistic tracks direct", 
   const ballistic = generateCampaignRoute(ballisticEvent, () => .5);
   assert.equal(ballistic.length, 2);
   assert.equal(routeHasSelfIntersection(ballistic), false);
+
+  const launchOrigin = { lat: 53.2, lng: 34.4 };
+  const adapted = generateCampaignRoute(droneEvent, () => leftRandom.next(), launchOrigin);
+  const adaptedTemplate = campaignRouteTemplates.find((route) => route.id === droneEvent.routeId)!;
+  assert.deepEqual(adapted[0], launchOrigin);
+  assert.deepEqual(adapted.at(-1), adaptedTemplate.baseWaypoints.at(-1));
+});
+
+test("campaign corridors select compatible animated launch zones", () => {
+  const sectors = createLaunchSectorState();
+  for (const event of buildCampaignSpawnEvents(1)) {
+    const route = campaignRouteTemplates.find((item) => item.id === event.routeId)!;
+    const sector = pickCampaignLaunchSector(sectors, route.launchSector, event.threatKind, () => .35);
+    assert.ok(campaignLaunchSectorIdsByAxis[route.launchSector].includes(sector.id));
+    assert.equal(sectorSupportsThreat(sector, event.threatKind), true);
+  }
+  for (const mission of campaignMissionsPlan) for (const event of buildCampaignSpawnEvents(mission.index)) {
+    const route = campaignRouteTemplates.find((item) => item.id === event.routeId)!;
+    const sector = pickCampaignLaunchSector(sectors, route.launchSector, event.threatKind, () => .65);
+    assert.ok(sectors.some((item) => item.id === sector.id));
+    assert.equal(sectorSupportsThreat(sector, event.threatKind), true);
+  }
 });
 
 test("campaign economy credits exact capped kill rewards immediately and preserves units between missions", () => {
@@ -78,7 +101,7 @@ test("campaign economy credits exact capped kill rewards immediately and preserv
   assert.ok(game.campaign?.unlockedSystems.includes("gepard"));
 });
 
-test("campaign onboarding cues expire and launch points identify their authored route", () => {
+test("campaign onboarding cues expire before the first launch", () => {
   assert.equal(activeCampaignTutorialCue(5)?.title, "Відкрийте «План»");
   assert.equal(activeCampaignTutorialCue(5, ["planning"]), null);
   assert.equal(activeCampaignTutorialCue(13), null);
@@ -86,11 +109,24 @@ test("campaign onboarding cues expire and launch points identify their authored 
     ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
     [1, 2, 2, 10, 10, 20],
   );
-  const launchPoints = campaignLaunchPointsForThreats([
-    { routeId: "R01", launchSectorName: "N1 · R01", origin: { lat: 53.1, lng: 30.2 }, kind: "geran2" } as never,
-    { routeId: "R01", launchSectorName: "N1 · R01", origin: { lat: 53.2, lng: 30.3 }, kind: "geran2" } as never,
-  ]);
-  assert.deepEqual(launchPoints.map(({ routeId, sectorLabel, activeTracks }) => ({ routeId, sectorLabel, activeTracks })), [{ routeId: "R01", sectorLabel: "N1", activeTracks: 2 }]);
+  assert.equal(buildCampaignSpawnEvents(1)[0].dueMs, 45_000);
+});
+
+test("live campaign launches from and animates a real launch zone", () => {
+  const random = createDeterministicRandom("campaign-live-launch-zone");
+  let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  applyCampaignMissionOpening(game);
+  game = startAttackNow(game, () => random.next());
+  game = advanceSimulation(game, 46_000, () => random.next());
+  const threat = game.liveThreats[0];
+  assert.ok(threat);
+  assert.notEqual(threat.launchSectorId, threat.routeId);
+  assert.equal(sectorSupportsThreat(game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!, threat.kind), true);
+  assert.deepEqual(threat.routeWaypoints?.[0], threat.origin);
+  const activeSector = game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!;
+  assert.equal(activeSector.state, "launching");
+  assert.deepEqual(activeSector.lastLaunchCoordinates, threat.origin);
 });
 
 test("intermission repair and resupply spend the persistent campaign wallet", () => {

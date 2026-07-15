@@ -195,13 +195,26 @@ function samplePolyline(points: Coordinates[], count: number) {
   return sampled;
 }
 
-export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => number): Coordinates[] {
+function routeFromLaunchOrigin(points: readonly Coordinates[], launchOrigin?: Coordinates) {
+  if (!launchOrigin || points.length < 2) return points.map(copyPoint);
+  const latitudeShift = launchOrigin.lat - points[0].lat;
+  const longitudeShift = launchOrigin.lng - points[0].lng;
+  return points.map((point, index) => {
+    const influence = 1 - index / (points.length - 1);
+    return index === 0
+      ? copyPoint(launchOrigin)
+      : { lat: point.lat + latitudeShift * influence, lng: point.lng + longitudeShift * influence };
+  });
+}
+
+export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => number, launchOrigin?: Coordinates): Coordinates[] {
   const route = getCampaignRoute(event.routeId);
   if (!route) return [];
+  const baseWaypoints = routeFromLaunchOrigin(route.baseWaypoints, launchOrigin);
   if (route.ballistic || event.threatKind === "iskander" || event.threatKind === "ballistic") {
-    const start = copyPoint(route.baseWaypoints[0]);
-    const end = copyPoint(route.baseWaypoints.at(-1)!);
-    start.lat += (random() - .5) * .08; start.lng += (random() - .5) * .08;
+    const start = copyPoint(baseWaypoints[0]);
+    const end = copyPoint(baseWaypoints.at(-1)!);
+    if (!launchOrigin) { start.lat += (random() - .5) * .08; start.lng += (random() - .5) * .08; }
     end.lat += (random() - .5) * .025; end.lng += (random() - .5) * .025;
     return [start, end];
   }
@@ -209,9 +222,9 @@ export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => n
   const decoy = event.threatKind === "parodiya" || event.threatKind === "decoy";
   const minTurns = cruise ? 3 : 2;
   const maxTurns = cruise || decoy ? 6 : 5;
-  const routeLength = route.baseWaypoints.slice(1).reduce((sum, point, index) => sum + pointDistanceKm(route.baseWaypoints[index], point), 0);
+  const routeLength = baseWaypoints.slice(1).reduce((sum, point, index) => sum + pointDistanceKm(baseWaypoints[index], point), 0);
   const turnCount = Math.max(minTurns, Math.min(maxTurns, Math.round(routeLength / 175) - 1));
-  let points = samplePolyline(route.baseWaypoints, turnCount + 2);
+  let points = samplePolyline(baseWaypoints, turnCount + 2);
   points = points.map((point, index) => {
     if (index === 0 || index === points.length - 1) return copyPoint(point);
     const previous = points[index - 1];
@@ -223,7 +236,7 @@ export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => n
   if (event.mergeRouteId && event.mergeRouteId !== event.routeId) {
     const mergeRoute = getCampaignRoute(event.mergeRouteId);
     if (mergeRoute) {
-      const canonical = samplePolyline(mergeRoute.baseWaypoints, points.length);
+      const canonical = samplePolyline(routeFromLaunchOrigin(mergeRoute.baseWaypoints, launchOrigin), points.length);
       const ratio = event.rallyRatio || .45;
       const rallyIndex = Math.max(1, Math.min(points.length - 2, Math.round(ratio * (points.length - 1))));
       points = points.map((point, index) => index >= rallyIndex ? copyPoint(canonical[index]) : point);
