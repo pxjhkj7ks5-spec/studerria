@@ -6,7 +6,7 @@ import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
-import { advanceSimulation, placeBattery, startAttackNow } from "../src/game/liveSimulation";
+import { advanceSimulation, deployStoredBattery, placeBattery, startAttackNow } from "../src/game/liveSimulation";
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
   assert.equal(campaignRouteTemplates.length, 30);
@@ -14,7 +14,7 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [15, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [38, 32, 48, 70, 100]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.rewardCap), [18, 35, 55, 80, 120]);
-  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [28, 41, 58, 78, 103]);
+  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [29, 41, 58, 78, 103]);
   assert.equal(campaignMissionsPlan.slice(0, 3).some((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), false);
   assert.equal(campaignMissionsPlan.slice(3).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
 });
@@ -33,13 +33,16 @@ test("authored waves expand to deterministic individual spawn events with groupi
 test("first contact keeps pressure active without doubling damaging targets", () => {
   const events = buildCampaignSpawnEvents(1);
   const gaps = events.slice(1).map((event, index) => event.dueMs - events[index].dueMs);
-  assert.equal(events.length, 28);
+  assert.equal(events.length, 29);
   assert.ok(Math.max(...gaps) <= 55_000);
-  assert.equal(events.filter((event) => event.threatKind !== "parodiya").length, 14);
+  assert.equal(events.filter((event) => event.threatKind !== "parodiya").length, 15);
   for (const groupId of new Set(events.map((event) => event.groupId))) {
     const group = events.filter((event) => event.groupId === groupId);
-    assert.equal(group.length, 2);
-    assert.equal(new Set(group.map((event) => event.routeId)).size, 2);
+    if (group[0].threatKind === "kh101") assert.equal(group.length, 1);
+    else {
+      assert.equal(group.length, 2);
+      assert.equal(new Set(group.map((event) => event.routeId)).size, 2);
+    }
   }
 });
 
@@ -97,7 +100,7 @@ test("campaign economy credits exact capped kill rewards immediately and preserv
   for (let index = 0; index < 30; index += 1) recordCampaignKill(game, "parodiya", 1);
   assert.equal(game.resources.budget, 25);
   assert.equal(game.campaign?.campaignWallet, 25);
-  game.interceptions = 28;
+  game.interceptions = 29;
   const result = finalizeCampaignMission(game)!;
   assert.equal(result.killReward, getCampaignMission(1).rewardCap);
   assert.equal(result.bonusRewards, 25);
@@ -118,11 +121,37 @@ test("campaign onboarding cues expire before the first launch", () => {
   assert.equal(activeCampaignTutorialCue(5)?.title, "Відкрийте «План»");
   assert.equal(activeCampaignTutorialCue(5, ["planning"]), null);
   assert.equal(activeCampaignTutorialCue(13), null);
+  assert.equal(activeCampaignTutorialCue(510)?.title, "Підкріплення прибуло");
   assert.deepEqual(
     ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
     [1, 2, 2, 10, 10, 20],
   );
   assert.equal(buildCampaignSpawnEvents(1)[0].dueMs, 45_000);
+});
+
+test("first mission grants one free S-300 reinforcement before the cruise launch", () => {
+  const random = createDeterministicRandom("campaign-s300-reinforcement");
+  let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  applyCampaignMissionOpening(game);
+  game = startAttackNow(game, () => random.next());
+  game = advanceSimulation(game, 180_000, () => random.next());
+  game = advanceSimulation(game, 180_000, () => random.next());
+  game = advanceSimulation(game, 149_000, () => random.next());
+  assert.equal(game.campaign?.unlockedSystems.includes("s300"), false);
+  assert.equal(game.storedBatteries.some((battery) => battery.kind === "s300"), false);
+  game = advanceSimulation(game, 2_000, () => random.next());
+  assert.equal(game.campaign?.unlockedSystems.includes("s300"), true);
+  assert.equal(game.storedBatteries.filter((battery) => battery.kind === "s300").length, 1);
+  assert.equal(game.log.some((entry) => entry.title === "Підкріплення прибуло"), true);
+  game = advanceSimulation(game, 5_000, () => random.next());
+  assert.equal(game.storedBatteries.filter((battery) => battery.kind === "s300").length, 1);
+  const reinforcement = game.storedBatteries.find((battery) => battery.kind === "s300")!;
+  game.campaign!.campaignWallet = 0;
+  game.resources.budget = 0;
+  game = deployStoredBattery(game, reinforcement.id, { lat: 48.2, lng: 34.7 });
+  assert.equal(game.batteries.some((battery) => battery.id === reinforcement.id), true);
+  assert.equal(game.campaign?.campaignWallet, 0);
 });
 
 test("live campaign launches from and animates a real launch zone", () => {
@@ -177,9 +206,9 @@ test("the live campaign director resolves every authored target before opening i
   applyCampaignMissionOpening(game);
   game = startAttackNow(game, () => random.next());
   for (let step = 0; step < 8 && !game.campaign?.intermission; step += 1) game = advanceSimulation(game, 180_000, () => random.next());
-  assert.equal(game.campaign?.spawnCursor, 28);
+  assert.equal(game.campaign?.spawnCursor, 29);
   assert.equal(game.campaign?.intermission, true);
   assert.equal(game.campaign?.previousMissionResults.length, 1);
-  assert.equal(game.campaign?.previousMissionResults[0].totalTargets, 28);
+  assert.equal(game.campaign?.previousMissionResults[0].totalTargets, 29);
   assert.equal(game.liveThreats.length, 0);
 });

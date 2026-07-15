@@ -32,6 +32,8 @@ import type {
 const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
 const CAMPAIGN_LAUNCH_WARNING_MS = 15000;
+const FIRST_MISSION_REINFORCEMENT_MS = 510000;
+const REINFORCEMENT_AWAITING_DEPLOYMENT = "reinforcement awaiting deployment";
 const MIN_ATTACK_WINDOW_MS = 90000;
 const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
 const LAUNCH_CONE_RANGE_KM = 900;
@@ -302,7 +304,8 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   if (!battery || next.status !== "active") return next;
   const scenario = getScenario(next.scenarioId);
   const unit = getUnitDefinition(battery.kind);
-  const redeployCost = next.campaign ? campaignRedeployCost(battery.kind) : 0;
+  const reinforcementDeployment = battery.lastAction === REINFORCEMENT_AWAITING_DEPLOYMENT;
+  const redeployCost = next.campaign && !reinforcementDeployment ? campaignRedeployCost(battery.kind) : 0;
   if (next.campaign && next.campaign.campaignWallet < redeployCost) {
     next.placementWarning = `Для передислокації потрібно ${redeployCost} млн ₴.`;
     return next;
@@ -319,7 +322,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
     ...battery,
     position: { ...position },
     assignedCityId: nearestCityId(next, position),
-    lastAction: "redeployed from storage",
+    lastAction: reinforcementDeployment ? "reinforcement deployed" : "redeployed from storage",
     lastMovedMission: next.campaign?.missionIndex || battery.lastMovedMission,
   });
   if (next.campaign) {
@@ -330,6 +333,39 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   next.logistics = buildLogisticsState(next);
   pushLog(next.log, next.elapsedMs, `${unit.shortName} повернуто зі складу`, next.campaign ? `${unit.name} передислоковано за ${redeployCost} млн ₴.` : `${unit.name} безкоштовно розміщено на новій позиції.`, "success");
   return next;
+}
+
+function grantFirstMissionReinforcement(state: GameState, random: () => number) {
+  const campaign = state.campaign;
+  if (!campaign || campaign.missionIndex !== 1 || campaign.unlockedSystems.includes("s300")) return;
+  const missionElapsedMs = state.elapsedMs - state.cycleStartedAtMs;
+  if (state.cyclePhase !== "attack" || missionElapsedMs < FIRST_MISSION_REINFORCEMENT_MS) return;
+  const unit = getUnitDefinition("s300");
+  const stagingPosition = { lat: 47.2, lng: 35.8 };
+  campaign.unlockedSystems = [...new Set([...campaign.unlockedSystems, "s300"] as UnitKind[])];
+  state.storedBatteries.push({
+    id: createId("reinforcement-s300", Math.floor(state.elapsedMs), random),
+    kind: "s300",
+    position: stagingPosition,
+    coverageTier: batteryTier(unit),
+    coverageRadius: coverageRadiusFromUnit(unit),
+    readiness: unit.readiness,
+    fatigue: 0,
+    daysSinceMaintenance: 0,
+    lastAction: REINFORCEMENT_AWAITING_DEPLOYMENT,
+    lastEngagementResult: "awaiting deployment",
+    status: "ready",
+    supplyStatus: "strained",
+    cooldownMs: 0,
+    reloadRemainingMs: 0,
+    currentAmmo: unit.ammoCapacity,
+    assignedCityId: nearestCityId(state, stagingPosition),
+    health: 100,
+    experienceLevel: 0,
+    createdAtMission: 1,
+    lastMovedMission: 0,
+  });
+  pushLog(state.log, state.elapsedMs, "Підкріплення прибуло", "Розвідка повідомляє про пуски крилатих ракет. С-300 додано до резерву — розгорніть комплекс на південному сході.", "success");
 }
 
 export function setBatteryMaintenance(state: GameState, batteryId: string): GameState {
@@ -1179,6 +1215,7 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   const safeDelta = clamp(deltaMs, 0, 10_000);
   const previousElapsedMs = state.elapsedMs;
   state.elapsedMs += safeDelta;
+  grantFirstMissionReinforcement(state, random);
   if (state.campaign?.missionIndex === 1 && state.cyclePhase === "attack") {
     const missionElapsedSeconds = Math.max(0, (state.elapsedMs - state.cycleStartedAtMs) / 1_000);
     state.campaign.tutorialStep = campaignTutorialSteps.reduce((step, cue, index) => missionElapsedSeconds >= cue.atSeconds ? index : step, 0);

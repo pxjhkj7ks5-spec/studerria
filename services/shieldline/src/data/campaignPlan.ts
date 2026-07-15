@@ -86,7 +86,7 @@ const w = (time: string, threatKind: ThreatKind, count: number, routeIds: string
 };
 
 export const campaignMissionsPlan: CampaignMissionDefinition[] = [
-  { id: "first-contact", index: 1, title: "Перший контакт", durationMinutes: 15, focusRegion: "Столичний кластер", grant: 38, rewardCap: 18, objective: "Навчитися виявляти, класифікувати й пріоритезувати загрози без марної витрати дорогого БК.", expectedThreatClasses: ["Parody", "Gerbera", "Shahed"], broadAzimuth: "північ і північний схід", unlocks: ["radar", "mvg", "manpads"], waves: [
+  { id: "first-contact", index: 1, title: "Перший контакт", durationMinutes: 15, focusRegion: "Столичний кластер", grant: 38, rewardCap: 18, objective: "Навчитися виявляти, класифікувати й пріоритезувати загрози без марної витрати дорогого БК.", expectedThreatClasses: ["Parody", "Gerbera", "Shahed", "Cruise"], broadAzimuth: "північ, північний схід і південний схід", unlocks: ["radar", "mvg", "manpads"], waves: [
     w("00:45", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
     w("01:35", "gerbera", 2, ["R02", "R03"], 2, "twoAxisScreen", "Столичний кластер", .25, 5, "low"),
     w("02:30", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
@@ -98,6 +98,7 @@ export const campaignMissionsPlan: CampaignMissionDefinition[] = [
     w("08:05", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
     w("09:00", "geran2", 2, ["R01", "R02"], 2, "softMerge", "Столичний кластер", 0, 5, "medium"),
     w("10:00", "parodiya", 2, ["R03", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
+    w("10:30", "kh101", 1, ["R25"], 1, "independent", "Південно-східний кластер", 0, 0, "veryHigh"),
     w("11:00", "gerbera", 2, ["R02", "R06"], 2, "crossingScreen", "Столичний / енергетичний", .25, 5, "low"),
     w("12:00", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
     w("13:00", "geran2", 2, ["R01", "R02"], 2, "fullGroup", "Столичний кластер", 0, 5, "high"),
@@ -126,6 +127,7 @@ export const campaignTutorialSteps = [
   { atSeconds: 78, durationSeconds: 7, title: "Контакти низького пріоритету", body: "Не витрачайте дорогі ракети на кожну обманку." },
   { atSeconds: 92, durationSeconds: 7, title: "Читайте картку цілі", body: "Зіставляйте тип, швидкість, курс і достовірність." },
   { atSeconds: 390, durationSeconds: 7, title: "Реальна загроза", body: "Пріоритезуйте Shahed і збережіть БК для фіналу." },
+  { atSeconds: 510, durationSeconds: 9, title: "Підкріплення прибуло", body: "Розвідка повідомляє про пуски крилатих ракет. С-300 додано до резерву — розгорніть комплекс на південному сході." },
   { atSeconds: 570, durationSeconds: 7, title: "Бережіть боєкомплект", body: "Після місії безкоштовно відновиться лише 25% комплекту." },
   { atSeconds: 690, durationSeconds: 7, title: "Частина цілей відволікає", body: "Тримайте головний театр прикритим." },
   { atSeconds: 810, durationSeconds: 7, title: "Кампанія має пам’ять", body: "Позиції, БК, стан систем, досвід, стійкість і гаманець перейдуть далі." },
