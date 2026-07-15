@@ -9,6 +9,7 @@ import { clamp, createId, pick, weightedChance } from "./math";
 import { applyPlanningActionCosts, applyPlanningRecoveryEffects, closePlanningDay } from "./planningActions";
 import { distanceKm, validateBatteryPlacement } from "./placementRules";
 import { chooseAttackPlan, createThreatDirectorContext, pickThreatKindForPlan } from "./threatDirector";
+import { threatCourseAtProgress, threatPositionAtProgress } from "./threatRouteVisuals";
 import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recoverReadiness } from "./unitReadiness";
 import { applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
 import { campaignKillRewards, campaignTutorialSteps, getCampaignRoute } from "../data/campaignPlan";
@@ -339,14 +340,7 @@ export function setBatteryMaintenance(state: GameState, batteryId: string): Game
 }
 
 function threatPosition(threat: LiveThreat): Coordinates {
-  const points = threat.routeWaypoints;
-  if (points && points.length > 1) {
-    const scaled = clamp(threat.progress, 0, 1) * (points.length - 1);
-    const index = Math.min(points.length - 2, Math.floor(scaled));
-    const ratio = scaled - index;
-    return { lat: points[index].lat + (points[index + 1].lat - points[index].lat) * ratio, lng: points[index].lng + (points[index + 1].lng - points[index].lng) * ratio };
-  }
-  return { lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * threat.progress, lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * threat.progress };
+  return threatPositionAtProgress(threat, threat.progress);
 }
 
 function abstractDistance(left: Coordinates, right: Coordinates) {
@@ -923,6 +917,7 @@ function applyImpact(state: GameState, threat: LiveThreat, random: () => number)
   state.resources.energy = clamp(state.resources.energy - damage * 0.1);
   state.resources.morale = clamp(state.resources.morale - (city.importance * 0.5 + 0.8));
   if (state.campaign && damage > 0) {
+    state.campaign.civilianResilience = clamp(state.campaign.civilianResilience - 4, 0, 100);
     for (const battery of state.batteries.filter((item) => item.assignedCityId === city.id)) {
       battery.health = clamp(battery.health - damage * 1.2, 0, 100);
       battery.readiness = clamp(battery.readiness - damage * .8, 0, 100);
@@ -939,7 +934,7 @@ function updateThreats(state: GameState, deltaMs: number, random: () => number) 
     const next = { ...threat, progress: threat.progress + threat.speed * deltaMs };
     if (next.revealed) {
       next.lastKnownPosition = threatPosition(next);
-      next.headingDeg = bearingDeg(next.origin, next.target);
+      next.headingDeg = threatCourseAtProgress(next, next.progress);
     }
     if (next.progress >= 1) {
       applyImpact(state, next, random);
@@ -1025,16 +1020,11 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
     if (battery.status === "reloading") {
       battery.reloadRemainingMs = Math.max(0, battery.reloadRemainingMs - deltaMs);
       if (battery.reloadRemainingMs <= 0) {
-        if (state.campaign) {
-          battery.lastAction = "боєкомплект вичерпано";
-          battery.lastEngagementResult = "очікує поповнення між місіями";
-          battery.status = "exhausted";
-        } else {
-          battery.currentAmmo = unit.ammoCapacity;
-          battery.lastAction = "reload complete";
-          battery.lastEngagementResult = "reloaded";
-          battery.status = "ready";
-        }
+        battery.currentAmmo = unit.ammoCapacity;
+        battery.reloadRemainingMs = 0;
+        battery.lastAction = "reload complete";
+        battery.lastEngagementResult = "reloaded";
+        battery.status = battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
       }
     }
     battery.supplyStatus = state.logistics.unitSupply[battery.id] || "strained";

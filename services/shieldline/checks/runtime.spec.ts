@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
+import { getUnitDefinition } from "../src/data/units";
+import { finalizeCampaignMission, createCampaignState } from "../src/game/campaignMeta";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile, wheelZoomDelta } from "../src/game/mapZoom";
 import { advanceSimulation, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
 import { campaignCycleCompleted, normalizePersistedGame, useGameStore } from "../src/store/useGameStore";
+import { tacticalUnitStatus } from "../src/game/unitStatusDisplay";
 import type { GameState, LiveThreat } from "../src/types/game";
 
 function testThreat(): LiveThreat {
@@ -162,6 +165,62 @@ test("a battery keeps its condition and costs nothing when redeployed from stora
   assert.equal(game.batteries[0].currentAmmo, 2);
   assert.equal(game.batteries[0].readiness, 73);
   assert.equal(game.resources.budget, budgetAfterPurchase);
+});
+
+test("campaign batteries refill a full magazine after the reload timer and expose the correct status", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => .5);
+  const battery = game.batteries[0];
+  const unit = getUnitDefinition("mvg");
+  battery.currentAmmo = 0;
+  battery.status = "reloading";
+  battery.reloadRemainingMs = 1_000;
+  battery.readiness = 73;
+  battery.fatigue = 60;
+
+  game = tickSimulation(game, 500, () => .5);
+  assert.equal(game.batteries[0].currentAmmo, 0);
+  assert.equal(game.batteries[0].status, "reloading");
+  assert.equal(game.batteries[0].reloadRemainingMs, 500);
+  assert.equal(tacticalUnitStatus(unit, game.batteries[0]).label, "RELOADING");
+
+  game = tickSimulation(game, 500, () => .5);
+  assert.equal(game.batteries[0].currentAmmo, unit.ammoCapacity);
+  assert.equal(game.batteries[0].reloadRemainingMs, 0);
+  assert.equal(game.batteries[0].status, "strained");
+  assert.equal(tacticalUnitStatus(unit, game.batteries[0]).label, "READY");
+});
+
+test("real impacts reduce live city resilience once while decoys do no damage", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  game.cyclePhase = "attack";
+  game.cycleDurationMs = 999_999;
+  const cityBefore = { ...game.cities.find((city) => city.id === "kyiv")! };
+  game.liveThreats = [{ ...testThreat(), progress: .999, speed: .01, damage: 9 }];
+  game = tickSimulation(game, 100, () => .5);
+  const cityAfter = game.cities.find((city) => city.id === "kyiv")!;
+  assert.equal(game.campaign?.civilianResilience, 96);
+  assert.ok(cityAfter.damage > cityBefore.damage);
+  assert.ok(cityAfter.infrastructure < cityBefore.infrastructure);
+  assert.ok(cityAfter.energy < cityBefore.energy);
+  const resilienceBeforeAar = game.campaign!.civilianResilience;
+  finalizeCampaignMission(game);
+  assert.equal(game.campaign?.civilianResilience, resilienceBeforeAar);
+
+  let decoyGame = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  decoyGame.campaign = createCampaignState();
+  decoyGame.cyclePhase = "attack";
+  decoyGame.cycleDurationMs = 999_999;
+  const decoyCityBefore = { ...decoyGame.cities.find((city) => city.id === "kyiv")! };
+  decoyGame.liveThreats = [{ ...testThreat(), kind: "parodiya", isFalseTrack: true, damage: 0, progress: .999, speed: .01 }];
+  decoyGame = tickSimulation(decoyGame, 100, () => .5);
+  const decoyCityAfter = decoyGame.cities.find((city) => city.id === "kyiv")!;
+  assert.equal(decoyGame.campaign?.civilianResilience, 100);
+  assert.equal(decoyCityAfter.damage, decoyCityBefore.damage);
+  assert.equal(decoyCityAfter.infrastructure, decoyCityBefore.infrastructure);
+  assert.equal(decoyCityAfter.energy, decoyCityBefore.energy);
 });
 
 test("a started live operation advances launch sectors and creates threats", () => {

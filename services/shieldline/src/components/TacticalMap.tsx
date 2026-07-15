@@ -12,7 +12,7 @@ import { campaignLaunchPointsForThreats } from "../game/campaignLaunchPoints";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile, wheelZoomDelta, type MapZoomInputProfile } from "../game/mapZoom";
-import { advanceVisualThreatProgress, classifyThreatRoute, predictedRouteEndpoint, type ThreatRouteVisual } from "../game/threatRouteVisuals";
+import { advanceVisualThreatProgress, classifyThreatRoute, threatCourseAtProgress, threatPositionAtProgress, threatRouteAtProgress, type ThreatRouteVisual } from "../game/threatRouteVisuals";
 import { resolveReducedQuality } from "../platform/displayPreferences";
 import { useGameStore } from "../store/useGameStore";
 import type {
@@ -69,29 +69,8 @@ function threatPosition(threat: LiveThreat) {
   return threatPositionAtProgress(threat, threat.progress);
 }
 
-function threatPositionAtProgress(threat: LiveThreat, progress: number) {
-  if (threat.routeWaypoints && threat.routeWaypoints.length > 1) {
-    const scaled = Math.min(1, Math.max(0, progress)) * (threat.routeWaypoints.length - 1);
-    const index = Math.min(threat.routeWaypoints.length - 2, Math.floor(scaled));
-    const ratio = scaled - index;
-    const from = threat.routeWaypoints[index];
-    const to = threat.routeWaypoints[index + 1];
-    return { lat: from.lat + (to.lat - from.lat) * ratio, lng: from.lng + (to.lng - from.lng) * ratio };
-  }
-  return {
-    lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * progress,
-    lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * progress,
-  };
-}
-
 function visibleThreatRoute(threat: LiveThreat, progress: number, visual: ThreatRouteVisual): [number, number][] {
-  const current = threatPositionAtProgress(threat, progress);
-  if (visual === "predicted" || !threat.routeWaypoints?.length) {
-    const endpoint = visual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
-    return [[current.lat, current.lng], [endpoint.lat, endpoint.lng]] as [number, number][];
-  }
-  const startIndex = Math.min(threat.routeWaypoints.length - 1, Math.floor(Math.min(1, Math.max(0, progress)) * (threat.routeWaypoints.length - 1)) + 1);
-  return [[current.lat, current.lng] as [number, number], ...threat.routeWaypoints.slice(startIndex).map((point) => [point.lat, point.lng] as [number, number])];
+  return threatRouteAtProgress(threat, progress, visual).map((point) => [point.lat, point.lng]);
 }
 
 function engagementPosition(event: EngagementEvent, progress = event.progress) {
@@ -308,15 +287,15 @@ function makeBatteryIcon(battery: DefenseBattery) {
 function threatMarkerIconKey(threat: LiveThreat) {
   const tone = threatTone(threat);
   const labelStatus = targetLabelStatus(threat);
-  const targetHeading = Math.round(threat.headingDeg - 90);
-  return `${threat.kind}:${tone}:${labelStatus}:${targetHeading}:${threat.speedKph}:${threat.altitudeM}`;
+  return `${threat.kind}:${tone}:${labelStatus}:${threat.speedKph}:${threat.altitudeM}`;
 }
 
 function makeThreatIcon(threat: LiveThreat) {
   const tone = threatTone(threat);
   const labelStatus = targetLabelStatus(threat);
-  const targetHeading = Math.round(threat.headingDeg - 90);
-  const course = String(Math.round(threat.headingDeg) % 360).padStart(3, "0");
+  const courseHeading = threatCourseAtProgress(threat, threat.progress);
+  const targetHeading = Math.round(courseHeading - 90);
+  const course = String(Math.round(courseHeading) % 360).padStart(3, "0");
   const key = threatMarkerIconKey(threat);
   const cached = threatIconCache.get(key);
   if (cached) return cached;
@@ -328,6 +307,15 @@ function makeThreatIcon(threat: LiveThreat) {
   });
   threatIconCache.set(key, icon);
   return icon;
+}
+
+function updateThreatMarkerCourse(marker: L.Marker, threat: LiveThreat, progress: number) {
+  const heading = threatCourseAtProgress(threat, progress);
+  const markerElement = marker.getElement();
+  const wrapper = markerElement?.querySelector<HTMLElement>(".threat-marker-wrap");
+  const course = markerElement?.querySelector<HTMLElement>(".target-label__course");
+  wrapper?.style.setProperty("--target-heading", `${heading - 90}deg`);
+  if (course) course.textContent = `КУРС ${String(Math.round(heading) % 360).padStart(3, "0")}°`;
 }
 
 type EngagementVisualPhase = "lock" | "travel" | "success" | "miss" | "detected";
@@ -726,7 +714,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
   const threatGroupRef = useRef<L.LayerGroup | null>(null);
   const engagementGroupRef = useRef<L.LayerGroup | null>(null);
   const impactGroupRef = useRef<L.LayerGroup | null>(null);
-  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null; routeVisual: ThreatRouteVisual; iconKey: string; visualProgress: number }>());
+  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline; routeVisual: ThreatRouteVisual; iconKey: string; visualProgress: number }>());
   const engagementPoolRef = useRef(new Map<string, PooledEngagementVisual>());
   const impactPoolRef = useRef(new Map<string, L.Marker>());
   const latestRef = useRef({ threats, engagements, impacts, elapsedMs, mapMode, reducedQuality });
@@ -767,9 +755,8 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
           pooled.visualProgress = advanceVisualThreatProgress(pooled.visualProgress, threat.progress, threat.speed, frameDeltaMs);
           const current = threatPositionAtProgress(threat, pooled.visualProgress);
           pooled.marker.setLatLng([current.lat, current.lng]);
-          if (pooled.route) {
-            pooled.route.setLatLngs(visibleThreatRoute(threat, pooled.visualProgress, pooled.routeVisual));
-          }
+          updateThreatMarkerCourse(pooled.marker, threat, pooled.visualProgress);
+          pooled.route.setLatLngs(visibleThreatRoute(threat, pooled.visualProgress, pooled.routeVisual));
         }
         for (const event of latest.engagements) {
           const pooled = engagementPoolRef.current.get(event.id);
@@ -816,7 +803,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
     for (const [id, pooled] of threatPoolRef.current) {
       if (!threatIds.has(id)) {
         pooled.marker.remove();
-        pooled.route?.remove();
+        pooled.route.remove();
         threatPoolRef.current.delete(id);
       }
     }
@@ -828,46 +815,31 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
       const current = threatPositionAtProgress(threat, visualProgress);
       const routePositions = visibleThreatRoute(threat, visualProgress, routeVisual);
       const iconKey = threatMarkerIconKey(threat);
-      const previousRouteVisual = pooled?.routeVisual;
       if (!pooled) {
+        const route = L.polyline(routePositions, { interactive: false }).addTo(threatGroup);
         pooled = {
           marker: L.marker([current.lat, current.lng], { icon: makeThreatIcon(threat), interactive: false }).addTo(threatGroup),
-          route: null,
+          route,
           routeVisual,
           iconKey,
           visualProgress,
         };
         threatPoolRef.current.set(threat.id, pooled);
+        updateThreatMarkerCourse(pooled.marker, threat, visualProgress);
       } else if (pooled.iconKey !== iconKey) {
         pooled.marker.setIcon(makeThreatIcon(threat));
         pooled.iconKey = iconKey;
+        updateThreatMarkerCourse(pooled.marker, threat, visualProgress);
       }
       pooled.visualProgress = visualProgress;
-      if (pooled.route && previousRouteVisual && previousRouteVisual !== routeVisual) {
-        pooled.route.remove();
-        pooled.route = null;
-      }
       pooled.routeVisual = routeVisual;
-      if (routeVisual !== "hidden" && !pooled.route) {
-        pooled.route = L.polyline(routePositions, {
-          color: routeVisual === "predicted" ? "#d8d3c7" : threatRouteColor(tone),
-          weight: routeVisual === "predicted" ? 1.5 : mapMode === "threats" ? 3 : 2,
-          opacity: routeVisual === "predicted" ? 0.48 : mapMode === "coverage" ? 0.44 : 0.78,
-          dashArray: routeVisual === "predicted" ? "5 7" : undefined,
-          interactive: false,
-        }).addTo(threatGroup);
-      } else if (routeVisual === "hidden" && pooled.route) {
-        pooled.route.remove();
-        pooled.route = null;
-      } else if (pooled.route) {
-        pooled.route.setLatLngs(routePositions);
-        pooled.route.setStyle({
-          color: routeVisual === "predicted" ? "#d8d3c7" : threatRouteColor(tone),
-          weight: routeVisual === "predicted" ? 1.5 : mapMode === "threats" ? 3 : 2,
-          opacity: routeVisual === "predicted" ? 0.48 : mapMode === "coverage" ? 0.44 : 0.78,
-          dashArray: routeVisual === "predicted" ? "5 7" : undefined,
-        });
-      }
+      pooled.route.setLatLngs(routePositions);
+      pooled.route.setStyle({
+        color: routeVisual === "predicted" ? "#d8d3c7" : threatRouteColor(tone),
+        weight: routeVisual === "predicted" ? 1.5 : mapMode === "threats" ? 3 : 2,
+        opacity: routeVisual === "hidden" ? 0 : routeVisual === "predicted" ? 0.48 : mapMode === "coverage" ? 0.44 : 0.78,
+        dashArray: routeVisual === "predicted" ? "5 7" : undefined,
+      });
     }
 
     const engagementIds = new Set(engagements.map((event) => event.id));
@@ -1309,7 +1281,8 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
               {(() => {
                 const unit = getUnitDefinition(battery.kind);
                 const ammo = battery.currentAmmo === "infinite" ? "∞" : `${battery.currentAmmo}/${unit.ammoCapacity}`;
-                const reload = battery.reloadRemainingMs > 0 ? `${Math.ceil(battery.reloadRemainingMs / 1000)} с` : "готова";
+                const hasAmmo = battery.currentAmmo === "infinite" || Number(battery.currentAmmo) > 0;
+                const reload = battery.reloadRemainingMs > 0 ? `${Math.ceil(battery.reloadRemainingMs / 1000)} с` : hasAmmo ? "готова" : "очікує запуску";
                 return <div className="battery-action-popup__content">
                   <span>Встановлена одиниця</span>
                   <strong>{unit.name}</strong>

@@ -89,8 +89,6 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   const interceptions = state.interceptions - campaign.missionInterceptionsAtStart;
   const impacts = state.impacts - campaign.missionImpactsAtStart;
   const totalTargets = missionTargetCount(mission);
-  campaign.civilianResilience = clamp(campaign.civilianResilience - impacts * 4, 0, 100);
-
   const lines: CampaignMissionResult["rewardLines"] = [];
   addLine(lines, "Грант місії", mission.grant, "grant");
   addLine(lines, `Підтверджені збиття (cap ${mission.rewardCap})`, campaign.missionKillReward, "kill");
