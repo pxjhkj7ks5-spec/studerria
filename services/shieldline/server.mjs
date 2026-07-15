@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, randomUUID } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
@@ -8,6 +8,7 @@ import { createConfiguredPostgresStore } from "./serverPostgresStore.mjs";
 import { createFixedWindowRateLimiter, createPersistentSessionCodec, createSessionCodec, hashSessionToken, readCookie } from "./serverSecurity.mjs";
 import { normalizeNickname, parseAnalyticsEvent, parseAuthBootstrap, parseAuthRegistration, parseCampaignCommand, parseNicknameAvailability, parseOperationCommand, parseOperationInput, parseTelegramLink, parseTransferRedeem } from "./serverSchemas.mjs";
 import { instrumentHttpHandler, recordAnalyticsMetric, renderPrometheusMetrics, shutdownTelemetry } from "./serverTelemetry.mjs";
+import { validateTelegramInitData as validateTelegramPayload } from "./serverTelegramAuth.mjs";
 
 const port = Number(process.env.PORT || 8080);
 const basePath = normalizeBasePath(process.env.SHIELDLINE_BASE_PATH || "/shieldline");
@@ -165,19 +166,7 @@ async function issueActorCookie(res, actorId) {
 }
 
 function validateTelegramInitData(initData) {
-  if (!telegramBotToken) throw new Error("Telegram auth is not configured.");
-  const params = new URLSearchParams(String(initData || ""));
-  const hash = params.get("hash") || "";
-  params.delete("hash");
-  const checkString = [...params.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([key, value]) => `${key}=${value}`).join("\n");
-  const secret = createHmac("sha256", "WebAppData").update(telegramBotToken).digest();
-  const expected = createHmac("sha256", secret).update(checkString).digest("hex");
-  if (!hash || hash.length !== expected.length || !timingSafeEqual(Buffer.from(hash), Buffer.from(expected))) throw new Error("Telegram initData signature is invalid.");
-  const authDate = Number(params.get("auth_date") || 0);
-  if (!authDate || Math.abs(Date.now() / 1000 - authDate) > telegramAuthMaxAgeSeconds) throw new Error("Telegram initData has expired.");
-  const user = JSON.parse(params.get("user") || "{}");
-  if (!Number.isSafeInteger(user.id)) throw new Error("Telegram user is missing.");
-  return user;
+  return validateTelegramPayload(initData, { botToken: telegramBotToken, maxAgeSeconds: telegramAuthMaxAgeSeconds });
 }
 
 function telegramProfile(user) {
@@ -228,7 +217,12 @@ async function handleGameApi(req, res, pathname) {
     }
     if (req.method === "POST" && path === "/auth/bootstrap") {
       const body = parseAuthBootstrap(await readRequestJson(req));
-      const telegramUser = body.telegramInitData ? validateTelegramInitData(body.telegramInitData) : null;
+      let telegramUser = null;
+      let telegramRejected = false;
+      if (body.telegramInitData) {
+        try { telegramUser = validateTelegramInitData(body.telegramInitData); }
+        catch { telegramRejected = true; }
+      }
       const telegramIdentity = telegramUser ? await gameStore.findIdentity("telegram", String(telegramUser.id)) : null;
       const deviceHash = body.deviceToken ? hashSessionToken(body.deviceToken) : null;
       let actorId = await sessionActor(req, res);
@@ -253,6 +247,7 @@ async function handleGameApi(req, res, pathname) {
         telegramPrefill: telegramUser ? { id: String(telegramUser.id), ...telegramProfile(telegramUser) } : null,
         telegramLinkOffer,
         telegramConflict,
+        telegramRejected,
       });
       return;
     }

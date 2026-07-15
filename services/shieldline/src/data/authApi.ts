@@ -29,9 +29,11 @@ export type AuthBootstrap = {
   telegramPrefill: TelegramProfile | null;
   telegramLinkOffer: boolean;
   telegramConflict: boolean;
+  telegramRejected: boolean;
 };
 
 const DEVICE_TOKEN_KEY = "shieldline-device-token-v1";
+let useTelegramInitData = true;
 
 function base64Url(bytes: Uint8Array) {
   let binary = "";
@@ -61,12 +63,15 @@ async function request<T>(path: string, body: Record<string, unknown> = {}) {
 }
 
 async function telegramInitData() {
+  if (!useTelegramInitData) return undefined;
   return (await getTelegramInitData()) || undefined;
 }
 
 export const authApi = {
   async bootstrap(): Promise<AuthBootstrap> {
-    return request("/auth/bootstrap", { deviceToken: getDeviceToken(), telegramInitData: await telegramInitData() });
+    const result = await request<AuthBootstrap>("/auth/bootstrap", { deviceToken: getDeviceToken(), telegramInitData: await telegramInitData() });
+    if (result.telegramRejected) useTelegramInitData = false;
+    return result;
   },
   async nicknameAvailability(nickname: string) {
     return request<{ nickname: string; available: boolean }>("/auth/nickname-availability", { nickname });

@@ -24,3 +24,12 @@ test("registers a unique nickname and signs another device in with a one-time co
   await expect(secondPage.getByRole("button", { name: "Відкрити профіль" })).toContainText(nickname);
   await secondDevice.close();
 });
+
+test("invalid Telegram initData falls back to safe web onboarding", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.Telegram = { WebApp: { initData: "auth_date=1&user=%7B%22id%22%3A42%7D&hash=invalid", ready() {}, expand() {} } };
+  });
+  await page.goto("/shieldline/?onboarding=1");
+  await expect(page.getByRole("heading", { name: "Створіть позивний" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Немає зв’язку" })).toHaveCount(0);
+});
