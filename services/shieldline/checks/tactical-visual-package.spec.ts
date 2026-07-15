@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { normalizeDisplayPreferences, resolveReducedQuality } from "../src/platform/displayPreferences";
-import { classifyThreatRoute, predictedRouteEndpoint } from "../src/game/threatRouteVisuals";
+import { advanceVisualThreatProgress, classifyThreatRoute, predictedRouteEndpoint } from "../src/game/threatRouteVisuals";
 
 test("threat routes distinguish hidden, predicted and confirmed tracks", () => {
   assert.equal(classifyThreatRoute({ revealed: false, confidence: 100, status: "inbound" }, false), "hidden");
@@ -14,6 +14,9 @@ test("threat routes distinguish hidden, predicted and confirmed tracks", () => {
   const endpoint = predictedRouteEndpoint({ lat: 0, lng: 0 }, { lat: 10, lng: 20 });
   assert.ok(Math.abs(endpoint.lat - 3.4) < 1e-9);
   assert.ok(Math.abs(endpoint.lng - 6.8) < 1e-9);
+  assert.ok(Math.abs(advanceVisualThreatProgress(0.52, 0.49, 0.0001, 16) - 0.5216) < 1e-9);
+  assert.equal(advanceVisualThreatProgress(0.4, 0.56, 0.0001, 16), 0.56);
+  assert.ok(Math.abs(advanceVisualThreatProgress(0.4, 0.41, 0.0001, 1_000) - 0.41) < 1e-9);
 });
 
 test("display preferences are visual-only, normalized and performance mode overrides automatic quality", async () => {

@@ -17,3 +17,10 @@ export function predictedRouteEndpoint(current: Coordinates, target: Coordinates
     lng: current.lng + (target.lng - current.lng) * safeProgress,
   };
 }
+
+export function advanceVisualThreatProgress(previous: number, authoritative: number, speed: number, frameDeltaMs: number) {
+  const safePrevious = Number.isFinite(previous) ? previous : authoritative;
+  const safeAuthoritative = Math.min(1, Math.max(0, authoritative));
+  const safeDelta = Math.min(100, Math.max(0, frameDeltaMs));
+  return Math.min(1, Math.max(safeAuthoritative, safePrevious + Math.max(0, speed) * safeDelta));
+}

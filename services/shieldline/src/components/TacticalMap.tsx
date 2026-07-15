@@ -11,7 +11,7 @@ import { batteryCoverageState } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile } from "../game/mapZoom";
-import { classifyThreatRoute, predictedRouteEndpoint, type ThreatRouteVisual } from "../game/threatRouteVisuals";
+import { advanceVisualThreatProgress, classifyThreatRoute, predictedRouteEndpoint, type ThreatRouteVisual } from "../game/threatRouteVisuals";
 import { resolveReducedQuality } from "../platform/displayPreferences";
 import { useGameStore } from "../store/useGameStore";
 import type {
@@ -71,8 +71,7 @@ function threatPosition(threat: LiveThreat) {
   };
 }
 
-function interpolatedThreatPosition(threat: LiveThreat, elapsedSinceSyncMs: number) {
-  const progress = Math.min(1, threat.progress + threat.speed * elapsedSinceSyncMs);
+function threatPositionAtProgress(threat: LiveThreat, progress: number) {
   return {
     lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * progress,
     lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * progress,
@@ -399,15 +398,37 @@ function routeColor(route: SupplyRoute) {
 }
 
 function MapClickPlacement() {
+  const map = useMap();
   const placementKind = useGameStore((state) => state.placementKind);
   const placeSelectedBattery = useGameStore((state) => state.placeSelectedBattery);
 
-  useMapEvents({
-    click(event) {
-      if (!placementKind) return;
-      placeSelectedBattery({ lat: event.latlng.lat, lng: event.latlng.lng });
-    },
-  });
+  useEffect(() => {
+    if (!placementKind) return undefined;
+    const container = map.getContainer();
+    let pointerStart: { id: number; x: number; y: number } | null = null;
+    const isMapUi = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest("button, a, .leaflet-control, .leaflet-popup"));
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0 || isMapUi(event.target)) return;
+      pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    };
+    const handlePointerUp = (event: PointerEvent) => {
+      const start = pointerStart;
+      pointerStart = null;
+      if (!start || start.id !== event.pointerId || event.button !== 0 || isMapUi(event.target)) return;
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) return;
+      const latlng = map.mouseEventToLatLng(event);
+      placeSelectedBattery({ lat: latlng.lat, lng: latlng.lng });
+    };
+    const cancelPointer = () => { pointerStart = null; };
+    container.addEventListener("pointerdown", handlePointerDown, true);
+    container.addEventListener("pointerup", handlePointerUp, true);
+    container.addEventListener("pointercancel", cancelPointer, true);
+    return () => {
+      container.removeEventListener("pointerdown", handlePointerDown, true);
+      container.removeEventListener("pointerup", handlePointerUp, true);
+      container.removeEventListener("pointercancel", cancelPointer, true);
+    };
+  }, [map, placementKind, placeSelectedBattery]);
 
   return null;
 }
@@ -641,7 +662,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
   const threatGroupRef = useRef<L.LayerGroup | null>(null);
   const engagementGroupRef = useRef<L.LayerGroup | null>(null);
   const impactGroupRef = useRef<L.LayerGroup | null>(null);
-  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null; routeVisual: ThreatRouteVisual; iconKey: string }>());
+  const threatPoolRef = useRef(new Map<string, { marker: L.Marker; route: L.Polyline | null; routeVisual: ThreatRouteVisual; iconKey: string; visualProgress: number }>());
   const engagementPoolRef = useRef(new Map<string, PooledEngagementVisual>());
   const impactPoolRef = useRef(new Map<string, L.Marker>());
   const latestRef = useRef({ threats, engagements, impacts, elapsedMs, mapMode, reducedQuality });
@@ -649,6 +670,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
   const lastSyncedElapsedMsRef = useRef<number | null>(null);
   const mapMovingRef = useRef(false);
   const frameRef = useRef(0);
+  const lastAnimationFrameAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     const threatGroup = L.layerGroup().addTo(map);
@@ -669,14 +691,17 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
     map.on("moveend", resumeMapAnimation);
     map.on("zoomend", resumeMapAnimation);
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
+      const frameDeltaMs = lastAnimationFrameAtRef.current === null ? 0 : timestamp - lastAnimationFrameAtRef.current;
+      lastAnimationFrameAtRef.current = timestamp;
       if (!mapMovingRef.current) {
         const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
         const latest = latestRef.current;
         for (const threat of latest.threats) {
           const pooled = threatPoolRef.current.get(threat.id);
           if (!pooled) continue;
-          const current = interpolatedThreatPosition(threat, elapsedSinceSync);
+          pooled.visualProgress = advanceVisualThreatProgress(pooled.visualProgress, threat.progress, threat.speed, frameDeltaMs);
+          const current = threatPositionAtProgress(threat, pooled.visualProgress);
           pooled.marker.setLatLng([current.lat, current.lng]);
           if (pooled.route) {
             const endpoint = pooled.routeVisual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
@@ -695,6 +720,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
 
     return () => {
       window.cancelAnimationFrame(frameRef.current);
+      lastAnimationFrameAtRef.current = null;
       map.off("movestart", pauseMapAnimation);
       map.off("zoomstart", pauseMapAnimation);
       map.off("moveend", resumeMapAnimation);
@@ -735,7 +761,8 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
       const tone = threatTone(threat);
       const routeVisual = classifyThreatRoute(threat, reducedQuality);
       let pooled = threatPoolRef.current.get(threat.id);
-      const current = interpolatedThreatPosition(threat, elapsedSinceSync);
+      const visualProgress = advanceVisualThreatProgress(pooled?.visualProgress ?? threat.progress, threat.progress, threat.speed, 0);
+      const current = threatPositionAtProgress(threat, visualProgress);
       const routeEndpoint = routeVisual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
       const iconKey = threatMarkerIconKey(threat);
       const previousRouteVisual = pooled?.routeVisual;
@@ -745,12 +772,14 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
           route: null,
           routeVisual,
           iconKey,
+          visualProgress,
         };
         threatPoolRef.current.set(threat.id, pooled);
       } else if (pooled.iconKey !== iconKey) {
         pooled.marker.setIcon(makeThreatIcon(threat));
         pooled.iconKey = iconKey;
       }
+      pooled.visualProgress = visualProgress;
       if (pooled.route && previousRouteVisual && previousRouteVisual !== routeVisual) {
         pooled.route.remove();
         pooled.route = null;
@@ -843,6 +872,8 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
 function usePerformanceStats(renderCounts: RenderCounts): PerformanceStats {
   const [stats, setStats] = useState<PerformanceStats>({ fps: 60, frameMs: 16.7, memoryMb: null, quality: "full" });
   const statsRef = useRef(stats);
+  const lowFpsSamplesRef = useRef(0);
+  const recoveredFpsSamplesRef = useRef(0);
 
   useEffect(() => {
     statsRef.current = stats;
@@ -859,11 +890,23 @@ function usePerformanceStats(renderCounts: RenderCounts): PerformanceStats {
       lastFrame = timestamp;
       if (timestamp - lastReport >= 500) {
         const fps = Math.round((frames * 1000) / (timestamp - lastReport));
-        const quality = fps < LOW_FPS_THRESHOLD
-          ? "reduced"
-          : fps > RECOVERED_FPS_THRESHOLD
-            ? "full"
-            : statsRef.current.quality;
+        if (fps < LOW_FPS_THRESHOLD) {
+          lowFpsSamplesRef.current += 1;
+          recoveredFpsSamplesRef.current = 0;
+        } else if (fps > RECOVERED_FPS_THRESHOLD) {
+          recoveredFpsSamplesRef.current += 1;
+          lowFpsSamplesRef.current = 0;
+        } else {
+          lowFpsSamplesRef.current = 0;
+          recoveredFpsSamplesRef.current = 0;
+        }
+        const quality = statsRef.current.quality === "full"
+          ? lowFpsSamplesRef.current >= 3 ? "reduced" : "full"
+          : recoveredFpsSamplesRef.current >= 4 ? "full" : "reduced";
+        if (quality !== statsRef.current.quality) {
+          lowFpsSamplesRef.current = 0;
+          recoveredFpsSamplesRef.current = 0;
+        }
         const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
         const memoryMb = memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : null;
         setStats({ fps, frameMs: Math.round(frameMs * 10) / 10, memoryMb, quality });

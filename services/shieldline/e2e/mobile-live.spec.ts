@@ -93,7 +93,9 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
 
   await navigation.getByRole("button", { name: "ППО" }).click();
   await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ/ }).click();
-  await page.mouse.click(mapBox.x + mapBox.width * .5, mapBox.y + mapBox.height * .62);
+  const radarMarkerBox = await page.locator(".map-marker--battery").first().boundingBox();
+  if (!radarMarkerBox) throw new Error("Radar marker is unavailable for placement interception check.");
+  await page.mouse.click(radarMarkerBox.x + radarMarkerBox.width / 2, radarMarkerBox.y + radarMarkerBox.height / 2);
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);
   const operationPhase = () => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.operationPhase);
   await expect.poll(operationPhase).toBe("countdown");
