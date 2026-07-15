@@ -68,7 +68,7 @@ button {
   --command-amber: #f6c547;
   --command-red: #ff625a;
   min-height: max(100dvh, var(--tg-stable-height, 100dvh));
-  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(82px + max(12px, env(safe-area-inset-bottom))) max(16px, env(safe-area-inset-left));
+  padding: max(16px, var(--tg-layout-top, env(safe-area-inset-top))) max(16px, env(safe-area-inset-right)) calc(82px + max(12px, env(safe-area-inset-bottom))) max(16px, env(safe-area-inset-left));
   color: var(--command-text);
   background:
     radial-gradient(circle at 88% 4%, rgba(246, 197, 71, .10), transparent 28%),
@@ -4299,7 +4299,8 @@ body,
     radial-gradient(ellipse at 50% 20%, #1a1b16 0%, #0b0c0b 54%, #050606 100%);
   background-size: 34px 34px, auto, auto;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .auth-shell::before {
@@ -4351,15 +4352,16 @@ body,
 .auth-telegram-hint span { display: grid; flex: 1; color: #dce5e3; text-align: left; }
 .auth-telegram-hint strong { font-size: 12px; }
 .auth-telegram-hint small { color: #7eaaa9; font-size: 11px; }
-.auth-consent { display: flex; align-items: flex-start; gap: 10px; color: #9b9d96; font-size: 11px; line-height: 1.5; text-align: left; cursor: pointer; }
-.auth-consent > input { position: absolute; opacity: 0; pointer-events: none; }
-.auth-consent i { width: 18px; height: 18px; display: inline-grid; place-items: center; margin: 0 7px 0 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; color: transparent; vertical-align: -5px; background: rgba(0,0,0,.25); }
-.auth-consent input:checked + span i { color: #11120f; border-color: #f6c547; background: #f6c547; }
+.auth-consent { position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 9px; color: #9b9d96; font-size: 11px; line-height: 1.55; text-align: left; cursor: pointer; }
+.auth-consent > input { position: absolute; z-index: 1; top: 1px; left: 0; width: 18px; height: 18px; margin: 0; opacity: 0; cursor: pointer; }
+.auth-consent i { width: 18px; height: 18px; display: grid; place-items: center; margin-top: 1px; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; color: transparent; background: rgba(0,0,0,.25); }
+.auth-consent input:checked + i { color: #11120f; border-color: #f6c547; background: #f6c547; }
+.auth-consent > span { min-width: 0; }
 .auth-consent button { padding: 0; border: 0; color: #d9b84f; background: none; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .auth-primary { min-height: 51px; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 0 17px; border: 1px solid #f6c547; border-radius: 14px; color: #10110e; background: #f6c547; box-shadow: 0 12px 26px rgba(246,197,71,.12); font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; transition: transform .16s, opacity .16s; }
 .auth-primary svg:last-child { margin-left: auto; }
 .auth-primary:hover:not(:disabled) { transform: translateY(-1px); }
-.auth-primary:disabled { opacity: .38; cursor: not-allowed; }
+.auth-primary:disabled { opacity: .58; filter: saturate(.72); cursor: not-allowed; }
 .auth-error { margin: -5px 0 0; font-size: 12px; line-height: 1.4; text-align: left; }
 .auth-security { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 20px; color: #696c66; font-size: 9px; }
 .auth-code-form { justify-items: center; text-align: center; }
@@ -4430,10 +4432,13 @@ body,
 @keyframes authSpin { to { transform: rotate(1turn); } }
 
 @media (max-width: 520px) {
-  .auth-shell { place-items: end center; padding-left: 10px; padding-right: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .auth-shell { place-items: center; padding-top: max(20px, var(--tg-layout-top, env(safe-area-inset-top))); padding-right: 10px; padding-bottom: max(12px, env(safe-area-inset-bottom)); padding-left: 10px; }
   .auth-onboarding { padding: 20px 18px; border-radius: 25px; }
-  .auth-intro { padding-top: 21px; }
-  .catalog-profile-button { top: 12px; right: 12px; }
+  .auth-intro { padding: 20px 0 17px; }
+  .auth-form { gap: 13px; padding-top: 17px; }
+  .auth-security { margin-top: 16px; }
+  .catalog-hero { padding-top: 68px; }
+  .catalog-profile-button { top: 14px; right: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

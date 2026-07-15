@@ -6,9 +6,12 @@ test("registers a unique nickname and signs another device in with a one-time co
   await expect(page.getByRole("heading", { name: "Створіть позивний" })).toBeVisible();
   await page.getByLabel("Нікнейм").fill(nickname);
   await expect(page.getByText("Нікнейм вільний")).toBeVisible();
-  await page.locator(".auth-consent").click();
+  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: /Створити профіль/ }).click();
   await expect(page.getByRole("button", { name: "Відкрити профіль" })).toContainText(nickname);
+  const profileBox = await page.getByRole("button", { name: "Відкрити профіль" }).boundingBox();
+  const heroChipBox = await page.locator(".catalog-hero .hero-chip").boundingBox();
+  expect(profileBox && heroChipBox && profileBox.y + profileBox.height < heroChipBox.y).toBeTruthy();
   await page.getByRole("button", { name: "Відкрити профіль" }).click();
   await page.getByRole("button", { name: "Створити код входу" }).click();
   const code = (await page.locator(".account-transfer button").innerText()).replace(/\D/g, "");
@@ -27,9 +30,12 @@ test("registers a unique nickname and signs another device in with a one-time co
 
 test("invalid Telegram initData falls back to safe web onboarding", async ({ page }) => {
   await page.addInitScript(() => {
-    window.Telegram = { WebApp: { initData: "auth_date=1&user=%7B%22id%22%3A42%7D&hash=invalid", ready() {}, expand() {} } };
+    window.Telegram = { WebApp: { initData: "auth_date=1&user=%7B%22id%22%3A42%7D&hash=invalid", viewportStableHeight: 844, safeAreaInset: { top: 59 }, contentSafeAreaInset: { top: 0 }, ready() {}, expand() {} } };
   });
   await page.goto("/shieldline/?onboarding=1");
   await expect(page.getByRole("heading", { name: "Створіть позивний" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Немає зв’язку" })).toHaveCount(0);
+  const cardBox = await page.locator(".auth-onboarding").boundingBox();
+  const viewport = page.viewportSize();
+  expect(cardBox && viewport && cardBox.y >= 123 && cardBox.y + cardBox.height <= viewport.height).toBeTruthy();
 });

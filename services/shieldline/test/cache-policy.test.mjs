@@ -51,7 +51,9 @@ test("Telegram safe-area changes keep the mobile HUD below native controls", asy
 
   assert.match(shell, /onEvent\?\.\("safeAreaChanged", sync\)/);
   assert.match(shell, /onEvent\?\.\("contentSafeAreaChanged", sync\)/);
+  assert.match(shell, /--tg-layout-top/);
   assert.match(styles, /--tg-content-safe-area-inset-top/);
+  assert.match(styles, /var\(--tg-layout-top/);
   assert.match(styles, /\.shell--mobile-live \.strip-brand \{\s*display: flex/);
 });
 

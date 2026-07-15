@@ -38,9 +38,13 @@ export function initializeTelegramShell() {
     if (!app) return;
     const sync = () => {
       const root = document.documentElement;
+      root.classList.add("telegram-mini-app");
       if (app.viewportStableHeight) root.style.setProperty("--tg-stable-height", `${app.viewportStableHeight}px`);
       for (const [name, value] of Object.entries(app.safeAreaInset || {})) root.style.setProperty(`--tg-safe-area-${name}`, `${value || 0}px`);
       for (const [name, value] of Object.entries(app.contentSafeAreaInset || {})) root.style.setProperty(`--tg-content-safe-area-${name}`, `${value || 0}px`);
+      const safeTop = Number(app.safeAreaInset?.top || 0);
+      const contentTop = Number(app.contentSafeAreaInset?.top || 0);
+      root.style.setProperty("--tg-layout-top", `${Math.max(contentTop, safeTop + 64)}px`);
       Object.entries(app.themeParams || {}).forEach(([name, value]) => root.style.setProperty(`--tg-${name.replace(/_/g, "-")}`, value));
     };
     app.ready?.();
