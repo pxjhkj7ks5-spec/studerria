@@ -2050,6 +2050,13 @@ button {
   font-weight: 800;
 }
 
+.unit-card__badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
 .ammo-badge {
   padding: 0 7px;
   font-size: 11px;
@@ -2073,7 +2080,7 @@ button {
 .unit-card__storage {
   width: max-content;
   max-width: 100%;
-  margin: 2px 0 3px;
+  margin: 0;
   padding: 3px 7px;
   overflow: hidden;
   border: 1px solid rgba(93, 226, 163, 0.28);
@@ -2832,11 +2839,17 @@ button {
 
 .command-drawer .unit-card--has-status > strong { padding-right: 82px; }
 
-.command-drawer .unit-card__storage {
-  grid-column: 2 / 4;
-  margin: 0;
-  font-size: 9px;
+.command-drawer .unit-card--has-storage > strong { padding-right: 92px; }
+.command-drawer .unit-card--has-status.unit-card--has-storage > strong { padding-right: 160px; }
+
+.command-drawer .unit-card__badges {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 2;
 }
+
+.command-drawer .unit-card__storage { font-size: 9px; }
 
 .command-drawer .unit-card p {
   display: none;
@@ -3803,9 +3816,8 @@ button {
 .command-drawer .unit-card--radar {
   background: linear-gradient(100deg, rgba(99, 199, 212, .055), transparent 44%), #11120f;
 }
-.command-drawer .unit-card__top .unit-status { position: absolute; top: 8px; right: 9px; }
+.command-drawer .unit-card__top .unit-status { position: static; }
 .command-drawer .unit-card__code { grid-column: 2 / 4; margin: 0; font-size: 11px; line-height: 1.25; }
-.command-drawer .unit-card__storage { grid-column: 2 / 4; }
 .command-drawer .unit-card__telemetry {
   grid-column: 2 / 4;
   grid-template-columns: minmax(54px, .7fr) minmax(100px, 1.25fr) minmax(116px, 1fr);

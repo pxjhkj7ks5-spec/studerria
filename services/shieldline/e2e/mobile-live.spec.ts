@@ -88,7 +88,7 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await expect(page.locator(".coverage-ring")).toHaveCount(1);
 
   await navigation.getByRole("button", { name: "ППО" }).click();
-  await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ 6 млн/ }).click();
+  await page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ/ }).click();
   await page.mouse.click(mapBox.x + mapBox.width * .5, mapBox.y + mapBox.height * .62);
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);
   const operationPhase = () => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.operationPhase);
@@ -148,7 +148,10 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
 
   await navigation.getByRole("button", { name: "ППО" }).click();
   const storedRadar = page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /Radar 35D6/ });
-  await expect(storedRadar.getByText("На складі: 1 · розміщення безкоштовне")).toBeVisible();
+  const storageChip = storedRadar.getByText("На складі · 1");
+  await expect(storageChip).toBeVisible();
+  const [storedCardBox, storageChipBox] = await Promise.all([storedRadar.boundingBox(), storageChip.boundingBox()]);
+  expect(storedCardBox && storageChipBox && storageChipBox.x > storedCardBox.x + storedCardBox.width / 2 && storageChipBox.y < storedCardBox.y + 40).toBeTruthy();
   await storedRadar.click();
   if (!storedPosition) throw new Error("Stored battery position is unavailable.");
   await page.mouse.click(storedPosition.x + storedPosition.width / 2, storedPosition.y + storedPosition.height / 2);

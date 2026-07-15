@@ -108,7 +108,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
 
           return (
             <article
-              className={`unit-card unit-card--state-${tacticalStatus.tone} ${isRadar ? "unit-card--radar" : ""} ${showStatus ? "unit-card--has-status" : ""} ${expandedKind === unit.kind ? "unit-card--expanded" : ""} ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
+              className={`unit-card unit-card--state-${tacticalStatus.tone} ${isRadar ? "unit-card--radar" : ""} ${showStatus ? "unit-card--has-status" : ""} ${storedUnits.length ? "unit-card--has-storage" : ""} ${expandedKind === unit.kind ? "unit-card--expanded" : ""} ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
               key={unit.kind}
               tabIndex={0}
               role="button"
@@ -131,11 +131,13 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
             >
               <div className="unit-card__top">
                 <img className="unit-sprite" src={unitSprites[unit.kind]} alt="" draggable="false" />
-                {showStatus ? <span className={`unit-status unit-status--${tacticalStatus.tone}`}>{tacticalStatus.label}</span> : null}
+                {storedUnits.length || showStatus ? <div className="unit-card__badges">
+                  {storedUnits.length ? <span className="unit-card__storage">На складі · {storedUnits.length}</span> : null}
+                  {showStatus ? <span className={`unit-status unit-status--${tacticalStatus.tone}`}>{tacticalStatus.label}</span> : null}
+                </div> : null}
               </div>
               <strong>{unit.name}</strong>
               <span className="unit-card__code">{unit.technicalCode}</span>
-              {storedUnits.length ? <span className="unit-card__storage">На складі: {storedUnits.length} · розміщення безкоштовне</span> : null}
               <p>{unit.description}</p>
               <div className={`unit-card__telemetry ${isRadar ? "unit-card__telemetry--radar" : ""}`}>
                 {!isRadar ? <span><small>БК</small><b>{ammoText}</b></span> : null}
