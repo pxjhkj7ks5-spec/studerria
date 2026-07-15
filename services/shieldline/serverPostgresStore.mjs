@@ -17,6 +17,12 @@ CREATE TABLE IF NOT EXISTS shieldline_users (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS nickname text;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS nickname_normalized text;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS registration_completed_at timestamptz;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS consent_version text;
+ALTER TABLE shieldline_users ADD COLUMN IF NOT EXISTS consent_accepted_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS shieldline_users_nickname_unique ON shieldline_users(nickname_normalized) WHERE nickname_normalized IS NOT NULL;
 CREATE TABLE IF NOT EXISTS shieldline_sessions (
   token_hash text PRIMARY KEY,
   actor_id text NOT NULL REFERENCES shieldline_users(id) ON DELETE CASCADE,
@@ -25,6 +31,35 @@ CREATE TABLE IF NOT EXISTS shieldline_sessions (
   revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS shieldline_devices (
+  id text PRIMARY KEY,
+  actor_id text NOT NULL REFERENCES shieldline_users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  platform text NOT NULL DEFAULT 'web',
+  first_seen_at timestamptz NOT NULL DEFAULT now(),
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  revoked_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS shieldline_devices_actor_idx ON shieldline_devices(actor_id, last_seen_at DESC);
+CREATE TABLE IF NOT EXISTS shieldline_identities (
+  provider text NOT NULL,
+  provider_user_id text NOT NULL,
+  actor_id text NOT NULL REFERENCES shieldline_users(id) ON DELETE CASCADE,
+  profile jsonb NOT NULL DEFAULT '{}'::jsonb,
+  linked_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (provider, provider_user_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS shieldline_identities_actor_provider_unique ON shieldline_identities(actor_id, provider);
+CREATE TABLE IF NOT EXISTS shieldline_transfer_codes (
+  id text PRIMARY KEY,
+  actor_id text NOT NULL REFERENCES shieldline_users(id) ON DELETE CASCADE,
+  code_hash text NOT NULL UNIQUE,
+  expires_at timestamptz NOT NULL,
+  consumed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shieldline_transfer_codes_actor_idx ON shieldline_transfer_codes(actor_id, expires_at DESC);
 CREATE TABLE IF NOT EXISTS shieldline_cities (
   id text PRIMARY KEY,
   actor_id text NOT NULL UNIQUE REFERENCES shieldline_users(id) ON DELETE CASCADE,
@@ -289,6 +324,97 @@ export async function createPostgresGameStore({ legacyStore, pool, redis = null 
   return {
     ...legacyStore,
     storageDriver: "postgres",
+    async getAuthProfile(actorId) {
+      await upsertUser(pool, actorId);
+      const userResult = await pool.query("SELECT id, platform, display_name, nickname, registration_completed_at, consent_version, consent_accepted_at FROM shieldline_users WHERE id = $1", [actorId]);
+      const identityResult = await pool.query("SELECT provider_user_id, profile FROM shieldline_identities WHERE actor_id = $1 AND provider = 'telegram'", [actorId]);
+      const deviceResult = await pool.query("SELECT count(*) AS count FROM shieldline_devices WHERE actor_id = $1 AND revoked_at IS NULL", [actorId]);
+      const user = userResult.rows[0];
+      const identity = identityResult.rows[0] || null;
+      return {
+        id: user.id,
+        nickname: user.nickname,
+        displayName: user.nickname || user.display_name,
+        platform: identity ? "telegram" : user.platform,
+        registrationCompleted: Boolean(user.registration_completed_at),
+        registrationCompletedAt: user.registration_completed_at?.toISOString?.() || user.registration_completed_at || null,
+        consentVersion: user.consent_version,
+        consentAcceptedAt: user.consent_accepted_at?.toISOString?.() || user.consent_accepted_at || null,
+        telegram: identity ? { id: identity.provider_user_id, ...(identity.profile || {}) } : null,
+        deviceCount: Number(deviceResult.rows[0]?.count || 0),
+      };
+    },
+    async nicknameAvailable(nicknameNormalized, actorId = null) {
+      const result = await pool.query("SELECT 1 FROM shieldline_users WHERE nickname_normalized = $1 AND ($2::text IS NULL OR id <> $2) LIMIT 1", [nicknameNormalized, actorId]);
+      return !result.rowCount;
+    },
+    async completeRegistration(actorId, input) {
+      await upsertUser(pool, actorId);
+      try {
+        await pool.query(
+          `UPDATE shieldline_users SET nickname = $2, nickname_normalized = $3, display_name = $2,
+           registration_completed_at = COALESCE(registration_completed_at, now()), consent_version = $4,
+           consent_accepted_at = now(), updated_at = now() WHERE id = $1`,
+          [actorId, input.nickname, input.nicknameNormalized, input.consentVersion],
+        );
+      } catch (error) {
+        if (error?.code === "23505" || /unique|duplicate/i.test(String(error?.message || ""))) throw Object.assign(new Error("Цей нікнейм уже зайнятий."), { statusCode: 409 });
+        throw error;
+      }
+      return this.getAuthProfile(actorId);
+    },
+    async findDevice(tokenHash) {
+      const result = await pool.query("UPDATE shieldline_devices SET last_seen_at = now() WHERE token_hash = $1 AND revoked_at IS NULL RETURNING actor_id", [tokenHash]);
+      return result.rowCount ? { actorId: result.rows[0].actor_id } : null;
+    },
+    async bindDevice(actorId, tokenHash, metadata = {}) {
+      await upsertUser(pool, actorId);
+      const result = await pool.query(
+        `INSERT INTO shieldline_devices (id, actor_id, token_hash, platform) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (token_hash) DO UPDATE SET actor_id = EXCLUDED.actor_id, platform = EXCLUDED.platform, last_seen_at = now(), revoked_at = NULL
+         RETURNING id, actor_id, platform, first_seen_at, last_seen_at`,
+        [randomUUID(), actorId, tokenHash, String(metadata.platform || "web").slice(0, 32)],
+      );
+      return result.rows[0];
+    },
+    async findIdentity(provider, providerUserId) {
+      const result = await pool.query("SELECT actor_id, profile FROM shieldline_identities WHERE provider = $1 AND provider_user_id = $2", [provider, providerUserId]);
+      return result.rowCount ? { actorId: result.rows[0].actor_id, profile: result.rows[0].profile } : null;
+    },
+    async attachIdentity(actorId, provider, providerUserId, profile = {}) {
+      await upsertUser(pool, actorId);
+      const existing = await pool.query("SELECT actor_id FROM shieldline_identities WHERE provider = $1 AND provider_user_id = $2", [provider, providerUserId]);
+      if (existing.rowCount && existing.rows[0].actor_id !== actorId) throw Object.assign(new Error("Цей Telegram уже прив’язаний до іншого профілю."), { statusCode: 409 });
+      const actorIdentity = await pool.query("SELECT provider_user_id FROM shieldline_identities WHERE actor_id = $1 AND provider = $2", [actorId, provider]);
+      if (actorIdentity.rowCount && actorIdentity.rows[0].provider_user_id !== providerUserId) throw Object.assign(new Error("До профілю вже прив’язаний інший Telegram."), { statusCode: 409 });
+      await pool.query(
+        `INSERT INTO shieldline_identities (provider, provider_user_id, actor_id, profile) VALUES ($1,$2,$3,$4::jsonb)
+         ON CONFLICT (provider, provider_user_id) DO UPDATE SET profile = EXCLUDED.profile, updated_at = now()`,
+        [provider, providerUserId, actorId, JSON.stringify(profile)],
+      );
+      return this.getAuthProfile(actorId);
+    },
+    async createTransferCode(actorId, codeHash, expiresAt) {
+      await upsertUser(pool, actorId);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("DELETE FROM shieldline_transfer_codes WHERE actor_id = $1 AND consumed_at IS NULL", [actorId]);
+        await client.query("INSERT INTO shieldline_transfer_codes (id, actor_id, code_hash, expires_at) VALUES ($1,$2,$3,$4)", [randomUUID(), actorId, codeHash, expiresAt]);
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally { client.release(); }
+    },
+    async consumeTransferCode(codeHash, now = new Date()) {
+      const result = await pool.query(
+        "UPDATE shieldline_transfer_codes SET consumed_at = $2 WHERE code_hash = $1 AND consumed_at IS NULL AND expires_at > $2 RETURNING actor_id",
+        [codeHash, now],
+      );
+      if (!result.rowCount) throw Object.assign(new Error("Код недійсний або вже прострочений."), { statusCode: 400 });
+      return { actorId: result.rows[0].actor_id };
+    },
     async runMission(seed, actorId = "web-commander", plan = {}, missionId = CAMPAIGN_MISSIONS[0].id, source = "campaign") {
       if (source !== "campaign") return legacyStore.runMission(seed, actorId, plan, missionId, source);
       const run = simulateMission(seed, new Date().toISOString(), calculateDefenseBonus(plan), missionId);

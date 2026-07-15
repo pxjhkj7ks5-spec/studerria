@@ -7,7 +7,7 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
     Object.defineProperty(globalThis.crypto, "randomUUID", { value: () => "e2e", configurable: true });
   });
   await page.goto("/shieldline/");
-  await page.getByRole("button", { name: /Campaign/ }).click();
+  await page.getByRole("button", { name: /Campaign|Кампанія/ }).click();
   const tutorial = page.locator(".tutorial-overlay");
   const tutorialAppeared = await tutorial.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
   if (tutorialAppeared) {
@@ -87,7 +87,7 @@ test("Safari discards an outdated IndexedDB projection instead of showing a blan
     });
   });
   await page.goto("/shieldline/");
-  await page.getByRole("button", { name: /Campaign/ }).click();
+  await page.getByRole("button", { name: /Campaign|Кампанія/ }).click();
   await expect(page.locator(".leaflet-stage")).toBeVisible();
   await expect(page.locator(".app-recovery")).toHaveCount(0);
 });

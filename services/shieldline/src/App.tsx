@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, AlertTriangle, BookOpen, ClipboardList, Crosshair, HelpCircle, Layers, LogOut, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
+import { AccountSettings } from "./components/AccountSettings";
 import { ControlZoneAdmin } from "./components/ControlZoneAdmin";
 import { IntelLog } from "./components/IntelLog";
 import { MapLegend } from "./components/MapLegend";
@@ -486,6 +487,7 @@ export default function App() {
           ) : null}
           {activePanel === "settings" ? (
             <section className="drawer-section">
+              <AccountSettings />
               <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
               <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
                 <RotateCcw size={16} />

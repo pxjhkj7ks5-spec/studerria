@@ -29,6 +29,11 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
+    proxy: {
+      "/shieldline/api": {
+        target: process.env.SHIELDLINE_API_PROXY_TARGET || "http://127.0.0.1:4175",
+      },
+    },
   },
   preview: {
     host: "0.0.0.0",

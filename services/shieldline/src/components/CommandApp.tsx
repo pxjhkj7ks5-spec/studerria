@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, ArrowLeft, BarChart3, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Play, Radio, Shield, ShieldCheck, Swords, Trophy, Users, Waves, Zap } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Play, Radio, Shield, ShieldCheck, Swords, Trophy, UserRound, Users, Waves, Zap } from "lucide-react";
+import { AccountSettings } from "./AccountSettings";
+import { useAuth } from "./AuthGate";
 import { apiGameRepository } from "../data/apiGameRepository";
 import { gameModes, getGameMode } from "../data/gameModes";
 import { campaignMissions } from "../data/missions";
@@ -118,11 +120,14 @@ export function CommandApp() {
 }
 
 function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
+  const { profile } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
   const [notificationState, setNotificationState] = useState<"idle" | "enabled" | "unavailable">("idle");
   const enableNotifications = async () => setNotificationState(await setTelegramNotificationPreference(import.meta.env.BASE_URL, true) ? "enabled" : "unavailable");
   const campaignMode = gameModes.find((mode) => mode.id === "campaign")!;
   return <main className="command-app command-app--catalog" aria-label="Shieldline mode selection">
     <header className="catalog-hero">
+      <button className="catalog-profile-button" type="button" onClick={() => setAccountOpen(true)} aria-label="Відкрити профіль"><UserRound size={17} /><span>{profile.nickname}</span></button>
       <span className="hero-chip"><Radio size={14} /> {t("catalog.eyebrow")}</span>
       <h1>{t("catalog.title")}</h1>
       <p>{t("catalog.lead")}</p>
@@ -144,6 +149,7 @@ function ModeCatalog({ onSelect }: { onSelect: (id: GameModeId) => void }) {
       })}
     </section>
     <p className="catalog-roadmap-note">{t("catalog.paused")}</p>
+    {accountOpen ? <AccountSettings modal onClose={() => setAccountOpen(false)} /> : null}
   </main>;
 }
 

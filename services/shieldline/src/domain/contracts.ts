@@ -31,9 +31,15 @@ export interface GameModeRuntimePolicy {
 
 export interface ShieldlineUser {
   id: string;
+  nickname: string | null;
   displayName: string;
-  platform: "telegram" | "web" | "pwa";
-  telegramId?: string;
+  platform: "telegram" | "web" | "pwa" | "guest";
+  registrationCompleted: boolean;
+  registrationCompletedAt: string | null;
+  consentVersion: string | null;
+  consentAcceptedAt: string | null;
+  telegram: { id: string; username?: string | null; firstName?: string | null; lastName?: string | null } | null;
+  deviceCount: number;
   cosmeticLoadout?: string[];
 }
 

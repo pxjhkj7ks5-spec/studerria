@@ -50,6 +50,41 @@ const analyticsSchema = z.object({
   properties: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}),
 }).strict();
 
+const deviceToken = z.string().min(32).max(128).regex(/^[A-Za-z0-9_-]+$/);
+const telegramInitData = z.string().min(1).max(8192);
+const reservedNicknames = new Set(["admin", "administrator", "moderator", "support", "shieldline"]);
+
+export function normalizeNickname(value) {
+  return String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("uk-UA");
+}
+
+const nickname = z.string().transform((value) => String(value).normalize("NFKC").trim().replace(/\s+/g, " ")).pipe(
+  z.string().min(3).max(24).regex(/^[\p{L}\p{N}](?:[\p{L}\p{N} ._-]*[\p{L}\p{N}])?$/u, "Nickname contains unsupported characters."),
+).superRefine((value, context) => {
+  if (reservedNicknames.has(normalizeNickname(value))) context.addIssue({ code: "custom", message: "This nickname is reserved." });
+});
+
+const authBootstrapSchema = z.object({
+  deviceToken: deviceToken.optional(),
+  telegramInitData: telegramInitData.optional(),
+}).strict();
+
+const authRegistrationSchema = z.object({
+  nickname,
+  deviceToken,
+  consentAccepted: z.literal(true),
+  consentVersion: z.string().min(1).max(48),
+  telegramInitData: telegramInitData.optional(),
+}).strict();
+
+const nicknameAvailabilitySchema = z.object({ nickname }).strict();
+const transferRedeemSchema = z.object({
+  code: z.string().regex(/^\d{6}$/),
+  deviceToken,
+  telegramInitData: telegramInitData.optional(),
+}).strict();
+const telegramLinkSchema = z.object({ telegramInitData }).strict();
+
 function parse(schema, value) {
   const result = schema.safeParse(value);
   if (result.success) return result.data;
@@ -63,3 +98,8 @@ export function parseOperationInput(value) { return parse(operationSchema, value
 export function parseOperationCommand(value) { return parse(commandSchema, value); }
 export function parseCampaignCommand(value) { return parse(campaignCommandSchema, value); }
 export function parseAnalyticsEvent(value) { return parse(analyticsSchema, value); }
+export function parseAuthBootstrap(value) { return parse(authBootstrapSchema, value); }
+export function parseAuthRegistration(value) { return parse(authRegistrationSchema, value); }
+export function parseNicknameAvailability(value) { return parse(nicknameAvailabilitySchema, value); }
+export function parseTransferRedeem(value) { return parse(transferRedeemSchema, value); }
+export function parseTelegramLink(value) { return parse(telegramLinkSchema, value); }

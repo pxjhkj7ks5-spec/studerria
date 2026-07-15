@@ -28,3 +28,27 @@ test("PostgreSQL adapter persists campaign runs, events, snapshots and progress"
   assert.equal(Number((await pool.query("SELECT count(*) AS count FROM shieldline_assets")).rows[0].count), 2);
   await pool.end();
 });
+
+test("PostgreSQL auth adapter enforces identity and one-time code ownership", async () => {
+  const memory = newDb();
+  const adapter = memory.adapters.createPg();
+  const pool = new adapter.Pool();
+  const legacyStore = { async getRun() { return null; }, async getRunEvents() { return null; }, async getRunSnapshots() { return null; } };
+  const store = await createPostgresGameStore({ legacyStore, pool });
+  await store.completeRegistration("guest-auth", { nickname: "Варта", nicknameNormalized: "варта", consentVersion: "v1" });
+  assert.equal(await store.nicknameAvailable("варта", "guest-other"), false);
+  const parallel = await Promise.allSettled([
+    store.completeRegistration("guest-parallel-a", { nickname: "Обрій", nicknameNormalized: "обрій", consentVersion: "v1" }),
+    store.completeRegistration("guest-parallel-b", { nickname: "ОБРІЙ", nicknameNormalized: "обрій", consentVersion: "v1" }),
+  ]);
+  assert.equal(parallel.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(parallel.filter((result) => result.status === "rejected").length, 1);
+  await store.bindDevice("guest-auth", "device-hash", { platform: "pwa" });
+  assert.deepEqual(await store.findDevice("device-hash"), { actorId: "guest-auth" });
+  await store.attachIdentity("guest-auth", "telegram", "314", { username: "varta" });
+  assert.equal((await store.getAuthProfile("guest-auth")).telegram.id, "314");
+  await store.createTransferCode("guest-auth", "code-hash", new Date(Date.now() + 60_000));
+  assert.deepEqual(await store.consumeTransferCode("code-hash"), { actorId: "guest-auth" });
+  await assert.rejects(() => store.consumeTransferCode("code-hash"), /недійсний/);
+  await pool.end();
+});

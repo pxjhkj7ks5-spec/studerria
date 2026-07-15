@@ -28,6 +28,10 @@ function waitForTelegramWebApp() {
   });
 }
 
+export async function getTelegramInitData() {
+  return (await waitForTelegramWebApp())?.initData || null;
+}
+
 /** Progressive enhancement only: game state never trusts this client shell. */
 export function initializeTelegramShell() {
   const connect = (app: TelegramWebApp | undefined) => {
@@ -66,7 +70,7 @@ export function telegramCommandFeedback(result: "success" | "error" | "warning" 
 }
 
 export async function initializeTelegramSession(basePath: string) {
-  const initData = (await waitForTelegramWebApp())?.initData;
+  const initData = await getTelegramInitData();
   if (!initData) return null;
   const response = await fetch(`${basePath}api/auth/telegram/init`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData }) });
   return response.ok ? response.json() : null;

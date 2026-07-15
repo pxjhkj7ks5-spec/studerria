@@ -1,10 +1,11 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
+import { randomUUID } from "node:crypto";
 import { SIM_VERSION, calculateDefenseBonus, simulateOperation, stableHash } from "./src/game/simulationCore.mjs";
 import { CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS } from "./src/game/launchSystem.mjs";
 
-const DEFAULT_STORE = { version: 3, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {} };
+const DEFAULT_STORE = { version: 4, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {}, users: {}, devices: {}, identities: {}, transferCodes: {} };
 const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
 const missions = [
   {
@@ -65,15 +66,26 @@ function coOpSectorForCity(cityId) {
 }
 
 export async function createGameStore(file) {
+  let saveQueue = Promise.resolve();
+  let mutationQueue = Promise.resolve();
+  function mutate(operation) {
+    const result = mutationQueue.then(operation);
+    mutationQueue = result.then(() => undefined, () => undefined);
+    return result;
+  }
   async function readStore() {
     if (!existsSync(file)) return structuredClone(DEFAULT_STORE);
     try { return { ...structuredClone(DEFAULT_STORE), ...JSON.parse(await readFile(file, "utf8")) }; } catch { return structuredClone(DEFAULT_STORE); }
   }
   async function save(store) {
-    await mkdir(dirname(file), { recursive: true });
-    const temp = `${file}.tmp`;
-    await writeFile(temp, `${JSON.stringify(store, null, 2)}\n`, "utf8");
-    await rename(temp, file);
+    const write = saveQueue.then(async () => {
+      await mkdir(dirname(file), { recursive: true });
+      const temp = `${file}.${randomUUID()}.tmp`;
+      await writeFile(temp, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+      await rename(temp, file);
+    });
+    saveQueue = write.catch(() => undefined);
+    await write;
   }
   async function persistRun(run, metadata = {}) {
     const store = await readStore();
@@ -84,7 +96,129 @@ export async function createGameStore(file) {
     }
     return store.runs[run.id];
   }
+  function ensureAuthUser(store, actorId) {
+    if (!store.users[actorId]) {
+      store.users[actorId] = {
+        id: actorId,
+        platform: actorId.startsWith("tg-") ? "telegram" : actorId.startsWith("guest-") ? "guest" : "web",
+        displayName: actorId,
+        nickname: null,
+        nicknameNormalized: null,
+        registrationCompletedAt: null,
+        consentVersion: null,
+        consentAcceptedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return store.users[actorId];
+  }
+  function authProfile(store, actorId) {
+    const user = ensureAuthUser(store, actorId);
+    const telegram = Object.values(store.identities).find((identity) => identity.provider === "telegram" && identity.actorId === actorId) || null;
+    const deviceCount = Object.values(store.devices).filter((device) => device.actorId === actorId && !device.revokedAt).length;
+    return {
+      id: user.id,
+      nickname: user.nickname,
+      displayName: user.nickname || user.displayName,
+      platform: telegram ? "telegram" : user.platform,
+      registrationCompleted: Boolean(user.registrationCompletedAt),
+      registrationCompletedAt: user.registrationCompletedAt,
+      consentVersion: user.consentVersion,
+      consentAcceptedAt: user.consentAcceptedAt,
+      telegram: telegram ? { id: telegram.providerUserId, ...telegram.profile } : null,
+      deviceCount,
+    };
+  }
   return {
+    async getAuthProfile(actorId) {
+      const store = await readStore();
+      const existed = Boolean(store.users[actorId]);
+      const profile = authProfile(store, actorId);
+      if (!existed) await save(store);
+      return profile;
+    },
+    async nicknameAvailable(nicknameNormalized, actorId = null) {
+      const store = await readStore();
+      return !Object.values(store.users).some((user) => user.nicknameNormalized === nicknameNormalized && user.id !== actorId);
+    },
+    async completeRegistration(actorId, input) {
+      return mutate(async () => {
+        const store = await readStore();
+        if (Object.values(store.users).some((user) => user.nicknameNormalized === input.nicknameNormalized && user.id !== actorId)) {
+          throw Object.assign(new Error("Цей нікнейм уже зайнятий."), { statusCode: 409 });
+        }
+        const user = ensureAuthUser(store, actorId);
+        Object.assign(user, {
+          nickname: input.nickname,
+          nicknameNormalized: input.nicknameNormalized,
+          displayName: input.nickname,
+          registrationCompletedAt: user.registrationCompletedAt || new Date().toISOString(),
+          consentVersion: input.consentVersion,
+          consentAcceptedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        await save(store);
+        return authProfile(store, actorId);
+      });
+    },
+    async findDevice(tokenHash) {
+      const device = (await readStore()).devices[tokenHash];
+      return device && !device.revokedAt ? { actorId: device.actorId } : null;
+    },
+    async bindDevice(actorId, tokenHash, metadata = {}) {
+      return mutate(async () => {
+        const store = await readStore();
+        ensureAuthUser(store, actorId);
+        const previous = store.devices[tokenHash];
+        store.devices[tokenHash] = {
+          id: previous?.id || randomUUID(), actorId, tokenHash,
+          platform: String(metadata.platform || "web").slice(0, 32),
+          firstSeenAt: previous?.firstSeenAt || new Date().toISOString(),
+          lastSeenAt: new Date().toISOString(), revokedAt: null,
+        };
+        await save(store);
+        return store.devices[tokenHash];
+      });
+    },
+    async findIdentity(provider, providerUserId) {
+      const identity = (await readStore()).identities[`${provider}:${providerUserId}`];
+      return identity ? { actorId: identity.actorId, profile: identity.profile } : null;
+    },
+    async attachIdentity(actorId, provider, providerUserId, profile = {}) {
+      return mutate(async () => {
+        const store = await readStore();
+        const key = `${provider}:${providerUserId}`;
+        const existing = store.identities[key];
+        if (existing && existing.actorId !== actorId) throw Object.assign(new Error("Цей Telegram уже прив’язаний до іншого профілю."), { statusCode: 409 });
+        const actorIdentity = Object.values(store.identities).find((identity) => identity.provider === provider && identity.actorId === actorId && identity.providerUserId !== providerUserId);
+        if (actorIdentity) throw Object.assign(new Error("До профілю вже прив’язаний інший Telegram."), { statusCode: 409 });
+        ensureAuthUser(store, actorId);
+        store.identities[key] = { provider, providerUserId, actorId, profile, linkedAt: existing?.linkedAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+        await save(store);
+        return authProfile(store, actorId);
+      });
+    },
+    async createTransferCode(actorId, codeHash, expiresAt) {
+      return mutate(async () => {
+        const store = await readStore();
+        for (const [hash, entry] of Object.entries(store.transferCodes)) {
+          if (entry.actorId === actorId && !entry.consumedAt) delete store.transferCodes[hash];
+        }
+        store.transferCodes[codeHash] = { id: randomUUID(), actorId, codeHash, expiresAt, consumedAt: null, createdAt: new Date().toISOString() };
+        await save(store);
+      });
+    },
+    async consumeTransferCode(codeHash, now = new Date()) {
+      return mutate(async () => {
+        const store = await readStore();
+        const entry = store.transferCodes[codeHash];
+        if (!entry || entry.consumedAt || new Date(entry.expiresAt).getTime() <= now.getTime()) throw Object.assign(new Error("Код недійсний або вже прострочений."), { statusCode: 400 });
+        entry.consumedAt = now.toISOString();
+        await save(store);
+        return { actorId: entry.actorId };
+      });
+    },
     async runMission(seed, actorId = "web-commander", plan = {}, missionId = missions[0].id, source = "campaign") {
       const resolvedPlan = normalizeDailyPlan(plan);
       if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before resolving the operation.");

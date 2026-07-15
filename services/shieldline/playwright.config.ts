@@ -31,10 +31,18 @@ export default defineConfig({
       use: { browserName: "webkit", viewport: { width: 1440, height: 900 } },
     },
   ],
-  webServer: {
-    command: "npm run dev -- --port 4174",
-    url: "http://127.0.0.1:4174/shieldline/",
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: "PORT=4175 SHIELDLINE_AUTH_REQUIRED=0 SHIELDLINE_GAME_STORE_FILE=./test-results/playwright-game-store.json npm start",
+      url: "http://127.0.0.1:4175/shieldline/api/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      command: "npm run dev -- --port 4174",
+      url: "http://127.0.0.1:4174/shieldline/",
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+  ],
 });

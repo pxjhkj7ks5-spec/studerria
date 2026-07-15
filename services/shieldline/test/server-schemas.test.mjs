@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseAnalyticsEvent, parseOperationCommand, parseOperationInput } from "../serverSchemas.mjs";
+import { normalizeNickname, parseAnalyticsEvent, parseAuthRegistration, parseOperationCommand, parseOperationInput } from "../serverSchemas.mjs";
 
 test("operation schemas accept versioned campaign plans and reject inconsistent counts", () => {
   const valid = {
@@ -32,4 +32,11 @@ test("analytics contract limits event names and platform dimensions", () => {
   const event = parseAnalyticsEvent({ eventName: "campaign.operation.completed", channel: "pwa", sessionId: "session-123", occurredAt: "2026-07-10T12:00:00.000Z", properties: { result: "victory", impacts: 0 } });
   assert.equal(event.channel, "pwa");
   assert.throws(() => parseAnalyticsEvent({ ...event, eventName: "unknown.event" }));
+});
+
+test("auth schema normalizes Unicode nicknames and rejects reserved names", () => {
+  assert.equal(normalizeNickname("  СОКІЛ   01  "), "сокіл 01");
+  const parsed = parseAuthRegistration({ nickname: "  Сокіл_01  ", deviceToken: "a".repeat(43), consentAccepted: true, consentVersion: "2026-07-15" });
+  assert.equal(parsed.nickname, "Сокіл_01");
+  assert.throws(() => parseAuthRegistration({ nickname: "ShieldLine", deviceToken: "a".repeat(43), consentAccepted: true, consentVersion: "v1" }), /validation/);
 });

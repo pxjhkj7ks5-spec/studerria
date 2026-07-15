@@ -1,12 +1,12 @@
 import { createServer } from "node:http";
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
 import { createGameStore, dayKey } from "./serverGame.mjs";
 import { createConfiguredPostgresStore } from "./serverPostgresStore.mjs";
-import { createFixedWindowRateLimiter, createPersistentSessionCodec, createSessionCodec, readCookie } from "./serverSecurity.mjs";
-import { parseAnalyticsEvent, parseCampaignCommand, parseOperationCommand, parseOperationInput } from "./serverSchemas.mjs";
+import { createFixedWindowRateLimiter, createPersistentSessionCodec, createSessionCodec, hashSessionToken, readCookie } from "./serverSecurity.mjs";
+import { normalizeNickname, parseAnalyticsEvent, parseAuthBootstrap, parseAuthRegistration, parseCampaignCommand, parseNicknameAvailability, parseOperationCommand, parseOperationInput, parseTelegramLink, parseTransferRedeem } from "./serverSchemas.mjs";
 import { instrumentHttpHandler, recordAnalyticsMetric, renderPrometheusMetrics, shutdownTelemetry } from "./serverTelemetry.mjs";
 
 const port = Number(process.env.PORT || 8080);
@@ -20,6 +20,10 @@ const storageDriver = process.env.SHIELDLINE_STORAGE_DRIVER || "json";
 const gameStore = storageDriver === "postgres" ? await createConfiguredPostgresStore({ legacyStore: legacyGameStore }) : legacyGameStore;
 const telegramBotToken = process.env.SHIELDLINE_TELEGRAM_BOT_TOKEN || "";
 const telegramAuthMaxAgeSeconds = Number(process.env.SHIELDLINE_TELEGRAM_AUTH_MAX_AGE_SECONDS || 86400);
+const authRequired = !["0", "false", "off"].includes(String(process.env.SHIELDLINE_AUTH_REQUIRED || "true").toLowerCase());
+const consentVersion = process.env.SHIELDLINE_CONSENT_VERSION || "2026-07-15";
+const transferCodeTtlMs = Number(process.env.SHIELDLINE_TRANSFER_CODE_TTL_SECONDS || 300) * 1000;
+const transferCodeSecret = process.env.SHIELDLINE_TRANSFER_CODE_SECRET || process.env.SHIELDLINE_SESSION_SECRET || "shieldline-development-session-secret";
 const production = process.env.NODE_ENV === "production";
 const sessionCodec = createSessionCodec({
   secret: process.env.SHIELDLINE_SESSION_SECRET || "shieldline-development-session-secret",
@@ -35,6 +39,7 @@ const persistentSessionCodec = gameStore.createSession ? createPersistentSession
   rotationSeconds: Number(process.env.SHIELDLINE_SESSION_ROTATION_SECONDS || 86_400),
 }) : null;
 const apiRateLimiter = createFixedWindowRateLimiter({ limit: Number(process.env.SHIELDLINE_API_RATE_LIMIT_PER_MINUTE || 180) });
+const transferCodeRateLimiter = createFixedWindowRateLimiter({ limit: Number(process.env.SHIELDLINE_TRANSFER_CODE_ATTEMPTS || 5), windowMs: 900_000 });
 
 const securityHeaders = {
   "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' https://telegram.org; connect-src 'self' https://api.telegram.org; frame-ancestors 'self' https://*.telegram.org",
@@ -124,7 +129,7 @@ function gameApiPath(pathname) {
   return pathname.slice(apiBase.length) || "/";
 }
 
-async function safeActor(req, res) {
+async function sessionActor(req, res) {
   const token = readCookie(req.headers.cookie, "shieldline_sid");
   if (persistentSessionCodec) {
     const existing = await persistentSessionCodec.verify(token);
@@ -132,15 +137,27 @@ async function safeActor(req, res) {
       if (existing.replacementHeader) res.setHeader("Set-Cookie", existing.replacementHeader);
       return existing.actorId;
     }
-    const issued = `guest-${randomUUID().slice(0, 18)}`;
-    res.setHeader("Set-Cookie", (await persistentSessionCodec.issue(issued)).header);
-    return issued;
+    return null;
   }
   const existing = sessionCodec.verify(token);
   if (existing) return existing;
+  return null;
+}
+
+async function safeActor(req, res) {
+  const existing = await sessionActor(req, res);
+  if (existing) return existing;
   const issued = `guest-${randomUUID().slice(0, 18)}`;
-  res.setHeader("Set-Cookie", sessionCodec.header(issued));
+  res.setHeader("Set-Cookie", persistentSessionCodec ? (await persistentSessionCodec.issue(issued)).header : sessionCodec.header(issued));
   return issued;
+}
+
+async function gameActor(req, res) {
+  const actorId = await safeActor(req, res);
+  if (!authRequired) return actorId;
+  const profile = await gameStore.getAuthProfile(actorId);
+  if (!profile.registrationCompleted || profile.consentVersion !== consentVersion) throw Object.assign(new Error("Завершіть реєстрацію ShieldLine."), { statusCode: 401 });
+  return actorId;
 }
 
 async function issueActorCookie(res, actorId) {
@@ -161,6 +178,29 @@ function validateTelegramInitData(initData) {
   const user = JSON.parse(params.get("user") || "{}");
   if (!Number.isSafeInteger(user.id)) throw new Error("Telegram user is missing.");
   return user;
+}
+
+function telegramProfile(user) {
+  return {
+    username: user.username || null,
+    firstName: user.first_name || null,
+    lastName: user.last_name || null,
+    languageCode: user.language_code || null,
+    isPremium: Boolean(user.is_premium),
+  };
+}
+
+function hashTransferCode(code) {
+  return createHmac("sha256", transferCodeSecret).update(String(code)).digest("hex");
+}
+
+function devicePlatform(req, telegramUser = null) {
+  if (telegramUser) return "telegram";
+  return /Mobile|Android|iPhone|iPad/i.test(String(req.headers["user-agent"] || "")) ? "pwa" : "web";
+}
+
+function authStatus(profile) {
+  return profile.registrationCompleted && profile.consentVersion === consentVersion ? "authenticated" : "onboarding_required";
 }
 
 async function deliverTelegramNotifications() {
@@ -186,9 +226,101 @@ async function handleGameApi(req, res, pathname) {
       res.end(renderPrometheusMetrics());
       return;
     }
+    if (req.method === "POST" && path === "/auth/bootstrap") {
+      const body = parseAuthBootstrap(await readRequestJson(req));
+      const telegramUser = body.telegramInitData ? validateTelegramInitData(body.telegramInitData) : null;
+      const telegramIdentity = telegramUser ? await gameStore.findIdentity("telegram", String(telegramUser.id)) : null;
+      const deviceHash = body.deviceToken ? hashSessionToken(body.deviceToken) : null;
+      let actorId = await sessionActor(req, res);
+      if (!actorId && deviceHash) actorId = (await gameStore.findDevice(deviceHash))?.actorId || null;
+      if (!actorId && telegramIdentity) actorId = telegramIdentity.actorId;
+      if (!actorId && telegramUser) actorId = `tg-${telegramUser.id}`;
+      if (!actorId) actorId = await safeActor(req, res);
+      else if (!await sessionActor(req, res)) await issueActorCookie(res, actorId);
+
+      let profile = await gameStore.getAuthProfile(actorId);
+      if (profile.registrationCompleted && deviceHash) {
+        await gameStore.bindDevice(actorId, deviceHash, { platform: devicePlatform(req, telegramUser) });
+        profile = await gameStore.getAuthProfile(actorId);
+      }
+      const telegramConflict = Boolean(telegramIdentity && telegramIdentity.actorId !== actorId);
+      const telegramLinkOffer = Boolean(telegramUser && !telegramIdentity && profile.registrationCompleted);
+      sendJson(res, 200, {
+        status: authRequired ? authStatus(profile) : "authenticated",
+        authRequired,
+        consentVersion,
+        user: profile,
+        telegramPrefill: telegramUser ? { id: String(telegramUser.id), ...telegramProfile(telegramUser) } : null,
+        telegramLinkOffer,
+        telegramConflict,
+      });
+      return;
+    }
+    if (req.method === "POST" && path === "/auth/nickname-availability") {
+      const body = parseNicknameAvailability(await readRequestJson(req));
+      const actorId = await sessionActor(req, res);
+      sendJson(res, 200, { nickname: body.nickname, available: await gameStore.nicknameAvailable(normalizeNickname(body.nickname), actorId) });
+      return;
+    }
+    if (req.method === "POST" && path === "/auth/register") {
+      const body = parseAuthRegistration(await readRequestJson(req));
+      if (body.consentVersion !== consentVersion) throw Object.assign(new Error("Умови використання оновилися. Перегляньте їх ще раз."), { statusCode: 409 });
+      const actorId = await safeActor(req, res);
+      const nicknameNormalized = normalizeNickname(body.nickname);
+      if (!await gameStore.nicknameAvailable(nicknameNormalized, actorId)) throw Object.assign(new Error("Цей нікнейм уже зайнятий."), { statusCode: 409 });
+      const telegramUser = body.telegramInitData ? validateTelegramInitData(body.telegramInitData) : null;
+      if (telegramUser) {
+        const identity = await gameStore.findIdentity("telegram", String(telegramUser.id));
+        if (identity && identity.actorId !== actorId) throw Object.assign(new Error("Цей Telegram уже прив’язаний до іншого профілю. Увійдіть за кодом."), { statusCode: 409 });
+      }
+      await gameStore.completeRegistration(actorId, { nickname: body.nickname, nicknameNormalized, consentVersion });
+      if (telegramUser) await gameStore.attachIdentity(actorId, "telegram", String(telegramUser.id), telegramProfile(telegramUser));
+      await gameStore.bindDevice(actorId, hashSessionToken(body.deviceToken), { platform: devicePlatform(req, telegramUser) });
+      sendJson(res, 201, { user: await gameStore.getAuthProfile(actorId), consentVersion });
+      return;
+    }
+    if (req.method === "POST" && path === "/auth/transfer-code") {
+      const actorId = await gameActor(req, res);
+      const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      const expiresAt = new Date(Date.now() + transferCodeTtlMs).toISOString();
+      await gameStore.createTransferCode(actorId, hashTransferCode(code), expiresAt);
+      sendJson(res, 201, { code, expiresAt });
+      return;
+    }
+    if (req.method === "POST" && path === "/auth/redeem-code") {
+      const body = parseTransferRedeem(await readRequestJson(req));
+      const attemptKey = `${req.socket.remoteAddress || "unknown"}:${hashSessionToken(body.deviceToken).slice(0, 16)}`;
+      if (!transferCodeRateLimiter.allow(attemptKey)) throw Object.assign(new Error("Забагато невдалих спроб. Спробуйте пізніше."), { statusCode: 429 });
+      const result = await gameStore.consumeTransferCode(hashTransferCode(body.code), new Date());
+      const telegramUser = body.telegramInitData ? validateTelegramInitData(body.telegramInitData) : null;
+      if (telegramUser) {
+        const identity = await gameStore.findIdentity("telegram", String(telegramUser.id));
+        if (identity && identity.actorId !== result.actorId) throw Object.assign(new Error("Цей Telegram прив’язаний до іншого профілю."), { statusCode: 409 });
+        if (!identity) await gameStore.attachIdentity(result.actorId, "telegram", String(telegramUser.id), telegramProfile(telegramUser));
+      }
+      await gameStore.bindDevice(result.actorId, hashSessionToken(body.deviceToken), { platform: devicePlatform(req, telegramUser) });
+      await issueActorCookie(res, result.actorId);
+      sendJson(res, 200, { user: await gameStore.getAuthProfile(result.actorId), consentVersion });
+      return;
+    }
+    if (req.method === "POST" && path === "/auth/link-telegram") {
+      const body = parseTelegramLink(await readRequestJson(req));
+      const actorId = await gameActor(req, res);
+      const telegramUser = validateTelegramInitData(body.telegramInitData);
+      const profile = await gameStore.attachIdentity(actorId, "telegram", String(telegramUser.id), telegramProfile(telegramUser));
+      sendJson(res, 200, { user: profile });
+      return;
+    }
+    if (req.method === "GET" && path === "/auth/me") {
+      const actorId = await sessionActor(req, res);
+      if (!actorId) throw Object.assign(new Error("Сесію не знайдено."), { statusCode: 401 });
+      const profile = await gameStore.getAuthProfile(actorId);
+      sendJson(res, 200, { status: authStatus(profile), consentVersion, user: profile });
+      return;
+    }
     if (req.method === "POST" && path === "/analytics") {
       const event = parseAnalyticsEvent(await readRequestJson(req));
-      const actorId = await safeActor(req, res);
+      const actorId = await gameActor(req, res);
       if (gameStore.recordAnalytics) await gameStore.recordAnalytics(actorId, event);
       else console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: "info", component: "shieldline.analytics", actorId, ...event }));
       recordAnalyticsMetric(event.eventName, event.channel);
@@ -197,7 +329,7 @@ async function handleGameApi(req, res, pathname) {
     }
     if (req.method === "POST" && path === "/operations") {
       const body = parseOperationInput(await readRequestJson(req));
-      const actorId = await safeActor(req, res);
+      const actorId = await gameActor(req, res);
       const modeId = String(body.modeId || "training");
       if (!new Set(["campaign", "rapid-response", "ranked-challenge", "co-op-command", "sandbox", "training"]).has(modeId)) throw new Error("Unknown live operation mode.");
       if (production && actorId.startsWith("guest-") && (modeId === "ranked-challenge" || modeId === "co-op-command")) throw Object.assign(new Error("Telegram authorization is required for competitive modes."), { statusCode: 401 });
@@ -209,6 +341,7 @@ async function handleGameApi(req, res, pathname) {
     }
     const operationEventsMatch = path.match(/^\/operations\/([^/]+)\/events$/);
     if (req.method === "GET" && operationEventsMatch) {
+      await gameActor(req, res);
       const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
       const events = await gameStore.getRunEvents(operationEventsMatch[1], Math.max(0, Number(query.get("after") || 0)));
       if (!events) { sendJson(res, 404, { error: "Operation not found." }); return; }
@@ -217,6 +350,7 @@ async function handleGameApi(req, res, pathname) {
     }
     const operationSnapshotsMatch = path.match(/^\/operations\/([^/]+)\/snapshots$/);
     if (req.method === "GET" && operationSnapshotsMatch) {
+      await gameActor(req, res);
       const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
       const requestedTick = query.has("tick") ? Number(query.get("tick")) : Number.POSITIVE_INFINITY;
       const snapshots = await gameStore.getRunSnapshots(operationSnapshotsMatch[1], requestedTick);
@@ -227,11 +361,12 @@ async function handleGameApi(req, res, pathname) {
     const operationCommandsMatch = path.match(/^\/operations\/([^/]+)\/commands$/);
     if (req.method === "POST" && operationCommandsMatch) {
       const body = parseOperationCommand(await readRequestJson(req));
-      sendJson(res, 201, await gameStore.appendOperationCommand(operationCommandsMatch[1], await safeActor(req, res), body));
+      sendJson(res, 201, await gameStore.appendOperationCommand(operationCommandsMatch[1], await gameActor(req, res), body));
       return;
     }
     const operationMatch = path.match(/^\/operations\/([^/]+)$/);
     if (req.method === "GET" && operationMatch) {
+      await gameActor(req, res);
       const run = await gameStore.getRun(operationMatch[1]);
       if (!run) { sendJson(res, 404, { error: "Operation not found." }); return; }
       sendJson(res, 200, run);
@@ -239,29 +374,32 @@ async function handleGameApi(req, res, pathname) {
     }
     if (req.method === "GET" && path === "/daily") {
       const query = new URL(req.url || "/", "http://127.0.0.1").searchParams;
-      sendJson(res, 200, await gameStore.getDailyReport(query.get("day") || dayKey(), {}, await safeActor(req, res)));
+      sendJson(res, 200, await gameStore.getDailyReport(query.get("day") || dayKey(), {}, await gameActor(req, res)));
       return;
     }
     if (req.method === "POST" && path === "/daily/resolve") {
       const body = await readRequestJson(req);
       const key = /^\d{4}-\d{2}-\d{2}$/.test(String(body.dayKey || "")) ? body.dayKey : dayKey();
-      sendJson(res, 200, await gameStore.getDailyReport(key, body.plan, await safeActor(req, res)));
+      sendJson(res, 200, await gameStore.getDailyReport(key, body.plan, await gameActor(req, res)));
       return;
     }
     if (req.method === "GET" && path === "/daily/city") {
-      sendJson(res, 200, await gameStore.getDailyCity(await safeActor(req, res)));
+      sendJson(res, 200, await gameStore.getDailyCity(await gameActor(req, res)));
       return;
     }
     if (req.method === "POST" && path === "/daily/city") {
       const body = await readRequestJson(req);
-      sendJson(res, 200, await gameStore.saveDailyCity(await safeActor(req, res), body.plan));
+      sendJson(res, 200, await gameStore.saveDailyCity(await gameActor(req, res), body.plan));
       return;
     }
     if (req.method === "POST" && path === "/auth/telegram/init") {
       const user = validateTelegramInitData((await readRequestJson(req)).initData);
-      const actorId = `tg-${user.id}`;
-      await issueActorCookie(res, actorId);
-      sendJson(res, 200, { user: { id: actorId, displayName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "Telegram commander", platform: "telegram" } });
+      const identity = await gameStore.findIdentity("telegram", String(user.id));
+      if (!identity) throw Object.assign(new Error("Завершіть реєстрацію ShieldLine або увійдіть за кодом."), { statusCode: 401 });
+      await issueActorCookie(res, identity.actorId);
+      const profile = await gameStore.getAuthProfile(identity.actorId);
+      if (authRequired && authStatus(profile) !== "authenticated") throw Object.assign(new Error("Перегляньте актуальні умови використання ShieldLine."), { statusCode: 401 });
+      sendJson(res, 200, { user: profile });
       return;
     }
     if (req.method === "POST" && path === "/auth/logout") {
@@ -273,9 +411,10 @@ async function handleGameApi(req, res, pathname) {
     }
     if (req.method === "POST" && path === "/notifications/preferences") {
       const body = await readRequestJson(req);
-      const actorId = await safeActor(req, res);
-      if (!actorId.startsWith("tg-")) throw new Error("Telegram authorization is required for bot notifications.");
-      sendJson(res, 200, await gameStore.setNotificationPreference(actorId, actorId.slice(3), body.enabled));
+      const actorId = await gameActor(req, res);
+      const profile = await gameStore.getAuthProfile(actorId);
+      if (!profile.telegram?.id) throw new Error("Telegram authorization is required for bot notifications.");
+      sendJson(res, 200, await gameStore.setNotificationPreference(actorId, profile.telegram.id, body.enabled));
       return;
     }
     if (req.method === "GET" && path === "/leaderboard") {
@@ -290,35 +429,36 @@ async function handleGameApi(req, res, pathname) {
     }
     if (req.method === "POST" && path === "/ranked/submit") {
       const body = await readRequestJson(req);
-      sendJson(res, 201, await gameStore.submitRanked(String(body.challengeId || ""), body.plan, await safeActor(req, res)));
+      sendJson(res, 201, await gameStore.submitRanked(String(body.challengeId || ""), body.plan, await gameActor(req, res)));
       return;
     }
     if (req.method === "POST" && path === "/missions/run") {
       const body = await readRequestJson(req);
-      const actorId = await safeActor(req, res);
+      const actorId = await gameActor(req, res);
       const seed = String(body.seed || `${dayKey()}-${actorId}`).replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
       const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan, String(body.missionId || "campaign-night-01"), String(body.source || "campaign"));
       sendJson(res, 201, run);
       return;
     }
     if (req.method === "GET" && path === "/campaign/state") {
-      sendJson(res, 200, await gameStore.campaignState(await safeActor(req, res)));
+      sendJson(res, 200, await gameStore.campaignState(await gameActor(req, res)));
       return;
     }
     if (req.method === "POST" && path === "/campaign/commands") {
       const body = parseCampaignCommand(await readRequestJson(req));
-      await gameStore.recordCampaignCommand(await safeActor(req, res), String(body.type || "unknown"), body.payload);
+      await gameStore.recordCampaignCommand(await gameActor(req, res), String(body.type || "unknown"), body.payload);
       sendJson(res, 201, { ok: true });
       return;
     }
     if (req.method === "GET" && path.startsWith("/runs/")) {
+      await gameActor(req, res);
       const run = await gameStore.getRun(path.slice("/runs/".length));
       if (!run) { sendJson(res, 404, { error: "Run not found." }); return; }
       sendJson(res, 200, run);
       return;
     }
     if (req.method === "GET" && path.startsWith("/rooms/")) {
-      const viewerId = await safeActor(req, res);
+      const viewerId = await gameActor(req, res);
       sendJson(res, 200, { ...(await gameStore.getRoom(path.slice("/rooms/".length))), viewerId });
       return;
     }
@@ -327,7 +467,7 @@ async function handleGameApi(req, res, pathname) {
       const body = await readRequestJson(req);
       const sectorId = String(body.sectorId || "");
       if (!new Set(["north", "south", "east", "west", "hq"]).has(sectorId)) { sendJson(res, 400, { error: "Unknown sector." }); return; }
-      const viewerId = await safeActor(req, res);
+      const viewerId = await gameActor(req, res);
       sendJson(res, 200, { ...(await gameStore.claimSector(roomMatch[1], sectorId, viewerId)), viewerId });
       return;
     }
@@ -336,13 +476,13 @@ async function handleGameApi(req, res, pathname) {
       const body = await readRequestJson(req);
       const sectorId = String(body.sectorId || "");
       if (!new Set(["north", "south", "east", "west"]).has(sectorId)) { sendJson(res, 400, { error: "Unknown sector." }); return; }
-      const viewerId = await safeActor(req, res);
+      const viewerId = await gameActor(req, res);
       sendJson(res, 201, { ...(await gameStore.appendRoomCommand(commandMatch[1], viewerId, sectorId, String(body.type || "unknown"), body.payload)), viewerId });
       return;
     }
     const resolveRoomMatch = path.match(/^\/rooms\/([^/]+)\/resolve$/);
     if (req.method === "POST" && resolveRoomMatch) {
-      const viewerId = await safeActor(req, res);
+      const viewerId = await gameActor(req, res);
       sendJson(res, 201, await gameStore.resolveCoOpRoom(resolveRoomMatch[1], viewerId));
       return;
     }
