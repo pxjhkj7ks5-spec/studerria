@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { normalizeDisplayPreferences, resolveReducedQuality } from "../src/platform/displayPreferences";
 import { classifyThreatRoute, predictedRouteEndpoint } from "../src/game/threatRouteVisuals";
-import { unitMarkerStatusClass } from "../src/game/unitMarkerVisuals";
 
 test("threat routes distinguish hidden, predicted and confirmed tracks", () => {
   assert.equal(classifyThreatRoute({ revealed: false, confidence: 100, status: "inbound" }, false), "hidden");
@@ -15,12 +14,6 @@ test("threat routes distinguish hidden, predicted and confirmed tracks", () => {
   const endpoint = predictedRouteEndpoint({ lat: 0, lng: 0 }, { lat: 10, lng: 20 });
   assert.ok(Math.abs(endpoint.lat - 3.4) < 1e-9);
   assert.ok(Math.abs(endpoint.lng - 6.8) < 1e-9);
-});
-
-test("unit marker status classes cover every tactical status", () => {
-  for (const status of ["ready", "engaging", "strained", "exhausted", "maintenance", "redeploying", "reloading"] as const) {
-    assert.equal(unitMarkerStatusClass(status), `map-marker--unit-${status}`);
-  }
 });
 
 test("display preferences are visual-only, normalized and performance mode overrides automatic quality", async () => {

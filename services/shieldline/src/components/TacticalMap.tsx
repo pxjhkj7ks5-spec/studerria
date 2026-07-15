@@ -12,7 +12,6 @@ import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile } from "../game/mapZoom";
 import { classifyThreatRoute, predictedRouteEndpoint, type ThreatRouteVisual } from "../game/threatRouteVisuals";
-import { unitMarkerStatusClass } from "../game/unitMarkerVisuals";
 import { resolveReducedQuality } from "../platform/displayPreferences";
 import { useGameStore } from "../store/useGameStore";
 import type {
@@ -283,9 +282,9 @@ function makeBatteryIcon(battery: DefenseBattery) {
   if (cached) return cached;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="map-marker map-marker--image map-marker--battery ${unitMarkerStatusClass(battery.status)}"><i class="unit-status-ring" aria-hidden="true"></i><img src="${unitSprites[battery.kind]}" alt="" draggable="false" /></span>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+    html: imageMarkerHtml(unitSprites[battery.kind], "map-marker--battery"),
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
   });
   batteryIconCache.set(key, icon);
   return icon;
