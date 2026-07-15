@@ -87,7 +87,7 @@ const w = (time: string, threatKind: ThreatKind, count: number, routeIds: string
 
 export const campaignMissionsPlan: CampaignMissionDefinition[] = [
   { id: "first-contact", index: 1, title: "Перший контакт", durationMinutes: 15, focusRegion: "Столичний кластер", grant: 38, rewardCap: 18, objective: "Навчитися виявляти, класифікувати й пріоритезувати загрози без марної витрати дорогого БК.", expectedThreatClasses: ["Parody", "Gerbera", "Shahed"], broadAzimuth: "північ і північний схід", unlocks: ["radar", "mvg", "manpads"], waves: [
-    w("00:45", "parodiya", 2, ["R01"], 1, "none", "Столичний кластер", 0, 35, "low"), w("03:00", "gerbera", 3, ["R02", "R29"], 1, "none", "Столичний / енергетичний", .33, 55, "low"), w("06:30", "geran2", 2, ["R02", "R06"], 1, "softMerge", "Столичний кластер", 0, 40, "medium"), w("09:30", "parodiya", 2, ["R01", "R29"], 1, "splitFeint", "Столичний / енергетичний", .5, 25, "low"), w("10:00", "gerbera", 2, ["R02"], 1, "trailPreviousWave", "Столичний кластер", 0, 20, "low"), w("13:00", "geran2", 3, ["R01"], 3, "fullGroup", "Столичний кластер", 0, 30, "high"), w("14:20", "gerbera", 2, ["R03"], 1, "none", "Столичний кластер", 0, 20, "low"),
+    w("01:15", "parodiya", 2, ["R01"], 1, "none", "Столичний кластер", 0, 35, "low"), w("03:00", "gerbera", 3, ["R02", "R29"], 1, "none", "Столичний / енергетичний", .33, 55, "low"), w("06:30", "geran2", 2, ["R02", "R06"], 1, "softMerge", "Столичний кластер", 0, 40, "medium"), w("09:30", "parodiya", 2, ["R01", "R29"], 1, "splitFeint", "Столичний / енергетичний", .5, 25, "low"), w("10:00", "gerbera", 2, ["R02"], 1, "trailPreviousWave", "Столичний кластер", 0, 20, "low"), w("13:00", "geran2", 3, ["R01"], 3, "fullGroup", "Столичний кластер", 0, 30, "high"), w("14:20", "gerbera", 2, ["R03"], 1, "none", "Столичний кластер", 0, 20, "low"),
   ] },
   { id: "southern-corridor", index: 2, title: "Південний коридор", durationMinutes: 35, focusRegion: "Південний портовий кластер", grant: 32, rewardCap: 35, objective: "Передислокувати частину мережі на новий театр, не оголюючи попередній рубіж.", expectedThreatClasses: ["Decoy", "Shahed", "Cruise"], broadAzimuth: "морський південь і південний схід", unlocks: ["boat", "ew", "gepard", "drone-operators"], waves: [
     w("02:00", "gerbera", 4, ["R10", "R30"], 1, "none", "Портовий", .25, 70, "low"), w("06:00", "parodiya", 5, ["R10", "R14"], 2, "splitFeint", "Портовий / логістичний", .4, 60, "low"), w("11:00", "geran2", 4, ["R12", "R15"], 2, "rallyMerge", "Портовий", 0, 50, "medium"), w("15:30", "gerbera", 3, ["R13"], 3, "screenForNext", "Портовий", 0, 25, "low"), w("16:00", "geran2", 6, ["R10", "R12"], 3, "rallyMerge", "Портовий", 0, 55, "high"), w("21:30", "parodiya", 3, ["R14"], 1, "diversionOnly", "Логістичний", 1, 40, "low"), w("23:00", "kalibr", 1, ["R23"], 1, "independent", "Портовий", 0, 0, "veryHigh"), w("28:00", "geran2", 8, ["R11", "R15"], 5, "corridorMerge", "Портовий", .15, 65, "high"), w("32:30", "gerbera", 2, ["R30"], 1, "falseTerminal", "Південний вузол", 1, 20, "low"), w("33:00", "geran2", 5, ["R13"], 5, "fullGroup", "Портовий", 0, 30, "high"),
@@ -108,15 +108,21 @@ export const campaignResupplyCosts: Partial<Record<UnitKind, number>> = { mvg: 1
 export const campaignRedeployRates: Record<UnitKind, number> = { mvg: .10, boat: .10, manpads: .10, gepard: .15, buk: .15, ew: .15, "drone-operators": .15, radar: .15, s300: .20, "iris-t": .20, nasams: .20, patriot: .25 };
 
 export const campaignTutorialSteps = [
-  { atSeconds: 0, title: "Поставте 1 радар", body: "Почніть із сенсора: без нього контакти залишаться непевними." },
-  { atSeconds: 60, title: "Поставте дешевий перехоплювач", body: "Виявлення та ураження виконують різні системи." },
-  { atSeconds: 150, title: "Контакти низького пріоритету", body: "Не витрачайте дорогі ракети на кожну обманку." },
-  { atSeconds: 240, title: "Читайте картку цілі", body: "Зіставляйте тип, швидкість, напрямок і достовірність." },
-  { atSeconds: 390, title: "Реальна загроза", body: "Пріоритезуйте Shahed і збережіть БК для фіналу." },
-  { atSeconds: 570, title: "Бережіть боєкомплект", body: "Після місії безкоштовно відновиться лише 25% комплекту." },
-  { atSeconds: 690, title: "Частина цілей відволікає", body: "Тримайте головний театр прикритим." },
-  { atSeconds: 810, title: "Кампанія має пам’ять", body: "Позиції, БК, стан систем, досвід, стійкість і гаманець перейдуть далі." },
+  { atSeconds: 5, durationSeconds: 7, panelTarget: "planning" as const, title: "Відкрийте «План»", body: "Перегляньте доступні дії перед першим контактом." },
+  { atSeconds: 22, durationSeconds: 7, panelTarget: "intel" as const, title: "Відкрийте «Розвідку»", body: "Ознайомтеся з журналом контактів і напрямками пусків." },
+  { atSeconds: 78, durationSeconds: 7, title: "Контакти низького пріоритету", body: "Не витрачайте дорогі ракети на кожну обманку." },
+  { atSeconds: 92, durationSeconds: 7, title: "Читайте картку цілі", body: "Зіставляйте тип, швидкість, курс і достовірність." },
+  { atSeconds: 390, durationSeconds: 7, title: "Реальна загроза", body: "Пріоритезуйте Shahed і збережіть БК для фіналу." },
+  { atSeconds: 570, durationSeconds: 7, title: "Бережіть боєкомплект", body: "Після місії безкоштовно відновиться лише 25% комплекту." },
+  { atSeconds: 690, durationSeconds: 7, title: "Частина цілей відволікає", body: "Тримайте головний театр прикритим." },
+  { atSeconds: 810, durationSeconds: 7, title: "Кампанія має пам’ять", body: "Позиції, БК, стан систем, досвід, стійкість і гаманець перейдуть далі." },
 ];
+
+export function activeCampaignTutorialCue(elapsedSeconds: number, visitedPanels: readonly string[] = []) {
+  return campaignTutorialSteps.find((cue) => elapsedSeconds >= cue.atSeconds
+    && elapsedSeconds < cue.atSeconds + cue.durationSeconds
+    && (!("panelTarget" in cue) || typeof cue.panelTarget !== "string" || !visitedPanels.includes(cue.panelTarget))) || null;
+}
 
 export function getCampaignMission(index: number) { return campaignMissionsPlan[Math.max(0, Math.min(campaignMissionsPlan.length - 1, index - 1))]; }
 export function getCampaignRoute(id: string) { return campaignRouteTemplates.find((route) => route.id === id); }

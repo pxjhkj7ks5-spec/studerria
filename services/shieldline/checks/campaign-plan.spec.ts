@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { campaignMissionsPlan, campaignRouteTemplates, getCampaignMission, missionTargetCount } from "../src/data/campaignPlan";
+import { activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, getCampaignMission, missionTargetCount } from "../src/data/campaignPlan";
+import { campaignLaunchPointsForThreats } from "../src/game/campaignLaunchPoints";
 import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery } from "../src/game/campaignMeta";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
@@ -44,7 +45,7 @@ test("seeded route generation curves drones and keeps ballistic tracks direct", 
   assert.equal(routeHasSelfIntersection(ballistic), false);
 });
 
-test("campaign economy defers capped kill rewards and preserves units between missions", () => {
+test("campaign economy credits exact capped kill rewards immediately and preserves units between missions", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   game.resources.budget = 0;
@@ -58,6 +59,8 @@ test("campaign economy defers capped kill rewards and preserves units between mi
   mvg.health = 76;
   const originalPosition = { ...mvg.position };
   for (let index = 0; index < 30; index += 1) recordCampaignKill(game, "parodiya", 1);
+  assert.equal(game.resources.budget, 25);
+  assert.equal(game.campaign?.campaignWallet, 25);
   game.interceptions = 16;
   const result = finalizeCampaignMission(game)!;
   assert.equal(result.killReward, getCampaignMission(1).rewardCap);
@@ -73,6 +76,21 @@ test("campaign economy defers capped kill rewards and preserves units between mi
   assert.equal(game.resources.budget, 82);
   assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, 3);
   assert.ok(game.campaign?.unlockedSystems.includes("gepard"));
+});
+
+test("campaign onboarding cues expire and launch points identify their authored route", () => {
+  assert.equal(activeCampaignTutorialCue(5)?.title, "Відкрийте «План»");
+  assert.equal(activeCampaignTutorialCue(5, ["planning"]), null);
+  assert.equal(activeCampaignTutorialCue(13), null);
+  assert.deepEqual(
+    ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
+    [1, 2, 2, 10, 10, 20],
+  );
+  const launchPoints = campaignLaunchPointsForThreats([
+    { routeId: "R01", launchSectorName: "N1 · R01", origin: { lat: 53.1, lng: 30.2 }, kind: "geran2" } as never,
+    { routeId: "R01", launchSectorName: "N1 · R01", origin: { lat: 53.2, lng: 30.3 }, kind: "geran2" } as never,
+  ]);
+  assert.deepEqual(launchPoints.map(({ routeId, sectorLabel, activeTracks }) => ({ routeId, sectorLabel, activeTracks })), [{ routeId: "R01", sectorLabel: "N1", activeTracks: 2 }]);
 });
 
 test("intermission repair and resupply spend the persistent campaign wallet", () => {

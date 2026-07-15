@@ -18,7 +18,7 @@ import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
 import { campaignMissions } from "./data/missions";
-import { campaignTutorialSteps, getCampaignMission } from "./data/campaignPlan";
+import { activeCampaignTutorialCue, getCampaignMission } from "./data/campaignPlan";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice, selectBattleNotice } from "./game/battleNotices";
@@ -161,6 +161,7 @@ export default function App() {
   const [isResolving, setIsResolving] = useState(false);
   const [displayPreferences, setDisplayPreferences] = useState(readDisplayPreferences);
   const [fullscreenReportOpen, setFullscreenReportOpen] = useState(false);
+  const [visitedCampaignPanels, setVisitedCampaignPanels] = useState<ActivePanel[]>([]);
   const coOpSyncedBatteryIds = useRef(new Set<string>());
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
@@ -180,10 +181,10 @@ export default function App() {
   })();
   const activeMission = campaignMissions[(game.campaign?.missionIndex || 1) - 1] || campaignMissions[0];
   const activeMissionTitle = game.campaign ? getCampaignMission(game.campaign.missionIndex).title : t("mission.1");
-  const campaignTutorialIndex = game.campaign?.missionIndex === 1
-    ? Math.max(game.campaign.tutorialStep, game.batteries.some((battery) => battery.kind === "radar") ? 1 : 0, game.batteries.some((battery) => !["radar", "ew"].includes(battery.kind)) ? 2 : 0)
-    : 0;
-  const campaignTutorial = game.campaign?.missionIndex === 1 && operationPhase === "running" ? campaignTutorialSteps[campaignTutorialIndex] : null;
+  const missionElapsedSeconds = Math.max(0, (game.elapsedMs - game.cycleStartedAtMs) / 1_000);
+  const campaignTutorial = game.campaign?.missionIndex === 1 && operationPhase === "running"
+    ? activeCampaignTutorialCue(missionElapsedSeconds, visitedCampaignPanels)
+    : null;
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
     url.search = "";
@@ -361,10 +362,15 @@ export default function App() {
   const panelItems = isMobileLive ? mobilePanelItems : desktopPanelItems;
   const placementUnit = placementKind ? getUnitDefinition(placementKind) : null;
   const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
+  const ownedBatteryKinds = [...game.batteries, ...(game.storedBatteries || [])].map((battery) => battery.kind);
+  const hasOwnedRadar = ownedBatteryKinds.includes("radar");
+  const hasOwnedKinetic = ownedBatteryKinds.some((kind) => !["radar", "ew"].includes(kind));
   const setupGuidance = operationPhase === "planning" && runtimePolicy.start === "auto-checklist" && !defenseReadiness.ready
-    ? defenseReadiness.radarReady
-      ? { kind: "kinetic" as const, text: "Тепер встановіть бойову ППО" }
-      : { kind: "radar" as const, text: "Спочатку встановіть радар" }
+    ? !hasOwnedRadar
+      ? { kind: "radar" as const, text: "Спочатку встановіть радар" }
+      : !hasOwnedKinetic
+        ? { kind: "kinetic" as const, text: "Тепер встановіть бойову ППО" }
+        : null
     : null;
   const activePanelTitle = activePanel
     ? isMobileLive
@@ -386,11 +392,12 @@ export default function App() {
             const Icon = item.icon;
             return (
               <button
-                className={`rail-button ${activePanel === item.id ? "rail-button--active" : ""}`}
+                className={`rail-button ${activePanel === item.id ? "rail-button--active" : ""} ${campaignTutorial && "panelTarget" in campaignTutorial && campaignTutorial.panelTarget === item.id ? "rail-button--tutorial-target" : ""}`}
                 type="button"
                 key={item.id}
                 data-testid={`panel-${item.id}`}
                 onClick={() => {
+                  if (!visitedCampaignPanels.includes(item.id)) setVisitedCampaignPanels((current) => [...current, item.id]);
                   setActivePanel((current) => (current === item.id ? null : item.id));
                 }}
                 aria-label={item.label}

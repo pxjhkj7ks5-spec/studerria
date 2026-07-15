@@ -66,13 +66,16 @@ export function applyCampaignMissionOpening(state: GameState) {
 }
 
 export function recordCampaignKill(state: GameState, kind: ThreatKind, reward: number) {
-  if (!state.campaign) return false;
+  if (!state.campaign) return 0;
   const mission = getCampaignMission(state.campaign.missionIndex);
   const canonicalReward = campaignKillRewards[kind] ?? reward;
   const available = Math.max(0, mission.rewardCap - state.campaign.missionKillReward);
-  state.campaign.missionKillReward += Math.min(canonicalReward, available);
+  const credited = Math.min(canonicalReward, available);
+  state.campaign.missionKillReward += credited;
   state.campaign.missionKillsByKind[kind] = (state.campaign.missionKillsByKind[kind] || 0) + 1;
-  return true;
+  state.campaign.campaignWallet = clamp(state.campaign.campaignWallet + credited, 0, 9999);
+  state.resources.budget = state.campaign.campaignWallet;
+  return credited;
 }
 
 function addLine(lines: CampaignMissionResult["rewardLines"], label: string, amount: number, kind: CampaignMissionResult["rewardLines"][number]["kind"]) {
@@ -106,7 +109,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   if (heavilyDamaged) { penaltyCosts += heavilyDamaged * 3; addLine(lines, `${heavilyDamaged} суттєво пошкодж. систем`, -heavilyDamaged * 3, "penalty"); }
   if (impacts > 8) { penaltyCosts += 5; addLine(lines, "Більше 8 влучань", -5, "penalty"); }
 
-  campaign.campaignWallet = clamp(state.resources.budget + campaign.missionKillReward + bonusRewards - penaltyCosts, 0, 9999);
+  campaign.campaignWallet = clamp(state.resources.budget + bonusRewards - penaltyCosts, 0, 9999);
   state.resources.budget = campaign.campaignWallet;
   for (const battery of [...state.batteries, ...state.storedBatteries]) {
     const unit = getUnitDefinition(battery.kind);

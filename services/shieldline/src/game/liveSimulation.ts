@@ -518,7 +518,8 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   state.liveThreats.push(threat);
   campaign.spawnCursor += 1;
   const missile = isMissileClass(event.threatKind);
-  pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Track Warning", `${event.routeId}: ${event.targetRegion} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: event.targetRegion });
+  const launchPointLabel = `${route.launchSector} · ${event.routeId}`;
+  pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Пуск БПЛА", `Пускова точка ${launchPointLabel}. Цільовий сектор: ${event.targetRegion} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: launchPointLabel });
   return true;
 }
 
@@ -715,15 +716,18 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
         threat.status = "intercepted";
         resolvedThreatIds.add(threat.id);
         state.interceptions += 1;
-        const deferredCampaignReward = recordCampaignKill(state, threat.kind, threat.reward);
-        if (!deferredCampaignReward) state.resources.budget = clamp(state.resources.budget + threat.reward, 0, 999);
+        const campaignReward = recordCampaignKill(state, threat.kind, threat.reward);
+        if (!state.campaign) state.resources.budget = clamp(state.resources.budget + threat.reward, 0, 999);
         state.impactMarkers.push({
           id: createId("intercept", Math.floor(state.elapsedMs), random),
           position: threatPosition(threat),
           tone: "intercept",
           ttlMs: 1800,
         });
-        pushLog(state.log, state.elapsedMs, "Перехоплення успішне", deferredCampaignReward ? `Повітряну ціль нейтралізовано. Нагороду зараховано до підсумку місії.` : `Повітряну ціль нейтралізовано. Винагорода +${threat.reward} млн ₴.`, "success");
+        const rewardCopy = state.campaign
+          ? campaignReward > 0 ? `Винагорода одразу зарахована: +${campaignReward} млн ₴.` : "Ліміт нагороди цієї місії вже досягнуто."
+          : `Винагорода +${threat.reward} млн ₴.`;
+        pushLog(state.log, state.elapsedMs, "Перехоплення успішне", `Повітряну ціль нейтралізовано. ${rewardCopy}`, "success");
       } else if (event.result === "miss" && threat) {
         threat.status = "inbound";
         pushLog(state.log, state.elapsedMs, "Промах", "Перехоплювач не уразив ціль. Ціль продовжує рух.", "warning");
