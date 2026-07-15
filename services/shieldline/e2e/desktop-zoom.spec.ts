@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("desktop mouse and trackpad wheel zoom respond around the pointer", async ({ page }) => {
+test("desktop trackpad zoom is continuous and anchored under the pointer", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
@@ -23,12 +23,26 @@ test("desktop mouse and trackpad wheel zoom respond around the pointer", async (
     });
     return Math.hypot(centers[1].x - centers[0].x, centers[1].y - centers[0].y);
   });
+  const markerAnchor = () => cityMarkers.nth(0).evaluate((marker) => {
+    const box = marker.getBoundingClientRect();
+    const style = getComputedStyle(marker);
+    return { x: box.left - Number.parseFloat(style.marginLeft), y: box.top - Number.parseFloat(style.marginTop) };
+  });
   const before = await markerDistance();
   const mapBox = await map.boundingBox();
   if (!mapBox) throw new Error("Desktop map did not render.");
-  await page.mouse.move(mapBox.x + mapBox.width * 0.55, mapBox.y + mapBox.height * 0.5);
-  await page.mouse.wheel(0, -240);
+  const anchor = await markerAnchor();
+  await page.mouse.move(anchor.x, anchor.y);
+  for (let step = 0; step < 12; step += 1) await page.mouse.wheel(0, -12);
   await expect.poll(markerDistance).toBeGreaterThan(before * 1.05);
+  await expect.poll(async () => {
+    const current = await markerAnchor();
+    return Math.hypot(current.x - anchor.x, current.y - anchor.y);
+  }).toBeLessThan(4);
+
+  const zoomBeforePinch = await markerDistance();
+  await map.dispatchEvent("wheel", { deltaY: -30, ctrlKey: true, clientX: anchor.x, clientY: anchor.y });
+  await expect.poll(markerDistance).toBeGreaterThan(zoomBeforePinch);
 });
 
 test("desktop defense cards expand in flow and radar telemetry stays sensor-specific", async ({ page }) => {

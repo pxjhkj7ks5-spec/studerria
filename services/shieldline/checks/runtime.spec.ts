@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
-import { mapZoomInputProfile } from "../src/game/mapZoom";
+import { mapZoomInputProfile, wheelZoomDelta } from "../src/game/mapZoom";
 import { advanceSimulation, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
@@ -55,9 +55,13 @@ test("coverage circles and occupied polygons use Leaflet's shared SVG renderer",
   assert.match(source, /state === "maintenance"[\s\S]*?color: "#ffad42"/);
 });
 
-test("desktop wheel zoom is responsive while touch zoom keeps its existing profile", () => {
-  assert.deepEqual(mapZoomInputProfile(true), { zoomDelta: 0.35, wheelPxPerZoomLevel: 70, wheelDebounceTime: 18 });
-  assert.deepEqual(mapZoomInputProfile(false), { zoomDelta: 0.5, wheelPxPerZoomLevel: 160, wheelDebounceTime: 35 });
+test("desktop wheel zoom uses small continuous trackpad deltas and caps mouse-wheel spikes", () => {
+  const desktop = mapZoomInputProfile(true);
+  assert.deepEqual(desktop, { pixelsPerZoomLevel: 240, smoothing: 0.38, maxDelta: 0.75 });
+  assert.deepEqual(mapZoomInputProfile(false), { pixelsPerZoomLevel: 320, smoothing: 0.3, maxDelta: 0.6 });
+  assert.equal(wheelZoomDelta(-12, 0, desktop), 0.05);
+  assert.equal(wheelZoomDelta(-3, 1, desktop), 0.2);
+  assert.equal(wheelZoomDelta(-1_000, 0, desktop), 0.75);
 });
 
 test("map panning defers React culling and tile updates until movement settles", async () => {
@@ -70,6 +74,7 @@ test("map panning defers React culling and tile updates until movement settles",
   assert.doesNotMatch(tracker, /\bmove\(\)\s*\{/);
   assert.match(tracker, /moveend\(\)\s*\{\s*scheduleViewportFrame\(\)/);
   assert.match(source, /keepBuffer=\{4\}[\s\S]*?updateWhenIdle[\s\S]*?updateWhenZooming/);
+  assert.match(source, /leaflet-stage--smooth-zooming/);
   assert.doesNotMatch(source, /updateWhenIdle=\{false\}/);
 });
 

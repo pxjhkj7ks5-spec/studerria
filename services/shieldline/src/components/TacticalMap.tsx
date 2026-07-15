@@ -10,7 +10,7 @@ import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageState } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
-import { mapZoomInputProfile } from "../game/mapZoom";
+import { mapZoomInputProfile, wheelZoomDelta, type MapZoomInputProfile } from "../game/mapZoom";
 import { advanceVisualThreatProgress, classifyThreatRoute, predictedRouteEndpoint, type ThreatRouteVisual } from "../game/threatRouteVisuals";
 import { resolveReducedQuality } from "../platform/displayPreferences";
 import { useGameStore } from "../store/useGameStore";
@@ -433,6 +433,53 @@ function MapClickPlacement() {
   return null;
 }
 
+function SmoothWheelZoom({ profile }: { profile: MapZoomInputProfile }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    let targetZoom = map.getZoom();
+    let anchor = map.getSize().divideBy(2);
+    let frame = 0;
+
+    const renderZoom = () => {
+      const currentZoom = map.getZoom();
+      const distance = targetZoom - currentZoom;
+      if (Math.abs(distance) < 0.001) {
+        map.setZoomAround(anchor, targetZoom);
+        container.classList.remove("leaflet-stage--smooth-zooming");
+        frame = 0;
+        map.fire("moveend");
+        return;
+      }
+      map.setZoomAround(anchor, currentZoom + distance * profile.smoothing);
+      frame = window.requestAnimationFrame(renderZoom);
+    };
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!Number.isFinite(event.deltaY)) return;
+      event.preventDefault();
+      anchor = map.mouseEventToContainerPoint(event);
+      if (!frame) targetZoom = map.getZoom();
+      const delta = wheelZoomDelta(event.deltaY * (event.ctrlKey ? 2 : 1), event.deltaMode, profile, container.clientHeight);
+      targetZoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), targetZoom + delta));
+      if (!frame && Math.abs(targetZoom - map.getZoom()) >= 0.001) {
+        container.classList.add("leaflet-stage--smooth-zooming");
+        frame = window.requestAnimationFrame(renderZoom);
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+      container.classList.remove("leaflet-stage--smooth-zooming");
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [map, profile]);
+
+  return null;
+}
+
 function DesktopPlacementPreview() {
   const map = useMap();
   const placementKind = useGameStore((state) => state.placementKind);
@@ -539,6 +586,7 @@ function MapViewportTracker({
   });
 
   function scheduleViewportFrame() {
+    if (map.getContainer().classList.contains("leaflet-stage--smooth-zooming")) return;
     window.cancelAnimationFrame(frameRef.current);
     frameRef.current = window.requestAnimationFrame(() => {
       const next = createRenderBounds(map);
@@ -1090,14 +1138,12 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
         inertiaDeceleration={2400}
         easeLinearity={0.18}
         zoomSnap={0}
-        zoomDelta={zoomInput.zoomDelta}
-        wheelPxPerZoomLevel={zoomInput.wheelPxPerZoomLevel}
-        wheelDebounceTime={zoomInput.wheelDebounceTime}
         zoomAnimationThreshold={4}
         fadeAnimation={false}
         className="leaflet-stage"
-        scrollWheelZoom
+        scrollWheelZoom={false}
       >
+        <SmoothWheelZoom profile={zoomInput} />
         <MapViewportTracker onChange={setRenderBounds} />
         <ThreatLabelZoomMode />
         <MapClickPlacement />
