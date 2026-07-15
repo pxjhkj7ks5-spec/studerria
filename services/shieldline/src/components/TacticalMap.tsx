@@ -65,17 +65,32 @@ const carrierIconCache = new Map<string, L.DivIcon>();
 const threatIconCache = new Map<string, L.DivIcon>();
 
 function threatPosition(threat: LiveThreat) {
-  return {
-    lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * threat.progress,
-    lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * threat.progress,
-  };
+  return threatPositionAtProgress(threat, threat.progress);
 }
 
 function threatPositionAtProgress(threat: LiveThreat, progress: number) {
+  if (threat.routeWaypoints && threat.routeWaypoints.length > 1) {
+    const scaled = Math.min(1, Math.max(0, progress)) * (threat.routeWaypoints.length - 1);
+    const index = Math.min(threat.routeWaypoints.length - 2, Math.floor(scaled));
+    const ratio = scaled - index;
+    const from = threat.routeWaypoints[index];
+    const to = threat.routeWaypoints[index + 1];
+    return { lat: from.lat + (to.lat - from.lat) * ratio, lng: from.lng + (to.lng - from.lng) * ratio };
+  }
   return {
     lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * progress,
     lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * progress,
   };
+}
+
+function visibleThreatRoute(threat: LiveThreat, progress: number, visual: ThreatRouteVisual): [number, number][] {
+  const current = threatPositionAtProgress(threat, progress);
+  if (visual === "predicted" || !threat.routeWaypoints?.length) {
+    const endpoint = visual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
+    return [[current.lat, current.lng], [endpoint.lat, endpoint.lng]] as [number, number][];
+  }
+  const startIndex = Math.min(threat.routeWaypoints.length - 1, Math.floor(Math.min(1, Math.max(0, progress)) * (threat.routeWaypoints.length - 1)) + 1);
+  return [[current.lat, current.lng] as [number, number], ...threat.routeWaypoints.slice(startIndex).map((point) => [point.lat, point.lng] as [number, number])];
 }
 
 function engagementPosition(event: EngagementEvent, progress = event.progress) {
@@ -752,8 +767,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
           const current = threatPositionAtProgress(threat, pooled.visualProgress);
           pooled.marker.setLatLng([current.lat, current.lng]);
           if (pooled.route) {
-            const endpoint = pooled.routeVisual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
-            pooled.route.setLatLngs([[current.lat, current.lng], [endpoint.lat, endpoint.lng]]);
+            pooled.route.setLatLngs(visibleThreatRoute(threat, pooled.visualProgress, pooled.routeVisual));
           }
         }
         for (const event of latest.engagements) {
@@ -811,7 +825,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
       let pooled = threatPoolRef.current.get(threat.id);
       const visualProgress = advanceVisualThreatProgress(pooled?.visualProgress ?? threat.progress, threat.progress, threat.speed, 0);
       const current = threatPositionAtProgress(threat, visualProgress);
-      const routeEndpoint = routeVisual === "predicted" ? predictedRouteEndpoint(current, threat.target) : threat.target;
+      const routePositions = visibleThreatRoute(threat, visualProgress, routeVisual);
       const iconKey = threatMarkerIconKey(threat);
       const previousRouteVisual = pooled?.routeVisual;
       if (!pooled) {
@@ -834,7 +848,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
       }
       pooled.routeVisual = routeVisual;
       if (routeVisual !== "hidden" && !pooled.route) {
-        pooled.route = L.polyline([[current.lat, current.lng], [routeEndpoint.lat, routeEndpoint.lng]], {
+        pooled.route = L.polyline(routePositions, {
           color: routeVisual === "predicted" ? "#d8d3c7" : threatRouteColor(tone),
           weight: routeVisual === "predicted" ? 1.5 : mapMode === "threats" ? 3 : 2,
           opacity: routeVisual === "predicted" ? 0.48 : mapMode === "coverage" ? 0.44 : 0.78,
@@ -845,7 +859,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
         pooled.route.remove();
         pooled.route = null;
       } else if (pooled.route) {
-        pooled.route.setLatLngs([[current.lat, current.lng], [routeEndpoint.lat, routeEndpoint.lng]]);
+        pooled.route.setLatLngs(routePositions);
         pooled.route.setStyle({
           color: routeVisual === "predicted" ? "#d8d3c7" : threatRouteColor(tone),
           weight: routeVisual === "predicted" ? 1.5 : mapMode === "threats" ? 3 : 2,
@@ -1280,6 +1294,7 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
                   <strong>{unit.name}</strong>
                   <small>Зона дії {unit.primaryRangeKm}/{unit.outerRangeKm} км</small>
                   <small>Готовність {Math.round(battery.readiness)}% · {battery.status}</small>
+                  <small>Стан {Math.round(battery.health)}% · досвід L{battery.experienceLevel}</small>
                   <small>БК {ammo} · перезаряджання {reload}</small>
                   <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Перемістити на склад</button>
                 </div>;

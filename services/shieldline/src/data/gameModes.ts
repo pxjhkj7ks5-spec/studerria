@@ -15,8 +15,8 @@ export interface GameModeDefinition {
 
 export const gameModes: GameModeDefinition[] = [
   {
-    id: "campaign", eyebrow: "Core operation", title: "Campaign", duration: "30-120 min", difficulty: "Adaptive", resources: "Ammo · morale · reserves",
-    description: "A sequence of night operations. Each mission preserves the city state and sharpens the next decision.", mainRisk: "Cascading pressure across sectors", victory: "Protect critical city systems through the operation", availability: "available",
+    id: "campaign", eyebrow: "5 persistent missions", title: "Campaign", duration: "15-60 min", difficulty: "Escalating", resources: "Wallet · ammo · resilience",
+    description: "Five authored operations. Positions, ammunition, damage, experience and the campaign wallet persist between missions.", mainRisk: "Decoy, Shahed, cruise and ballistic salvos", victory: "Carry a viable layered defense through Mass Night", availability: "available",
   },
   {
     id: "rapid-response", eyebrow: "Manual operation", title: "Rapid Response", duration: "15-30 min", difficulty: "Standard", resources: "Ready assets · reserve",

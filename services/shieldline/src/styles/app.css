@@ -4605,3 +4605,23 @@ body,
 @media (prefers-reduced-motion: reduce) {
   .environment-overlay b { animation: none !important; }
 }
+.campaign-service-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.campaign-service-actions button {
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--accent, #f6c547) 42%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #10151c) 86%, transparent);
+  color: inherit;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.aar-section--campaign {
+  border-color: color-mix(in srgb, #f6c547 38%, transparent);
+  background: color-mix(in srgb, #f6c547 7%, transparent);
+}

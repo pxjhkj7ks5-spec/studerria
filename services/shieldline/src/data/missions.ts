@@ -1,14 +1,44 @@
-import type { MissionDefinition } from "../domain/contracts";
-import { CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS } from "../game/launchSystem.mjs";
+import type { MissionDefinition, SectorId } from "../domain/contracts";
+import { campaignMissionsPlan } from "./campaignPlan";
 
-export const campaignMissions: MissionDefinition[] = [
-  {
-    id: "campaign-night-01", modeId: "campaign", title: "Random Threat Night", subtitle: "Campaign · Single mission", durationMinutes: 10, difficulty: "standard",
-    resources: { budget: 120, ammo: 82, morale: 76, energy: 78 }, mainRisk: "Unpredictable mixed launches", victoryCondition: "Contain the randomly generated air attack.",
-    briefing: "Every operation generates a new mix of launch points, airborne threats and defended directions.",
-    launchSectorIds: [...CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS],
-    randomWaveCount: 8,
-    pacingProfile: "guided-three-stage",
-    waves: [],
-  },
-];
+function originSector(routeId: string): SectorId {
+  if (["R10", "R11", "R13", "R14", "R23", "R27", "R30"].includes(routeId)) return "south";
+  if (["R03", "R18", "R19"].includes(routeId)) return "west";
+  if (["R01", "R02", "R06", "R17", "R22", "R29"].includes(routeId)) return "north";
+  return "east";
+}
+
+export const campaignMissions: MissionDefinition[] = campaignMissionsPlan.map((mission) => ({
+  id: mission.id,
+  modeId: "campaign",
+  title: mission.title,
+  subtitle: `Кампанія · Місія ${mission.index} з 5`,
+  durationMinutes: mission.durationMinutes,
+  difficulty: mission.index === 1 ? "guided" : mission.index < 4 ? "standard" : mission.index === 4 ? "hard" : "expert",
+  resources: { budget: mission.grant, ammo: 0, morale: 100, energy: 100 },
+  grant: mission.grant,
+  rewardCap: mission.rewardCap,
+  focusRegion: mission.focusRegion,
+  expectedThreatClasses: mission.expectedThreatClasses,
+  broadAzimuth: mission.broadAzimuth,
+  mainRisk: mission.expectedThreatClasses.join(" + "),
+  victoryCondition: mission.objective,
+  briefing: `${mission.focusRegion}. ${mission.objective}`,
+  waves: mission.waves.map((wave, waveIndex) => ({
+    id: `${mission.id}-wave-${String(waveIndex + 1).padStart(2, "0")}`,
+    index: waveIndex + 1,
+    threatKind: wave.threatKind,
+    originSector: originSector(wave.routeIds[0]),
+    targetSector: "hq",
+    etaSeconds: wave.timeSeconds,
+    size: wave.count,
+    difficulty: 30 + mission.index * 8,
+    routeIds: wave.routeIds,
+    groupSize: wave.groupSize,
+    mergeBehavior: wave.mergeBehavior,
+    targetRegion: wave.targetRegion,
+    diversionRatio: wave.diversionRatio,
+    spawnSpreadSec: wave.spawnSpreadSec,
+    priority: wave.priority,
+  })),
+}));

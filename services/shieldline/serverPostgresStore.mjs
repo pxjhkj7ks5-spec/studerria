@@ -6,7 +6,11 @@ import { calculateDefenseBonus, stableHash } from "./src/game/simulationCore.mjs
 
 const { Pool } = pg;
 const CAMPAIGN_MISSIONS = [
-  { id: "campaign-night-01", title: "Random Threat Night" },
+  { id: "first-contact", title: "Перший контакт" },
+  { id: "southern-corridor", title: "Південний коридор" },
+  { id: "eastern-arc", title: "Східна дуга" },
+  { id: "saturation", title: "Насичення" },
+  { id: "mass-night", title: "Масована ніч" },
 ];
 
 export const SHIELDLINE_SCHEMA_SQL = `
@@ -228,13 +232,13 @@ function defaultProgress() {
 
 function progressView(progress) {
   return {
-    currentMissionId: CAMPAIGN_MISSIONS[0].id,
-    completedMissionIds: [],
+    currentMissionId: progress.currentMissionId,
+    completedMissionIds: progress.completedMissionIds,
     lastRunId: progress.lastRunId,
     missions: CAMPAIGN_MISSIONS.map((mission, index) => ({
       ...mission,
       index: index + 1,
-      status: "active",
+      status: progress.completedMissionIds.includes(mission.id) ? "completed" : mission.id === progress.currentMissionId ? "active" : "locked",
     })),
   };
 }
@@ -310,8 +314,9 @@ async function persistCampaignRun(pool, redis, run, { actorId, source, plan }) {
           lastRunId: existing.rows[0].last_run_id,
           revision: existing.rows[0].revision,
         } : defaultProgress();
-        progress.currentMissionId = CAMPAIGN_MISSIONS[0].id;
-        progress.completedMissionIds = [];
+        const missionIndex = CAMPAIGN_MISSIONS.findIndex((mission) => mission.id === run.missionId);
+        progress.completedMissionIds = [...new Set([...(progress.completedMissionIds || []), run.missionId])];
+        progress.currentMissionId = CAMPAIGN_MISSIONS[Math.min(CAMPAIGN_MISSIONS.length - 1, missionIndex + 1)].id;
         progress.lastRunId = run.id;
         await client.query(
           `INSERT INTO shieldline_campaigns (actor_id, current_mission_id, completed_mission_ids, last_run_id, revision)

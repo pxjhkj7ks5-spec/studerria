@@ -81,7 +81,7 @@ async function applyImport(store, checksum, source) {
         `INSERT INTO shieldline_runs (id, actor_id, mission_id, source, seed, sim_version, status, result, revision, started_at, completed_at, plan, summary, run_document, import_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15)
          ON CONFLICT (id) DO NOTHING`,
-        [run.id, actorId, run.missionId || "campaign-night-01", run.metadata?.source || "campaign", run.seed || run.id, run.simVersion || "legacy", run.status || "completed", run.result || "contained", run.revision || 1, run.startedAt || new Date(0).toISOString(), run.completedAt || run.startedAt || new Date(0).toISOString(), JSON.stringify(run.metadata?.plan || {}), JSON.stringify({ interceptions: run.interceptions || 0, impacts: run.impacts || 0, ammoSpent: run.ammoSpent || 0, sectorSummary: run.sectorSummary || {} }), JSON.stringify(run), importId],
+        [run.id, actorId, run.missionId || "first-contact", run.metadata?.source || "campaign", run.seed || run.id, run.simVersion || "legacy", run.status || "completed", run.result || "contained", run.revision || 1, run.startedAt || new Date(0).toISOString(), run.completedAt || run.startedAt || new Date(0).toISOString(), JSON.stringify(run.metadata?.plan || {}), JSON.stringify({ interceptions: run.interceptions || 0, impacts: run.impacts || 0, ammoSpent: run.ammoSpent || 0, sectorSummary: run.sectorSummary || {} }), JSON.stringify(run), importId],
       );
       for (const event of run.events || []) {
         await client.query(

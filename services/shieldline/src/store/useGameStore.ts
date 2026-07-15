@@ -8,6 +8,7 @@ import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBat
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
+import { advanceCampaignMission as advanceCampaignMissionState, applyCampaignMissionOpening, createCampaignState, serviceCampaignBattery } from "../game/campaignMeta";
 import type { CampaignAttackSchedule, CampaignMode, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
 
@@ -123,16 +124,27 @@ export function normalizePersistedGame(game: GameState | null) {
       origin: { ...threat.origin },
       target: { ...threat.target },
       lastKnownPosition: validCoordinates(threat.lastKnownPosition) ? { ...threat.lastKnownPosition } : undefined,
+      routeWaypoints: Array.isArray(threat.routeWaypoints) ? threat.routeWaypoints.filter(validCoordinates).map((point) => ({ ...point })) : undefined,
     }));
+  const normalizeBattery = (battery: GameState["batteries"][number]) => ({
+    ...battery,
+    position: { ...battery.position },
+    health: Number.isFinite(battery.health) ? battery.health : battery.readiness,
+    experienceLevel: Number.isFinite(battery.experienceLevel) ? battery.experienceLevel : 0,
+    createdAtMission: Number.isFinite(battery.createdAtMission) ? battery.createdAtMission : 0,
+    lastMovedMission: Number.isFinite(battery.lastMovedMission) ? battery.lastMovedMission : 0,
+  });
   return {
     ...game,
     campaignAttackSchedule: normalizeCampaignSchedule(game),
     launchSectors,
     pendingLaunches,
     carriers: Array.isArray(game.carriers) ? game.carriers : [],
-    storedBatteries: (Array.isArray(game.storedBatteries) ? game.storedBatteries : []).map((battery) => ({ ...battery, position: { ...battery.position } })),
+    batteries: (Array.isArray(game.batteries) ? game.batteries : []).map(normalizeBattery),
+    storedBatteries: (Array.isArray(game.storedBatteries) ? game.storedBatteries : []).map(normalizeBattery),
     liveThreats,
     engagementEvents,
+    campaign: game.campaign || null,
   };
 }
 
@@ -176,6 +188,8 @@ interface GameStore {
   triggerNextWave: () => void;
   advanceOperation: (deltaMs: number) => void;
   resetCampaign: () => void;
+  advanceCampaignMission: () => void;
+  serviceCampaignBattery: (batteryId: string, action: "repair" | "resupply", portion?: .5 | 1) => void;
 }
 
 const initialSeed = createSimulationSeed("legacy");
@@ -218,6 +232,11 @@ export const useGameStore = create<GameStore>()(
           training: { campaignMode: "training" as const, scenarioId: "first-night" },
         }[mode];
         const seeded = createSeededScenario(seed, profile.campaignMode, profile.scenarioId);
+        if (mode === "campaign") {
+          seeded.game.campaign = createCampaignState();
+          seeded.game.resources.budget = 0;
+          applyCampaignMissionOpening(seeded.game);
+        }
         set({
           campaignMode: profile.campaignMode,
           activeGameMode: mode,
@@ -350,12 +369,24 @@ export const useGameStore = create<GameStore>()(
         const mode = get().activeGameMode || "training";
         const seed = createSimulationSeed(mode);
         const seeded = createSeededScenario(seed, get().campaignMode || "crisis", get().game.scenarioId);
+        if (mode === "campaign") {
+          seeded.game.campaign = createCampaignState();
+          seeded.game.resources.budget = 0;
+          applyCampaignMissionOpening(seeded.game);
+        }
         set({ game: seeded.game, dailyCityGame: mode === "daily-defense" ? seeded.game : get().dailyCityGame, placementKind: null, placementStoredBatteryId: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: getGameModeRuntimePolicy(mode).defaultSpeed, simulationSeed: seed, simulationRandomCursor: seeded.cursor });
       },
+      advanceCampaignMission: () => set((state) => {
+        if (state.activeGameMode !== "campaign") return state;
+        const game = advanceCampaignMissionState(structuredClone(state.game));
+        const readiness = defenseReadinessForMode("campaign", game.batteries.map((battery) => battery.kind));
+        return { ...state, game, operationPhase: readiness.ready ? "countdown" : "planning", countdownRemainingMs: readiness.ready ? getGameModeRuntimePolicy("campaign").countdownMs : 0, placementKind: null, placementStoredBatteryId: null };
+      }),
+      serviceCampaignBattery: (batteryId, action, portion = .5) => set((state) => ({ ...state, game: serviceCampaignBattery(structuredClone(state.game), batteryId, action, portion) })),
     }),
     {
       name: "shieldline-live-v7",
-      version: 18,
+      version: 19,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         const migratedGame = normalizePersistedGame(state.game || null);

@@ -105,7 +105,7 @@ test("combat modes auto-start only after radar and kinetic air defense are deplo
   useGameStore.getState().beginPlacement("radar");
   useGameStore.getState().placeSelectedBattery({ lat: 49.2, lng: 29.4 });
   assert.equal(useGameStore.getState().operationPhase, "planning");
-  useGameStore.getState().beginPlacement("buk");
+  useGameStore.getState().beginPlacement("mvg");
   useGameStore.getState().placeSelectedBattery({ lat: 49.1, lng: 29.7 });
   assert.equal(useGameStore.getState().operationPhase, "countdown");
   assert.equal(useGameStore.getState().countdownRemainingMs, 5_000);

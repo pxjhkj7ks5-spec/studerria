@@ -337,7 +337,7 @@ async function handleGameApi(req, res, pathname) {
       if (production && actorId.startsWith("guest-") && (modeId === "ranked-challenge" || modeId === "co-op-command")) throw Object.assign(new Error("Telegram authorization is required for competitive modes."), { statusCode: 401 });
       const seed = String(body.seed || `${modeId}-${dayKey()}-${actorId}`).replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
       const source = modeId === "ranked-challenge" ? "ranked" : modeId === "co-op-command" ? "co-op" : modeId === "campaign" ? "campaign" : "command";
-      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan, String(body.missionId || "campaign-night-01"), source);
+      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan, String(body.missionId || "first-contact"), source);
       sendJson(res, 201, { runId: run.id, revision: run.revision || 1, status: run.status || "completed", seed: run.seed, simVersion: run.simVersion || "1.0.0", run });
       return;
     }
@@ -438,7 +438,7 @@ async function handleGameApi(req, res, pathname) {
       const body = await readRequestJson(req);
       const actorId = await gameActor(req, res);
       const seed = String(body.seed || `${dayKey()}-${actorId}`).replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
-      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan, String(body.missionId || "campaign-night-01"), String(body.source || "campaign"));
+      const run = await gameStore.runMission(seed || dayKey(), actorId, body.plan, String(body.missionId || "first-contact"), String(body.source || "campaign"));
       sendJson(res, 201, run);
       return;
     }

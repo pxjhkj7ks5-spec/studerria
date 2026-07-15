@@ -1,4 +1,4 @@
-import { ArrowLeft, ClipboardList, LogOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, ClipboardList, LogOut } from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
@@ -12,9 +12,10 @@ interface AfterActionReportProps {
   variant?: "panel" | "fullscreen";
   onInspectMap?: () => void;
   onExit?: () => void;
+  onContinueCampaign?: () => void;
 }
 
-export function AfterActionReport({ game, rankedResult, authoritativeRun, variant = "panel", onInspectMap, onExit }: AfterActionReportProps) {
+export function AfterActionReport({ game, rankedResult, authoritativeRun, variant = "panel", onInspectMap, onExit, onContinueCampaign }: AfterActionReportProps) {
   const report = game.afterActionReports[0];
   const reportRef = useRef<HTMLElement | null>(null);
   const outcomeTitle = authoritativeRun
@@ -27,6 +28,7 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
       : game.liveThreats.length > 6
         ? "Expand detection coverage."
       : "Maintain layered coverage.";
+  const campaignResult = game.campaign?.previousMissionResults.at(-1);
 
   useEffect(() => {
     if (variant !== "fullscreen") return undefined;
@@ -81,6 +83,7 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
             <span>Morale {signed(report.resourceChanges.morale)} · Political {signed(report.resourceChanges.political)}</span>
           </div>
           <p>{report.recommendation}</p>
+          {campaignResult ? <div className="aar-section aar-section--campaign"><strong>Економіка місії · гаманець {campaignResult.walletAfterMission} млн ₴</strong>{campaignResult.rewardLines.map((line) => <span key={`${line.kind}-${line.label}`}>{line.label}: {line.amount > 0 ? "+" : ""}{line.amount} млн</span>)}<span>Стійкість цивільних: {campaignResult.civilianResilienceAfterMission}% · збито {campaignResult.interceptions}/{campaignResult.totalTargets} · влучань {campaignResult.impacts}</span><span>Безкоштовно відновлено 25% комплекту БК; решта поповнення, ремонт і передислокація оплачуються окремо.</span></div> : null}
           {rankedResult ? <div className="aar-section aar-section--ranked"><strong>Ranked result</strong><span>#{rankedResult.entry.rank} · {rankedResult.entry.score} score · {rankedResult.challenge.title}</span></div> : null}
         </>
       ) : (
@@ -117,6 +120,7 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
       {variant === "fullscreen" ? (
         <footer className="aar-actions">
           <button type="button" onClick={onInspectMap}><ArrowLeft size={17} /> Оглянути мапу</button>
+          {game.campaign?.intermission && !game.campaign.completed && onContinueCampaign ? <button type="button" onClick={onContinueCampaign}><ArrowRight size={17} /> До місії {game.campaign.missionIndex + 1}</button> : null}
           <button type="button" onClick={onExit}><LogOut size={17} /> До вибору режимів</button>
         </footer>
       ) : null}

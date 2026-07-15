@@ -18,6 +18,7 @@ import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
 import { campaignMissions } from "./data/missions";
+import { campaignTutorialSteps, getCampaignMission } from "./data/campaignPlan";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice, selectBattleNotice } from "./game/battleNotices";
@@ -143,6 +144,7 @@ export default function App() {
   const setMapMode = useGameStore((state) => state.setMapMode);
   const dismissTutorial = useGameStore((state) => state.dismissTutorial);
   const resetCampaign = useGameStore((state) => state.resetCampaign);
+  const advanceCampaignMission = useGameStore((state) => state.advanceCampaignMission);
   const advanceOperation = useGameStore((state) => state.advanceOperation);
   const placementKind = useGameStore((state) => state.placementKind);
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
@@ -176,8 +178,12 @@ export default function App() {
     if (typeof window === "undefined" || tacticalMode !== "co-op-command") return null;
     try { return JSON.parse(window.sessionStorage.getItem("shieldline-coop-session") || "null") as { roomId: string; sectorId: string } | null; } catch { return null; }
   })();
-  const activeMission = campaignMissions[0];
-  const activeMissionTitle = t("mission.1");
+  const activeMission = campaignMissions[(game.campaign?.missionIndex || 1) - 1] || campaignMissions[0];
+  const activeMissionTitle = game.campaign ? getCampaignMission(game.campaign.missionIndex).title : t("mission.1");
+  const campaignTutorialIndex = game.campaign?.missionIndex === 1
+    ? Math.max(game.campaign.tutorialStep, game.batteries.some((battery) => battery.kind === "radar") ? 1 : 0, game.batteries.some((battery) => !["radar", "ew"].includes(battery.kind)) ? 2 : 0)
+    : 0;
+  const campaignTutorial = game.campaign?.missionIndex === 1 && operationPhase === "running" ? campaignTutorialSteps[campaignTutorialIndex] : null;
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
     url.search = "";
@@ -415,7 +421,7 @@ export default function App() {
         <MapLegend mode={mapMode} game={game} />
       </section>
 
-      {battleNotice || placementUnit || setupGuidance ? (
+      {battleNotice || placementUnit || setupGuidance || campaignTutorial ? (
         <div
           className={`map-feedback-slot ${battleNotice ? `map-feedback-slot--${battleNotice.eventType}` : placementUnit ? "map-feedback-slot--placement" : "map-feedback-slot--guidance"}`}
           role="status"
@@ -437,7 +443,7 @@ export default function App() {
               {setupGuidance.kind === "radar" ? <Radio size={17} /> : <Shield size={17} />}
               <strong>{setupGuidance.text}</strong>
             </>
-          ) : null}
+          ) : campaignTutorial ? <><BookOpen size={17} /><div><strong>{campaignTutorial.title}</strong><span>{campaignTutorial.body}</span></div></> : null}
         </div>
       ) : null}
 
@@ -547,6 +553,7 @@ export default function App() {
             variant="fullscreen"
             onInspectMap={inspectCompletedMap}
             onExit={returnToCommandModes}
+            onContinueCampaign={() => { advanceCampaignMission(); setFullscreenReportOpen(false); setActivePanel("units"); }}
           />
         </div>
       ) : null}

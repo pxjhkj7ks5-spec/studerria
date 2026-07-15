@@ -7,7 +7,7 @@ const en = {
   "catalog.lead": "Place real defenses, follow live launches, and hold the city through one operation.",
   "catalog.open": "Open Campaign",
   "catalog.campaign": "Campaign", "catalog.campaignDesc": "A sequence of night operations where each result carries into the next mission.", "catalog.resources": "Resources", "catalog.risk": "Main risk", "catalog.victory": "Victory",
-  "mission.1": "Random Threat Night",
+  "mission.1": "Перший контакт",
   "catalog.paused": "Training, Sandbox, Ranked, Co-op, Rapid Response and Daily Defense are paused while Campaign reaches production quality.",
   "panel.layers": "Layers", "panel.units": "Defense units", "panel.planning": "Planning", "panel.intel": "Live intelligence", "panel.report": "After-action", "panel.settings": "Settings",
   "layer.live": "Live", "layer.threats": "Threats", "layer.coverage": "Coverage", "layer.logistics": "Logistics",

@@ -24,7 +24,7 @@ function threatLevel(pressure: number) {
 export function MapLegend({ mode, game, embedded = false }: MapLegendProps) {
   const activeContacts = game.liveThreats.filter((threat) => threat.revealed && (threat.status === "inbound" || threat.status === "engaged")).length;
   const confirmedTargets = game.liveThreats.filter((threat) => threat.revealed && threat.confidence >= 58 && (threat.status === "inbound" || threat.status === "engaged")).length;
-  const safety = game.cities.length ? Math.round(game.cities.reduce((sum, city) => sum + city.morale, 0) / game.cities.length) : 0;
+  const safety = game.campaign?.civilianResilience ?? (game.cities.length ? Math.round(game.cities.reduce((sum, city) => sum + city.morale, 0) / game.cities.length) : 0);
   const level = threatLevel(game.wavePressure);
 
   return (

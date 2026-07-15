@@ -82,6 +82,13 @@ export interface ThreatWave {
   size: number;
   difficulty: number;
   launchDirection?: LaunchDirection;
+  routeIds?: string[];
+  groupSize?: number;
+  mergeBehavior?: string;
+  targetRegion?: string;
+  diversionRatio?: number;
+  spawnSpreadSec?: number;
+  priority?: "low" | "medium" | "high" | "veryHigh" | "critical";
 }
 
 export interface MissionDefinition {
@@ -98,6 +105,11 @@ export interface MissionDefinition {
   launchSectorIds?: string[];
   randomWaveCount?: number;
   pacingProfile?: "guided-three-stage";
+  grant?: number;
+  rewardCap?: number;
+  focusRegion?: string;
+  expectedThreatClasses?: string[];
+  broadAzimuth?: string;
   waves: ThreatWave[];
 }
 

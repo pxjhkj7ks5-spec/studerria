@@ -68,6 +68,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
   const placementKind = useGameStore((state) => state.placementKind);
   const beginPlacement = useGameStore((state) => state.beginPlacement);
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
+  const serviceBattery = useGameStore((state) => state.serviceCampaignBattery);
   const active = game.status === "active";
   const scenario = getScenario(game.scenarioId);
   const storedBatteries = game.storedBatteries || [];
@@ -90,7 +91,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
       </div>
       <div className="unit-list">
         {unitDefinitions.map((unit) => {
-          const allowed = scenario.allowedUnits.includes(unit.kind);
+          const allowed = scenario.allowedUnits.includes(unit.kind) && (!game.campaign || game.campaign.unlockedSystems.includes(unit.kind));
           const storedUnits = storedBatteries.filter((item) => item.kind === unit.kind);
           const storedBattery = storedUnits[0];
           const affordable = storedUnits.length > 0 || game.resources.budget >= unit.cost;
@@ -169,7 +170,9 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                   )}
                   <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
                   <span>Готовність {Math.round(readiness)}% · втома {Math.round(fatigue)}% ({fatigueLabel(fatigue)})</span>
+                  {referenceBattery ? <span>Стан {Math.round(referenceBattery.health)}% · досвід L{referenceBattery.experienceLevel}</span> : null}
                   <span>{storedBattery ? "На складі" : localBattery?.supplyStatus || "Не розміщена"}</span>
+                  {game.campaign?.intermission && referenceBattery ? <div className="campaign-service-actions"><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "resupply", .5); }}>+50% БК</button><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "repair", 1); }}>Ремонт</button></div> : null}
                 </div>
               </div>
               <div className={`fatigue-track fatigue-track--${fatigue > 70 ? "danger" : fatigue > 45 ? "warning" : "stable"}`} aria-label={`Втома ${unit.name}`}>

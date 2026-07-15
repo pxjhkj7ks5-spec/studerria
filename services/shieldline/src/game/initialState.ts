@@ -105,6 +105,7 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
     log: openingLog,
     forecast: createForecast(1, random),
     placementWarning: null,
+    campaign: null,
   };
   state.logistics = buildLogisticsState(state);
   return state;

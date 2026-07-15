@@ -195,6 +195,10 @@ export interface DefenseBattery {
   reloadRemainingMs: number;
   currentAmmo: number | "infinite";
   assignedCityId: CityId;
+  health: number;
+  experienceLevel: number;
+  createdAtMission: number;
+  lastMovedMission: number;
 }
 
 export interface LaunchSector {
@@ -283,6 +287,63 @@ export interface LiveThreat {
   trackQuality: number;
   reward: number;
   carrierId?: string;
+  routeId?: string;
+  routeWaypoints?: Coordinates[];
+  campaignPriority?: "low" | "medium" | "high" | "veryHigh" | "critical";
+  campaignGroupId?: string;
+}
+
+export interface CampaignSpawnEvent {
+  id: string;
+  dueMs: number;
+  threatKind: ThreatKind;
+  routeId: string;
+  groupId: string;
+  mergeBehavior: string;
+  priority: "low" | "medium" | "high" | "veryHigh" | "critical";
+  targetRegion: string;
+  mergeRouteId?: string;
+  rallyRatio?: number;
+}
+
+export interface CampaignRewardLine {
+  label: string;
+  amount: number;
+  kind: "grant" | "kill" | "bonus" | "penalty" | "cost";
+}
+
+export interface CampaignMissionResult {
+  missionIndex: number;
+  missionId: string;
+  title: string;
+  totalTargets: number;
+  interceptions: number;
+  impacts: number;
+  killReward: number;
+  bonusRewards: number;
+  penaltyCosts: number;
+  walletAfterMission: number;
+  civilianResilienceAfterMission: number;
+  rewardLines: CampaignRewardLine[];
+}
+
+export interface CampaignState {
+  missionIndex: number;
+  campaignWallet: number;
+  civilianResilience: number;
+  unlockedSystems: UnitKind[];
+  previousMissionResults: CampaignMissionResult[];
+  spawnEvents: CampaignSpawnEvent[];
+  spawnCursor: number;
+  missionKillReward: number;
+  missionKillsByKind: Partial<Record<ThreatKind, number>>;
+  missionInterceptionsAtStart: number;
+  missionImpactsAtStart: number;
+  missionGrant: number;
+  missionGrantApplied: boolean;
+  intermission: boolean;
+  completed: boolean;
+  tutorialStep: number;
 }
 
 export type EngagementResult = "success" | "miss" | "detected";
@@ -506,4 +567,5 @@ export interface GameState {
   log: IntelEntry[];
   forecast: DailyForecast;
   placementWarning: string | null;
+  campaign: CampaignState | null;
 }

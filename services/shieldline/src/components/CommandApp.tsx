@@ -50,6 +50,11 @@ export function CommandApp() {
       void apiGameRepository.getCoOpRoom("kyiv-01").then((nextRoom) => { setRoom(nextRoom); setScreen("coop"); });
       return;
     }
+    if (id === "campaign") {
+      setSelectedMode(id);
+      setScreen("briefing");
+      return;
+    }
     if (id !== "daily-defense") {
       openManualCommand(id);
       return;
@@ -162,8 +167,8 @@ function Briefing({ modeId, onBack, onStart, isRunning }: { modeId: GameModeId; 
       <span className="hero-chip"><Waves size={14} /> {mission.subtitle}</span>
       <h1>{modeId === "campaign" ? mission.title : mode.title}</h1>
       <p className="briefing-lead">{modeId === "campaign" ? mission.briefing : mode.description}</p>
-      <section className="briefing-facts"><Fact label="Duration" value={`${mission.durationMinutes} min`} /><Fact label="Difficulty" value={mission.difficulty} /><Fact label="Main risk" value={mission.mainRisk} /><Fact label="Win condition" value={mission.victoryCondition} /></section>
-      <section className="reserve-bar"><span>Reserve</span><b>Ammo {mission.resources.ammo}</b><b>Morale {mission.resources.morale}%</b><b>Energy {mission.resources.energy}%</b></section>
+      <section className="briefing-facts"><Fact label="Тривалість" value={`${mission.durationMinutes} хв`} /><Fact label="Основний театр" value={mission.focusRegion || mission.mainRisk} /><Fact label="Очікувані загрози" value={mission.expectedThreatClasses?.join(" · ") || mission.mainRisk} /><Fact label="Широкий азимут" value={mission.broadAzimuth || "невизначений"} /><Fact label="Завдання" value={mission.victoryCondition} /></section>
+      <section className="reserve-bar"><span>Кампанійний резерв</span><b>Грант {mission.grant || mission.resources.budget} млн ₴</b><b>Reward cap {mission.rewardCap || 0} млн ₴</b><b>Стійкість 100%</b></section>
       <button className="primary-command" type="button" onClick={onStart} disabled={isRunning}><Play size={19} />{isRunning ? "Synchronizing command…" : modeId === "daily-defense" ? "Open daily report" : "Open manual command board"}</button>
       <small className="briefing-note">All primary modes start with your manual placement and planning. Only Daily Defense resolves its prepared city automatically once per day.</small>
     </section>

@@ -3,19 +3,18 @@ import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { SIM_VERSION, calculateDefenseBonus, simulateOperation, stableHash } from "./src/game/simulationCore.mjs";
-import { CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS } from "./src/game/launchSystem.mjs";
 
 const DEFAULT_STORE = { version: 4, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {}, users: {}, devices: {}, identities: {}, transferCodes: {} };
 const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
+const campaignDifficulty = { "first-contact": 38, "southern-corridor": 46, "eastern-arc": 54, saturation: 62, "mass-night": 70 };
+const campaignWave = (missionId, index, threatKind, size, etaSeconds) => ({ id: `${missionId}-wave-${String(index + 1).padStart(2, "0")}`, index: index + 1, threatKind, originSector: "east", targetSector: "hq", etaSeconds, size, difficulty: campaignDifficulty[missionId] || 38 });
+const campaignMission = (id, title, durationMinutes, grant, rewardCap, specs) => ({ id, title, durationMinutes, grant, rewardCap, waves: specs.map((spec, index) => campaignWave(id, index, ...spec)) });
 const missions = [
-  {
-    id: "campaign-night-01",
-    title: "Random Threat Night",
-    launchSectorIds: CAMPAIGN_RANDOM_LAUNCH_SECTOR_IDS,
-    randomWaveCount: 8,
-    pacingProfile: "guided-three-stage",
-    waves: [],
-  },
+  campaignMission("first-contact", "Перший контакт", 15, 38, 18, [["parodiya",2,45],["gerbera",3,180],["geran2",2,390],["parodiya",2,570],["gerbera",2,600],["geran2",3,780],["gerbera",2,860]]),
+  campaignMission("southern-corridor", "Південний коридор", 35, 32, 35, [["gerbera",4,120],["parodiya",5,360],["geran2",4,660],["gerbera",3,930],["geran2",6,960],["parodiya",3,1290],["kalibr",1,1380],["geran2",8,1680],["gerbera",2,1950],["geran2",5,1980]]),
+  campaignMission("eastern-arc", "Східна дуга", 45, 48, 55, [["parodiya",6,180],["geran2",6,480],["gerbera",4,810],["geran2",4,840],["kalibr",1,1200],["parodiya",4,1470],["geran2",10,1500],["kh101",2,1860],["gerbera",3,2190],["geran2",10,2220],["geran2",8,2520]]),
+  campaignMission("saturation", "Насичення", 50, 70, 80, [["parodiya",8,120],["geran2",6,420],["gerbera",5,690],["geran2",5,720],["iskander",1,1080],["geran2",12,1320],["kh101",2,1710],["geran2",6,1740],["geran2",15,2100],["parodiya",10,2490],["geran2",6,2520],["iskander",1,2820],["kalibr",1,2840]]),
+  campaignMission("mass-night", "Масована ніч", 60, 100, 120, [["parodiya",10,180],["geran2",8,480],["geran2",10,780],["kh101",2,1080],["geran2",12,1320],["gerbera",6,1650],["geran2",8,1680],["iskander",1,2040],["geran2",12,2280],["kh101",3,2640],["geran2",15,3000],["iskander",1,3360],["kh101",2,3360],["parodiya",5,3380],["geran2",8,3400]]),
 ];
 
 function missionById(missionId) {
@@ -228,8 +227,9 @@ export async function createGameStore(file) {
       if (source === "campaign") {
         const store = await readStore();
         const current = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
-        current.currentMissionId = missions[0].id;
-        current.completedMissionIds = [];
+        const missionIndex = missions.findIndex((entry) => entry.id === mission.id);
+        current.completedMissionIds = [...new Set([...(current.completedMissionIds || []), mission.id])];
+        current.currentMissionId = missions[Math.min(missions.length - 1, missionIndex + 1)].id;
         current.lastRunId = run.id;
         store.campaigns[actorId] = current;
         store.events.push(event(`campaign-${actorId}`, store.events.length + 1, "mission.completed", Date.now(), `${actorId} resolved ${mission.id}.`, { payload: { runId: run.id, result: run.result } }));
@@ -312,7 +312,7 @@ export async function createGameStore(file) {
     async campaignState(actorId = "web-commander") {
       const store = await readStore();
       const progress = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
-      return { ...progress, currentMissionId: missions[0].id, completedMissionIds: [], missions: missions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: "active" })) };
+      return { ...progress, missions: missions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: progress.completedMissionIds.includes(entry.id) ? "completed" : entry.id === progress.currentMissionId ? "active" : "locked" })) };
     },
     async leaderboard() {
       const store = await readStore();
