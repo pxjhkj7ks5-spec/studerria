@@ -83,7 +83,7 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
             <span>Morale {signed(report.resourceChanges.morale)} · Political {signed(report.resourceChanges.political)}</span>
           </div>
           <p>{report.recommendation}</p>
-          {campaignResult ? <div className="aar-section aar-section--campaign"><strong>Економіка місії · гаманець {campaignResult.walletAfterMission} млн ₴</strong>{campaignResult.rewardLines.map((line) => <span key={`${line.kind}-${line.label}`}>{line.label}: {line.amount > 0 ? "+" : ""}{line.amount} млн</span>)}<span>Стійкість цивільних: {campaignResult.civilianResilienceAfterMission}% · збито {campaignResult.interceptions}/{campaignResult.totalTargets} · влучань {campaignResult.impacts}</span><span>Безкоштовно відновлено 25% комплекту БК; решта поповнення, ремонт і передислокація оплачуються окремо.</span></div> : null}
+          {campaignResult ? <div className="aar-section aar-section--campaign"><strong>Економіка місії · гаманець {campaignResult.walletAfterMission} млн ₴</strong>{campaignResult.rewardLines.map((line) => <span key={`${line.kind}-${line.label}`}>{line.label}: {line.amount > 0 ? "+" : ""}{line.amount} млн</span>)}<span>Стійкість цивільних: {campaignResult.civilianResilienceAfterMission}% · збито {campaignResult.interceptions}/{campaignResult.totalTargets} · влучань {campaignResult.impacts}</span></div> : null}
           {rankedResult ? <div className="aar-section aar-section--ranked"><strong>Ranked result</strong><span>#{rankedResult.entry.rank} · {rankedResult.entry.score} score · {rankedResult.challenge.title}</span></div> : null}
         </>
       ) : (

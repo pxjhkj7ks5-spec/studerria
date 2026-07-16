@@ -116,12 +116,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   campaign.campaignWallet = clamp(state.resources.budget + bonusRewards - penaltyCosts, 0, 9999);
   state.resources.budget = campaign.campaignWallet;
   for (const battery of [...state.batteries, ...state.storedBatteries]) {
-    const unit = getUnitDefinition(battery.kind);
-    if (typeof unit.ammoCapacity === "number" && unit.ammoCapacity > 0 && typeof battery.currentAmmo === "number") {
-      battery.currentAmmo = Math.min(unit.ammoCapacity, battery.currentAmmo + Math.ceil(unit.ammoCapacity * .25));
-    }
     battery.experienceLevel = Math.min(5, battery.experienceLevel + 1);
-    if (typeof battery.currentAmmo === "number" && battery.currentAmmo > 0 && battery.status === "exhausted") battery.status = "ready";
   }
   const result: CampaignMissionResult = {
     missionIndex: campaign.missionIndex,

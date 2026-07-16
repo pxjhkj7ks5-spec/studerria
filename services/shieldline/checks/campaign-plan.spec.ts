@@ -13,7 +13,8 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.title), ["Перший контакт", "Південний коридор", "Східна дуга", "Насичення", "Масована ніч"]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [15, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [38, 32, 48, 70, 100]);
-  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.rewardCap), [18, 35, 55, 80, 120]);
+  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.rewardCap), [52, 82, 130, 198, 283]);
+  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.waves.reduce((sum, wave) => sum + wave.count * campaignKillRewards[wave.threatKind], 0)), campaignMissionsPlan.map((mission) => mission.rewardCap));
   assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [29, 41, 58, 78, 103]);
   assert.equal(campaignMissionsPlan.slice(0, 3).some((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), false);
   assert.equal(campaignMissionsPlan.slice(3).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
@@ -96,7 +97,7 @@ test("campaign corridors select compatible animated launch zones", () => {
   }
 });
 
-test("campaign economy credits exact capped kill rewards immediately and preserves units between missions", () => {
+test("campaign economy credits every authored kill reward and preserves units without free ammo between missions", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   game.resources.budget = 0;
@@ -109,23 +110,23 @@ test("campaign economy credits exact capped kill rewards immediately and preserv
   mvg.currentAmmo = 1;
   mvg.health = 76;
   const originalPosition = { ...mvg.position };
-  for (let index = 0; index < 30; index += 1) recordCampaignKill(game, "parodiya", 1);
-  assert.equal(game.resources.budget, 25);
-  assert.equal(game.campaign?.campaignWallet, 25);
+  for (let index = 0; index < 60; index += 1) recordCampaignKill(game, "parodiya", 1);
+  assert.equal(game.resources.budget, 59);
+  assert.equal(game.campaign?.campaignWallet, 59);
   game.interceptions = 29;
   const result = finalizeCampaignMission(game)!;
   assert.equal(result.killReward, getCampaignMission(1).rewardCap);
   assert.equal(result.bonusRewards, 25);
-  assert.equal(result.walletAfterMission, 50);
-  assert.equal(mvg.currentAmmo, 3);
+  assert.equal(result.walletAfterMission, 84);
+  assert.equal(mvg.currentAmmo, 1);
   assert.equal(mvg.health, 76);
   assert.equal(mvg.experienceLevel, 1);
   assert.deepEqual(mvg.position, originalPosition);
 
   game = advanceCampaignMission(game);
   assert.equal(game.campaign?.missionIndex, 2);
-  assert.equal(game.resources.budget, 82);
-  assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, 3);
+  assert.equal(game.resources.budget, 116);
+  assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, 1);
   assert.ok(game.campaign?.unlockedSystems.includes("gepard"));
 });
 
@@ -134,6 +135,7 @@ test("campaign onboarding cues expire before the first launch", () => {
   assert.equal(activeCampaignTutorialCue(5, ["planning"]), null);
   assert.equal(activeCampaignTutorialCue(13), null);
   assert.equal(activeCampaignTutorialCue(510)?.title, "Підкріплення прибуло");
+  assert.equal(activeCampaignTutorialCue(570), null);
   assert.deepEqual(
     ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
     [1, 2, 2, 10, 10, 20],

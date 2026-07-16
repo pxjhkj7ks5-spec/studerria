@@ -58,9 +58,9 @@ test("coverage circles and occupied polygons use Leaflet's shared SVG renderer",
   assert.match(source, /state === "maintenance"[\s\S]*?color: "#ffad42"/);
 });
 
-test("desktop wheel zoom is responsive while touch zoom keeps its existing profile", () => {
-  assert.deepEqual(mapZoomInputProfile(true), { zoomDelta: 0.35, wheelPxPerZoomLevel: 70, wheelDebounceTime: 18 });
-  assert.deepEqual(mapZoomInputProfile(false), { zoomDelta: 0.5, wheelPxPerZoomLevel: 160, wheelDebounceTime: 35 });
+test("desktop wheel zoom uses predictable quarter-level steps while touch keeps continuous pinch zoom", () => {
+  assert.deepEqual(mapZoomInputProfile(true), { zoomSnap: 0.25, zoomDelta: 0.25, wheelPxPerZoomLevel: 240, wheelDebounceTime: 40 });
+  assert.deepEqual(mapZoomInputProfile(false), { zoomSnap: 0, zoomDelta: 0.5, wheelPxPerZoomLevel: 160, wheelDebounceTime: 35 });
 });
 
 test("map panning defers React culling and tile updates until movement settles", async () => {

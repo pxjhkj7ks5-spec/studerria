@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("desktop mouse and trackpad wheel zoom respond around the pointer", async ({ page }) => {
+test("desktop trackpad and mouse wheel zoom use bounded intuitive steps", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
     localStorage.setItem("shieldline-live-v7", JSON.stringify({
@@ -27,8 +27,14 @@ test("desktop mouse and trackpad wheel zoom respond around the pointer", async (
   const mapBox = await map.boundingBox();
   if (!mapBox) throw new Error("Desktop map did not render.");
   await page.mouse.move(mapBox.x + mapBox.width * 0.55, mapBox.y + mapBox.height * 0.5);
-  await page.mouse.wheel(0, -240);
+  await page.mouse.wheel(0, -12);
   await expect.poll(markerDistance).toBeGreaterThan(before * 1.05);
+  const afterTrackpadStep = await markerDistance();
+  expect(afterTrackpadStep).toBeLessThan(before * 1.35);
+
+  await page.mouse.wheel(0, -1_000);
+  await expect.poll(markerDistance).toBeGreaterThan(afterTrackpadStep * 1.05);
+  expect(await markerDistance()).toBeLessThan(afterTrackpadStep * 2.6);
 });
 
 test("desktop defense cards expand in flow and radar telemetry stays sensor-specific", async ({ page }) => {

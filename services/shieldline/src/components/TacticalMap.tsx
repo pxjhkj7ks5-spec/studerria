@@ -1075,7 +1075,7 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
         inertia
         inertiaDeceleration={2400}
         easeLinearity={0.18}
-        zoomSnap={0}
+        zoomSnap={zoomInput.zoomSnap}
         zoomDelta={zoomInput.zoomDelta}
         wheelPxPerZoomLevel={zoomInput.wheelPxPerZoomLevel}
         wheelDebounceTime={zoomInput.wheelDebounceTime}
