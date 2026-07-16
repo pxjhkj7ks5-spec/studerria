@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, getCampaignMission, missionTargetCount } from "../src/data/campaignPlan";
-import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
+import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignRedeployCost, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
 import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/game/campaignLaunchZones";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
@@ -128,6 +128,12 @@ test("campaign economy credits every authored kill reward and preserves units wi
   assert.equal(game.resources.budget, 116);
   assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, 1);
   assert.ok(game.campaign?.unlockedSystems.includes("gepard"));
+});
+
+test("campaign redeployment always costs one million regardless of the air-defense system", () => {
+  for (const kind of ["mvg", "boat", "manpads", "gepard", "buk", "ew", "drone-operators", "radar", "s300", "iris-t", "nasams", "patriot"] as const) {
+    assert.equal(campaignRedeployCost(kind), 1);
+  }
 });
 
 test("campaign onboarding cues expire before the first launch", () => {

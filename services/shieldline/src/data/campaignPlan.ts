@@ -119,7 +119,6 @@ export const campaignMissionsPlan: CampaignMissionDefinition[] = [
 
 export const campaignKillRewards: Partial<Record<ThreatKind, number>> = { parodiya: 1, decoy: 1, gerbera: 2, geran2: 2, drone: 2, kh101: 10, kalibr: 10, cruise: 10, iskander: 20, ballistic: 20 };
 export const campaignResupplyCosts: Partial<Record<UnitKind, number>> = { mvg: 1, boat: 1.4, manpads: 4, gepard: 2, "drone-operators": 4, buk: 12, s300: 16, "iris-t": 18, nasams: 16, patriot: 25 };
-export const campaignRedeployRates: Record<UnitKind, number> = { mvg: .10, boat: .10, manpads: .10, gepard: .15, buk: .15, ew: .15, "drone-operators": .15, radar: .15, s300: .20, "iris-t": .20, nasams: .20, patriot: .25 };
 
 export const campaignTutorialSteps = [
   { atSeconds: 5, durationSeconds: 7, panelTarget: "planning" as const, title: "Відкрийте «План»", body: "Перегляньте доступні дії перед першим контактом." },

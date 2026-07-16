@@ -1,4 +1,4 @@
-import { campaignKillRewards, campaignRedeployRates, campaignResupplyCosts, getCampaignMission, getCampaignRoute, missionTargetCount } from "../data/campaignPlan";
+import { campaignKillRewards, campaignResupplyCosts, getCampaignMission, getCampaignRoute, missionTargetCount } from "../data/campaignPlan";
 import { getUnitDefinition } from "../data/units";
 import type { CampaignMissionResult, CampaignSpawnEvent, CampaignState, Coordinates, DefenseBattery, GameState, ThreatKind, UnitKind } from "../types/game";
 import { clamp } from "./math";
@@ -255,7 +255,7 @@ export function routeHasSelfIntersection(points: Coordinates[]) {
   return false;
 }
 
-export function campaignRedeployCost(kind: UnitKind) { const unit = getUnitDefinition(kind); return Math.ceil(unit.cost * campaignRedeployRates[kind]); }
+export function campaignRedeployCost(_kind: UnitKind) { return 1; }
 export function campaignRepairCost(battery: DefenseBattery) { const unit = getUnitDefinition(battery.kind); return Math.max(1, Math.ceil(unit.cost * ((100 - battery.health) / 100) * .25)); }
 export function campaignResupplyCost(kind: UnitKind, portion: .5 | 1 = .5) { return Math.ceil((campaignResupplyCosts[kind] || 0) * portion * 10) / 10; }
 
