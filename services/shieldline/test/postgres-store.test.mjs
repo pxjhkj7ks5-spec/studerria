@@ -51,5 +51,14 @@ test("PostgreSQL auth adapter enforces identity and one-time code ownership", as
   await store.createTransferCode("guest-auth", "code-hash", new Date(Date.now() + 60_000));
   assert.deepEqual(await store.consumeTransferCode("code-hash"), { actorId: "guest-auth" });
   await assert.rejects(() => store.consumeTransferCode("code-hash"), /недійсний/);
+  const firstProgress = await store.savePlayerProgress("guest-auth", 0, { game: { campaign: { missionIndex: 2 } } });
+  assert.equal(firstProgress.revision, 1);
+  assert.equal((await store.getPlayerProgress("guest-auth")).state.game.campaign.missionIndex, 2);
+  const secondProgress = await store.savePlayerProgress("guest-auth", 1, { game: { campaign: { missionIndex: 3 } } });
+  assert.equal(secondProgress.revision, 2);
+  await assert.rejects(
+    () => store.savePlayerProgress("guest-auth", 1, { game: { campaign: { missionIndex: 1 } } }),
+    (error) => error.statusCode === 409 && error.latestPatch.accountProgress.revision === 2,
+  );
   await pool.end();
 });

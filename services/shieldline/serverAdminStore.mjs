@@ -271,6 +271,7 @@ export async function createAdminStore({ pool, ensureBaseSchema = true }) {
     },
     resetProgress(actor, actorId, reason, requestId) {
       return mutateUser(actor, actorId, "user.reset_progress", reason, async (client) => {
+        await client.query("DELETE FROM shieldline_player_progress WHERE actor_id = $1", [actorId]);
         await client.query("DELETE FROM shieldline_campaign_projection WHERE actor_id = $1", [actorId]);
         await client.query("DELETE FROM shieldline_campaigns WHERE actor_id = $1", [actorId]);
         await client.query("DELETE FROM shieldline_cities WHERE actor_id = $1", [actorId]);

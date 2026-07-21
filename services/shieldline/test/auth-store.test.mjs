@@ -27,6 +27,15 @@ test("JSON auth store keeps nicknames unique and transfers one profile between d
     await store.createTransferCode("guest-alpha", "code-hash", new Date(Date.now() + 60_000).toISOString());
     assert.deepEqual(await store.consumeTransferCode("code-hash"), { actorId: "guest-alpha" });
     await assert.rejects(() => store.consumeTransferCode("code-hash"), /недійсний/);
+    const firstProgress = await store.savePlayerProgress("guest-alpha", 0, { campaign: { mission: 2 } });
+    assert.equal(firstProgress.revision, 1);
+    assert.deepEqual(await store.getPlayerProgress("guest-alpha"), firstProgress);
+    const secondProgress = await store.savePlayerProgress("guest-alpha", 1, { campaign: { mission: 3 } });
+    assert.equal(secondProgress.revision, 2);
+    await assert.rejects(
+      () => store.savePlayerProgress("guest-alpha", 1, { campaign: { mission: 1 } }),
+      (error) => error.statusCode === 409 && error.latestPatch.accountProgress.revision === 2,
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

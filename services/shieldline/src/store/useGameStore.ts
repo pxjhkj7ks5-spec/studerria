@@ -154,7 +154,7 @@ export function campaignCycleCompleted(previous: GameState, next: GameState) {
     && next.afterActionReports.length > previous.afterActionReports.length;
 }
 
-interface GameStore {
+export interface GameStore {
   game: GameState;
   campaignMode: CampaignMode | null;
   activeGameMode: GameModeId | null;
@@ -440,3 +440,55 @@ export const useGameStore = create<GameStore>()(
     },
   ),
 );
+
+export type AccountProgressState = Pick<GameStore,
+  | "game"
+  | "campaignMode"
+  | "activeGameMode"
+  | "dailyCityGame"
+  | "pendingCampaignMode"
+  | "mapMode"
+  | "operationPhase"
+  | "countdownRemainingMs"
+  | "simulationSpeed"
+  | "simulationSeed"
+  | "simulationRandomCursor"
+>;
+
+export function readAccountProgressState(): AccountProgressState {
+  const state = useGameStore.getState();
+  return {
+    game: state.game,
+    campaignMode: state.campaignMode,
+    activeGameMode: state.activeGameMode,
+    dailyCityGame: state.dailyCityGame,
+    pendingCampaignMode: state.pendingCampaignMode,
+    mapMode: state.mapMode,
+    operationPhase: state.operationPhase,
+    countdownRemainingMs: state.countdownRemainingMs,
+    simulationSpeed: state.simulationSpeed,
+    simulationSeed: state.simulationSeed,
+    simulationRandomCursor: state.simulationRandomCursor,
+  };
+}
+
+export function applyAccountProgressState(value: AccountProgressState) {
+  const game = normalizePersistedGame(value?.game || null);
+  if (!game) return false;
+  useGameStore.setState({
+    game,
+    campaignMode: value.campaignMode || null,
+    activeGameMode: value.activeGameMode || null,
+    dailyCityGame: normalizePersistedGame(value.dailyCityGame || null),
+    pendingCampaignMode: value.pendingCampaignMode || null,
+    mapMode: value.mapMode || "live",
+    operationPhase: value.operationPhase || "planning",
+    countdownRemainingMs: Math.max(0, Number(value.countdownRemainingMs) || 0),
+    simulationSpeed: 1,
+    simulationSeed: String(value.simulationSeed || createSimulationSeed("legacy")),
+    simulationRandomCursor: Math.max(0, Number(value.simulationRandomCursor) || 0),
+    placementKind: null,
+    placementStoredBatteryId: null,
+  });
+  return true;
+}

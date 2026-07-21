@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeNickname, parseAnalyticsEvent, parseAuthRegistration, parseOperationCommand, parseOperationInput } from "../serverSchemas.mjs";
+import { normalizeNickname, parseAnalyticsEvent, parseAuthRegistration, parseOperationCommand, parseOperationInput, parsePlayerProgress } from "../serverSchemas.mjs";
 
 test("operation schemas accept versioned campaign plans and reject inconsistent counts", () => {
   const valid = {
@@ -39,4 +39,9 @@ test("auth schema normalizes Unicode nicknames and rejects reserved names", () =
   const parsed = parseAuthRegistration({ nickname: "  Сокіл_01  ", deviceToken: "a".repeat(43), consentAccepted: true, consentVersion: "2026-07-15" });
   assert.equal(parsed.nickname, "Сокіл_01");
   assert.throws(() => parseAuthRegistration({ nickname: "ShieldLine", deviceToken: "a".repeat(43), consentAccepted: true, consentVersion: "v1" }), /validation/);
+});
+
+test("player progress accepts revisioned account snapshots", () => {
+  assert.deepEqual(parsePlayerProgress({ baseRevision: 4, state: { game: { campaign: { missionIndex: 3 } } } }), { baseRevision: 4, state: { game: { campaign: { missionIndex: 3 } } } });
+  assert.throws(() => parsePlayerProgress({ baseRevision: -1, state: {} }), /validation/);
 });

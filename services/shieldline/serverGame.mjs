@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { SIM_VERSION, calculateDefenseBonus, simulateOperation, stableHash } from "./src/game/simulationCore.mjs";
 
-const DEFAULT_STORE = { version: 4, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {}, users: {}, devices: {}, identities: {}, transferCodes: {} };
+const DEFAULT_STORE = { version: 5, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, playerProgress: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {}, users: {}, devices: {}, identities: {}, transferCodes: {} };
 const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
 const campaignDifficulty = { "first-contact": 38, "southern-corridor": 46, "eastern-arc": 54, saturation: 62, "mass-night": 70 };
 const campaignWave = (missionId, index, threatKind, size, etaSeconds) => ({ id: `${missionId}-wave-${String(index + 1).padStart(2, "0")}`, index: index + 1, threatKind, originSector: "east", targetSector: "hq", etaSeconds, size, difficulty: campaignDifficulty[missionId] || 38 });
@@ -313,6 +313,22 @@ export async function createGameStore(file) {
       const store = await readStore();
       const progress = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
       return { ...progress, missions: missions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: progress.completedMissionIds.includes(entry.id) ? "completed" : entry.id === progress.currentMissionId ? "active" : "locked" })) };
+    },
+    async getPlayerProgress(actorId) {
+      const entry = (await readStore()).playerProgress[actorId];
+      return entry ? structuredClone(entry) : null;
+    },
+    async savePlayerProgress(actorId, baseRevision, state) {
+      return mutate(async () => {
+        const store = await readStore();
+        const current = store.playerProgress[actorId] || null;
+        const expected = current?.revision || 0;
+        if (baseRevision !== expected) throw Object.assign(new Error("Player progress revision conflict."), { statusCode: 409, latestPatch: { accountProgress: current } });
+        const entry = { revision: expected + 1, state: structuredClone(state), updatedAt: new Date().toISOString() };
+        store.playerProgress[actorId] = entry;
+        await save(store);
+        return structuredClone(entry);
+      });
     },
     async leaderboard() {
       const store = await readStore();

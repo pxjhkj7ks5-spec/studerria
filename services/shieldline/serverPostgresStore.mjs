@@ -160,6 +160,12 @@ CREATE TABLE IF NOT EXISTS shieldline_campaigns (
   import_id text,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS shieldline_player_progress (
+  actor_id text PRIMARY KEY REFERENCES shieldline_users(id) ON DELETE CASCADE,
+  revision integer NOT NULL DEFAULT 1,
+  state_document jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS shieldline_outbox (
   id text PRIMARY KEY,
   actor_id text REFERENCES shieldline_users(id),
@@ -510,6 +516,37 @@ export async function createPostgresGameStore({ legacyStore, pool, redis = null 
       const result = await pool.query("SELECT current_mission_id, completed_mission_ids, last_run_id, revision FROM shieldline_campaigns WHERE actor_id = $1", [actorId]);
       if (!result.rowCount) return progressView(defaultProgress());
       return progressView({ currentMissionId: result.rows[0].current_mission_id, completedMissionIds: result.rows[0].completed_mission_ids || [], lastRunId: result.rows[0].last_run_id, revision: result.rows[0].revision });
+    },
+    async getPlayerProgress(actorId) {
+      const result = await pool.query("SELECT revision, state_document, updated_at FROM shieldline_player_progress WHERE actor_id = $1", [actorId]);
+      if (!result.rowCount) return null;
+      return { revision: result.rows[0].revision, state: result.rows[0].state_document, updatedAt: result.rows[0].updated_at.toISOString() };
+    },
+    async savePlayerProgress(actorId, baseRevision, state) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await upsertUser(client, actorId);
+        const currentResult = await client.query("SELECT revision, state_document, updated_at FROM shieldline_player_progress WHERE actor_id = $1 FOR UPDATE", [actorId]);
+        const current = currentResult.rowCount ? { revision: currentResult.rows[0].revision, state: currentResult.rows[0].state_document, updatedAt: currentResult.rows[0].updated_at.toISOString() } : null;
+        if (baseRevision !== (current?.revision || 0)) {
+          await client.query("ROLLBACK");
+          throw Object.assign(new Error("Player progress revision conflict."), { statusCode: 409, latestPatch: { accountProgress: current } });
+        }
+        const revision = (current?.revision || 0) + 1;
+        const result = await client.query(
+          `INSERT INTO shieldline_player_progress (actor_id, revision, state_document)
+           VALUES ($1,$2,$3::jsonb)
+           ON CONFLICT (actor_id) DO UPDATE SET revision = EXCLUDED.revision, state_document = EXCLUDED.state_document, updated_at = now()
+           RETURNING revision, state_document, updated_at`,
+          [actorId, revision, JSON.stringify(state)],
+        );
+        await client.query("COMMIT");
+        return { revision: result.rows[0].revision, state: result.rows[0].state_document, updatedAt: result.rows[0].updated_at.toISOString() };
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally { client.release(); }
     },
     async createSession(tokenHash, actorId, expiresAt) {
       await upsertUser(pool, actorId);

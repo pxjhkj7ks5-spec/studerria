@@ -8,7 +8,7 @@ import { createConfiguredPostgresStore } from "./serverPostgresStore.mjs";
 import { createConfiguredAdminStore } from "./serverAdminStore.mjs";
 import { createAdminApi } from "./serverAdminApi.mjs";
 import { createFixedWindowRateLimiter, createPersistentSessionCodec, createSessionCodec, hashSessionToken, readCookie } from "./serverSecurity.mjs";
-import { normalizeNickname, parseAnalyticsEvent, parseAuthBootstrap, parseAuthRegistration, parseCampaignCommand, parseNicknameAvailability, parseOperationCommand, parseOperationInput, parseTelegramLink, parseTransferRedeem } from "./serverSchemas.mjs";
+import { normalizeNickname, parseAnalyticsEvent, parseAuthBootstrap, parseAuthRegistration, parseCampaignCommand, parseNicknameAvailability, parseOperationCommand, parseOperationInput, parsePlayerProgress, parseTelegramLink, parseTransferRedeem } from "./serverSchemas.mjs";
 import { instrumentHttpHandler, recordAnalyticsMetric, renderPrometheusMetrics, shutdownTelemetry } from "./serverTelemetry.mjs";
 import { validateTelegramInitData as validateTelegramPayload } from "./serverTelegramAuth.mjs";
 
@@ -318,6 +318,15 @@ async function handleGameApi(req, res, pathname) {
       if (!actorId) throw Object.assign(new Error("Сесію не знайдено."), { statusCode: 401 });
       const profile = await gameStore.getAuthProfile(actorId);
       sendJson(res, 200, { status: authStatus(profile), consentVersion, user: profile });
+      return;
+    }
+    if (req.method === "GET" && path === "/player/progress") {
+      sendJson(res, 200, { progress: await gameStore.getPlayerProgress(await gameActor(req, res)) });
+      return;
+    }
+    if (req.method === "PUT" && path === "/player/progress") {
+      const body = parsePlayerProgress(await readRequestJson(req));
+      sendJson(res, 200, { progress: await gameStore.savePlayerProgress(await gameActor(req, res), body.baseRevision, body.state) });
       return;
     }
     if (req.method === "POST" && path === "/analytics") {

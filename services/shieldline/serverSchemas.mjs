@@ -84,6 +84,10 @@ const transferRedeemSchema = z.object({
   telegramInitData: telegramInitData.optional(),
 }).strict();
 const telegramLinkSchema = z.object({ telegramInitData }).strict();
+const playerProgressSchema = z.object({
+  baseRevision: z.number().int().min(0),
+  state: z.record(z.string(), z.unknown()),
+}).strict();
 
 function parse(schema, value) {
   const result = schema.safeParse(value);
@@ -103,3 +107,4 @@ export function parseAuthRegistration(value) { return parse(authRegistrationSche
 export function parseNicknameAvailability(value) { return parse(nicknameAvailabilitySchema, value); }
 export function parseTransferRedeem(value) { return parse(transferRedeemSchema, value); }
 export function parseTelegramLink(value) { return parse(telegramLinkSchema, value); }
+export function parsePlayerProgress(value) { return parse(playerProgressSchema, value); }

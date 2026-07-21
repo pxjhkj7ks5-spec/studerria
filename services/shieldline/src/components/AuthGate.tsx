@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
 import { AlertTriangle, Check, ChevronRight, FileText, LoaderCircle, LockKeyhole, Radio, RotateCcw, ShieldCheck, UserRound } from "lucide-react";
 import { authApi, type AuthBootstrap, type AuthProfile } from "../data/authApi";
+import { initializeAccountProgressSync } from "../platform/accountProgressSync";
 
 type AuthContextValue = {
   profile: AuthProfile;
@@ -26,7 +27,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try { setBootstrap(await authApi.bootstrap()); }
+    try {
+      const next = await authApi.bootstrap();
+      if (next.status === "authenticated") await initializeAccountProgressSync(next.user.id);
+      setBootstrap(next);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "ShieldLine зараз недоступний."); }
     finally { setLoading(false); }
   }, []);
@@ -91,7 +96,11 @@ function Onboarding({ bootstrap, onAuthenticated }: { bootstrap: AuthBootstrap; 
   const submitRegistration = async () => {
     if (!consent || available !== true) return;
     setBusy(true); setError(null);
-    try { onAuthenticated((await authApi.register(nickname.trim(), bootstrap.consentVersion)).user); }
+    try {
+      const profile = (await authApi.register(nickname.trim(), bootstrap.consentVersion)).user;
+      await initializeAccountProgressSync(profile.id);
+      onAuthenticated(profile);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Не вдалося завершити реєстрацію."); }
     finally { setBusy(false); }
   };
@@ -99,7 +108,11 @@ function Onboarding({ bootstrap, onAuthenticated }: { bootstrap: AuthBootstrap; 
   const submitCode = async () => {
     if (code.some((digit) => !digit)) return;
     setBusy(true); setError(null);
-    try { onAuthenticated((await authApi.redeemTransferCode(code.join(""))).user); }
+    try {
+      const profile = (await authApi.redeemTransferCode(code.join(""))).user;
+      await initializeAccountProgressSync(profile.id);
+      onAuthenticated(profile);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Не вдалося виконати вхід."); }
     finally { setBusy(false); }
   };
