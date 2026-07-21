@@ -14,6 +14,7 @@ import { TutorialOverlay } from "./components/TutorialOverlay";
 import { UnitRail } from "./components/UnitRail";
 import { CommandApp } from "./components/CommandApp";
 import { DisplaySettings } from "./components/DisplaySettings";
+import { BrandMark } from "./components/BrandMark";
 import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
@@ -394,7 +395,7 @@ export default function App() {
           <Menu size={24} />
         </button> : null}
         <div className="rail-brand" aria-hidden="true">
-          <Shield size={24} />
+          <BrandMark size={26} />
         </div>
         <div className="rail-button-stack">
           {panelItems.map((item) => {
@@ -426,7 +427,7 @@ export default function App() {
         <div className="environment-overlay" aria-hidden="true"><i /><b /></div>
         <header className="map-status-strip" aria-label="Стан операції">
           <div className="strip-brand">
-            <Shield size={22} />
+            <BrandMark size={24} />
             <div>
               <h1>Shieldline</h1>
               <span>{tacticalMode === "campaign" ? `${activeMissionTitle} · жива операція` : `${scenario.title} · ${modeDefinition?.title || "Живий захист"} · ${t(`operation.${operationPhase}`)}`}</span>

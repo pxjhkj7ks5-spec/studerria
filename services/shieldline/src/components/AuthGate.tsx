@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
-import { AlertTriangle, Check, ChevronRight, FileText, LoaderCircle, LockKeyhole, Radio, RotateCcw, ShieldCheck, UserRound } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, FileText, LoaderCircle, LockKeyhole, Radio, RotateCcw, UserRound } from "lucide-react";
 import { authApi, type AuthBootstrap, type AuthProfile } from "../data/authApi";
 import { initializeAccountProgressSync } from "../platform/accountProgressSync";
+import { BrandMark } from "./BrandMark";
 
 type AuthContextValue = {
   profile: AuthProfile;
@@ -139,7 +140,7 @@ function Onboarding({ bootstrap, onAuthenticated }: { bootstrap: AuthBootstrap; 
 
   return <main className="auth-shell">
     <section className="auth-card auth-onboarding" aria-label="Реєстрація ShieldLine">
-      <header className="auth-brand"><span><ShieldCheck size={26} /></span><div><strong>ShieldLine</strong><small>COMMAND NETWORK</small></div></header>
+      <header className="auth-brand"><span><BrandMark size={30} /></span><div><strong>ShieldLine</strong><small>COMMAND NETWORK</small></div></header>
       <div className="auth-intro"><span className="auth-kicker"><Radio size={14} /> ПЕРШИЙ ВИХІД НА ЗВ’ЯЗОК</span><h1>Створіть позивний</h1><p>Один унікальний нікнейм працюватиме на всіх ваших пристроях і показуватиметься в рейтингах.</p></div>
       <div className="auth-tabs" role="tablist"><button type="button" role="tab" aria-selected={tab === "register"} onClick={() => { setTab("register"); setError(null); }}>Реєстрація</button><button type="button" role="tab" aria-selected={tab === "code"} onClick={() => { setTab("code"); setError(null); }}>Вхід за кодом</button></div>
       {tab === "register" ? <div className="auth-form">

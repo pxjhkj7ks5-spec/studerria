@@ -1,6 +1,7 @@
 import { Activity, Clock, GraduationCap, Infinity, Shield } from "lucide-react";
 import { campaignModes } from "../data/campaignModes";
 import type { CampaignMode } from "../types/game";
+import { BrandMark } from "./BrandMark";
 
 const modeIcons: Record<CampaignMode, typeof Shield> = {
   training: GraduationCap,
@@ -19,7 +20,7 @@ export function ModeSelection({ onSelect }: ModeSelectionProps) {
       <div className="mode-shell">
         <div className="mode-heading">
           <div className="mode-mark">
-            <Shield size={32} />
+            <BrandMark size={40} />
           </div>
           <div>
             <h1>Shieldline</h1>

@@ -3,8 +3,8 @@
   "short_name": "Shieldline",
   "start_url": "/shieldline/",
   "display": "standalone",
-  "background_color": "#09141e",
-  "theme_color": "#09141e",
+  "background_color": "#070808",
+  "theme_color": "#070808",
   "description": "A fictional Telegram-first city command simulation.",
   "icons": [
     { "src": "/shieldline/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },

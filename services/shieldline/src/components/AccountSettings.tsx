@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, Link2, LoaderCircle, Radio, ShieldCheck, Smartphone, UserRound, X } from "lucide-react";
 import { authApi } from "../data/authApi";
 import { useAuth } from "./AuthGate";
+import { BrandMark } from "./BrandMark";
 
 export function AccountSettings({ modal = false, onClose }: { modal?: boolean; onClose?: () => void }) {
   const { profile, bootstrap, setProfile } = useAuth();
@@ -40,7 +41,7 @@ export function AccountSettings({ modal = false, onClose }: { modal?: boolean; o
   };
 
   const content = <section className={`account-card${modal ? " account-card--modal" : ""}`} aria-label="Профіль ShieldLine">
-    <header className="account-header"><div><span><ShieldCheck size={20} /></span><div><small>ПРОФІЛЬ КОМАНДИРА</small><strong>{profile.nickname}</strong></div></div>{modal ? <button type="button" onClick={onClose} aria-label="Закрити профіль"><X size={19} /></button> : null}</header>
+    <header className="account-header"><div><span><BrandMark size={24} /></span><div><small>ПРОФІЛЬ КОМАНДИРА</small><strong>{profile.nickname}</strong></div></div>{modal ? <button type="button" onClick={onClose} aria-label="Закрити профіль"><X size={19} /></button> : null}</header>
     <div className="account-summary"><span><UserRound size={21} /></span><div><strong>{profile.nickname}</strong><small>Унікальний нікнейм · активний</small></div><Check size={17} /></div>
     <div className="account-meta"><div><span>Telegram</span><strong>{profile.telegram ? (profile.telegram.username ? `@${profile.telegram.username}` : "Прив’язано") : "Не прив’язано"}</strong></div><div><span>Пристрої</span><strong>{profile.deviceCount}</strong></div></div>
     {!profile.telegram && bootstrap.telegramLinkOffer ? <button className="account-secondary" type="button" disabled={busy} onClick={() => void linkTelegram()}><Radio size={17} /> Прив’язати цей Telegram</button> : null}

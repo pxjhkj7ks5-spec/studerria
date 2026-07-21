@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, ArrowLeft, BarChart3, Check, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Lock, Play, Radio, Shield, ShieldCheck, Swords, Trophy, UserRound, Users, Waves, Zap } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, Check, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Lock, Play, Radio, Shield, Swords, Trophy, UserRound, Users, Waves, Zap } from "lucide-react";
 import { AccountSettings } from "./AccountSettings";
+import { BrandMark } from "./BrandMark";
 import { useAuth } from "./AuthGate";
 import { apiGameRepository } from "../data/apiGameRepository";
 import { gameModes, getGameMode } from "../data/gameModes";
@@ -122,7 +123,7 @@ export function CommandApp() {
     <main className="command-app" aria-label="Shieldline command center">
       <header className="command-header">
         <button className="icon-action" type="button" onClick={() => setScreen("modes")} aria-label="Back to modes"><ArrowLeft size={20} /></button>
-        <div className="command-brand"><ShieldCheck size={22} /><span>Shieldline</span><small>City 01 · Night 01</small></div>
+        <div className="command-brand"><BrandMark size={25} /><span>Shieldline</span><small>City 01 · Night 01</small></div>
         <span className={`outcome outcome--${run.result}`}>{run.result === "victory" ? "Contained" : run.result}</span>
       </header>
       <section className="command-content">
@@ -143,6 +144,7 @@ function ModeCatalog({ onSelect, campaign, unlockedMissionIndex }: { onSelect: (
   return <main className="command-app command-app--catalog" aria-label="Shieldline mode selection">
     <header className="catalog-hero">
       <button className="catalog-profile-button" type="button" onClick={() => setAccountOpen(true)} aria-label="Відкрити профіль"><UserRound size={17} /><span>{profile.nickname}</span></button>
+      <div className="catalog-brand"><BrandMark size={30} /><strong>ShieldLine</strong></div>
       <span className="hero-chip"><Radio size={14} /> {t("catalog.eyebrow")}</span>
       <h1>{t("catalog.title")}</h1>
       <p>{t("catalog.lead")}</p>
@@ -178,7 +180,7 @@ function Briefing({ modeId, missionIndex, onBack, onStart, isRunning }: { modeId
   const mode = getGameMode(modeId);
   const mission = modeId === "campaign" ? campaignMissions[missionIndex - 1] || campaignMissions[0] : campaignMissions[0];
   return <main className="command-app" aria-label="Mission briefing">
-    <header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back"><ArrowLeft size={20} /></button><div className="command-brand"><ShieldCheck size={22} /><span>Mission briefing</span><small>{mode.title}</small></div></header>
+    <header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back"><ArrowLeft size={20} /></button><div className="command-brand"><BrandMark size={25} /><span>Mission briefing</span><small>{mode.title}</small></div></header>
     <section className="briefing-screen">
       <span className="hero-chip"><Waves size={14} /> {mission.subtitle}</span>
       <h1>{modeId === "campaign" ? mission.title : mode.title}</h1>
@@ -193,7 +195,7 @@ function Briefing({ modeId, missionIndex, onBack, onStart, isRunning }: { modeId
 
 function OperationLoading() { return <section className="operation-loading"><div className="scan-ring"><Radio size={38} /></div><h1>Night simulation resolved</h1><p>Building after-action report from the immutable event stream.</p></section>; }
 
-function CommandFrame({ onBack, children }: { onBack: () => void; children: ReactNode }) { return <main className="command-app" aria-label="Shieldline command center"><header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back to modes"><ArrowLeft size={20} /></button><div className="command-brand"><ShieldCheck size={22} /><span>Shieldline</span><small>City 01 · command view</small></div></header><section className="command-content">{children}</section><BottomNav active="operations" onChange={() => undefined} /></main>; }
+function CommandFrame({ onBack, children }: { onBack: () => void; children: ReactNode }) { return <main className="command-app" aria-label="Shieldline command center"><header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back to modes"><ArrowLeft size={20} /></button><div className="command-brand"><BrandMark size={25} /><span>Shieldline</span><small>City 01 · command view</small></div></header><section className="command-content">{children}</section><BottomNav active="operations" onChange={() => undefined} /></main>; }
 
 function DailyDefense({ report, run }: { report: DailyReport | null; run: MissionRun | null }) { const launchDailyBoard = () => { const state = useGameStore.getState(); state.launchTacticalMode("daily-defense"); const url = new URL(window.location.href); url.searchParams.set("legacy", "1"); url.searchParams.set("mode", "daily-defense"); window.location.assign(url.toString()); }; return <section className="report-screen" aria-label="Daily defense report"><span className="hero-chip"><Home size={14} /> Daily Defense · city persists</span><h1>Morning report</h1><p>{report?.summary || "The daily command report is being prepared."} Your repair and doctrine decisions are ready for the next night.</p>{run ? <><SectorMap summary={run.sectorSummary} /><section className="recommendation"><Flag size={19} /><div><strong>Daily command</strong><span>{report?.recommendedAction}</span></div></section><button className="primary-command" type="button" onClick={launchDailyBoard}><Shield size={19} /> Open city planning board</button></> : null}</section>; }
 function Ranking({ entries }: { entries: LeaderboardEntry[] }) { return <section className="report-screen ranking-screen" aria-label="Ranked challenge leaderboard"><span className="hero-chip"><Trophy size={14} /> Ranked Challenge · shared results</span><h1>Daily ranking</h1><p>Each run is scored from its server-side event stream. Cosmetic and convenience features never change combat power.</p><ol>{entries.length ? entries.map((entry) => <li key={`${entry.userId}-${entry.rank}`}><b>#{entry.rank}</b><span>{entry.displayName}</span><em>{entry.result}</em><strong>{entry.score}</strong></li>) : <li><span>No completed ranked runs yet.</span></li>}</ol></section>; }
