@@ -10,12 +10,15 @@ import type {
 import { createId, pick } from "./math";
 
 const archetypeThreats: Record<AttackArchetype, ThreatKind[]> = {
-  probe: ["gerbera", "parodiya", "geran2"],
+  probe: ["recon", "gerbera", "parodiya", "geran2"],
   saturation: ["geran2", "gerbera", "parodiya", "geran2"],
   infrastructure: ["kh101", "kalibr", "geran2", "iskander"],
-  "decoy-screen": ["parodiya", "gerbera", "parodiya"],
+  "decoy-screen": ["jammer", "parodiya", "gerbera", "parodiya"],
   pressure: ["geran2", "kh101", "parodiya"],
   combined: ["geran2", "kh101", "kalibr", "iskander", "parodiya"],
+  "cruise-strike": ["low-signature-cruise", "kh101", "kalibr", "kh101"],
+  "mixed-strike": ["jammer", "parodiya", "geran2", "low-signature-cruise", "kh101", "kalibr"],
+  "ballistic-event": ["iskander"],
 };
 
 const archetypeTargets: Record<AttackArchetype, InfrastructureKind[]> = {
@@ -25,6 +28,9 @@ const archetypeTargets: Record<AttackArchetype, InfrastructureKind[]> = {
   "decoy-screen": ["communications", "logistics"],
   pressure: ["energy", "industry", "communications"],
   combined: ["energy", "logistics", "communications", "industry"],
+  "cruise-strike": ["energy", "logistics"],
+  "mixed-strike": ["communications", "energy", "industry"],
+  "ballistic-event": ["energy", "industry"],
 };
 
 export function createThreatDirectorContext(state: GameState, scenario: ScenarioDefinition): ThreatDirectorContext {
@@ -74,6 +80,11 @@ function scoreArchetype(archetype: AttackArchetype, context: ThreatDirectorConte
   if (archetype === "pressure" && context.moraleLevel < 78) score += 16;
   if (archetype === "combined" && context.currentDay >= 5) score += 18;
   if (archetype === "combined" && context.currentDay < 4) score -= 26;
+  if (archetype === "cruise-strike" && context.currentDay >= 3) score += 12;
+  if (archetype === "mixed-strike" && context.currentDay >= 5) score += 18;
+  if (archetype === "mixed-strike" && context.currentDay < 4) score -= 30;
+  if (archetype === "ballistic-event" && context.currentDay < 6) score -= 999;
+  if (archetype === "ballistic-event" && context.currentDay >= 6) score += 10;
   if (context.recentArchetypes.at(-1) === archetype) score -= 16;
   if (context.recentArchetypes.slice(-2).every((item) => item === archetype)) score -= 999;
   if (context.placedDefenseUnits < 2 && archetype !== "probe") score -= 10;
@@ -94,7 +105,7 @@ function weightedPick(scores: Array<{ archetype: AttackArchetype; score: number 
 export function chooseAttackPlan(context: ThreatDirectorContext, random: () => number = Math.random): AttackPlan {
   // The director scores fictional pressure patterns against abstract weaknesses, then
   // penalizes recent repeats so attacks feel adaptive without becoming operational advice.
-  const archetypes: AttackArchetype[] = ["probe", "saturation", "infrastructure", "decoy-screen", "pressure", "combined"];
+  const archetypes: AttackArchetype[] = ["probe", "decoy-screen", "saturation", "cruise-strike", "mixed-strike", "ballistic-event"];
   const archetype = weightedPick(archetypes.map((item) => ({ archetype: item, score: scoreArchetype(item, context) })), random);
   const ramp = difficultyRamp(context);
   const baseIntensity = {
@@ -104,9 +115,12 @@ export function chooseAttackPlan(context: ThreatDirectorContext, random: () => n
     "decoy-screen": 1.8,
     pressure: 2.0,
     combined: 2.7,
+    "cruise-strike": 2.2,
+    "mixed-strike": 3.0,
+    "ballistic-event": 1.3,
   }[archetype];
   const intensity = Math.min(5.2, Math.max(1, baseIntensity * ramp + random() * 0.7));
-  const deception = Math.min(5, Math.max(0.4, (archetype === "decoy-screen" ? 3.2 : archetype === "combined" ? 2.3 : 1.1) * ramp));
+  const deception = Math.min(5, Math.max(0.4, (archetype === "decoy-screen" ? 3.2 : archetype === "mixed-strike" ? 2.3 : 1.1) * ramp));
   const targetPriorities = [...new Set([...context.weakSystems, ...archetypeTargets[archetype]])].slice(0, 3);
   return {
     id: createId("attack-plan", context.currentDay, random),
@@ -137,5 +151,8 @@ export function archetypeLabel(archetype: AttackArchetype) {
     "decoy-screen": "Decoy screen",
     pressure: "Pressure campaign",
     combined: "Combined attack",
+    "cruise-strike": "Cruise strike",
+    "mixed-strike": "Mixed strike",
+    "ballistic-event": "Ballistic event",
   }[archetype];
 }

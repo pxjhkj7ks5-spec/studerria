@@ -25,7 +25,9 @@ export type CityId =
 export type InfrastructureKind = "energy" | "logistics" | "industry" | "communications";
 
 export type UnitKind =
+  | "small-radar"
   | "radar"
+  | "long-radar"
   | "mvg"
   | "boat"
   | "ew"
@@ -50,7 +52,10 @@ export type ThreatKind =
   | "parodiya"
   | "kh101"
   | "kalibr"
-  | "iskander";
+  | "iskander"
+  | "recon"
+  | "low-signature-cruise"
+  | "jammer";
 
 export type LaunchThreatProfile =
   | "shahed"
@@ -84,6 +89,33 @@ export type CoverageTier = "I" | "II" | "III";
 
 export type ThreatStatus = "inbound" | "engaged" | "intercepted" | "impact";
 
+export type SoftKillEffect = "disrupted" | "diverted" | "delayed" | "guidance-lost" | "degraded";
+export type ThreatClassification = "unknown" | "probable-class" | "confirmed-class" | "confirmed-type";
+export type UnitRoleClass = "sensor" | "ew" | "gun" | "shorad" | "mrad" | "area-defense" | "upper-tier" | "specialist";
+export type SalvoPolicy = "single" | "double" | "conditional-double";
+
+export interface UnitDoctrine {
+  allowedTargets: ThreatKind[];
+  preferredTargets: ThreatKind[];
+  reservedFor: ThreatKind[];
+  forbiddenByDefault: ThreatKind[];
+  minConfidenceToEngage: number;
+  minTrackQuality: number;
+  conserveAmmoThreshold: number;
+  allowManualOverride: boolean;
+  salvoPolicy: SalvoPolicy;
+  cheapFirstPolicy: boolean;
+  networkRequired: boolean;
+  coastalOnly: boolean;
+}
+
+export interface SensorProfile {
+  acquisitionBase: number;
+  classificationGain: number;
+  fusionValue: number;
+  lowSignaturePenalty: number;
+}
+
 export type CampaignMode = "training" | "seven-day" | "crisis" | "sandbox";
 
 export type MapMode = "live" | "threats" | "coverage" | "logistics";
@@ -95,6 +127,9 @@ export type CyclePhase = "planning" | "attack" | "recovery";
 export type AttackArchetype =
   | "probe"
   | "saturation"
+  | "cruise-strike"
+  | "mixed-strike"
+  | "ballistic-event"
   | "infrastructure"
   | "decoy-screen"
   | "pressure"
@@ -163,6 +198,10 @@ export interface UnitDefinition {
   primaryAccuracy: number;
   outerAccuracy: number;
   engagementMode: "detect" | "kinetic" | "disrupt";
+  roleClass: UnitRoleClass;
+  doctrine: UnitDoctrine;
+  sensorProfile?: SensorProfile;
+  missionReserveCapacity: number | "infinite";
   engagementChanceByThreat: Record<ThreatKind, number>;
   mobility: number;
   readiness: number;
@@ -194,6 +233,8 @@ export interface DefenseBattery {
   cooldownMs: number;
   reloadRemainingMs: number;
   currentAmmo: number | "infinite";
+  missionReserve: number | "infinite";
+  manualOverrideTargets: ThreatKind[];
   assignedCityId: CityId;
   health: number;
   experienceLevel: number;
@@ -276,6 +317,8 @@ export interface LiveThreat {
   difficulty: number;
   damage: number;
   confidence: number;
+  classification: ThreatClassification;
+  displayLabel: string;
   saturation: number;
   attackPlanId?: string;
   archetype?: AttackArchetype;
@@ -285,6 +328,10 @@ export interface LiveThreat {
   lastKnownPosition?: Coordinates;
   revealed: boolean;
   trackQuality: number;
+  fireControlQuality: number;
+  softKillEffect?: SoftKillEffect;
+  speedModifier: number;
+  damageModifier: number;
   reward: number;
   carrierId?: string;
   routeId?: string;
@@ -324,12 +371,15 @@ export interface CampaignMissionResult {
   penaltyCosts: number;
   walletAfterMission: number;
   civilianResilienceAfterMission: number;
+  objectiveMet: boolean;
+  objectiveSummary: string;
   rewardLines: CampaignRewardLine[];
 }
 
 export interface CampaignState {
   missionIndex: number;
   campaignWallet: number;
+  campaignAmmoStock: number;
   civilianResilience: number;
   unlockedSystems: UnitKind[];
   previousMissionResults: CampaignMissionResult[];
@@ -346,7 +396,7 @@ export interface CampaignState {
   tutorialStep: number;
 }
 
-export type EngagementResult = "success" | "miss" | "detected";
+export type EngagementResult = "success" | "soft-kill" | "miss" | "detected";
 
 export interface EngagementEvent {
   id: string;
@@ -362,6 +412,7 @@ export interface EngagementEvent {
   progress: number;
   resolved: boolean;
   style: ShotStyle | "radar";
+  softKillEffect?: SoftKillEffect;
 }
 
 export type InterceptorShot = EngagementEvent;
@@ -563,6 +614,7 @@ export interface GameState {
   engagementEvents: EngagementEvent[];
   impactMarkers: ImpactMarker[];
   interceptions: number;
+  softKills: number;
   impacts: number;
   log: IntelEntry[];
   forecast: DailyForecast;

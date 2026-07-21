@@ -14,6 +14,18 @@ const chanceKinds: Array<{ kind: ThreatKind; label: string }> = [
   { kind: "iskander", label: "OTRK" },
 ];
 
+const doctrineTargetLabels: Partial<Record<ThreatKind, string>> = {
+  geran2: "Geran-2",
+  gerbera: "Gerbera",
+  decoy: "приманка",
+  parodiya: "Parodiya",
+  recon: "розвідник",
+  jammer: "постановник перешкод",
+  kh101: "X-101",
+  kalibr: "Kalibr",
+  iskander: "балістична ціль",
+};
+
 const REINFORCEMENT_AWAITING_DEPLOYMENT = "reinforcement awaiting deployment";
 
 function maintenanceRisk(readiness: number) {
@@ -28,9 +40,9 @@ function fatigueLabel(fatigue: number) {
   return "нормальна";
 }
 
-function ammoLabel(unit: UnitDefinition, current?: number | "infinite") {
+function ammoLabel(unit: UnitDefinition, current?: number | "infinite", reserve?: number | "infinite") {
   if (unit.ammoCapacity === "infinite") return "∞";
-  if (typeof current === "number") return `${current}/${unit.ammoCapacity}`;
+  if (typeof current === "number") return `${current}/${unit.ammoCapacity} · запас ${reserve ?? unit.missionReserveCapacity}`;
   return `${unit.ammoCapacity}`;
 }
 
@@ -60,6 +72,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
   const beginPlacement = useGameStore((state) => state.beginPlacement);
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
   const serviceBattery = useGameStore((state) => state.serviceCampaignBattery);
+  const setManualOverride = useGameStore((state) => state.setBatteryManualOverride);
   const active = game.status === "active";
   const scenario = getScenario(game.scenarioId);
   const storedBatteries = game.storedBatteries || [];
@@ -81,7 +94,9 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
         {game.placementWarning ? <strong className="placement-warning">{game.placementWarning}</strong> : null}
       </div>
       <div className="unit-list">
-        {unitDefinitions.map((unit) => {
+        {unitDefinitions
+          .filter((unit) => scenario.allowedUnits.includes(unit.kind) || storedBatteries.some((battery) => battery.kind === unit.kind))
+          .map((unit) => {
           const allowed = scenario.allowedUnits.includes(unit.kind) && (!game.campaign || game.campaign.unlockedSystems.includes(unit.kind));
           const storedUnits = storedBatteries.filter((item) => item.kind === unit.kind);
           const storedBattery = storedUnits[0];
@@ -96,7 +111,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
           const readiness = referenceBattery ? referenceBattery.readiness : unit.readiness;
           const fatigue = referenceBattery ? referenceBattery.fatigue : 0;
           const reloadText = referenceBattery?.reloadRemainingMs ? seconds(referenceBattery.reloadRemainingMs) : seconds(unit.reloadMs);
-          const ammoText = ammoLabel(unit, referenceBattery?.currentAmmo);
+          const ammoText = ammoLabel(unit, referenceBattery?.currentAmmo, referenceBattery?.missionReserve);
           const tacticalStatus = tacticalUnitStatus(unit, referenceBattery);
           const isRadar = unit.engagementMode === "detect";
           const showStatus = tacticalStatus.label !== "READY";
@@ -109,10 +124,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
               role="button"
               aria-disabled={disabled}
               onMouseEnter={(event) => expandCard(event.currentTarget, unit.kind)}
-              onMouseLeave={(event) => {
-                if (event.currentTarget.parentElement?.matches(":hover")) return;
-                setExpandedKind((current) => current === unit.kind ? null : current);
-              }}
+              onMouseLeave={() => setExpandedKind((current) => current === unit.kind ? null : current)}
               onFocus={(event) => expandCard(event.currentTarget, unit.kind)}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget)) setExpandedKind((current) => current === unit.kind ? null : current);
@@ -142,14 +154,14 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <span><small>{isRadar ? "Радіус" : "Зона"}</small><b>{isRadar ? `${unit.outerRangeKm} км` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</b></span>
                 <span><small>Вартість</small><b>{storedUnits.length ? storedDeploymentCost ? "1 млн ₴" : "0 ₴" : unit.costLabel}</b></span>
               </div>
-              <div className="unit-chance-row" aria-label={`Імовірність ураження для ${unit.name}`}>
+              {!isRadar ? <div className="unit-chance-row" aria-label={`Імовірність ураження для ${unit.name}`}>
                 {chanceKinds.map(({ kind, label }) => (
                   <span key={kind} className={unit.engagementChanceByThreat[kind] <= 0 ? "unit-chance--muted" : ""}>
                     <b>{Math.round(unit.engagementChanceByThreat[kind])}%</b>
                     {label}
                   </span>
                 ))}
-              </div>
+              </div> : null}
               <div className="unit-hover-card" role="tooltip">
                 <div className="unit-hover-card__content">
                   <strong>Дані {unit.shortName}</strong>
@@ -163,12 +175,21 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                       <span>Основна зона {unit.primaryRangeKm} км · зовнішня {unit.outerRangeKm} км</span>
                       <span>БК {ammoText} · перезаряджання {reloadText} · пауза {seconds(unit.shotCooldownMs)}</span>
                       <span>Точність: {unit.primaryAccuracy}% · зовнішня зона {unit.outerAccuracy}%</span>
+                      <span>Доктрина: поріг {unit.doctrine.minConfidenceToEngage}% · резерв {Math.round(unit.doctrine.conserveAmmoThreshold * 100)}%{unit.doctrine.cheapFirstPolicy ? " · дешевий ешелон першим" : ""}</span>
                     </>
                   )}
                   <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
                   <span>Готовність {Math.round(readiness)}% · втома {Math.round(fatigue)}% ({fatigueLabel(fatigue)})</span>
                   {referenceBattery ? <span>Стан {Math.round(referenceBattery.health)}% · досвід L{referenceBattery.experienceLevel}</span> : null}
                   <span>{storedBattery ? storedDeploymentCost ? "На складі · передислокація 1 млн ₴" : "На складі · підкріплення" : localBattery ? `${localBattery.supplyStatus} · передислокація через маркер 1 млн ₴` : "Не розміщена"}</span>
+                  {localBattery && unit.doctrine.allowManualOverride && unit.doctrine.forbiddenByDefault.length ? (
+                    <div className="campaign-service-actions" aria-label="Ручні дозволи доктрини">
+                      {unit.doctrine.forbiddenByDefault.slice(0, 4).map((targetKind) => {
+                        const enabled = localBattery.manualOverrideTargets.includes(targetKind);
+                        return <button type="button" key={targetKind} aria-pressed={enabled} onClick={(event) => { event.stopPropagation(); setManualOverride(localBattery.id, targetKind, !enabled); }}>{enabled ? "Заборонити" : "Дозволити"} {doctrineTargetLabels[targetKind] || targetKind}</button>;
+                      })}
+                    </div>
+                  ) : null}
                   {game.campaign?.intermission && referenceBattery ? <div className="campaign-service-actions"><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "resupply", .5); }}>+50% БК</button><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "repair", 1); }}>Ремонт</button></div> : null}
                 </div>
               </div>

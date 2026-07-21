@@ -1,0 +1,20 @@
+import type { SensorProfile, SoftKillEffect, ThreatClassification, ThreatKind, UnitDoctrine, UnitKind, UnitRoleClass } from "../types/game";
+
+export const AIR_DEFENSE_RULES_VERSION: string;
+export const UNIT_RULES: Record<UnitKind, { roleClass: UnitRoleClass; reserve: number | "infinite"; sensor?: SensorProfile; doctrine: UnitDoctrine }>;
+export const THREAT_RULES: Record<ThreatKind, { class: "drone" | "decoy" | "cruise" | "ballistic" | "support"; subtype: string; signature: number; classificationDifficulty: number; interceptDifficulty: number; damageChannels: string[]; falseTrackBehavior: string; routingProfile: string }>;
+export function unitRule(kind: UnitKind): (typeof UNIT_RULES)[UnitKind];
+export function threatRule(kind: ThreatKind): (typeof THREAT_RULES)[ThreatKind];
+export function classificationTier(confidence: number): ThreatClassification;
+export function threatDisplayLabel(kind: ThreatKind, confidence: number): string;
+export function supportLeakEffect(kind: ThreatKind): { wavePressure: number; defensePenalty: number; damaging: boolean };
+export function salvoSizeFor(unitKind: UnitKind, threatKind: ThreatKind, availableAmmo?: number): number;
+export function acquisitionScore(input: { sensorKind: UnitKind; distanceKm: number; readiness?: number; status?: string; threatKind: ThreatKind; fusionSensorCount?: number; highAlert?: boolean; intelFocus?: boolean; wavePressure?: number; jammerPenalty?: number; primaryRangeKm?: number; outerRangeKm?: number; coastalBonus?: number }): number;
+export function classificationGain(input: { sensorKind: UnitKind; trackQuality?: number; fusionSensorCount?: number; threatKind: ThreatKind; intelFocus?: boolean; jammerPenalty?: number }): number;
+export function fusedTrackQuality(input: { bestSensorScore?: number; sensorScores?: number[]; continuity?: number; maneuver?: number }): number;
+export function fireControlScore(input: { trackQuality: number; confidence: number; networkRequired?: boolean; networkAvailable?: boolean; congestion?: number }): number;
+export function evaluateDoctrine(input: { unitKind: UnitKind; threatKind: ThreatKind; confidence: number; trackQuality: number; reserveRatio?: number; lowerTierAvailable?: boolean; manualOverride?: boolean; networkAvailable?: boolean; coastalApproach?: boolean }): { allowed: boolean; reason: string };
+export function engagementProbability(input: { base: number; bandAccuracy: number; readiness: number; status?: string; fatigue?: number; confidence: number; trackQuality: number; saturation?: number; conserveAmmo?: boolean; experience?: number; threatKind: ThreatKind; coastalBonus?: number }): number;
+export function ewEffectFor(input: { threatKind: ThreatKind; confidence: number; trackQuality: number; random?: number }): { success: boolean; effect: SoftKillEffect; score: number };
+export function planEffectivenessForThreat(plan: unknown, threatKind: ThreatKind): { probability: number; confidence: number; trackQuality: number; eligibleAssets: number; salvoSize?: number } | null;
+export const TARGET_GROUPS: Readonly<Record<string, readonly ThreatKind[]>>;

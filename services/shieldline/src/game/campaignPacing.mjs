@@ -1,9 +1,9 @@
 export const GUIDED_THREE_STAGE_PROFILE = "guided-three-stage";
 
 export const launchSectorIdsByDirection = {
-  north: ["kursk_north", "bryansk_north", "oryol_deep_north", "smolensk_northwest", "vologda_air_corridor"],
-  east: ["belgorod_tactical", "voronezh_deep_east", "millerovo_rostov", "taganrog_azov", "occupied_donetsk", "astrakhan_air_corridor"],
-  south: ["primorsko_akhtarsk", "yeisk_kuban", "occupied_azov", "dzhankoi_crimea", "hvardiiske_crimea", "chauda_crimea", "sevastopol_black_sea", "novorossiysk_black_sea", "black_sea_launch_box"],
+  north: ["north_corridor_a", "north_corridor_b", "north_deep_a", "northwest_deep_a", "long_range_air_c"],
+  east: ["east_tactical_a", "east_deep_b", "southeast_corridor_a", "southeast_coastal_a", "east_short_a", "long_range_air_a"],
+  south: ["southeast_corridor_b", "southeast_corridor_c", "south_land_a", "south_mixed_a", "south_drone_a", "south_drone_b", "sea_corridor_a", "sea_corridor_b", "sea_corridor_c"],
 };
 
 const droneKinds = ["geran2", "gerbera", "parodiya"];

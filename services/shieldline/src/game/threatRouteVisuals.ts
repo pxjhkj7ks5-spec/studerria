@@ -72,7 +72,7 @@ export function threatRouteAtProgress(threat: Pick<LiveThreat, "origin" | "targe
 
 export function classifyThreatRoute(threat: Pick<LiveThreat, "revealed" | "confidence" | "status">, reducedQuality: boolean): ThreatRouteVisual {
   if (!threat.revealed) return "hidden";
-  const confirmed = threat.status === "engaged" || threat.confidence >= 58;
+  const confirmed = threat.status === "engaged" || threat.confidence >= 60;
   if (confirmed) return "confirmed";
   if (!reducedQuality && threat.confidence >= 35) return "predicted";
   return "hidden";

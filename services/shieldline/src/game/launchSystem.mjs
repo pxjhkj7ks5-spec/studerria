@@ -1,48 +1,50 @@
 export const SHOW_LAUNCH_DEBUG = false;
 
+// Fictional sector anchors for the game board. IDs, labels and centers do not
+// represent sites, bases or operational routes; only broad approach semantics.
 export const launchSectors = [
-  { id: "kursk_north", name: "Курський напрямок", lat: 51.75, lng: 36.20, radiusKm: 45, weight: 4, threats: ["shahed", "gerbera", "parodiya"], role: "Північний дроновий вектор на Суми / Полтаву / Київ" },
-  { id: "bryansk_north", name: "Брянський напрямок", lat: 53.25, lng: 34.35, radiusKm: 55, weight: 4, threats: ["shahed", "gerbera", "iskander_m", "s400_ballistic"], role: "Північний вектор на Чернігів / Київ / Житомир" },
-  { id: "oryol_deep_north", name: "Орловський напрямок", lat: 52.95, lng: 36.05, radiusKm: 60, weight: 3, threats: ["shahed", "gerbera", "parodiya"], role: "Глибший північний старт, довші маршрути дронів" },
-  { id: "smolensk_northwest", name: "Смоленський напрямок", lat: 54.30, lng: 32.45, radiusKm: 70, weight: 2, threats: ["shahed", "gerbera", "parodiya"], role: "Північно-західний вектор, рідший сценарій для різноманіття маршрутів" },
-  { id: "belgorod_tactical", name: "Бєлгородський напрямок", lat: 50.60, lng: 36.60, radiusKm: 40, weight: 3, threats: ["s300_ballistic", "s400_ballistic", "iskander_m"], role: "Короткий балістичний тиск по Харкову / Сумщині" },
-  { id: "voronezh_deep_east", name: "Воронезький напрямок", lat: 51.65, lng: 39.20, radiusKm: 80, weight: 2, threats: ["iskander_m", "decoy_ballistic"], role: "Глибший східний балістичний / імітаційний сектор" },
-  { id: "millerovo_rostov", name: "Міллерово / Ростовський напрямок", lat: 48.90, lng: 40.40, radiusKm: 55, weight: 3, threats: ["shahed", "gerbera", "italmas", "parodiya"], role: "Східний дроновий вектор на Харків / Дніпро / центр" },
-  { id: "taganrog_azov", name: "Таганрозько-Азовський сектор", lat: 47.20, lng: 38.90, radiusKm: 50, weight: 2, threats: ["shahed", "gerbera", "decoy"], role: "Південно-східний вектор через Азов / Донбас" },
-  { id: "primorsko_akhtarsk", name: "Приморсько-Ахтарський напрямок", lat: 46.05, lng: 38.20, radiusKm: 45, weight: 5, threats: ["shahed", "gerbera", "italmas", "parodiya"], role: "Один з головних дронових векторів на південь / центр" },
-  { id: "yeisk_kuban", name: "Єйсько-Кубанський сектор", lat: 46.70, lng: 38.30, radiusKm: 50, weight: 2, threats: ["shahed", "gerbera", "parodiya"], role: "Додатковий південний дроновий сектор" },
-  { id: "occupied_donetsk", name: "Окупований Донецький напрямок", lat: 48.00, lng: 37.80, radiusKm: 45, weight: 3, threats: ["shahed", "gerbera", "s300_ballistic", "decoy"], role: "Коротші маршрути на схід / Дніпро / Запоріжжя" },
-  { id: "occupied_azov", name: "Окупований Приазовський сектор", lat: 46.80, lng: 35.70, radiusKm: 55, weight: 2, threats: ["shahed", "gerbera", "kh59", "decoy"], role: "Південний вектор: Запоріжжя / Дніпро / Миколаїв" },
-  { id: "dzhankoi_crimea", name: "Північний Крим / Джанкойський сектор", lat: 45.70, lng: 34.40, radiusKm: 45, weight: 3, threats: ["iskander_m", "s400_ballistic", "shahed"], role: "Кримський балістичний і змішаний сектор" },
-  { id: "hvardiiske_crimea", name: "Гвардійське / центральний Крим", lat: 45.10, lng: 34.00, radiusKm: 40, weight: 4, threats: ["shahed", "gerbera", "parodiya"], role: "Кримський дроновий сектор на центр / південь" },
-  { id: "chauda_crimea", name: "Мис Чауда / східний Крим", lat: 45.00, lng: 35.85, radiusKm: 45, weight: 5, threats: ["shahed", "gerbera", "italmas", "parodiya"], role: "Ключовий кримський дроновий сектор" },
-  { id: "sevastopol_black_sea", name: "Севастопольсько-чорноморський сектор", lat: 44.60, lng: 33.50, radiusKm: 65, weight: 2, threats: ["kalibr", "kh31p", "decoy_cruise"], role: "Морські / протирадарні пуски, рідше ніж дрони" },
-  { id: "novorossiysk_black_sea", name: "Новоросійський чорноморський сектор", lat: 44.70, lng: 37.80, radiusKm: 75, weight: 2, threats: ["kalibr", "decoy_cruise"], role: "Резервний морський сектор для Kalibr" },
-  { id: "black_sea_launch_box", name: "Відкрите Чорне море", lat: 44.00, lng: 32.80, radiusKm: 120, weight: 2, threats: ["kalibr", "kh31p"], role: "Рандомізована морська launch box, не прив’язана до порту" },
-  { id: "astrakhan_air_corridor", name: "Астраханський повітряний коридор", lat: 46.35, lng: 48.00, radiusKm: 150, weight: 2, threats: ["kh101", "kh555", "decoy_cruise"], role: "Далекий повітряний пуск стратегічної авіації" },
-  { id: "caspian_air_corridor", name: "Каспійський повітряний коридор", lat: 44.80, lng: 47.20, radiusKm: 170, weight: 2, threats: ["kh101", "kh555", "decoy_cruise"], role: "Далекий південно-східний повітряний коридор" },
-  { id: "vologda_air_corridor", name: "Вологодський повітряний коридор", lat: 59.20, lng: 39.90, radiusKm: 150, weight: 2, threats: ["kh101", "kh555"], role: "Північний далекий пуск Х-101 / Х-555" },
+  { id: "north_corridor_a", name: "Північний сектор A", lat: 52.0, lng: 35.5, radiusKm: 90, weight: 4, threats: ["shahed", "gerbera", "parodiya"], role: "короткий північний дроновий підхід" },
+  { id: "north_corridor_b", name: "Північний сектор B", lat: 53.0, lng: 33.5, radiusKm: 110, weight: 4, threats: ["shahed", "gerbera", "iskander_m", "s400_ballistic"], role: "змішаний північний підхід" },
+  { id: "north_deep_a", name: "Далекий північний сектор", lat: 54.0, lng: 36.0, radiusKm: 130, weight: 3, threats: ["shahed", "gerbera", "parodiya"], role: "довгий північний дроновий коридор" },
+  { id: "northwest_deep_a", name: "Північно-західний сектор", lat: 54.5, lng: 31.5, radiusKm: 140, weight: 2, threats: ["shahed", "gerbera", "parodiya"], role: "рідкісний довгий обхідний коридор" },
+  { id: "east_tactical_a", name: "Східний тактичний сектор", lat: 50.5, lng: 37.0, radiusKm: 80, weight: 3, threats: ["s300_ballistic", "s400_ballistic", "iskander_m"], role: "короткий балістичний тиск" },
+  { id: "east_deep_b", name: "Далекий східний сектор", lat: 52.0, lng: 39.5, radiusKm: 150, weight: 2, threats: ["iskander_m", "decoy_ballistic"], role: "далекий балістичний та імітаційний підхід" },
+  { id: "southeast_corridor_a", name: "Південно-східний сектор A", lat: 49.0, lng: 40.5, radiusKm: 110, weight: 3, threats: ["shahed", "gerbera", "italmas", "parodiya"], role: "довгий східний дроновий підхід" },
+  { id: "southeast_coastal_a", name: "Південно-східний прибережний сектор", lat: 47.0, lng: 39.0, radiusKm: 100, weight: 2, threats: ["shahed", "gerbera", "decoy"], role: "низьковисотний прибережний коридор" },
+  { id: "southeast_corridor_b", name: "Південно-східний сектор B", lat: 46.0, lng: 38.5, radiusKm: 90, weight: 5, threats: ["shahed", "gerbera", "italmas", "parodiya"], role: "основний дроновий коридор" },
+  { id: "southeast_corridor_c", name: "Південно-східний сектор C", lat: 46.5, lng: 37.5, radiusKm: 100, weight: 2, threats: ["shahed", "gerbera", "parodiya"], role: "додатковий дроновий коридор" },
+  { id: "east_short_a", name: "Короткий східний сектор", lat: 48.0, lng: 38.0, radiusKm: 90, weight: 3, threats: ["shahed", "gerbera", "s300_ballistic", "decoy"], role: "короткий змішаний підхід" },
+  { id: "south_land_a", name: "Південний сухопутний сектор", lat: 47.0, lng: 35.5, radiusKm: 110, weight: 2, threats: ["shahed", "gerbera", "kh59", "decoy"], role: "південний сухопутний коридор" },
+  { id: "south_mixed_a", name: "Південний змішаний сектор", lat: 45.5, lng: 34.5, radiusKm: 90, weight: 3, threats: ["iskander_m", "s400_ballistic", "shahed"], role: "південний балістичний і змішаний підхід" },
+  { id: "south_drone_a", name: "Південний дроновий сектор A", lat: 45.0, lng: 34.0, radiusKm: 80, weight: 4, threats: ["shahed", "gerbera", "parodiya"], role: "південний дроновий коридор" },
+  { id: "south_drone_b", name: "Південний дроновий сектор B", lat: 45.0, lng: 36.0, radiusKm: 90, weight: 5, threats: ["shahed", "gerbera", "italmas", "parodiya"], role: "щільний південний дроновий коридор" },
+  { id: "sea_corridor_a", name: "Морський сектор A", lat: 44.5, lng: 33.5, radiusKm: 130, weight: 2, threats: ["kalibr", "kh31p", "decoy_cruise"], role: "морський крилатий і support-підхід" },
+  { id: "sea_corridor_b", name: "Морський сектор B", lat: 44.5, lng: 38.0, radiusKm: 150, weight: 2, threats: ["kalibr", "decoy_cruise"], role: "резервний морський коридор" },
+  { id: "sea_corridor_c", name: "Відкритий морський сектор", lat: 43.5, lng: 32.5, radiusKm: 180, weight: 2, threats: ["kalibr", "kh31p"], role: "широка рандомізована морська зона" },
+  { id: "long_range_air_a", name: "Далекий повітряний сектор A", lat: 46.0, lng: 47.5, radiusKm: 180, weight: 2, threats: ["kh101", "kh555", "decoy_cruise"], role: "далекий повітряний коридор" },
+  { id: "long_range_air_b", name: "Далекий повітряний сектор B", lat: 44.5, lng: 46.5, radiusKm: 180, weight: 2, threats: ["kh101", "kh555", "decoy_cruise"], role: "південно-східний повітряний коридор" },
+  { id: "long_range_air_c", name: "Далекий повітряний сектор C", lat: 58.5, lng: 39.5, radiusKm: 180, weight: 2, threats: ["kh101", "kh555"], role: "північний далекий повітряний коридор" },
 ];
 
 export const FIRST_NIGHT_LAUNCH_SECTOR_IDS = [
-  "kursk_north",
-  "bryansk_north",
-  "millerovo_rostov",
-  "primorsko_akhtarsk",
-  "occupied_donetsk",
-  "hvardiiske_crimea",
-  "chauda_crimea",
-  "belgorod_tactical",
+  "north_corridor_a",
+  "north_corridor_b",
+  "southeast_corridor_a",
+  "southeast_corridor_b",
+  "east_short_a",
+  "south_drone_a",
+  "south_drone_b",
+  "east_tactical_a",
 ];
 
 export const SECOND_NIGHT_LAUNCH_SECTOR_IDS = [
   ...FIRST_NIGHT_LAUNCH_SECTOR_IDS,
-  "occupied_azov",
-  "dzhankoi_crimea",
-  "sevastopol_black_sea",
-  "novorossiysk_black_sea",
-  "astrakhan_air_corridor",
-  "caspian_air_corridor",
+  "south_land_a",
+  "south_mixed_a",
+  "sea_corridor_a",
+  "sea_corridor_b",
+  "long_range_air_a",
+  "long_range_air_b",
 ];
 
 export const ALL_LAUNCH_SECTOR_IDS = launchSectors.map((sector) => sector.id);
@@ -61,6 +63,9 @@ const threatAliases = {
   kh101: ["kh101", "kh555"],
   kalibr: ["kalibr"],
   iskander: ["iskander_m"],
+  recon: ["shahed", "gerbera", "italmas"],
+  "low-signature-cruise": ["kh59", "kh31p", "decoy_cruise"],
+  jammer: ["kh31p", "decoy_cruise"],
 };
 
 export function threatProfilesForKind(kind) {

@@ -4,6 +4,7 @@ import type { GameState } from "../types/game";
 import type { OperationPhase } from "../domain/contracts";
 import { getCampaignMission } from "../data/campaignPlan";
 import type { ReactNode } from "react";
+import { getUnitDefinition } from "../data/units";
 
 interface ResourceBarProps {
   game: GameState;
@@ -18,11 +19,11 @@ export function ResourceBar({ game, operationPhase, mobile = false }: ResourceBa
   const campaignTime: ReactNode = campaignMission
     ? <span className="resource-time"><b>{elapsedTime}</b><i>{campaignMission.durationMinutes}:00</i></span>
     : formatClock(game.elapsedMs);
-  const finiteBatteries = game.batteries.filter((battery) => typeof battery.currentAmmo === "number").map((battery) => ({ battery, capacity: getCampaignAmmoCapacity(battery.kind) }));
-  const campaignAmmoPercent = finiteBatteries.length ? Math.round(finiteBatteries.reduce((sum, entry) => sum + Number(entry.battery.currentAmmo), 0) / Math.max(1, finiteBatteries.reduce((sum, entry) => sum + entry.capacity, 0)) * 100) : 0;
+  const finiteBatteries = game.batteries.filter((battery) => typeof battery.currentAmmo === "number" && getUnitDefinition(battery.kind).ammoCapacity !== 0).map((battery) => ({ battery, unit: getUnitDefinition(battery.kind) }));
+  const campaignAmmoPercent = finiteBatteries.length ? Math.round(finiteBatteries.reduce((sum, entry) => sum + Number(entry.battery.currentAmmo) + Number(entry.battery.missionReserve || 0), 0) / Math.max(1, finiteBatteries.reduce((sum, entry) => sum + Number(entry.unit.ammoCapacity) + Number(entry.unit.missionReserveCapacity), 0)) * 100) : 0;
   const items = [
     { label: "Бюджет", value: Math.round(game.resources.budget), icon: Coins, delta: "постачання" },
-    { label: game.campaign ? "БК мережі" : "БК", value: game.campaign ? `${campaignAmmoPercent}%` : Math.round(game.resources.ammo), icon: Landmark, delta: "запас" },
+    { label: game.campaign ? "БК мережі" : "БК", value: game.campaign ? `${campaignAmmoPercent}%` : Math.round(game.resources.ammo), icon: Landmark, delta: game.campaign ? `стратегічний запас ${Math.round(game.campaign.campaignAmmoStock)}` : "запас" },
     { label: game.campaign ? "Стійкість" : "Мораль", value: `${Math.round(game.campaign?.civilianResilience ?? game.resources.morale)}%`, icon: Users, delta: "цивільні" },
     { label: game.campaign ? `Місія ${game.campaign.missionIndex}/5` : "Час", value: campaignTime, icon: CalendarDays, delta: operationPhase === "paused" ? "пауза" : "реальний час", className: "resource-card--mission-time" },
   ];
@@ -44,9 +45,4 @@ export function ResourceBar({ game, operationPhase, mobile = false }: ResourceBa
       })}
     </div>
   );
-}
-
-function getCampaignAmmoCapacity(kind: GameState["batteries"][number]["kind"]) {
-  const capacities: Partial<Record<typeof kind, number>> = { radar: 0, mvg: 5, boat: 6, ew: 0, manpads: 3, gepard: 8, buk: 4, s300: 4, "iris-t": 4, nasams: 6, patriot: 2, "drone-operators": 6 };
-  return capacities[kind] || 0;
 }

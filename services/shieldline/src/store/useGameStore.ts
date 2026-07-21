@@ -3,13 +3,15 @@ import { persist } from "zustand/middleware";
 import { initialCities } from "../data/mapData";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "../data/gameModes";
 import { threatTelemetryFor } from "../data/threatFlightProfiles";
+import { getUnitDefinition } from "../data/units";
+import { classificationTier, threatDisplayLabel } from "../game/airDefenseRules.mjs";
 import { createDeterministicRandom } from "../game/deterministicRandom";
-import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBatteryToStorageState, placeBattery, startAttackNow } from "../game/liveSimulation";
+import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBatteryToStorageState, placeBattery, setBatteryManualOverride, startAttackNow } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
 import { advanceCampaignMission as advanceCampaignMissionState, applyCampaignMissionOpening, createCampaignState, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../game/campaignMeta";
-import type { CampaignAttackSchedule, CampaignMode, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, UnitKind } from "../types/game";
+import type { CampaignAttackSchedule, CampaignMode, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, ThreatKind, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
 
 const tutorialKey = "shieldline-tutorial-complete-v1";
@@ -125,15 +127,25 @@ export function normalizePersistedGame(game: GameState | null) {
       target: { ...threat.target },
       lastKnownPosition: validCoordinates(threat.lastKnownPosition) ? { ...threat.lastKnownPosition } : undefined,
       routeWaypoints: Array.isArray(threat.routeWaypoints) ? threat.routeWaypoints.filter(validCoordinates).map((point) => ({ ...point })) : undefined,
+      classification: threat.classification || classificationTier(threat.confidence || 0),
+      displayLabel: threat.displayLabel || threatDisplayLabel(threat.kind, threat.confidence || 0),
+      fireControlQuality: Number.isFinite(threat.fireControlQuality) ? threat.fireControlQuality : 0,
+      speedModifier: Number.isFinite(threat.speedModifier) ? threat.speedModifier : 1,
+      damageModifier: Number.isFinite(threat.damageModifier) ? threat.damageModifier : 1,
     }));
-  const normalizeBattery = (battery: GameState["batteries"][number]) => ({
-    ...battery,
-    position: { ...battery.position },
-    health: Number.isFinite(battery.health) ? battery.health : battery.readiness,
-    experienceLevel: Number.isFinite(battery.experienceLevel) ? battery.experienceLevel : 0,
-    createdAtMission: Number.isFinite(battery.createdAtMission) ? battery.createdAtMission : 0,
-    lastMovedMission: Number.isFinite(battery.lastMovedMission) ? battery.lastMovedMission : 0,
-  });
+  const normalizeBattery = (battery: GameState["batteries"][number]) => {
+    const unit = getUnitDefinition(battery.kind);
+    return {
+      ...battery,
+      position: { ...battery.position },
+      health: Number.isFinite(battery.health) ? battery.health : battery.readiness,
+      experienceLevel: Number.isFinite(battery.experienceLevel) ? battery.experienceLevel : 0,
+      createdAtMission: Number.isFinite(battery.createdAtMission) ? battery.createdAtMission : 0,
+      lastMovedMission: Number.isFinite(battery.lastMovedMission) ? battery.lastMovedMission : 0,
+      missionReserve: battery.missionReserve ?? unit.missionReserveCapacity,
+      manualOverrideTargets: Array.isArray(battery.manualOverrideTargets) ? battery.manualOverrideTargets : [],
+    };
+  };
   return {
     ...game,
     campaignAttackSchedule: normalizeCampaignSchedule(game),
@@ -144,7 +156,8 @@ export function normalizePersistedGame(game: GameState | null) {
     storedBatteries: (Array.isArray(game.storedBatteries) ? game.storedBatteries : []).map(normalizeBattery),
     liveThreats,
     engagementEvents,
-    campaign: game.campaign || null,
+    softKills: Number.isFinite(game.softKills) ? game.softKills : 0,
+    campaign: game.campaign ? { ...game.campaign, campaignAmmoStock: Number.isFinite(game.campaign.campaignAmmoStock) ? game.campaign.campaignAmmoStock : 36 } : null,
   };
 }
 
@@ -182,6 +195,7 @@ export interface GameStore {
   cancelPlacement: () => void;
   placeSelectedBattery: (position: Coordinates) => void;
   moveBatteryToStorage: (batteryId: string) => void;
+  setBatteryManualOverride: (batteryId: string, threatKind: ThreatKind, enabled: boolean) => void;
   togglePlanningAction: (actionId: PlanningActionId) => void;
   startOperation: () => void;
   pauseOperation: () => void;
@@ -348,6 +362,10 @@ export const useGameStore = create<GameStore>()(
           placementStoredBatteryId: null,
         };
       }),
+      setBatteryManualOverride: (batteryId, threatKind, enabled) => set((state) => {
+        const game = setBatteryManualOverride(state.game, batteryId, threatKind, enabled);
+        return { game, dailyCityGame: state.activeGameMode === "daily-defense" ? game : state.dailyCityGame };
+      }),
       togglePlanningAction: (actionId) => set((state) => { const game = togglePlanningAction(state.game, actionId); return { game, dailyCityGame: state.activeGameMode === "daily-defense" ? game : state.dailyCityGame }; }),
       startOperation: () => set((state) => {
         const mode = state.activeGameMode || "training";
@@ -413,7 +431,7 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 19,
+      version: 20,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         const migratedGame = normalizePersistedGame(state.game || null);

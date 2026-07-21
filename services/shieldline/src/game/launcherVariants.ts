@@ -10,8 +10,8 @@ export type LauncherVariant =
   | "cruise-naval"
   | "cruise-air";
 
-const seaSectorIds = new Set(["sevastopol_black_sea", "novorossiysk_black_sea", "black_sea_launch_box"]);
-const deepBallisticSectorIds = new Set(["voronezh_deep_east", "astrakhan_air_corridor", "vologda_air_corridor"]);
+const seaSectorIds = new Set(["sea_corridor_a", "sea_corridor_b", "sea_corridor_c"]);
+const deepBallisticSectorIds = new Set(["east_deep_b", "long_range_air_a", "long_range_air_c"]);
 
 function stableParity(value: string) {
   let hash = 0;

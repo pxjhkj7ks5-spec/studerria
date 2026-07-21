@@ -19,10 +19,13 @@ import mvgUnit from "./units/mvg.png";
 import nasamsUnit from "./units/nasams.png";
 import patriotUnit from "./units/patriot.png";
 import radarUnit from "./units/radar.png";
+import smallRadarUnit from "./units/small-radar.png";
+import longRadarUnit from "./units/long-radar.png";
 import s300Unit from "./units/s300.png";
 import droneOperatorsUnit from "./units/drone-operators.png";
 import tu95Carrier from "./carriers/tu95.png";
 import blackSeaShipCarrier from "./carriers/black-sea-ship.png";
+import unknownTrack from "./icons/unknown-track.png";
 import droneLaunch from "./launch/drone-launch.png";
 import ballisticLaunch from "./launch/ballistic-launch.png";
 import cruiseLaunch from "./launch/cruise-launch.png";
@@ -48,10 +51,17 @@ export const threatSprites: Record<ThreatKind, string> = {
   kh101: threatKh101,
   kalibr: threatKalibr,
   iskander: threatIskander,
+  recon: threatGerbera,
+  "low-signature-cruise": threatKh101,
+  jammer: threatCruise,
 };
 
+export const unknownThreatSprite = unknownTrack;
+
 export const unitSprites: Record<UnitKind, string> = {
+  "small-radar": smallRadarUnit,
   radar: radarUnit,
+  "long-radar": longRadarUnit,
   mvg: mvgUnit,
   boat: boatUnit,
   ew: ewUnit,

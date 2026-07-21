@@ -5,12 +5,13 @@ import { randomUUID } from "node:crypto";
 import { SIM_VERSION, calculateDefenseBonus, simulateOperation, stableHash } from "./src/game/simulationCore.mjs";
 
 const DEFAULT_STORE = { version: 5, events: [], runs: {}, dailyReports: {}, dailyCities: {}, campaigns: {}, playerProgress: {}, rankedSubmissions: {}, rooms: {}, notificationOutbox: [], notificationPreferences: {}, operationCommands: {}, operationRevisions: {}, users: {}, devices: {}, identities: {}, transferCodes: {} };
-const VALID_ASSET_KINDS = new Set(["radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
+const VALID_ASSET_KINDS = new Set(["small-radar", "radar", "long-radar", "mvg", "boat", "ew", "manpads", "gepard", "buk", "s300", "iris-t", "nasams", "patriot", "drone-operators"]);
+const RADAR_KINDS = new Set(["small-radar", "radar", "long-radar"]);
 const campaignDifficulty = { "first-contact": 38, "southern-corridor": 46, "eastern-arc": 54, saturation: 62, "mass-night": 70 };
 const campaignWave = (missionId, index, threatKind, size, etaSeconds) => ({ id: `${missionId}-wave-${String(index + 1).padStart(2, "0")}`, index: index + 1, threatKind, originSector: "east", targetSector: "hq", etaSeconds, size, difficulty: campaignDifficulty[missionId] || 38 });
 const campaignMission = (id, title, durationMinutes, grant, specs) => ({ id, title, durationMinutes, grant, waves: specs.map((spec, index) => campaignWave(id, index, ...spec)) });
 const missions = [
-  campaignMission("first-contact", "Перший контакт", 15, 38, [["parodiya",2,45],["gerbera",2,95],["parodiya",2,150],["gerbera",2,205],["parodiya",2,260],["geran2",2,315],["parodiya",2,375],["gerbera",2,430],["parodiya",2,485],["geran2",2,540],["parodiya",2,600],["kh101",1,630],["gerbera",2,660],["parodiya",2,720],["geran2",2,780]]),
+  campaignMission("first-contact", "Перший контакт", 15, 42, [["parodiya",2,45],["gerbera",2,95],["parodiya",2,150],["gerbera",2,205],["parodiya",2,260],["geran2",2,315],["parodiya",2,375],["gerbera",2,430],["parodiya",2,485],["geran2",2,540],["parodiya",2,600],["geran2",2,630],["gerbera",2,660],["parodiya",2,720],["geran2",2,780]]),
   campaignMission("southern-corridor", "Південний коридор", 35, 32, [["gerbera",4,120],["parodiya",5,360],["geran2",4,660],["gerbera",3,930],["geran2",6,960],["parodiya",3,1290],["kalibr",1,1380],["geran2",8,1680],["gerbera",2,1950],["geran2",5,1980]]),
   campaignMission("eastern-arc", "Східна дуга", 45, 48, [["parodiya",6,180],["geran2",6,480],["gerbera",4,810],["geran2",4,840],["kalibr",1,1200],["parodiya",4,1470],["geran2",10,1500],["kh101",2,1860],["gerbera",3,2190],["geran2",10,2220],["geran2",8,2520]]),
   campaignMission("saturation", "Насичення", 50, 70, [["parodiya",8,120],["geran2",6,420],["gerbera",5,690],["geran2",5,720],["iskander",1,1080],["geran2",12,1320],["kh101",2,1710],["geran2",6,1740],["geran2",15,2100],["parodiya",10,2490],["geran2",6,2520],["iskander",1,2820],["kalibr",1,2840]]),
@@ -25,8 +26,8 @@ function event(runId, sequence, type, occurredAtMs, message, extras = {}) {
   return { id: `${runId}-evt-${sequence}`, runId, sequence, type, occurredAtMs, tick: occurredAtMs, simVersion: SIM_VERSION, schemaVersion: 1, message, payload: {}, ...extras };
 }
 
-export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0, missionId = missions[0].id) {
-  return simulateOperation({ mission: missionById(missionId), seed, defenseBonus, startedAt: now });
+export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0, missionId = missions[0].id, plan = {}) {
+  return simulateOperation({ mission: missionById(missionId), seed, defenseBonus, plan, startedAt: now });
 }
 
 export function dayKey(now = new Date()) { return now.toISOString().slice(0, 10); }
@@ -39,8 +40,8 @@ function normalizeDailyPlan(input = {}) {
     position: Number.isFinite(Number(asset?.position?.lat)) && Number.isFinite(Number(asset?.position?.lng)) ? { lat: Number(asset.position.lat), lng: Number(asset.position.lng) } : undefined,
   })).filter((asset) => VALID_ASSET_KINDS.has(asset.kind)) : [];
   const assetCount = assets.length;
-  const radarCount = assets.filter((asset) => asset.kind === "radar").length;
-  const kineticCount = assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length;
+  const radarCount = assets.filter((asset) => RADAR_KINDS.has(asset.kind)).length;
+  const kineticCount = assets.filter((asset) => !RADAR_KINDS.has(asset.kind) && asset.kind !== "ew").length;
   const averageReadiness = assetCount ? assets.reduce((sum, asset) => sum + asset.readiness, 0) / assetCount : 0;
   return { assetCount, radarCount, kineticCount, averageReadiness, assets };
 }
@@ -223,7 +224,7 @@ export async function createGameStore(file) {
       if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before resolving the operation.");
       const defenseBonus = defenseBonusFor(resolvedPlan);
       const mission = missionById(missionId);
-      const run = await persistRun(simulateMission(seed, new Date().toISOString(), defenseBonus, mission.id), { source, actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId, plan: resolvedPlan, defenseBonus });
+      const run = await persistRun(simulateMission(seed, new Date().toISOString(), defenseBonus, mission.id, resolvedPlan), { source, actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId, plan: resolvedPlan, defenseBonus });
       if (source === "campaign") {
         const store = await readStore();
         const current = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
@@ -298,7 +299,7 @@ export async function createGameStore(file) {
       const resolvedPlan = suppliedPlan.assetCount ? suppliedPlan : normalizeDailyPlan({ assets: city.assets });
       if (!resolvedPlan.assetCount) return { report: null, run: null, city };
       const defenseBonus = defenseBonusFor(resolvedPlan);
-      const run = simulateMission(`daily-${key}-${actorId}`, new Date().toISOString(), defenseBonus);
+      const run = simulateMission(`daily-${key}-${actorId}`, new Date().toISOString(), defenseBonus, missions[0].id, resolvedPlan);
       store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key, actorId, plan: resolvedPlan, defenseBonus } };
       store.events.push(...run.events);
       const nextCity = { ...city, assets: resolvedPlan.assets.map((asset) => ({ ...asset, readiness: Math.max(35, Math.round(asset.readiness - (run.impacts ? 7 : 2)) ) })), morale: Math.max(0, city.morale - run.impacts * 3), energy: Math.max(0, city.energy - run.impacts * 2), infrastructure: Math.max(0, city.infrastructure - run.impacts * 2), damage: Math.min(100, city.damage + run.impacts * 4), lastResolvedDay: key, revision: city.revision + 1, updatedAt: new Date().toISOString() };
@@ -350,7 +351,7 @@ export async function createGameStore(file) {
       const resolvedPlan = normalizeDailyPlan(plan);
       if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before entering Ranked Challenge.");
       const defenseBonus = defenseBonusFor(resolvedPlan);
-      const run = simulateMission(`${challenge.seed}-${actorId}`, new Date().toISOString(), defenseBonus);
+      const run = simulateMission(`${challenge.seed}-${actorId}`, new Date().toISOString(), defenseBonus, missions[0].id, resolvedPlan);
       store.runs[run.id] = { ...run, metadata: { source: "ranked", challengeId, actorId, displayName: actorId, plan: resolvedPlan, defenseBonus } };
       store.events.push(...run.events);
       store.rankedSubmissions[challenge.id] = { ...(store.rankedSubmissions[challenge.id] || {}), [actorId]: run.id };

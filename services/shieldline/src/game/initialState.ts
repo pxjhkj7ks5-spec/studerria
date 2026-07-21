@@ -101,6 +101,7 @@ export function createInitialState(random: () => number = Math.random, mode: Cam
     engagementEvents: [],
     impactMarkers: [],
     interceptions: 0,
+    softKills: 0,
     impacts: 0,
     log: openingLog,
     forecast: createForecast(1, random),

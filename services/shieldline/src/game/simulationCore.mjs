@@ -1,7 +1,8 @@
 import { createLaunchSectorState, launchSectorCategory, pickWeightedSector, randomPointInSector } from "./launchSystem.mjs";
 import { createGuidedOperationWaves, GUIDED_THREE_STAGE_PROFILE, sectorIdsForDirection } from "./campaignPacing.mjs";
+import { AIR_DEFENSE_RULES_VERSION, planEffectivenessForThreat, supportLeakEffect } from "./airDefenseRules.mjs";
 
-export const SIM_VERSION = "2.5.0";
+export const SIM_VERSION = "3.0.0";
 // Geography changes must not silently rebalance established mission outcomes.
 const OUTCOME_RANDOM_VERSION = "2.1.0";
 
@@ -13,14 +14,22 @@ const targetSectorCoordinates = {
   hq: { lat: 50.45, lng: 30.52 },
 };
 
-const randomThreatKinds = ["geran2", "gerbera", "parodiya", "kalibr", "iskander"];
+const randomWaveArchetypes = [
+  { id: "probe", mix: ["recon", "gerbera", "parodiya", "geran2"], intensity: [2, 5], mergeBehavior: "independent" },
+  { id: "decoy-screen", mix: ["jammer", "parodiya", "gerbera", "parodiya", "geran2"], intensity: [4, 8], mergeBehavior: "screen" },
+  { id: "saturation", mix: ["geran2", "geran2", "gerbera"], intensity: [7, 13], mergeBehavior: "corridor-merge" },
+  { id: "cruise-strike", mix: ["low-signature-cruise", "kh101", "kalibr"], intensity: [2, 5], mergeBehavior: "staggered" },
+  { id: "mixed-strike", mix: ["jammer", "parodiya", "geran2", "low-signature-cruise", "kh101", "kalibr"], intensity: [5, 10], mergeBehavior: "split-screen" },
+  { id: "ballistic-event", mix: ["iskander"], intensity: [1, 2], mergeBehavior: "independent" },
+];
 const randomTargetSectors = ["north", "south", "east", "west", "hq"];
 
 function pick(values, random) {
   return values[Math.min(values.length - 1, Math.floor(random() * values.length))];
 }
 
-function randomWaveSize(kind, random) {
+function randomWaveSize(kind, random, intensity) {
+  if (intensity) return intensity[0] + Math.floor(random() * (intensity[1] - intensity[0] + 1));
   if (kind === "iskander") return 1 + Math.floor(random() * 3);
   if (kind === "kh101" || kind === "kalibr") return 2 + Math.floor(random() * 5);
   return 4 + Math.floor(random() * 8);
@@ -32,7 +41,9 @@ function createOperationWaves(mission, random) {
   if (!mission.randomWaveCount) return mission.waves;
   let etaSeconds = 16 + Math.round(random() * 8);
   return Array.from({ length: count }, (_, index) => {
-    const threatKind = pick(randomThreatKinds, random);
+    const eligible = index < Math.ceil(count * .55) ? randomWaveArchetypes.filter((item) => item.id !== "ballistic-event") : randomWaveArchetypes;
+    const archetype = pick(eligible, random);
+    const threatKind = pick(archetype.mix, random);
     const targetSector = pick(randomTargetSectors, random);
     const wave = {
       id: `wave-${String(index + 1).padStart(2, "0")}`,
@@ -40,8 +51,11 @@ function createOperationWaves(mission, random) {
       threatKind,
       targetSector,
       etaSeconds,
-      size: randomWaveSize(threatKind, random),
+      size: randomWaveSize(threatKind, random, archetype.intensity),
       difficulty: 38 + Math.round(random() * 42),
+      archetype: archetype.id,
+      mergeBehavior: archetype.mergeBehavior,
+      routeSemantics: `sector-${targetSector}`,
     };
     etaSeconds += 22 + Math.round(random() * 16);
     return wave;
@@ -75,6 +89,9 @@ const threatFlightDurationMs = {
   kh101: [70_000, 110_000],
   kalibr: [70_000, 110_000],
   iskander: [20_000, 40_000],
+  recon: [110_000, 160_000],
+  "low-signature-cruise": [75_000, 115_000],
+  jammer: [90_000, 140_000],
 };
 
 function flightDurationFor(kind, random) {
@@ -110,9 +127,10 @@ function seededRandom(seed) {
 
 export function calculateDefenseBonus(plan = {}) {
   const assets = Array.isArray(plan.assets) ? plan.assets : [];
+  const sensorKinds = new Set(["small-radar", "radar", "long-radar"]);
   const assetCount = Number.isFinite(Number(plan.assetCount)) ? Number(plan.assetCount) : assets.length;
-  const radarCount = Number.isFinite(Number(plan.radarCount)) ? Number(plan.radarCount) : assets.filter((asset) => asset?.kind === "radar").length;
-  const kineticCount = Number.isFinite(Number(plan.kineticCount)) ? Number(plan.kineticCount) : assets.filter((asset) => !["radar", "ew"].includes(asset?.kind)).length;
+  const radarCount = Number.isFinite(Number(plan.radarCount)) ? Number(plan.radarCount) : assets.filter((asset) => sensorKinds.has(asset?.kind)).length;
+  const kineticCount = Number.isFinite(Number(plan.kineticCount)) ? Number(plan.kineticCount) : assets.filter((asset) => !sensorKinds.has(asset?.kind) && asset?.kind !== "ew").length;
   const averageReadiness = Number.isFinite(Number(plan.averageReadiness))
     ? Number(plan.averageReadiness)
     : assetCount ? assets.reduce((sum, asset) => sum + Math.max(0, Math.min(100, Number(asset?.readiness || 0))), 0) / assetCount : 0;
@@ -153,7 +171,7 @@ function buildSnapshots(runId, events) {
   const state = { interceptions: 0, impacts: 0, ammoSpent: 0, status: "running", result: "pending" };
   for (const entry of events) {
     if (entry.type === "interception") state.interceptions += Number(entry.payload.count || 0);
-    if (entry.type === "impact") state.impacts += Number(entry.payload.count || 0);
+    if (entry.type === "impact" && entry.payload.damaging !== false) state.impacts += Number(entry.payload.count || 0);
     if (entry.type === "battery.fired") state.ammoSpent += Number(entry.payload.ammoSpent || entry.payload.count || 0);
     if (entry.type === "mission.completed") {
       state.status = "completed";
@@ -189,6 +207,7 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
   let interceptions = 0;
   let impacts = 0;
   let ammoSpent = 0;
+  let supportPressure = 0;
 
   events.push(event(runId, sequence++, "mission.started", 0, "Mission command accepted; authoritative simulation started.", {
     payload: { missionId: mission.id, seed: normalizedSeed, simVersion: SIM_VERSION },
@@ -226,6 +245,9 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
       launchSectorCategory: launchSectorCategory(launchSector),
       launchDirection: wave.launchDirection || originSectorForPoint(origin),
       flightDurationMs,
+      archetype: wave.archetype || null,
+      mergeBehavior: wave.mergeBehavior || "authored",
+      routeSemantics: wave.routeSemantics || `sector-${wave.targetSector}`,
     };
     const warningLeadMs = wave.threatKind === "iskander" ? 15_000 : 5_000;
     const warning = event(runId, sequence++, "launch.warning", Math.max(0, launchedAt - warningLeadMs), `${launchSector.name} entered warning state.`, {
@@ -249,12 +271,17 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
     events.push(warning, launched, detected);
     replay.push(replayEvent(warning, route), replayEvent(launched, route), replayEvent(detected, route));
 
-    const coverage = Math.min(0.9, 0.38 + random() * 0.42 + effectiveDefenseBonus);
+    const sharedResolution = planEffectivenessForThreat(plan, wave.threatKind);
+    const coverage = sharedResolution
+      ? Math.min(0.9, Math.max(0.04, sharedResolution.probability + (random() - .5) * .12 - supportPressure))
+      : Math.min(0.9, Math.max(0.04, 0.38 + random() * 0.42 + effectiveDefenseBonus - supportPressure));
     const successful = Math.max(0, Math.min(wave.size, Math.round(wave.size * coverage - wave.difficulty / 140 + random() * 1.8)));
     const missed = wave.size - successful;
     interceptions += successful;
-    impacts += missed;
-    const waveAmmo = successful * (wave.threatKind === "kh101" ? 3 : 1);
+    const leakEffect = supportLeakEffect(wave.threatKind);
+    if (leakEffect.damaging) impacts += missed;
+    supportPressure = Math.max(0, supportPressure * 0.72 + missed * leakEffect.defensePenalty);
+    const waveAmmo = successful * (sharedResolution?.salvoSize || 1);
     ammoSpent += waveAmmo;
 
     if (successful) {
@@ -289,7 +316,7 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
         sectorId: wave.targetSector,
         waveId: wave.id,
         targetId: wave.targetSector,
-        payload: { ...commonPayload, count: missed, latitude: target.lat, longitude: target.lng },
+        payload: { ...commonPayload, count: missed, damaging: leakEffect.damaging, supportPressure: leakEffect.defensePenalty, latitude: target.lat, longitude: target.lng },
       });
       events.push(impact);
       replay.push(replayEvent(impact, route));
@@ -299,7 +326,7 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
   const result = impacts === 0 ? "victory" : impacts <= 5 ? "contained" : "setback";
   const completedAtMs = Math.max(7_600, ...events.map((entry) => entry.occurredAtMs)) + 5_000;
   events.push(event(runId, sequence, "mission.completed", completedAtMs, result === "victory" ? "Mission complete: all critical tracks contained." : "Mission complete: command report is ready.", {
-    payload: { result, interceptions, impacts, ammoSpent },
+      payload: { result, interceptions, impacts, ammoSpent, rulesVersion: AIR_DEFENSE_RULES_VERSION },
   }));
 
   return {

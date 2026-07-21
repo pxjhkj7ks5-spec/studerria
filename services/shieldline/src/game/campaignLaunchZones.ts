@@ -5,13 +5,13 @@ import { pickWeightedSector, sectorSupportsThreat } from "./launchSystem.mjs";
 type CampaignLaunchAxis = CampaignRouteTemplate["launchSector"];
 
 export const campaignLaunchSectorIdsByAxis: Record<CampaignLaunchAxis, readonly string[]> = {
-  N1: ["smolensk_northwest", "bryansk_north", "oryol_deep_north", "kursk_north"],
-  NE1: ["bryansk_north", "oryol_deep_north", "kursk_north"],
-  NW1: ["smolensk_northwest", "bryansk_north"],
-  E1: ["kursk_north", "belgorod_tactical", "voronezh_deep_east", "millerovo_rostov", "astrakhan_air_corridor"],
-  SE1: ["millerovo_rostov", "taganrog_azov", "primorsko_akhtarsk", "yeisk_kuban", "astrakhan_air_corridor", "caspian_air_corridor"],
-  S1: ["primorsko_akhtarsk", "yeisk_kuban", "novorossiysk_black_sea", "black_sea_launch_box", "sevastopol_black_sea", "hvardiiske_crimea", "chauda_crimea", "dzhankoi_crimea"],
-  SW1: ["black_sea_launch_box", "sevastopol_black_sea", "hvardiiske_crimea", "chauda_crimea", "dzhankoi_crimea"],
+  N1: ["northwest_deep_a", "north_corridor_b", "north_deep_a", "north_corridor_a"],
+  NE1: ["north_corridor_b", "north_deep_a", "north_corridor_a"],
+  NW1: ["northwest_deep_a", "north_corridor_b"],
+  E1: ["north_corridor_a", "east_tactical_a", "east_deep_b", "southeast_corridor_a", "long_range_air_a"],
+  SE1: ["southeast_corridor_a", "southeast_coastal_a", "southeast_corridor_b", "southeast_corridor_c", "long_range_air_a", "long_range_air_b"],
+  S1: ["southeast_corridor_b", "southeast_corridor_c", "sea_corridor_b", "sea_corridor_c", "sea_corridor_a", "south_drone_a", "south_drone_b", "south_mixed_a"],
+  SW1: ["sea_corridor_c", "sea_corridor_a", "south_drone_a", "south_drone_b", "south_mixed_a"],
 };
 
 export function pickCampaignLaunchSector(

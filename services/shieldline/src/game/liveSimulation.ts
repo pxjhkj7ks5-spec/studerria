@@ -14,6 +14,7 @@ import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recover
 import { applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
 import { campaignKillRewards, campaignTutorialSteps, getCampaignRoute } from "../data/campaignPlan";
 import { pickCampaignLaunchSector } from "./campaignLaunchZones";
+import { acquisitionScore, classificationGain, classificationTier, engagementProbability, evaluateDoctrine, ewEffectFor, fireControlScore, fusedTrackQuality, salvoSizeFor, supportLeakEffect, threatDisplayLabel, threatRule, unitRule } from "./airDefenseRules.mjs";
 import type {
   CityId,
   Coordinates,
@@ -32,8 +33,6 @@ import type {
 const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
 const CAMPAIGN_LAUNCH_WARNING_MS = 15000;
-const FIRST_MISSION_REINFORCEMENT_MS = 510000;
-const REINFORCEMENT_AWAITING_DEPLOYMENT = "reinforcement awaiting deployment";
 const MIN_ATTACK_WINDOW_MS = 90000;
 const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
 const LAUNCH_CONE_RANGE_KM = 900;
@@ -41,7 +40,7 @@ const AIR_RAID_TRACK_DISTANCE_KM = 55;
 const AIR_RAID_TARGET_DISTANCE_KM = 60;
 const PROBABLE_TARGET_DISTANCE_KM = 82;
 
-const fallbackThreatKinds: ThreatKind[] = ["geran2", "gerbera", "parodiya", "kh101", "kalibr", "iskander"];
+const fallbackThreatKinds: ThreatKind[] = ["recon", "geran2", "gerbera", "parodiya", "jammer", "low-signature-cruise", "kh101", "kalibr", "iskander"];
 const ABSTRACT_KM_PER_DEGREE = 85;
 
 const threatFlightDurationMs: Record<ThreatKind, [number, number]> = {
@@ -57,6 +56,9 @@ const threatFlightDurationMs: Record<ThreatKind, [number, number]> = {
   kh101: [70000, 110000],
   kalibr: [70000, 110000],
   iskander: [20000, 40000],
+  recon: [110000, 160000],
+  "low-signature-cruise": [75000, 115000],
+  jammer: [90000, 140000],
 };
 
 const threatBaseDifficulty: Record<ThreatKind, number> = {
@@ -72,6 +74,9 @@ const threatBaseDifficulty: Record<ThreatKind, number> = {
   kh101: 44,
   kalibr: 42,
   iskander: 58,
+  recon: 34,
+  "low-signature-cruise": 58,
+  jammer: 50,
 };
 
 const threatDamage: Record<ThreatKind, number> = {
@@ -87,6 +92,9 @@ const threatDamage: Record<ThreatKind, number> = {
   kh101: 7,
   kalibr: 7,
   iskander: 9,
+  recon: 0,
+  "low-signature-cruise": 8,
+  jammer: 0,
 };
 
 const threatReward: Record<ThreatKind, number> = {
@@ -102,6 +110,9 @@ const threatReward: Record<ThreatKind, number> = {
   kh101: 10,
   kalibr: 10,
   iskander: 20,
+  recon: 4,
+  "low-signature-cruise": 14,
+  jammer: 12,
 };
 
 function cloneState(state: GameState): GameState {
@@ -117,8 +128,8 @@ function cloneState(state: GameState): GameState {
       threats: [...sector.threats],
     })),
     units: state.units.map((unit) => ({ ...unit })),
-    batteries: state.batteries.map((battery) => ({ ...battery, position: { ...battery.position } })),
-    storedBatteries: (state.storedBatteries || []).map((battery) => ({ ...battery, position: { ...battery.position } })),
+    batteries: state.batteries.map((battery) => ({ ...battery, position: { ...battery.position }, manualOverrideTargets: [...(battery.manualOverrideTargets || [])] })),
+    storedBatteries: (state.storedBatteries || []).map((battery) => ({ ...battery, position: { ...battery.position }, manualOverrideTargets: [...(battery.manualOverrideTargets || [])] })),
     carriers: state.carriers.map((carrier) => ({ ...carrier, position: { ...carrier.position } })),
     pendingLaunches: state.pendingLaunches.map((launch) => ({ ...launch, origin: { ...launch.origin } })),
     liveThreats: state.liveThreats.map((threat) => ({
@@ -222,7 +233,6 @@ function batteryTier(unit: ReturnType<typeof getUnitDefinition>): DefenseBattery
 }
 
 function coverageRadiusFromUnit(unit: ReturnType<typeof getUnitDefinition>) {
-  if (unit.kind === "radar") return 100 / ABSTRACT_KM_PER_DEGREE;
   return clamp(unit.outerRangeKm / ABSTRACT_KM_PER_DEGREE, 0.1, 2.1);
 }
 
@@ -257,12 +267,19 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     cooldownMs: next.planningActions.selected.includes("rapid-redeployment") ? 900 : 0,
     reloadRemainingMs: 0,
     currentAmmo: unit.ammoCapacity,
+    missionReserve: unit.missionReserveCapacity,
+    manualOverrideTargets: [],
     assignedCityId: nearestCityId(next, position),
     health: 100,
     experienceLevel: 0,
     createdAtMission: next.campaign?.missionIndex || 0,
     lastMovedMission: next.campaign?.missionIndex || 0,
   };
+  if (next.campaign && typeof battery.missionReserve === "number") {
+    const allocated = Math.min(battery.missionReserve, next.campaign.campaignAmmoStock);
+    battery.missionReserve = allocated;
+    next.campaign.campaignAmmoStock -= allocated;
+  }
   if (next.planningActions.selected.includes("rapid-redeployment")) {
     applyRedeployFatigue(battery);
   }
@@ -304,8 +321,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   if (!battery || next.status !== "active") return next;
   const scenario = getScenario(next.scenarioId);
   const unit = getUnitDefinition(battery.kind);
-  const reinforcementDeployment = battery.lastAction === REINFORCEMENT_AWAITING_DEPLOYMENT;
-  const redeployCost = next.campaign && !reinforcementDeployment ? campaignRedeployCost(battery.kind) : 0;
+  const redeployCost = next.campaign ? campaignRedeployCost(battery.kind) : 0;
   if (next.campaign && next.campaign.campaignWallet < redeployCost) {
     next.placementWarning = `Для передислокації потрібно ${redeployCost} млн ₴.`;
     return next;
@@ -322,7 +338,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
     ...battery,
     position: { ...position },
     assignedCityId: nearestCityId(next, position),
-    lastAction: reinforcementDeployment ? "reinforcement deployed" : "redeployed from storage",
+    lastAction: "redeployed from storage",
     lastMovedMission: next.campaign?.missionIndex || battery.lastMovedMission,
   });
   if (next.campaign) {
@@ -335,45 +351,28 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   return next;
 }
 
-function grantFirstMissionReinforcement(state: GameState, random: () => number) {
-  const campaign = state.campaign;
-  if (!campaign || campaign.missionIndex !== 1 || campaign.unlockedSystems.includes("s300")) return;
-  const missionElapsedMs = state.elapsedMs - state.cycleStartedAtMs;
-  if (state.cyclePhase !== "attack" || missionElapsedMs < FIRST_MISSION_REINFORCEMENT_MS) return;
-  const unit = getUnitDefinition("s300");
-  const stagingPosition = { lat: 47.2, lng: 35.8 };
-  campaign.unlockedSystems = [...new Set([...campaign.unlockedSystems, "s300"] as UnitKind[])];
-  state.storedBatteries.push({
-    id: createId("reinforcement-s300", Math.floor(state.elapsedMs), random),
-    kind: "s300",
-    position: stagingPosition,
-    coverageTier: batteryTier(unit),
-    coverageRadius: coverageRadiusFromUnit(unit),
-    readiness: unit.readiness,
-    fatigue: 0,
-    daysSinceMaintenance: 0,
-    lastAction: REINFORCEMENT_AWAITING_DEPLOYMENT,
-    lastEngagementResult: "awaiting deployment",
-    status: "ready",
-    supplyStatus: "strained",
-    cooldownMs: 0,
-    reloadRemainingMs: 0,
-    currentAmmo: unit.ammoCapacity,
-    assignedCityId: nearestCityId(state, stagingPosition),
-    health: 100,
-    experienceLevel: 0,
-    createdAtMission: 1,
-    lastMovedMission: 0,
-  });
-  pushLog(state.log, state.elapsedMs, "Підкріплення прибуло", "Розвідка повідомляє про пуски крилатих ракет. С-300 додано до резерву — розгорніть комплекс на південному сході.", "success");
-}
-
 export function setBatteryMaintenance(state: GameState, batteryId: string): GameState {
   const next = cloneState(state);
   const battery = next.batteries.find((item) => item.id === batteryId);
   if (!battery || battery.status === "maintenance") return next;
   enterMaintenance(battery);
   pushLog(next.log, next.elapsedMs, "Maintenance Assigned", "A defense unit entered one abstract cycle of accelerated recovery.", "info");
+  return next;
+}
+
+export function setBatteryManualOverride(state: GameState, batteryId: string, threatKind: ThreatKind, enabled: boolean): GameState {
+  const next = cloneState(state);
+  const battery = next.batteries.find((item) => item.id === batteryId);
+  if (!battery) return next;
+  const doctrine = getUnitDefinition(battery.kind).doctrine;
+  if (!doctrine.allowManualOverride) {
+    battery.lastEngagementResult = "Ручний дозвіл для цієї системи недоступний";
+    return next;
+  }
+  const targets = new Set(battery.manualOverrideTargets || []);
+  if (enabled) targets.add(threatKind); else targets.delete(threatKind);
+  battery.manualOverrideTargets = [...targets];
+  battery.lastEngagementResult = enabled ? `Ручний дозвіл: ${threatKind}` : `Ручний дозвіл скасовано: ${threatKind}`;
   return next;
 }
 
@@ -435,11 +434,11 @@ function activeLaunchCorridors(state: GameState) {
 }
 
 function isDroneClass(kind: ThreatKind) {
-  return kind === "drone" || kind === "decoy" || kind === "saturation" || kind === "geran2" || kind === "gerbera" || kind === "parodiya";
+  return kind === "drone" || kind === "decoy" || kind === "saturation" || kind === "geran2" || kind === "gerbera" || kind === "parodiya" || kind === "recon";
 }
 
 function isMissileClass(kind: ThreatKind) {
-  return kind === "ballistic" || kind === "cruise" || kind === "combined" || kind === "kh101" || kind === "kalibr" || kind === "iskander";
+  return kind === "ballistic" || kind === "cruise" || kind === "combined" || kind === "kh101" || kind === "kalibr" || kind === "iskander" || kind === "low-signature-cruise";
 }
 
 function pickLaunchSector(sectors: LaunchSector[], kind: ThreatKind, random: () => number): LaunchSector {
@@ -512,6 +511,8 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     difficulty: threatBaseDifficulty[kind] * (1 + Math.max(-0.06, Math.min(0.08, (launchSector.weight - 3) * 0.025))) + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
     damage: falseTrack ? 0 : threatDamage[kind],
     confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,
+    classification: "unknown",
+    displayLabel: "Невідомий контакт",
     saturation: kind === "saturation" || kind === "geran2" ? 1.25 : kind === "combined" ? 1.35 : 1,
     attackPlanId: plan?.id,
     archetype: plan?.archetype,
@@ -520,6 +521,9 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     headingDeg: heading,
     revealed: false,
     trackQuality: 0,
+    fireControlQuality: 0,
+    speedModifier: 1,
+    damageModifier: 1,
     reward: threatReward[kind],
     carrierId,
   };
@@ -716,34 +720,48 @@ function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => numbe
 function detectThreats(state: GameState, random: () => number, shouldScan: boolean) {
   const highAlert = state.planningActions.selected.includes("high-alert");
   const intelFocus = state.planningActions.selected.includes("intelligence-focus");
+  const jammerCount = state.liveThreats.filter((item) => item.kind === "jammer" && item.status !== "intercepted" && item.status !== "impact").length;
+  const jammerAcquisitionPenalty = Math.min(21, jammerCount * 7);
+  const jammerClassificationPenalty = Math.min(8, jammerCount * 2.5);
   for (const threat of state.liveThreats) {
     const position = threatPosition(threat);
     const wasRevealed = threat.revealed;
-    let bestRadarChance = 0;
-    let bestRadar: DefenseBattery | null = null;
-    for (const battery of state.batteries) {
+    const sensorScores: Array<{ battery: DefenseBattery; score: number; networkNode: boolean }> = [];
+    const sensors = state.batteries.filter((battery) => Boolean(unitRule(battery.kind).sensor) && battery.status !== "maintenance");
+    const networkSensorCount = sensors.filter((battery) => unitRule(battery.kind).roleClass === "sensor").length;
+    for (const battery of sensors) {
       const unit = getUnitDefinition(battery.kind);
-      if (unit.engagementMode !== "detect" || battery.status === "maintenance") continue;
       const rangeKm = distanceKm(position, battery.position);
-      if (rangeKm > 100) continue;
-      const bandChance = rangeKm <= 50 ? 95 : rangeKm <= 75 ? 75 : 40;
-      const statusPenalty = battery.status === "exhausted" ? 0.45 : battery.status === "strained" ? 0.72 : 1;
-      const readinessFactor = 0.58 + (battery.readiness / 100) * 0.42;
-      const planningBoost = (highAlert ? 8 : 0) + (intelFocus ? 6 : 0);
-      const chance = clamp(bandChance * statusPenalty * readinessFactor + planningBoost - threat.difficulty * 0.08, 5, 98);
-      if (chance > bestRadarChance) {
-        bestRadarChance = chance;
-        bestRadar = battery;
-      }
+      const networkNode = unitRule(battery.kind).roleClass === "sensor";
+      const coastalApproach = threat.kind === "kalibr" || threat.kind === "low-signature-cruise" || threat.targetCityId === "odesa" || threat.targetCityId === "mykolaiv";
+      const score = acquisitionScore({
+        sensorKind: battery.kind,
+        distanceKm: rangeKm,
+        readiness: battery.readiness,
+        status: battery.status,
+        threatKind: threat.kind,
+        fusionSensorCount: networkNode ? networkSensorCount : 1,
+        highAlert,
+        intelFocus,
+        wavePressure: state.wavePressure,
+        jammerPenalty: threat.kind === "jammer" ? jammerAcquisitionPenalty * .45 : jammerAcquisitionPenalty,
+        primaryRangeKm: unit.primaryRangeKm,
+        outerRangeKm: unit.outerRangeKm,
+        coastalBonus: battery.kind === "boat" && coastalApproach ? 12 : 0,
+      });
+      if (score > 0) sensorScores.push({ battery, score, networkNode });
     }
-
-    const campaignMissileTrack = Boolean(state.campaign && isMissileClass(threat.kind) && threat.progress >= .04);
-    if (campaignMissileTrack && bestRadarChance === 0) bestRadarChance = 28;
-
-    threat.revealed = bestRadarChance > 0;
+    sensorScores.sort((left, right) => right.score - left.score);
+    const bestRadar = sensorScores[0]?.battery || null;
+    const bestRadarChance = sensorScores[0]?.score || 0;
+    const acquiredThisScan = bestRadarChance > 0 && (!shouldScan || weightedChance(bestRadarChance, random));
+    threat.revealed = wasRevealed ? bestRadarChance > 0 : acquiredThisScan;
     if (!threat.revealed) {
       if (threat.status !== "engaged") threat.status = "inbound";
       threat.trackQuality = clamp(threat.trackQuality - 0.32, 0, 100);
+      threat.fireControlQuality = 0;
+      threat.classification = classificationTier(threat.confidence);
+      threat.displayLabel = threatDisplayLabel(threat.kind, threat.confidence);
       continue;
     }
 
@@ -751,21 +769,22 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
     threat.lastKnownPosition = position;
     threat.headingDeg = bearingDeg(threat.origin, threat.target);
     threat.trackQuality = shouldScan
-      ? clamp(bestRadarChance + (intelFocus ? 8 : 0), 18, 100)
-      : clamp(threat.trackQuality - 0.04, 18, 100);
+      ? fusedTrackQuality({ bestSensorScore: bestRadarChance, sensorScores: sensorScores.map((entry) => entry.score), continuity: wasRevealed ? 1 : .9, maneuver: threat.kind === "iskander" ? .82 : 1 })
+      : clamp(threat.trackQuality - 0.05, 12, 100);
+    threat.fireControlQuality = fireControlScore({ trackQuality: threat.trackQuality, confidence: threat.confidence, networkRequired: false, networkAvailable: sensorScores.some((entry) => entry.networkNode), congestion: Math.max(0, state.liveThreats.length - 8) / 4 });
 
     if (shouldScan) {
-      const firstContactBoost = wasRevealed ? 0 : 8 + random() * 8;
-      threat.confidence = clamp(threat.confidence + (bestRadarChance / 100) * 8 + firstContactBoost + (intelFocus ? 6 : 0), 0, 100);
+      const gain = bestRadar ? classificationGain({ sensorKind: bestRadar.kind, trackQuality: threat.trackQuality, fusionSensorCount: sensorScores.length, threatKind: threat.kind, intelFocus, jammerPenalty: threat.kind === "jammer" ? jammerClassificationPenalty * .4 : jammerClassificationPenalty }) : 1;
+      threat.confidence = clamp(threat.confidence + gain, 0, 100);
+      threat.classification = classificationTier(threat.confidence);
+      threat.displayLabel = threatDisplayLabel(threat.kind, threat.confidence);
       if (!wasRevealed) {
         if (bestRadar) queueEngagementEvent(state, random, bestRadar, threat, "radar", "detected");
         pushLog(
           state.log,
           state.elapsedMs,
-          bestRadar ? "Радарний контакт" : "Маршрут підтверджено",
-          bestRadar
-            ? `${threat.isFalseTrack ? "Ціль із низькою достовірністю" : "Ціль"} увійшла в зону радіолокаційного покриття.`
-            : `Далекий супровід підтвердив вхід ракети за маршрутом ${threat.routeId || "кампанії"}.`,
+          bestRadar && unitRule(bestRadar.kind).roleClass === "sensor" ? "Радарний контакт" : "Локальний сенсорний контакт",
+          `${threat.displayLabel}. Якість супроводу ${Math.round(threat.trackQuality)}%.`,
           "info",
           { eventType: "detection", locationLabel: threat.targetCityId },
         );
@@ -785,7 +804,22 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
       nextEvent.resolved = true;
       const threat = threatById.get(event.targetId);
       const battery = state.batteries.find((item) => item.id === event.unitId);
-      if (event.result === "success" && threat) {
+      if (event.result === "soft-kill" && threat) {
+        const effect = event.softKillEffect || "disrupted";
+        threat.softKillEffect = effect;
+        state.softKills += 1;
+        if (effect === "diverted" || effect === "guidance-lost") {
+          resolvedThreatIds.add(threat.id);
+        } else {
+          threat.status = "inbound";
+          threat.confidence = clamp(threat.confidence - 8, 0, 100);
+          threat.trackQuality = clamp(threat.trackQuality - 10, 0, 100);
+          if (effect === "delayed" || effect === "disrupted") threat.speedModifier = Math.min(threat.speedModifier, .62);
+          if (effect === "degraded") threat.damageModifier = Math.min(threat.damageModifier, .45);
+        }
+        const effectCopy = effect === "diverted" ? "Маршрут відхилено" : effect === "guidance-lost" ? "Наведення зірвано" : effect === "delayed" ? "Ціль затримано" : effect === "degraded" ? "Наведення деградовано" : "Зв'язок цілі пригнічено";
+        pushLog(state.log, state.elapsedMs, "РЕБ: м'яке придушення", `${effectCopy}. Ціль не зарахована як кінетичне перехоплення.`, "success");
+      } else if (event.result === "success" && threat) {
         threat.status = "intercepted";
         resolvedThreatIds.add(threat.id);
         state.interceptions += 1;
@@ -810,8 +844,9 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
       if (battery && battery.status === "engaging") {
         const unit = getUnitDefinition(battery.kind);
         if (unit.ammoCapacity !== "infinite" && unit.ammoCapacity !== 0 && battery.currentAmmo === 0) {
-          battery.status = "reloading";
-          battery.lastAction = "reloading";
+          const canReload = battery.missionReserve === "infinite" || Number(battery.missionReserve || 0) > 0;
+          battery.status = canReload ? "reloading" : "strained";
+          battery.lastAction = canReload ? "reloading" : "mission reserve exhausted";
         } else {
           battery.status = battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
         }
@@ -831,7 +866,7 @@ function hasLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: Defen
   return typeof battery.currentAmmo === "number" && battery.currentAmmo > 0;
 }
 
-function consumeLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery) {
+function consumeLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery, shots: number) {
   if (unit.ammoCapacity === "infinite") {
     battery.currentAmmo = "infinite";
     return;
@@ -839,10 +874,12 @@ function consumeLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: D
   if (typeof battery.currentAmmo !== "number") {
     battery.currentAmmo = unit.ammoCapacity;
   }
-  battery.currentAmmo = Math.max(0, battery.currentAmmo - Math.max(1, unit.salvoSize));
+  battery.currentAmmo = Math.max(0, battery.currentAmmo - Math.max(1, shots));
   if (battery.currentAmmo === 0) {
-    battery.reloadRemainingMs = unit.reloadMs;
-    battery.lastEngagementResult = "empty after engagement";
+    const reserveAvailable = battery.missionReserve === "infinite" || Number(battery.missionReserve || 0) > 0;
+    battery.reloadRemainingMs = reserveAvailable ? unit.reloadMs : 0;
+    battery.lastEngagementResult = reserveAvailable ? "Перезаряджання із запасу місії" : "Запас місії вичерпано";
+    if (!reserveAvailable) battery.status = "strained";
   }
 }
 
@@ -854,10 +891,13 @@ function setShotCooldown(battery: DefenseBattery, unit: ReturnType<typeof getUni
 
 function threatPriority(kind: ThreatKind) {
   if (kind === "iskander") return 36;
+  if (kind === "jammer") return 28;
+  if (kind === "low-signature-cruise") return 26;
   if (kind === "kh101" || kind === "kalibr") return 24;
   if (kind === "ballistic") return 30;
   if (kind === "cruise" || kind === "combined") return 22;
   if (kind === "saturation" || kind === "geran2") return 18;
+  if (kind === "recon") return 17;
   if (kind === "drone" || kind === "gerbera") return 14;
   return 8;
 }
@@ -892,6 +932,7 @@ function queueEngagementEvent(
   threat: LiveThreat,
   style: EngagementEvent["style"],
   result: EngagementEvent["result"],
+  softKillEffect?: EngagementEvent["softKillEffect"],
 ) {
   const durationMs = engagementDurationMs(style);
   const targetStartPosition = threatPosition(threat);
@@ -909,6 +950,7 @@ function queueEngagementEvent(
     progress: 0,
     resolved: false,
     style,
+    softKillEffect,
   });
 }
 
@@ -918,31 +960,32 @@ function engagementChance(
   threat: LiveThreat,
   distanceKm: number,
   conserveAmmo: boolean,
+  shots: number,
 ) {
   const base = unit.engagementChanceByThreat[threat.kind] || 0;
   if (base <= 0 || distanceKm > unit.outerRangeKm) return 0;
   const inPrimaryBand = distanceKm <= unit.primaryRangeKm;
   const bandAccuracy = inPrimaryBand ? unit.primaryAccuracy : unit.outerAccuracy;
-  const statusPenalty = battery.status === "exhausted" ? 0.46 : battery.status === "strained" ? 0.74 : 1;
-  const readinessFactor = 0.42 + (battery.readiness / 100) * 0.58;
-  const fatiguePenalty = clamp(battery.fatigue * 0.18, 0, 18);
-  const confidenceFactor = threat.confidence < 35 ? 0.72 : threat.confidence < 58 ? 0.86 : 1;
-  const saturationPenalty = Math.max(0, threat.saturation - 1) * 8;
-  const conservePenalty = conserveAmmo ? 7 : 0;
-  const experienceBonus = (battery.experienceLevel || 0) * 1.5;
-  return clamp(
-    (base * 0.68 + bandAccuracy * 0.32) * readinessFactor * statusPenalty * confidenceFactor
-      - fatiguePenalty
-      - saturationPenalty
-      - conservePenalty
-      + experienceBonus,
-    0,
-    98,
-  );
+  const perShot = engagementProbability({
+    base,
+    bandAccuracy,
+    readiness: battery.readiness,
+    status: battery.status,
+    fatigue: battery.fatigue,
+    confidence: threat.confidence,
+    trackQuality: threat.fireControlQuality || threat.trackQuality,
+    saturation: threat.saturation,
+    conserveAmmo,
+    experience: battery.experienceLevel || 0,
+    threatKind: threat.kind,
+    coastalBonus: battery.kind === "boat" && (threat.kind === "kalibr" || threat.targetCityId === "odesa" || threat.targetCityId === "mykolaiv") ? 10 : 0,
+  });
+  return shots > 1 ? Math.min(98, (1 - (1 - perShot / 100) ** shots) * 100) : perShot;
 }
 
 function engageThreats(state: GameState, random: () => number) {
   const conserveAmmo = state.planningActions.selected.includes("conserve-ammo");
+  const networkAvailable = state.batteries.some((battery) => getUnitDefinition(battery.kind).engagementMode === "detect" && battery.status !== "maintenance");
   for (const battery of state.batteries) {
     const unit = getUnitDefinition(battery.kind);
     if (
@@ -952,34 +995,64 @@ function engageThreats(state: GameState, random: () => number) {
       || battery.status === "reloading"
       || !hasLocalAmmo(unit, battery)
     ) continue;
-    let candidate: { threat: LiveThreat; distanceKm: number; chance: number; outerBand: boolean } | null = null;
+    let candidate: { threat: LiveThreat; distanceKm: number; chance: number; outerBand: boolean; shots: number } | null = null;
     let candidateScore = -Infinity;
+    let lastDoctrineReason = "Немає придатної цілі";
     for (const threat of state.liveThreats) {
       if (!threat.revealed || threat.status === "engaged") continue;
       if (battery.kind === "drone-operators" && !isDroneClass(threat.kind)) continue;
       const distanceKm = abstractDistanceKm(threatPosition(threat), battery.position);
-      const chance = engagementChance(unit, battery, threat, distanceKm, conserveAmmo);
+      const lowerTierAvailable = state.batteries.some((other) => {
+        if (other.id === battery.id || other.status === "maintenance" || other.status === "reloading") return false;
+        const otherUnit = getUnitDefinition(other.kind);
+        if (otherUnit.cost >= unit.cost || otherUnit.engagementMode !== "kinetic") return false;
+        const otherDistance = abstractDistanceKm(threatPosition(threat), other.position);
+        if (otherDistance > otherUnit.outerRangeKm) return false;
+        return evaluateDoctrine({ unitKind: other.kind, threatKind: threat.kind, confidence: threat.confidence, trackQuality: threat.fireControlQuality || threat.trackQuality, reserveRatio: 1, networkAvailable, coastalApproach: true }).allowed;
+      });
+      const totalAmmo = unit.ammoCapacity === "infinite" || battery.missionReserve === "infinite"
+        ? 1
+        : Math.max(1, Number(unit.ammoCapacity) + Number(unit.missionReserveCapacity));
+      const availableAmmo = unit.ammoCapacity === "infinite" || battery.missionReserve === "infinite"
+        ? totalAmmo
+        : Number(battery.currentAmmo) + Number(battery.missionReserve || 0);
+      const doctrineResult = evaluateDoctrine({
+        unitKind: battery.kind,
+        threatKind: threat.kind,
+        confidence: threat.confidence,
+        trackQuality: threat.fireControlQuality || threat.trackQuality,
+        reserveRatio: availableAmmo / totalAmmo,
+        lowerTierAvailable,
+        manualOverride: battery.manualOverrideTargets?.includes(threat.kind),
+        networkAvailable,
+        coastalApproach: battery.kind !== "boat" || threat.targetCityId === "odesa" || threat.targetCityId === "mykolaiv" || threat.kind === "kalibr",
+      });
+      if (!doctrineResult.allowed) { lastDoctrineReason = doctrineResult.reason; continue; }
+      const shots = salvoSizeFor(battery.kind, threat.kind, typeof battery.currentAmmo === "number" ? battery.currentAmmo : 1);
+      const chance = engagementChance(unit, battery, threat, distanceKm, conserveAmmo, shots);
       if (chance <= 0) continue;
-      const score = threatPriority(threat.kind) + threat.progress * 42 + chance * 0.18;
+      const preferred = unit.doctrine.preferredTargets.includes(threat.kind) ? 18 : 0;
+      const score = threatPriority(threat.kind) + preferred + threat.progress * 42 + chance * 0.18;
       if (score > candidateScore) {
-        candidate = { threat, distanceKm, chance, outerBand: distanceKm > unit.primaryRangeKm };
+        candidate = { threat, distanceKm, chance, outerBand: distanceKm > unit.primaryRangeKm, shots };
         candidateScore = score;
       }
     }
-    if (!candidate) continue;
+    if (!candidate) { battery.lastEngagementResult = lastDoctrineReason; continue; }
 
     const style = engagementStyleForUnit(battery.kind);
-    consumeLocalAmmo(unit, battery);
+    consumeLocalAmmo(unit, battery, candidate.shots);
     setShotCooldown(battery, unit, random, candidate.outerBand);
-    const success = weightedChance(candidate.chance, random);
+    const ewResult = style === "ew" ? ewEffectFor({ threatKind: candidate.threat.kind, confidence: candidate.threat.confidence, trackQuality: candidate.threat.trackQuality, random: random() }) : null;
+    const success = ewResult ? ewResult.success : weightedChance(candidate.chance, random);
     candidate.threat.status = "engaged";
     candidate.threat.confidence = clamp(candidate.threat.confidence + 18, 0, 100);
     battery.status = "engaging";
     battery.lastAction = "engaging target";
     battery.lastEngagementResult = `${success ? "pending intercept" : "pending miss"} ${candidate.threat.kind} (${Math.round(candidate.chance)}%)`;
-    applyEngagementFatigue(battery, unit.engagementMode === "disrupt" ? 0 : unit.salvoSize, success);
+    applyEngagementFatigue(battery, unit.engagementMode === "disrupt" ? 0 : candidate.shots, success);
     battery.status = "engaging";
-    queueEngagementEvent(state, random, battery, candidate.threat, style, success ? "success" : "miss");
+    queueEngagementEvent(state, random, battery, candidate.threat, style, success ? (style === "ew" ? "soft-kill" : "success") : "miss", ewResult?.effect);
     const action = style === "gun" ? "Черга по цілі" : style === "ew" ? "РЕБ взяла ціль у роботу" : "Пуск перехоплювача";
     pushLog(state.log, state.elapsedMs, action, `${unit.shortName}: ціль у супроводі, розрахункова ймовірність ${Math.round(candidate.chance)}%.`, style === "ew" ? "warning" : "info");
   }
@@ -989,12 +1062,33 @@ function applyImpact(state: GameState, threat: LiveThreat, random: () => number)
   const city = state.cities.find((item) => item.id === threat.targetCityId);
   if (!city) return;
 
-  const damage = threat.isFalseTrack ? 0 : threat.damage;
-  city.damage = clamp(city.damage + damage * 0.35);
-  city.infrastructure = clamp(city.infrastructure - damage * 0.25);
-  city.energy = clamp(city.energy - damage * 0.2);
-  state.resources.energy = clamp(state.resources.energy - damage * 0.1);
-  state.resources.morale = clamp(state.resources.morale - (city.importance * 0.5 + 0.8));
+  if (threat.kind === "recon") {
+    state.wavePressure = clamp(state.wavePressure + supportLeakEffect(threat.kind).wavePressure, 10, 100);
+    pushLog(state.log, state.elapsedMs, "Розвідка пройшла", "Наступні контакти отримали більше маскування та хвильового тиску.", "warning");
+    return;
+  }
+  if (threat.kind === "jammer") {
+    state.wavePressure = clamp(state.wavePressure + supportLeakEffect(threat.kind).wavePressure, 10, 100);
+    pushLog(state.log, state.elapsedMs, "Супровід РЕП завершено", "Сенсорна мережа відновлюється, але наступна хвиля отримала короткий бонус тиску.", "warning");
+    return;
+  }
+
+  const damage = threat.isFalseTrack ? 0 : threat.damage * (threat.damageModifier || 1);
+  if (damage <= 0) {
+    pushLog(state.log, state.elapsedMs, "Хибний контакт згас", "Приманка дісталася сектора, але не спричинила шкоди й не рахується як влучання.", "info");
+    return;
+  }
+  const damageChannels = threatRule(threat.kind).damageChannels;
+  if (damageChannels.includes("infrastructure")) {
+    city.damage = clamp(city.damage + damage * 0.35);
+    city.infrastructure = clamp(city.infrastructure - damage * 0.25);
+  }
+  if (damageChannels.includes("energy")) {
+    city.energy = clamp(city.energy - damage * 0.2);
+    state.resources.energy = clamp(state.resources.energy - damage * 0.1);
+  }
+  if (damageChannels.includes("morale")) state.resources.morale = clamp(state.resources.morale - (city.importance * 0.5 + 0.8));
+  if (damageChannels.includes("logistics")) state.logistics.resupplyDelayDays = Math.min(3, state.logistics.resupplyDelayDays + 1);
   if (state.campaign && damage > 0) {
     state.campaign.civilianResilience = clamp(state.campaign.civilianResilience - 4, 0, 100);
     for (const battery of state.batteries.filter((item) => item.assignedCityId === city.id)) {
@@ -1010,7 +1104,7 @@ function applyImpact(state: GameState, threat: LiveThreat, random: () => number)
 function updateThreats(state: GameState, deltaMs: number, random: () => number) {
   const remaining: LiveThreat[] = [];
   for (const threat of state.liveThreats) {
-    const next = { ...threat, progress: threat.progress + threat.speed * deltaMs };
+    const next = { ...threat, progress: threat.progress + threat.speed * (threat.speedModifier || 1) * deltaMs };
     if (next.revealed) {
       next.lastKnownPosition = threatPosition(next);
       next.headingDeg = threatCourseAtProgress(next, next.progress);
@@ -1092,6 +1186,10 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
     if (battery.currentAmmo === undefined || battery.currentAmmo === null) {
       battery.currentAmmo = unit.ammoCapacity;
     }
+    if (battery.missionReserve === undefined || battery.missionReserve === null) {
+      battery.missionReserve = unit.missionReserveCapacity;
+    }
+    if (!battery.manualOverrideTargets) battery.manualOverrideTargets = [];
     if (battery.reloadRemainingMs === undefined || battery.reloadRemainingMs === null) {
       battery.reloadRemainingMs = 0;
     }
@@ -1099,15 +1197,23 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
     if (battery.status === "reloading") {
       battery.reloadRemainingMs = Math.max(0, battery.reloadRemainingMs - deltaMs);
       if (battery.reloadRemainingMs <= 0) {
-        battery.currentAmmo = unit.ammoCapacity;
+        const transfer = unit.ammoCapacity === "infinite" || battery.missionReserve === "infinite"
+          ? unit.ammoCapacity
+          : Math.min(Number(unit.ammoCapacity), Number(battery.missionReserve || 0));
+        battery.currentAmmo = transfer;
+        if (typeof battery.missionReserve === "number") battery.missionReserve = Math.max(0, battery.missionReserve - Number(transfer));
         battery.reloadRemainingMs = 0;
-        battery.lastAction = "reload complete";
-        battery.lastEngagementResult = "reloaded";
-        battery.status = battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
+        battery.lastAction = Number(transfer) > 0 ? "reload complete" : "reserve exhausted";
+        battery.lastEngagementResult = Number(transfer) > 0 ? `Магазин поповнено із запасу місії: ${transfer}` : "Запас місії вичерпано";
+        battery.status = Number(transfer) <= 0 ? "strained" : battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
       }
     }
     battery.supplyStatus = state.logistics.unitSupply[battery.id] || "strained";
     recoverReadiness(battery, deltaMs, false, battery.supplyStatus);
+    if (battery.currentAmmo === 0 && battery.missionReserve === 0 && unit.engagementMode !== "detect") {
+      battery.status = "strained";
+      battery.lastEngagementResult = "Запас місії вичерпано";
+    }
     if (state.planningActions.selected.includes("high-alert")) {
       battery.fatigue = clamp(battery.fatigue + deltaMs * 0.00009, 0, 100);
     }
@@ -1227,7 +1333,6 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   const safeDelta = clamp(deltaMs, 0, 10_000);
   const previousElapsedMs = state.elapsedMs;
   state.elapsedMs += safeDelta;
-  grantFirstMissionReinforcement(state, random);
   if (state.campaign?.missionIndex === 1 && state.cyclePhase === "attack") {
     const missionElapsedSeconds = Math.max(0, (state.elapsedMs - state.cycleStartedAtMs) / 1_000);
     state.campaign.tutorialStep = campaignTutorialSteps.reduce((step, cue, index) => missionElapsedSeconds >= cue.atSeconds ? index : step, 0);

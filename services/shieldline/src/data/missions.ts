@@ -34,7 +34,9 @@ export const campaignMissions: MissionDefinition[] = campaignMissionsPlan.map((m
     difficulty: 30 + mission.index * 8,
     routeIds: wave.routeIds,
     groupSize: wave.groupSize,
-    mergeBehavior: wave.mergeBehavior,
+    // The deterministic server adapter consumes one neutral authored value.
+    // Rich merge behaviour stays in the live campaign director, which owns it.
+    mergeBehavior: "authored",
     targetRegion: wave.targetRegion,
     diversionRatio: wave.diversionRatio,
     spawnSpreadSec: wave.spawnSpreadSec,

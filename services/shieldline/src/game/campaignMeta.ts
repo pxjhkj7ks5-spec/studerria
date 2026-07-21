@@ -35,6 +35,7 @@ export function createCampaignState(missionIndex = 1, wallet = 0): CampaignState
   return {
     missionIndex,
     campaignWallet: wallet,
+    campaignAmmoStock: 36,
     civilianResilience: 100,
     unlockedSystems: [...mission.unlocks],
     previousMissionResults: [],
@@ -64,6 +65,7 @@ export function applyCampaignMissionOpening(state: GameState) {
   state.campaign.unlockedSystems = [...new Set([...state.campaign.unlockedSystems, ...mission.unlocks])];
   state.campaign.missionGrant = mission.grant;
   state.campaign.campaignWallet = clamp(state.campaign.campaignWallet + mission.grant, 0, 9999);
+  state.campaign.campaignAmmoStock = clamp(state.campaign.campaignAmmoStock + 8 + mission.index * 4, 0, 9999);
   state.resources.budget = state.campaign.campaignWallet;
   state.campaign.missionGrantApplied = true;
   state.campaign.missionInterceptionsAtStart = state.interceptions;
@@ -86,6 +88,18 @@ function addLine(lines: CampaignMissionResult["rewardLines"], label: string, amo
   if (amount) lines.push({ label, amount, kind });
 }
 
+export function campaignMissionObjective(state: GameState, missionIndex = state.campaign?.missionIndex || 1) {
+  const campaign = state.campaign;
+  const impactLimits = [3, 6, 7, 8, 9];
+  const resilienceFloors = [88, 78, 68, 55, 40];
+  const impacts = campaign ? state.impacts - campaign.missionImpactsAtStart : state.impacts;
+  const resilience = campaign?.civilianResilience ?? 100;
+  const impactLimit = impactLimits[Math.max(0, Math.min(4, missionIndex - 1))];
+  const resilienceFloor = resilienceFloors[Math.max(0, Math.min(4, missionIndex - 1))];
+  const objectiveMet = impacts <= impactLimit && resilience >= resilienceFloor;
+  return { objectiveMet, summary: objectiveMet ? `Завдання виконано: влучань ${impacts}/${impactLimit}, стійкість ${Math.round(resilience)}%.` : `Завдання не виконано: допустимо до ${impactLimit} влучань і стійкість не нижче ${resilienceFloor}%.` };
+}
+
 export function finalizeCampaignMission(state: GameState): CampaignMissionResult | null {
   const campaign = state.campaign;
   if (!campaign || campaign.intermission) return null;
@@ -93,6 +107,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   const interceptions = state.interceptions - campaign.missionInterceptionsAtStart;
   const impacts = state.impacts - campaign.missionImpactsAtStart;
   const totalTargets = missionTargetCount(mission);
+  const objective = campaignMissionObjective(state, campaign.missionIndex);
   const lines: CampaignMissionResult["rewardLines"] = [];
   addLine(lines, "Грант місії", mission.grant, "grant");
   addLine(lines, "Винагорода за збиті цілі", campaign.missionKillReward, "kill");
@@ -101,6 +116,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   if (campaign.civilianResilience > 90) { bonusRewards += 10; addLine(lines, "Civilian resilience > 90%", 10, "bonus"); }
   if (impacts < 3) { bonusRewards += 5; addLine(lines, "Менше 3 влучань", 5, "bonus"); }
   if (totalTargets > 0 && interceptions / totalTargets > .8) { bonusRewards += 5; addLine(lines, "Збито понад 80%", 5, "bonus"); }
+  if (objective.objectiveMet) { bonusRewards += 4; addLine(lines, "Завдання місії виконано", 4, "bonus"); }
   const ballisticKills = (campaign.missionKillsByKind.iskander || 0) + (campaign.missionKillsByKind.ballistic || 0);
   if (ballisticKills > 0) { bonusRewards += 10; addLine(lines, "Збито балістичну ціль", 10, "bonus"); }
 
@@ -128,6 +144,8 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
     penaltyCosts,
     walletAfterMission: campaign.campaignWallet,
     civilianResilienceAfterMission: campaign.civilianResilience,
+    objectiveMet: objective.objectiveMet,
+    objectiveSummary: objective.summary,
     rewardLines: lines,
   };
   campaign.previousMissionResults = [...campaign.previousMissionResults, result];
@@ -261,12 +279,25 @@ export function serviceCampaignBattery(state: GameState, batteryId: string, acti
   if (!state.campaign || !state.campaign.intermission) return state;
   const battery = [...state.batteries, ...state.storedBatteries].find((item) => item.id === batteryId);
   if (!battery) return state;
-  const cost = action === "repair" ? campaignRepairCost(battery) : campaignResupplyCost(battery.kind, portion);
-  if (cost <= 0 || state.campaign.campaignWallet < cost) return state;
   const unit = getUnitDefinition(battery.kind);
+  const reserveCapacity = unit.missionReserveCapacity === "infinite" ? 0 : Number(unit.missionReserveCapacity);
+  const reserveNow = battery.missionReserve === "infinite" ? reserveCapacity : Number(battery.missionReserve || 0);
+  const requestedAmmo = action === "resupply" ? Math.min(Math.ceil(reserveCapacity * portion), Math.max(0, reserveCapacity - reserveNow), state.campaign.campaignAmmoStock) : 0;
+  if (action === "resupply" && requestedAmmo <= 0) {
+    state.placementWarning = state.campaign.campaignAmmoStock <= 0 ? "Стратегічний запас відсутній" : "Запас місії вже заповнено";
+    return state;
+  }
+  const cost = action === "repair"
+    ? campaignRepairCost(battery)
+    : Math.ceil((campaignResupplyCosts[battery.kind] || 0) * (requestedAmmo / Math.max(1, reserveCapacity)) * 10) / 10;
+  if (cost <= 0 || state.campaign.campaignWallet < cost) return state;
   state.campaign.campaignWallet -= cost;
   state.resources.budget = state.campaign.campaignWallet;
   if (action === "repair") { battery.health = 100; battery.readiness = Math.max(battery.readiness, 90); }
-  else if (typeof unit.ammoCapacity === "number" && typeof battery.currentAmmo === "number") battery.currentAmmo = Math.min(unit.ammoCapacity, battery.currentAmmo + Math.ceil(unit.ammoCapacity * portion));
+  else {
+    battery.missionReserve = reserveNow + requestedAmmo;
+    state.campaign.campaignAmmoStock -= requestedAmmo;
+  }
+  state.placementWarning = null;
   return state;
 }

@@ -32,10 +32,10 @@ test("runtime model sprites are clean 96px RGBA assets", async () => {
 });
 
 test("launcher variants follow the active threat and sector", () => {
-  const sea = launchSectors.find((sector) => sector.id === "sevastopol_black_sea");
-  const air = launchSectors.find((sector) => sector.id === "vologda_air_corridor");
-  const near = launchSectors.find((sector) => sector.id === "belgorod_tactical");
-  const deep = launchSectors.find((sector) => sector.id === "voronezh_deep_east");
+  const sea = launchSectors.find((sector) => sector.id === "sea_corridor_a");
+  const air = launchSectors.find((sector) => sector.id === "long_range_air_c");
+  const near = launchSectors.find((sector) => sector.id === "east_tactical_a");
+  const deep = launchSectors.find((sector) => sector.id === "east_deep_b");
   assert.equal(launcherVariantForSector({ ...sea, activeThreatKind: "kalibr" }), "cruise-naval");
   assert.equal(launcherVariantForSector({ ...air, activeThreatKind: "kh101" }), "cruise-air");
   assert.equal(launcherVariantForSector({ ...near, activeThreatKind: "iskander" }), "ballistic-tactical-tel");

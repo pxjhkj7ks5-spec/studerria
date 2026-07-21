@@ -100,7 +100,7 @@ export function generateAfterActionReport(state: GameState, snapshot: CycleSnaps
 }
 
 function chooseRecommendation(state: GameState, ammoSpent: number) {
-  const radarCount = state.batteries.filter((battery) => battery.kind === "radar").length;
+  const radarCount = state.batteries.filter((battery) => ["small-radar", "radar", "long-radar"].includes(battery.kind)).length;
   if (radarCount < 2 || state.liveThreats.some((threat) => threat.confidence < 45)) return "Improve radar coverage with abstract sensor assets.";
   if (state.resources.energy < 55 || systemAverage(state, "energy") < 58) return "Prioritize energy grid repair before the next attack cycle.";
   if (state.resources.ammo < 30 || ammoSpent > 25) return "Conserve ammo and let stronger coverage handle confirmed tracks.";

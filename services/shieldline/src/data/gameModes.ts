@@ -56,8 +56,9 @@ export function getGameModeRuntimePolicy(id: GameModeId | null | undefined) {
 
 export function defenseReadinessForMode(id: GameModeId, kinds: string[]) {
   const policy = gameModeRuntimePolicies[id];
-  const radarReady = !policy.requiresRadar || kinds.includes("radar");
-  const kineticReady = !policy.requiresKinetic || kinds.some((kind) => kind !== "radar" && kind !== "ew");
+  const sensorKinds = new Set(["small-radar", "radar", "long-radar"]);
+  const radarReady = !policy.requiresRadar || kinds.some((kind) => sensorKinds.has(kind));
+  const kineticReady = !policy.requiresKinetic || kinds.some((kind) => !sensorKinds.has(kind) && kind !== "ew");
   return {
     ready: radarReady && kineticReady,
     radarReady,

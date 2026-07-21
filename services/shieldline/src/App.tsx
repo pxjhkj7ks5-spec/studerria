@@ -40,6 +40,7 @@ const mapModes: Array<{ id: MapMode; label: string }> = [
 
 const SIMULATION_TICK_MS = 300;
 const MAX_SIMULATION_FRAME_DELTA_MS = 1_000;
+const RADAR_KINDS = new Set<UnitKind>(["small-radar", "radar", "long-radar"]);
 function coOpSectorForCity(cityId: string) {
   if (["chernihiv", "sumy", "kyiv", "zhytomyr", "rivne", "lutsk"].includes(cityId)) return "north";
   if (["kharkiv", "dnipro", "zaporizhzhia", "poltava", "kryvyi-rih"].includes(cityId)) return "east";
@@ -49,7 +50,7 @@ function coOpSectorForCity(cityId: string) {
 
 function defensePlanFromBatteries(batteries: DefenseBattery[]): DailyDefensePlan {
   const assets = batteries.map((battery) => ({ id: battery.id, kind: battery.kind, cityId: battery.assignedCityId, readiness: battery.readiness, position: battery.position }));
-  return { assetCount: assets.length, radarCount: assets.filter((asset) => asset.kind === "radar").length, kineticCount: assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length, averageReadiness: assets.length ? assets.reduce((sum, asset) => sum + asset.readiness, 0) / assets.length : 0, assets };
+  return { assetCount: assets.length, radarCount: assets.filter((asset) => RADAR_KINDS.has(asset.kind)).length, kineticCount: assets.filter((asset) => !RADAR_KINDS.has(asset.kind) && asset.kind !== "ew").length, averageReadiness: assets.length ? assets.reduce((sum, asset) => sum + asset.readiness, 0) / assets.length : 0, assets };
 }
 
 type ActivePanel = "menu" | "layers" | "units" | "planning" | "intel" | "report" | "settings";
@@ -374,7 +375,7 @@ export default function App() {
   const defenseReadiness = defenseReadinessForMode(resolvedMode, game.batteries.map((battery) => battery.kind));
   const ownedBatteryKinds = [...game.batteries, ...(game.storedBatteries || [])].map((battery) => battery.kind);
   const hasOwnedRadar = ownedBatteryKinds.includes("radar");
-  const hasOwnedKinetic = ownedBatteryKinds.some((kind) => !["radar", "ew"].includes(kind));
+  const hasOwnedKinetic = ownedBatteryKinds.some((kind) => !RADAR_KINDS.has(kind) && kind !== "ew");
   const setupGuidance = operationPhase === "planning" && runtimePolicy.start === "auto-checklist" && !defenseReadiness.ready
     ? !hasOwnedRadar
       ? { kind: "radar" as const, text: "Спочатку встановіть радар" }

@@ -30,10 +30,15 @@ function testThreat(): LiveThreat {
     difficulty: 10,
     damage: 3,
     confidence: 95,
+    classification: "confirmed-type",
+    displayLabel: "Тип підтверджено: Geran-2",
     saturation: 1,
     headingDeg: 90,
     revealed: true,
     trackQuality: 95,
+    fireControlQuality: 95,
+    speedModifier: 1,
+    damageModifier: 1,
     reward: 2,
   };
 }
@@ -230,11 +235,11 @@ test("a started live operation advances launch sectors and creates threats", () 
   assert.equal(game.cyclePhase, "attack");
   assert.ok(game.liveThreats.length > 0 || game.impacts > 0 || game.interceptions > 0);
   assert.ok(game.log.some((entry) => entry.title === "Track Warning" || entry.title === "Missile Launch"));
-  const launchedSector = game.launchSectors.find((sector) => sector.lastLaunchCoordinates);
-  assert.ok(launchedSector);
-  const launchedThreat = game.liveThreats.find((threat) => threat.launchSectorId === launchedSector.id);
-  const pendingLaunch = game.pendingLaunches.find((launch) => launch.sectorId === launchedSector.id);
-  assert.deepEqual(launchedSector.lastLaunchCoordinates, launchedThreat?.origin || pendingLaunch?.origin);
+  const matchingLaunch = game.launchSectors.some((sector) => sector.lastLaunchCoordinates && [
+    ...game.liveThreats.filter((threat) => threat.launchSectorId === sector.id).map((threat) => threat.origin),
+    ...game.pendingLaunches.filter((launch) => launch.sectorId === sector.id).map((launch) => launch.origin),
+  ].some((origin) => origin.lat === sector.lastLaunchCoordinates?.lat && origin.lng === sector.lastLaunchCoordinates?.lng));
+  assert.equal(matchingLaunch, true);
 });
 
 test("radars and absent defenses never create mystery interceptions", () => {

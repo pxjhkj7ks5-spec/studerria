@@ -80,6 +80,9 @@ function generateThreats(state: GameState, random: () => number): Threat[] {
       kh101: 42,
       kalibr: 42,
       iskander: 50,
+      recon: 34,
+      "low-signature-cruise": 58,
+      jammer: 50,
     };
 
     threats.push({

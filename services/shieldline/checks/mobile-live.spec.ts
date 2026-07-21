@@ -22,7 +22,7 @@ test("zero-ammo sensors remain available and only switch tone during maintenance
 
 test("launch notifications replace detections and remain visible for four seconds", () => {
   const detection = { id: "detection", eventType: "detection", locationLabel: "kharkiv" } as IntelEntry;
-  const launch = { id: "launch", eventType: "launch", locationLabel: "kursk" } as IntelEntry;
+  const launch = { id: "launch", eventType: "launch", locationLabel: "sector-a" } as IntelEntry;
 
   assert.equal(BATTLE_NOTICE_DURATION_MS, 4_000);
   assert.equal(preferBattleNotice(detection, launch), launch);
@@ -30,7 +30,7 @@ test("launch notifications replace detections and remain visible for four second
 });
 
 test("launch notifications win when offline simulation emits a launch and detection in one frame", () => {
-  const launch = { id: "launch", eventType: "launch", locationLabel: "kursk" } as IntelEntry;
+  const launch = { id: "launch", eventType: "launch", locationLabel: "sector-a" } as IntelEntry;
   const detection = { id: "detection", eventType: "detection", locationLabel: "kharkiv" } as IntelEntry;
 
   assert.equal(selectBattleNotice([detection, launch]), launch);

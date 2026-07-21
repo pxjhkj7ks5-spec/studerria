@@ -23,7 +23,7 @@ function threatLevel(pressure: number) {
 
 export function MapLegend({ mode, game, embedded = false }: MapLegendProps) {
   const activeContacts = game.liveThreats.filter((threat) => threat.revealed && (threat.status === "inbound" || threat.status === "engaged")).length;
-  const confirmedTargets = game.liveThreats.filter((threat) => threat.revealed && threat.confidence >= 58 && (threat.status === "inbound" || threat.status === "engaged")).length;
+  const confirmedTargets = game.liveThreats.filter((threat) => threat.revealed && threat.confidence >= 60 && (threat.status === "inbound" || threat.status === "engaged")).length;
   const safety = game.campaign?.civilianResilience ?? (game.cities.length ? Math.round(game.cities.reduce((sum, city) => sum + city.morale, 0) / game.cities.length) : 0);
   const level = threatLevel(game.wavePressure);
 
@@ -37,7 +37,7 @@ export function MapLegend({ mode, game, embedded = false }: MapLegendProps) {
       <div className="intel-panel__metrics">
         <IntelMetric label="Контакти" value={activeContacts} tone="radar" />
         <IntelMetric label="Підтверджено" value={confirmedTargets} tone="confirmed" />
-        <IntelMetric label="Перехоплення" value={game.engagementEvents.filter((event) => event.style !== "radar" && !event.resolved).length} tone="intercepted" />
+        <IntelMetric label="Робота ППО" value={game.engagementEvents.filter((event) => event.style !== "radar" && !event.resolved).length} tone="intercepted" />
         <IntelMetric label="Влучання" value={game.impacts} tone="impact" />
       </div>
       <div className="intel-panel__safety">
@@ -52,6 +52,7 @@ export function MapLegend({ mode, game, embedded = false }: MapLegendProps) {
           <LegendItem icon={RadioTower} tone="uncertain" label="Радарний контакт" />
           <LegendItem icon={Siren} tone="confirmed" label="Підтверджена ціль" />
           <LegendItem icon={ShieldCheck} tone="intercepted" label="Перехоплено" />
+          <LegendItem icon={RadioTower} tone="uncertain" label={`РЕБ: ${game.softKills} ефектів`} />
           <LegendItem icon={Zap} tone="impact" label="Влучання" />
         </div>
       </details>

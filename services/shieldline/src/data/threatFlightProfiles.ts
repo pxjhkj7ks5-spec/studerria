@@ -24,6 +24,9 @@ export const threatFlightProfiles: Record<ThreatKind, ThreatFlightProfile> = {
   kh101: { label: "X-101", speedKph: [700, 850], altitudeM: [30, 120] },
   kalibr: { label: "Kalibr", speedKph: [750, 950], altitudeM: [20, 100] },
   iskander: { label: "Iskander-M", speedKph: [3_500, 7_200], altitudeM: [20_000, 50_000] },
+  recon: { label: "Recon", speedKph: [160, 260], altitudeM: [500, 1_800] },
+  "low-signature-cruise": { label: "Low-signature cruise", speedKph: [680, 880], altitudeM: [25, 100] },
+  jammer: { label: "Jammer escort", speedKph: [420, 720], altitudeM: [1_500, 5_000] },
 };
 
 function hashFraction(value: string) {

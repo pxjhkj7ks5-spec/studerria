@@ -99,8 +99,8 @@ export function CommandApp() {
         const assets = dailyCityGame.batteries.map((battery) => ({ kind: battery.kind, cityId: battery.assignedCityId, readiness: battery.readiness }));
         const report = await apiGameRepository.getDailyReport(new Date().toISOString().slice(0, 10), {
           assetCount: assets.length,
-          radarCount: assets.filter((asset) => asset.kind === "radar").length,
-          kineticCount: assets.filter((asset) => !["radar", "ew"].includes(asset.kind)).length,
+          radarCount: assets.filter((asset) => ["small-radar", "radar", "long-radar"].includes(asset.kind)).length,
+          kineticCount: assets.filter((asset) => !["small-radar", "radar", "long-radar", "ew"].includes(asset.kind)).length,
           averageReadiness: assets.reduce((sum, asset) => sum + asset.readiness, 0) / assets.length,
           assets,
         });

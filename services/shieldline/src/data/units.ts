@@ -1,4 +1,5 @@
 import type { ThreatKind, UnitDefinition, UnitKind } from "../types/game";
+import { unitRule } from "../game/airDefenseRules.mjs";
 
 const none: Record<ThreatKind, number> = {
   drone: 0,
@@ -13,6 +14,9 @@ const none: Record<ThreatKind, number> = {
   kh101: 0,
   kalibr: 0,
   iskander: 0,
+  recon: 0,
+  "low-signature-cruise": 0,
+  jammer: 0,
 };
 
 function chances(values: Partial<Record<ThreatKind, number>>): Record<ThreatKind, number> {
@@ -26,15 +30,20 @@ function chances(values: Partial<Record<ThreatKind, number>>): Record<ThreatKind
     saturation: drone,
     geran2: drone,
     gerbera: Math.min(98, drone + (drone ? 5 : 0)),
+    recon: drone,
     parodiya: decoy || drone,
     kh101: cruise,
     kalibr: cruise,
+    "low-signature-cruise": Math.max(0, cruise - (cruise ? 10 : 0)),
+    jammer: cruise,
     ...values,
   };
 }
 
 export const unitKinds: UnitKind[] = [
+  "small-radar",
   "radar",
+  "long-radar",
   "mvg",
   "boat",
   "ew",
@@ -45,10 +54,35 @@ export const unitKinds: UnitKind[] = [
   "iris-t",
   "nasams",
   "patriot",
-  "drone-operators",
 ];
 
-export const unitDefinitions: UnitDefinition[] = [
+const unitDefinitionsBase: Array<Omit<UnitDefinition, "roleClass" | "doctrine" | "sensorProfile" | "missionReserveCapacity">> = [
+  {
+    kind: "small-radar",
+    name: "Малий секторний радар",
+    shortName: "Малий радар",
+    technicalCode: "RAD-SR",
+    cost: 12,
+    costLabel: "12 млн ₴",
+    upkeep: 2,
+    rangeLevel: 1,
+    detectionBonus: 22,
+    interceptionPower: 0,
+    ammoUse: 0,
+    ammoCapacity: 0,
+    reloadMs: 0,
+    shotCooldownMs: 0,
+    salvoSize: 0,
+    primaryRangeKm: 50,
+    outerRangeKm: 68,
+    primaryAccuracy: 0,
+    outerAccuracy: 0,
+    engagementMode: "detect",
+    engagementChanceByThreat: chances({}),
+    mobility: 4,
+    readiness: 88,
+    description: "Дешевий локальний сенсор: швидко класифікує цілі у своєму коридорі, але не бачить глибоко.",
+  },
   {
     kind: "radar",
     name: "Radar 35D6",
@@ -65,15 +99,41 @@ export const unitDefinitions: UnitDefinition[] = [
     reloadMs: 0,
     shotCooldownMs: 0,
     salvoSize: 0,
-    primaryRangeKm: 100,
-    outerRangeKm: 100,
+    primaryRangeKm: 95,
+    outerRangeKm: 118,
     primaryAccuracy: 0,
     outerAccuracy: 0,
     engagementMode: "detect",
     engagementChanceByThreat: chances({}),
     mobility: 1,
     readiness: 88,
-    description: "Радар далекого виявлення з періодичним оглядом повітряного простору.",
+    description: "Основний мережевий радар із балансом дальності, класифікації та sensor fusion.",
+  },
+  {
+    kind: "long-radar",
+    name: "Радар раннього попередження",
+    shortName: "Дальній радар",
+    technicalCode: "RAD-EW",
+    cost: 52,
+    costLabel: "52 млн ₴",
+    upkeep: 8,
+    rangeLevel: 3,
+    detectionBonus: 48,
+    interceptionPower: 0,
+    ammoUse: 0,
+    ammoCapacity: 0,
+    reloadMs: 0,
+    shotCooldownMs: 0,
+    salvoSize: 0,
+    primaryRangeKm: 155,
+    outerRangeKm: 185,
+    primaryAccuracy: 0,
+    outerAccuracy: 0,
+    engagementMode: "detect",
+    engagementChanceByThreat: chances({}),
+    mobility: 1,
+    readiness: 84,
+    description: "Дає раннє попередження і сильний fusion-бонус, але повільніше уточнює тип контакту.",
   },
   {
     kind: "mvg",
@@ -96,7 +156,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 68,
     outerAccuracy: 31.3,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 68, cruise: 34, decoy: 45 }),
+    engagementChanceByThreat: chances({ drone: 68, cruise: 0, decoy: 52 }),
     mobility: 4,
     readiness: 84,
     description: "Мобільна вогнева група для швидкої протидії повільним дронам.",
@@ -122,7 +182,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 74,
     outerAccuracy: 34,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 74, cruise: 37, decoy: 45 }),
+    engagementChanceByThreat: chances({ drone: 76, cruise: 0, kalibr: 48, decoy: 50 }),
     mobility: 3,
     readiness: 84,
     description: "Патрульний катер, адаптований для прикриття прибережних напрямків.",
@@ -148,7 +208,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 12,
     outerAccuracy: 8,
     engagementMode: "disrupt",
-    engagementChanceByThreat: chances({ drone: 12, cruise: 18, decoy: 70 }),
+    engagementChanceByThreat: chances({ drone: 58, cruise: 36, decoy: 76, ballistic: 0 }),
     mobility: 2,
     readiness: 86,
     description: "Комплекс радіоелектронної протидії з необмеженим ресурсом впливу.",
@@ -174,7 +234,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 75,
     outerAccuracy: 34.5,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 75, cruise: 37.5, ballistic: 35, decoy: 35 }),
+    engagementChanceByThreat: chances({ drone: 75, cruise: 48, ballistic: 0, decoy: 0 }),
     mobility: 4,
     readiness: 84,
     description: "Мобільна група ближньої дії з обмеженим запасом ракет.",
@@ -200,7 +260,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 85,
     outerAccuracy: 39.1,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 85, cruise: 42.5, ballistic: 46.5, decoy: 45 }),
+    engagementChanceByThreat: chances({ drone: 87, cruise: 0, ballistic: 0, decoy: 55 }),
     mobility: 2,
     readiness: 82,
     description: "Зенітна самохідна установка зі швидким повторним вогнем по дронах.",
@@ -226,7 +286,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 78,
     outerAccuracy: 35.9,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 78, cruise: 55, ballistic: 70.2, decoy: 55 }),
+    engagementChanceByThreat: chances({ drone: 0, geran2: 42, cruise: 72, ballistic: 0, decoy: 0 }),
     mobility: 2,
     readiness: 78,
     description: "Ракетний комплекс середньої дальності проти крилатих і балістичних цілей.",
@@ -252,7 +312,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 78,
     outerAccuracy: 38,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 78, cruise: 62, ballistic: 42, decoy: 55 }),
+    engagementChanceByThreat: chances({ drone: 0, cruise: 76, ballistic: 0, decoy: 0 }),
     mobility: 1,
     readiness: 76,
     description: "Далекобійний ракетний комплекс із широкою зоною прикриття.",
@@ -278,7 +338,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 92,
     outerAccuracy: 42.3,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 92, cruise: 46, ballistic: 92, decoy: 68 }),
+    engagementChanceByThreat: chances({ drone: 62, gerbera: 0, cruise: 88, ballistic: 0, decoy: 0 }),
     mobility: 1,
     readiness: 78,
     description: "Сучасний комплекс із високою точністю проти дронів і крилатих ракет.",
@@ -304,7 +364,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 90,
     outerAccuracy: 41.4,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 98, cruise: 45, ballistic: 90, decoy: 72 }),
+    engagementChanceByThreat: chances({ drone: 58, gerbera: 0, cruise: 84, ballistic: 0, decoy: 0 }),
     mobility: 1,
     readiness: 80,
     description: "Мережева пускова установка з великим БК і високою точністю.",
@@ -330,7 +390,7 @@ export const unitDefinitions: UnitDefinition[] = [
     primaryAccuracy: 95,
     outerAccuracy: 43.7,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 95, cruise: 47.5, ballistic: 95, iskander: 88, decoy: 65 }),
+    engagementChanceByThreat: chances({ drone: 0, cruise: 62, ballistic: 94, iskander: 90, decoy: 0 }),
     mobility: 1,
     readiness: 76,
     description: "Стратегічна батарея з найкращими можливостями проти балістичних цілей.",
@@ -368,6 +428,17 @@ export const unitDefinitions: UnitDefinition[] = [
     description: "Мобільна команда дронів-перехоплювачів для цілей безпілотного класу.",
   },
 ];
+
+export const unitDefinitions: UnitDefinition[] = unitDefinitionsBase.map((unit) => {
+  const rules = unitRule(unit.kind);
+  return {
+    ...unit,
+    roleClass: rules.roleClass,
+    doctrine: rules.doctrine,
+    sensorProfile: rules.sensor,
+    missionReserveCapacity: rules.reserve,
+  };
+});
 
 export function getUnitDefinition(kind: UnitKind): UnitDefinition {
   const definition = unitDefinitions.find((unit) => unit.kind === kind);

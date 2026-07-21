@@ -11,6 +11,7 @@ test("production image includes every authoritative simulation runtime module", 
   assert.match(dockerfile, /src\/game\/simulationCore\.mjs/);
   assert.match(dockerfile, /src\/game\/launchSystem\.mjs/);
   assert.match(dockerfile, /src\/game\/campaignPacing\.mjs/);
+  assert.match(dockerfile, /src\/game\/airDefenseRules\.mjs/);
   assert.match(dockerfile, /serverTelegramAuth\.mjs/);
 });
 
@@ -24,7 +25,7 @@ test("authoritative mission output is stable for a golden seed", () => {
   assert.ok(left.events.some((event) => event.type === "threat.launched"));
   assert.ok(left.events.some((event) => event.type === "track.detected"));
   assert.ok(left.events.some((event) => event.type === "battery.fired"));
-  assert.equal(left.simVersion, "2.5.0");
+  assert.equal(left.simVersion, "3.0.0");
   assert.equal(left.snapshots.length, 2);
   const windows = { geran2: [120_000, 180_000], gerbera: [120_000, 180_000], parodiya: [120_000, 180_000], kh101: [70_000, 110_000], kalibr: [70_000, 110_000], iskander: [20_000, 40_000] };
   for (const launched of left.events.filter((event) => event.type === "threat.launched")) {
@@ -53,7 +54,7 @@ test("browser offline and server adapters emit byte-identical campaign events", 
     ],
   };
   const browserRun = runDeterministicMission(campaignMissions[0], "adapter-parity", plan);
-  const serverRun = simulateMission("adapter-parity", "2026-07-09T00:00:00.000Z", calculateDefenseBonus(plan), campaignMissions[0].id);
+  const serverRun = simulateMission("adapter-parity", "2026-07-09T00:00:00.000Z", calculateDefenseBonus(plan), campaignMissions[0].id, plan);
   assert.equal(JSON.stringify(browserRun.events), JSON.stringify(serverRun.events));
   assert.equal(JSON.stringify(browserRun.snapshots), JSON.stringify(serverRun.snapshots));
 });

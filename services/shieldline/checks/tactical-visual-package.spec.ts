@@ -10,7 +10,7 @@ test("threat routes distinguish hidden, predicted and confirmed tracks", () => {
   assert.equal(classifyThreatRoute({ revealed: true, confidence: 34, status: "inbound" }, false), "hidden");
   assert.equal(classifyThreatRoute({ revealed: true, confidence: 35, status: "inbound" }, false), "predicted");
   assert.equal(classifyThreatRoute({ revealed: true, confidence: 57, status: "inbound" }, true), "hidden");
-  assert.equal(classifyThreatRoute({ revealed: true, confidence: 58, status: "inbound" }, true), "confirmed");
+  assert.equal(classifyThreatRoute({ revealed: true, confidence: 60, status: "inbound" }, true), "confirmed");
   assert.equal(classifyThreatRoute({ revealed: true, confidence: 20, status: "engaged" }, true), "confirmed");
   const endpoint = predictedRouteEndpoint({ lat: 0, lng: 0 }, { lat: 10, lng: 20 });
   assert.ok(Math.abs(endpoint.lat - 3.4) < 1e-9);

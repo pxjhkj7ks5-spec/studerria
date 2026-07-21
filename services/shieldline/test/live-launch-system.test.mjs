@@ -29,11 +29,13 @@ test("live mode uses the complete abstract launch-sector catalogue", () => {
   assert.equal(new Set(launchSectors.map((sector) => sector.id)).size, launchSectors.length);
   assert.equal(SHOW_LAUNCH_DEBUG, false);
   assert.ok(launchSectors.every((sector) => sector.radiusKm >= 40 && sector.weight > 0 && sector.threats.length > 0 && sector.role));
+  assert.ok(launchSectors.every((sector) => /^(north|northwest|east|southeast|south|sea|long_range)_/.test(sector.id)));
+  assert.ok(launchSectors.every((sector) => /сектор/i.test(sector.name)));
   assert.ok(!launchSectors.some((sector) => ["drone-northwest", "otrk-northeast", "black-sea-ships"].includes(sector.id)));
 });
 
 test("random launch points are distributed inside the sector radius", () => {
-  const sector = launchSectors.find((item) => item.id === "chauda_crimea");
+  const sector = launchSectors.find((item) => item.id === "south_drone_b");
   const values = [0.25, 0];
   const point = randomPointInSector(sector, () => values.shift());
   const distance = distanceKm({ lat: sector.lat, lng: sector.lng }, point);
@@ -75,9 +77,9 @@ test("the five-mission campaign follows the authored escalation while launch ori
   const mission = campaignMissions[0];
   assert.equal(campaignMissions.length, 5);
   assert.deepEqual(campaignMissions.map((entry) => entry.durationMinutes), [15, 35, 45, 50, 60]);
-  assert.deepEqual(campaignMissions.map((entry) => entry.grant), [38, 32, 48, 70, 100]);
+  assert.deepEqual(campaignMissions.map((entry) => entry.grant), [42, 32, 48, 70, 100]);
   assert.ok(campaignMissions.every((entry) => !("rewardCap" in entry)));
-  assert.equal(mission.waves.reduce((sum, wave) => sum + wave.size, 0), 29);
+  assert.equal(mission.waves.reduce((sum, wave) => sum + wave.size, 0), 30);
   assert.equal(campaignMissions[3].waves.some((wave) => wave.threatKind === "iskander"), true);
   assert.equal(campaignMissions[4].waves.reduce((sum, wave) => sum + wave.size, 0), 103);
   const left = runDeterministicMission(mission, "campaign-sector-left");

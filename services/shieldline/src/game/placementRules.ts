@@ -38,7 +38,7 @@ export function validateBatteryPlacement(kind: UnitKind, position: Coordinates, 
     const onWater = overlay.waterPlacementPolygons.some((polygon) => pointInPolygon(position, polygon));
     return onWater
       ? { allowed: true }
-      : { allowed: false, reason: "Катери можна розміщувати лише на воді." };
+      : { allowed: false, reason: "Катер можна розміщувати лише у прибережному секторі." };
   }
 
   const insideUkraine = overlay.ukrainePlacementPolygons.some((polygon) => pointInPolygon(position, polygon));

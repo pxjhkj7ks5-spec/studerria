@@ -1,10 +1,11 @@
 import L from "leaflet";
 import { Circle, CircleMarker, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { carrierSprites, launchSprites, launcherVariantSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
+import { carrierSprites, launchSprites, launcherVariantSprites, threatSprites, unitSprites, unknownThreatSprite } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
-import { formatThreatAltitude, formatThreatSpeed, threatDisplayName } from "../data/threatFlightProfiles";
+import { formatThreatAltitude, formatThreatSpeed } from "../data/threatFlightProfiles";
+import { threatRule } from "../game/airDefenseRules.mjs";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageState } from "../game/coverageVisuals";
@@ -203,7 +204,7 @@ function imageMarkerHtml(src: string, className: string) {
 
 function threatTone(threat: LiveThreat) {
   if (threat.kind === "decoy") return "decoy";
-  if (threat.status === "engaged" || threat.confidence >= 58) return "confirmed";
+  if (threat.status === "engaged" || threat.confidence >= 60) return "confirmed";
   return "uncertain";
 }
 
@@ -212,7 +213,7 @@ type TargetLabelStatus = "radar" | "confirmed" | "intercepted" | "hit";
 function targetLabelStatus(threat: LiveThreat): TargetLabelStatus {
   if (threat.status === "impact") return "hit";
   if (threat.status === "intercepted") return "intercepted";
-  if (threat.status === "engaged" || threat.confidence >= 58) return "confirmed";
+  if (threat.status === "engaged" || threat.confidence >= 60) return "confirmed";
   return "radar";
 }
 
@@ -286,7 +287,7 @@ function makeBatteryIcon(battery: DefenseBattery) {
 function threatMarkerIconKey(threat: LiveThreat) {
   const tone = threatTone(threat);
   const labelStatus = targetLabelStatus(threat);
-  return `${threat.kind}:${tone}:${labelStatus}:${threat.speedKph}:${threat.altitudeM}`;
+  return `${threat.kind}:${tone}:${labelStatus}:${threat.classification}:${threat.displayLabel}:${threat.speedKph}:${threat.altitudeM}`;
 }
 
 function makeThreatIcon(threat: LiveThreat) {
@@ -298,9 +299,13 @@ function makeThreatIcon(threat: LiveThreat) {
   const key = threatMarkerIconKey(threat);
   const cached = threatIconCache.get(key);
   if (cached) return cached;
+  const classSprite = threatRule(threat.kind).class === "ballistic" ? threatSprites.ballistic
+    : threatRule(threat.kind).class === "cruise" ? threatSprites.cruise
+      : threatRule(threat.kind).class === "decoy" ? threatSprites.decoy : threatSprites.drone;
+  const sprite = threat.confidence < 35 ? unknownThreatSprite : threat.confidence < 85 ? classSprite : threatSprites[threat.kind];
   const icon = L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span><span class="target-label target-label--${labelStatus}" aria-hidden="true"><span class="target-label__head"><b>${threatDisplayName(threat.kind)}</b><i>${targetLabelStatusText(labelStatus)}</i></span><span class="target-label__metrics"><span>${formatThreatSpeed(threat.speedKph)}</span><span>${formatThreatAltitude(threat.altitudeM)}</span></span><span class="target-label__course">КУРС ${course}°</span></span></span>`,
+    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${sprite}" alt="" draggable="false" /></span><span class="target-label target-label--${labelStatus}" aria-hidden="true"><span class="target-label__head"><b>${threat.displayLabel || "Невідомий контакт"}</b><i>${targetLabelStatusText(labelStatus)}</i></span><span class="target-label__metrics"><span>${formatThreatSpeed(threat.speedKph)}</span><span>${formatThreatAltitude(threat.altitudeM)}</span></span><span class="target-label__course">СУПРОВІД ${Math.round(threat.trackQuality)}%</span></span></span>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
@@ -1228,7 +1233,8 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
                   <small>Зона дії {unit.primaryRangeKm}/{unit.outerRangeKm} км</small>
                   <small>Готовність {Math.round(battery.readiness)}% · {battery.status}</small>
                   <small>Стан {Math.round(battery.health)}% · досвід L{battery.experienceLevel}</small>
-                  <small>БК {ammo} · перезаряджання {reload}</small>
+                  <small>БК {ammo} · запас місії {battery.missionReserve === "infinite" ? "∞" : battery.missionReserve} · {reload}</small>
+                  <small>{battery.lastEngagementResult}</small>
                   <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Передислокувати · 1 млн ₴ при розміщенні</button>
                 </div>;
               })()}
