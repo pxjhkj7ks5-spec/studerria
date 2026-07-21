@@ -79,6 +79,11 @@ test("map panning defers React culling and tile updates until movement settles",
   assert.match(tracker, /moveend\(\)\s*\{\s*scheduleViewportFrame\(\)/);
   assert.match(source, /keepBuffer=\{4\}[\s\S]*?updateWhenIdle[\s\S]*?updateWhenZooming/);
   assert.doesNotMatch(source, /updateWhenIdle=\{false\}/);
+  assert.match(source, /if \(mapMovingRef\.current\) return;/);
+  assert.match(source, /setMapMotionRevision\(\(revision\) => revision \+ 1\)/);
+  assert.match(source, /const CityExclusionCircle = memo/);
+  assert.match(source, /<CityExclusionCircle[\s\S]*?reducedQuality=\{reducedQuality\}/);
+  assert.doesNotMatch(source, /key=\{`city-exclusion-\$\{city\.id\}`\}[\s\S]{0,120}?center=\{/);
 });
 
 test("the first six modes are live while Daily Defense is scheduled", () => {

@@ -26,14 +26,17 @@ test("desktop trackpad and mouse wheel zoom use bounded intuitive steps", async 
   const before = await markerDistance();
   const mapBox = await map.boundingBox();
   if (!mapBox) throw new Error("Desktop map did not render.");
+  const waitForZoomToSettle = () => expect.poll(() => map.evaluate((element) => !element.classList.contains("leaflet-zoom-anim"))).toBe(true);
   await page.mouse.move(mapBox.x + mapBox.width * 0.55, mapBox.y + mapBox.height * 0.5);
   await page.mouse.wheel(0, -12);
   await expect.poll(markerDistance).toBeGreaterThan(before * 1.05);
+  await waitForZoomToSettle();
   const afterTrackpadStep = await markerDistance();
   expect(afterTrackpadStep).toBeLessThan(before * 1.35);
 
   await page.mouse.wheel(0, -1_000);
   await expect.poll(markerDistance).toBeGreaterThan(afterTrackpadStep * 1.05);
+  await waitForZoomToSettle();
   expect(await markerDistance()).toBeLessThan(afterTrackpadStep * 2.6);
 });
 

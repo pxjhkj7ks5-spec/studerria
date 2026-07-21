@@ -270,6 +270,21 @@ const CoverageCircle = memo(function CoverageCircle({ lat, lng, radius, color, f
   return <Circle center={center} radius={radius} pathOptions={pathOptions} />;
 });
 
+const CityExclusionCircle = memo(function CityExclusionCircle({ lat, lng, reducedQuality }: { lat: number; lng: number; reducedQuality: boolean }) {
+  const center = useMemo<[number, number]>(() => [lat, lng], [lat, lng]);
+  const pathOptions = useMemo(() => ({
+    color: "#ff8b6e",
+    fillColor: "#ff4f4f",
+    fillOpacity: reducedQuality ? 0.035 : 0.055,
+    opacity: reducedQuality ? 0.42 : 0.58,
+    weight: 1,
+    dashArray: "4 5",
+    className: "city-exclusion-ring",
+  }), [reducedQuality]);
+
+  return <Circle center={center} radius={CITY_PLACEMENT_EXCLUSION_KM * 1000} pathOptions={pathOptions} />;
+});
+
 function makeBatteryIcon(battery: DefenseBattery) {
   const key = `${battery.kind}:${battery.status}`;
   const cached = batteryIconCache.get(key);
@@ -703,6 +718,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
   const mapMovingRef = useRef(false);
   const frameRef = useRef(0);
   const lastAnimationFrameAtRef = useRef<number | null>(null);
+  const [mapMotionRevision, setMapMotionRevision] = useState(0);
 
   useEffect(() => {
     const threatGroup = L.layerGroup().addTo(map);
@@ -716,7 +732,9 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
       mapMovingRef.current = true;
     };
     const resumeMapAnimation = () => {
+      const wasMoving = mapMovingRef.current;
       mapMovingRef.current = false;
+      if (wasMoving) setMapMotionRevision((revision) => revision + 1);
     };
     map.on("movestart", pauseMapAnimation);
     map.on("zoomstart", pauseMapAnimation);
@@ -779,6 +797,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
     const engagementGroup = engagementGroupRef.current;
     const impactGroup = impactGroupRef.current;
     if (!threatGroup || !engagementGroup || !impactGroup) return;
+    if (mapMovingRef.current) return;
 
     const threatIds = new Set(threats.map((threat) => threat.id));
     for (const [id, pooled] of threatPoolRef.current) {
@@ -882,7 +901,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
         );
       }
     }
-  }, [threats, engagements, impacts, elapsedMs, mapMode, reducedQuality]);
+  }, [threats, engagements, impacts, elapsedMs, mapMode, reducedQuality, mapMotionRevision]);
 
   return null;
 }
@@ -1144,19 +1163,11 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
           />
         ))}
         {placementKind && placementKind !== "boat" ? game.cities.map((city) => (
-          <Circle
+          <CityExclusionCircle
             key={`city-exclusion-${city.id}`}
-            center={[city.coordinates.lat, city.coordinates.lng]}
-            radius={CITY_PLACEMENT_EXCLUSION_KM * 1000}
-            pathOptions={{
-              color: "#ff8b6e",
-              fillColor: "#ff4f4f",
-              fillOpacity: reducedQuality ? 0.035 : 0.055,
-              opacity: reducedQuality ? 0.42 : 0.58,
-              weight: 1,
-              dashArray: "4 5",
-              className: "city-exclusion-ring",
-            }}
+            lat={city.coordinates.lat}
+            lng={city.coordinates.lng}
+            reducedQuality={reducedQuality}
           />
         )) : null}
         {visibleLaunchSectors.map((sector) => {
