@@ -1,11 +1,10 @@
 import L from "leaflet";
 import { Circle, CircleMarker, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { carrierSprites, launchSprites, launcherVariantSprites, threatSprites, unitSprites, unknownThreatSprite } from "../assets/sprites/spriteCatalog";
+import { carrierSprites, launchSprites, launcherVariantSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { formatThreatAltitude, formatThreatSpeed } from "../data/threatFlightProfiles";
-import { threatRule } from "../game/airDefenseRules.mjs";
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageState } from "../game/coverageVisuals";
@@ -299,13 +298,12 @@ function makeThreatIcon(threat: LiveThreat) {
   const key = threatMarkerIconKey(threat);
   const cached = threatIconCache.get(key);
   if (cached) return cached;
-  const classSprite = threatRule(threat.kind).class === "ballistic" ? threatSprites.ballistic
-    : threatRule(threat.kind).class === "cruise" ? threatSprites.cruise
-      : threatRule(threat.kind).class === "decoy" ? threatSprites.decoy : threatSprites.drone;
-  const sprite = threat.confidence < 35 ? unknownThreatSprite : threat.confidence < 85 ? classSprite : threatSprites[threat.kind];
+  const targetVisual = threat.confidence >= 85
+    ? `<span class="target-sprite target-sprite--${tone}"><img src="${threatSprites[threat.kind]}" alt="" draggable="false" /></span>`
+    : `<span class="target-contact target-contact--${threat.confidence < 35 ? "unknown" : "classified"}" aria-hidden="true">${threat.confidence < 35 ? "?" : "•"}</span>`;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg"><span class="target-sprite target-sprite--${tone}"><img src="${sprite}" alt="" draggable="false" /></span><span class="target-label target-label--${labelStatus}" aria-hidden="true"><span class="target-label__head"><b>${threat.displayLabel || "Невідомий контакт"}</b><i>${targetLabelStatusText(labelStatus)}</i></span><span class="target-label__metrics"><span>${formatThreatSpeed(threat.speedKph)}</span><span>${formatThreatAltitude(threat.altitudeM)}</span></span><span class="target-label__course">СУПРОВІД ${Math.round(threat.trackQuality)}%</span></span></span>`,
+    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg">${targetVisual}<span class="target-label target-label--${labelStatus}" aria-hidden="true"><span class="target-label__head"><b>${threat.displayLabel || "Невідомий контакт"}</b><i>${targetLabelStatusText(labelStatus)}</i></span><span class="target-label__metrics"><span>${formatThreatSpeed(threat.speedKph)}</span><span>${formatThreatAltitude(threat.altitudeM)}</span></span><span class="target-label__course">СУПРОВІД ${Math.round(threat.trackQuality)}%</span></span></span>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });

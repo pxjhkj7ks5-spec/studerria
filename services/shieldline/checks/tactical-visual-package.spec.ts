@@ -45,6 +45,19 @@ test("route sampling follows distance, turns the sprite locally and keeps predic
   assert.doesNotMatch(mapSource, /previousRouteVisual|pooled\.route = null/);
 });
 
+test("unidentified contacts use red tactical symbols instead of generic target artwork", async () => {
+  const mapSource = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
+  const spriteCatalog = await readFile(new URL("../src/assets/sprites/spriteCatalog.ts", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../src/styles/app.css", import.meta.url), "utf8");
+
+  assert.match(mapSource, /threat\.confidence >= 85/);
+  assert.match(mapSource, /target-contact--\$\{threat\.confidence < 35 \? "unknown" : "classified"\}/);
+  assert.match(mapSource, /threat\.confidence < 35 \? "\?" : "•"/);
+  assert.doesNotMatch(mapSource, /classSprite|unknownThreatSprite/);
+  assert.doesNotMatch(spriteCatalog, /unknownThreatSprite/);
+  assert.match(styles, /\.target-contact[\s\S]*?color: #ff625a/);
+});
+
 test("display preferences are visual-only, normalized and performance mode overrides automatic quality", async () => {
   assert.deepEqual(normalizeDisplayPreferences(null), { environmentTime: "night", environmentWeather: "clear", performanceMode: false });
   assert.deepEqual(normalizeDisplayPreferences({ environmentTime: "day", environmentWeather: "fog", performanceMode: true }), { environmentTime: "day", environmentWeather: "fog", performanceMode: true });

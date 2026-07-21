@@ -25,7 +25,6 @@ import s300Unit from "./units/s300.png";
 import droneOperatorsUnit from "./units/drone-operators.png";
 import tu95Carrier from "./carriers/tu95.png";
 import blackSeaShipCarrier from "./carriers/black-sea-ship.png";
-import unknownTrack from "./icons/unknown-track.png";
 import droneLaunch from "./launch/drone-launch.png";
 import ballisticLaunch from "./launch/ballistic-launch.png";
 import cruiseLaunch from "./launch/cruise-launch.png";
@@ -55,8 +54,6 @@ export const threatSprites: Record<ThreatKind, string> = {
   "low-signature-cruise": threatKh101,
   jammer: threatCruise,
 };
-
-export const unknownThreatSprite = unknownTrack;
 
 export const unitSprites: Record<UnitKind, string> = {
   "small-radar": smallRadarUnit,
