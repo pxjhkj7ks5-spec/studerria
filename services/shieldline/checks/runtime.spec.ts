@@ -297,6 +297,26 @@ test("only an in-range real battery launches and resolves an interceptor", () =>
   assert.equal(game.liveThreats.some((threat) => threat.id === "test-threat"), false);
 });
 
+test("interceptor prediction follows the assigned target route instead of a direct shortcut", () => {
+  let game = combatState();
+  game.liveThreats[0].target = { lat: 49.8, lng: 30 };
+  game.liveThreats[0].routeWaypoints = [
+    { ...game.liveThreats[0].origin },
+    { lat: 49.2, lng: 30 },
+    { ...game.liveThreats[0].target },
+  ];
+  game.liveThreats[0].progress = .08;
+  game = placeBattery(game, "radar", { lat: 49.2, lng: 29.45 }, () => 0.5);
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.5 }, () => 0.5);
+  game = tickSimulation(game, 100, () => 0.999);
+
+  const event = game.engagementEvents.find((item) => item.style === "gun");
+  assert.ok(event);
+  assert.ok(Math.abs(event.targetPredictedPosition.lat - 49.2) < .0001);
+  assert.ok(event.targetPredictedPosition.lng > event.targetStartPosition.lng);
+  assert.ok(event.targetPredictedPosition.lng < 30);
+});
+
 test("a failed engagement is animated and logged without removing the target", () => {
   let game = combatState();
   game = placeBattery(game, "radar", { lat: 49.25, lng: 29.45 }, () => 0.5);

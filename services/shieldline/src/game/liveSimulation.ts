@@ -919,10 +919,7 @@ function engagementDurationMs(style: EngagementEvent["style"]) {
 
 function predictedThreatPosition(threat: LiveThreat, durationMs: number) {
   const predictedProgress = clamp(threat.progress + threat.speed * durationMs * 0.82, 0, 1);
-  return {
-    lat: threat.origin.lat + (threat.target.lat - threat.origin.lat) * predictedProgress,
-    lng: threat.origin.lng + (threat.target.lng - threat.origin.lng) * predictedProgress,
-  };
+  return threatPositionAtProgress(threat, predictedProgress);
 }
 
 function queueEngagementEvent(

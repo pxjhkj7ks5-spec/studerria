@@ -58,6 +58,15 @@ test("unidentified contacts use red tactical symbols instead of generic target a
   assert.match(styles, /\.target-contact[\s\S]*?color: #ff625a/);
 });
 
+test("engagement visuals stay bound to the marker for their target id", async () => {
+  const mapSource = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
+
+  assert.match(mapSource, /threatPool\.get\(event\.targetId\)\?\.marker\.getLatLng\(\)/);
+  assert.match(mapSource, /boundEngagementTargetPosition\(event, threatPoolRef\.current, pooled\.targetPosition\)/);
+  assert.match(mapSource, /updateEngagementVisual\(map, event, pooled,[\s\S]*?targetPosition\)/);
+  assert.doesNotMatch(mapSource, /coordinateBetween\(event\.startPosition, event\.targetPredictedPosition/);
+});
+
 test("display preferences are visual-only, normalized and performance mode overrides automatic quality", async () => {
   assert.deepEqual(normalizeDisplayPreferences(null), { environmentTime: "night", environmentWeather: "clear", performanceMode: false });
   assert.deepEqual(normalizeDisplayPreferences({ environmentTime: "day", environmentWeather: "fog", performanceMode: true }), { environmentTime: "day", environmentWeather: "fog", performanceMode: true });
