@@ -67,6 +67,21 @@ test("engagement visuals stay bound to the marker for their target id", async ()
   assert.doesNotMatch(mapSource, /coordinateBetween\(event\.startPosition, event\.targetPredictedPosition/);
 });
 
+test("target markers keep interpolating through pan and zoom without mutating route geometry", async () => {
+  const mapSource = await readFile(new URL("../src/components/TacticalMap.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../src/styles/app.css", import.meta.url), "utf8");
+  const animationStart = mapSource.indexOf("const animate = (timestamp: number)");
+  const animationEnd = mapSource.indexOf("frameRef.current = window.requestAnimationFrame(animate);", animationStart);
+  const animation = mapSource.slice(animationStart, animationEnd);
+
+  assert.match(animation, /pooled\.visualProgress = advanceVisualThreatProgress/);
+  assert.match(animation, /if \(moving\) \{\s*setThreatMotionOffset/);
+  assert.match(animation, /else \{\s*pooled\.marker\.setLatLng[\s\S]*?pooled\.route\.setLatLngs/);
+  assert.match(mapSource, /map\.on\("zoomanim", projectZoomMotion\)/);
+  assert.match(mapSource, /wrapper\.dataset\.visualProgress = progress\.toFixed\(6\)/);
+  assert.match(styles, /\.threat-marker-wrap[\s\S]*?translate3d\(var\(--target-motion-x/);
+});
+
 test("display preferences are visual-only, normalized and performance mode overrides automatic quality", async () => {
   assert.deepEqual(normalizeDisplayPreferences(null), { environmentTime: "night", environmentWeather: "clear", performanceMode: false });
   assert.deepEqual(normalizeDisplayPreferences({ environmentTime: "day", environmentWeather: "fog", performanceMode: true }), { environmentTime: "day", environmentWeather: "fog", performanceMode: true });

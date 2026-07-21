@@ -56,6 +56,45 @@ async function setBattleNotice(page: import("@playwright/test").Page) {
   });
 }
 
+async function setMovingThreat(page: import("@playwright/test").Page) {
+  await page.evaluate(async () => {
+    const { useGameStore } = await import("/shieldline/src/store/useGameStore.ts");
+    const current = useGameStore.getState().game;
+    useGameStore.setState({
+      game: {
+        ...current,
+        liveThreats: [{
+          id: "moving-zoom-target",
+          kind: "geran2",
+          status: "inbound",
+          origin: { lat: 49.2, lng: 28.8 },
+          target: { lat: 49.2, lng: 34.8 },
+          targetCityId: "kyiv",
+          launchSectorId: "test-sector",
+          launchSectorName: "Test sector",
+          progress: 0.2,
+          speed: 1 / 8_000,
+          speedKph: 180,
+          altitudeM: 120,
+          difficulty: 10,
+          damage: 3,
+          confidence: 95,
+          classification: "confirmed-type",
+          displayLabel: "Тип підтверджено: Geran-2",
+          saturation: 1,
+          headingDeg: 90,
+          revealed: true,
+          trackQuality: 95,
+          fireControlQuality: 95,
+          speedModifier: 1,
+          damageModifier: 1,
+          reward: 2,
+        }],
+      },
+    });
+  });
+}
+
 test("engagement visuals stay Leaflet-native and distinguish success from miss", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("shieldline-tutorial-complete-v1", "true");
@@ -83,6 +122,52 @@ test("engagement visuals stay Leaflet-native and distinguish success from miss",
   await expect(page.locator(".engagement-effect--success")).toBeVisible();
   const after = await page.locator(".engagement-effect--success").boundingBox();
   expect(before && after && Number.isFinite(after.x) && Number.isFinite(after.y)).toBeTruthy();
+});
+
+test("target markers keep moving while the desktop map zooms and pans", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("shieldline-tutorial-complete-v1", "true");
+    localStorage.setItem("shieldline-live-v7", JSON.stringify({
+      state: { campaignMode: "training", activeGameMode: "training", pendingCampaignMode: null, mapMode: "live", operationPhase: "planning" },
+      version: 18,
+    }));
+  });
+  await page.goto("/shieldline/?legacy=1&mode=training");
+  const map = page.locator(".leaflet-stage");
+  await expect(map).toBeVisible();
+  await setMovingThreat(page);
+
+  const target = page.locator(".threat-marker-wrap[data-visual-progress]").first();
+  await expect(target).toBeVisible();
+  const progress = () => target.evaluate((element) => Number((element as HTMLElement).dataset.visualProgress || 0));
+  const mapBox = await map.boundingBox();
+  if (!mapBox) throw new Error("Desktop map did not render.");
+
+  const beforeZoom = await progress();
+  await page.mouse.move(mapBox.x + mapBox.width * 0.55, mapBox.y + mapBox.height * 0.5);
+  await Promise.all([
+    expect.poll(async () => target.evaluate((element, initialProgress) => {
+      const currentProgress = Number((element as HTMLElement).dataset.visualProgress || 0);
+      const transform = getComputedStyle(element).transform;
+      return currentProgress > initialProgress + 0.004
+        && transform !== "none"
+        && transform !== "matrix(1, 0, 0, 1, 0, 0)";
+    }, beforeZoom)).toBe(true),
+    (async () => {
+      for (let step = 0; step < 8; step += 1) {
+        await page.mouse.wheel(0, -90);
+        await page.waitForTimeout(55);
+      }
+    })(),
+  ]);
+  await expect(map).not.toHaveClass(/leaflet-zoom-anim/);
+
+  const beforePan = await progress();
+  await page.mouse.move(mapBox.x + mapBox.width * 0.55, mapBox.y + mapBox.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(mapBox.x + mapBox.width * 0.48, mapBox.y + mapBox.height * 0.56, { steps: 4 });
+  await expect.poll(progress).toBeGreaterThan(beforePan + 0.004);
+  await page.mouse.up();
 });
 
 test("desktop shows the same live battle notices as mobile", async ({ page }, testInfo) => {

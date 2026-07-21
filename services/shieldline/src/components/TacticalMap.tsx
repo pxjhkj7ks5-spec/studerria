@@ -333,6 +333,7 @@ function updateThreatMarkerCourse(marker: L.Marker, threat: LiveThreat, progress
   const wrapper = markerElement?.querySelector<HTMLElement>(".threat-marker-wrap");
   const course = markerElement?.querySelector<HTMLElement>(".target-label__course");
   wrapper?.style.setProperty("--target-heading", `${heading - 90}deg`);
+  if (wrapper) wrapper.dataset.visualProgress = progress.toFixed(6);
   if (course) course.textContent = `КУРС ${String(Math.round(heading) % 360).padStart(3, "0")}°`;
 }
 
@@ -613,6 +614,7 @@ interface PooledThreatVisual {
   routeVisual: ThreatRouteVisual;
   iconKey: string;
   visualProgress: number;
+  motionAnchorPosition: Coordinates;
 }
 
 interface PooledEngagementVisual {
@@ -631,6 +633,20 @@ function boundEngagementTargetPosition(
 ) {
   const markerPosition = threatPool.get(event.targetId)?.marker.getLatLng();
   return markerPosition ? { lat: markerPosition.lat, lng: markerPosition.lng } : fallback;
+}
+
+function setThreatMotionOffset(map: L.Map, pooled: PooledThreatVisual, position: Coordinates, projectionZoom: number) {
+  const anchor = map.project([pooled.motionAnchorPosition.lat, pooled.motionAnchorPosition.lng], projectionZoom);
+  const current = map.project([position.lat, position.lng], projectionZoom);
+  const wrapper = pooled.marker.getElement()?.querySelector<HTMLElement>(".threat-marker-wrap");
+  wrapper?.style.setProperty("--target-motion-x", `${current.x - anchor.x}px`);
+  wrapper?.style.setProperty("--target-motion-y", `${current.y - anchor.y}px`);
+}
+
+function resetThreatMotionOffset(pooled: PooledThreatVisual) {
+  const wrapper = pooled.marker.getElement()?.querySelector<HTMLElement>(".threat-marker-wrap");
+  wrapper?.style.setProperty("--target-motion-x", "0px");
+  wrapper?.style.setProperty("--target-motion-y", "0px");
 }
 
 function clampNumber(value: number, minimum: number, maximum: number) {
@@ -716,6 +732,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
   const syncAtRef = useRef(0);
   const lastSyncedElapsedMsRef = useRef<number | null>(null);
   const mapMovingRef = useRef(false);
+  const motionProjectionZoomRef = useRef(map.getZoom());
   const frameRef = useRef(0);
   const lastAnimationFrameAtRef = useRef<number | null>(null);
   const [mapMotionRevision, setMapMotionRevision] = useState(0);
@@ -729,33 +746,60 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
     impactGroupRef.current = impactGroup;
 
     const pauseMapAnimation = () => {
+      if (mapMovingRef.current) return;
       mapMovingRef.current = true;
+      motionProjectionZoomRef.current = map.getZoom();
+      for (const pooled of threatPoolRef.current.values()) {
+        const anchor = pooled.marker.getLatLng();
+        pooled.motionAnchorPosition = { lat: anchor.lat, lng: anchor.lng };
+        resetThreatMotionOffset(pooled);
+      }
     };
     const resumeMapAnimation = () => {
       const wasMoving = mapMovingRef.current;
       mapMovingRef.current = false;
-      if (wasMoving) setMapMotionRevision((revision) => revision + 1);
+      if (!wasMoving) return;
+      const threatById = new Map(latestRef.current.threats.map((threat) => [threat.id, threat]));
+      for (const [id, pooled] of threatPoolRef.current) {
+        const threat = threatById.get(id);
+        if (!threat) continue;
+        const current = threatPositionAtProgress(threat, pooled.visualProgress);
+        pooled.marker.setLatLng([current.lat, current.lng]);
+        pooled.motionAnchorPosition = current;
+        resetThreatMotionOffset(pooled);
+        pooled.route.setLatLngs(visibleThreatRoute(threat, pooled.visualProgress, pooled.routeVisual));
+      }
+      setMapMotionRevision((revision) => revision + 1);
+    };
+    const projectZoomMotion = (event: L.ZoomAnimEvent) => {
+      motionProjectionZoomRef.current = event.zoom;
     };
     map.on("movestart", pauseMapAnimation);
     map.on("zoomstart", pauseMapAnimation);
+    map.on("zoomanim", projectZoomMotion);
     map.on("moveend", resumeMapAnimation);
     map.on("zoomend", resumeMapAnimation);
 
     const animate = (timestamp: number) => {
       const frameDeltaMs = lastAnimationFrameAtRef.current === null ? 0 : timestamp - lastAnimationFrameAtRef.current;
       lastAnimationFrameAtRef.current = timestamp;
-      if (!mapMovingRef.current) {
-        const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
-        const latest = latestRef.current;
-        for (const threat of latest.threats) {
-          const pooled = threatPoolRef.current.get(threat.id);
-          if (!pooled) continue;
-          pooled.visualProgress = advanceVisualThreatProgress(pooled.visualProgress, threat.progress, threat.speed, frameDeltaMs);
-          const current = threatPositionAtProgress(threat, pooled.visualProgress);
+      const moving = mapMovingRef.current;
+      const elapsedSinceSync = Math.max(0, performance.now() - syncAtRef.current);
+      const latest = latestRef.current;
+      for (const threat of latest.threats) {
+        const pooled = threatPoolRef.current.get(threat.id);
+        if (!pooled) continue;
+        pooled.visualProgress = advanceVisualThreatProgress(pooled.visualProgress, threat.progress, threat.speed, frameDeltaMs);
+        const current = threatPositionAtProgress(threat, pooled.visualProgress);
+        if (moving) {
+          setThreatMotionOffset(map, pooled, current, motionProjectionZoomRef.current);
+        } else {
           pooled.marker.setLatLng([current.lat, current.lng]);
-          updateThreatMarkerCourse(pooled.marker, threat, pooled.visualProgress);
           pooled.route.setLatLngs(visibleThreatRoute(threat, pooled.visualProgress, pooled.routeVisual));
         }
+        updateThreatMarkerCourse(pooled.marker, threat, pooled.visualProgress);
+      }
+      if (!moving) {
         for (const event of latest.engagements) {
           const pooled = engagementPoolRef.current.get(event.id);
           if (!pooled) continue;
@@ -772,6 +816,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
       lastAnimationFrameAtRef.current = null;
       map.off("movestart", pauseMapAnimation);
       map.off("zoomstart", pauseMapAnimation);
+      map.off("zoomanim", projectZoomMotion);
       map.off("moveend", resumeMapAnimation);
       map.off("zoomend", resumeMapAnimation);
       threatGroup.remove();
@@ -823,6 +868,7 @@ function MovingObjectsLayer({ threats, engagements, impacts, elapsedMs, mapMode,
           routeVisual,
           iconKey,
           visualProgress,
+          motionAnchorPosition: current,
         };
         threatPoolRef.current.set(threat.id, pooled);
         updateThreatMarkerCourse(pooled.marker, threat, visualProgress);
