@@ -51,6 +51,9 @@ test("combat results use tactical effects and desktop unit details keep readable
   assert.match(rail, /keepExpandedCardVisible/);
   assert.match(rail, /showStatus = tacticalStatus\.label !== "READY"/);
   assert.match(rail, /!isRadar \? <span><small>БК<\/small>/);
+  assert.match(rail, /return `\$\{unit\.ammoCapacity\}\/\$\{unit\.ammoCapacity\} · запас \$\{unit\.missionReserveCapacity\}`/);
+  assert.doesNotMatch(rail, /ammoLabel\(unit, referenceBattery/);
+  assert.match(map, /battery\.currentAmmo === "infinite" \? "∞" : `\$\{battery\.currentAmmo\}\/\$\{unit\.ammoCapacity\}`/);
   assert.match(rail, /Радіус виявлення/);
   assert.match(map, /#63c7d4/);
   assert.match(map, /placement-preview-ring--radar/);

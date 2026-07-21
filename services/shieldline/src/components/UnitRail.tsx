@@ -40,10 +40,9 @@ function fatigueLabel(fatigue: number) {
   return "нормальна";
 }
 
-function ammoLabel(unit: UnitDefinition, current?: number | "infinite", reserve?: number | "infinite") {
+function ammoLabel(unit: UnitDefinition) {
   if (unit.ammoCapacity === "infinite") return "∞";
-  if (typeof current === "number") return `${current}/${unit.ammoCapacity} · запас ${reserve ?? unit.missionReserveCapacity}`;
-  return `${unit.ammoCapacity}`;
+  return `${unit.ammoCapacity}/${unit.ammoCapacity} · запас ${unit.missionReserveCapacity}`;
 }
 
 function seconds(ms: number) {
@@ -111,7 +110,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
           const readiness = referenceBattery ? referenceBattery.readiness : unit.readiness;
           const fatigue = referenceBattery ? referenceBattery.fatigue : 0;
           const reloadText = referenceBattery?.reloadRemainingMs ? seconds(referenceBattery.reloadRemainingMs) : seconds(unit.reloadMs);
-          const ammoText = ammoLabel(unit, referenceBattery?.currentAmmo, referenceBattery?.missionReserve);
+          const ammoText = ammoLabel(unit);
           const tacticalStatus = tacticalUnitStatus(unit, referenceBattery);
           const isRadar = unit.engagementMode === "detect";
           const showStatus = tacticalStatus.label !== "READY";
