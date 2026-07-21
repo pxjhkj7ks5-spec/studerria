@@ -11,7 +11,7 @@ interface ScenarioSelectionProps {
 
 export function ScenarioSelection({ onSelect, onBack }: ScenarioSelectionProps) {
   return (
-    <section className="mode-screen" aria-label="Вибір сценарію Shieldline">
+    <section className="mode-screen" data-audio-scope="player" aria-label="Вибір сценарію Shieldline">
       <div className="mode-shell">
         <div className="mode-heading">
           <button className="scenario-back" type="button" onClick={onBack} aria-label="Повернутися до вибору режиму">

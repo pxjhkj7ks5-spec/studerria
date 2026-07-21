@@ -35,6 +35,7 @@ export function PlanningActionsPanel() {
               className={`planning-action ${selected ? "planning-action--selected" : ""}`}
               type="button"
               key={action.id}
+              data-sound-cue="planning.toggle"
               onClick={() => toggleAction(action.id)}
               disabled={disabled}
               title={action.description}

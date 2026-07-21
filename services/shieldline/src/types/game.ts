@@ -1,3 +1,5 @@
+import type { SoundCue } from "../audio/soundCues";
+
 export type CityId =
   | "kyiv"
   | "lviv"
@@ -288,6 +290,7 @@ export interface IntelEntry {
   tone: IntelTone;
   eventType?: BattleNoticeType;
   locationLabel?: string;
+  soundCue?: SoundCue;
 }
 
 export interface Threat {

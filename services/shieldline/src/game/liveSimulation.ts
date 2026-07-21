@@ -29,6 +29,7 @@ import type {
   ThreatKind,
   UnitKind,
 } from "../types/game";
+import type { SoundCue } from "../audio/soundCues";
 
 const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
@@ -200,7 +201,7 @@ function pushLog(
   title: string,
   body: string,
   tone: IntelEntry["tone"],
-  metadata: Pick<IntelEntry, "eventType" | "locationLabel"> = {},
+  metadata: Pick<IntelEntry, "eventType" | "locationLabel" | "soundCue"> = {},
 ) {
   entries.unshift({
     id: `${Math.floor(elapsedMs)}-${entries.length}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
@@ -211,6 +212,20 @@ function pushLog(
     ...metadata,
   });
   entries.splice(30);
+}
+
+function launchSoundCue(kind: ThreatKind): SoundCue {
+  if (kind === "iskander" || kind === "ballistic") return "alert.launch.ballistic";
+  if (isMissileClass(kind)) return "alert.launch.cruise";
+  return "alert.launch.drone";
+}
+
+function engagementSoundCue(style: EngagementEvent["style"]): SoundCue {
+  if (style === "radar") return "engagement.radar";
+  if (style === "gun") return "engagement.gun";
+  if (style === "ew") return "engagement.ew";
+  if (style === "drone") return "engagement.drone";
+  return "engagement.missile";
 }
 
 function nearestCityId(state: GameState, position: Coordinates): CityId {
@@ -245,7 +260,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
   const placement = validateBatteryPlacement(kind, position, next.cities);
   if (!placement.allowed) {
     next.placementWarning = placement.reason || "Розміщення заборонене умовами сценарію.";
-    pushLog(next.log, next.elapsedMs, "Розміщення неможливе", next.placementWarning, "warning");
+    pushLog(next.log, next.elapsedMs, "Розміщення неможливе", next.placementWarning, "warning", { soundCue: "placement.failure" });
     return next;
   }
   const tier = batteryTier(unit);
@@ -286,7 +301,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
   next.batteries.push(battery);
   next.placementWarning = null;
   next.logistics = buildLogisticsState(next);
-  pushLog(next.log, next.elapsedMs, `${unit.name} Placed`, `${unit.name} is active in Coverage ${tier}.`, "success");
+  pushLog(next.log, next.elapsedMs, `${unit.name} Placed`, `${unit.name} is active in Coverage ${tier}.`, "success", { soundCue: "placement.success" });
   return next;
 }
 
@@ -311,7 +326,7 @@ export function moveBatteryToStorage(state: GameState, batteryId: string): GameS
   next.storedBatteries.push({ ...battery, position: { ...battery.position }, lastAction: "stored" });
   next.placementWarning = null;
   next.logistics = buildLogisticsState(next);
-  pushLog(next.log, next.elapsedMs, `${unit.shortName} переміщено на склад`, "Одиницю знято з позиції без повернення коштів.", "info");
+  pushLog(next.log, next.elapsedMs, `${unit.shortName} переміщено на склад`, "Одиницю знято з позиції без повернення коштів.", "info", { soundCue: "placement.redeploy" });
   return next;
 }
 
@@ -330,7 +345,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   const placement = validateBatteryPlacement(battery.kind, position, next.cities);
   if (!placement.allowed) {
     next.placementWarning = placement.reason || "Розміщення заборонене умовами сценарію.";
-    pushLog(next.log, next.elapsedMs, "Розміщення неможливе", next.placementWarning, "warning");
+    pushLog(next.log, next.elapsedMs, "Розміщення неможливе", next.placementWarning, "warning", { soundCue: "placement.failure" });
     return next;
   }
   next.storedBatteries = next.storedBatteries.filter((item) => item.id !== batteryId);
@@ -347,7 +362,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   }
   next.placementWarning = null;
   next.logistics = buildLogisticsState(next);
-  pushLog(next.log, next.elapsedMs, `${unit.shortName} повернуто зі складу`, next.campaign ? `${unit.name} передислоковано за ${redeployCost} млн ₴.` : `${unit.name} безкоштовно розміщено на новій позиції.`, "success");
+  pushLog(next.log, next.elapsedMs, `${unit.shortName} повернуто зі складу`, next.campaign ? `${unit.name} передислоковано за ${redeployCost} млн ₴.` : `${unit.name} безкоштовно розміщено на новій позиції.`, "success", { soundCue: "placement.redeploy" });
   return next;
 }
 
@@ -356,7 +371,7 @@ export function setBatteryMaintenance(state: GameState, batteryId: string): Game
   const battery = next.batteries.find((item) => item.id === batteryId);
   if (!battery || battery.status === "maintenance") return next;
   enterMaintenance(battery);
-  pushLog(next.log, next.elapsedMs, "Maintenance Assigned", "A defense unit entered one abstract cycle of accelerated recovery.", "info");
+  pushLog(next.log, next.elapsedMs, "Maintenance Assigned", "A defense unit entered one abstract cycle of accelerated recovery.", "info", { soundCue: "placement.service" });
   return next;
 }
 
@@ -561,7 +576,7 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates }, launchOrigin, event.threatKind);
   const missile = isMissileClass(event.threatKind);
   const launchPointLabel = `${launchSector.name} · маршрут ${event.routeId}`;
-  pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Пуск БПЛА", `Пускова точка ${launchPointLabel}. Цільовий сектор: ${event.targetRegion} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: launchPointLabel });
+  pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Пуск БПЛА", `Пускова точка ${launchPointLabel}. Цільовий сектор: ${event.targetRegion} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: launchPointLabel, soundCue: launchSoundCue(event.threatKind) });
   return true;
 }
 
@@ -584,7 +599,7 @@ function prepareCampaignLaunch(state: GameState, random: () => number) {
   const sector = pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
   const origin = randomPointInSector(sector, random);
   markLaunchSector(state, sector.id, "warning", untilLaunchMs + 1000, { cityId: city.id, coordinates: city.coordinates }, origin, event.threatKind);
-  pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Активність у секторі «${sector.name}». До можливого пуску менше 15 секунд.`, "warning", { eventType: "launch", locationLabel: sector.name });
+  pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Активність у секторі «${sector.name}». До можливого пуску менше 15 секунд.`, "warning", { eventType: "launch", locationLabel: sector.name, soundCue: "alert.prelaunch" });
 }
 
 function markLaunchSector(
@@ -629,12 +644,12 @@ function schedulePendingLaunch(state: GameState, kind: ThreatKind, random: () =>
     };
     state.pendingLaunches.push(pending);
     markLaunchSector(state, launchSector.id, "warning", warningMs, { cityId: city.id, coordinates: city.coordinates }, origin, kind);
-    pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Зафіксовано підготовку в секторі «${launchSector.name}».`, "warning", { eventType: "launch", locationLabel: launchSector.name });
+    pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Зафіксовано підготовку в секторі «${launchSector.name}».`, "warning", { eventType: "launch", locationLabel: launchSector.name, soundCue: "alert.prelaunch" });
     return;
   }
   markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates }, origin, kind);
   state.liveThreats.push(spawnThreat(state, random, kind, city.id, launchSector.id, origin));
-  pushLog(state.log, state.elapsedMs, "Пуски", `Зафіксовано пуски: ${launchSector.name}.`, "danger", { eventType: "launch", locationLabel: launchSector.name });
+  pushLog(state.log, state.elapsedMs, "Пуски", `Зафіксовано пуски: ${launchSector.name}.`, "danger", { eventType: "launch", locationLabel: launchSector.name, soundCue: launchSoundCue(kind) });
 }
 
 function resolvePendingLaunches(state: GameState, random: () => number) {
@@ -656,7 +671,7 @@ function resolvePendingLaunches(state: GameState, random: () => number) {
     );
     state.liveThreats.push(spawnThreat(state, random, launch.kind, launch.targetCityId, launch.sectorId, launch.origin));
     const launchSector = state.launchSectors.find((sector) => sector.id === launch.sectorId);
-    pushLog(state.log, state.elapsedMs, "Ракетний пуск", "Підготовлена балістична ціль увійшла в повітряний простір.", "danger", { eventType: "launch", locationLabel: launchSector?.name || "невідомий напрямок" });
+    pushLog(state.log, state.elapsedMs, "Ракетний пуск", "Підготовлена балістична ціль увійшла в повітряний простір.", "danger", { eventType: "launch", locationLabel: launchSector?.name || "невідомий напрямок", soundCue: launchSoundCue(launch.kind) });
   }
   state.pendingLaunches = remaining;
 }
@@ -726,6 +741,7 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
   for (const threat of state.liveThreats) {
     const position = threatPosition(threat);
     const wasRevealed = threat.revealed;
+    const previousClassification = threat.classification;
     const sensorScores: Array<{ battery: DefenseBattery; score: number; networkNode: boolean }> = [];
     const sensors = state.batteries.filter((battery) => Boolean(unitRule(battery.kind).sensor) && battery.status !== "maintenance");
     const networkSensorCount = sensors.filter((battery) => unitRule(battery.kind).roleClass === "sensor").length;
@@ -786,8 +802,10 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
           bestRadar && unitRule(bestRadar.kind).roleClass === "sensor" ? "Радарний контакт" : "Локальний сенсорний контакт",
           `${threat.displayLabel}. Якість супроводу ${Math.round(threat.trackQuality)}%.`,
           "info",
-          { eventType: "detection", locationLabel: threat.targetCityId },
+          { eventType: "detection", locationLabel: threat.targetCityId, soundCue: "contact.detected" },
         );
+      } else if (previousClassification !== threat.classification && (threat.classification === "confirmed-class" || threat.classification === "confirmed-type")) {
+        pushLog(state.log, state.elapsedMs, "Ціль класифіковано", `${threat.displayLabel}. Підтвердження ${Math.round(threat.confidence)}%.`, "info", { soundCue: "contact.classified" });
       }
     }
   }
@@ -818,7 +836,7 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
           if (effect === "degraded") threat.damageModifier = Math.min(threat.damageModifier, .45);
         }
         const effectCopy = effect === "diverted" ? "Маршрут відхилено" : effect === "guidance-lost" ? "Наведення зірвано" : effect === "delayed" ? "Ціль затримано" : effect === "degraded" ? "Наведення деградовано" : "Зв'язок цілі пригнічено";
-        pushLog(state.log, state.elapsedMs, "РЕБ: м'яке придушення", `${effectCopy}. Ціль не зарахована як кінетичне перехоплення.`, "success");
+        pushLog(state.log, state.elapsedMs, "РЕБ: м'яке придушення", `${effectCopy}. Ціль не зарахована як кінетичне перехоплення.`, "success", { soundCue: "result.soft-kill" });
       } else if (event.result === "success" && threat) {
         threat.status = "intercepted";
         resolvedThreatIds.add(threat.id);
@@ -834,12 +852,12 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
         const rewardCopy = state.campaign
           ? `Винагорода одразу зарахована: +${campaignReward} млн ₴.`
           : `Винагорода +${threat.reward} млн ₴.`;
-        pushLog(state.log, state.elapsedMs, "Перехоплення успішне", `Повітряну ціль нейтралізовано. ${rewardCopy}`, "success");
+        pushLog(state.log, state.elapsedMs, "Перехоплення успішне", `Повітряну ціль нейтралізовано. ${rewardCopy}`, "success", { soundCue: "result.intercept" });
       } else if (event.result === "miss" && threat) {
         threat.status = "inbound";
-        pushLog(state.log, state.elapsedMs, "Промах", "Перехоплювач не уразив ціль. Ціль продовжує рух.", "warning");
+        pushLog(state.log, state.elapsedMs, "Промах", "Перехоплювач не уразив ціль. Ціль продовжує рух.", "warning", { soundCue: "result.miss" });
       } else if (event.result !== "detected") {
-        pushLog(state.log, state.elapsedMs, "Втрачено супровід", "Контакт вийшов із супроводу до завершення відпрацювання.", "warning");
+        pushLog(state.log, state.elapsedMs, "Втрачено супровід", "Контакт вийшов із супроводу до завершення відпрацювання.", "warning", { soundCue: "contact.lost" });
       }
       if (battery && battery.status === "engaging") {
         const unit = getUnitDefinition(battery.kind);
@@ -847,6 +865,7 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
           const canReload = battery.missionReserve === "infinite" || Number(battery.missionReserve || 0) > 0;
           battery.status = canReload ? "reloading" : "strained";
           battery.lastAction = canReload ? "reloading" : "mission reserve exhausted";
+          if (canReload) pushLog(state.log, state.elapsedMs, "Перезарядження", `${unit.shortName}: поповнення магазину із запасу місії.`, "info", { soundCue: "engagement.reload" });
         } else {
           battery.status = battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
         }
@@ -1051,7 +1070,7 @@ function engageThreats(state: GameState, random: () => number) {
     battery.status = "engaging";
     queueEngagementEvent(state, random, battery, candidate.threat, style, success ? (style === "ew" ? "soft-kill" : "success") : "miss", ewResult?.effect);
     const action = style === "gun" ? "Черга по цілі" : style === "ew" ? "РЕБ взяла ціль у роботу" : "Пуск перехоплювача";
-    pushLog(state.log, state.elapsedMs, action, `${unit.shortName}: ціль у супроводі, розрахункова ймовірність ${Math.round(candidate.chance)}%.`, style === "ew" ? "warning" : "info");
+    pushLog(state.log, state.elapsedMs, action, `${unit.shortName}: ціль у супроводі, розрахункова ймовірність ${Math.round(candidate.chance)}%.`, style === "ew" ? "warning" : "info", { soundCue: engagementSoundCue(style) });
   }
 }
 
@@ -1095,7 +1114,7 @@ function applyImpact(state: GameState, threat: LiveThreat, random: () => number)
   }
   state.impacts += 1;
   state.impactMarkers.push({ id: createId("impact", Math.floor(state.elapsedMs), random), position: city.coordinates, tone: "impact", ttlMs: 2600 });
-  pushLog(state.log, state.elapsedMs, "Impact", `${city.name} was hit by an unresolved ${threat.kind} track.`, "danger");
+  pushLog(state.log, state.elapsedMs, "Impact", `${city.name} was hit by an unresolved ${threat.kind} track.`, "danger", { soundCue: "result.impact" });
 }
 
 function updateThreats(state: GameState, deltaMs: number, random: () => number) {

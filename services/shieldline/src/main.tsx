@@ -8,9 +8,11 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { hydrateControlOverlayFromServer } from "./data/controlZones";
 import { initializeTelegramShell } from "./platform/telegramShell";
 import { initializeOfflinePersistence } from "./platform/offlineStore";
+import { installPlayerAudioInteractions } from "./audio/useGameAudio";
 
 async function bootstrap() {
   initializeTelegramShell();
+  installPlayerAudioInteractions();
   void initializeOfflinePersistence(import.meta.env.BASE_URL);
   if ("serviceWorker" in navigator) {
     const hadController = Boolean(navigator.serviceWorker.controller);

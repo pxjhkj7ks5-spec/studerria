@@ -120,7 +120,7 @@ export function CommandApp() {
   if (!run) return null;
 
   return (
-    <main className="command-app" aria-label="Shieldline command center">
+    <main className="command-app" data-audio-scope="player" aria-label="Shieldline command center">
       <header className="command-header">
         <button className="icon-action" type="button" onClick={() => setScreen("modes")} aria-label="Back to modes"><ArrowLeft size={20} /></button>
         <div className="command-brand"><BrandMark size={25} /><span>Shieldline</span><small>City 01 · Night 01</small></div>
@@ -141,7 +141,7 @@ function ModeCatalog({ onSelect, campaign, unlockedMissionIndex }: { onSelect: (
   const [notificationState, setNotificationState] = useState<"idle" | "enabled" | "unavailable">("idle");
   const enableNotifications = async () => setNotificationState(await setTelegramNotificationPreference(import.meta.env.BASE_URL, true) ? "enabled" : "unavailable");
   const campaignMode = gameModes.find((mode) => mode.id === "campaign")!;
-  return <main className="command-app command-app--catalog" aria-label="Shieldline mode selection">
+  return <main className="command-app command-app--catalog" data-audio-scope="player" aria-label="Shieldline mode selection">
     <header className="catalog-hero">
       <button className="catalog-profile-button" type="button" onClick={() => setAccountOpen(true)} aria-label="Відкрити профіль"><UserRound size={17} /><span>{profile.nickname}</span></button>
       <div className="catalog-brand"><BrandMark size={30} /><strong>ShieldLine</strong></div>
@@ -179,7 +179,7 @@ function ModeCatalog({ onSelect, campaign, unlockedMissionIndex }: { onSelect: (
 function Briefing({ modeId, missionIndex, onBack, onStart, isRunning }: { modeId: GameModeId; missionIndex: number; onBack: () => void; onStart: () => void; isRunning: boolean }) {
   const mode = getGameMode(modeId);
   const mission = modeId === "campaign" ? campaignMissions[missionIndex - 1] || campaignMissions[0] : campaignMissions[0];
-  return <main className="command-app" aria-label="Mission briefing">
+  return <main className="command-app" data-audio-scope="player" aria-label="Mission briefing">
     <header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back"><ArrowLeft size={20} /></button><div className="command-brand"><BrandMark size={25} /><span>Mission briefing</span><small>{mode.title}</small></div></header>
     <section className="briefing-screen">
       <span className="hero-chip"><Waves size={14} /> {mission.subtitle}</span>
@@ -195,7 +195,7 @@ function Briefing({ modeId, missionIndex, onBack, onStart, isRunning }: { modeId
 
 function OperationLoading() { return <section className="operation-loading"><div className="scan-ring"><Radio size={38} /></div><h1>Night simulation resolved</h1><p>Building after-action report from the immutable event stream.</p></section>; }
 
-function CommandFrame({ onBack, children }: { onBack: () => void; children: ReactNode }) { return <main className="command-app" aria-label="Shieldline command center"><header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back to modes"><ArrowLeft size={20} /></button><div className="command-brand"><BrandMark size={25} /><span>Shieldline</span><small>City 01 · command view</small></div></header><section className="command-content">{children}</section><BottomNav active="operations" onChange={() => undefined} /></main>; }
+function CommandFrame({ onBack, children }: { onBack: () => void; children: ReactNode }) { return <main className="command-app" data-audio-scope="player" aria-label="Shieldline command center"><header className="command-header"><button className="icon-action" type="button" onClick={onBack} aria-label="Back to modes"><ArrowLeft size={20} /></button><div className="command-brand"><BrandMark size={25} /><span>Shieldline</span><small>City 01 · command view</small></div></header><section className="command-content">{children}</section><BottomNav active="operations" onChange={() => undefined} /></main>; }
 
 function DailyDefense({ report, run }: { report: DailyReport | null; run: MissionRun | null }) { const launchDailyBoard = () => { const state = useGameStore.getState(); state.launchTacticalMode("daily-defense"); const url = new URL(window.location.href); url.searchParams.set("legacy", "1"); url.searchParams.set("mode", "daily-defense"); window.location.assign(url.toString()); }; return <section className="report-screen" aria-label="Daily defense report"><span className="hero-chip"><Home size={14} /> Daily Defense · city persists</span><h1>Morning report</h1><p>{report?.summary || "The daily command report is being prepared."} Your repair and doctrine decisions are ready for the next night.</p>{run ? <><SectorMap summary={run.sectorSummary} /><section className="recommendation"><Flag size={19} /><div><strong>Daily command</strong><span>{report?.recommendedAction}</span></div></section><button className="primary-command" type="button" onClick={launchDailyBoard}><Shield size={19} /> Open city planning board</button></> : null}</section>; }
 function Ranking({ entries }: { entries: LeaderboardEntry[] }) { return <section className="report-screen ranking-screen" aria-label="Ranked challenge leaderboard"><span className="hero-chip"><Trophy size={14} /> Ranked Challenge · shared results</span><h1>Daily ranking</h1><p>Each run is scored from its server-side event stream. Cosmetic and convenience features never change combat power.</p><ol>{entries.length ? entries.map((entry) => <li key={`${entry.userId}-${entry.rank}`}><b>#{entry.rank}</b><span>{entry.displayName}</span><em>{entry.result}</em><strong>{entry.score}</strong></li>) : <li><span>No completed ranked runs yet.</span></li>}</ol></section>; }

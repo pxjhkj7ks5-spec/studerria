@@ -16,7 +16,7 @@ interface ModeSelectionProps {
 
 export function ModeSelection({ onSelect }: ModeSelectionProps) {
   return (
-    <section className="mode-screen" aria-label="Вибір режиму кампанії Shieldline">
+    <section className="mode-screen" data-audio-scope="player" aria-label="Вибір режиму кампанії Shieldline">
       <div className="mode-shell">
         <div className="mode-heading">
           <div className="mode-mark">

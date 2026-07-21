@@ -28,6 +28,8 @@ import { bindTelegramBackButton } from "./platform/telegramShell";
 import { formatNumber, t } from "./platform/i18n";
 import { trackAnalytics } from "./platform/analytics";
 import { readDisplayPreferences, writeDisplayPreferences } from "./platform/displayPreferences";
+import { readAudioPreferences, writeAudioPreferences } from "./platform/audioPreferences";
+import { useGameAudio } from "./audio/useGameAudio";
 import type { CampaignStatus, DefenseBattery, IntelEntry, MapMode, UnitKind } from "./types/game";
 import type { DailyDefensePlan, GameModeId, MissionRun, RankedResult } from "./domain/contracts";
 
@@ -152,6 +154,7 @@ export default function App() {
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
   const activeGameMode = useGameStore((state) => state.activeGameMode);
   const operationPhase = useGameStore((state) => state.operationPhase);
+  const simulationSeed = useGameStore((state) => state.simulationSeed);
   const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
   const isMobileViewport = useMobileViewport();
   const isMobileLive = isMobileViewport;
@@ -162,6 +165,7 @@ export default function App() {
   const [authoritativeRun, setAuthoritativeRun] = useState<MissionRun | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [displayPreferences, setDisplayPreferences] = useState(readDisplayPreferences);
+  const [audioPreferences, setAudioPreferences] = useState(readAudioPreferences);
   const [fullscreenReportOpen, setFullscreenReportOpen] = useState(false);
   const [visitedCampaignPanels, setVisitedCampaignPanels] = useState<ActivePanel[]>([]);
   const coOpSyncedBatteryIds = useRef(new Set<string>());
@@ -211,6 +215,12 @@ export default function App() {
   useEffect(() => {
     writeDisplayPreferences(displayPreferences);
   }, [displayPreferences]);
+
+  useEffect(() => {
+    writeAudioPreferences(audioPreferences);
+  }, [audioPreferences]);
+
+  useGameAudio({ game, operationPhase, simulationSeed, preferences: audioPreferences });
 
   useEffect(() => {
     const battleEntries = game.log.filter((entry) => entry.eventType === "launch" || entry.eventType === "detection");
@@ -390,7 +400,7 @@ export default function App() {
     : "";
 
   return (
-    <main className={`shell shell--map-first environment--${displayPreferences.environmentTime} weather--${displayPreferences.environmentWeather} ${displayPreferences.performanceMode ? "shell--performance-mode" : ""} ${isMobileLive ? "shell--mobile-live" : ""} ${activePanel ? "shell--drawer-open shell--panel-open" : "shell--drawer-closed"}`} aria-label="Симуляція протиповітряної оборони Shieldline">
+    <main className={`shell shell--map-first environment--${displayPreferences.environmentTime} weather--${displayPreferences.environmentWeather} ${displayPreferences.performanceMode ? "shell--performance-mode" : ""} ${isMobileLive ? "shell--mobile-live" : ""} ${activePanel ? "shell--drawer-open shell--panel-open" : "shell--drawer-closed"}`} data-audio-scope="player" aria-label="Симуляція протиповітряної оборони Shieldline">
       <nav className="app-rail" aria-label="Панелі Shieldline">
         {!isMobileLive ? <button className="rail-button rail-button--menu" type="button" aria-label="До вибору режиму" onClick={returnToCommandModes}>
           <span className="rail-icon"><Menu size={21} strokeWidth={2.2} /></span>
@@ -547,7 +557,7 @@ export default function App() {
           {activePanel === "settings" ? (
             <section className="drawer-section">
               <AccountSettings />
-              <DisplaySettings preferences={displayPreferences} onChange={setDisplayPreferences} />
+              <DisplaySettings preferences={displayPreferences} onChange={setDisplayPreferences} audioPreferences={audioPreferences} onAudioChange={setAudioPreferences} />
               <LiveStatusPanel placementKind={placementKind} placementWarning={game.placementWarning} />
               <button className="reset-button" type="button" onClick={() => setConfirmReset(true)}>
                 <RotateCcw size={16} />

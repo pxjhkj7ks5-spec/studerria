@@ -1,4 +1,4 @@
-const CACHE = "shieldline-runtime-v7";
+const CACHE = "shieldline-runtime-v8";
 const SHELL = [
   "./",
   "./index.html",
@@ -11,6 +11,15 @@ const SHELL = [
   "./apple-touch-icon.png?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",
+  "./audio/sfx/chime.mp3",
+  "./audio/sfx/confirm.mp3",
+  "./audio/sfx/gun-burst-1.mp3",
+  "./audio/sfx/impact.mp3",
+  "./audio/sfx/mechanical.mp3",
+  "./audio/sfx/missile-launch.mp3",
+  "./audio/sfx/radio-static.mp3",
+  "./audio/sfx/siren.mp3",
+  "./audio/sfx/timer.mp3",
 ];
 
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));
@@ -36,7 +45,7 @@ self.addEventListener("fetch", (event) => {
     const cached = await cache.match(event.request);
     if (cached) return cached;
     return fetch(event.request).then((response) => {
-      if (response.ok && (/\/assets\//.test(event.request.url) || /\.(?:js|css|png|webp|svg|woff2?)$/i.test(new URL(event.request.url).pathname))) {
+      if (response.ok && (/\/assets\//.test(event.request.url) || /\.(?:js|css|mp3|ogg|png|webp|svg|woff2?)$/i.test(new URL(event.request.url).pathname))) {
         void cache.put(event.request, response.clone());
       }
       return response;

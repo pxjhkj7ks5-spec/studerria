@@ -18,7 +18,9 @@ test("service worker navigations bypass Safari's HTTP cache", async () => {
   const source = await readSource("../public/sw.js");
 
   assert.match(source, /new Request\(event\.request, \{ cache: "no-store" \}\)/);
-  assert.match(source, /shieldline-runtime-v7/);
+  assert.match(source, /shieldline-runtime-v8/);
+  assert.match(source, /audio\/sfx\/siren\.mp3/);
+  assert.match(source, /mp3\|ogg/);
   assert.match(source, /favicon\.ico\?v=4/);
   assert.match(source, /shieldline-mask\.svg\?v=4/);
   assert.match(source, /caches\.open\(CACHE\)/);

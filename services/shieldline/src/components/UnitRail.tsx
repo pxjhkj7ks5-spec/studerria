@@ -5,6 +5,7 @@ import { getScenario } from "../data/scenarios";
 import { unitDefinitions } from "../data/units";
 import { tacticalUnitStatus } from "../game/unitStatusDisplay";
 import { useGameStore } from "../store/useGameStore";
+import { playSound } from "../audio/audioEngine";
 import type { ThreatKind, UnitDefinition } from "../types/game";
 
 const chanceKinds: Array<{ kind: ThreatKind; label: string }> = [
@@ -56,12 +57,10 @@ function keepExpandedCardVisible(card: HTMLElement) {
     const cardRect = card.getBoundingClientRect();
     const listRect = list.getBoundingClientRect();
     const overflow = cardRect.bottom - listRect.bottom + 8;
-    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-    if (overflow > 0) list.scrollBy({ top: overflow, behavior });
+    if (overflow > 0) list.scrollTop = Math.min(list.scrollTop + overflow, list.scrollHeight - list.clientHeight);
   };
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   window.requestAnimationFrame(alignCard);
-  window.setTimeout(alignCard, reducedMotion ? 0 : 240);
+  window.setTimeout(alignCard, 240);
 }
 
 export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }) {
@@ -81,11 +80,17 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
     setExpandedKind(kind);
     keepExpandedCardVisible(card);
   };
+  const service = (batteryId: string, action: "repair" | "resupply", portion: .5 | 1) => {
+    const before = useGameStore.getState().game.campaign?.campaignWallet;
+    serviceBattery(batteryId, action, portion);
+    const after = useGameStore.getState().game.campaign?.campaignWallet;
+    void playSound(typeof before === "number" && typeof after === "number" && after < before ? "placement.service" : "ui.error");
+  };
 
   return (
     <>
       <div className="unit-actions">
-        <button className="redeploy-button" type="button" onClick={cancelPlacement} disabled={!placementKind}>
+        <button className="redeploy-button" type="button" data-sound-cue="ui.cancel" onClick={cancelPlacement} disabled={!placementKind}>
           <RadioTower size={16} />
           Скасувати розміщення
         </button>
@@ -121,6 +126,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
               key={unit.kind}
               tabIndex={0}
               role="button"
+              data-sound-cue="placement.select"
               aria-disabled={disabled}
               onMouseEnter={(event) => expandCard(event.currentTarget, unit.kind)}
               onMouseLeave={() => setExpandedKind((current) => current === unit.kind ? null : current)}
@@ -185,11 +191,11 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                     <div className="campaign-service-actions" aria-label="Ручні дозволи доктрини">
                       {unit.doctrine.forbiddenByDefault.slice(0, 4).map((targetKind) => {
                         const enabled = localBattery.manualOverrideTargets.includes(targetKind);
-                        return <button type="button" key={targetKind} aria-pressed={enabled} onClick={(event) => { event.stopPropagation(); setManualOverride(localBattery.id, targetKind, !enabled); }}>{enabled ? "Заборонити" : "Дозволити"} {doctrineTargetLabels[targetKind] || targetKind}</button>;
+                        return <button type="button" key={targetKind} data-sound-cue="planning.toggle" aria-pressed={enabled} onClick={(event) => { event.stopPropagation(); setManualOverride(localBattery.id, targetKind, !enabled); }}>{enabled ? "Заборонити" : "Дозволити"} {doctrineTargetLabels[targetKind] || targetKind}</button>;
                       })}
                     </div>
                   ) : null}
-                  {game.campaign?.intermission && referenceBattery ? <div className="campaign-service-actions"><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "resupply", .5); }}>+50% БК</button><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "repair", 1); }}>Ремонт</button></div> : null}
+                  {game.campaign?.intermission && referenceBattery ? <div className="campaign-service-actions"><button type="button" data-sound="none" onClick={(event) => { event.stopPropagation(); service(referenceBattery.id, "resupply", .5); }}>+50% БК</button><button type="button" data-sound="none" onClick={(event) => { event.stopPropagation(); service(referenceBattery.id, "repair", 1); }}>Ремонт</button></div> : null}
                 </div>
               </div>
               <div className={`fatigue-track fatigue-track--${fatigue > 70 ? "danger" : fatigue > 45 ? "warning" : "stable"}`} aria-label={`Втома ${unit.name}`}>
