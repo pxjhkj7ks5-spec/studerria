@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Activity, AlertTriangle, BookOpen, ClipboardList, Crosshair, HelpCircle, Layers, LogOut, Menu, Radio, RotateCcw, Settings, Shield, SlidersHorizontal, X, Zap } from "lucide-react";
+import { Activity, AlertTriangle, BookOpen, ChartNoAxesCombined, ClipboardList, Crosshair, HelpCircle, ListChecks, LogOut, Map as MapIcon, Menu, Radio, RadioTower, RotateCcw, Settings2, Shield, X, Zap } from "lucide-react";
 import { AfterActionReport } from "./components/AfterActionReport";
 import { AccountSettings } from "./components/AccountSettings";
 import { AdminApp } from "./components/AdminApp";
@@ -54,21 +54,21 @@ function defensePlanFromBatteries(batteries: DefenseBattery[]): DailyDefensePlan
 
 type ActivePanel = "menu" | "layers" | "units" | "planning" | "intel" | "report" | "settings";
 
-const desktopPanelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }> = [
-  { id: "layers", label: t("panel.layers"), icon: Layers },
-  { id: "units", label: t("panel.units"), icon: Crosshair },
-  { id: "planning", label: t("panel.planning"), icon: SlidersHorizontal },
-  { id: "intel", label: t("panel.intel"), icon: Radio },
-  { id: "report", label: t("panel.report"), icon: ClipboardList },
-  { id: "settings", label: t("panel.settings"), icon: Settings },
+const desktopPanelItems: Array<{ id: ActivePanel; label: string; icon: typeof MapIcon }> = [
+  { id: "layers", label: t("panel.layers"), icon: MapIcon },
+  { id: "units", label: t("panel.units"), icon: Shield },
+  { id: "planning", label: t("panel.planning"), icon: ListChecks },
+  { id: "intel", label: t("panel.intel"), icon: RadioTower },
+  { id: "report", label: t("panel.report"), icon: ChartNoAxesCombined },
+  { id: "settings", label: t("panel.settings"), icon: Settings2 },
 ];
 
-const mobilePanelItems: Array<{ id: ActivePanel; label: string; icon: typeof Layers }> = [
+const mobilePanelItems: Array<{ id: ActivePanel; label: string; icon: typeof MapIcon }> = [
   { id: "menu", label: "Меню", icon: Menu },
-  { id: "units", label: "ППО", icon: Crosshair },
-  { id: "planning", label: "План", icon: SlidersHorizontal },
-  { id: "intel", label: "Розвідка", icon: Radio },
-  { id: "settings", label: "Налаштування", icon: Settings },
+  { id: "units", label: "ППО", icon: Shield },
+  { id: "planning", label: "План", icon: ListChecks },
+  { id: "intel", label: "Розвідка", icon: RadioTower },
+  { id: "settings", label: "Налаштування", icon: Settings2 },
 ];
 
 const panelTitle: Record<ActivePanel, string> = {
@@ -392,7 +392,7 @@ export default function App() {
     <main className={`shell shell--map-first environment--${displayPreferences.environmentTime} weather--${displayPreferences.environmentWeather} ${displayPreferences.performanceMode ? "shell--performance-mode" : ""} ${isMobileLive ? "shell--mobile-live" : ""} ${activePanel ? "shell--drawer-open shell--panel-open" : "shell--drawer-closed"}`} aria-label="Симуляція протиповітряної оборони Shieldline">
       <nav className="app-rail" aria-label="Панелі Shieldline">
         {!isMobileLive ? <button className="rail-button rail-button--menu" type="button" aria-label="До вибору режиму" onClick={returnToCommandModes}>
-          <Menu size={24} />
+          <span className="rail-icon"><Menu size={21} strokeWidth={2.2} /></span>
         </button> : null}
         <div className="rail-brand" aria-hidden="true">
           <BrandMark size={26} />
@@ -414,7 +414,7 @@ export default function App() {
                 aria-pressed={activePanel === item.id}
                 title={item.label}
               >
-                <Icon size={21} />
+                <span className="rail-icon"><Icon size={20} strokeWidth={2.15} /></span>
                 <span className="rail-label">{item.label}</span>
               </button>
             );

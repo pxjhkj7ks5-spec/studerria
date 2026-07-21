@@ -109,7 +109,10 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
               role="button"
               aria-disabled={disabled}
               onMouseEnter={(event) => expandCard(event.currentTarget, unit.kind)}
-              onMouseLeave={() => setExpandedKind((current) => current === unit.kind ? null : current)}
+              onMouseLeave={(event) => {
+                if (event.currentTarget.parentElement?.matches(":hover")) return;
+                setExpandedKind((current) => current === unit.kind ? null : current);
+              }}
               onFocus={(event) => expandCard(event.currentTarget, unit.kind)}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget)) setExpandedKind((current) => current === unit.kind ? null : current);

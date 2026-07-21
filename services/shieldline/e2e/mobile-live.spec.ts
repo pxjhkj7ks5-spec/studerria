@@ -148,18 +148,19 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   const storedPosition = await firstBattery.boundingBox();
   const budgetBeforeStorage = await page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state?.game?.resources?.budget);
   await firstBattery.click({ force: true });
-  await expect(page.getByRole("button", { name: "Перемістити на склад" })).toBeVisible();
+  const redeployButton = page.getByRole("button", { name: /Передислокувати/ });
+  await expect(redeployButton).toBeVisible();
   await expect(page.locator(".map-marker--selected, .selected-unit-card")).toHaveCount(0);
-  await page.getByRole("button", { name: "Перемістити на склад" }).click();
+  await redeployButton.click();
   await expect(page.locator(".map-marker--battery")).toHaveCount(1);
 
   await navigation.getByRole("button", { name: "ППО" }).click();
-  const storedRadar = page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /Radar 35D6/ });
-  const storageChip = storedRadar.getByText("На складі · 1");
+  const storedUnit = page.getByRole("complementary", { name: /ППО/ }).getByRole("button", { name: /МВГ/ });
+  const storageChip = storedUnit.getByText("На складі · 1");
   await expect(storageChip).toBeVisible();
-  const [storedCardBox, storageChipBox] = await Promise.all([storedRadar.boundingBox(), storageChip.boundingBox()]);
+  const [storedCardBox, storageChipBox] = await Promise.all([storedUnit.boundingBox(), storageChip.boundingBox()]);
   expect(storedCardBox && storageChipBox && storageChipBox.x > storedCardBox.x + storedCardBox.width / 2 && storageChipBox.y < storedCardBox.y + 40).toBeTruthy();
-  await storedRadar.click();
+  await storedUnit.click();
   if (!storedPosition) throw new Error("Stored battery position is unavailable.");
   await page.mouse.click(storedPosition.x + storedPosition.width / 2, storedPosition.y + storedPosition.height / 2);
   await expect(page.locator(".map-marker--battery")).toHaveCount(2);

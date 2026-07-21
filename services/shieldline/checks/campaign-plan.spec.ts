@@ -13,8 +13,7 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.title), ["Перший контакт", "Південний коридор", "Східна дуга", "Насичення", "Масована ніч"]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [15, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [38, 32, 48, 70, 100]);
-  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.rewardCap), [52, 82, 130, 198, 283]);
-  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.waves.reduce((sum, wave) => sum + wave.count * campaignKillRewards[wave.threatKind], 0)), campaignMissionsPlan.map((mission) => mission.rewardCap));
+  assert.ok(campaignMissionsPlan.every((mission) => !("rewardCap" in mission)));
   assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [29, 41, 58, 78, 103]);
   assert.equal(campaignMissionsPlan.slice(0, 3).some((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), false);
   assert.equal(campaignMissionsPlan.slice(3).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);

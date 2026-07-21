@@ -17,7 +17,6 @@ export const campaignMissions: MissionDefinition[] = campaignMissionsPlan.map((m
   difficulty: mission.index === 1 ? "guided" : mission.index < 4 ? "standard" : mission.index === 4 ? "hard" : "expert",
   resources: { budget: mission.grant, ammo: 0, morale: 100, energy: 100 },
   grant: mission.grant,
-  rewardCap: mission.rewardCap,
   focusRegion: mission.focusRegion,
   expectedThreatClasses: mission.expectedThreatClasses,
   broadAzimuth: mission.broadAzimuth,

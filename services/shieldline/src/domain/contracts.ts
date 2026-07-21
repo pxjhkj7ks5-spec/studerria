@@ -106,7 +106,6 @@ export interface MissionDefinition {
   randomWaveCount?: number;
   pacingProfile?: "guided-three-stage";
   grant?: number;
-  rewardCap?: number;
   focusRegion?: string;
   expectedThreatClasses?: string[];
   broadAzimuth?: string;

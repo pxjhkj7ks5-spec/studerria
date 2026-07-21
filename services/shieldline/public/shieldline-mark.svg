@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ShieldLine">
-  <path d="M32 5.5C24.7 11.1 16.9 14.2 9 15.2v18.2c0 11.7 7.1 19.7 23 25.1 15.9-5.4 23-13.4 23-25.1V15.2c-7.9-1-15.7-4.1-23-9.7Z" fill="#090a09" stroke="#f6c547" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M10.5 32h43" fill="none" stroke="#f6c547" stroke-width="4" stroke-linecap="round"/>
-  <path d="m32 27 5 5-5 5-5-5 5-5Z" fill="#f6c547"/>
+  <title>ShieldLine</title>
+  <path d="M32 4C24.3 10 16.1 13.2 7.5 14.4v19.1c0 12.4 7.6 20.9 24.5 26.5 16.9-5.6 24.5-14.1 24.5-26.5V14.4C47.9 13.2 39.7 10 32 4Z" fill="#080909" stroke="#f6c547" stroke-width="4.8" stroke-linejoin="round"/>
+  <path d="M10.5 32h43" fill="none" stroke="#f6c547" stroke-width="4.8" stroke-linecap="round"/>
+  <path d="m32 26.4 5.6 5.6-5.6 5.6-5.6-5.6 5.6-5.6Z" fill="#f6c547"/>
 </svg>

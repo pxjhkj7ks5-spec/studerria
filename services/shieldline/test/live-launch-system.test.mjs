@@ -76,7 +76,7 @@ test("the five-mission campaign follows the authored escalation while launch ori
   assert.equal(campaignMissions.length, 5);
   assert.deepEqual(campaignMissions.map((entry) => entry.durationMinutes), [15, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissions.map((entry) => entry.grant), [38, 32, 48, 70, 100]);
-  assert.deepEqual(campaignMissions.map((entry) => entry.rewardCap), [52, 82, 130, 198, 283]);
+  assert.ok(campaignMissions.every((entry) => !("rewardCap" in entry)));
   assert.equal(mission.waves.reduce((sum, wave) => sum + wave.size, 0), 29);
   assert.equal(campaignMissions[3].waves.some((wave) => wave.threatKind === "iskander"), true);
   assert.equal(campaignMissions[4].waves.reduce((sum, wave) => sum + wave.size, 0), 103);

@@ -4680,3 +4680,92 @@ body,
   border-color: color-mix(in srgb, #f6c547 38%, transparent);
   background: color-mix(in srgb, #f6c547 7%, transparent);
 }
+
+/* Compact desktop command pass: quieter chrome, clearer menu affordances. */
+@media (min-width: 821px) {
+  .app-rail {
+    grid-template-rows: 48px 48px 1fr;
+    width: 64px;
+    padding: 10px 0;
+    border-color: rgba(246, 197, 71, .14);
+    background: rgba(9, 10, 9, .94);
+    box-shadow: 10px 0 28px rgba(0, 0, 0, .28);
+  }
+
+  .rail-brand {
+    width: 38px;
+    height: 38px;
+    border: 1px solid rgba(246, 197, 71, .13);
+    border-radius: 11px;
+    background: rgba(246, 197, 71, .045);
+  }
+
+  .rail-brand .shieldline-brand-mark { width: 23px; height: 23px; }
+  .rail-button-stack { gap: 6px; margin-top: 13px; }
+
+  .rail-button {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    color: rgba(244, 241, 231, .62);
+    transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease;
+  }
+
+  .rail-icon { display: grid; place-items: center; }
+  .rail-button:hover { color: #f4f1e7; border-color: rgba(246, 197, 71, .16); background: rgba(246, 197, 71, .065); transform: translateY(-1px); }
+  .rail-button--active { color: #f6c547 !important; border-color: rgba(246, 197, 71, .34); background: rgba(246, 197, 71, .11) !important; box-shadow: inset 0 1px rgba(255,255,255,.045), 0 8px 20px rgba(0,0,0,.2); }
+  .rail-button--active::before { position: absolute; top: 10px; bottom: 10px; left: -12px; width: 3px; border-radius: 99px; background: #f6c547; box-shadow: 0 0 11px rgba(246,197,71,.45); content: ""; }
+  .rail-button::after { position: absolute; z-index: 2; top: 50%; left: calc(100% + 10px); padding: 6px 8px; border: 1px solid rgba(246,197,71,.16); border-radius: 8px; color: #e9e6dc; background: rgba(9,10,9,.96); box-shadow: 0 8px 24px rgba(0,0,0,.32); content: attr(aria-label); font-size: 10px; font-weight: 700; letter-spacing: .01em; opacity: 0; pointer-events: none; transform: translate(-4px,-50%); transition: opacity .14s ease, transform .14s ease; white-space: nowrap; }
+  .rail-button:hover::after, .rail-button:focus-visible::after { opacity: 1; transform: translate(0,-50%); }
+
+  .shell--map-first .map-stage { left: 64px; }
+  .command-drawer { top: 12px; bottom: 12px; left: 76px; width: min(336px, calc(100vw - 96px)); padding: 12px; border-color: rgba(246,197,71,.15); border-radius: 14px; animation: command-drawer-enter .18s cubic-bezier(.2,.8,.2,1) both; }
+  .drawer-header { padding: 2px 2px 10px; }
+  .drawer-header span { color: rgba(244,241,231,.46); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .drawer-header strong { margin-top: 2px; font-size: 18px; }
+  .drawer-close { width: 34px; height: 34px; border-radius: 10px; }
+  .map-status-strip { top: 12px; right: 12px; left: 424px; gap: 8px; }
+  .shell--drawer-closed .map-status-strip { left: 76px; }
+  .strip-brand { grid-template-columns: 30px minmax(0,1fr); min-height: 48px; padding: 7px 10px; border-radius: 11px; }
+  .strip-brand h1 { font-size: 17px; }
+  .strip-brand span { font-size: 10px; }
+  .shell--map-first .resource-card { min-height: 44px; padding: 5px 7px; border-radius: 10px; }
+  .shell--map-first .resource-card span { font-size: 9px; }
+  .shell--map-first .resource-card strong { font-size: 15px; }
+  .shell--map-first .resource-card small { font-size: 8px; }
+  .shell--map-first .map-legend { top: 88px; width: 252px; border-radius: 13px; }
+
+  .command-app { padding-top: max(12px, var(--tg-layout-top, env(safe-area-inset-top))); }
+  .command-app--catalog .catalog-hero { padding: clamp(22px, 4vh, 44px) 0 20px; }
+  .command-app--catalog .catalog-hero h1 { font-size: clamp(42px, 6vw, 66px); }
+  .command-mode-card { min-height: 304px; padding: 16px; border-radius: 20px; }
+  .mode-icon { width: 36px; height: 36px; border: 1px solid rgba(246,197,71,.14); border-radius: 11px; }
+  .bottom-command-nav { max-width: 540px; padding: 4px; border-color: rgba(246,197,71,.16); border-radius: 18px; background: rgba(9,10,9,.92); }
+  .bottom-command-nav button { min-height: 43px; border-radius: 12px; transition: color .16s ease, background .16s ease, transform .16s ease; }
+  .bottom-command-nav button:hover { color: #f4f1e7; transform: translateY(-1px); }
+  .bottom-command-nav button svg { width: 19px; height: 19px; stroke-width: 2.15; }
+}
+
+@media (min-width: 821px) and (max-width: 1280px), (min-width: 821px) and (max-height: 760px) {
+  .app-rail { width: 58px; }
+  .rail-brand { width: 34px; height: 34px; }
+  .rail-button { width: 38px; height: 38px; }
+  .rail-button-stack { gap: 4px; margin-top: 9px; }
+  .rail-button--active::before { left: -10px; }
+  .shell--map-first .map-stage { left: 58px; }
+  .command-drawer { top: 9px; bottom: 9px; left: 68px; width: min(312px, calc(100vw - 82px)); padding: 10px; }
+  .map-status-strip { top: 9px; right: 9px; left: 390px; }
+  .shell--drawer-closed .map-status-strip { left: 68px; }
+  .shell--map-first .map-legend { top: 82px; right: 9px; width: 232px; }
+  .drawer-section { padding-top: 9px; }
+  .command-drawer--units > .unit-list { gap: 7px; }
+}
+
+@keyframes command-drawer-enter { from { opacity: 0; transform: translateX(-8px) scale(.992); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .command-drawer { animation: none; }
+  .rail-button, .rail-button::after, .bottom-command-nav button { transition: none; }
+}
