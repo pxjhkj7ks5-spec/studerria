@@ -5,8 +5,10 @@ import { readFile } from "node:fs/promises";
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("the vector ShieldLine mark is the favicon and shared UI brand", async () => {
-  const [index, mark, mask, app, command, admin, auth, account, mode] = await Promise.all([
+  const [index, offline, manifest, mark, mask, app, command, admin, auth, account, mode] = await Promise.all([
     read("../index.html"),
+    read("../public/offline.html"),
+    read("../public/manifest.webmanifest"),
     read("../public/shieldline-mark.svg"),
     read("../public/shieldline-mask.svg"),
     read("../src/App.tsx"),
@@ -17,9 +19,16 @@ test("the vector ShieldLine mark is the favicon and shared UI brand", async () =
     read("../src/components/ModeSelection.tsx"),
   ]);
 
-  assert.match(index, /shieldline-mark\.svg\?v=3/);
-  assert.match(index, /favicon-32\.png\?v=3/);
-  assert.match(index, /rel="mask-icon"/);
+  for (const page of [index, offline]) {
+    assert.match(page, /favicon\.ico\?v=4/);
+    assert.match(page, /shieldline-mark\.svg\?v=4/);
+    assert.match(page, /favicon-32\.png\?v=4/);
+    assert.match(page, /rel="mask-icon"/);
+    assert.match(page, /apple-touch-icon\.png\?v=4/);
+  }
+  assert.match(index, /manifest\.webmanifest\?v=4/);
+  assert.match(manifest, /icon-192\.png\?v=4/);
+  assert.match(manifest, /icon-512\.png\?v=4/);
   assert.match(mark, /#f6c547/);
   assert.match(mark, /stroke-width="4\.8"/);
   assert.match(mark, /M10\.5 32h43/);

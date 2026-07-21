@@ -1,5 +1,17 @@
-const CACHE = "shieldline-runtime-v6";
-const SHELL = ["./", "./index.html", "./offline.html", "./manifest.webmanifest"];
+const CACHE = "shieldline-runtime-v7";
+const SHELL = [
+  "./",
+  "./index.html",
+  "./offline.html",
+  "./manifest.webmanifest?v=4",
+  "./favicon.ico?v=4",
+  "./favicon-32.png?v=4",
+  "./shieldline-mark.svg?v=4",
+  "./shieldline-mask.svg?v=4",
+  "./apple-touch-icon.png?v=4",
+  "./icon-192.png?v=4",
+  "./icon-512.png?v=4",
+];
 
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));
 
