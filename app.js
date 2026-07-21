@@ -647,6 +647,7 @@ const DEFAULT_SETTINGS = {
   session_idle_timeout_minutes: SESSION_SECURITY_DEFAULTS.idleTimeoutMinutes,
   session_absolute_timeout_hours: SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours,
   max_file_size_mb: 20,
+  web_registration_enabled: false,
   allow_homework_creation: true,
   min_team_members: 2,
   allow_custom_deadlines: true,
@@ -682,6 +683,7 @@ const SYSTEM_SETTINGS_AUDIT_KEYS = [
   'session_idle_timeout_minutes',
   'session_absolute_timeout_hours',
   'max_file_size_mb',
+  'web_registration_enabled',
   'allow_homework_creation',
   'min_team_members',
   'allow_custom_deadlines',
@@ -1756,6 +1758,8 @@ const refreshSettingsCache = async () => {
     } else if (row.key === 'max_file_size_mb') {
       const n = Number(row.value);
       if (!Number.isNaN(n) && n > 0) parsed.max_file_size_mb = n;
+    } else if (row.key === 'web_registration_enabled') {
+      parsed.web_registration_enabled = String(row.value).toLowerCase() === 'true';
     } else if (row.key === 'allow_homework_creation') {
       parsed.allow_homework_creation = String(row.value).toLowerCase() === 'true';
     } else if (row.key === 'min_team_members') {
@@ -14242,6 +14246,7 @@ function buildJournalInsightsCsv({ context, teacherJournalMode = false }) {
 function normalizeAdminSettingValue(key, rawValue, fallback = DEFAULT_SETTINGS[key]) {
   if (
     key === 'allow_homework_creation'
+    || key === 'web_registration_enabled'
     || key === 'allow_custom_deadlines'
     || key === 'myday_show_student_homework'
     || key === 'allow_messages'
@@ -27278,6 +27283,9 @@ app.post('/login', authLimiter, async (req, res) => {
 app.get('/register', async (req, res) => {
   let pendingFullName = '';
   const pendingUserId = Number(req.session.pendingUserId || 0);
+  if (settingsCache.web_registration_enabled !== true && !(Number.isInteger(pendingUserId) && pendingUserId > 0)) {
+    return res.render('register-closed', { layout: false });
+  }
   if (Number.isInteger(pendingUserId) && pendingUserId > 0) {
     try {
       await ensureDbReady();
@@ -27296,6 +27304,10 @@ app.get('/register', async (req, res) => {
 });
 
 app.post('/register', registerLimiter, async (req, res) => {
+  const pendingUserId = Number(req.session.pendingUserId || 0);
+  if (settingsCache.web_registration_enabled !== true && !(Number.isInteger(pendingUserId) && pendingUserId > 0)) {
+    return res.status(403).render('register-closed', { layout: false });
+  }
   const full_name = String(req.body.full_name || '').trim();
   const password = String(req.body.password || '');
   const confirm_password = String(req.body.confirm_password || '');
@@ -27313,7 +27325,6 @@ app.post('/register', registerLimiter, async (req, res) => {
   if (!hasConsent) return redirectRegisterError('consent-required');
 
   const normalizedName = full_name.replace(/\s+/g, ' ');
-  const pendingUserId = Number(req.session.pendingUserId || 0);
   if (Number.isInteger(pendingUserId) && pendingUserId > 0) {
     try {
       await ensureDbReady();
@@ -63218,6 +63229,7 @@ app.post('/admin/settings', requireSettingsSectionAccess, requireSensitiveAction
   const idleTimeoutMinutes = Number(body.session_idle_timeout_minutes);
   const absoluteTimeoutHours = Number(body.session_absolute_timeout_hours);
   const maxFileSize = Number(body.max_file_size_mb);
+  const webRegistrationEnabled = String(body.web_registration_enabled).toLowerCase() === 'true';
   const minTeamMembers = Number(body.min_team_members);
   const allowHomework = String(body.allow_homework_creation).toLowerCase() === 'true';
   const allowCustomDeadlines = String(body.allow_custom_deadlines).toLowerCase() === 'true';
@@ -63367,6 +63379,7 @@ app.post('/admin/settings', requireSettingsSectionAccess, requireSensitiveAction
       session_absolute_timeout_hours: normalizedSessionSecurity.absoluteTimeoutHours,
       session_duration_days: resolveSessionCompatibilityDays(normalizedSessionSecurity.absoluteTimeoutHours),
       max_file_size_mb: maxFileSize,
+      web_registration_enabled: webRegistrationEnabled,
       allow_homework_creation: allowHomework,
       min_team_members: minTeamMembers,
       allow_custom_deadlines: allowCustomDeadlines,

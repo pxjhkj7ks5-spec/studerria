@@ -80,7 +80,9 @@
           <button class="td-secondary-button" type="submit"><%= t('demo.loginCta') %></button>
         </form>
 
-        <p class="td-login-bottom"><%= t('login.noAccount') %> <a href="/register"><%= t('login.createAccountCta') %></a></p>
+        <% if (settings && settings.web_registration_enabled) { %>
+          <p class="td-login-bottom"><%= t('login.noAccount') %> <a href="/register"><%= t('login.createAccountCta') %></a></p>
+        <% } %>
       </section>
     </main>
 

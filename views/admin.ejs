@@ -1406,6 +1406,21 @@
               <form method="POST" action="/admin/settings" class="row g-3 align-items-end" id="systemSettingsForm">
                 <div class="col-12">
                   <div class="settings-section">
+                    <div class="settings-section-title">Public access</div>
+                    <div class="row g-3">
+                      <div class="col-12 col-md-5">
+                        <label class="form-label">Web-реєстрація Studerria</label>
+                        <select class="form-select" name="web_registration_enabled" data-settings-field>
+                          <option value="true" <%= (settings && settings.web_registration_enabled) ? 'selected' : '' %>>Відкрита</option>
+                          <option value="false" <%= (settings && settings.web_registration_enabled) ? '' : 'selected' %>>Закрита</option>
+                        </select>
+                        <div class="small text-muted mt-1">Керує лише реєстрацією через studerria.com. Вхід і Telegram Mini App залишаються доступними.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="settings-section">
                     <div class="settings-section-title">Security</div>
                     <div class="row g-3">
                       <div class="col-12 col-md-4">
