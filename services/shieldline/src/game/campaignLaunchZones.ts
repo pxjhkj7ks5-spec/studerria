@@ -9,7 +9,7 @@ export const campaignLaunchSectorIdsByAxis: Record<CampaignLaunchAxis, readonly 
   NE1: ["bryansk_north", "oryol_deep_north", "kursk_north"],
   NW1: ["smolensk_northwest", "bryansk_north"],
   E1: ["kursk_north", "belgorod_tactical", "voronezh_deep_east", "millerovo_rostov", "astrakhan_air_corridor"],
-  SE1: ["millerovo_rostov", "taganrog_azov", "primorsko_akhtarsk", "yeisk_kuban", "astrakhan_air_corridor"],
+  SE1: ["millerovo_rostov", "taganrog_azov", "primorsko_akhtarsk", "yeisk_kuban", "astrakhan_air_corridor", "caspian_air_corridor"],
   S1: ["primorsko_akhtarsk", "yeisk_kuban", "novorossiysk_black_sea", "black_sea_launch_box", "sevastopol_black_sea", "hvardiiske_crimea", "chauda_crimea", "dzhankoi_crimea"],
   SW1: ["black_sea_launch_box", "sevastopol_black_sea", "hvardiiske_crimea", "chauda_crimea", "dzhankoi_crimea"],
 };
@@ -19,7 +19,11 @@ export function pickCampaignLaunchSector(
   axis: CampaignLaunchAxis,
   threatKind: ThreatKind,
   random: () => number,
+  preferredSectorIds: readonly string[] = [],
 ): LaunchSector {
+  const exactIds = new Set(preferredSectorIds);
+  const exact = sectors.filter((sector) => exactIds.has(sector.id) && sectorSupportsThreat(sector, threatKind));
+  if (exact.length) return pickWeightedSector(exact, threatKind, random);
   const preferredIds = new Set(campaignLaunchSectorIdsByAxis[axis]);
   const preferred = sectors.filter((sector) => preferredIds.has(sector.id) && sectorSupportsThreat(sector, threatKind));
   const compatible = preferred.length ? preferred : sectors.filter((sector) => sectorSupportsThreat(sector, threatKind));

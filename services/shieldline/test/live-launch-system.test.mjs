@@ -25,7 +25,7 @@ function distanceKm(left, right) {
 }
 
 test("live mode uses the complete abstract launch-sector catalogue", () => {
-  assert.equal(launchSectors.length, 20);
+  assert.equal(launchSectors.length, 21);
   assert.equal(new Set(launchSectors.map((sector) => sector.id)).size, launchSectors.length);
   assert.equal(SHOW_LAUNCH_DEBUG, false);
   assert.ok(launchSectors.every((sector) => sector.radiusKm >= 40 && sector.weight > 0 && sector.threats.length > 0 && sector.role));

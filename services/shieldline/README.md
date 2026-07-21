@@ -14,7 +14,7 @@ It is intentionally isolated as a sidecar service:
 
 Campaign is the active production mode. It escalates through First Contact, Southern Corridor, Eastern Arc, Saturation and Mass Night. Other modes remain in the codebase as paused foundations but are hidden from the primary catalog while Campaign reaches production quality.
 
-Each mission follows `planning -> countdown -> running -> completed -> intermission`. The intermission preserves placed systems, local ammunition, health, experience, civilian resilience and the campaign wallet; only 25% of each finite ammunition pack recovers for free. The tactical map, reconnect and AAR project the same versioned state, and PostgreSQL stores five-step server Campaign progress.
+Each mission follows `planning -> countdown -> running -> completed -> intermission`. The intermission preserves placed systems, exact local ammunition, health, experience, civilian resilience and the campaign wallet; ammunition is restored only through an explicit paid resupply action. The tactical map, reconnect and AAR project the same versioned state, and PostgreSQL stores five-step server Campaign progress.
 
 ## Local development
 

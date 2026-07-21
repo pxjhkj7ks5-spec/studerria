@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, getCampaignMission, missionTargetCount } from "../src/data/campaignPlan";
+import { activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, missionTargetCount } from "../src/data/campaignPlan";
 import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignRedeployCost, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
 import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/game/campaignLaunchZones";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
-import { advanceSimulation, deployStoredBattery, placeBattery, startAttackNow } from "../src/game/liveSimulation";
+import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow } from "../src/game/liveSimulation";
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
-  assert.equal(campaignRouteTemplates.length, 30);
+  assert.equal(campaignRouteTemplates.length, 36);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.title), ["Перший контакт", "Південний коридор", "Східна дуга", "Насичення", "Масована ніч"]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [15, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [38, 32, 48, 70, 100]);
@@ -91,9 +91,26 @@ test("campaign corridors select compatible animated launch zones", () => {
   }
   for (const mission of campaignMissionsPlan) for (const event of buildCampaignSpawnEvents(mission.index)) {
     const route = campaignRouteTemplates.find((item) => item.id === event.routeId)!;
-    const sector = pickCampaignLaunchSector(sectors, route.launchSector, event.threatKind, () => .65);
+    const sector = pickCampaignLaunchSector(sectors, route.launchSector, event.threatKind, () => .65, route.preferredLaunchSectorIds);
     assert.ok(sectors.some((item) => item.id === sector.id));
     assert.equal(sectorSupportsThreat(sector, event.threatKind), true);
+    if (route.preferredLaunchSectorIds?.length) assert.ok(route.preferredLaunchSectorIds.includes(sector.id));
+  }
+});
+
+test("long-range and southern cruise presets stay connected to their authored corridors", () => {
+  const sectors = createLaunchSectorState();
+  for (const routeId of ["R31", "R32", "R33", "R34", "R35", "R36"]) {
+    const route = campaignRouteTemplates.find((item) => item.id === routeId)!;
+    const kind = route.allowedThreats[0];
+    const sector = pickCampaignLaunchSector(sectors, route.launchSector, kind, () => .5, route.preferredLaunchSectorIds);
+    const event = { ...buildCampaignSpawnEvents(kind === "kalibr" ? 2 : 1)[0], routeId, threatKind: kind };
+    const generated = generateCampaignRoute(event, () => .5, { lat: sector.lat, lng: sector.lng });
+    assert.ok(route.preferredLaunchSectorIds?.includes(sector.id));
+    assert.deepEqual(generated[0], { lat: sector.lat, lng: sector.lng });
+    assert.ok(Math.abs(generated.at(-1)!.lat - route.baseWaypoints.at(-1)!.lat) < 1e-9);
+    assert.ok(Math.abs(generated.at(-1)!.lng - route.baseWaypoints.at(-1)!.lng) < 1e-9);
+    assert.equal(routeHasSelfIntersection(generated), false);
   }
 });
 
@@ -111,13 +128,13 @@ test("campaign economy credits every authored kill reward and preserves units wi
   mvg.health = 76;
   const originalPosition = { ...mvg.position };
   for (let index = 0; index < 60; index += 1) recordCampaignKill(game, "parodiya", 1);
-  assert.equal(game.resources.budget, 59);
-  assert.equal(game.campaign?.campaignWallet, 59);
+  assert.equal(game.resources.budget, 67);
+  assert.equal(game.campaign?.campaignWallet, 67);
   game.interceptions = 29;
   const result = finalizeCampaignMission(game)!;
-  assert.equal(result.killReward, getCampaignMission(1).rewardCap);
+  assert.equal(result.killReward, 60);
   assert.equal(result.bonusRewards, 25);
-  assert.equal(result.walletAfterMission, 84);
+  assert.equal(result.walletAfterMission, 92);
   assert.equal(mvg.currentAmmo, 1);
   assert.equal(mvg.health, 76);
   assert.equal(mvg.experienceLevel, 1);
@@ -125,7 +142,7 @@ test("campaign economy credits every authored kill reward and preserves units wi
 
   game = advanceCampaignMission(game);
   assert.equal(game.campaign?.missionIndex, 2);
-  assert.equal(game.resources.budget, 116);
+  assert.equal(game.resources.budget, 124);
   assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, 1);
   assert.ok(game.campaign?.unlockedSystems.includes("gepard"));
 });
@@ -134,6 +151,17 @@ test("campaign redeployment always costs one million regardless of the air-defen
   for (const kind of ["mvg", "boat", "manpads", "gepard", "buk", "ew", "drone-operators", "radar", "s300", "iris-t", "nasams", "patriot"] as const) {
     assert.equal(campaignRedeployCost(kind), 1);
   }
+
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  applyCampaignMissionOpening(game);
+  game = placeBattery(game, "radar", { lat: 49.2, lng: 29.4 }, () => .5);
+  const radar = game.batteries.find((battery) => battery.kind === "radar")!;
+  game = moveBatteryToStorage(game, radar.id);
+  const walletBeforeRedeployment = game.campaign!.campaignWallet;
+  game = deployStoredBattery(game, radar.id, { lat: 48.7, lng: 30.1 });
+  assert.equal(game.campaign?.campaignWallet, walletBeforeRedeployment - 1);
+  assert.equal(game.batteries.find((battery) => battery.id === radar.id)?.position.lat, 48.7);
 });
 
 test("campaign onboarding cues expire before the first launch", () => {
@@ -142,6 +170,7 @@ test("campaign onboarding cues expire before the first launch", () => {
   assert.equal(activeCampaignTutorialCue(13), null);
   assert.equal(activeCampaignTutorialCue(510)?.title, "Підкріплення прибуло");
   assert.equal(activeCampaignTutorialCue(570), null);
+  assert.equal(activeCampaignTutorialCue(810), null);
   assert.deepEqual(
     ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
     [1, 2, 2, 10, 10, 20],
@@ -194,6 +223,33 @@ test("live campaign launches from and animates a real launch zone", () => {
   const activeSector = game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!;
   assert.equal(activeSector.state, "launching");
   assert.deepEqual(activeSector.lastLaunchCoordinates, threat.origin);
+});
+
+test("campaign cruise missiles receive an early track and complete their authored route", () => {
+  const random = createDeterministicRandom("campaign-cruise-route");
+  let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  game.campaign.spawnEvents = [{
+    id: "cruise-route-check",
+    dueMs: 10_000,
+    threatKind: "kh101",
+    routeId: "R31",
+    groupId: "cruise-route-check",
+    mergeBehavior: "independent",
+    priority: "veryHigh",
+    targetRegion: "Південно-східний кластер",
+  }];
+  applyCampaignMissionOpening(game);
+  game = startAttackNow(game, () => random.next());
+  game = advanceSimulation(game, 15_000, () => random.next());
+  const cruise = game.liveThreats.find((threat) => threat.kind === "kh101");
+  assert.ok(cruise);
+  assert.equal(cruise.routeId, "R31");
+  assert.equal(cruise.launchSectorId, "astrakhan_air_corridor");
+  game = advanceSimulation(game, 10_000, () => random.next());
+  assert.equal(game.liveThreats.find((threat) => threat.id === cruise.id)?.revealed, true);
+  game = advanceSimulation(game, 120_000, () => random.next());
+  assert.equal(game.liveThreats.some((threat) => threat.id === cruise.id), false);
 });
 
 test("intermission repair and resupply spend the persistent campaign wallet", () => {

@@ -439,6 +439,9 @@ function MapClickPlacement() {
 function DesktopPlacementPreview() {
   const map = useMap();
   const placementKind = useGameStore((state) => state.placementKind);
+  const placementStoredBatteryId = useGameStore((state) => state.placementStoredBatteryId);
+  const storedBattery = useGameStore((state) => state.game.storedBatteries.find((battery) => battery.id === state.placementStoredBatteryId));
+  const campaign = useGameStore((state) => state.game.campaign);
 
   useEffect(() => {
     if (!placementKind || !window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 821px)").matches) return undefined;
@@ -447,6 +450,9 @@ function DesktopPlacementPreview() {
     const isRadar = unit.engagementMode === "detect";
     const previewColor = isRadar ? "#63c7d4" : "#f6c547";
     const previewFill = isRadar ? "#4fb5c4" : "#f6c547";
+    const placementCostLabel = placementStoredBatteryId
+      ? campaign && storedBattery?.lastAction !== "reinforcement awaiting deployment" ? "1 млн ₴ · передислокація" : "0 ₴ · підкріплення"
+      : `${unit.costLabel} · нова одиниця`;
     const initial = map.getCenter();
     const group = L.layerGroup();
     const outerCircle = L.circle(initial, {
@@ -487,7 +493,7 @@ function DesktopPlacementPreview() {
       zIndexOffset: 910,
       icon: L.divIcon({
         className: "",
-        html: `<span class="placement-preview-card"><small>${unit.technicalCode}</small><b>${unit.name}</b><span>${unit.costLabel} · ${isRadar ? `${unit.outerRangeKm} км виявлення` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</span>${isRadar ? "" : `<span>БК ${unit.ammoCapacity === "infinite" ? "∞" : unit.ammoCapacity}</span>`}</span>`,
+        html: `<span class="placement-preview-card"><small>${unit.technicalCode}</small><b>${unit.name}</b><span>${placementCostLabel} · ${isRadar ? `${unit.outerRangeKm} км виявлення` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</span>${isRadar ? "" : `<span>БК ${unit.ammoCapacity === "infinite" ? "∞" : unit.ammoCapacity}</span>`}</span>`,
         iconSize: [190, 72],
         iconAnchor: [-18, 82],
       }),
@@ -517,7 +523,7 @@ function DesktopPlacementPreview() {
       map.getContainer().removeEventListener("pointerleave", hide);
       group.removeFrom(map);
     };
-  }, [map, placementKind]);
+  }, [campaign, map, placementKind, placementStoredBatteryId, storedBattery]);
 
   return null;
 }
@@ -1223,7 +1229,7 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
                   <small>Готовність {Math.round(battery.readiness)}% · {battery.status}</small>
                   <small>Стан {Math.round(battery.health)}% · досвід L{battery.experienceLevel}</small>
                   <small>БК {ammo} · перезаряджання {reload}</small>
-                  <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Перемістити на склад</button>
+                  <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Передислокувати · 1 млн ₴ при розміщенні</button>
                 </div>;
               })()}
             </Popup>

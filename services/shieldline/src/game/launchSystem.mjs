@@ -20,6 +20,7 @@ export const launchSectors = [
   { id: "novorossiysk_black_sea", name: "Новоросійський чорноморський сектор", lat: 44.70, lng: 37.80, radiusKm: 75, weight: 2, threats: ["kalibr", "decoy_cruise"], role: "Резервний морський сектор для Kalibr" },
   { id: "black_sea_launch_box", name: "Відкрите Чорне море", lat: 44.00, lng: 32.80, radiusKm: 120, weight: 2, threats: ["kalibr", "kh31p"], role: "Рандомізована морська launch box, не прив’язана до порту" },
   { id: "astrakhan_air_corridor", name: "Астраханський повітряний коридор", lat: 46.35, lng: 48.00, radiusKm: 150, weight: 2, threats: ["kh101", "kh555", "decoy_cruise"], role: "Далекий повітряний пуск стратегічної авіації" },
+  { id: "caspian_air_corridor", name: "Каспійський повітряний коридор", lat: 44.80, lng: 47.20, radiusKm: 170, weight: 2, threats: ["kh101", "kh555", "decoy_cruise"], role: "Далекий південно-східний повітряний коридор" },
   { id: "vologda_air_corridor", name: "Вологодський повітряний коридор", lat: 59.20, lng: 39.90, radiusKm: 150, weight: 2, threats: ["kh101", "kh555"], role: "Північний далекий пуск Х-101 / Х-555" },
 ];
 
@@ -41,6 +42,7 @@ export const SECOND_NIGHT_LAUNCH_SECTOR_IDS = [
   "sevastopol_black_sea",
   "novorossiysk_black_sea",
   "astrakhan_air_corridor",
+  "caspian_air_corridor",
 ];
 
 export const ALL_LAUNCH_SECTOR_IDS = launchSectors.map((sector) => sector.id);

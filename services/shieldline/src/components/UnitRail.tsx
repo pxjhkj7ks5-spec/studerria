@@ -14,6 +14,8 @@ const chanceKinds: Array<{ kind: ThreatKind; label: string }> = [
   { kind: "iskander", label: "OTRK" },
 ];
 
+const REINFORCEMENT_AWAITING_DEPLOYMENT = "reinforcement awaiting deployment";
+
 function maintenanceRisk(readiness: number) {
   if (readiness < 70) return "високий";
   if (readiness < 84) return "помірний";
@@ -83,7 +85,10 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
           const allowed = scenario.allowedUnits.includes(unit.kind) && (!game.campaign || game.campaign.unlockedSystems.includes(unit.kind));
           const storedUnits = storedBatteries.filter((item) => item.kind === unit.kind);
           const storedBattery = storedUnits[0];
-          const affordable = storedUnits.length > 0 || game.resources.budget >= unit.cost;
+          const storedDeploymentCost = game.campaign && storedBattery?.lastAction !== REINFORCEMENT_AWAITING_DEPLOYMENT ? 1 : 0;
+          const affordable = storedUnits.length > 0
+            ? game.resources.budget >= storedDeploymentCost
+            : game.resources.budget >= unit.cost;
           const selected = placementKind === unit.kind;
           const disabled = !active || !affordable || !allowed;
           const localBattery = game.batteries.find((item) => item.kind === unit.kind);
@@ -132,7 +137,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
               <div className={`unit-card__telemetry ${isRadar ? "unit-card__telemetry--radar" : ""}`}>
                 {!isRadar ? <span><small>БК</small><b>{ammoText}</b></span> : null}
                 <span><small>{isRadar ? "Радіус" : "Зона"}</small><b>{isRadar ? `${unit.outerRangeKm} км` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</b></span>
-                <span><small>Вартість</small><b>{storedUnits.length ? "0 ₴" : unit.costLabel}</b></span>
+                <span><small>Вартість</small><b>{storedUnits.length ? storedDeploymentCost ? "1 млн ₴" : "0 ₴" : unit.costLabel}</b></span>
               </div>
               <div className="unit-chance-row" aria-label={`Імовірність ураження для ${unit.name}`}>
                 {chanceKinds.map(({ kind, label }) => (
@@ -160,7 +165,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                   <span>Мобільність {unit.mobility}/4 · ризик обслуговування {maintenanceRisk(readiness)}</span>
                   <span>Готовність {Math.round(readiness)}% · втома {Math.round(fatigue)}% ({fatigueLabel(fatigue)})</span>
                   {referenceBattery ? <span>Стан {Math.round(referenceBattery.health)}% · досвід L{referenceBattery.experienceLevel}</span> : null}
-                  <span>{storedBattery ? "На складі" : localBattery?.supplyStatus || "Не розміщена"}</span>
+                  <span>{storedBattery ? storedDeploymentCost ? "На складі · передислокація 1 млн ₴" : "На складі · підкріплення" : localBattery ? `${localBattery.supplyStatus} · передислокація через маркер 1 млн ₴` : "Не розміщена"}</span>
                   {game.campaign?.intermission && referenceBattery ? <div className="campaign-service-actions"><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "resupply", .5); }}>+50% БК</button><button type="button" onClick={(event) => { event.stopPropagation(); serviceBattery(referenceBattery.id, "repair", 1); }}>Ремонт</button></div> : null}
                 </div>
               </div>
@@ -168,7 +173,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <i style={{ width: `${Math.round(fatigue)}%` }} />
               </div>
               <div className="unit-card__meta">
-                <span>{storedUnits.length ? "зі складу" : `${unit.cost} млн`}</span>
+                <span>{storedUnits.length ? storedDeploymentCost ? "передислокація · 1 млн" : "підкріплення · 0" : `${unit.cost} млн · нова одиниця`}</span>
                 <span>{allowed ? selected ? "обрано" : storedUnits.length ? "розмістити" : affordable ? "обрати" : "бракує бюджету" : "недоступно"}</span>
               </div>
             </article>

@@ -539,7 +539,7 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
     && sector.targetCityId === city.id
     && sectorSupportsThreat(sector, event.threatKind));
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
-  const launchSector = preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random);
+  const launchSector = preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
   const launchOrigin = preparedSector?.lastLaunchCoordinates || randomPointInSector(launchSector, random);
   const waypoints = generateCampaignRoute(event, random, launchOrigin);
   const threat = spawnThreat(state, random, event.threatKind, city.id, launchSector.id, launchOrigin);
@@ -577,7 +577,7 @@ function prepareCampaignLaunch(state: GameState, random: () => number) {
     && sector.targetCityId === city.id);
   if (existing) return;
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
-  const sector = pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random);
+  const sector = pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
   const origin = randomPointInSector(sector, random);
   markLaunchSector(state, sector.id, "warning", untilLaunchMs + 1000, { cityId: city.id, coordinates: city.coordinates }, origin, event.threatKind);
   pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Активність у секторі «${sector.name}». До можливого пуску менше 15 секунд.`, "warning", { eventType: "launch", locationLabel: sector.name });
@@ -737,6 +737,9 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
       }
     }
 
+    const campaignMissileTrack = Boolean(state.campaign && isMissileClass(threat.kind) && threat.progress >= .04);
+    if (campaignMissileTrack && bestRadarChance === 0) bestRadarChance = 28;
+
     threat.revealed = bestRadarChance > 0;
     if (!threat.revealed) {
       if (threat.status !== "engaged") threat.status = "inbound";
@@ -756,7 +759,16 @@ function detectThreats(state: GameState, random: () => number, shouldScan: boole
       threat.confidence = clamp(threat.confidence + (bestRadarChance / 100) * 8 + firstContactBoost + (intelFocus ? 6 : 0), 0, 100);
       if (!wasRevealed) {
         if (bestRadar) queueEngagementEvent(state, random, bestRadar, threat, "radar", "detected");
-        pushLog(state.log, state.elapsedMs, "Радарний контакт", `${threat.isFalseTrack ? "Ціль із низькою достовірністю" : "Ціль"} увійшла в зону радіолокаційного покриття.`, "info", { eventType: "detection", locationLabel: threat.targetCityId });
+        pushLog(
+          state.log,
+          state.elapsedMs,
+          bestRadar ? "Радарний контакт" : "Маршрут підтверджено",
+          bestRadar
+            ? `${threat.isFalseTrack ? "Ціль із низькою достовірністю" : "Ціль"} увійшла в зону радіолокаційного покриття.`
+            : `Далекий супровід підтвердив вхід ракети за маршрутом ${threat.routeId || "кампанії"}.`,
+          "info",
+          { eventType: "detection", locationLabel: threat.targetCityId },
+        );
       }
     }
   }
@@ -786,7 +798,7 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
           ttlMs: 1800,
         });
         const rewardCopy = state.campaign
-          ? campaignReward > 0 ? `Винагорода одразу зарахована: +${campaignReward} млн ₴.` : "Ліміт нагороди цієї місії вже досягнуто."
+          ? `Винагорода одразу зарахована: +${campaignReward} млн ₴.`
           : `Винагорода +${threat.reward} млн ₴.`;
         pushLog(state.log, state.elapsedMs, "Перехоплення успішне", `Повітряну ціль нейтралізовано. ${rewardCopy}`, "success");
       } else if (event.result === "miss" && threat) {

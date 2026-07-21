@@ -73,10 +73,8 @@ export function applyCampaignMissionOpening(state: GameState) {
 
 export function recordCampaignKill(state: GameState, kind: ThreatKind, reward: number) {
   if (!state.campaign) return 0;
-  const mission = getCampaignMission(state.campaign.missionIndex);
   const canonicalReward = campaignKillRewards[kind] ?? reward;
-  const available = Math.max(0, mission.rewardCap - state.campaign.missionKillReward);
-  const credited = Math.min(canonicalReward, available);
+  const credited = Math.max(0, canonicalReward);
   state.campaign.missionKillReward += credited;
   state.campaign.missionKillsByKind[kind] = (state.campaign.missionKillsByKind[kind] || 0) + 1;
   state.campaign.campaignWallet = clamp(state.campaign.campaignWallet + credited, 0, 9999);
@@ -97,7 +95,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   const totalTargets = missionTargetCount(mission);
   const lines: CampaignMissionResult["rewardLines"] = [];
   addLine(lines, "Грант місії", mission.grant, "grant");
-  addLine(lines, `Підтверджені збиття (cap ${mission.rewardCap})`, campaign.missionKillReward, "kill");
+  addLine(lines, "Винагорода за збиті цілі", campaign.missionKillReward, "kill");
   let bonusRewards = 0;
   if (campaign.civilianResilience > 80) { bonusRewards += 5; addLine(lines, "Civilian resilience > 80%", 5, "bonus"); }
   if (campaign.civilianResilience > 90) { bonusRewards += 10; addLine(lines, "Civilian resilience > 90%", 10, "bonus"); }
