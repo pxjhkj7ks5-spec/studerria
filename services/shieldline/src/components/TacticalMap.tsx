@@ -23,6 +23,8 @@ import type {
   ImpactMarker,
   LaunchSector,
   LiveThreat,
+  GameState,
+  MapMode,
   SupplyRoute,
 } from "../types/game";
 
@@ -1020,11 +1022,21 @@ function PerformanceOverlay({ stats, counts }: { stats: PerformanceStats; counts
   );
 }
 
-export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQuality?: boolean }) {
-  const game = useGameStore((state) => state.game);
-  const mapMode = useGameStore((state) => state.mapMode);
-  const placementKind = useGameStore((state) => state.placementKind);
+interface TacticalMapProps {
+  forcedReducedQuality?: boolean;
+  gameOverride?: GameState;
+  mapModeOverride?: MapMode;
+  readOnly?: boolean;
+}
+
+export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapModeOverride, readOnly = false }: TacticalMapProps) {
+  const storedGame = useGameStore((state) => state.game);
+  const storedMapMode = useGameStore((state) => state.mapMode);
+  const storedPlacementKind = useGameStore((state) => state.placementKind);
   const moveBatteryToStorage = useGameStore((state) => state.moveBatteryToStorage);
+  const game = gameOverride || storedGame;
+  const mapMode = mapModeOverride || storedMapMode;
+  const placementKind = readOnly ? null : storedPlacementKind;
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
@@ -1183,8 +1195,8 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
       >
         <MapViewportTracker onChange={setRenderBounds} />
         <ThreatLabelZoomMode />
-        <MapClickPlacement />
-        <DesktopPlacementPreview />
+        {readOnly ? null : <MapClickPlacement />}
+        {readOnly ? null : <DesktopPlacementPreview />}
         <MovingObjectsLayer
           threats={visibleThreats}
           engagements={visibleEngagements}
@@ -1313,7 +1325,7 @@ export function TacticalMap({ forcedReducedQuality = false }: { forcedReducedQua
                   <small>Стан {Math.round(battery.health)}% · досвід L{battery.experienceLevel}</small>
                   <small>БК {ammo} · запас місії {battery.missionReserve === "infinite" ? "∞" : battery.missionReserve} · {reload}</small>
                   <small>{battery.lastEngagementResult}</small>
-                  <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Передислокувати · 1 млн ₴ при розміщенні</button>
+                  {readOnly ? null : <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Передислокувати · 1 млн ₴ при розміщенні</button>}
                 </div>;
               })()}
             </Popup>

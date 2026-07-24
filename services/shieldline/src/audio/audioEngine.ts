@@ -105,6 +105,13 @@ export class ShieldlineAudioEngine {
     }
   }
 
+  async preview(cue: SoundCue) {
+    if (!await this.unlock()) return false;
+    this.stopAll();
+    this.lastPlayedAt.delete(cue);
+    return this.play(cue, performance.now());
+  }
+
   stopAll() {
     this.criticalRequestId += 1;
     if (this.duckRestoreTimer !== null) {
@@ -213,6 +220,10 @@ export const shieldlineAudio = new ShieldlineAudioEngine();
 
 export function playSound(cue: SoundCue) {
   return shieldlineAudio.play(cue);
+}
+
+export function previewSound(cue: SoundCue) {
+  return shieldlineAudio.preview(cue);
 }
 
 export function resetAudioPreferencesForTests() {

@@ -15,6 +15,7 @@ import { UnitRail } from "./components/UnitRail";
 import { CommandApp } from "./components/CommandApp";
 import { DisplaySettings } from "./components/DisplaySettings";
 import { BrandMark } from "./components/BrandMark";
+import { SoundEventLab } from "./components/SoundEventLab";
 import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
@@ -130,6 +131,10 @@ export default function App() {
   const isAdminRoute = typeof window !== "undefined" && window.location.pathname.replace(/\/+$/, "").endsWith("/admin");
   if (isAdminRoute) {
     return <AdminApp />;
+  }
+  const isSoundLabRoute = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("soundLab") === "1";
+  if (isSoundLabRoute) {
+    return <SoundEventLab />;
   }
   const legacyRequested = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("legacy") === "1";
   if (!legacyRequested) {
