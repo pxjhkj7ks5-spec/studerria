@@ -192,7 +192,7 @@ test("first mission has meaningful radar builds and no scripted S-300 answer", (
   assert.ok(builds.every((cost) => cost <= 42));
 });
 
-test("live campaign launches from and animates an abstract launch sector", () => {
+test("live campaign launches from and animates a named geographic direction", () => {
   const random = createDeterministicRandom("campaign-live-launch-zone");
   let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();

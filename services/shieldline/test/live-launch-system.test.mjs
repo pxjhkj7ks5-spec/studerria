@@ -8,6 +8,7 @@ import {
   SHOW_LAUNCH_DEBUG,
   createLaunchSectorState,
   generateLaunchOrigin,
+  launchSectorThreatClasses,
   launchSectors,
   pickWeightedSector,
   randomPointInSector,
@@ -24,14 +25,30 @@ function distanceKm(left, right) {
   return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
-test("live mode uses the complete abstract launch-sector catalogue", () => {
+test("live mode uses the complete named geographic launch-direction catalogue", () => {
   assert.equal(launchSectors.length, 21);
   assert.equal(new Set(launchSectors.map((sector) => sector.id)).size, launchSectors.length);
+  assert.equal(new Set(launchSectors.map((sector) => sector.name)).size, launchSectors.length);
   assert.equal(SHOW_LAUNCH_DEBUG, false);
   assert.ok(launchSectors.every((sector) => sector.radiusKm >= 40 && sector.weight > 0 && sector.threats.length > 0 && sector.role));
   assert.ok(launchSectors.every((sector) => /^(north|northwest|east|southeast|south|sea|long_range)_/.test(sector.id)));
-  assert.ok(launchSectors.every((sector) => /сектор/i.test(sector.name)));
+  assert.ok(launchSectors.some((sector) => sector.name === "Курський напрямок"));
+  assert.ok(launchSectors.some((sector) => sector.name === "Брянський напрямок"));
+  assert.ok(launchSectors.some((sector) => sector.name === "Мис Чауда / східний Крим"));
+  assert.ok(launchSectors.some((sector) => sector.name === "Вологодський повітряний напрямок"));
+  assert.ok(!launchSectors.some((sector) => /сектор\s+[A-CА-В]$/i.test(sector.name)));
+  assert.ok(launchSectors.every((sector) => launchSectorThreatClasses(sector).length > 0));
   assert.ok(!launchSectors.some((sector) => ["drone-northwest", "otrk-northeast", "black-sea-ships"].includes(sector.id)));
+});
+
+test("launch directions expose the supported threat classes", () => {
+  const bryansk = launchSectors.find((sector) => sector.id === "north_corridor_b");
+  const blackSea = launchSectors.find((sector) => sector.id === "sea_corridor_a");
+  const chauda = launchSectors.find((sector) => sector.id === "south_drone_b");
+
+  assert.deepEqual(launchSectorThreatClasses(bryansk), ["Балістичні ракети", "Дрони"]);
+  assert.deepEqual(launchSectorThreatClasses(blackSea), ["Крилаті ракети"]);
+  assert.deepEqual(launchSectorThreatClasses(chauda), ["Дрони"]);
 });
 
 test("random launch points are distributed inside the sector radius", () => {

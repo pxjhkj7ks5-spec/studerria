@@ -8,7 +8,7 @@ import { formatThreatAltitude, formatThreatSpeed } from "../data/threatFlightPro
 import { getUnitDefinition } from "../data/units";
 import { CITY_PLACEMENT_EXCLUSION_KM } from "../game/placementRules";
 import { batteryCoverageState } from "../game/coverageVisuals";
-import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter } from "../game/launchSystem.mjs";
+import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter, launchSectorThreatClasses } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile } from "../game/mapZoom";
 import { advanceVisualThreatProgress, classifyThreatRoute, threatCourseAtProgress, threatPositionAtProgress, threatRouteAtProgress, type ThreatRouteVisual } from "../game/threatRouteVisuals";
@@ -401,6 +401,16 @@ function makeLaunchSectorIcon(sector: LaunchSector) {
   });
   launchSectorIconCache.set(key, icon);
   return icon;
+}
+
+function LaunchSectorTooltip({ sector, exact = false }: { sector: LaunchSector; exact?: boolean }) {
+  return (
+    <span className="launch-sector-tooltip__content">
+      <strong>{exact ? `Точка пуску · ${sector.name}` : sector.name}</strong>
+      <span>Можливі загрози: {launchSectorThreatClasses(sector).join(" · ")}</span>
+      <small>{sector.role}</small>
+    </span>
+  );
 }
 
 function makeCarrierIcon(carrier: CarrierTrack) {
@@ -1241,7 +1251,7 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
               ) : null}
               <Marker position={[center.lat, center.lng]} icon={makeLaunchSectorIcon(sector)}>
                 <Tooltip className="launch-sector-tooltip" direction="auto" offset={[8, 0]}>
-                  {sector.name} · {sector.role}
+                  <LaunchSectorTooltip sector={sector} />
                 </Tooltip>
               </Marker>
               {sector.lastLaunchCoordinates ? (
@@ -1249,7 +1259,9 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
                   position={[sector.lastLaunchCoordinates.lat, sector.lastLaunchCoordinates.lng]}
                   icon={makeLaunchSectorIcon({ ...sector, id: `campaign-launch-${sector.id}`, lat: sector.lastLaunchCoordinates.lat, lng: sector.lastLaunchCoordinates.lng, radiusKm: 1 })}
                 >
-                  <Tooltip className="launch-sector-tooltip" direction="auto" offset={[8, 0]}>Точна точка пуску · {sector.name}</Tooltip>
+                  <Tooltip className="launch-sector-tooltip" direction="auto" offset={[8, 0]}>
+                    <LaunchSectorTooltip sector={sector} exact />
+                  </Tooltip>
                 </Marker>
               ) : null}
             </Fragment>

@@ -19,7 +19,7 @@ export function ScenarioSelection({ onSelect, onBack }: ScenarioSelectionProps) 
           </button>
           <div>
             <h1>Оберіть сценарій</h1>
-            <p>Кожен сценарій використовує умовні сектори, абстрактну логістику та збалансовані напрямки загроз.</p>
+            <p>Кожен сценарій використовує названі географічні напрямки, умовні дальності та збалансовану логістику.</p>
           </div>
         </div>
         <div className="scenario-grid">

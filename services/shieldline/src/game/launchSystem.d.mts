@@ -13,4 +13,5 @@ export function pickWeightedSector(sectors: readonly LaunchSector[], allowedThre
 export function randomPointInSector(sector: LaunchSector, random?: () => number): Coordinates;
 export function generateLaunchOrigin(sectors: readonly LaunchSector[], threatType: ThreatKind | string, random?: () => number): { sector: LaunchSector; point: Coordinates };
 export function launchSectorCategory(sector: LaunchSector): "drone" | "ballistic" | "cruise";
+export function launchSectorThreatClasses(sector: LaunchSector): Array<"Балістичні ракети" | "Крилаті ракети" | "Дрони">;
 export function launchSectorCenter(sector: LaunchSector): Coordinates;

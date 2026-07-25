@@ -43,7 +43,7 @@ function localizedEntry(entry: GameState["log"][number]) {
     "Maintenance Assigned": ["Призначено обслуговування", "Установка проходить прискорене відновлення."],
     "Scenario Selected": ["Сценарій обрано", "Командний центр завантажив умови поточної операції."],
     "Intel Briefing": ["Розвідувальне зведення", "Зберігайте енергію, мораль і ремонтний резерв протягом операції."],
-    "Simulation Scope": ["Межі симуляції", "Shieldline використовує умовні абстрактні механіки й дальності."],
+    "Simulation Scope": ["Межі симуляції", "Географічні назви показують загальні напрямки; точки й дальності залишаються умовними."],
   };
   const translated = copy[entry.title];
   return translated ? { ...entry, title: translated[0], body: translated[1] } : entry;
