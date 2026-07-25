@@ -99,9 +99,11 @@ export class ShieldlineAudioEngine {
       this.trimVoices(cue, definition.maxVoices);
       const source = context.createBufferSource();
       const gain = context.createGain();
+      const playbackRate = variant.playbackRate || 1;
+      const gainValue = variant.gain ?? 1;
       source.buffer = buffer;
-      source.playbackRate.value = variant.playbackRate || 1;
-      gain.gain.value = variant.gain ?? 1;
+      source.playbackRate.value = playbackRate;
+      gain.gain.value = gainValue;
       source.connect(gain);
       gain.connect(destination);
       const voice: ActiveVoice = { cue, source, gain, startedAt: context.currentTime };
@@ -109,7 +111,14 @@ export class ShieldlineAudioEngine {
       source.addEventListener("ended", () => this.removeVoice(voice), { once: true });
       const offset = Math.max(0, Math.min(variant.offset || 0, Math.max(0, buffer.duration - 0.01)));
       const duration = Math.max(0.02, Math.min(variant.duration || buffer.duration - offset, buffer.duration - offset));
-      if (definition.priority === 3) this.duckLowerPriorities(duration);
+      const playbackDuration = duration / playbackRate;
+      const fadeOutSeconds = Math.min(Math.max(0, variant.fadeOutSeconds || 0), playbackDuration);
+      if (fadeOutSeconds > 0) {
+        const fadeStart = context.currentTime + playbackDuration - fadeOutSeconds;
+        gain.gain.setValueAtTime(gainValue, fadeStart);
+        gain.gain.linearRampToValueAtTime(0, context.currentTime + playbackDuration);
+      }
+      if (definition.priority === 3) this.duckLowerPriorities(playbackDuration);
       source.start(0, offset, duration);
       return { cue, variantIndex, file: variant.file } satisfies SoundPlaybackResult;
     } catch {

@@ -35,6 +35,7 @@ test("reviewed launch, warning, gun, and interceptor cues use the selected singl
   assert.deepEqual(soundCueDefinitions["engagement.gun"].variants.map(({ file }) => file), ["audio/sfx/gun-burst-1.mp3"]);
   assert.deepEqual(soundCueDefinitions["engagement.missile"].variants.map(({ file }) => file), ["audio/sfx/missile-launch.mp3"]);
   assert.deepEqual(soundCueDefinitions["alert.air-raid"].variants.map(({ file }) => file), ["audio/sfx/air-raid.mp3"]);
+  assert.equal(soundCueDefinitions["alert.air-raid"].variants[0].fadeOutSeconds, 1.5);
   assert.deepEqual(soundCueDefinitions["alert.clear"].variants.map(({ file }) => file), ["audio/sfx/chime.mp3"]);
   assert.deepEqual(soundCueDefinitions["result.intercept"].variants.map(({ file }) => file), ["audio/sfx/intercept-impact.mp3"]);
   assert.deepEqual(soundCueDefinitions["result.impact"].variants.map(({ file }) => file), ["audio/sfx/city-impact.mp3"]);

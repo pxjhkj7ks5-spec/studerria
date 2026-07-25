@@ -50,6 +50,7 @@ export interface SoundVariant {
   duration?: number;
   playbackRate?: number;
   gain?: number;
+  fadeOutSeconds?: number;
 }
 
 export interface SoundCueDefinition {
@@ -87,7 +88,7 @@ export const soundCueDefinitions: Record<SoundCue, SoundCueDefinition> = {
   "alert.launch.drone": combat([sfx("rocket-distant", { offset: 2.1, duration: 1.7, gain: 0.23, playbackRate: 1.12 })], 1_400, 1),
   "alert.launch.cruise": combat([sfx("rocket-distant", { offset: 1.2, duration: 3.2, gain: 0.42 })], 1_600, 2),
   "alert.launch.ballistic": critical([sfx("missile-launch", { duration: 3, gain: 0.58, playbackRate: 0.92 })], 2_200),
-  "alert.air-raid": critical([sfx("air-raid", { duration: 9, gain: 0.28 })], 12_000),
+  "alert.air-raid": critical([sfx("air-raid", { duration: 9, gain: 0.28, fadeOutSeconds: 1.5 })], 12_000),
   "alert.clear": critical([sfx("chime", { gain: 0.34, playbackRate: 0.74 })], 8_000),
   "contact.detected": combat([sfx("confirm", { gain: 0.28, playbackRate: 1.45 }), sfx("radio-static", { offset: 2.2, duration: 0.42, gain: 0.22 })], 700, 2),
   "contact.classified": combat([sfx("confirm", { gain: 0.3, playbackRate: 1.7 })], 650, 2),

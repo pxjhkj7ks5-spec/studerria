@@ -11,7 +11,7 @@ Direction: realistic hybrid, restrained command-interface design, no music or sp
 | Prelaunch/contact/radar | Short radio interference and high confirmation tick | 0.4–1.2 s | 2 | Medium | `radio-static`, `confirm` | Grouped by cooldown during dense waves |
 | Drone launch/engagement | Distant launch wash or propeller texture, fixed by context | 1.5–2.0 s | 1 per cue | Medium | `rocket-distant`, `drone` | Launch and interceptor-drone cues no longer alternate unrelated sources |
 | Cruise/ballistic launch | Distant rocket wash or close missile ignition | 2.0–3.2 s | 2 | Medium/Critical | `rocket-distant`, `missile-launch` | Ballistic warning ducks lower-priority voices |
-| Air raid/all clear | Dedicated warning signal followed by a restrained clear chime | 0.4–9 s | 1 per cue | Critical | `air-raid`, `chime` | One global cue per escalation; minimum 12 s cooldown |
+| Air raid/all clear | Dedicated warning signal followed by a restrained clear chime | 0.4–9 s | 1 per cue | Critical | `air-raid`, `chime` | Air-raid signal fades over its final 1.5 s; one global cue per escalation |
 | Gun/missile/EW engagement | Distinct kinetic burst, missile ignition, or radio disruption | 0.4–2.3 s | 1 per cue | Medium | `gun-burst-1`, `missile-launch`, `radio-static` | Maximum three simultaneous voices; fixed source per context |
 | Reload | Short metallic mechanism | 0.5–0.7 s | 1 | Medium | `mechanical` | Fires when the battery actually enters reload |
 | Intercept/soft kill/miss | Short kinetic impact, interference fade, or contact loss | 0.6–1.8 s | 1 per cue | Medium | `intercept-impact`, `radio-static` | Successful PVO impact uses its own fixed source below the city-impact level |

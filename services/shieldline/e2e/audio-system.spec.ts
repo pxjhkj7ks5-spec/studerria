@@ -4,16 +4,23 @@ async function installAudioHarness(page: import("@playwright/test").Page) {
   await page.addInitScript(() => {
     const audioWindow = window as typeof window & {
       __audioFetches: string[];
+      __audioGainRamps: Array<{ value: number; at: number }>;
       __audioStarts: Array<{ offset: number; duration: number }>;
       __audioStops: number;
     };
     audioWindow.__audioFetches = [];
+    audioWindow.__audioGainRamps = [];
     audioWindow.__audioStarts = [];
     audioWindow.__audioStops = 0;
 
     class FakeAudioParam {
       value = 1;
       setTargetAtTime(value: number) { this.value = value; }
+      setValueAtTime(value: number) { this.value = value; }
+      linearRampToValueAtTime(value: number, at: number) {
+        this.value = value;
+        audioWindow.__audioGainRamps.push({ value, at });
+      }
     }
     class FakeGain {
       gain = new FakeAudioParam();
@@ -107,6 +114,7 @@ test("air raid sounds once for a global escalation and hidden updates are not re
 
   await setAlerts(["air-raid", "air-raid"]);
   await expect.poll(() => page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("air-raid.mp3")).length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { __audioGainRamps: Array<{ value: number; at: number }> }).__audioGainRamps.some(({ value, at }) => value === 0 && at === 9))).toBe(true);
   await setAlerts(["air-raid", "air-raid", "air-raid"]);
   await page.waitForTimeout(150);
   expect(await page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("air-raid.mp3")).length)).toBe(1);
