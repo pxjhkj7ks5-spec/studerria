@@ -1,4 +1,4 @@
-const CACHE = "shieldline-runtime-v8";
+const CACHE = "shieldline-runtime-v9";
 const SHELL = [
   "./",
   "./index.html",
@@ -11,14 +11,16 @@ const SHELL = [
   "./apple-touch-icon.png?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",
+  "./audio/sfx/air-raid.mp3",
   "./audio/sfx/chime.mp3",
   "./audio/sfx/confirm.mp3",
+  "./audio/sfx/drone.mp3",
   "./audio/sfx/gun-burst-1.mp3",
   "./audio/sfx/impact.mp3",
   "./audio/sfx/mechanical.mp3",
   "./audio/sfx/missile-launch.mp3",
   "./audio/sfx/radio-static.mp3",
-  "./audio/sfx/siren.mp3",
+  "./audio/sfx/rocket-distant.mp3",
   "./audio/sfx/timer.mp3",
 ];
 

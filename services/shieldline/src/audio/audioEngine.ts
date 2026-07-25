@@ -8,6 +8,12 @@ interface ActiveVoice {
   startedAt: number;
 }
 
+export interface SoundPlaybackResult {
+  cue: SoundCue;
+  variantIndex: number;
+  file: string;
+}
+
 type AudioContextConstructor = typeof AudioContext;
 
 function audioContextConstructor() {
@@ -29,6 +35,7 @@ export class ShieldlineAudioEngine {
   private unlocked = false;
   private duckRestoreTimer: number | null = null;
   private criticalRequestId = 0;
+  private previewRequestId = 0;
 
   get currentPreferences() {
     return { ...this.preferences };
@@ -67,7 +74,7 @@ export class ShieldlineAudioEngine {
     }
   }
 
-  async play(cue: SoundCue, now = performance.now()) {
+  async play(cue: SoundCue, now = performance.now(), previewRequestId?: number) {
     if (!this.preferences.enabled || !this.visible || !this.unlocked || !cueAllowedAt(cue, this.lastPlayedAt.get(cue), now)) return false;
     const definition = soundCueDefinitions[cue];
     const variantIndex = selectSoundVariant(cue, this.lastVariant.get(cue));
@@ -81,7 +88,13 @@ export class ShieldlineAudioEngine {
     const criticalRequestId = definition.priority === 3 ? ++this.criticalRequestId : this.criticalRequestId;
     try {
       const buffer = await this.loadBuffer(variant.file);
-      if (!this.preferences.enabled || !this.visible || context.state !== "running" || (definition.priority === 3 && criticalRequestId !== this.criticalRequestId)) return false;
+      if (
+        !this.preferences.enabled
+        || !this.visible
+        || context.state !== "running"
+        || (definition.priority === 3 && criticalRequestId !== this.criticalRequestId)
+        || (previewRequestId !== undefined && previewRequestId !== this.previewRequestId)
+      ) return false;
       if (definition.priority === 3) this.stopCriticalVoices();
       this.trimVoices(cue, definition.maxVoices);
       const source = context.createBufferSource();
@@ -98,7 +111,7 @@ export class ShieldlineAudioEngine {
       const duration = Math.max(0.02, Math.min(variant.duration || buffer.duration - offset, buffer.duration - offset));
       if (definition.priority === 3) this.duckLowerPriorities(duration);
       source.start(0, offset, duration);
-      return true;
+      return { cue, variantIndex, file: variant.file } satisfies SoundPlaybackResult;
     } catch {
       this.buffers.delete(variant.file);
       return false;
@@ -106,13 +119,15 @@ export class ShieldlineAudioEngine {
   }
 
   async preview(cue: SoundCue) {
-    if (!await this.unlock()) return false;
-    this.stopAll();
+    const requestId = ++this.previewRequestId;
+    if (!await this.unlock() || requestId !== this.previewRequestId) return false;
+    this.stopAll(false);
     this.lastPlayedAt.delete(cue);
-    return this.play(cue, performance.now());
+    return this.play(cue, performance.now(), requestId);
   }
 
-  stopAll() {
+  stopAll(invalidatePendingPreviews = true) {
+    if (invalidatePendingPreviews) this.previewRequestId += 1;
     this.criticalRequestId += 1;
     if (this.duckRestoreTimer !== null) {
       window.clearTimeout(this.duckRestoreTimer);

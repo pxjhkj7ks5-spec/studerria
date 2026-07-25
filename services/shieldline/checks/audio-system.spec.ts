@@ -4,6 +4,7 @@ import test from "node:test";
 import { normalizeAudioPreferences } from "../src/platform/audioPreferences";
 import { collectUnseenSoundCues } from "../src/audio/useGameAudio";
 import { cueAllowedAt, selectSoundVariant, soundCueDefinitions, soundCueNames } from "../src/audio/soundCues";
+import { getSoundSource, getSoundSources } from "../src/audio/soundSources";
 import { createScenarioState } from "../src/game/initialState";
 import { placeBattery, tickSimulation } from "../src/game/liveSimulation";
 import type { IntelEntry, LiveThreat } from "../src/types/game";
@@ -27,6 +28,24 @@ test("every typed cue has bounded playback policy and variation avoids immediate
   assert.equal(cueAllowedAt("alert.air-raid", undefined, 100), true);
   assert.equal(cueAllowedAt("alert.air-raid", 100, 11_000), false);
   assert.equal(cueAllowedAt("alert.air-raid", 100, 12_100), true);
+});
+
+test("reviewed launch, warning, gun, and interceptor cues use the selected single sources", () => {
+  assert.deepEqual(soundCueDefinitions["alert.launch.drone"].variants.map(({ file }) => file), ["audio/sfx/rocket-distant.mp3"]);
+  assert.deepEqual(soundCueDefinitions["engagement.gun"].variants.map(({ file }) => file), ["audio/sfx/gun-burst-1.mp3"]);
+  assert.deepEqual(soundCueDefinitions["engagement.missile"].variants.map(({ file }) => file), ["audio/sfx/missile-launch.mp3"]);
+  assert.deepEqual(soundCueDefinitions["alert.air-raid"].variants.map(({ file }) => file), ["audio/sfx/air-raid.mp3"]);
+  assert.deepEqual(soundCueDefinitions["alert.clear"].variants.map(({ file }) => file), ["audio/sfx/chime.mp3"]);
+});
+
+test("every configured audio file has displayable source metadata", () => {
+  const configuredFiles = new Set(Object.values(soundCueDefinitions).flatMap((definition) => definition.variants.map(({ file }) => file)));
+  assert.equal(getSoundSources().length, configuredFiles.size);
+  for (const file of configuredFiles) {
+    const source = getSoundSource(file);
+    assert.ok(source, `missing source metadata for ${file}`);
+    assert.ok(source.sourceUrl.startsWith("https://freesound.org/s/"));
+  }
 });
 
 test("hydrated entries form a baseline and only new semantic cues play in chronological order", () => {

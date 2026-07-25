@@ -5123,6 +5123,24 @@ body,
   font-size: 9px;
 }
 
+.sound-lab-event-card .sound-lab-source {
+  pointer-events: auto;
+}
+
+.sound-lab-event-card .sound-lab-source code {
+  color: #a5bdc7;
+  font-size: inherit;
+}
+
+.sound-lab-event-card .sound-lab-source a {
+  color: #75cad5;
+  text-decoration: none;
+}
+
+.sound-lab-event-card .sound-lab-source a:hover {
+  text-decoration: underline;
+}
+
 .sound-lab-playback {
   position: absolute;
   z-index: 900;

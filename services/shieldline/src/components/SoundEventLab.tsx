@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, Headphones, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { previewSound, shieldlineAudio } from "../audio/audioEngine";
+import { previewSound, shieldlineAudio, type SoundPlaybackResult } from "../audio/audioEngine";
 import { soundCueDefinitions, type SoundCue } from "../audio/soundCues";
+import { getSoundSource } from "../audio/soundSources";
 import { createScenarioState } from "../game/initialState";
 import { getUnitDefinition } from "../data/units";
 import { readAudioPreferences, writeAudioPreferences } from "../platform/audioPreferences";
@@ -435,29 +436,32 @@ function sceneForCue(cue: SoundCue, sequence: number): { game: GameState; mapMod
   return { game, mapMode, note };
 }
 
-function sourceNames(cue: SoundCue) {
-  return [...new Set(soundCueDefinitions[cue].variants.map((variant) => variant.file.replace("audio/sfx/", "").replace(".mp3", "")))].join(" · ");
-}
-
 export function SoundEventLab() {
   const [sequence, setSequence] = useState(1);
   const [activeCue, setActiveCue] = useState<SoundCue>("alert.launch.drone");
   const [scene, setScene] = useState(() => sceneForCue("alert.launch.drone", 1));
   const [audioPreferences, setAudioPreferences] = useState(readAudioPreferences);
   const [playState, setPlayState] = useState<"idle" | "playing" | "muted" | "failed">("idle");
+  const [playback, setPlayback] = useState<SoundPlaybackResult | null>(null);
+  const playbackRequest = useRef(0);
   const allCueCount = useMemo(() => soundEventLabGroups.reduce((total, group) => total + group.items.length, 0), []);
 
   const trigger = async (cue: SoundCue) => {
+    const requestId = ++playbackRequest.current;
     const nextSequence = sequence + 1;
     setSequence(nextSequence);
     setActiveCue(cue);
     setScene(sceneForCue(cue, nextSequence));
     setPlayState("playing");
+    setPlayback(null);
     const played = await previewSound(cue);
+    if (requestId !== playbackRequest.current) return;
+    setPlayback(played || null);
     setPlayState(played ? "playing" : audioPreferences.enabled ? "failed" : "muted");
   };
 
   const toggleAudio = async () => {
+    playbackRequest.current += 1;
     const next = { ...audioPreferences, enabled: !audioPreferences.enabled };
     setAudioPreferences(next);
     writeAudioPreferences(next);
@@ -468,11 +472,13 @@ export function SoundEventLab() {
   };
 
   const reset = () => {
+    playbackRequest.current += 1;
     const nextSequence = sequence + 1;
     setSequence(nextSequence);
     setActiveCue("alert.launch.drone");
     setScene(sceneForCue("alert.launch.drone", nextSequence));
     setPlayState("idle");
+    setPlayback(null);
     shieldlineAudio.stopAll();
   };
 
@@ -484,6 +490,8 @@ export function SoundEventLab() {
   };
 
   const definition = soundCueDefinitions[activeCue];
+  const playedSource = playback?.cue === activeCue ? getSoundSource(playback.file) : undefined;
+  const configuredFiles = definition.variants.map((variant) => getSoundSource(variant.file)?.file || variant.file).join(" · ");
   return (
     <main className="sound-event-lab" data-audio-scope="player" aria-label="Полігон звуку та бойових подій Shieldline">
       <header className="sound-event-lab__header">
@@ -539,7 +547,14 @@ export function SoundEventLab() {
             <strong>{soundEventLabGroups.flatMap((group) => group.items).find((item) => item.cue === activeCue)?.label}</strong>
             <code>{activeCue}</code>
             <p>{scene.note}</p>
-            <small>Джерело: {sourceNames(activeCue)} · {definition.variants.length} вар. · cooldown {definition.cooldownMs} мс</small>
+            {playedSource ? (
+              <small className="sound-lab-source">
+                Зараз звучить: <code>{playedSource.file}</code> · “{playedSource.work}” — {playedSource.creator} ·{" "}
+                <a href={playedSource.sourceUrl} target="_blank" rel="noreferrer" data-sound="none">Freesound ↗</a>
+              </small>
+            ) : (
+              <small>Налаштовані файли: {configuredFiles} · {definition.variants.length} вар. · cooldown {definition.cooldownMs} мс</small>
+            )}
           </div>
           <div className={`sound-lab-playback sound-lab-playback--${playState}`}>
             {playState === "muted" ? <VolumeX size={14} /> : playState === "failed" ? <VolumeX size={14} /> : <Volume2 size={14} />}

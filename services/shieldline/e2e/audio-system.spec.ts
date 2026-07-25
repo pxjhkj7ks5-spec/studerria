@@ -106,10 +106,10 @@ test("air raid sounds once for a global escalation and hidden updates are not re
   }, states);
 
   await setAlerts(["air-raid", "air-raid"]);
-  await expect.poll(() => page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("siren.mp3")).length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("air-raid.mp3")).length)).toBe(1);
   await setAlerts(["air-raid", "air-raid", "air-raid"]);
   await page.waitForTimeout(150);
-  expect(await page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("siren.mp3")).length)).toBe(1);
+  expect(await page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("air-raid.mp3")).length)).toBe(1);
 
   await page.evaluate(() => {
     const audioWindow = window as typeof window & { __shieldlineHidden: boolean };

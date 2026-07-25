@@ -1,6 +1,6 @@
 # Shieldline audio cue sheet
 
-Direction: realistic hybrid, restrained command-interface design, no music or speech. Runtime processing in `soundCues.ts` applies gain, playback-rate, offsets, duration limits, cooldowns, priority ducking, and variation selection. All shipped source recordings are CC0 and were downloaded as Freesound HQ MP3 previews on 2026-07-22, then re-encoded at 48 kHz with a -20 LUFS / -1.5 dBTP normalization target; short UI and transient files are mono, spatial and environmental files remain stereo.
+Direction: realistic hybrid, restrained command-interface design, no music or speech. Runtime processing in `soundCues.ts` applies gain, playback-rate, offsets, duration limits, cooldowns, priority ducking, and variation selection. All shipped source recordings are CC0 Freesound HQ MP3 previews. Compact UI and transient files use normalized excerpts; longer warning material is bounded by runtime duration and gain.
 
 | Cue family | Character and function | Target length | Variations | Priority | Source material | Processing and acceptance notes |
 | --- | --- | ---: | ---: | --- | --- | --- |
@@ -9,10 +9,10 @@ Direction: realistic hybrid, restrained command-interface design, no music or sp
 | Placement/redeploy/service | Physical command-console latch | 0.3–0.7 s | 2 | Low | `mechanical`, `chime` | Played only after a meaningful command; service failure uses error cue |
 | Operation countdown/start | Timer plus brief radio-channel opening | 0.7–3.7 s | 2 | Medium | `timer`, `radio-static`, `mechanical` | Countdown is single-voice; never loops |
 | Prelaunch/contact/radar | Short radio interference and high confirmation tick | 0.4–1.2 s | 2 | Medium | `radio-static`, `confirm` | Grouped by cooldown during dense waves |
-| Drone launch/engagement | Distant propeller texture with subdued launch layer | 1.5–2.0 s | 2 | Medium | `drone`, `rocket-distant` | Selected excerpts avoid sustained ambience |
+| Drone launch/engagement | Distant launch wash or propeller texture, fixed by context | 1.5–2.0 s | 1 per cue | Medium | `rocket-distant`, `drone` | Launch and interceptor-drone cues no longer alternate unrelated sources |
 | Cruise/ballistic launch | Distant rocket wash or close missile ignition | 2.0–3.2 s | 2 | Medium/Critical | `rocket-distant`, `missile-launch` | Ballistic warning ducks lower-priority voices |
-| Air raid/all clear | Neutral synthesized siren, not a live geographic recording | 4–9 s | 2 excerpts | Critical | `siren` | One global cue per escalation; minimum 12 s cooldown |
-| Gun/missile/EW engagement | Distinct kinetic burst, launch wash, or radio disruption | 0.4–2.3 s | 2 per frequent kinetic cue | Medium | `gun-burst-1`, `gun-burst-2`, `missile-launch`, `radio-static` | Maximum three simultaneous voices; no immediate variation repeat |
+| Air raid/all clear | Dedicated warning signal followed by a restrained clear chime | 0.4–9 s | 1 per cue | Critical | `air-raid`, `chime` | One global cue per escalation; minimum 12 s cooldown |
+| Gun/missile/EW engagement | Distinct kinetic burst, missile ignition, or radio disruption | 0.4–2.3 s | 1 per cue | Medium | `gun-burst-1`, `missile-launch`, `radio-static` | Maximum three simultaneous voices; fixed source per context |
 | Reload | Short metallic mechanism | 0.5–0.7 s | 1 | Medium | `mechanical` | Fires when the battery actually enters reload |
 | Intercept/soft kill/miss | Controlled impact, interference fade, or contact loss | 0.6–2.3 s | 2 | Medium | `impact`, `radio-static`, `chime` | Kept below the impact alarm level |
 | Impact | Low, short explosion excerpt | 4.5 s maximum | 1 | Critical | `impact` | Ducks UI/combat buses; never stacked beyond one voice |
