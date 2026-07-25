@@ -4,7 +4,6 @@ import { AfterActionReport } from "./components/AfterActionReport";
 import { AccountSettings } from "./components/AccountSettings";
 import { AdminApp } from "./components/AdminApp";
 import { IntelLog } from "./components/IntelLog";
-import { MapLegend } from "./components/MapLegend";
 import { ModeSelection } from "./components/ModeSelection";
 import { PlanningActionsPanel } from "./components/PlanningActionsPanel";
 import { ResourceBar } from "./components/ResourceBar";
@@ -451,7 +450,6 @@ export default function App() {
           </div>
           <ResourceBar game={game} operationPhase={operationPhase} mobile={isMobileLive} />
         </header>
-        <MapLegend mode={mapMode} game={game} />
       </section>
 
       {battleNotice || placementUnit || setupGuidance || campaignTutorial ? (
@@ -495,7 +493,7 @@ export default function App() {
             <section className="drawer-section mobile-menu-panel">
               <div className="mobile-menu-intro">
                 <BookOpen size={24} />
-                <div><strong>Командний центр</strong><span>Оберіть шар мапи, перегляньте позначення або поверніться до режимів.</span></div>
+                <div><strong>Командний центр</strong><span>Оберіть шар мапи або поверніться до режимів.</span></div>
               </div>
               <section className="menu-group" aria-labelledby="mobile-layer-heading">
                 <h2 id="mobile-layer-heading">Шар мапи</h2>
@@ -504,9 +502,6 @@ export default function App() {
                     <button className={`nav-pill ${mapMode === mode.id ? "nav-pill--active" : ""}`} type="button" key={mode.id} onClick={() => setMapMode(mode.id)}>{mode.label}</button>
                   ))}
                 </div>
-              </section>
-              <section className="menu-group">
-                <MapLegend mode={mapMode} game={game} embedded />
               </section>
               <section className="menu-group menu-help">
                 <HelpCircle size={21} />
