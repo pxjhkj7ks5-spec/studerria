@@ -78,6 +78,12 @@ const soundSources: Record<string, SoundSource> = {
     creator: "Rudmer_Rotteveel",
     sourceUrl: "https://freesound.org/s/536420/",
   },
+  "audio/sfx/ui-click.mp3": {
+    file: "ui-click.mp3",
+    work: "Interface2.wav",
+    creator: "Eternitys",
+    sourceUrl: "https://freesound.org/s/141257/",
+  },
 };
 
 export function getSoundSource(file: string) {

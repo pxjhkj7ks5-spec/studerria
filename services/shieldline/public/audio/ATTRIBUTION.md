@@ -16,5 +16,6 @@ All audio files in `sfx/` are released under Creative Commons Zero (CC0 1.0). At
 | `radio-static.mp3` | “Radio Static” by JovianSounds | https://freesound.org/s/524204/ | CC0 1.0 | `0e871906eb7fa91a9a46662b295ce0291dcadae8e5e408b277b66f614839f7e6` |
 | `rocket-distant.mp3` | “Far Away Rocket Launch” by qubodup | https://freesound.org/s/211617/ | CC0 1.0 | `f0bb69262527a35d19df8df5f8434e60525c266f7d6d2c5fdd97691fe1bb8a5a` |
 | `timer.mp3` | “Electronic Timer Beeping 4X” by Rudmer_Rotteveel | https://freesound.org/s/536420/ | CC0 1.0 | `14d097c353cdcd1766edbac5453192ead8c5381495fc6db5bbece58db1d8347a` |
+| `ui-click.mp3` | “Interface2.wav” by Eternitys | https://freesound.org/s/141257/ | CC0 1.0 | `1b945f1610ea18cae2258db4fce9b41689c7ecfb44020f320e87875564d57f1d` |
 
 License text: https://creativecommons.org/publicdomain/zero/1.0/

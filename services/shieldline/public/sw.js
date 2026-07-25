@@ -1,4 +1,4 @@
-const CACHE = "shieldline-runtime-v10";
+const CACHE = "shieldline-runtime-v11";
 const SHELL = [
   "./",
   "./index.html",
@@ -23,6 +23,7 @@ const SHELL = [
   "./audio/sfx/radio-static.mp3",
   "./audio/sfx/rocket-distant.mp3",
   "./audio/sfx/timer.mp3",
+  "./audio/sfx/ui-click.mp3",
 ];
 
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));

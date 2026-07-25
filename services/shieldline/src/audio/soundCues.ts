@@ -62,27 +62,28 @@ export interface SoundCueDefinition {
 }
 
 const sfx = (file: string, options: Omit<SoundVariant, "file"> = {}): SoundVariant => ({ file: `audio/sfx/${file}.mp3`, ...options });
+const uiClick = (): SoundVariant => sfx("ui-click", { gain: 0.3 });
 const ui = (variants: SoundVariant[], cooldownMs = 70): SoundCueDefinition => ({ category: "ui", priority: 1, cooldownMs, maxVoices: 2, variants });
 const combat = (variants: SoundVariant[], cooldownMs = 350, maxVoices = 3): SoundCueDefinition => ({ category: "combat", priority: 2, cooldownMs, maxVoices, variants });
 const critical = (variants: SoundVariant[], cooldownMs: number): SoundCueDefinition => ({ category: "critical", priority: 3, cooldownMs, maxVoices: 1, variants });
 
 export const soundCueDefinitions: Record<SoundCue, SoundCueDefinition> = {
-  "ui.open": ui([sfx("confirm", { gain: 0.34, playbackRate: 1.08 })]),
-  "ui.close": ui([sfx("confirm", { gain: 0.26, playbackRate: 0.82 })]),
-  "ui.select": ui([sfx("confirm", { gain: 0.28 })]),
-  "ui.confirm": ui([sfx("chime", { gain: 0.42 })], 120),
-  "ui.cancel": ui([sfx("mechanical", { gain: 0.22, playbackRate: 1.25 })], 120),
-  "ui.error": ui([sfx("timer", { duration: 0.42, gain: 0.3, playbackRate: 0.78 })], 350),
-  "placement.select": ui([sfx("mechanical", { gain: 0.28, playbackRate: 1.18 })], 100),
-  "placement.success": ui([sfx("mechanical", { gain: 0.42 }), sfx("chime", { gain: 0.34, playbackRate: 0.9 })], 180),
-  "placement.failure": ui([sfx("timer", { duration: 0.5, gain: 0.3, playbackRate: 0.74 })], 350),
-  "placement.redeploy": ui([sfx("mechanical", { gain: 0.38, playbackRate: 0.86 })], 180),
-  "placement.service": ui([sfx("mechanical", { gain: 0.3, playbackRate: 1.08 }), sfx("confirm", { gain: 0.3, playbackRate: 0.92 })], 180),
-  "planning.toggle": ui([sfx("confirm", { gain: 0.3, playbackRate: 1.16 })], 100),
+  "ui.open": ui([uiClick()]),
+  "ui.close": ui([uiClick()]),
+  "ui.select": ui([uiClick()]),
+  "ui.confirm": ui([uiClick()], 120),
+  "ui.cancel": ui([uiClick()], 120),
+  "ui.error": ui([uiClick()], 350),
+  "placement.select": ui([uiClick()], 100),
+  "placement.success": ui([uiClick()], 180),
+  "placement.failure": ui([uiClick()], 350),
+  "placement.redeploy": ui([uiClick()], 180),
+  "placement.service": ui([uiClick()], 180),
+  "planning.toggle": ui([uiClick()], 100),
   "operation.countdown": combat([sfx("timer", { duration: 3.6, gain: 0.34 })], 3_500, 1),
   "operation.start": combat([sfx("radio-static", { offset: 0.5, duration: 0.65, gain: 0.27 }), sfx("mechanical", { gain: 0.38, playbackRate: 0.78 })], 1_200, 1),
-  "operation.pause": ui([sfx("mechanical", { gain: 0.28, playbackRate: 0.7 })], 300),
-  "operation.resume": ui([sfx("mechanical", { gain: 0.3, playbackRate: 1.1 })], 300),
+  "operation.pause": ui([uiClick()], 300),
+  "operation.resume": ui([uiClick()], 300),
   "operation.complete": combat([sfx("radio-static", { offset: 3.2, duration: 0.75, gain: 0.24 })], 2_000, 1),
   "alert.prelaunch": combat([sfx("radio-static", { offset: 1.1, duration: 0.9, gain: 0.38 }), sfx("timer", { duration: 0.75, gain: 0.25 })], 1_400, 1),
   "alert.launch.drone": combat([sfx("rocket-distant", { offset: 2.1, duration: 1.7, gain: 0.23, playbackRate: 1.12 })], 1_400, 1),

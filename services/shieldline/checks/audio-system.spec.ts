@@ -24,7 +24,7 @@ test("every typed cue has bounded playback policy and variation avoids immediate
     assert.ok(definition.variants.length >= 1);
     assert.ok(definition.variants.every((variant) => variant.file.startsWith("audio/sfx/") && variant.file.endsWith(".mp3")));
   }
-  assert.equal(selectSoundVariant("placement.success", 0, () => 0), 1);
+  assert.equal(selectSoundVariant("operation.start", 0, () => 0), 1);
   assert.equal(cueAllowedAt("alert.air-raid", undefined, 100), true);
   assert.equal(cueAllowedAt("alert.air-raid", 100, 11_000), false);
   assert.equal(cueAllowedAt("alert.air-raid", 100, 12_100), true);
@@ -39,6 +39,29 @@ test("reviewed launch, warning, gun, and interceptor cues use the selected singl
   assert.deepEqual(soundCueDefinitions["alert.clear"].variants.map(({ file }) => file), ["audio/sfx/chime.mp3"]);
   assert.deepEqual(soundCueDefinitions["result.intercept"].variants.map(({ file }) => file), ["audio/sfx/intercept-impact.mp3"]);
   assert.deepEqual(soundCueDefinitions["result.impact"].variants.map(({ file }) => file), ["audio/sfx/city-impact.mp3"]);
+});
+
+test("interface and planning actions share one unpitched neutral click", () => {
+  const clickCues = [
+    "ui.open",
+    "ui.close",
+    "ui.select",
+    "ui.confirm",
+    "ui.cancel",
+    "ui.error",
+    "placement.select",
+    "placement.success",
+    "placement.failure",
+    "placement.redeploy",
+    "placement.service",
+    "planning.toggle",
+    "operation.pause",
+    "operation.resume",
+  ] as const;
+
+  for (const cue of clickCues) {
+    assert.deepEqual(soundCueDefinitions[cue].variants, [{ file: "audio/sfx/ui-click.mp3", gain: 0.3 }]);
+  }
 });
 
 test("every configured audio file has displayable source metadata", () => {
