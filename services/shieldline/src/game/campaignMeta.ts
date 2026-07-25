@@ -1,4 +1,4 @@
-import { campaignKillRewards, campaignResupplyCosts, getCampaignMission, getCampaignRoute, missionTargetCount } from "../data/campaignPlan";
+import { CAMPAIGN_TUTORIAL_ASSET_ACTION, campaignKillRewards, campaignResupplyCosts, getCampaignMission, getCampaignRoute, missionTargetCount } from "../data/campaignPlan";
 import { getUnitDefinition } from "../data/units";
 import type { CampaignMissionResult, CampaignSpawnEvent, CampaignState, Coordinates, DefenseBattery, GameState, ThreatKind, UnitKind } from "../types/game";
 import { clamp } from "./math";
@@ -50,6 +50,8 @@ export function createCampaignState(missionIndex = 1, wallet = 0): CampaignState
     intermission: false,
     completed: false,
     tutorialStep: 0,
+    tutorialActionQueue: [],
+    tutorialNextPromptAtMs: 0,
   };
 }
 
@@ -60,11 +62,16 @@ export function unlockedCampaignMissionIndex(campaign: CampaignState | null | un
 }
 
 export function applyCampaignMissionOpening(state: GameState) {
-  if (!state.campaign || state.campaign.missionGrantApplied) return;
+  if (!state.campaign) return;
   const mission = getCampaignMission(state.campaign.missionIndex);
+  if (mission.index === 1) {
+    addCampaignStoredBattery(state, "long-radar", { lat: 50.2, lng: 30.1 }, CAMPAIGN_TUTORIAL_ASSET_ACTION, "campaign-m1-long-radar");
+    addCampaignStoredBattery(state, "mvg", { lat: 50.2, lng: 31.0 }, CAMPAIGN_TUTORIAL_ASSET_ACTION, "campaign-m1-mvg");
+  }
   state.campaign.unlockedSystems = [...new Set([...state.campaign.unlockedSystems, ...mission.unlocks])];
+  if (state.campaign.missionGrantApplied) return;
   state.campaign.missionGrant = mission.grant;
-  state.campaign.campaignWallet = clamp(state.campaign.campaignWallet + mission.grant, 0, 9999);
+  state.campaign.campaignWallet = Math.max(0, state.campaign.campaignWallet + mission.grant);
   state.campaign.campaignAmmoStock = clamp(state.campaign.campaignAmmoStock + 8 + mission.index * 4, 0, 9999);
   state.resources.budget = state.campaign.campaignWallet;
   state.campaign.missionGrantApplied = true;
@@ -79,7 +86,7 @@ export function recordCampaignKill(state: GameState, kind: ThreatKind, reward: n
   const credited = Math.max(0, canonicalReward);
   state.campaign.missionKillReward += credited;
   state.campaign.missionKillsByKind[kind] = (state.campaign.missionKillsByKind[kind] || 0) + 1;
-  state.campaign.campaignWallet = clamp(state.campaign.campaignWallet + credited, 0, 9999);
+  state.campaign.campaignWallet = Math.max(0, state.campaign.campaignWallet + credited);
   state.resources.budget = state.campaign.campaignWallet;
   return credited;
 }
@@ -106,7 +113,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   const mission = getCampaignMission(campaign.missionIndex);
   const interceptions = state.interceptions - campaign.missionInterceptionsAtStart;
   const impacts = state.impacts - campaign.missionImpactsAtStart;
-  const totalTargets = missionTargetCount(mission);
+  const totalTargets = campaign.spawnEvents.length || missionTargetCount(mission);
   const objective = campaignMissionObjective(state, campaign.missionIndex);
   const lines: CampaignMissionResult["rewardLines"] = [];
   addLine(lines, "Грант місії", mission.grant, "grant");
@@ -127,7 +134,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
   if (heavilyDamaged) { penaltyCosts += heavilyDamaged * 3; addLine(lines, `${heavilyDamaged} суттєво пошкодж. систем`, -heavilyDamaged * 3, "penalty"); }
   if (impacts > 8) { penaltyCosts += 5; addLine(lines, "Більше 8 влучань", -5, "penalty"); }
 
-  campaign.campaignWallet = clamp(state.resources.budget + bonusRewards - penaltyCosts, 0, 9999);
+  campaign.campaignWallet = Math.max(0, state.resources.budget + bonusRewards - penaltyCosts);
   state.resources.budget = campaign.campaignWallet;
   for (const battery of [...state.batteries, ...state.storedBatteries]) {
     battery.experienceLevel = Math.min(5, battery.experienceLevel + 1);
@@ -168,6 +175,8 @@ export function advanceCampaignMission(state: GameState): GameState {
   campaign.missionGrantApplied = false;
   campaign.intermission = false;
   campaign.tutorialStep = 0;
+  campaign.tutorialActionQueue = [];
+  campaign.tutorialNextPromptAtMs = 0;
   campaign.unlockedSystems = [...new Set([...campaign.unlockedSystems, ...nextMission.unlocks])];
   state.resources.budget = campaign.campaignWallet;
   state.cyclePhase = "planning";
@@ -184,6 +193,53 @@ export function advanceCampaignMission(state: GameState): GameState {
   state.latestReportId = null;
   applyCampaignMissionOpening(state);
   return state;
+}
+
+export function addCampaignStoredBattery(state: GameState, kind: UnitKind, position: Coordinates, lastAction: string, id: string) {
+  if (!state.campaign || state.storedBatteries.some((battery) => battery.id === id) || state.batteries.some((battery) => battery.id === id)) return false;
+  const unit = getUnitDefinition(kind);
+  const coverageTier: DefenseBattery["coverageTier"] = unit.outerRangeKm >= 75 ? "III" : unit.outerRangeKm >= 35 ? "II" : "I";
+  state.storedBatteries.push({
+    id,
+    kind,
+    position: { ...position },
+    coverageTier,
+    coverageRadius: clamp(unit.outerRangeKm / 85, .1, 2.1),
+    readiness: unit.readiness,
+    fatigue: 0,
+    daysSinceMaintenance: 0,
+    lastAction,
+    lastEngagementResult: "awaiting tutorial deployment",
+    status: "ready",
+    supplyStatus: "well-supplied",
+    cooldownMs: 0,
+    reloadRemainingMs: 0,
+    currentAmmo: unit.ammoCapacity,
+    missionReserve: unit.missionReserveCapacity,
+    manualOverrideTargets: [],
+    assignedCityId: "kyiv",
+    health: 100,
+    experienceLevel: 0,
+    createdAtMission: 1,
+    lastMovedMission: 0,
+  });
+  return true;
+}
+
+export function accelerateFirstMissionSchedule(state: GameState, gapMs = 8_000) {
+  const campaign = state.campaign;
+  if (!campaign || campaign.missionIndex !== 1 || state.cyclePhase !== "attack" || state.liveThreats.length || state.pendingLaunches.length) return 0;
+  const nextEvent = campaign.spawnEvents[campaign.spawnCursor];
+  if (!nextEvent) return 0;
+  const phaseElapsedMs = state.elapsedMs - state.cycleStartedAtMs;
+  const reinforcementLeadMs = nextEvent.threatKind === "kh101" && nextEvent.routeId === "R32" ? 45_000 : gapMs;
+  const desiredDueMs = phaseElapsedMs + reinforcementLeadMs;
+  if (nextEvent.dueMs <= desiredDueMs) return 0;
+  const shiftMs = nextEvent.dueMs - desiredDueMs;
+  for (let index = campaign.spawnCursor; index < campaign.spawnEvents.length; index += 1) {
+    campaign.spawnEvents[index].dueMs = Math.max(desiredDueMs, campaign.spawnEvents[index].dueMs - shiftMs);
+  }
+  return shiftMs;
 }
 
 function chaikin(points: Coordinates[]) {

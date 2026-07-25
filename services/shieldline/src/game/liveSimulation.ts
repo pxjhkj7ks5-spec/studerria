@@ -11,8 +11,8 @@ import { distanceKm, validateBatteryPlacement } from "./placementRules";
 import { chooseAttackPlan, createThreatDirectorContext, pickThreatKindForPlan } from "./threatDirector";
 import { threatCourseAtProgress, threatPositionAtProgress } from "./threatRouteVisuals";
 import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recoverReadiness } from "./unitReadiness";
-import { applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
-import { campaignKillRewards, campaignTutorialSteps, getCampaignRoute } from "../data/campaignPlan";
+import { accelerateFirstMissionSchedule, addCampaignStoredBattery, applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
+import { CAMPAIGN_REINFORCEMENT_ACTION, campaignKillRewards, getCampaignRoute, isFreeCampaignDeploymentAction } from "../data/campaignPlan";
 import { pickCampaignLaunchSector } from "./campaignLaunchZones";
 import { acquisitionScore, classificationGain, classificationTier, engagementProbability, evaluateDoctrine, ewEffectFor, fireControlScore, fusedTrackQuality, salvoSizeFor, supportLeakEffect, threatDisplayLabel, threatRule, unitRule } from "./airDefenseRules.mjs";
 import type {
@@ -34,6 +34,7 @@ import type { SoundCue } from "../audio/soundCues";
 const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
 const CAMPAIGN_LAUNCH_WARNING_MS = 15000;
+const FIRST_MISSION_REINFORCEMENT_LEAD_MS = 45_000;
 const MIN_ATTACK_WINDOW_MS = 90000;
 const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
 const LAUNCH_CONE_RANGE_KM = 900;
@@ -336,7 +337,8 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   if (!battery || next.status !== "active") return next;
   const scenario = getScenario(next.scenarioId);
   const unit = getUnitDefinition(battery.kind);
-  const redeployCost = next.campaign ? campaignRedeployCost(battery.kind) : 0;
+  const freeCampaignDeployment = isFreeCampaignDeploymentAction(battery.lastAction);
+  const redeployCost = next.campaign && !freeCampaignDeployment ? campaignRedeployCost(battery.kind) : 0;
   if (next.campaign && next.campaign.campaignWallet < redeployCost) {
     next.placementWarning = `Для передислокації потрібно ${redeployCost} млн ₴.`;
     return next;
@@ -353,7 +355,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
     ...battery,
     position: { ...position },
     assignedCityId: nearestCityId(next, position),
-    lastAction: "redeployed from storage",
+    lastAction: freeCampaignDeployment ? battery.kind === "s300" ? "reinforcement deployed" : "tutorial asset deployed" : "redeployed from storage",
     lastMovedMission: next.campaign?.missionIndex || battery.lastMovedMission,
   });
   if (next.campaign) {
@@ -698,6 +700,8 @@ function updateLaunchSectors(state: GameState) {
 function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => number) {
   if (state.cyclePhase !== "attack" || state.liveThreats.length >= MAX_LIVE_THREATS) return;
   if (state.campaign) {
+    accelerateFirstMissionSchedule(state);
+    grantFirstMissionS300(state);
     prepareCampaignLaunch(state, random);
     while (state.liveThreats.length < MAX_LIVE_THREATS && spawnCampaignThreat(state, random)) { /* drain due targets */ }
     return;
@@ -729,6 +733,26 @@ function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => numbe
     const kind = plan ? pickThreatKindForPlan(plan, random) : pick(fallbackThreatKinds, random);
     schedulePendingLaunch(state, kind, random);
     pushLog(state.log, state.elapsedMs, "Track Warning", `${plan?.eventText || "Uncertain inbound track appeared on the tactical map."}`, "warning");
+  }
+}
+
+function grantFirstMissionS300(state: GameState) {
+  const campaign = state.campaign;
+  if (!campaign || campaign.missionIndex !== 1 || state.cyclePhase !== "attack") return;
+  const upcomingCruise = campaign.spawnEvents.slice(campaign.spawnCursor).find((event) => event.threatKind === "kh101" && event.routeId === "R32");
+  if (!upcomingCruise) return;
+  const phaseElapsedMs = state.elapsedMs - state.cycleStartedAtMs;
+  if (upcomingCruise.dueMs - phaseElapsedMs > FIRST_MISSION_REINFORCEMENT_LEAD_MS) return;
+  campaign.unlockedSystems = [...new Set([...campaign.unlockedSystems, "s300"] as UnitKind[])];
+  const granted = addCampaignStoredBattery(
+    state,
+    "s300",
+    { lat: 50.1, lng: 31.2 },
+    CAMPAIGN_REINFORCEMENT_ACTION,
+    "campaign-m1-s300-reinforcement",
+  );
+  if (granted) {
+    pushLog(state.log, state.elapsedMs, "Підкріплення прибуло", "С-300 передано до резерву. Розгорніть комплекс для перехоплення крилатої ракети з Каспійського напрямку.", "success");
   }
 }
 
@@ -1349,13 +1373,10 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   const safeDelta = clamp(deltaMs, 0, 10_000);
   const previousElapsedMs = state.elapsedMs;
   state.elapsedMs += safeDelta;
-  if (state.campaign?.missionIndex === 1 && state.cyclePhase === "attack") {
-    const missionElapsedSeconds = Math.max(0, (state.elapsedMs - state.cycleStartedAtMs) / 1_000);
-    state.campaign.tutorialStep = campaignTutorialSteps.reduce((step, cue, index) => missionElapsedSeconds >= cue.atSeconds ? index : step, 0);
-  }
   updateResourcesAndTimers(state, safeDelta);
   updateLaunchSectors(state);
   updateCycle(state, random);
+  grantFirstMissionS300(state);
   resolvePendingLaunches(state, random);
   maybeSpawnThreat(state, safeDelta, random);
   detectThreats(state, random, Math.floor(previousElapsedMs / 1000) !== Math.floor(state.elapsedMs / 1000));

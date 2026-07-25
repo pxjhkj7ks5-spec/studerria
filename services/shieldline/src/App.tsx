@@ -19,7 +19,7 @@ import { apiGameRepository } from "./data/apiGameRepository";
 import { getCampaignModeDefinition } from "./data/campaignModes";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "./data/gameModes";
 import { campaignMissions } from "./data/missions";
-import { activeCampaignTutorialCue, getCampaignMission } from "./data/campaignPlan";
+import { CAMPAIGN_REINFORCEMENT_ACTION, activeCampaignTutorialCue, campaignTutorialComplete, getCampaignMission } from "./data/campaignPlan";
 import { getScenario } from "./data/scenarios";
 import { getUnitDefinition } from "./data/units";
 import { BATTLE_NOTICE_DURATION_MS, preferBattleNotice, selectBattleNotice } from "./game/battleNotices";
@@ -171,13 +171,15 @@ export default function App() {
   const [displayPreferences, setDisplayPreferences] = useState(readDisplayPreferences);
   const [audioPreferences, setAudioPreferences] = useState(readAudioPreferences);
   const [fullscreenReportOpen, setFullscreenReportOpen] = useState(false);
-  const [visitedCampaignPanels, setVisitedCampaignPanels] = useState<ActivePanel[]>([]);
+  const [tutorialClockMs, setTutorialClockMs] = useState(() => Date.now());
   const coOpSyncedBatteryIds = useRef(new Set<string>());
   const campaignSyncedBatteryIds = useRef(new Set<string>());
   const dailySavedPlanRef = useRef<string | null>(null);
   const completedCampaignReportRef = useRef<string | null>(null);
   const latestBattleNoticeIdRef = useRef<string | null>(null);
   const latestReportIdRef = useRef<string | null>(null);
+  const recordCampaignTutorialAction = useGameStore((state) => state.recordCampaignTutorialAction);
+  const refreshCampaignTutorial = useGameStore((state) => state.refreshCampaignTutorial);
   const modeDefinition = campaignMode ? getCampaignModeDefinition(campaignMode) : null;
   const scenario = getScenario(game.scenarioId);
   const lastTickRef = useRef<number | null>(null);
@@ -191,10 +193,14 @@ export default function App() {
   })();
   const activeMission = campaignMissions[(game.campaign?.missionIndex || 1) - 1] || campaignMissions[0];
   const activeMissionTitle = game.campaign ? getCampaignMission(game.campaign.missionIndex).title : t("mission.1");
-  const missionElapsedSeconds = Math.max(0, (game.elapsedMs - game.cycleStartedAtMs) / 1_000);
-  const campaignTutorial = game.campaign?.missionIndex === 1 && operationPhase === "running"
-    ? activeCampaignTutorialCue(missionElapsedSeconds, visitedCampaignPanels)
+  const campaignTutorialInProgress = game.campaign?.missionIndex === 1 && operationPhase === "planning" && !campaignTutorialComplete(game.campaign);
+  const planningTutorial = campaignTutorialInProgress ? activeCampaignTutorialCue(game.campaign, tutorialClockMs) : null;
+  const reinforcementTutorial = game.campaign?.missionIndex === 1
+    && operationPhase === "running"
+    && game.storedBatteries.some((battery) => battery.kind === "s300" && battery.lastAction === CAMPAIGN_REINFORCEMENT_ACTION)
+    ? { panelTarget: "units" as const, title: "Підкріплення: С-300", body: "Відкрийте «ППО» та безкоштовно розгорніть С-300 для крилатої ракети з Каспійського напрямку." }
     : null;
+  const campaignTutorial = planningTutorial || reinforcementTutorial;
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
     url.search = "";
@@ -225,6 +231,18 @@ export default function App() {
   }, [audioPreferences]);
 
   useGameAudio({ game, operationPhase, simulationSeed, preferences: audioPreferences });
+
+  useEffect(() => {
+    if (!campaignTutorialInProgress) return undefined;
+    const updateTutorial = () => {
+      const nowMs = Date.now();
+      setTutorialClockMs(nowMs);
+      refreshCampaignTutorial(nowMs);
+    };
+    updateTutorial();
+    const interval = window.setInterval(updateTutorial, 250);
+    return () => window.clearInterval(interval);
+  }, [campaignTutorialInProgress, refreshCampaignTutorial]);
 
   useEffect(() => {
     const battleEntries = game.log.filter((entry) => entry.eventType === "launch" || entry.eventType === "detection");
@@ -390,7 +408,7 @@ export default function App() {
   const ownedBatteryKinds = [...game.batteries, ...(game.storedBatteries || [])].map((battery) => battery.kind);
   const hasOwnedRadar = ownedBatteryKinds.includes("radar");
   const hasOwnedKinetic = ownedBatteryKinds.some((kind) => !RADAR_KINDS.has(kind) && kind !== "ew");
-  const setupGuidance = operationPhase === "planning" && runtimePolicy.start === "auto-checklist" && !defenseReadiness.ready
+  const setupGuidance = operationPhase === "planning" && !campaignTutorialInProgress && runtimePolicy.start === "auto-checklist" && !defenseReadiness.ready
     ? !hasOwnedRadar
       ? { kind: "radar" as const, text: "Спочатку встановіть радар" }
       : !hasOwnedKinetic
@@ -422,7 +440,9 @@ export default function App() {
                 key={item.id}
                 data-testid={`panel-${item.id}`}
                 onClick={() => {
-                  if (!visitedCampaignPanels.includes(item.id)) setVisitedCampaignPanels((current) => [...current, item.id]);
+                  if (item.id === "intel") recordCampaignTutorialAction("open-intel");
+                  if (item.id === "units") recordCampaignTutorialAction("open-units");
+                  if (item.id === "planning") recordCampaignTutorialAction("open-planning");
                   setActivePanel((current) => (current === item.id ? null : item.id));
                 }}
                 aria-label={item.label}
@@ -469,12 +489,14 @@ export default function App() {
               <div><strong>Розмістіть: {placementUnit.shortName}</strong>{game.placementWarning ? <span>{game.placementWarning}</span> : null}</div>
               <button type="button" onClick={cancelPlacement}>Скасувати</button>
             </>
+          ) : campaignTutorial ? (
+            <><BookOpen size={17} /><div><strong>{campaignTutorial.title}</strong><span>{campaignTutorial.body}</span></div></>
           ) : setupGuidance ? (
             <>
               {setupGuidance.kind === "radar" ? <Radio size={17} /> : <Shield size={17} />}
               <strong>{setupGuidance.text}</strong>
             </>
-          ) : campaignTutorial ? <><BookOpen size={17} /><div><strong>{campaignTutorial.title}</strong><span>{campaignTutorial.body}</span></div></> : null}
+          ) : null}
         </div>
       ) : null}
 
@@ -587,7 +609,10 @@ export default function App() {
         </div>
       ) : null}
 
-      {!tutorialDismissed ? <TutorialOverlay onDismiss={dismissTutorial} /> : null}
+      {!tutorialDismissed &&
+      !(resolvedMode === "campaign" && game.campaign?.missionIndex === 1 && !game.campaign.intermission) ? (
+        <TutorialOverlay onDismiss={dismissTutorial} />
+      ) : null}
       {confirmReset ? (
         <div className="confirm-overlay" role="dialog" aria-modal="true" aria-label="Підтвердження скидання операції">
           <section className="confirm-card">

@@ -6,6 +6,7 @@ import { unitDefinitions } from "../data/units";
 import { tacticalUnitStatus } from "../game/unitStatusDisplay";
 import { useGameStore } from "../store/useGameStore";
 import { playSound } from "../audio/audioEngine";
+import { isFreeCampaignDeploymentAction } from "../data/campaignPlan";
 import type { ThreatKind, UnitDefinition } from "../types/game";
 
 const chanceKinds: Array<{ kind: ThreatKind; label: string }> = [
@@ -26,8 +27,6 @@ const doctrineTargetLabels: Partial<Record<ThreatKind, string>> = {
   kalibr: "Kalibr",
   iskander: "балістична ціль",
 };
-
-const REINFORCEMENT_AWAITING_DEPLOYMENT = "reinforcement awaiting deployment";
 
 function maintenanceRisk(readiness: number) {
   if (readiness < 70) return "високий";
@@ -104,7 +103,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
           const allowed = scenario.allowedUnits.includes(unit.kind) && (!game.campaign || game.campaign.unlockedSystems.includes(unit.kind));
           const storedUnits = storedBatteries.filter((item) => item.kind === unit.kind);
           const storedBattery = storedUnits[0];
-          const storedDeploymentCost = game.campaign && storedBattery?.lastAction !== REINFORCEMENT_AWAITING_DEPLOYMENT ? 1 : 0;
+          const storedDeploymentCost = game.campaign && storedBattery && !isFreeCampaignDeploymentAction(storedBattery.lastAction) ? 1 : 0;
           const affordable = storedUnits.length > 0
             ? game.resources.budget >= storedDeploymentCost
             : game.resources.budget >= unit.cost;

@@ -397,7 +397,16 @@ export interface CampaignState {
   intermission: boolean;
   completed: boolean;
   tutorialStep: number;
+  tutorialActionQueue: CampaignTutorialAction[];
+  tutorialNextPromptAtMs: number;
 }
+
+export type CampaignTutorialAction =
+  | "open-intel"
+  | "open-units"
+  | "place-long-radar-near-kyiv"
+  | "place-mvg-east-of-kyiv"
+  | "open-planning";
 
 export type EngagementResult = "success" | "soft-kill" | "miss" | "detected";
 

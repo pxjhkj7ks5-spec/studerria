@@ -1,4 +1,5 @@
-import type { Coordinates, ThreatKind, UnitKind } from "../types/game";
+import type { CampaignState, CampaignTutorialAction, City, Coordinates, ThreatKind, UnitKind } from "../types/game";
+import { distanceKm } from "../game/placementRules";
 
 export type CampaignPriority = "low" | "medium" | "high" | "veryHigh" | "critical";
 
@@ -39,6 +40,7 @@ export interface CampaignMissionDefinition {
   objective: string;
   expectedThreatClasses: string[];
   broadAzimuth: string;
+  briefing?: string;
   waves: CampaignWaveDefinition[];
   unlocks: UnitKind[];
 }
@@ -92,22 +94,16 @@ const w = (time: string, threatKind: ThreatKind, count: number, routeIds: string
 };
 
 export const campaignMissionsPlan: CampaignMissionDefinition[] = [
-  { id: "first-contact", index: 1, title: "Перший контакт", durationMinutes: 15, focusRegion: "Столичний кластер", grant: 42, objective: "Побудувати сенсорну мережу, класифікувати контакти й не витрачати дефіцитний БК на приманки.", expectedThreatClasses: ["Unknown", "Decoy", "Gerbera", "Shahed"], broadAzimuth: "Курський, Брянський і південні напрямки", unlocks: ["small-radar", "radar", "mvg", "manpads", "ew"], waves: [
-    w("00:45", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
-    w("01:35", "gerbera", 2, ["R02", "R03"], 2, "twoAxisScreen", "Столичний кластер", .25, 5, "low"),
-    w("02:30", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
-    w("03:25", "gerbera", 2, ["R02", "R29"], 2, "crossingScreen", "Столичний / енергетичний", .25, 5, "low"),
-    w("04:20", "parodiya", 2, ["R03", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
-    w("05:15", "geran2", 2, ["R02", "R06"], 2, "softMerge", "Столичний кластер", 0, 5, "medium"),
-    w("06:15", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
-    w("07:10", "gerbera", 2, ["R02", "R03"], 2, "twoAxisScreen", "Столичний кластер", .25, 5, "low"),
-    w("08:05", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
-    w("09:00", "geran2", 2, ["R01", "R02"], 2, "softMerge", "Столичний кластер", 0, 5, "medium"),
-    w("10:00", "parodiya", 2, ["R03", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
-    w("10:30", "geran2", 2, ["R02", "R06"], 2, "independent", "Столичний кластер", 0, 5, "high"),
-    w("11:00", "gerbera", 2, ["R02", "R06"], 2, "crossingScreen", "Столичний / енергетичний", .25, 5, "low"),
-    w("12:00", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 5, "low"),
-    w("13:00", "geran2", 2, ["R01", "R02"], 2, "fullGroup", "Столичний кластер", 0, 5, "high"),
+  { id: "first-contact", index: 1, title: "Перший контакт", durationMinutes: 10, focusRegion: "Столичний кластер", grant: 42, objective: "Розгорнути захист Києва, пройти бойове злагодження й відбити стислу комбіновану атаку.", expectedThreatClasses: ["Decoy", "Gerbera", "Shahed", "Cruise"], broadAzimuth: "Курський, Брянський і Каспійський напрямки", briefing: "Розвідка очікує атаку на Київ цієї ночі. Штаб передав навчальний комплект: розгорніть дальній радар і мобільну вогневу групу, перевірте розвідку та план, після чого одразу переходьте до бою.", unlocks: ["small-radar", "radar", "long-radar", "mvg", "manpads", "ew"], waves: [
+    w("00:10", "parodiya", 2, ["R01", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 4, "low"),
+    w("00:45", "gerbera", 2, ["R02", "R03"], 2, "twoAxisScreen", "Столичний кластер", .25, 4, "low"),
+    w("01:30", "geran2", 3, ["R01", "R02"], 3, "softMerge", "Столичний кластер", 0, 8, "medium"),
+    w("02:25", "parodiya", 2, ["R03", "R29"], 2, "splitFeint", "Столичний / енергетичний", .5, 4, "low"),
+    w("03:20", "geran2", 3, ["R02", "R06"], 3, "rallyMerge", "Столичний кластер", 0, 8, "high"),
+    w("04:35", "kh101", 1, ["R32"], 1, "independent", "Столичний кластер", 0, 0, "veryHigh"),
+    w("05:35", "gerbera", 2, ["R01", "R03"], 2, "crossingScreen", "Столичний кластер", .25, 5, "low"),
+    w("06:30", "geran2", 4, ["R01", "R02"], 4, "hardMerge", "Столичний кластер", 0, 12, "high"),
+    w("07:35", "geran2", 4, ["R02", "R03"], 4, "fullGroup", "Столичний кластер", 0, 12, "critical"),
   ] },
   { id: "southern-corridor", index: 2, title: "Південний коридор", durationMinutes: 35, focusRegion: "Південний портовий кластер", grant: 32, objective: "Передислокувати частину мережі й використати прибережний катер та РЕБ без марної витрати ракет.", expectedThreatClasses: ["Decoy", "Shahed", "Cruise"], broadAzimuth: "Чорне море, Крим і Приазов’я", unlocks: ["boat", "gepard"], waves: [
     w("02:00", "gerbera", 4, ["R10", "R30"], 1, "none", "Портовий", .25, 70, "low"), w("06:00", "parodiya", 5, ["R10", "R14"], 2, "splitFeint", "Портовий / логістичний", .4, 60, "low"), w("11:00", "geran2", 4, ["R12", "R15"], 2, "rallyMerge", "Портовий", 0, 50, "medium"), w("15:30", "gerbera", 3, ["R13"], 3, "screenForNext", "Портовий", 0, 25, "low"), w("16:00", "geran2", 6, ["R10", "R12"], 3, "rallyMerge", "Портовий", 0, 55, "high"), w("21:30", "parodiya", 3, ["R14"], 1, "diversionOnly", "Логістичний", 1, 40, "low"), w("23:00", "kalibr", 1, ["R33", "R34"], 1, "independent", "Портовий", 0, 0, "veryHigh"), w("28:00", "geran2", 8, ["R11", "R15"], 5, "corridorMerge", "Портовий", .15, 65, "high"), w("32:30", "gerbera", 2, ["R30"], 1, "falseTerminal", "Південний вузол", 1, 20, "low"), w("33:00", "geran2", 5, ["R13"], 5, "fullGroup", "Портовий", 0, 30, "high"),
@@ -126,20 +122,63 @@ export const campaignMissionsPlan: CampaignMissionDefinition[] = [
 export const campaignKillRewards: Partial<Record<ThreatKind, number>> = { parodiya: 1, decoy: 1, gerbera: 2, geran2: 2, drone: 2, kh101: 10, kalibr: 10, cruise: 10, iskander: 20, ballistic: 20 };
 export const campaignResupplyCosts: Partial<Record<UnitKind, number>> = { mvg: 1, boat: 1.4, manpads: 4, gepard: 2, "drone-operators": 4, buk: 12, s300: 16, "iris-t": 18, nasams: 16, patriot: 25 };
 
-export const campaignTutorialSteps = [
-  { atSeconds: 5, durationSeconds: 7, panelTarget: "planning" as const, title: "Відкрийте «План»", body: "Перегляньте доступні дії перед першим контактом." },
-  { atSeconds: 22, durationSeconds: 7, panelTarget: "intel" as const, title: "Відкрийте «Розвідку»", body: "Ознайомтеся з журналом контактів і напрямками пусків." },
-  { atSeconds: 78, durationSeconds: 7, title: "Контакти низького пріоритету", body: "Не витрачайте дорогі ракети на кожну обманку." },
-  { atSeconds: 92, durationSeconds: 7, title: "Читайте стан контакту", body: "Точний тип з'явиться лише після достатньої класифікації та стабільного супроводу." },
-  { atSeconds: 390, durationSeconds: 7, title: "Реальна загроза", body: "Пріоритезуйте Shahed і збережіть БК для фіналу." },
-  { atSeconds: 510, durationSeconds: 9, title: "Запас місії обмежений", body: "Перезаряджання переносить боєприпаси із запасу місії. Коли він вичерпаний, магазин не поповнюється." },
-  { atSeconds: 690, durationSeconds: 7, title: "Частина цілей відволікає", body: "Тримайте головний театр прикритим." },
+export const CAMPAIGN_TUTORIAL_COOLDOWN_MS = 5_000;
+export const CAMPAIGN_TUTORIAL_ASSET_ACTION = "tutorial asset awaiting deployment";
+export const CAMPAIGN_REINFORCEMENT_ACTION = "reinforcement awaiting deployment";
+
+export const campaignTutorialSteps: Array<{
+  action: CampaignTutorialAction;
+  panelTarget?: "units" | "planning" | "intel";
+  title: string;
+  body: string;
+}> = [
+  { action: "open-intel", panelTarget: "intel", title: "Розвідка: атака на Київ", body: "Очікується повітряна атака на столицю. Відкрийте «Розвідку» та прийміть оперативне зведення." },
+  { action: "open-units", panelTarget: "units", title: "Підготуйте сенсорну мережу", body: "Відкрийте «ППО». Навчальний дальній радар уже передано на склад." },
+  { action: "place-long-radar-near-kyiv", panelTarget: "units", title: "Розгорніть дальній радар", body: "Виберіть складський дальній радар і встановіть його поблизу Києва, але не в межах міста." },
+  { action: "open-intel", panelTarget: "intel", title: "Перевірте розвідувальну картину", body: "Поверніться до «Розвідки»: новий радар підсилить раннє виявлення та sensor fusion." },
+  { action: "open-units", panelTarget: "units", title: "Додайте вогневий ешелон", body: "Знову відкрийте «ППО». Перша мобільна вогнева група також чекає на складі." },
+  { action: "place-mvg-east-of-kyiv", panelTarget: "units", title: "Прикрийте східний підхід", body: "Розмістіть МВГ східніше Києва, щоб перехоплювати повільні дрони на підході." },
+  { action: "open-planning", panelTarget: "planning", title: "Підтвердьте план оборони", body: "Відкрийте «План». Після перевірки розпочнеться короткий відлік до реального бою." },
 ];
 
-export function activeCampaignTutorialCue(elapsedSeconds: number, visitedPanels: readonly string[] = []) {
-  return campaignTutorialSteps.find((cue) => elapsedSeconds >= cue.atSeconds
-    && elapsedSeconds < cue.atSeconds + cue.durationSeconds
-    && (!("panelTarget" in cue) || typeof cue.panelTarget !== "string" || !visitedPanels.includes(cue.panelTarget))) || null;
+export function settleCampaignTutorial(campaign: CampaignState, nowMs: number) {
+  if (campaign.missionIndex !== 1 || campaign.tutorialStep >= campaignTutorialSteps.length || nowMs < campaign.tutorialNextPromptAtMs) return false;
+  const expectedAction = campaignTutorialSteps[campaign.tutorialStep].action;
+  const queuedIndex = campaign.tutorialActionQueue.indexOf(expectedAction);
+  if (queuedIndex < 0) return false;
+  campaign.tutorialActionQueue.splice(queuedIndex, 1);
+  campaign.tutorialStep += 1;
+  campaign.tutorialNextPromptAtMs = nowMs + CAMPAIGN_TUTORIAL_COOLDOWN_MS;
+  return true;
+}
+
+export function recordCampaignTutorialAction(campaign: CampaignState | null | undefined, action: CampaignTutorialAction, nowMs: number) {
+  if (!campaign || campaign.missionIndex !== 1 || campaign.tutorialStep >= campaignTutorialSteps.length) return false;
+  if (campaignTutorialSteps[campaign.tutorialStep].action !== action) return false;
+  if (!campaign.tutorialActionQueue.includes(action)) campaign.tutorialActionQueue.push(action);
+  return settleCampaignTutorial(campaign, nowMs);
+}
+
+export function campaignTutorialComplete(campaign: CampaignState | null | undefined) {
+  return Boolean(campaign && campaign.missionIndex === 1 && campaign.tutorialStep >= campaignTutorialSteps.length);
+}
+
+export function activeCampaignTutorialCue(campaign: CampaignState | null | undefined, nowMs: number) {
+  if (!campaign || campaign.missionIndex !== 1 || campaignTutorialComplete(campaign) || nowMs < campaign.tutorialNextPromptAtMs) return null;
+  return campaignTutorialSteps[campaign.tutorialStep] || null;
+}
+
+export function campaignTutorialPlacementAction(kind: UnitKind, position: Coordinates, cities: readonly City[]): CampaignTutorialAction | null {
+  const kyiv = cities.find((city) => city.id === "kyiv");
+  if (!kyiv) return null;
+  const distanceFromKyiv = distanceKm(kyiv.coordinates, position);
+  if (kind === "long-radar" && distanceFromKyiv >= 10 && distanceFromKyiv <= 140) return "place-long-radar-near-kyiv";
+  if (kind === "mvg" && position.lng >= kyiv.coordinates.lng + .12 && distanceFromKyiv >= 10 && distanceFromKyiv <= 180) return "place-mvg-east-of-kyiv";
+  return null;
+}
+
+export function isFreeCampaignDeploymentAction(lastAction: string) {
+  return lastAction === CAMPAIGN_TUTORIAL_ASSET_ACTION || lastAction === CAMPAIGN_REINFORCEMENT_ACTION;
 }
 
 export function getCampaignMission(index: number) { return campaignMissionsPlan[Math.max(0, Math.min(campaignMissionsPlan.length - 1, index - 1))]; }

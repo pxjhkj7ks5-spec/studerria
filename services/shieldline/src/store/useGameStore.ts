@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { initialCities } from "../data/mapData";
+import { campaignTutorialComplete, campaignTutorialPlacementAction, recordCampaignTutorialAction as recordTutorialAction, settleCampaignTutorial } from "../data/campaignPlan";
 import { defenseReadinessForMode, getGameModeRuntimePolicy } from "../data/gameModes";
 import { threatTelemetryFor } from "../data/threatFlightProfiles";
 import { getUnitDefinition } from "../data/units";
@@ -11,7 +12,7 @@ import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
 import { advanceCampaignMission as advanceCampaignMissionState, applyCampaignMissionOpening, createCampaignState, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../game/campaignMeta";
-import type { CampaignAttackSchedule, CampaignMode, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, ThreatKind, UnitKind } from "../types/game";
+import type { CampaignAttackSchedule, CampaignMode, CampaignTutorialAction, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, ThreatKind, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
 
 const tutorialKey = "shieldline-tutorial-complete-v1";
@@ -146,7 +147,7 @@ export function normalizePersistedGame(game: GameState | null) {
       manualOverrideTargets: Array.isArray(battery.manualOverrideTargets) ? battery.manualOverrideTargets : [],
     };
   };
-  return {
+  const normalizedGame: GameState = {
     ...game,
     campaignAttackSchedule: normalizeCampaignSchedule(game),
     launchSectors,
@@ -157,8 +158,16 @@ export function normalizePersistedGame(game: GameState | null) {
     liveThreats,
     engagementEvents,
     softKills: Number.isFinite(game.softKills) ? game.softKills : 0,
-    campaign: game.campaign ? { ...game.campaign, campaignAmmoStock: Number.isFinite(game.campaign.campaignAmmoStock) ? game.campaign.campaignAmmoStock : 36 } : null,
+    campaign: game.campaign ? {
+      ...game.campaign,
+      campaignAmmoStock: Number.isFinite(game.campaign.campaignAmmoStock) ? game.campaign.campaignAmmoStock : 36,
+      tutorialStep: Number.isInteger(game.campaign.tutorialStep) ? game.campaign.tutorialStep : 0,
+      tutorialActionQueue: Array.isArray(game.campaign.tutorialActionQueue) ? game.campaign.tutorialActionQueue : [],
+      tutorialNextPromptAtMs: Number.isFinite(game.campaign.tutorialNextPromptAtMs) ? game.campaign.tutorialNextPromptAtMs : 0,
+    } : null,
   };
+  applyCampaignMissionOpening(normalizedGame);
+  return normalizedGame;
 }
 
 export function campaignCycleCompleted(previous: GameState, next: GameState) {
@@ -191,6 +200,8 @@ export interface GameStore {
   returnToModeSelect: () => void;
   setMapMode: (mode: MapMode) => void;
   dismissTutorial: () => void;
+  recordCampaignTutorialAction: (action: CampaignTutorialAction, nowMs?: number) => void;
+  refreshCampaignTutorial: (nowMs?: number) => void;
   beginPlacement: (kind: UnitKind) => void;
   cancelPlacement: () => void;
   placeSelectedBattery: (position: Coordinates) => void;
@@ -289,8 +300,8 @@ export const useGameStore = create<GameStore>()(
           game,
           placementKind: null,
           placementStoredBatteryId: null,
-          operationPhase: keepPhase ? current.operationPhase : readiness.ready ? "countdown" : "planning",
-          countdownRemainingMs: keepPhase ? current.countdownRemainingMs : readiness.ready ? getGameModeRuntimePolicy("campaign").countdownMs : 0,
+          operationPhase: keepPhase ? current.operationPhase : readiness.ready && (missionIndex !== 1 || campaignTutorialComplete(game.campaign)) ? "countdown" : "planning",
+          countdownRemainingMs: keepPhase ? current.countdownRemainingMs : readiness.ready && (missionIndex !== 1 || campaignTutorialComplete(game.campaign)) ? getGameModeRuntimePolicy("campaign").countdownMs : 0,
         });
       },
       hydrateDailyCity: (city) => {
@@ -335,6 +346,33 @@ export const useGameStore = create<GameStore>()(
         }
         set({ tutorialDismissed: true });
       },
+      recordCampaignTutorialAction: (action, nowMs = Date.now()) => set((state) => {
+        if (!state.game.campaign || state.game.campaign.missionIndex !== 1 || state.operationPhase !== "planning") return state;
+        const game = structuredClone(state.game);
+        recordTutorialAction(game.campaign, action, nowMs);
+        const readiness = defenseReadinessForMode("campaign", game.batteries.map((battery) => battery.kind));
+        const tutorialReady = campaignTutorialComplete(game.campaign);
+        return {
+          ...state,
+          game,
+          operationPhase: tutorialReady && readiness.ready ? "countdown" : state.operationPhase,
+          countdownRemainingMs: tutorialReady && readiness.ready ? getGameModeRuntimePolicy("campaign").countdownMs : state.countdownRemainingMs,
+        };
+      }),
+      refreshCampaignTutorial: (nowMs = Date.now()) => set((state) => {
+        if (!state.game.campaign || state.game.campaign.missionIndex !== 1 || state.operationPhase !== "planning") return state;
+        const game = structuredClone(state.game);
+        const advanced = settleCampaignTutorial(game.campaign!, nowMs);
+        if (!advanced) return state;
+        const readiness = defenseReadinessForMode("campaign", game.batteries.map((battery) => battery.kind));
+        const tutorialReady = campaignTutorialComplete(game.campaign);
+        return {
+          ...state,
+          game,
+          operationPhase: tutorialReady && readiness.ready ? "countdown" : state.operationPhase,
+          countdownRemainingMs: tutorialReady && readiness.ready ? getGameModeRuntimePolicy("campaign").countdownMs : state.countdownRemainingMs,
+        };
+      }),
       beginPlacement: (kind) => set((state) => ({
         placementKind: kind,
         placementStoredBatteryId: state.game.storedBatteries?.find((battery) => battery.kind === kind)?.id || null,
@@ -347,10 +385,14 @@ export const useGameStore = create<GameStore>()(
         const nextGame = placementStoredBatteryId
           ? deployStoredBattery(game, placementStoredBatteryId, position)
           : placeBattery(game, placementKind, position, () => random.next());
+        const placedBattery = nextGame.batteries.find((battery) => !game.batteries.some((current) => current.id === battery.id));
+        const tutorialAction = placedBattery ? campaignTutorialPlacementAction(placedBattery.kind, placedBattery.position, nextGame.cities) : null;
+        if (tutorialAction) recordTutorialAction(nextGame.campaign, tutorialAction, Date.now());
         const mode = activeGameMode || "training";
         const policy = getGameModeRuntimePolicy(mode);
         const readiness = defenseReadinessForMode(mode, nextGame.batteries.map((battery) => battery.kind));
-        const shouldAutoStart = policy.start === "auto-checklist" && readiness.ready && operationPhase === "planning";
+        const tutorialAllowsStart = mode !== "campaign" || nextGame.campaign?.missionIndex !== 1 || campaignTutorialComplete(nextGame.campaign);
+        const shouldAutoStart = policy.start === "auto-checklist" && readiness.ready && tutorialAllowsStart && operationPhase === "planning";
         set({ game: nextGame, dailyCityGame: mode === "daily-defense" ? nextGame : get().dailyCityGame, placementKind: nextGame.placementWarning ? placementKind : null, placementStoredBatteryId: nextGame.placementWarning ? placementStoredBatteryId : null, simulationRandomCursor: placementStoredBatteryId ? simulationRandomCursor : random.cursor(), operationPhase: shouldAutoStart ? "countdown" : operationPhase, countdownRemainingMs: shouldAutoStart ? policy.countdownMs : get().countdownRemainingMs });
       },
       moveBatteryToStorage: (batteryId) => set((state) => {
@@ -371,6 +413,7 @@ export const useGameStore = create<GameStore>()(
         const mode = state.activeGameMode || "training";
         const policy = getGameModeRuntimePolicy(mode);
         if (policy.execution !== "live" || state.operationPhase !== "planning") return state;
+        if (mode === "campaign" && state.game.campaign?.missionIndex === 1 && !campaignTutorialComplete(state.game.campaign)) return state;
         const readiness = defenseReadinessForMode(mode, state.game.batteries.map((battery) => battery.kind));
         if (!readiness.ready) return { ...state, game: { ...state.game, placementWarning: readiness.message } };
         if (policy.countdownMs > 0) return { ...state, game: { ...state.game, placementWarning: null }, operationPhase: "countdown", countdownRemainingMs: policy.countdownMs };
@@ -431,7 +474,7 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 20,
+      version: 21,
       migrate: (persistedState) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         const migratedGame = normalizePersistedGame(state.game || null);

@@ -1,20 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, missionTargetCount } from "../src/data/campaignPlan";
-import { advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignRedeployCost, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
+import { CAMPAIGN_REINFORCEMENT_ACTION, activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, campaignTutorialComplete, campaignTutorialPlacementAction, campaignTutorialSteps, missionTargetCount, recordCampaignTutorialAction, settleCampaignTutorial } from "../src/data/campaignPlan";
+import { accelerateFirstMissionSchedule, advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignRedeployCost, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
 import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/game/campaignLaunchZones";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow } from "../src/game/liveSimulation";
+import { initialCities as gameCities } from "../src/data/mapData";
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
   assert.equal(campaignRouteTemplates.length, 36);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.title), ["Перший контакт", "Південний коридор", "Східна дуга", "Насичення", "Масована ніч"]);
-  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [15, 35, 45, 50, 60]);
+  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [10, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [42, 32, 48, 70, 100]);
   assert.ok(campaignMissionsPlan.every((mission) => !("rewardCap" in mission)));
-  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [30, 41, 58, 78, 103]);
+  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 41, 58, 78, 103]);
   assert.equal(campaignMissionsPlan.slice(0, 3).some((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), false);
   assert.equal(campaignMissionsPlan.slice(3).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
 });
@@ -42,19 +43,29 @@ test("authored waves expand to deterministic individual spawn events with groupi
   assert.ok(merged?.rallyRatio && merged.rallyRatio >= .35 && merged.rallyRatio <= .6);
 });
 
-test("first contact keeps pressure active without doubling damaging targets", () => {
+test("first contact is a concise mixed battle with a real Caspian cruise wave", () => {
   const events = buildCampaignSpawnEvents(1);
   const gaps = events.slice(1).map((event, index) => event.dueMs - events[index].dueMs);
-  assert.equal(events.length, 30);
-  assert.ok(Math.max(...gaps) <= 55_000);
-  assert.equal(events.filter((event) => event.threatKind !== "parodiya").length, 16);
+  assert.equal(events.length, 23);
+  assert.ok(Math.max(...gaps) <= 75_000);
+  assert.equal(events.filter((event) => event.threatKind !== "parodiya").length, 19);
+  assert.equal(events.at(-1)!.dueMs < 8 * 60_000, true);
+  assert.deepEqual(events.find((event) => event.threatKind === "kh101"), {
+    id: "m1-w6-t1",
+    dueMs: 275_000,
+    threatKind: "kh101",
+    routeId: "R32",
+    groupId: "m1-w6-g1",
+    mergeBehavior: "independent",
+    priority: "veryHigh",
+    targetRegion: "Столичний кластер",
+    mergeRouteId: undefined,
+    rallyRatio: undefined,
+  });
   for (const groupId of new Set(events.map((event) => event.groupId))) {
     const group = events.filter((event) => event.groupId === groupId);
-    if (group[0].threatKind === "kh101") assert.equal(group.length, 1);
-    else {
-      assert.equal(group.length, 2);
-      assert.equal(new Set(group.map((event) => event.routeId)).size, 2);
-    }
+    assert.ok(group.length >= 1 && group.length <= 4);
+    assert.ok(new Set(group.map((event) => event.routeId)).size >= 1);
   }
 });
 
@@ -163,33 +174,49 @@ test("campaign redeployment always costs one million regardless of the air-defen
   assert.equal(game.batteries.find((battery) => battery.id === radar.id)?.position.lat, 48.7);
 });
 
-test("campaign onboarding cues expire before the first launch", () => {
-  assert.equal(activeCampaignTutorialCue(5)?.title, "Відкрийте «План»");
-  assert.equal(activeCampaignTutorialCue(5, ["planning"]), null);
-  assert.equal(activeCampaignTutorialCue(13), null);
-  assert.equal(activeCampaignTutorialCue(510)?.title, "Запас місії обмежений");
-  assert.equal(activeCampaignTutorialCue(570), null);
-  assert.equal(activeCampaignTutorialCue(810), null);
+test("campaign onboarding advances by action and keeps five seconds between prompts", () => {
+  const campaign = createCampaignState();
+  assert.equal(activeCampaignTutorialCue(campaign, 0)?.title, "Розвідка: атака на Київ");
+  assert.equal(recordCampaignTutorialAction(campaign, "open-intel", 0), true);
+  assert.equal(campaign.tutorialStep, 1);
+  assert.equal(activeCampaignTutorialCue(campaign, 4_999), null);
+  assert.equal(recordCampaignTutorialAction(campaign, "open-units", 1_000), false);
+  assert.equal(settleCampaignTutorial(campaign, 4_999), false);
+  assert.equal(settleCampaignTutorial(campaign, 5_000), true);
+  assert.equal(campaign.tutorialStep, 2);
+  assert.equal(activeCampaignTutorialCue(campaign, 9_999), null);
+  assert.equal(activeCampaignTutorialCue(campaign, 10_000)?.title, "Розгорніть дальній радар");
+
+  let nowMs = 10_000;
+  for (const step of campaignTutorialSteps.slice(2)) {
+    assert.equal(recordCampaignTutorialAction(campaign, step.action, nowMs), true);
+    nowMs += 5_000;
+  }
+  assert.equal(campaignTutorialComplete(campaign), true);
+  assert.equal(activeCampaignTutorialCue(campaign, nowMs), null);
+  assert.equal(campaignTutorialPlacementAction("long-radar", { lat: 50.2, lng: 30.3 }, gameCities), "place-long-radar-near-kyiv");
+  assert.equal(campaignTutorialPlacementAction("mvg", { lat: 50.2, lng: 31.0 }, gameCities), "place-mvg-east-of-kyiv");
+  assert.equal(campaignTutorialPlacementAction("mvg", { lat: 50.2, lng: 29.8 }, gameCities), null);
   assert.deepEqual(
     ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
     [1, 2, 2, 10, 10, 20],
   );
-  assert.equal(buildCampaignSpawnEvents(1)[0].dueMs, 45_000);
+  assert.equal(buildCampaignSpawnEvents(1)[0].dueMs, 10_000);
 });
 
-test("first mission has meaningful radar builds and no scripted S-300 answer", () => {
+test("first mission provides the tutorial radar and mobile fire group without spending the grant", () => {
   const random = createDeterministicRandom("campaign-s300-reinforcement");
   let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   applyCampaignMissionOpening(game);
-  game = startAttackNow(game, () => random.next());
   assert.equal(game.campaign?.campaignWallet, 42);
-  assert.ok(game.campaign?.unlockedSystems.includes("small-radar"));
-  assert.ok(game.campaign?.unlockedSystems.includes("radar"));
+  assert.ok(game.campaign?.unlockedSystems.includes("long-radar"));
   assert.equal(game.campaign?.unlockedSystems.includes("s300"), false);
-  assert.equal(game.storedBatteries.some((battery) => battery.kind === "s300"), false);
-  const builds = [12 + 6 + 6, 12 + 6 + 12, 25 + 6 + 6, 25 + 12, 12 + 12 + 6];
-  assert.ok(builds.every((cost) => cost <= 42));
+  assert.deepEqual(game.storedBatteries.map((battery) => battery.kind).sort(), ["long-radar", "mvg"]);
+  const radar = game.storedBatteries.find((battery) => battery.kind === "long-radar")!;
+  game = deployStoredBattery(game, radar.id, { lat: 50.2, lng: 30.3 });
+  assert.equal(game.campaign?.campaignWallet, 42);
+  assert.equal(game.batteries.some((battery) => battery.kind === "long-radar"), true);
 });
 
 test("live campaign launches from and animates a named geographic direction", () => {
@@ -198,12 +225,12 @@ test("live campaign launches from and animates a named geographic direction", ()
   game.campaign = createCampaignState();
   applyCampaignMissionOpening(game);
   game = startAttackNow(game, () => random.next());
-  game = advanceSimulation(game, 31_000, () => random.next());
+  game = advanceSimulation(game, 1_000, () => random.next());
   const warningSector = game.launchSectors.find((sector) => sector.state === "warning");
   assert.ok(warningSector);
   assert.ok(warningSector.lastLaunchCoordinates);
   assert.equal(game.liveThreats.length, 0);
-  game = advanceSimulation(game, 15_000, () => random.next());
+  game = advanceSimulation(game, 10_000, () => random.next());
   const threat = game.liveThreats[0];
   assert.ok(threat);
   assert.notEqual(threat.launchSectorId, threat.routeId);
@@ -212,6 +239,70 @@ test("live campaign launches from and animates a named geographic direction", ()
   const activeSector = game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!;
   assert.equal(activeSector.state, "launching");
   assert.deepEqual(activeSector.lastLaunchCoordinates, threat.origin);
+});
+
+test("clearing mission one pulls the next authored wave forward without changing its order", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  applyCampaignMissionOpening(game);
+  game = startAttackNow(game, () => .5);
+  game.campaign!.spawnCursor = 3;
+  game.elapsedMs = game.cycleStartedAtMs + 20_000;
+  const before = game.campaign!.spawnEvents.slice(3).map((event) => ({ id: event.id, dueMs: event.dueMs }));
+  const shiftMs = accelerateFirstMissionSchedule(game);
+  const after = game.campaign!.spawnEvents.slice(3);
+  assert.ok(shiftMs > 0);
+  assert.equal(after[0].dueMs, 28_000);
+  assert.deepEqual(after.map((event) => event.id), before.map((event) => event.id));
+  assert.deepEqual(after.slice(1).map((event, index) => event.dueMs - after[index].dueMs), before.slice(1).map((event, index) => event.dueMs - before[index].dueMs));
+});
+
+test("S-300 reinforcement is paired with a real Caspian warning, flight, and resolution", () => {
+  const random = createDeterministicRandom("campaign-caspian-lifecycle");
+  let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  game.campaign.spawnEvents = [{
+    id: "caspian-tutorial-wave",
+    dueMs: 30_000,
+    threatKind: "kh101",
+    routeId: "R32",
+    groupId: "caspian-tutorial-wave",
+    mergeBehavior: "independent",
+    priority: "veryHigh",
+    targetRegion: "Столичний кластер",
+  }];
+  applyCampaignMissionOpening(game);
+  game = startAttackNow(game, () => random.next());
+  game = advanceSimulation(game, 1_000, () => random.next());
+  const reinforcement = game.storedBatteries.find((battery) => battery.kind === "s300");
+  assert.ok(reinforcement);
+  assert.equal(reinforcement.lastAction, CAMPAIGN_REINFORCEMENT_ACTION);
+  const walletBeforeDeployment = game.campaign!.campaignWallet;
+  game = deployStoredBattery(game, reinforcement.id, { lat: 50.15, lng: 31.1 });
+  assert.equal(game.campaign!.campaignWallet, walletBeforeDeployment);
+  game = advanceSimulation(game, 14_000, () => random.next());
+  assert.equal(game.launchSectors.find((sector) => sector.id === "long_range_air_b")?.state, "warning");
+  game = advanceSimulation(game, 15_000, () => random.next());
+  const cruise = game.liveThreats.find((threat) => threat.kind === "kh101");
+  assert.ok(cruise);
+  assert.equal(cruise.routeId, "R32");
+  assert.equal(cruise.launchSectorId, "long_range_air_b");
+  assert.equal(game.log.some((entry) => entry.eventType === "launch" && entry.locationLabel?.includes("Каспійський")), true);
+  const cruiseId = cruise.id;
+  game = advanceSimulation(game, 180_000, () => random.next());
+  assert.equal(game.liveThreats.some((threat) => threat.id === cruiseId), false);
+  assert.equal(game.campaign?.spawnCursor, 1);
+  assert.equal(game.campaign?.intermission, true);
+});
+
+test("campaign kill earnings have no mission or wallet ceiling", () => {
+  const game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  applyCampaignMissionOpening(game);
+  for (let index = 0; index < 10_000; index += 1) recordCampaignKill(game, "parodiya", 1);
+  assert.equal(game.campaign.missionKillReward, 10_000);
+  assert.equal(game.campaign.campaignWallet, 10_042);
+  assert.equal(game.resources.budget, 10_042);
 });
 
 test("campaign cruise missiles require sensor acquisition and complete their authored route", () => {
@@ -272,9 +363,9 @@ test("the live campaign director resolves every authored target before opening i
   applyCampaignMissionOpening(game);
   game = startAttackNow(game, () => random.next());
   for (let step = 0; step < 8 && !game.campaign?.intermission; step += 1) game = advanceSimulation(game, 180_000, () => random.next());
-  assert.equal(game.campaign?.spawnCursor, 30);
+  assert.equal(game.campaign?.spawnCursor, 23);
   assert.equal(game.campaign?.intermission, true);
   assert.equal(game.campaign?.previousMissionResults.length, 1);
-  assert.equal(game.campaign?.previousMissionResults[0].totalTargets, 30);
+  assert.equal(game.campaign?.previousMissionResults[0].totalTargets, 23);
   assert.equal(game.liveThreats.length, 0);
 });

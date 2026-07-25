@@ -15,7 +15,7 @@ export interface GameModeDefinition {
 
 export const gameModes: GameModeDefinition[] = [
   {
-    id: "campaign", eyebrow: "5 persistent missions", title: "Campaign", duration: "15-60 min", difficulty: "Escalating", resources: "Wallet · ammo · resilience",
+    id: "campaign", eyebrow: "5 persistent missions", title: "Campaign", duration: "10-60 min", difficulty: "Escalating", resources: "Wallet · ammo · resilience",
     description: "Five authored operations. Positions, ammunition, damage, experience and the campaign wallet persist between missions.", mainRisk: "Decoy, Shahed, cruise and ballistic salvos", victory: "Carry a viable layered defense through Mass Night", availability: "available",
   },
   {

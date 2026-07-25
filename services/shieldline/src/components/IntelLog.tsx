@@ -50,6 +50,7 @@ function localizedEntry(entry: GameState["log"][number]) {
 }
 
 export function IntelLog({ game }: IntelLogProps) {
+  const firstMissionBriefing = game.campaign?.missionIndex === 1 && !game.campaign.intermission;
   return (
     <section className="intel-card" aria-label="Журнал розвідки">
       <div className="intel-heading">
@@ -60,8 +61,8 @@ export function IntelLog({ game }: IntelLogProps) {
         </div>
       </div>
       <article className="briefing-card">
-        <strong>Оперативне зведення</strong>
-        <p>Нові контакти з’являються постійно. Розміщуйте ППО вручну та стежте за зонами прикриття.</p>
+        <strong>{firstMissionBriefing ? "Розвідка: очікується атака на Київ" : "Оперативне зведення"}</strong>
+        <p>{firstMissionBriefing ? "Ймовірні дронові хибні цілі, ударні БПЛА та окремий далекий ракетний пуск. Розгорніть навчальні активи й тримайте столичний кластер під безперервним спостереженням." : "Нові контакти з’являються постійно. Розміщуйте ППО вручну та стежте за зонами прикриття."}</p>
         <span>Індекс тиску: {Math.round(game.wavePressure)}</span>
       </article>
       <div className="log-list">

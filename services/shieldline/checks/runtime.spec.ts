@@ -104,17 +104,26 @@ test("combat readiness requires a radar and a kinetic asset", () => {
   assert.equal(defenseReadinessForMode("sandbox", []).ready, true);
 });
 
-test("combat modes auto-start only after radar and kinetic air defense are deployed", () => {
+test("combat modes auto-start only after readiness and the mission-one action checklist", () => {
   const automaticModes = ["campaign", "rapid-response", "ranked-challenge", "co-op-command", "training"] as const;
   assert.ok(automaticModes.every((mode) => gameModeRuntimePolicies[mode].start === "auto-checklist"));
 
   const store = useGameStore.getState();
   store.launchTacticalMode("campaign");
-  useGameStore.getState().beginPlacement("radar");
-  useGameStore.getState().placeSelectedBattery({ lat: 49.2, lng: 29.4 });
+  const startedAtMs = Date.now();
+  useGameStore.getState().recordCampaignTutorialAction("open-intel", startedAtMs);
+  useGameStore.getState().recordCampaignTutorialAction("open-units", startedAtMs + 5_000);
+  useGameStore.getState().beginPlacement("long-radar");
+  useGameStore.getState().placeSelectedBattery({ lat: 50.2, lng: 30.3 });
+  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 10_000);
   assert.equal(useGameStore.getState().operationPhase, "planning");
+  useGameStore.getState().recordCampaignTutorialAction("open-intel", startedAtMs + 15_000);
+  useGameStore.getState().recordCampaignTutorialAction("open-units", startedAtMs + 20_000);
   useGameStore.getState().beginPlacement("mvg");
-  useGameStore.getState().placeSelectedBattery({ lat: 49.1, lng: 29.7 });
+  useGameStore.getState().placeSelectedBattery({ lat: 50.2, lng: 31.0 });
+  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 25_000);
+  assert.equal(useGameStore.getState().operationPhase, "planning");
+  useGameStore.getState().recordCampaignTutorialAction("open-planning", startedAtMs + 30_000);
   assert.equal(useGameStore.getState().operationPhase, "countdown");
   assert.equal(useGameStore.getState().countdownRemainingMs, 5_000);
 });

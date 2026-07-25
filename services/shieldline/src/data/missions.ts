@@ -22,7 +22,7 @@ export const campaignMissions: MissionDefinition[] = campaignMissionsPlan.map((m
   broadAzimuth: mission.broadAzimuth,
   mainRisk: mission.expectedThreatClasses.join(" + "),
   victoryCondition: mission.objective,
-  briefing: `${mission.focusRegion}. ${mission.objective}`,
+  briefing: mission.briefing || `${mission.focusRegion}. ${mission.objective}`,
   waves: mission.waves.map((wave, waveIndex) => ({
     id: `${mission.id}-wave-${String(waveIndex + 1).padStart(2, "0")}`,
     index: waveIndex + 1,
