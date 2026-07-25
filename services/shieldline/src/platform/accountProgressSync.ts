@@ -39,6 +39,20 @@ function fingerprint(state: AccountProgressState) {
   return JSON.stringify(state);
 }
 
+export function resolveProgressWriteConflict<T>(localState: T, conflict: { revision: number; state: T } | null) {
+  const remoteFingerprint = conflict ? JSON.stringify(conflict.state) : "";
+  return {
+    baseRevision: conflict?.revision || 0,
+    state: localState,
+    remoteFingerprint,
+    shouldRetry: JSON.stringify(localState) !== remoteFingerprint,
+  };
+}
+
+export function canApplyRemoteProgress(state: Pick<AccountProgressState, "operationPhase">) {
+  return state.operationPhase !== "countdown" && state.operationPhase !== "running" && state.operationPhase !== "paused";
+}
+
 function applyRemote(snapshot: ProgressSnapshot) {
   applyingRemote = true;
   try {
@@ -60,8 +74,10 @@ async function flush() {
   try {
     const result = await writeRemote(revision, state);
     if ("conflict" in result) {
-      if (result.conflict) applyRemote(result.conflict);
-      else revision = 0;
+      const resolution = resolveProgressWriteConflict(readAccountProgressState(), result.conflict || null);
+      revision = resolution.baseRevision;
+      lastFingerprint = resolution.remoteFingerprint;
+      dirty = dirty || resolution.shouldRetry;
     } else {
       revision = result.progress.revision;
       lastFingerprint = nextFingerprint;
@@ -78,7 +94,17 @@ async function refreshLatest() {
   if (!actorId || saving || dirty) return;
   try {
     const remote = await readRemote();
-    if (remote && (revision === null || remote.revision > revision)) applyRemote(remote);
+    if (remote && (revision === null || remote.revision > revision)) {
+      const localState = readAccountProgressState();
+      if (canApplyRemoteProgress(localState)) applyRemote(remote);
+      else {
+        const resolution = resolveProgressWriteConflict(localState, remote);
+        revision = resolution.baseRevision;
+        lastFingerprint = resolution.remoteFingerprint;
+        dirty = resolution.shouldRetry;
+        if (dirty) scheduleSave();
+      }
+    }
   } catch { /* Keep the local snapshot and retry on the next focus/online event. */ }
 }
 
