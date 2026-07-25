@@ -4995,7 +4995,6 @@ body,
 .sound-lab-group button.is-active {
   border-color: rgba(246, 197, 71, .36);
   background: linear-gradient(90deg, rgba(246, 197, 71, .1), rgba(99, 199, 212, .045));
-  box-shadow: inset 2px 0 #f6c547;
 }
 
 .sound-lab-group button > span:nth-child(2) {
