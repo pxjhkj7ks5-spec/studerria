@@ -76,14 +76,14 @@ test("audio unlocks on player interaction, respects mute, and never replays hydr
   const navigation = page.getByRole("navigation", { name: "Панелі Shieldline" });
   await navigation.getByRole("button", { name: "Налаштування" }).click();
   await expect.poll(() => page.evaluate(() => (window as typeof window & { __audioStarts: unknown[] }).__audioStarts.length)).toBeGreaterThan(0);
-  expect(await page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.some((url) => url.includes("impact.mp3")))).toBe(false);
+  expect(await page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.some((url) => url.includes("city-impact.mp3")))).toBe(false);
 
   await page.evaluate(async () => {
     const { useGameStore } = await import("/shieldline/src/store/useGameStore.ts");
     const current = useGameStore.getState().game;
     useGameStore.setState({ game: { ...current, log: [{ id: "new-impact", time: "20:01", title: "Impact", body: "New impact", tone: "danger", soundCue: "result.impact" }, ...current.log] } });
   });
-  await expect.poll(() => page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("impact.mp3")).length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.filter((url) => url.includes("city-impact.mp3")).length)).toBe(1);
 
   await page.getByRole("checkbox", { name: "Увімкнути звуковий супровід" }).uncheck();
   await page.waitForTimeout(100);
@@ -128,5 +128,5 @@ test("air raid sounds once for a global escalation and hidden updates are not re
     document.dispatchEvent(new Event("visibilitychange"));
   });
   await page.waitForTimeout(200);
-  expect(await page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.some((url) => url.includes("impact.mp3")))).toBe(false);
+  expect(await page.evaluate(() => (window as typeof window & { __audioFetches: string[] }).__audioFetches.some((url) => url.includes("city-impact.mp3")))).toBe(false);
 });

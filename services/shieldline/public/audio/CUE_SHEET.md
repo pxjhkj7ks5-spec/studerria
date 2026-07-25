@@ -14,8 +14,8 @@ Direction: realistic hybrid, restrained command-interface design, no music or sp
 | Air raid/all clear | Dedicated warning signal followed by a restrained clear chime | 0.4–9 s | 1 per cue | Critical | `air-raid`, `chime` | One global cue per escalation; minimum 12 s cooldown |
 | Gun/missile/EW engagement | Distinct kinetic burst, missile ignition, or radio disruption | 0.4–2.3 s | 1 per cue | Medium | `gun-burst-1`, `missile-launch`, `radio-static` | Maximum three simultaneous voices; fixed source per context |
 | Reload | Short metallic mechanism | 0.5–0.7 s | 1 | Medium | `mechanical` | Fires when the battery actually enters reload |
-| Intercept/soft kill/miss | Controlled impact, interference fade, or contact loss | 0.6–2.3 s | 2 | Medium | `impact`, `radio-static`, `chime` | Kept below the impact alarm level |
-| Impact | Low, short explosion excerpt | 4.5 s maximum | 1 | Critical | `impact` | Ducks UI/combat buses; never stacked beyond one voice |
+| Intercept/soft kill/miss | Short kinetic impact, interference fade, or contact loss | 0.6–1.8 s | 1 per cue | Medium | `intercept-impact`, `radio-static` | Successful PVO impact uses its own fixed source below the city-impact level |
+| City impact | Deep explosion with a long natural tail | 11.4 s maximum | 1 | Critical | `city-impact` | Ducks UI/combat buses; never stacked beyond one voice |
 | Mission outcome | Clean chime or slowed warning sequence | 0.4–2.4 s | 2 | Critical | `chime`, `timer` | Played after operation-complete cue |
 
 ## Rejected source categories

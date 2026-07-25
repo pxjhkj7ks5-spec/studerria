@@ -36,11 +36,17 @@ const soundSources: Record<string, SoundSource> = {
     creator: "qubodup",
     sourceUrl: "https://freesound.org/s/740120/",
   },
-  "audio/sfx/impact.mp3": {
-    file: "impact.mp3",
-    work: "Huge Explosion",
-    creator: "florianreichelt",
-    sourceUrl: "https://freesound.org/s/459973/",
+  "audio/sfx/city-impact.mp3": {
+    file: "city-impact.mp3",
+    work: "Large explosion",
+    creator: "SamsterBirdies",
+    sourceUrl: "https://freesound.org/s/592000/",
+  },
+  "audio/sfx/intercept-impact.mp3": {
+    file: "intercept-impact.mp3",
+    work: "impact_.wav",
+    creator: "sangnamsa",
+    sourceUrl: "https://freesound.org/s/473941/",
   },
   "audio/sfx/mechanical.mp3": {
     file: "mechanical.mp3",
