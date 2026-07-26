@@ -41,7 +41,7 @@ test("reviewed launch, warning, gun, and interceptor cues use the selected singl
   assert.deepEqual(soundCueDefinitions["result.impact"].variants.map(({ file }) => file), ["audio/sfx/city-impact.mp3"]);
 });
 
-test("interface and planning actions share one unpitched neutral click", () => {
+test("interface actions share one neutral click while successful placement has audible confirmation", () => {
   const clickCues = [
     "ui.open",
     "ui.close",
@@ -50,7 +50,6 @@ test("interface and planning actions share one unpitched neutral click", () => {
     "ui.cancel",
     "ui.error",
     "placement.select",
-    "placement.success",
     "placement.failure",
     "placement.redeploy",
     "placement.service",
@@ -62,6 +61,7 @@ test("interface and planning actions share one unpitched neutral click", () => {
   for (const cue of clickCues) {
     assert.deepEqual(soundCueDefinitions[cue].variants, [{ file: "audio/sfx/ui-click.mp3", gain: 0.3 }]);
   }
+  assert.deepEqual(soundCueDefinitions["placement.success"].variants, [{ file: "audio/sfx/confirm.mp3", gain: .34, playbackRate: 1.18 }]);
 });
 
 test("every configured audio file has displayable source metadata", () => {

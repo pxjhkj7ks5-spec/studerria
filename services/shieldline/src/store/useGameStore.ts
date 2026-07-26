@@ -61,7 +61,27 @@ function normalizeCampaignSchedule(game: GameState): CampaignAttackSchedule | nu
   };
 }
 
-export function normalizePersistedGame(game: GameState | null) {
+function migratedTutorialStep(step: number, persistedVersion: number) {
+  if (persistedVersion > 21) return Math.max(0, Math.min(5, step));
+  if (step <= 2) return Math.max(0, step);
+  if (step >= 7) return 5;
+  if (step >= 6) return 4;
+  return 3;
+}
+
+function recordPlacedTutorialAssets(game: GameState, nowMs: number) {
+  if (!game.campaign || game.campaign.missionIndex !== 1) return false;
+  let advanced = false;
+  if (game.campaign.tutorialStep <= 2 && game.batteries.some((battery) => battery.kind === "long-radar")) {
+    advanced = recordTutorialAction(game.campaign, "place-long-radar-near-kyiv", nowMs) || advanced;
+  }
+  if (game.campaign.tutorialStep <= 3 && game.batteries.some((battery) => battery.kind === "mvg")) {
+    advanced = recordTutorialAction(game.campaign, "place-mvg-east-of-kyiv", nowMs) || advanced;
+  }
+  return advanced;
+}
+
+export function normalizePersistedGame(game: GameState | null, persistedVersion = 22) {
   if (!game) return game;
   const persistedSectorById = new Map((Array.isArray(game.launchSectors) ? game.launchSectors : []).map((sector) => [sector.id, sector]));
   const launchSectors = createLaunchSectorState().map((sector) => {
@@ -161,12 +181,13 @@ export function normalizePersistedGame(game: GameState | null) {
     campaign: game.campaign ? {
       ...game.campaign,
       campaignAmmoStock: Number.isFinite(game.campaign.campaignAmmoStock) ? game.campaign.campaignAmmoStock : 36,
-      tutorialStep: Number.isInteger(game.campaign.tutorialStep) ? game.campaign.tutorialStep : 0,
+      tutorialStep: migratedTutorialStep(Number.isInteger(game.campaign.tutorialStep) ? game.campaign.tutorialStep : 0, persistedVersion),
       tutorialActionQueue: Array.isArray(game.campaign.tutorialActionQueue) ? game.campaign.tutorialActionQueue : [],
       tutorialNextPromptAtMs: Number.isFinite(game.campaign.tutorialNextPromptAtMs) ? game.campaign.tutorialNextPromptAtMs : 0,
     } : null,
   };
   applyCampaignMissionOpening(normalizedGame);
+  recordPlacedTutorialAssets(normalizedGame, Date.now());
   return normalizedGame;
 }
 
@@ -362,7 +383,8 @@ export const useGameStore = create<GameStore>()(
       refreshCampaignTutorial: (nowMs = Date.now()) => set((state) => {
         if (!state.game.campaign || state.game.campaign.missionIndex !== 1 || state.operationPhase !== "planning") return state;
         const game = structuredClone(state.game);
-        const advanced = settleCampaignTutorial(game.campaign!, nowMs);
+        const reconciled = recordPlacedTutorialAssets(game, nowMs);
+        const advanced = settleCampaignTutorial(game.campaign!, nowMs) || reconciled;
         if (!advanced) return state;
         const readiness = defenseReadinessForMode("campaign", game.batteries.map((battery) => battery.kind));
         const tutorialReady = campaignTutorialComplete(game.campaign);
@@ -386,7 +408,7 @@ export const useGameStore = create<GameStore>()(
           ? deployStoredBattery(game, placementStoredBatteryId, position)
           : placeBattery(game, placementKind, position, () => random.next());
         const placedBattery = nextGame.batteries.find((battery) => !game.batteries.some((current) => current.id === battery.id));
-        const tutorialAction = placedBattery ? campaignTutorialPlacementAction(placedBattery.kind, placedBattery.position, nextGame.cities) : null;
+        const tutorialAction = placedBattery ? campaignTutorialPlacementAction(placedBattery.kind) : null;
         if (tutorialAction) recordTutorialAction(nextGame.campaign, tutorialAction, Date.now());
         const mode = activeGameMode || "training";
         const policy = getGameModeRuntimePolicy(mode);
@@ -474,14 +496,15 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 21,
-      migrate: (persistedState) => {
+      version: 22,
+      migrate: (persistedState, persistedVersion) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
-        const migratedGame = normalizePersistedGame(state.game || null);
+        const migratedGame = normalizePersistedGame(state.game || null, persistedVersion);
         return {
           ...state,
           ...(migratedGame ? { game: migratedGame } : {}),
-          dailyCityGame: normalizePersistedGame(state.dailyCityGame || null),
+          activeGameMode: state.activeGameMode === "campaign" && !migratedGame?.campaign ? null : state.activeGameMode,
+          dailyCityGame: normalizePersistedGame(state.dailyCityGame || null, persistedVersion),
           simulationSpeed: 1,
         } as GameStore;
       },
@@ -535,7 +558,7 @@ export function readAccountProgressState(): AccountProgressState {
 
 export function applyAccountProgressState(value: AccountProgressState) {
   const game = normalizePersistedGame(value?.game || null);
-  if (!game) return false;
+  if (!game || (value.activeGameMode === "campaign" && !game.campaign)) return false;
   useGameStore.setState({
     game,
     campaignMode: value.campaignMode || null,

@@ -4,7 +4,7 @@ import type { MissionRun } from "../domain/contracts";
 const DATABASE_NAME = "shieldline-offline-v1";
 const DATABASE_VERSION = 3;
 const PROJECTION_KEY = "current-game";
-const PROJECTION_SCHEMA_VERSION = 3;
+const PROJECTION_SCHEMA_VERSION = 4;
 
 interface PendingCommand {
   id?: number;
@@ -89,10 +89,16 @@ export async function initializeOfflinePersistence(basePath: string) {
     }
     const updatedAt = typeof projection?.updatedAt === "string" ? projection.updatedAt : "";
     if (!projection || updatedAt <= latestProjectionAt) return;
+    const projectedGame = projection.game ? normalizePersistedGame(projection.game as ReturnType<typeof useGameStore.getState>["game"]) : null;
+    const projectedMode = projection.activeGameMode;
+    if (projectedMode === "campaign" && !projectedGame?.campaign) {
+      await transact("projections", "readwrite", (store) => store.delete(PROJECTION_KEY));
+      return;
+    }
     latestProjectionAt = updatedAt;
     useGameStore.setState({
-      ...(projection.game ? { game: normalizePersistedGame(projection.game as ReturnType<typeof useGameStore.getState>["game"]) } : {}),
-      ...(projection.activeGameMode ? { activeGameMode: projection.activeGameMode } : {}),
+      ...(projectedGame ? { game: projectedGame } : {}),
+      ...(projectedMode ? { activeGameMode: projectedMode } : {}),
       ...(projection.operationPhase ? { operationPhase: projection.operationPhase } : {}),
       simulationSpeed: 1,
       ...(projection.simulationSeed ? { simulationSeed: projection.simulationSeed } : {}),

@@ -3890,7 +3890,7 @@ button {
 .command-drawer .unit-card__code { grid-column: 2 / 4; margin: 0; font-size: 11px; line-height: 1.25; }
 .command-drawer .unit-card__telemetry {
   grid-column: 2 / 4;
-  grid-template-columns: minmax(54px, .7fr) minmax(100px, 1.25fr) minmax(116px, 1fr);
+  grid-template-columns: minmax(124px, 1.15fr) minmax(104px, .95fr) minmax(108px, 1fr);
   gap: 10px;
   margin: 7px 0 2px;
 }

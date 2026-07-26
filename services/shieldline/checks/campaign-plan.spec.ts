@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CAMPAIGN_REINFORCEMENT_ACTION, activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, campaignTutorialComplete, campaignTutorialPlacementAction, campaignTutorialSteps, missionTargetCount, recordCampaignTutorialAction, settleCampaignTutorial } from "../src/data/campaignPlan";
-import { accelerateFirstMissionSchedule, advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignRedeployCost, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
+import { CAMPAIGN_REINFORCEMENT_ACTION, activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, campaignTutorialComplete, campaignTutorialPlacementAction, missionTargetCount, recordCampaignTutorialAction, settleCampaignTutorial } from "../src/data/campaignPlan";
+import { accelerateCampaignSchedule, advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignRedeployCost, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
 import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/game/campaignLaunchZones";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow } from "../src/game/liveSimulation";
-import { initialCities as gameCities } from "../src/data/mapData";
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
   assert.equal(campaignRouteTemplates.length, 36);
@@ -15,9 +14,10 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [10, 35, 45, 50, 60]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [42, 32, 48, 70, 100]);
   assert.ok(campaignMissionsPlan.every((mission) => !("rewardCap" in mission)));
-  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 41, 58, 78, 103]);
-  assert.equal(campaignMissionsPlan.slice(0, 3).some((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), false);
-  assert.equal(campaignMissionsPlan.slice(3).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
+  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 42, 59, 78, 103]);
+  assert.equal(campaignMissionsPlan[0].waves.some((wave) => wave.threatKind === "iskander"), false);
+  assert.equal(campaignMissionsPlan[1].waves.at(-1)?.threatKind, "iskander");
+  assert.equal(campaignMissionsPlan.slice(1).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
 });
 
 test("campaign mission selection unlocks only the next sequential mission", () => {
@@ -41,6 +41,18 @@ test("authored waves expand to deterministic individual spawn events with groupi
   }
   const merged = buildCampaignSpawnEvents(3).find((event) => event.mergeRouteId && event.routeId !== event.mergeRouteId);
   assert.ok(merged?.rallyRatio && merged.rallyRatio >= .35 && merged.rallyRatio <= .6);
+});
+
+test("every campaign mission starts its next cleared wave without a long idle gate", () => {
+  const expectedFirstDueMs = [8_000, 12_000, 14_000, 16_000, 18_000];
+  for (const missionIndex of [1, 2, 3, 4, 5]) {
+    let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+    game.campaign = createCampaignState(missionIndex);
+    applyCampaignMissionOpening(game);
+    game = startAttackNow(game, () => .5);
+    assert.ok(accelerateCampaignSchedule(game) > 0);
+    assert.equal(game.campaign?.spawnEvents[0].dueMs, expectedFirstDueMs[missionIndex - 1]);
+  }
 });
 
 test("first contact is a concise mixed battle with a real Caspian cruise wave", () => {
@@ -180,6 +192,7 @@ test("campaign onboarding advances by action and keeps five seconds between prom
   assert.equal(recordCampaignTutorialAction(campaign, "open-intel", 0), true);
   assert.equal(campaign.tutorialStep, 1);
   assert.equal(activeCampaignTutorialCue(campaign, 4_999), null);
+  assert.equal(recordCampaignTutorialAction(campaign, "place-mvg-east-of-kyiv", 1_000), false);
   assert.equal(recordCampaignTutorialAction(campaign, "open-units", 1_000), false);
   assert.equal(settleCampaignTutorial(campaign, 4_999), false);
   assert.equal(settleCampaignTutorial(campaign, 5_000), true);
@@ -187,16 +200,16 @@ test("campaign onboarding advances by action and keeps five seconds between prom
   assert.equal(activeCampaignTutorialCue(campaign, 9_999), null);
   assert.equal(activeCampaignTutorialCue(campaign, 10_000)?.title, "Розгорніть дальній радар");
 
-  let nowMs = 10_000;
-  for (const step of campaignTutorialSteps.slice(2)) {
-    assert.equal(recordCampaignTutorialAction(campaign, step.action, nowMs), true);
-    nowMs += 5_000;
-  }
+  assert.equal(recordCampaignTutorialAction(campaign, "place-long-radar-near-kyiv", 10_000), true);
+  assert.equal(settleCampaignTutorial(campaign, 15_000), true);
+  assert.equal(campaign.tutorialStep, 4);
+  assert.equal(activeCampaignTutorialCue(campaign, 20_000)?.title, "Підтвердьте план оборони");
+  assert.equal(recordCampaignTutorialAction(campaign, "open-planning", 20_000), true);
   assert.equal(campaignTutorialComplete(campaign), true);
-  assert.equal(activeCampaignTutorialCue(campaign, nowMs), null);
-  assert.equal(campaignTutorialPlacementAction("long-radar", { lat: 50.2, lng: 30.3 }, gameCities), "place-long-radar-near-kyiv");
-  assert.equal(campaignTutorialPlacementAction("mvg", { lat: 50.2, lng: 31.0 }, gameCities), "place-mvg-east-of-kyiv");
-  assert.equal(campaignTutorialPlacementAction("mvg", { lat: 50.2, lng: 29.8 }, gameCities), null);
+  assert.equal(activeCampaignTutorialCue(campaign, 25_000), null);
+  assert.equal(campaignTutorialPlacementAction("long-radar"), "place-long-radar-near-kyiv");
+  assert.equal(campaignTutorialPlacementAction("mvg"), "place-mvg-east-of-kyiv");
+  assert.equal(campaignTutorialPlacementAction("radar"), null);
   assert.deepEqual(
     ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
     [1, 2, 2, 10, 10, 20],
@@ -217,6 +230,7 @@ test("first mission provides the tutorial radar and mobile fire group without sp
   game = deployStoredBattery(game, radar.id, { lat: 50.2, lng: 30.3 });
   assert.equal(game.campaign?.campaignWallet, 42);
   assert.equal(game.batteries.some((battery) => battery.kind === "long-radar"), true);
+  assert.equal(game.log[0].soundCue, "placement.success");
 });
 
 test("live campaign launches from and animates a named geographic direction", () => {
@@ -241,7 +255,7 @@ test("live campaign launches from and animates a named geographic direction", ()
   assert.deepEqual(activeSector.lastLaunchCoordinates, threat.origin);
 });
 
-test("clearing mission one pulls the next authored wave forward without changing its order", () => {
+test("clearing campaign waves pulls the next authored wave forward without changing its order", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   applyCampaignMissionOpening(game);
@@ -249,12 +263,20 @@ test("clearing mission one pulls the next authored wave forward without changing
   game.campaign!.spawnCursor = 3;
   game.elapsedMs = game.cycleStartedAtMs + 20_000;
   const before = game.campaign!.spawnEvents.slice(3).map((event) => ({ id: event.id, dueMs: event.dueMs }));
-  const shiftMs = accelerateFirstMissionSchedule(game);
+  const shiftMs = accelerateCampaignSchedule(game);
   const after = game.campaign!.spawnEvents.slice(3);
   assert.ok(shiftMs > 0);
   assert.equal(after[0].dueMs, 28_000);
   assert.deepEqual(after.map((event) => event.id), before.map((event) => event.id));
   assert.deepEqual(after.slice(1).map((event, index) => event.dueMs - after[index].dueMs), before.slice(1).map((event, index) => event.dueMs - before[index].dueMs));
+
+  let secondMission = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  secondMission.campaign = createCampaignState(2);
+  applyCampaignMissionOpening(secondMission);
+  secondMission = startAttackNow(secondMission, () => .5);
+  secondMission.elapsedMs = secondMission.cycleStartedAtMs + 20_000;
+  assert.ok(accelerateCampaignSchedule(secondMission) > 0);
+  assert.equal(secondMission.campaign!.spawnEvents[0].dueMs, 32_000);
 });
 
 test("S-300 reinforcement is paired with a real Caspian warning, flight, and resolution", () => {

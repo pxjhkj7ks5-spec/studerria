@@ -10,6 +10,7 @@ let saving = false;
 let dirty = false;
 let applyingRemote = false;
 let lastFingerprint = "";
+let initialization: { actorId: string; promise: Promise<void> } | null = null;
 
 function endpoint() {
   return `${import.meta.env.BASE_URL}api/player/progress`;
@@ -122,30 +123,44 @@ function startWatching() {
   });
 }
 
-export async function initializeAccountProgressSync(nextActorId: string) {
-  if (actorId === nextActorId && revision !== null) return;
-  actorId = nextActorId;
-  revision = null;
-  dirty = false;
-  unsubscribe?.();
-  unsubscribe = null;
-  try {
-    const remote = await readRemote();
-    if (remote) applyRemote(remote);
-    else {
-      const state = readAccountProgressState();
-      const result = await writeRemote(0, state);
-      if ("progress" in result && result.progress) {
-        revision = result.progress.revision;
-        lastFingerprint = fingerprint(state);
-      } else if (result.conflict) applyRemote(result.conflict);
+export function initializeAccountProgressSync(nextActorId: string) {
+  if (actorId === nextActorId && revision !== null) return Promise.resolve();
+  if (initialization?.actorId === nextActorId) return initialization.promise;
+
+  const promise = (async () => {
+    actorId = nextActorId;
+    revision = null;
+    dirty = false;
+    unsubscribe?.();
+    unsubscribe = null;
+    try {
+      const remote = await readRemote();
+      if (actorId !== nextActorId) return;
+      if (remote) applyRemote(remote);
+      else {
+        const state = readAccountProgressState();
+        const result = await writeRemote(0, state);
+        if (actorId !== nextActorId) return;
+        if ("progress" in result && result.progress) {
+          revision = result.progress.revision;
+          lastFingerprint = fingerprint(state);
+        } else if (result.conflict) applyRemote(result.conflict);
+      }
+    } catch {
+      if (actorId !== nextActorId) return;
+      revision = 0;
+      dirty = true;
     }
-  } catch {
-    revision = 0;
-    dirty = true;
-  }
-  startWatching();
-  if (dirty) scheduleSave();
+    if (actorId !== nextActorId) return;
+    startWatching();
+    if (dirty) scheduleSave();
+  })();
+
+  initialization = { actorId: nextActorId, promise };
+  void promise.finally(() => {
+    if (initialization?.promise === promise) initialization = null;
+  });
+  return promise;
 }
 
 if (typeof window !== "undefined") {

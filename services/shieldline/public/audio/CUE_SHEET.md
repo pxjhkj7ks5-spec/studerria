@@ -5,7 +5,8 @@ Direction: realistic hybrid, restrained command-interface design, no music or sp
 | Cue family | Character and function | Target length | Variations | Priority | Source material | Processing and acceptance notes |
 | --- | --- | ---: | ---: | --- | --- | --- |
 | UI actions | One short, dry electronic click | 0.26 s | 1 | Low | `ui-click` | Same file, gain and playback rate for open, close, select, confirm, cancel and error |
-| Placement/redeploy/service/planning | The same neutral UI click | 0.26 s | 1 | Low | `ui-click` | No tonal variants; played only after a meaningful command |
+| Placement success | Short confirmation tone | 0.35 s | 1 | Low | `confirm` | Distinct feedback after a unit is accepted on the map |
+| Placement select/redeploy/service/planning | The same neutral UI click | 0.26 s | 1 | Low | `ui-click` | No tonal variants; played only after a meaningful command |
 | Operation countdown/start | Timer plus brief radio-channel opening | 0.7–3.7 s | 2 | Medium | `timer`, `radio-static`, `mechanical` | Countdown is single-voice; pause and resume use the neutral UI click |
 | Prelaunch/contact/radar | Short radio interference and high confirmation tick | 0.4–1.2 s | 2 | Medium | `radio-static`, `confirm` | Grouped by cooldown during dense waves |
 | Drone launch/engagement | Distant launch wash or propeller texture, fixed by context | 1.5–2.0 s | 1 per cue | Medium | `rocket-distant`, `drone` | Launch and interceptor-drone cues no longer alternate unrelated sources |

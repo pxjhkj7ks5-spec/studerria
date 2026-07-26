@@ -3,13 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { getUnitDefinition } from "../src/data/units";
-import { finalizeCampaignMission, createCampaignState } from "../src/game/campaignMeta";
+import { applyCampaignMissionOpening, finalizeCampaignMission, createCampaignState } from "../src/game/campaignMeta";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
 import { advanceSimulation, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
-import { campaignCycleCompleted, normalizePersistedGame, useGameStore } from "../src/store/useGameStore";
+import { applyAccountProgressState, campaignCycleCompleted, normalizePersistedGame, readAccountProgressState, useGameStore } from "../src/store/useGameStore";
 import { tacticalUnitStatus } from "../src/game/unitStatusDisplay";
 import type { GameState, LiveThreat } from "../src/types/game";
 
@@ -104,6 +104,12 @@ test("combat readiness requires a radar and a kinetic asset", () => {
   assert.equal(defenseReadinessForMode("sandbox", []).ready, true);
 });
 
+test("the mission-one S-300 can answer the mission-two ballistic finale", () => {
+  const s300 = getUnitDefinition("s300");
+  assert.ok((s300.engagementChanceByThreat.iskander || 0) > 0);
+  assert.ok((s300.engagementChanceByThreat.ballistic || 0) > 0);
+});
+
 test("combat modes auto-start only after readiness and the mission-one action checklist", () => {
   const automaticModes = ["campaign", "rapid-response", "ranked-challenge", "co-op-command", "training"] as const;
   assert.ok(automaticModes.every((mode) => gameModeRuntimePolicies[mode].start === "auto-checklist"));
@@ -117,15 +123,42 @@ test("combat modes auto-start only after readiness and the mission-one action ch
   useGameStore.getState().placeSelectedBattery({ lat: 50.2, lng: 30.3 });
   useGameStore.getState().refreshCampaignTutorial(startedAtMs + 10_000);
   assert.equal(useGameStore.getState().operationPhase, "planning");
-  useGameStore.getState().recordCampaignTutorialAction("open-intel", startedAtMs + 15_000);
-  useGameStore.getState().recordCampaignTutorialAction("open-units", startedAtMs + 20_000);
   useGameStore.getState().beginPlacement("mvg");
-  useGameStore.getState().placeSelectedBattery({ lat: 50.2, lng: 31.0 });
-  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 25_000);
+  useGameStore.getState().placeSelectedBattery({ lat: 50.2, lng: 29.8 });
+  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 15_000);
   assert.equal(useGameStore.getState().operationPhase, "planning");
-  useGameStore.getState().recordCampaignTutorialAction("open-planning", startedAtMs + 30_000);
+  useGameStore.getState().recordCampaignTutorialAction("open-planning", startedAtMs + 20_000);
   assert.equal(useGameStore.getState().operationPhase, "countdown");
   assert.equal(useGameStore.getState().countdownRemainingMs, 5_000);
+});
+
+test("version 21 campaign progress reconciles already placed tutorial assets", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  applyCampaignMissionOpening(game);
+  const radar = game.storedBatteries.find((battery) => battery.kind === "long-radar")!;
+  game = deployStoredBattery(game, radar.id, { lat: 50.2, lng: 30.3 });
+  const mvg = game.storedBatteries.find((battery) => battery.kind === "mvg")!;
+  game = deployStoredBattery(game, mvg.id, { lat: 50.2, lng: 29.8 });
+  game.campaign!.tutorialStep = 4;
+  game.campaign!.tutorialActionQueue = [];
+  game.campaign!.tutorialNextPromptAtMs = 0;
+
+  const migrated = normalizePersistedGame(game, 21)!;
+  assert.equal(migrated.campaign?.tutorialStep, 4);
+  assert.equal(migrated.campaign?.tutorialActionQueue.includes("place-mvg-east-of-kyiv"), false);
+});
+
+test("an inconsistent account snapshot cannot replace an active campaign with a non-campaign game", () => {
+  useGameStore.getState().launchTacticalMode("campaign");
+  const corruptSnapshot = {
+    ...readAccountProgressState(),
+    game: createScenarioState(() => .5, "training", "first-night"),
+    activeGameMode: "campaign" as const,
+  };
+  assert.equal(applyAccountProgressState(corruptSnapshot), false);
+  assert.equal(useGameStore.getState().game.campaign?.missionIndex, 1);
+  assert.equal(useGameStore.getState().activeGameMode, "campaign");
 });
 
 test("the deterministic cursor reproduces the same random sequence", () => {

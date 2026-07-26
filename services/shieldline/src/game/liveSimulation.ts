@@ -11,7 +11,7 @@ import { distanceKm, validateBatteryPlacement } from "./placementRules";
 import { chooseAttackPlan, createThreatDirectorContext, pickThreatKindForPlan } from "./threatDirector";
 import { threatCourseAtProgress, threatPositionAtProgress } from "./threatRouteVisuals";
 import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recoverReadiness } from "./unitReadiness";
-import { accelerateFirstMissionSchedule, addCampaignStoredBattery, applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
+import { accelerateCampaignSchedule, addCampaignStoredBattery, applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
 import { CAMPAIGN_REINFORCEMENT_ACTION, campaignKillRewards, getCampaignRoute, isFreeCampaignDeploymentAction } from "../data/campaignPlan";
 import { pickCampaignLaunchSector } from "./campaignLaunchZones";
 import { acquisitionScore, classificationGain, classificationTier, engagementProbability, evaluateDoctrine, ewEffectFor, fireControlScore, fusedTrackQuality, salvoSizeFor, supportLeakEffect, threatDisplayLabel, threatRule, unitRule } from "./airDefenseRules.mjs";
@@ -364,7 +364,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   }
   next.placementWarning = null;
   next.logistics = buildLogisticsState(next);
-  pushLog(next.log, next.elapsedMs, `${unit.shortName} повернуто зі складу`, next.campaign ? `${unit.name} передислоковано за ${redeployCost} млн ₴.` : `${unit.name} безкоштовно розміщено на новій позиції.`, "success", { soundCue: "placement.redeploy" });
+  pushLog(next.log, next.elapsedMs, `${unit.shortName} повернуто зі складу`, next.campaign ? `${unit.name} передислоковано за ${redeployCost} млн ₴.` : `${unit.name} безкоштовно розміщено на новій позиції.`, "success", { soundCue: freeCampaignDeployment ? "placement.success" : "placement.redeploy" });
   return next;
 }
 
@@ -700,7 +700,7 @@ function updateLaunchSectors(state: GameState) {
 function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => number) {
   if (state.cyclePhase !== "attack" || state.liveThreats.length >= MAX_LIVE_THREATS) return;
   if (state.campaign) {
-    accelerateFirstMissionSchedule(state);
+    accelerateCampaignSchedule(state);
     grantFirstMissionS300(state);
     prepareCampaignLaunch(state, random);
     while (state.liveThreats.length < MAX_LIVE_THREATS && spawnCampaignThreat(state, random)) { /* drain due targets */ }

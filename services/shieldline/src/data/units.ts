@@ -312,7 +312,7 @@ const unitDefinitionsBase: Array<Omit<UnitDefinition, "roleClass" | "doctrine" |
     primaryAccuracy: 78,
     outerAccuracy: 38,
     engagementMode: "kinetic",
-    engagementChanceByThreat: chances({ drone: 0, cruise: 76, ballistic: 0, decoy: 0 }),
+    engagementChanceByThreat: chances({ drone: 0, cruise: 76, ballistic: 62, iskander: 55, decoy: 0 }),
     mobility: 1,
     readiness: 76,
     description: "Далекобійний ракетний комплекс із широкою зоною прикриття.",

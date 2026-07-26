@@ -226,14 +226,18 @@ export function addCampaignStoredBattery(state: GameState, kind: UnitKind, posit
   return true;
 }
 
-export function accelerateFirstMissionSchedule(state: GameState, gapMs = 8_000) {
+export function accelerateCampaignSchedule(state: GameState, overrideGapMs?: number) {
   const campaign = state.campaign;
-  if (!campaign || campaign.missionIndex !== 1 || state.cyclePhase !== "attack" || state.liveThreats.length || state.pendingLaunches.length) return 0;
+  if (!campaign || state.cyclePhase !== "attack" || state.liveThreats.length || state.pendingLaunches.length) return 0;
   const nextEvent = campaign.spawnEvents[campaign.spawnCursor];
   if (!nextEvent) return 0;
   const phaseElapsedMs = state.elapsedMs - state.cycleStartedAtMs;
-  const reinforcementLeadMs = nextEvent.threatKind === "kh101" && nextEvent.routeId === "R32" ? 45_000 : gapMs;
-  const desiredDueMs = phaseElapsedMs + reinforcementLeadMs;
+  const gapByMissionMs = [0, 8_000, 12_000, 14_000, 16_000, 18_000];
+  const standardGapMs = overrideGapMs ?? gapByMissionMs[campaign.missionIndex] ?? 18_000;
+  const ballisticLeadMs = nextEvent.threatKind === "iskander" || nextEvent.threatKind === "ballistic" ? 25_000 : 0;
+  const cruiseLeadMs = ["kh101", "kalibr", "cruise"].includes(nextEvent.threatKind) ? 20_000 : 0;
+  const firstMissionReinforcementLeadMs = campaign.missionIndex === 1 && nextEvent.threatKind === "kh101" && nextEvent.routeId === "R32" ? 45_000 : 0;
+  const desiredDueMs = phaseElapsedMs + Math.max(standardGapMs, ballisticLeadMs, cruiseLeadMs, firstMissionReinforcementLeadMs);
   if (nextEvent.dueMs <= desiredDueMs) return 0;
   const shiftMs = nextEvent.dueMs - desiredDueMs;
   for (let index = campaign.spawnCursor; index < campaign.spawnEvents.length; index += 1) {

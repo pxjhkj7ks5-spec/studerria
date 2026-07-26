@@ -75,7 +75,7 @@ export const soundCueDefinitions: Record<SoundCue, SoundCueDefinition> = {
   "ui.cancel": ui([uiClick()], 120),
   "ui.error": ui([uiClick()], 350),
   "placement.select": ui([uiClick()], 100),
-  "placement.success": ui([uiClick()], 180),
+  "placement.success": ui([sfx("confirm", { gain: 0.34, playbackRate: 1.18 })], 180),
   "placement.failure": ui([uiClick()], 350),
   "placement.redeploy": ui([uiClick()], 180),
   "placement.service": ui([uiClick()], 180),
