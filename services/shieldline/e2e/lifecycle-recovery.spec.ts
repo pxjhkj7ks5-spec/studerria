@@ -24,7 +24,7 @@ test("a running operation recovers after backgrounding and a stale offline proje
     await page.mouse.click(mapBox.x + mapBox.width * x, mapBox.y + mapBox.height * y);
   };
   await placeUnit(/Radar 35D6/, .43, .58);
-  await placeUnit(/МВГ 6 млн/, .5, .62);
+  await placeUnit(/МВГ.*6 млн/, .5, .62);
 
   const persistedState = () => page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state);
   await expect.poll(async () => (await persistedState()).operationPhase, { timeout: 8_000 }).toBe("running");
@@ -86,5 +86,5 @@ test("a running operation recovers after backgrounding and a stale offline proje
       };
     };
     request.onerror = () => resolve(null);
-  }))).toBe(3);
+  }))).toBe(4);
 });

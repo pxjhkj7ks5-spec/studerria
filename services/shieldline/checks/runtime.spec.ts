@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { defenseReadinessForMode, gameModeRuntimePolicies } from "../src/data/gameModes";
 import { getUnitDefinition } from "../src/data/units";
-import { applyCampaignMissionOpening, finalizeCampaignMission, createCampaignState } from "../src/game/campaignMeta";
+import { applyCampaignMissionOpening, captureCampaignAttemptCheckpoint, createCampaignState, finalizeCampaignMission, restoreCampaignAttempt } from "../src/game/campaignMeta";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
 import { advanceSimulation, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
@@ -118,16 +118,22 @@ test("combat modes auto-start only after readiness and the mission-one action ch
   store.launchTacticalMode("campaign");
   const startedAtMs = Date.now();
   useGameStore.getState().recordCampaignTutorialAction("open-intel", startedAtMs);
-  useGameStore.getState().recordCampaignTutorialAction("open-units", startedAtMs + 5_000);
+  useGameStore.getState().recordCampaignTutorialAction("inspect-ammo-depot", startedAtMs + 5_000);
+  useGameStore.getState().recordCampaignTutorialAction("open-units", startedAtMs + 10_000);
   useGameStore.getState().beginPlacement("long-radar");
   useGameStore.getState().placeSelectedBattery({ lat: 50.2, lng: 30.3 });
-  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 10_000);
+  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 15_000);
   assert.equal(useGameStore.getState().operationPhase, "planning");
   useGameStore.getState().beginPlacement("mvg");
   useGameStore.getState().placeSelectedBattery({ lat: 50.2, lng: 29.8 });
-  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 15_000);
+  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 20_000);
   assert.equal(useGameStore.getState().operationPhase, "planning");
-  useGameStore.getState().recordCampaignTutorialAction("open-planning", startedAtMs + 20_000);
+  const depot = useGameStore.getState().game.campaign!.depot;
+  useGameStore.getState().beginPlacement("mvg");
+  useGameStore.getState().placeSelectedBattery({ lat: depot.position.lat + .03, lng: depot.position.lng });
+  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 25_000);
+  useGameStore.getState().refreshCampaignTutorial(startedAtMs + 30_000);
+  useGameStore.getState().recordCampaignTutorialAction("open-planning", startedAtMs + 35_000);
   assert.equal(useGameStore.getState().operationPhase, "countdown");
   assert.equal(useGameStore.getState().countdownRemainingMs, 5_000);
 });
@@ -145,7 +151,7 @@ test("version 21 campaign progress reconciles already placed tutorial assets", (
   game.campaign!.tutorialNextPromptAtMs = 0;
 
   const migrated = normalizePersistedGame(game, 21)!;
-  assert.equal(migrated.campaign?.tutorialStep, 4);
+  assert.equal(migrated.campaign?.tutorialStep, 5);
   assert.equal(migrated.campaign?.tutorialActionQueue.includes("place-mvg-east-of-kyiv"), false);
 });
 
@@ -187,6 +193,7 @@ test("persisted operations reconcile stale launch data with the current catalog"
   assert.deepEqual(normalized.launchSectors[0].threats, currentSectors[0].threats);
   assert.equal(normalized.launchSectors.some((sector) => sector.id === "legacy-sector"), false);
   assert.equal(normalized.liveThreats.length, 1);
+  assert.equal(normalized.liveThreats[0].speed, legacyThreat.speed);
   assert.ok(normalized.liveThreats[0].speedKph > 0);
   assert.ok(normalized.liveThreats[0].altitudeM > 0);
   assert.deepEqual(normalized.storedBatteries, []);
@@ -221,6 +228,7 @@ test("campaign batteries refill a full magazine after the reload timer and expos
   const battery = game.batteries[0];
   const unit = getUnitDefinition("mvg");
   battery.currentAmmo = 0;
+  battery.missionReserve = Number(unit.missionReserveCapacity);
   battery.status = "reloading";
   battery.reloadRemainingMs = 1_000;
   battery.readiness = 73;
@@ -242,13 +250,14 @@ test("campaign batteries refill a full magazine after the reload timer and expos
 test("real impacts reduce live city resilience once while decoys do no damage", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
+  game.cities = game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
   game.cyclePhase = "attack";
   game.cycleDurationMs = 999_999;
   const cityBefore = { ...game.cities.find((city) => city.id === "kyiv")! };
   game.liveThreats = [{ ...testThreat(), progress: .999, speed: .01, damage: 9 }];
   game = tickSimulation(game, 100, () => .5);
   const cityAfter = game.cities.find((city) => city.id === "kyiv")!;
-  assert.equal(game.campaign?.civilianResilience, 96);
+  assert.equal(game.campaign?.civilianResilience, 91);
   assert.ok(cityAfter.damage > cityBefore.damage);
   assert.ok(cityAfter.infrastructure < cityBefore.infrastructure);
   assert.ok(cityAfter.energy < cityBefore.energy);
@@ -258,6 +267,7 @@ test("real impacts reduce live city resilience once while decoys do no damage", 
 
   let decoyGame = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   decoyGame.campaign = createCampaignState();
+  decoyGame.cities = decoyGame.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
   decoyGame.cyclePhase = "attack";
   decoyGame.cycleDurationMs = 999_999;
   const decoyCityBefore = { ...decoyGame.cities.find((city) => city.id === "kyiv")! };
@@ -268,6 +278,66 @@ test("real impacts reduce live city resilience once while decoys do no damage", 
   assert.equal(decoyCityAfter.damage, decoyCityBefore.damage);
   assert.equal(decoyCityAfter.infrastructure, decoyCityBefore.infrastructure);
   assert.equal(decoyCityAfter.energy, decoyCityBefore.energy);
+});
+
+test("two ballistic impacts destroy a campaign city and retry restores the checkpoint", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState(2, 40, "city-defeat");
+  game.resources.budget = 40;
+  game.cities = game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
+  game.cyclePhase = "attack";
+  game.cycleDurationMs = 999_999;
+  captureCampaignAttemptCheckpoint(game, 23);
+  const ballistic = {
+    ...testThreat(),
+    kind: "iskander" as const,
+    targetCityId: "kyiv" as const,
+    damage: 50,
+    progress: .999,
+    speed: .01,
+  };
+  game.liveThreats = [{ ...ballistic, id: "ballistic-one" }];
+  game = tickSimulation(game, 100, () => .5);
+  assert.equal(game.cities.find((city) => city.id === "kyiv")?.infrastructure, 50);
+  assert.equal(game.status, "active");
+  game.liveThreats = [{ ...ballistic, id: "ballistic-two" }];
+  game = tickSimulation(game, 100, () => .5);
+  assert.equal(game.cities.find((city) => city.id === "kyiv")?.infrastructure, 0);
+  assert.equal(game.status, "lost");
+  assert.equal(game.campaign?.lastAttemptResult?.outcome, "defeat");
+  assert.equal(game.campaign?.lastAttemptResult?.failedCityId, "kyiv");
+  assert.equal(game.campaign?.previousMissionResults.length, 0);
+
+  const retry = restoreCampaignAttempt(game)!;
+  assert.equal(retry.simulationRandomCursor, 23);
+  assert.equal(retry.game.status, "active");
+  assert.equal(retry.game.cyclePhase, "planning");
+  assert.equal(retry.game.cities.find((city) => city.id === "kyiv")?.infrastructure, 100);
+  assert.equal(retry.game.campaign?.campaignWallet, 40);
+  assert.equal(retry.game.campaign?.lastAttemptResult, null);
+});
+
+test("depot impacts use their own damage path and never count as city impacts", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState(1, 24, "depot-impact");
+  game.cities = game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
+  game.cyclePhase = "attack";
+  game.cycleDurationMs = 999_999;
+  game.liveThreats = [{
+    ...testThreat(),
+    id: "depot-cruise",
+    kind: "kh101",
+    target: { ...game.campaign.depot.position },
+    targetAsset: "ammo-depot",
+    damage: 34,
+    progress: .999,
+    speed: .01,
+  }];
+  game = tickSimulation(game, 100, () => .5);
+  assert.equal(game.campaign.depot.health, 57.5);
+  assert.equal(game.impacts, 0);
+  assert.ok(game.cities.every((city) => city.infrastructure === 100));
+  assert.equal(game.status, "active");
 });
 
 test("a started live operation advances launch sectors and creates threats", () => {

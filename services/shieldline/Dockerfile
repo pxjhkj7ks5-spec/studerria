@@ -46,6 +46,7 @@ COPY --chown=shieldline:nodejs --from=builder /app/src/game/simulationCore.mjs .
 COPY --chown=shieldline:nodejs --from=builder /app/src/game/airDefenseRules.mjs ./src/game/airDefenseRules.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/src/game/launchSystem.mjs ./src/game/launchSystem.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/src/game/campaignPacing.mjs ./src/game/campaignPacing.mjs
+COPY --chown=shieldline:nodejs --from=builder /app/src/game/threatFlightModel.mjs ./src/game/threatFlightModel.mjs
 COPY --chown=shieldline:nodejs --from=builder /app/package.json ./package.json
 
 USER shieldline

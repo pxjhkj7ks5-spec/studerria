@@ -1,13 +1,55 @@
 import { CAMPAIGN_TUTORIAL_ASSET_ACTION, campaignKillRewards, campaignResupplyCosts, getCampaignMission, getCampaignRoute, missionTargetCount } from "../data/campaignPlan";
 import { getUnitDefinition } from "../data/units";
-import type { CampaignMissionResult, CampaignSpawnEvent, CampaignState, Coordinates, DefenseBattery, GameState, ThreatKind, UnitKind } from "../types/game";
+import type { CampaignAmmoDepot, CampaignMissionResult, CampaignSpawnEvent, CampaignState, CityId, Coordinates, DefenseBattery, GameState, ThreatKind, UnitKind } from "../types/game";
 import { clamp } from "./math";
 
 const KM_PER_DEGREE = 100;
+export const CAMPAIGN_DEPOT_REPAIR_COST = 12;
+export const CAMPAIGN_DEPOT_REPAIR_DURATION_MS = 120_000;
+export const CAMPAIGN_DEPOT_PRODUCTION_INTERVAL_MS = 60_000;
+
+export const campaignAmmoDepotPositions: readonly Coordinates[] = [
+  { lat: 49.73, lng: 23.52 },
+  { lat: 50.58, lng: 25.20 },
+  { lat: 50.45, lng: 26.55 },
+  { lat: 49.63, lng: 25.32 },
+  { lat: 49.12, lng: 26.42 },
+  { lat: 48.78, lng: 24.18 },
+  { lat: 48.46, lng: 22.78 },
+  { lat: 48.35, lng: 25.64 },
+];
+
+const ammoDepotTargetEventIds = new Set([
+  "m1-w1-t2", "m1-w2-t2",
+  "m2-w3-t2", "m2-w5-t2", "m2-w11-t2",
+  "m3-w2-t2", "m3-w4-t1", "m3-w10-t2", "m3-w14-t1",
+  "m4-w4-t2", "m4-w10-t1", "m4-w10-t3", "m4-w13-t1",
+  "m5-w6-t2", "m5-w6-t4", "m5-w9-t2", "m5-w13-t3", "m5-w13-t6", "m5-w13-t9", "m5-w14-t3", "m5-w18-t1",
+]);
 
 function copyPoint(point: Coordinates): Coordinates { return { lat: point.lat, lng: point.lng }; }
 function pointDistanceKm(a: Coordinates, b: Coordinates) { return Math.hypot(a.lat - b.lat, a.lng - b.lng) * KM_PER_DEGREE; }
 function interpolate(a: Coordinates, b: Coordinates, ratio: number): Coordinates { return { lat: a.lat + (b.lat - a.lat) * ratio, lng: a.lng + (b.lng - a.lng) * ratio }; }
+
+function stableIndex(seed: string, length: number) {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) hash = Math.imul(hash ^ seed.charCodeAt(index), 16777619);
+  return (hash >>> 0) % Math.max(1, length);
+}
+
+export function createCampaignAmmoDepot(seed = "campaign-default", stock = 0): CampaignAmmoDepot {
+  return {
+    id: "campaign-ammo-depot",
+    position: { ...campaignAmmoDepotPositions[stableIndex(seed, campaignAmmoDepotPositions.length)] },
+    health: 100,
+    stock: Math.max(0, stock),
+    productionProgressMs: 0,
+    repairRemainingMs: 0,
+    stockLossApplied: false,
+    producedTotal: 0,
+    lostTotal: 0,
+  };
+}
 
 export function buildCampaignSpawnEvents(missionIndex: number): CampaignSpawnEvent[] {
   const mission = getCampaignMission(missionIndex);
@@ -15,8 +57,9 @@ export function buildCampaignSpawnEvents(missionIndex: number): CampaignSpawnEve
     const routeId = wave.routeIds[targetIndex % wave.routeIds.length];
     const spread = wave.count <= 1 ? 0 : wave.spawnSpreadSec * targetIndex / (wave.count - 1);
     const merges = /merge/i.test(wave.mergeBehavior) && wave.routeIds.length > 1;
+    const id = `m${missionIndex}-w${waveIndex + 1}-t${targetIndex + 1}`;
     return {
-      id: `m${missionIndex}-w${waveIndex + 1}-t${targetIndex + 1}`,
+      id,
       dueMs: Math.round((wave.timeSeconds + spread) * 1_000),
       threatKind: wave.threatKind,
       routeId,
@@ -26,19 +69,22 @@ export function buildCampaignSpawnEvents(missionIndex: number): CampaignSpawnEve
       targetRegion: wave.targetRegion,
       mergeRouteId: merges ? wave.routeIds[0] : undefined,
       rallyRatio: merges ? (/inner/i.test(wave.mergeBehavior) ? .6 : /hard/i.test(wave.mergeBehavior) ? .5 : .4) : undefined,
+      targetAsset: ammoDepotTargetEventIds.has(id) ? "ammo-depot" as const : undefined,
     };
   })).sort((left, right) => left.dueMs - right.dueMs || left.id.localeCompare(right.id));
 }
 
-export function createCampaignState(missionIndex = 1, wallet = 0): CampaignState {
+export function createCampaignState(missionIndex = 1, wallet = 0, campaignSeed = "campaign-default"): CampaignState {
   const mission = getCampaignMission(missionIndex);
   return {
     missionIndex,
     campaignWallet: wallet,
-    campaignAmmoStock: 36,
+    depot: createCampaignAmmoDepot(campaignSeed),
     civilianResilience: 100,
     unlockedSystems: [...mission.unlocks],
     previousMissionResults: [],
+    lastAttemptResult: null,
+    retryCheckpoint: null,
     spawnEvents: buildCampaignSpawnEvents(missionIndex),
     spawnCursor: 0,
     missionKillReward: 0,
@@ -47,6 +93,8 @@ export function createCampaignState(missionIndex = 1, wallet = 0): CampaignState
     missionImpactsAtStart: 0,
     missionGrant: mission.grant,
     missionGrantApplied: false,
+    missionDepotProducedAtStart: 0,
+    missionDepotLostAtStart: 0,
     intermission: false,
     completed: false,
     tutorialStep: 0,
@@ -72,11 +120,12 @@ export function applyCampaignMissionOpening(state: GameState) {
   if (state.campaign.missionGrantApplied) return;
   state.campaign.missionGrant = mission.grant;
   state.campaign.campaignWallet = Math.max(0, state.campaign.campaignWallet + mission.grant);
-  state.campaign.campaignAmmoStock = clamp(state.campaign.campaignAmmoStock + 8 + mission.index * 4, 0, 9999);
   state.resources.budget = state.campaign.campaignWallet;
   state.campaign.missionGrantApplied = true;
   state.campaign.missionInterceptionsAtStart = state.interceptions;
   state.campaign.missionImpactsAtStart = state.impacts;
+  state.campaign.missionDepotProducedAtStart = state.campaign.depot.producedTotal;
+  state.campaign.missionDepotLostAtStart = state.campaign.depot.lostTotal;
   state.cycleDurationMs = mission.durationMinutes * 60_000;
 }
 
@@ -89,6 +138,76 @@ export function recordCampaignKill(state: GameState, kind: ThreatKind, reward: n
   state.campaign.campaignWallet = Math.max(0, state.campaign.campaignWallet + credited);
   state.resources.budget = state.campaign.campaignWallet;
   return credited;
+}
+
+export function campaignDepotProductionRate(depot: CampaignAmmoDepot) {
+  if (depot.repairRemainingMs > 0 || depot.health <= 0) return 0;
+  return depot.health <= 50 ? 1 : 2;
+}
+
+export function advanceCampaignDepot(state: GameState, deltaMs: number, combatActive: boolean) {
+  const campaign = state.campaign;
+  if (!campaign || campaign.intermission || campaign.completed || state.status !== "active") return state;
+  const depot = campaign.depot;
+  const safeDelta = Math.max(0, deltaMs);
+  if (depot.repairRemainingMs > 0) {
+    if (combatActive) {
+      depot.repairRemainingMs = Math.max(0, depot.repairRemainingMs - safeDelta);
+      if (depot.repairRemainingMs === 0) {
+        depot.health = 100;
+        depot.stockLossApplied = false;
+      }
+    }
+    return state;
+  }
+  const rate = campaignDepotProductionRate(depot);
+  if (rate <= 0) return state;
+  depot.productionProgressMs += safeDelta;
+  while (depot.productionProgressMs >= CAMPAIGN_DEPOT_PRODUCTION_INTERVAL_MS) {
+    depot.productionProgressMs -= CAMPAIGN_DEPOT_PRODUCTION_INTERVAL_MS;
+    depot.stock += rate;
+    depot.producedTotal += rate;
+  }
+  return state;
+}
+
+export function damageCampaignDepot(state: GameState, baseDamage: number) {
+  const campaign = state.campaign;
+  if (!campaign || baseDamage <= 0) return { damage: 0, stockLost: 0 };
+  const depot = campaign.depot;
+  const previousHealth = depot.health;
+  const damage = Math.max(0, baseDamage * 1.25);
+  depot.health = clamp(depot.health - damage, 0, 100);
+  let stockLost = 0;
+  if (previousHealth > 0 && depot.health <= 0 && !depot.stockLossApplied) {
+    const retained = Math.floor(depot.stock / 2);
+    stockLost = depot.stock - retained;
+    depot.stock = retained;
+    depot.lostTotal += stockLost;
+    depot.stockLossApplied = true;
+    depot.productionProgressMs = 0;
+  }
+  return { damage, stockLost };
+}
+
+export function serviceCampaignDepot(state: GameState) {
+  const campaign = state.campaign;
+  if (!campaign || campaign.intermission || campaign.completed || state.status !== "active") return state;
+  const depot = campaign.depot;
+  if (depot.health >= 100 || depot.repairRemainingMs > 0) {
+    state.placementWarning = depot.repairRemainingMs > 0 ? "Ремонт складу вже триває" : "Склад БК не потребує ремонту";
+    return state;
+  }
+  if (campaign.campaignWallet < CAMPAIGN_DEPOT_REPAIR_COST) {
+    state.placementWarning = "Недостатньо коштів для ремонту складу БК";
+    return state;
+  }
+  campaign.campaignWallet -= CAMPAIGN_DEPOT_REPAIR_COST;
+  state.resources.budget = campaign.campaignWallet;
+  depot.repairRemainingMs = CAMPAIGN_DEPOT_REPAIR_DURATION_MS;
+  depot.productionProgressMs = 0;
+  state.placementWarning = null;
+  return state;
 }
 
 function addLine(lines: CampaignMissionResult["rewardLines"], label: string, amount: number, kind: CampaignMissionResult["rewardLines"][number]["kind"]) {
@@ -140,6 +259,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
     battery.experienceLevel = Math.min(5, battery.experienceLevel + 1);
   }
   const result: CampaignMissionResult = {
+    outcome: "victory",
     missionIndex: campaign.missionIndex,
     missionId: mission.id,
     title: mission.title,
@@ -152,14 +272,104 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
     penaltyCosts,
     walletAfterMission: campaign.campaignWallet,
     civilianResilienceAfterMission: campaign.civilianResilience,
+    minimumCityHp: Math.min(...state.cities.map((city) => city.infrastructure)),
+    missionGrant: campaign.missionGrant,
+    depotHealth: campaign.depot.health,
+    depotStock: campaign.depot.stock,
+    depotProduced: campaign.depot.producedTotal - campaign.missionDepotProducedAtStart,
+    depotLost: campaign.depot.lostTotal - campaign.missionDepotLostAtStart,
     objectiveMet: objective.objectiveMet,
     objectiveSummary: objective.summary,
     rewardLines: lines,
   };
   campaign.previousMissionResults = [...campaign.previousMissionResults, result];
+  campaign.lastAttemptResult = null;
+  campaign.retryCheckpoint = null;
   campaign.intermission = true;
   campaign.completed = campaign.missionIndex >= 5;
   return result;
+}
+
+export function recordCampaignDefeat(state: GameState, failedCityId: CityId): CampaignMissionResult | null {
+  const campaign = state.campaign;
+  if (!campaign || campaign.lastAttemptResult?.outcome === "defeat") return campaign?.lastAttemptResult || null;
+  const mission = getCampaignMission(campaign.missionIndex);
+  const result: CampaignMissionResult = {
+    outcome: "defeat",
+    missionIndex: campaign.missionIndex,
+    missionId: mission.id,
+    title: mission.title,
+    durationSeconds: Math.max(0, Math.round((state.elapsedMs - state.cycleStartedAtMs) / 1_000)),
+    totalTargets: campaign.spawnEvents.length || missionTargetCount(mission),
+    interceptions: state.interceptions - campaign.missionInterceptionsAtStart,
+    impacts: state.impacts - campaign.missionImpactsAtStart,
+    killReward: campaign.missionKillReward,
+    bonusRewards: 0,
+    penaltyCosts: 0,
+    walletAfterMission: campaign.campaignWallet,
+    civilianResilienceAfterMission: campaign.civilianResilience,
+    minimumCityHp: Math.min(...state.cities.map((city) => city.infrastructure)),
+    failedCityId,
+    missionGrant: campaign.missionGrant,
+    depotHealth: campaign.depot.health,
+    depotStock: campaign.depot.stock,
+    depotProduced: campaign.depot.producedTotal - campaign.missionDepotProducedAtStart,
+    depotLost: campaign.depot.lostTotal - campaign.missionDepotLostAtStart,
+    objectiveMet: false,
+    objectiveSummary: `Місію програно: місто ${state.cities.find((city) => city.id === failedCityId)?.name || failedCityId} втратило всі міські служби.`,
+    rewardLines: [
+      { label: "Грант місії", amount: campaign.missionGrant, kind: "grant" },
+      ...(campaign.missionKillReward ? [{ label: "Зароблено у невдалій спробі", amount: campaign.missionKillReward, kind: "kill" as const }] : []),
+    ],
+  };
+  campaign.lastAttemptResult = result;
+  return result;
+}
+
+export function captureCampaignAttemptCheckpoint(state: GameState, simulationRandomCursor: number) {
+  if (!state.campaign) return state;
+  const cloned = structuredClone(state);
+  const campaign = cloned.campaign!;
+  const { retryCheckpoint: _checkpoint, lastAttemptResult: _lastAttempt, ...campaignSnapshot } = campaign;
+  const { campaign: _campaign, ...gameSnapshot } = cloned;
+  state.campaign.retryCheckpoint = {
+    game: gameSnapshot,
+    campaign: campaignSnapshot,
+    simulationRandomCursor,
+  };
+  state.campaign.lastAttemptResult = null;
+  return state;
+}
+
+export function restoreCampaignAttempt(state: GameState) {
+  const checkpoint = state.campaign?.retryCheckpoint;
+  if (!checkpoint) return null;
+  const restoredCheckpoint = structuredClone(checkpoint);
+  const game: GameState = {
+    ...restoredCheckpoint.game,
+    campaign: {
+      ...restoredCheckpoint.campaign,
+      retryCheckpoint: restoredCheckpoint,
+      lastAttemptResult: null,
+    },
+  };
+  const authoredTargets = new Map(
+    buildCampaignSpawnEvents(game.campaign!.missionIndex).map((event) => [event.id, event.targetAsset]),
+  );
+  game.campaign!.spawnEvents = game.campaign!.spawnEvents.map((event) => ({
+    ...event,
+    targetAsset: authoredTargets.get(event.id),
+  }));
+  game.status = "active";
+  game.statusReason = "";
+  game.cyclePhase = "planning";
+  game.currentAttackPlan = null;
+  game.campaignAttackSchedule = null;
+  game.liveThreats = [];
+  game.pendingLaunches = [];
+  game.engagementEvents = [];
+  game.impactMarkers = [];
+  return { game, simulationRandomCursor: checkpoint.simulationRandomCursor };
 }
 
 export function advanceCampaignMission(state: GameState): GameState {
@@ -174,6 +384,8 @@ export function advanceCampaignMission(state: GameState): GameState {
   campaign.missionKillsByKind = {};
   campaign.missionGrant = nextMission.grant;
   campaign.missionGrantApplied = false;
+  campaign.lastAttemptResult = null;
+  campaign.retryCheckpoint = null;
   campaign.intermission = false;
   campaign.tutorialStep = 0;
   campaign.tutorialActionQueue = [];
@@ -238,7 +450,8 @@ export function accelerateCampaignSchedule(state: GameState, overrideGapMs?: num
   const ballisticLeadMs = nextEvent.threatKind === "iskander" || nextEvent.threatKind === "ballistic" ? 25_000 : 0;
   const cruiseLeadMs = ["kh101", "kalibr", "cruise"].includes(nextEvent.threatKind) ? 20_000 : 0;
   const firstMissionReinforcementLeadMs = campaign.missionIndex === 1 && nextEvent.threatKind === "kh101" && nextEvent.routeId === "R32" ? 45_000 : 0;
-  const desiredDueMs = phaseElapsedMs + Math.max(standardGapMs, ballisticLeadMs, cruiseLeadMs, firstMissionReinforcementLeadMs);
+  const secondMissionReinforcementLeadMs = campaign.missionIndex === 2 && nextEvent.threatKind === "iskander" && nextEvent.routeId === "R27" ? 90_000 : 0;
+  const desiredDueMs = phaseElapsedMs + Math.max(standardGapMs, ballisticLeadMs, cruiseLeadMs, firstMissionReinforcementLeadMs, secondMissionReinforcementLeadMs);
   if (nextEvent.dueMs <= desiredDueMs) return 0;
   const shiftMs = nextEvent.dueMs - desiredDueMs;
   for (let index = campaign.spawnCursor; index < campaign.spawnEvents.length; index += 1) {
@@ -285,7 +498,7 @@ function routeFromLaunchOrigin(points: readonly Coordinates[], launchOrigin?: Co
   });
 }
 
-export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => number, launchOrigin?: Coordinates): Coordinates[] {
+export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => number, launchOrigin?: Coordinates, targetCoordinates?: Coordinates): Coordinates[] {
   const route = getCampaignRoute(event.routeId);
   if (!route) return [];
   const baseWaypoints = routeFromLaunchOrigin(route.baseWaypoints, launchOrigin);
@@ -293,7 +506,13 @@ export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => n
     const start = copyPoint(baseWaypoints[0]);
     const end = copyPoint(baseWaypoints.at(-1)!);
     if (!launchOrigin) { start.lat += (random() - .5) * .08; start.lng += (random() - .5) * .08; }
-    end.lat += (random() - .5) * .025; end.lng += (random() - .5) * .025;
+    if (event.targetAsset === "ammo-depot" && targetCoordinates) {
+      end.lat = targetCoordinates.lat;
+      end.lng = targetCoordinates.lng;
+    } else {
+      end.lat += (random() - .5) * .025;
+      end.lng += (random() - .5) * .025;
+    }
     return [start, end];
   }
   const cruise = event.threatKind === "kh101" || event.threatKind === "kalibr" || event.threatKind === "cruise";
@@ -320,7 +539,11 @@ export function generateCampaignRoute(event: CampaignSpawnEvent, random: () => n
       points = points.map((point, index) => index >= rallyIndex ? copyPoint(canonical[index]) : point);
     }
   }
-  return samplePolyline(chaikin(points), points.length);
+  const generated = samplePolyline(chaikin(points), points.length);
+  if (event.targetAsset === "ammo-depot" && targetCoordinates && generated.length) {
+    generated[generated.length - 1] = copyPoint(targetCoordinates);
+  }
+  return generated;
 }
 
 function orientation(a: Coordinates, b: Coordinates, c: Coordinates) { return Math.sign((b.lng - a.lng) * (c.lat - b.lat) - (b.lat - a.lat) * (c.lng - b.lng)); }
@@ -343,9 +566,9 @@ export function serviceCampaignBattery(state: GameState, batteryId: string, acti
   const unit = getUnitDefinition(battery.kind);
   const reserveCapacity = unit.missionReserveCapacity === "infinite" ? 0 : Number(unit.missionReserveCapacity);
   const reserveNow = battery.missionReserve === "infinite" ? reserveCapacity : Number(battery.missionReserve || 0);
-  const requestedAmmo = action === "resupply" ? Math.min(Math.ceil(reserveCapacity * portion), Math.max(0, reserveCapacity - reserveNow), state.campaign.campaignAmmoStock) : 0;
+  const requestedAmmo = action === "resupply" ? Math.min(Math.ceil(reserveCapacity * portion), Math.max(0, reserveCapacity - reserveNow), state.campaign.depot.stock) : 0;
   if (action === "resupply" && requestedAmmo <= 0) {
-    state.placementWarning = state.campaign.campaignAmmoStock <= 0 ? "Стратегічний запас відсутній" : "Запас місії вже заповнено";
+    state.placementWarning = state.campaign.depot.stock <= 0 ? "Склад БК порожній" : "Запас місії вже заповнено";
     return state;
   }
   const cost = action === "repair"
@@ -357,7 +580,7 @@ export function serviceCampaignBattery(state: GameState, batteryId: string, acti
   if (action === "repair") { battery.health = 100; battery.readiness = Math.max(battery.readiness, 90); }
   else {
     battery.missionReserve = reserveNow + requestedAmmo;
-    state.campaign.campaignAmmoStock -= requestedAmmo;
+    state.campaign.depot.stock -= requestedAmmo;
   }
   state.placementWarning = null;
   return state;

@@ -1,7 +1,7 @@
 import L from "leaflet";
 import { Circle, CircleMarker, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip, MapContainer, useMap, useMapEvents } from "react-leaflet";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { carrierSprites, launchSprites, launcherVariantSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
+import { carrierSprites, infrastructureSprites, launchSprites, launcherVariantSprites, threatSprites, unitSprites } from "../assets/sprites/spriteCatalog";
 import { getControlOverlay } from "../data/controlZones";
 import { darkMapTiles } from "../data/mapTiles";
 import { formatThreatAltitude, formatThreatSpeed } from "../data/threatFlightProfiles";
@@ -226,6 +226,11 @@ function targetLabelStatusText(status: TargetLabelStatus) {
   return "RADAR";
 }
 
+function threatEtaLabel(threat: LiveThreat, progress = threat.progress) {
+  const seconds = Math.max(0, Math.ceil((1 - progress) / Math.max(threat.speed * (threat.speedModifier || 1), 0.00000001) / 1000));
+  return `ETA ${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 function threatRouteColor(tone: ReturnType<typeof threatTone>) {
   if (tone === "confirmed") return "#ff625a";
   if (tone === "decoy") return "#b79af4";
@@ -301,6 +306,13 @@ function makeBatteryIcon(battery: DefenseBattery) {
   return icon;
 }
 
+const ammoDepotIcon = L.divIcon({
+  className: "",
+  html: imageMarkerHtml(infrastructureSprites["ammo-depot"], "map-marker--ammo-depot"),
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
+});
+
 function threatMarkerIconKey(threat: LiveThreat) {
   const tone = threatTone(threat);
   const labelStatus = targetLabelStatus(threat);
@@ -321,7 +333,7 @@ function makeThreatIcon(threat: LiveThreat) {
     : `<span class="target-contact target-contact--${threat.confidence < 35 ? "unknown" : "classified"}" aria-hidden="true">${threat.confidence < 35 ? "?" : "•"}</span>`;
   const icon = L.divIcon({
     className: "",
-    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg">${targetVisual}<span class="target-label target-label--${labelStatus}" aria-hidden="true"><span class="target-label__head"><b>${threat.displayLabel || "Невідомий контакт"}</b><i>${targetLabelStatusText(labelStatus)}</i></span><span class="target-label__metrics"><span>${formatThreatSpeed(threat.speedKph)}</span><span>${formatThreatAltitude(threat.altitudeM)}</span></span><span class="target-label__course">СУПРОВІД ${Math.round(threat.trackQuality)}%</span></span></span>`,
+    html: `<span class="threat-marker-wrap threat-marker-wrap--compact" style="--target-heading:${targetHeading}deg">${targetVisual}<span class="target-label target-label--${labelStatus}" aria-hidden="true"><span class="target-label__head"><b>${threat.displayLabel || "Невідомий контакт"}</b><i>${targetLabelStatusText(labelStatus)}</i></span><span class="target-label__metrics"><span>${formatThreatSpeed(threat.speedKph)}</span><span>${formatThreatAltitude(threat.altitudeM)}</span><span class="target-label__eta">${threatEtaLabel(threat)}</span></span><span class="target-label__course">СУПРОВІД ${Math.round(threat.trackQuality)}%</span></span></span>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
@@ -334,9 +346,11 @@ function updateThreatMarkerCourse(marker: L.Marker, threat: LiveThreat, progress
   const markerElement = marker.getElement();
   const wrapper = markerElement?.querySelector<HTMLElement>(".threat-marker-wrap");
   const course = markerElement?.querySelector<HTMLElement>(".target-label__course");
+  const eta = markerElement?.querySelector<HTMLElement>(".target-label__eta");
   wrapper?.style.setProperty("--target-heading", `${heading - 90}deg`);
   if (wrapper) wrapper.dataset.visualProgress = progress.toFixed(6);
   if (course) course.textContent = `КУРС ${String(Math.round(heading) % 360).padStart(3, "0")}°`;
+  if (eta) eta.textContent = threatEtaLabel(threat, progress);
 }
 
 type EngagementVisualPhase = "lock" | "travel" | "success" | "miss" | "detected";
@@ -1044,6 +1058,8 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
   const storedMapMode = useGameStore((state) => state.mapMode);
   const storedPlacementKind = useGameStore((state) => state.placementKind);
   const moveBatteryToStorage = useGameStore((state) => state.moveBatteryToStorage);
+  const serviceCampaignDepot = useGameStore((state) => state.serviceCampaignDepot);
+  const recordCampaignTutorialAction = useGameStore((state) => state.recordCampaignTutorialAction);
   const game = gameOverride || storedGame;
   const mapMode = mapModeOverride || storedMapMode;
   const placementKind = readOnly ? null : storedPlacementKind;
@@ -1068,6 +1084,9 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
     () => game.cities.filter((city) => pointInBounds(city.coordinates, renderBounds)),
     [game.cities, renderBounds],
   );
+  const visibleDepot = game.campaign && pointInBounds(game.campaign.depot.position, renderBounds)
+    ? game.campaign.depot
+    : null;
   const cityMarkers = useMemo(
     () => visibleCities.map((city) => ({
       city,
@@ -1127,6 +1146,7 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
   }, [renderBounds?.key]);
   const renderCounts = useMemo<RenderCounts>(() => {
     const activeObjects = game.cities.length
+      + (game.campaign ? 1 : 0)
       + game.carriers.length
       + game.batteries.length
       + liveThreats.length
@@ -1134,6 +1154,7 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
       + impactMarkers.length
       + (mapMode === "logistics" ? game.logistics.routes.length : 0);
     const renderedObjects = visibleCities.length
+      + (visibleDepot ? 1 : 0)
       + visibleLaunchSectors.length
       + visibleCarriers.length
       + visibleBatteries.length
@@ -1153,6 +1174,7 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
   }, [
     cachedChunkCount,
     game.cities.length,
+    game.campaign,
     game.carriers.length,
     game.batteries.length,
     liveThreats.length,
@@ -1164,6 +1186,7 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
     visibleBatteries.length,
     visibleCarriers.length,
     visibleCities.length,
+    visibleDepot,
     visibleCoverageBatteries.length,
     visibleImpactMarkers.length,
     visibleLaunchSectors.length,
@@ -1317,6 +1340,31 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
             </Tooltip>
           </Marker>
         ))}
+        {visibleDepot ? (
+          <Marker
+            position={[visibleDepot.position.lat, visibleDepot.position.lng]}
+            icon={ammoDepotIcon}
+            title="Склад БК"
+            alt="Склад БК"
+            eventHandlers={{ click: () => recordCampaignTutorialAction("inspect-ammo-depot") }}
+          >
+            <Tooltip direction="top" offset={[0, -18]}>
+              Склад БК · {Math.round(visibleDepot.health)}% · запас {Math.round(visibleDepot.stock)}
+            </Tooltip>
+            <Popup className="battery-action-popup ammo-depot-popup" closeButton>
+              <div className="battery-action-popup__content">
+                <span>Кампанійна логістика</span>
+                <strong>Склад БК</strong>
+                <small>Стан {Math.round(visibleDepot.health)}% · запас {Math.round(visibleDepot.stock)} БК</small>
+                <small>{visibleDepot.repairRemainingMs > 0 ? `Ремонт: ${Math.ceil(visibleDepot.repairRemainingMs / 1000)} с активного бою` : visibleDepot.health <= 0 ? "Виробництво зупинено" : `Виробництво +${visibleDepot.health <= 50 ? 1 : 2} БК/хв`}</small>
+                {visibleDepot.repairRemainingMs <= 0 && visibleDepot.health > 0
+                  ? <small>Наступна партія через {Math.ceil((60_000 - visibleDepot.productionProgressMs) / 1000)} с</small>
+                  : null}
+                {readOnly || visibleDepot.health >= 100 || visibleDepot.repairRemainingMs > 0 ? null : <button type="button" onClick={serviceCampaignDepot}>Повний ремонт · 12 млн ₴</button>}
+              </div>
+            </Popup>
+          </Marker>
+        ) : null}
         {visibleBatteries.map((battery) => (
           <Marker
             key={battery.id}

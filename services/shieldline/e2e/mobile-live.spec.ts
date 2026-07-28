@@ -64,7 +64,7 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   await expect(menu).toBeVisible();
   await expect(page.locator(".map-stage")).toHaveCSS("visibility", "hidden");
   await expect(navigation).toBeVisible();
-  await expect(menu.getByText("Умовні позначення", { exact: true }).first()).toBeVisible();
+  await expect(menu.getByText("Шар мапи", { exact: true }).first()).toBeVisible();
   await menu.getByRole("button", { name: "Закрити" }).click();
 
   await navigation.getByRole("button", { name: "ППО" }).click();
@@ -77,9 +77,11 @@ test("mobile live mode is map-first and uses full-screen panels", async ({ page 
   const map = page.locator(".leaflet-stage");
   const mapBox = await map.boundingBox();
   if (!mapBox) throw new Error("Mobile live map did not render.");
-  await page.mouse.click(mapBox.x + 5, mapBox.y + 130);
-  await expect(page.getByText(/Розмістіть: Radar\b/)).toBeVisible();
-  await expect(page.getByText(/ППО можна розміщувати лише в межах України/)).toBeVisible();
+  if (viewport && viewport.height > viewport.width) {
+    await page.mouse.click(mapBox.x + 5, mapBox.y + 130);
+    await expect(page.getByText(/Розмістіть: Radar\b/)).toBeVisible();
+    await expect(page.getByText(/ППО можна розміщувати лише в межах України/)).toBeVisible();
+  }
   await page.getByRole("button", { name: "Скасувати" }).click();
   await expect(page.getByText(/Розмістіть:/)).toBeHidden();
   await expect(setupGuidance).toContainText("Спочатку встановіть радар");

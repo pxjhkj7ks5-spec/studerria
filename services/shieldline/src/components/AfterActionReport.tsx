@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ClipboardList, LogOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, ClipboardList, LogOut, RotateCcw } from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { archetypeLabel } from "../game/threatDirector";
 import type { GameState } from "../types/game";
@@ -13,9 +13,10 @@ interface AfterActionReportProps {
   onInspectMap?: () => void;
   onExit?: () => void;
   onContinueCampaign?: () => void;
+  onRetryCampaign?: () => void;
 }
 
-export function AfterActionReport({ game, rankedResult, authoritativeRun, variant = "panel", onInspectMap, onExit, onContinueCampaign }: AfterActionReportProps) {
+export function AfterActionReport({ game, rankedResult, authoritativeRun, variant = "panel", onInspectMap, onExit, onContinueCampaign, onRetryCampaign }: AfterActionReportProps) {
   const report = game.afterActionReports[0];
   const reportRef = useRef<HTMLElement | null>(null);
   const outcomeTitle = authoritativeRun
@@ -28,7 +29,7 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
       : game.liveThreats.length > 6
         ? "Expand detection coverage."
       : "Maintain layered coverage.";
-  const campaignResult = game.campaign?.previousMissionResults.at(-1);
+  const campaignResult = game.campaign?.lastAttemptResult || game.campaign?.previousMissionResults.at(-1);
 
   useEffect(() => {
     if (variant !== "fullscreen") return undefined;
@@ -83,7 +84,7 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
             <span>Morale {signed(report.resourceChanges.morale)} · Political {signed(report.resourceChanges.political)}</span>
           </div>
           <p>{report.recommendation}</p>
-          {campaignResult ? <div className="aar-section aar-section--campaign"><strong>{campaignResult.objectiveMet ? "Завдання місії виконано" : "Завдання місії не виконано"}</strong><span>{campaignResult.objectiveSummary}</span><strong>Економіка місії · гаманець {campaignResult.walletAfterMission} млн ₴</strong>{campaignResult.rewardLines.map((line) => <span key={`${line.kind}-${line.label}`}>{line.label}: {line.amount > 0 ? "+" : ""}{line.amount} млн</span>)}<span>Стійкість цивільних: {campaignResult.civilianResilienceAfterMission}% · збито {campaignResult.interceptions}/{campaignResult.totalTargets} · влучань {campaignResult.impacts}</span></div> : null}
+          {campaignResult ? <div className="aar-section aar-section--campaign"><strong>{campaignResult.outcome === "defeat" ? "Місію програно" : campaignResult.objectiveMet ? "Завдання місії виконано" : "Завдання місії не виконано"}</strong><span>{campaignResult.objectiveSummary}</span><strong>Економіка місії · гаманець {campaignResult.walletAfterMission} млн ₴</strong>{campaignResult.rewardLines.map((line) => <span key={`${line.kind}-${line.label}`}>{line.label}: {line.amount > 0 ? "+" : ""}{line.amount} млн</span>)}<span>Мінімальний стан міста: {Math.round(campaignResult.minimumCityHp)}% · збито {campaignResult.interceptions}/{campaignResult.totalTargets} · влучань {campaignResult.impacts}</span><span>Склад БК: {Math.round(campaignResult.depotHealth)}% · запас {Math.round(campaignResult.depotStock)} · вироблено {campaignResult.depotProduced} · втрачено {campaignResult.depotLost}</span></div> : null}
           {rankedResult ? <div className="aar-section aar-section--ranked"><strong>Ranked result</strong><span>#{rankedResult.entry.rank} · {rankedResult.entry.score} score · {rankedResult.challenge.title}</span></div> : null}
         </>
       ) : (
@@ -120,9 +121,12 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
       {variant === "fullscreen" ? (
         <footer className="aar-actions">
           <button type="button" onClick={onInspectMap}><ArrowLeft size={17} /> Оглянути мапу</button>
+          {campaignResult?.outcome === "defeat" && onRetryCampaign ? <button type="button" onClick={onRetryCampaign}><RotateCcw size={17} /> Повторити місію</button> : null}
           {game.campaign?.intermission && !game.campaign.completed && onContinueCampaign ? <button type="button" onClick={onContinueCampaign}><ArrowRight size={17} /> До місії {game.campaign.missionIndex + 1}</button> : null}
           <button type="button" onClick={onExit}><LogOut size={17} /> До вибору режимів</button>
         </footer>
+      ) : campaignResult?.outcome === "defeat" && onRetryCampaign ? (
+        <footer className="aar-actions aar-actions--inline"><button type="button" onClick={onRetryCampaign}><RotateCcw size={17} /> Повторити місію</button></footer>
       ) : game.campaign?.intermission && !game.campaign.completed && onContinueCampaign ? (
         <footer className="aar-actions aar-actions--inline"><button type="button" onClick={onContinueCampaign}><ArrowRight size={17} /> До місії {game.campaign.missionIndex + 1}</button></footer>
       ) : null}

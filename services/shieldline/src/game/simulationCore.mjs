@@ -1,6 +1,7 @@
 import { createLaunchSectorState, launchSectorCategory, pickWeightedSector, randomPointInSector } from "./launchSystem.mjs";
 import { createGuidedOperationWaves, GUIDED_THREE_STAGE_PROFILE, sectorIdsForDirection } from "./campaignPacing.mjs";
 import { AIR_DEFENSE_RULES_VERSION, planEffectivenessForThreat, supportLeakEffect } from "./airDefenseRules.mjs";
+import { sampledThreatTelemetry } from "./threatFlightModel.mjs";
 
 export const SIM_VERSION = "3.0.0";
 // Geography changes must not silently rebalance established mission outcomes.
@@ -72,31 +73,6 @@ function originSectorForPoint(point) {
   if (point.lat > 52.5) return "north";
   if (point.lng < 28) return "west";
   return "east";
-}
-
-// Restored from the original live simulation. Campaign targets now travel at
-// the same real-time pace instead of resolving within a couple of seconds.
-const threatFlightDurationMs = {
-  drone: [120_000, 180_000],
-  ballistic: [20_000, 40_000],
-  cruise: [70_000, 110_000],
-  decoy: [120_000, 180_000],
-  combined: [70_000, 110_000],
-  saturation: [130_000, 190_000],
-  geran2: [120_000, 180_000],
-  gerbera: [120_000, 180_000],
-  parodiya: [120_000, 180_000],
-  kh101: [70_000, 110_000],
-  kalibr: [70_000, 110_000],
-  iskander: [20_000, 40_000],
-  recon: [110_000, 160_000],
-  "low-signature-cruise": [75_000, 115_000],
-  jammer: [90_000, 140_000],
-};
-
-function flightDurationFor(kind, random) {
-  const [minimum, maximum] = threatFlightDurationMs[kind] || threatFlightDurationMs.drone;
-  return Math.round(minimum + random() * (maximum - minimum));
 }
 
 const sectorPoints = {
@@ -215,7 +191,8 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
 
   for (const wave of operationWaves) {
     const launchedAt = Math.max(1_000, Number(wave.etaSeconds || 0) * 1_000);
-    const flightDurationMs = flightDurationFor(wave.threatKind, timingRandom);
+    const telemetry = sampledThreatTelemetry(wave.threatKind, timingRandom);
+    const flightDurationMs = telemetry.flightDurationMs;
     const detectedAt = launchedAt + Math.round(flightDurationMs * (0.2 + timingRandom() * 0.08));
     const interceptProgress = 0.62 + timingRandom() * 0.12;
     const interceptedAt = launchedAt + Math.round(flightDurationMs * interceptProgress);
@@ -245,6 +222,8 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
       launchSectorCategory: launchSectorCategory(launchSector),
       launchDirection: wave.launchDirection || originSectorForPoint(origin),
       flightDurationMs,
+      speedKph: telemetry.speedKph,
+      altitudeM: telemetry.altitudeM,
       archetype: wave.archetype || null,
       mergeBehavior: wave.mergeBehavior || "authored",
       routeSemantics: wave.routeSemantics || `sector-${wave.targetSector}`,

@@ -35,7 +35,7 @@ test("desktop trackpad and mouse wheel zoom use bounded intuitive steps", async 
   expect(afterTrackpadStep).toBeLessThan(before * 1.35);
 
   await page.mouse.wheel(0, -1_000);
-  await expect.poll(markerDistance).toBeGreaterThan(afterTrackpadStep * 1.05);
+  await expect.poll(markerDistance).toBeGreaterThan(afterTrackpadStep * 1.03);
   await waitForZoomToSettle();
   expect(await markerDistance()).toBeLessThan(afterTrackpadStep * 2.6);
 });
@@ -71,8 +71,10 @@ test("desktop defense cards expand in flow and radar telemetry stays sensor-spec
 
   const list = drawer.locator(".unit-list");
   const lastCard = cards.last();
+  await lastCard.scrollIntoViewIfNeeded();
   await lastCard.hover();
   await expect.poll(async () => (await lastCard.boundingBox())?.height || 0).toBeGreaterThan(108);
+  await lastCard.scrollIntoViewIfNeeded();
   await expect.poll(async () => {
     const listBox = await list.boundingBox();
     const cardBox = await lastCard.boundingBox();

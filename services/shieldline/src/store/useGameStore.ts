@@ -11,7 +11,7 @@ import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBat
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
-import { advanceCampaignMission as advanceCampaignMissionState, applyCampaignMissionOpening, createCampaignState, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../game/campaignMeta";
+import { advanceCampaignDepot, advanceCampaignMission as advanceCampaignMissionState, applyCampaignMissionOpening, captureCampaignAttemptCheckpoint, createCampaignAmmoDepot, createCampaignState, restoreCampaignAttempt, serviceCampaignBattery, serviceCampaignDepot, unlockedCampaignMissionIndex } from "../game/campaignMeta";
 import type { CampaignAttackSchedule, CampaignMode, CampaignTutorialAction, Coordinates, GameState, LaunchAreaState, LaunchDirection, MapMode, PlanningActionId, ThreatKind, UnitKind } from "../types/game";
 import type { GameModeId, OperationPhase, PersistentDailyCity, SimulationSpeed } from "../domain/contracts";
 
@@ -62,26 +62,34 @@ function normalizeCampaignSchedule(game: GameState): CampaignAttackSchedule | nu
 }
 
 function migratedTutorialStep(step: number, persistedVersion: number) {
-  if (persistedVersion > 21) return Math.max(0, Math.min(5, step));
-  if (step <= 2) return Math.max(0, step);
-  if (step >= 7) return 5;
-  if (step >= 6) return 4;
-  return 3;
+  if (persistedVersion >= 23) return Math.max(0, Math.min(8, step));
+  const version22Step = persistedVersion > 21
+    ? Math.max(0, Math.min(5, step))
+    : step <= 2 ? Math.max(0, step) : step >= 7 ? 5 : step >= 6 ? 4 : 3;
+  return [0, 1, 3, 4, 7, 8][version22Step] ?? 8;
 }
 
 function recordPlacedTutorialAssets(game: GameState, nowMs: number) {
   if (!game.campaign || game.campaign.missionIndex !== 1) return false;
   let advanced = false;
-  if (game.campaign.tutorialStep <= 2 && game.batteries.some((battery) => battery.kind === "long-radar")) {
+  if (game.campaign.tutorialStep <= 3 && game.batteries.some((battery) => battery.id === "campaign-m1-long-radar" || battery.kind === "long-radar")) {
     advanced = recordTutorialAction(game.campaign, "place-long-radar-near-kyiv", nowMs) || advanced;
   }
-  if (game.campaign.tutorialStep <= 3 && game.batteries.some((battery) => battery.kind === "mvg")) {
+  if (game.campaign.tutorialStep <= 4 && game.batteries.some((battery) => battery.id === "campaign-m1-mvg")) {
     advanced = recordTutorialAction(game.campaign, "place-mvg-east-of-kyiv", nowMs) || advanced;
+  }
+  const depot = game.campaign.depot;
+  const paidDepotMvg = game.batteries.find((battery) => battery.kind === "mvg"
+    && battery.id !== "campaign-m1-mvg"
+    && Math.hypot(battery.position.lat - depot.position.lat, battery.position.lng - depot.position.lng) * 100 <= getUnitDefinition("mvg").primaryRangeKm);
+  if (paidDepotMvg) {
+    advanced = recordTutorialAction(game.campaign, "purchase-depot-mvg", nowMs) || advanced;
+    advanced = recordTutorialAction(game.campaign, "place-mvg-near-depot", nowMs) || advanced;
   }
   return advanced;
 }
 
-export function normalizePersistedGame(game: GameState | null, persistedVersion = 22) {
+export function normalizePersistedGame(game: GameState | null, persistedVersion = 22, campaignSeed = "campaign-migrated") {
   if (!game) return game;
   const persistedSectorById = new Map((Array.isArray(game.launchSectors) ? game.launchSectors : []).map((sector) => [sector.id, sector]));
   const launchSectors = createLaunchSectorState().map((sector) => {
@@ -167,6 +175,27 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
       manualOverrideTargets: Array.isArray(battery.manualOverrideTargets) ? battery.manualOverrideTargets : [],
     };
   };
+  type LegacyCampaignState = NonNullable<GameState["campaign"]> & { campaignAmmoStock?: number };
+  const persistedCampaign = game.campaign as LegacyCampaignState | null;
+  const campaignWithoutLegacyAmmo: Omit<LegacyCampaignState, "campaignAmmoStock"> | null = persistedCampaign
+    ? (({ campaignAmmoStock: _legacyAmmoStock, ...campaign }) => campaign)(persistedCampaign)
+    : null;
+  const migratedDepot = createCampaignAmmoDepot(
+    campaignSeed,
+    Number.isFinite(persistedCampaign?.campaignAmmoStock) ? Number(persistedCampaign?.campaignAmmoStock) : 0,
+  );
+  const depot = persistedCampaign?.depot ? {
+    ...migratedDepot,
+    ...persistedCampaign.depot,
+    position: validCoordinates(persistedCampaign.depot.position) ? { ...persistedCampaign.depot.position } : migratedDepot.position,
+    health: Number.isFinite(persistedCampaign.depot.health) ? Math.max(0, Math.min(100, persistedCampaign.depot.health)) : 100,
+    stock: Number.isFinite(persistedCampaign.depot.stock) ? Math.max(0, persistedCampaign.depot.stock) : migratedDepot.stock,
+    productionProgressMs: Number.isFinite(persistedCampaign.depot.productionProgressMs) ? Math.max(0, persistedCampaign.depot.productionProgressMs) : 0,
+    repairRemainingMs: Number.isFinite(persistedCampaign.depot.repairRemainingMs) ? Math.max(0, persistedCampaign.depot.repairRemainingMs) : 0,
+    producedTotal: Number.isFinite(persistedCampaign.depot.producedTotal) ? Math.max(0, persistedCampaign.depot.producedTotal) : 0,
+    lostTotal: Number.isFinite(persistedCampaign.depot.lostTotal) ? Math.max(0, persistedCampaign.depot.lostTotal) : 0,
+    stockLossApplied: Boolean(persistedCampaign.depot.stockLossApplied),
+  } : migratedDepot;
   const normalizedGame: GameState = {
     ...game,
     campaignAttackSchedule: normalizeCampaignSchedule(game),
@@ -178,12 +207,16 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
     liveThreats,
     engagementEvents,
     softKills: Number.isFinite(game.softKills) ? game.softKills : 0,
-    campaign: game.campaign ? {
-      ...game.campaign,
-      campaignAmmoStock: Number.isFinite(game.campaign.campaignAmmoStock) ? game.campaign.campaignAmmoStock : 36,
-      tutorialStep: migratedTutorialStep(Number.isInteger(game.campaign.tutorialStep) ? game.campaign.tutorialStep : 0, persistedVersion),
-      tutorialActionQueue: Array.isArray(game.campaign.tutorialActionQueue) ? game.campaign.tutorialActionQueue : [],
-      tutorialNextPromptAtMs: Number.isFinite(game.campaign.tutorialNextPromptAtMs) ? game.campaign.tutorialNextPromptAtMs : 0,
+    campaign: persistedCampaign ? {
+      ...campaignWithoutLegacyAmmo!,
+      depot,
+      lastAttemptResult: persistedCampaign.lastAttemptResult || null,
+      retryCheckpoint: persistedCampaign.retryCheckpoint || null,
+      missionDepotProducedAtStart: Number.isFinite(persistedCampaign.missionDepotProducedAtStart) ? persistedCampaign.missionDepotProducedAtStart : depot.producedTotal,
+      missionDepotLostAtStart: Number.isFinite(persistedCampaign.missionDepotLostAtStart) ? persistedCampaign.missionDepotLostAtStart : depot.lostTotal,
+      tutorialStep: migratedTutorialStep(Number.isInteger(persistedCampaign.tutorialStep) ? persistedCampaign.tutorialStep : 0, persistedVersion),
+      tutorialActionQueue: Array.isArray(persistedCampaign.tutorialActionQueue) ? persistedCampaign.tutorialActionQueue : [],
+      tutorialNextPromptAtMs: Number.isFinite(persistedCampaign.tutorialNextPromptAtMs) ? persistedCampaign.tutorialNextPromptAtMs : 0,
     } : null,
   };
   applyCampaignMissionOpening(normalizedGame);
@@ -235,8 +268,10 @@ export interface GameStore {
   triggerNextWave: () => void;
   advanceOperation: (deltaMs: number) => void;
   resetCampaign: () => void;
+  retryCampaignMission: () => void;
   advanceCampaignMission: () => void;
   serviceCampaignBattery: (batteryId: string, action: "repair" | "resupply", portion?: .5 | 1) => void;
+  serviceCampaignDepot: () => void;
 }
 
 const initialSeed = createSimulationSeed("legacy");
@@ -280,7 +315,8 @@ export const useGameStore = create<GameStore>()(
         }[mode];
         const seeded = createSeededScenario(seed, profile.campaignMode, profile.scenarioId);
         if (mode === "campaign") {
-          seeded.game.campaign = createCampaignState();
+          seeded.game.campaign = createCampaignState(1, 0, seed);
+          seeded.game.cities = seeded.game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
           seeded.game.resources.budget = 0;
           applyCampaignMissionOpening(seeded.game);
         }
@@ -408,8 +444,20 @@ export const useGameStore = create<GameStore>()(
           ? deployStoredBattery(game, placementStoredBatteryId, position)
           : placeBattery(game, placementKind, position, () => random.next());
         const placedBattery = nextGame.batteries.find((battery) => !game.batteries.some((current) => current.id === battery.id));
-        const tutorialAction = placedBattery ? campaignTutorialPlacementAction(placedBattery.kind) : null;
-        if (tutorialAction) recordTutorialAction(nextGame.campaign, tutorialAction, Date.now());
+        if (placedBattery) {
+          const tutorialAction = campaignTutorialPlacementAction(placedBattery.kind);
+          if (tutorialAction && (placedBattery.kind !== "mvg" || placementStoredBatteryId === "campaign-m1-mvg")) {
+            recordTutorialAction(nextGame.campaign, tutorialAction, Date.now());
+          }
+          if (placedBattery.kind === "mvg" && !placementStoredBatteryId && nextGame.campaign?.missionIndex === 1) {
+            recordTutorialAction(nextGame.campaign, "purchase-depot-mvg", Date.now());
+            const depot = nextGame.campaign.depot;
+            const distanceKm = Math.hypot(position.lat - depot.position.lat, position.lng - depot.position.lng) * 100;
+            if (distanceKm <= getUnitDefinition("mvg").primaryRangeKm) {
+              recordTutorialAction(nextGame.campaign, "place-mvg-near-depot", Date.now());
+            }
+          }
+        }
         const mode = activeGameMode || "training";
         const policy = getGameModeRuntimePolicy(mode);
         const readiness = defenseReadinessForMode(mode, nextGame.batteries.map((battery) => battery.kind));
@@ -440,7 +488,9 @@ export const useGameStore = create<GameStore>()(
         if (!readiness.ready) return { ...state, game: { ...state.game, placementWarning: readiness.message } };
         if (policy.countdownMs > 0) return { ...state, game: { ...state.game, placementWarning: null }, operationPhase: "countdown", countdownRemainingMs: policy.countdownMs };
         const random = createDeterministicRandom(state.simulationSeed, state.simulationRandomCursor);
-        return { ...state, game: startAttackNow({ ...state.game, placementWarning: null }, () => random.next()), operationPhase: "running", countdownRemainingMs: 0, simulationRandomCursor: random.cursor() };
+        const checkpointed = structuredClone({ ...state.game, placementWarning: null });
+        if (mode === "campaign") captureCampaignAttemptCheckpoint(checkpointed, state.simulationRandomCursor);
+        return { ...state, game: startAttackNow(checkpointed, () => random.next()), operationPhase: "running", countdownRemainingMs: 0, simulationRandomCursor: random.cursor() };
       }),
       pauseOperation: () => set((state) => state.operationPhase === "running" ? { operationPhase: "paused" } : state),
       resumeOperation: () => set((state) => state.operationPhase === "paused" ? { operationPhase: "running" } : state),
@@ -456,17 +506,21 @@ export const useGameStore = create<GameStore>()(
             const policy = getGameModeRuntimePolicy(mode);
             if (policy.execution !== "live") return state;
             const random = createDeterministicRandom(state.simulationSeed, state.simulationRandomCursor);
+            const depotClockActive = mode === "campaign" && state.operationPhase !== "completed";
+            const depotGame = depotClockActive ? structuredClone(state.game) : state.game;
+            if (depotClockActive) advanceCampaignDepot(depotGame, deltaMs, state.operationPhase === "running");
             if (state.operationPhase === "countdown") {
               const remaining = state.countdownRemainingMs - deltaMs;
-              if (remaining > 0) return { countdownRemainingMs: remaining };
-              let game = startAttackNow(state.game, () => random.next());
+              if (remaining > 0) return { game: depotGame, countdownRemainingMs: remaining };
+              if (mode === "campaign") captureCampaignAttemptCheckpoint(depotGame, state.simulationRandomCursor);
+              let game = startAttackNow(depotGame, () => random.next());
               const overflowMs = Math.max(0, -remaining) * state.simulationSpeed;
               if (overflowMs > 0) game = advanceSimulation(game, overflowMs, () => random.next());
               const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
               return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", countdownRemainingMs: 0, simulationRandomCursor: random.cursor() };
             }
-            if (state.operationPhase !== "running") return state;
-            const game = advanceSimulation(state.game, deltaMs * state.simulationSpeed, () => random.next());
+            if (state.operationPhase !== "running") return depotClockActive ? { game: depotGame } : state;
+            const game = advanceSimulation(depotGame, deltaMs * state.simulationSpeed, () => random.next());
             const campaignCompleted = mode === "campaign" && campaignCycleCompleted(state.game, game);
             return { game, operationPhase: campaignCompleted || game.status !== "active" ? "completed" : "running", simulationRandomCursor: random.cursor() };
           });
@@ -480,12 +534,27 @@ export const useGameStore = create<GameStore>()(
         const seed = createSimulationSeed(mode);
         const seeded = createSeededScenario(seed, get().campaignMode || "crisis", get().game.scenarioId);
         if (mode === "campaign") {
-          seeded.game.campaign = createCampaignState();
+          seeded.game.campaign = createCampaignState(1, 0, seed);
+          seeded.game.cities = seeded.game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
           seeded.game.resources.budget = 0;
           applyCampaignMissionOpening(seeded.game);
         }
         set({ game: seeded.game, dailyCityGame: mode === "daily-defense" ? seeded.game : get().dailyCityGame, placementKind: null, placementStoredBatteryId: null, operationPhase: "planning", countdownRemainingMs: 0, simulationSpeed: getGameModeRuntimePolicy(mode).defaultSpeed, simulationSeed: seed, simulationRandomCursor: seeded.cursor });
       },
+      retryCampaignMission: () => set((state) => {
+        if (state.activeGameMode !== "campaign") return state;
+        const restored = restoreCampaignAttempt(state.game);
+        if (!restored) return state;
+        return {
+          ...state,
+          game: restored.game,
+          operationPhase: "planning",
+          countdownRemainingMs: 0,
+          placementKind: null,
+          placementStoredBatteryId: null,
+          simulationRandomCursor: restored.simulationRandomCursor,
+        };
+      }),
       advanceCampaignMission: () => set((state) => {
         if (state.activeGameMode !== "campaign") return state;
         const game = advanceCampaignMissionState(structuredClone(state.game));
@@ -493,18 +562,19 @@ export const useGameStore = create<GameStore>()(
         return { ...state, game, operationPhase: readiness.ready ? "countdown" : "planning", countdownRemainingMs: readiness.ready ? getGameModeRuntimePolicy("campaign").countdownMs : 0, placementKind: null, placementStoredBatteryId: null };
       }),
       serviceCampaignBattery: (batteryId, action, portion = .5) => set((state) => ({ ...state, game: serviceCampaignBattery(structuredClone(state.game), batteryId, action, portion) })),
+      serviceCampaignDepot: () => set((state) => ({ ...state, game: serviceCampaignDepot(structuredClone(state.game)) })),
     }),
     {
       name: "shieldline-live-v7",
-      version: 22,
+      version: 23,
       migrate: (persistedState, persistedVersion) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
-        const migratedGame = normalizePersistedGame(state.game || null, persistedVersion);
+        const migratedGame = normalizePersistedGame(state.game || null, persistedVersion, state.simulationSeed || "campaign-migrated");
         return {
           ...state,
           ...(migratedGame ? { game: migratedGame } : {}),
           activeGameMode: state.activeGameMode === "campaign" && !migratedGame?.campaign ? null : state.activeGameMode,
-          dailyCityGame: normalizePersistedGame(state.dailyCityGame || null, persistedVersion),
+          dailyCityGame: normalizePersistedGame(state.dailyCityGame || null, persistedVersion, state.simulationSeed || "daily-migrated"),
           simulationSpeed: 1,
         } as GameStore;
       },

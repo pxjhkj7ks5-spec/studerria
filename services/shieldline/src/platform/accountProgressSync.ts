@@ -54,6 +54,13 @@ export function canApplyRemoteProgress(state: Pick<AccountProgressState, "operat
   return state.operationPhase !== "countdown" && state.operationPhase !== "running" && state.operationPhase !== "paused";
 }
 
+export function shouldProtectLocalCampaign(
+  local: { activeGameMode: AccountProgressState["activeGameMode"]; game: { campaign: unknown | null } },
+  remote: { game: { campaign: unknown | null } },
+) {
+  return local.activeGameMode === "campaign" && Boolean(local.game.campaign) && !remote.game.campaign;
+}
+
 function applyRemote(snapshot: ProgressSnapshot) {
   applyingRemote = true;
   try {
@@ -97,7 +104,7 @@ async function refreshLatest() {
     const remote = await readRemote();
     if (remote && (revision === null || remote.revision > revision)) {
       const localState = readAccountProgressState();
-      if (canApplyRemoteProgress(localState)) applyRemote(remote);
+      if (canApplyRemoteProgress(localState) && !shouldProtectLocalCampaign(localState, remote.state)) applyRemote(remote);
       else {
         const resolution = resolveProgressWriteConflict(localState, remote);
         revision = resolution.baseRevision;
@@ -136,7 +143,16 @@ export function initializeAccountProgressSync(nextActorId: string) {
     try {
       const remote = await readRemote();
       if (actorId !== nextActorId) return;
-      if (remote) applyRemote(remote);
+      if (remote) {
+        const localState = readAccountProgressState();
+        if (shouldProtectLocalCampaign(localState, remote.state)) {
+          revision = remote.revision;
+          lastFingerprint = fingerprint(remote.state);
+          dirty = true;
+        } else {
+          applyRemote(remote);
+        }
+      }
       else {
         const state = readAccountProgressState();
         const result = await writeRemote(0, state);

@@ -341,6 +341,7 @@ export interface LiveThreat {
   routeWaypoints?: Coordinates[];
   campaignPriority?: "low" | "medium" | "high" | "veryHigh" | "critical";
   campaignGroupId?: string;
+  targetAsset?: "ammo-depot";
 }
 
 export interface CampaignSpawnEvent {
@@ -354,6 +355,7 @@ export interface CampaignSpawnEvent {
   targetRegion: string;
   mergeRouteId?: string;
   rallyRatio?: number;
+  targetAsset?: "ammo-depot";
 }
 
 export interface CampaignRewardLine {
@@ -363,6 +365,7 @@ export interface CampaignRewardLine {
 }
 
 export interface CampaignMissionResult {
+  outcome: "victory" | "defeat";
   missionIndex: number;
   missionId: string;
   title: string;
@@ -375,18 +378,45 @@ export interface CampaignMissionResult {
   penaltyCosts: number;
   walletAfterMission: number;
   civilianResilienceAfterMission: number;
+  minimumCityHp: number;
+  failedCityId?: CityId;
+  missionGrant: number;
+  depotHealth: number;
+  depotStock: number;
+  depotProduced: number;
+  depotLost: number;
   objectiveMet: boolean;
   objectiveSummary: string;
   rewardLines: CampaignRewardLine[];
 }
 
+export interface CampaignAmmoDepot {
+  id: "campaign-ammo-depot";
+  position: Coordinates;
+  health: number;
+  stock: number;
+  productionProgressMs: number;
+  repairRemainingMs: number;
+  stockLossApplied: boolean;
+  producedTotal: number;
+  lostTotal: number;
+}
+
+export interface CampaignAttemptCheckpoint {
+  game: Omit<GameState, "campaign">;
+  campaign: Omit<CampaignState, "retryCheckpoint" | "lastAttemptResult">;
+  simulationRandomCursor: number;
+}
+
 export interface CampaignState {
   missionIndex: number;
   campaignWallet: number;
-  campaignAmmoStock: number;
+  depot: CampaignAmmoDepot;
   civilianResilience: number;
   unlockedSystems: UnitKind[];
   previousMissionResults: CampaignMissionResult[];
+  lastAttemptResult: CampaignMissionResult | null;
+  retryCheckpoint: CampaignAttemptCheckpoint | null;
   spawnEvents: CampaignSpawnEvent[];
   spawnCursor: number;
   missionKillReward: number;
@@ -395,6 +425,8 @@ export interface CampaignState {
   missionImpactsAtStart: number;
   missionGrant: number;
   missionGrantApplied: boolean;
+  missionDepotProducedAtStart: number;
+  missionDepotLostAtStart: number;
   intermission: boolean;
   completed: boolean;
   tutorialStep: number;
@@ -404,9 +436,12 @@ export interface CampaignState {
 
 export type CampaignTutorialAction =
   | "open-intel"
+  | "inspect-ammo-depot"
   | "open-units"
   | "place-long-radar-near-kyiv"
   | "place-mvg-east-of-kyiv"
+  | "purchase-depot-mvg"
+  | "place-mvg-near-depot"
   | "open-planning";
 
 export type EngagementResult = "success" | "soft-kill" | "miss" | "detected";

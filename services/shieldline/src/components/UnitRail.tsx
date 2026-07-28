@@ -100,8 +100,8 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
         {unitDefinitions
           .filter((unit) => scenario.allowedUnits.includes(unit.kind) || storedBatteries.some((battery) => battery.kind === unit.kind))
           .map((unit) => {
-          const allowed = scenario.allowedUnits.includes(unit.kind) && (!game.campaign || game.campaign.unlockedSystems.includes(unit.kind));
           const storedUnits = storedBatteries.filter((item) => item.kind === unit.kind);
+          const allowed = storedUnits.length > 0 || (scenario.allowedUnits.includes(unit.kind) && (!game.campaign || game.campaign.unlockedSystems.includes(unit.kind)));
           const storedBattery = storedUnits[0];
           const storedDeploymentCost = game.campaign && storedBattery && !isFreeCampaignDeploymentAction(storedBattery.lastAction) ? 1 : 0;
           const affordable = storedUnits.length > 0

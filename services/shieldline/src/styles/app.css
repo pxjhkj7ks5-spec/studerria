@@ -776,6 +776,23 @@ button {
   height: 22px !important;
 }
 
+.map-marker--ammo-depot {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(242, 200, 101, 0.08);
+  box-shadow: 0 0 0 1px rgba(242, 200, 101, 0.34), 0 0 22px rgba(242, 200, 101, 0.22);
+}
+
+.map-marker--ammo-depot img {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.ammo-depot-popup .battery-action-popup__content strong {
+  color: #f2c865;
+}
+
 .map-marker--threat {
   width: 10px;
   height: 10px;
@@ -4644,7 +4661,7 @@ body,
 .performance-toggle > span > span { display: grid; gap: 2px; }
 .performance-toggle strong { color: #dcdad1; font-size: 11px; }
 .performance-toggle small { color: #747a7b; font-size: 9px; }
-.performance-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.performance-toggle input { position: absolute; right: 0; width: 42px; height: 24px; margin: 0; opacity: 0; z-index: 2; cursor: pointer; }
 .performance-toggle > i { position: relative; width: 42px; height: 24px; border-radius: 999px; background: rgba(255,255,255,.1); transition: background .18s; }
 .performance-toggle > i::after { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #8b9293; content: ""; transition: transform .18s, background .18s; }
 .performance-toggle input:checked + i { background: rgba(246,197,71,.2); }

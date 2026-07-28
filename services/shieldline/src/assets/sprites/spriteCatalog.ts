@@ -35,6 +35,7 @@ import ballisticHeavyTelLaunch from "./launch/ballistic-heavy-tel.png";
 import cruiseGroundLaunch from "./launch/cruise-ground.png";
 import cruiseNavalLaunch from "./launch/cruise-naval.png";
 import cruiseAirLaunch from "./launch/cruise-air.png";
+import ammoDepotInfrastructure from "./infrastructure/ammo-depot.png";
 import type { CarrierKind, ThreatKind, UnitKind } from "../../types/game";
 
 export const threatSprites: Record<ThreatKind, string> = {
@@ -82,6 +83,10 @@ export const launchSprites = {
   ballistic: ballisticLaunch,
   cruise: cruiseLaunch,
 };
+
+export const infrastructureSprites = {
+  "ammo-depot": ammoDepotInfrastructure,
+} as const;
 
 export const launcherVariantSprites = {
   "drone-mobile": droneMobileLaunch,

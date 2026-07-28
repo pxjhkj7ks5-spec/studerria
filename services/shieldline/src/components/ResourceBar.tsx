@@ -4,7 +4,6 @@ import type { GameState } from "../types/game";
 import type { OperationPhase } from "../domain/contracts";
 import { getCampaignMission } from "../data/campaignPlan";
 import type { ReactNode } from "react";
-import { getUnitDefinition } from "../data/units";
 
 interface ResourceBarProps {
   game: GameState;
@@ -19,11 +18,16 @@ export function ResourceBar({ game, operationPhase, mobile = false }: ResourceBa
   const campaignTime: ReactNode = campaignMission
     ? <span className="resource-time"><b>{elapsedTime}</b><i>{campaignMission.durationMinutes}:00</i></span>
     : formatClock(game.elapsedMs);
-  const finiteBatteries = game.batteries.filter((battery) => typeof battery.currentAmmo === "number" && getUnitDefinition(battery.kind).ammoCapacity !== 0).map((battery) => ({ battery, unit: getUnitDefinition(battery.kind) }));
-  const campaignAmmoPercent = finiteBatteries.length ? Math.round(finiteBatteries.reduce((sum, entry) => sum + Number(entry.battery.currentAmmo) + Number(entry.battery.missionReserve || 0), 0) / Math.max(1, finiteBatteries.reduce((sum, entry) => sum + Number(entry.unit.ammoCapacity) + Number(entry.unit.missionReserveCapacity), 0)) * 100) : 0;
+  const depot = game.campaign?.depot;
+  const depotRate = depot ? depot.repairRemainingMs > 0 || depot.health <= 0 ? 0 : depot.health <= 50 ? 1 : 2 : 0;
+  const depotDelta = depot?.repairRemainingMs
+    ? `HP ${Math.round(depot.health)}% · ремонт ${Math.ceil(depot.repairRemainingMs / 1000)} с`
+    : depotRate > 0
+      ? `HP ${Math.round(depot!.health)}% · +${depotRate}/хв · ${Math.ceil((60_000 - depot!.productionProgressMs) / 1000)} с`
+      : `HP ${Math.round(depot?.health || 0)}% · виробництво зупинено`;
   const items = [
     { label: "Бюджет", value: Math.round(game.resources.budget), icon: Coins, delta: "постачання" },
-    { label: game.campaign ? "БК мережі" : "БК", value: game.campaign ? `${campaignAmmoPercent}%` : Math.round(game.resources.ammo), icon: Landmark, delta: game.campaign ? `стратегічний запас ${Math.round(game.campaign.campaignAmmoStock)}` : "запас" },
+    { label: game.campaign ? "Склад БК" : "БК", value: game.campaign ? Math.round(depot?.stock || 0) : Math.round(game.resources.ammo), icon: Landmark, delta: game.campaign ? depotDelta : "запас" },
     { label: game.campaign ? "Стійкість" : "Мораль", value: `${Math.round(game.campaign?.civilianResilience ?? game.resources.morale)}%`, icon: Users, delta: "цивільні" },
     { label: game.campaign ? `Місія ${game.campaign.missionIndex}/5` : "Час", value: campaignTime, icon: CalendarDays, delta: operationPhase === "paused" ? "пауза" : "реальний час", className: "resource-card--mission-time" },
   ];

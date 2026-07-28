@@ -12,6 +12,7 @@ test("production image includes every authoritative simulation runtime module", 
   assert.match(dockerfile, /src\/game\/launchSystem\.mjs/);
   assert.match(dockerfile, /src\/game\/campaignPacing\.mjs/);
   assert.match(dockerfile, /src\/game\/airDefenseRules\.mjs/);
+  assert.match(dockerfile, /src\/game\/threatFlightModel\.mjs/);
   assert.match(dockerfile, /serverTelegramAuth\.mjs/);
 });
 
@@ -45,7 +46,7 @@ test("authoritative mission output is stable for a golden seed", () => {
   assert.ok(left.events.some((event) => event.type === "battery.fired"));
   assert.equal(left.simVersion, "3.0.0");
   assert.equal(left.snapshots.length, 2);
-  const windows = { geran2: [120_000, 180_000], gerbera: [120_000, 180_000], parodiya: [120_000, 180_000], kh101: [70_000, 110_000], kalibr: [70_000, 110_000], iskander: [20_000, 40_000] };
+  const windows = { geran2: [120_000, 180_000], gerbera: [120_000, 180_000], parodiya: [120_000, 180_000], kh101: [120_000, 145_000], kalibr: [120_000, 145_000], iskander: [35_000, 50_000] };
   for (const launched of left.events.filter((event) => event.type === "threat.launched")) {
     const duration = Number(launched.payload.flightDurationMs);
     const [minimum, maximum] = windows[launched.payload.threatKind];

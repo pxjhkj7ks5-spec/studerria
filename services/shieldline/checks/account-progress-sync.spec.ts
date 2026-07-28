@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canApplyRemoteProgress, resolveProgressWriteConflict } from "../src/platform/accountProgressSync";
+import { canApplyRemoteProgress, resolveProgressWriteConflict, shouldProtectLocalCampaign } from "../src/platform/accountProgressSync";
 
 test("a revision conflict keeps the active local mission and rebases it onto the latest revision", () => {
   const local = {
@@ -43,4 +43,12 @@ test("focus refresh cannot replace an operation that is already active on this d
   assert.equal(canApplyRemoteProgress({ operationPhase: "paused" }), false);
   assert.equal(canApplyRemoteProgress({ operationPhase: "planning" }), true);
   assert.equal(canApplyRemoteProgress({ operationPhase: "completed" }), true);
+});
+
+test("a stale non-campaign account snapshot cannot erase a newly opened local campaign", () => {
+  const campaignGame = { campaign: { missionIndex: 1 } };
+  const nonCampaignGame = { campaign: null };
+  assert.equal(shouldProtectLocalCampaign({ activeGameMode: "campaign", game: campaignGame }, { game: nonCampaignGame }), true);
+  assert.equal(shouldProtectLocalCampaign({ activeGameMode: null, game: campaignGame }, { game: nonCampaignGame }), false);
+  assert.equal(shouldProtectLocalCampaign({ activeGameMode: "campaign", game: campaignGame }, { game: campaignGame }), false);
 });

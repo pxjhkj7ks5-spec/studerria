@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CAMPAIGN_REINFORCEMENT_ACTION, activeCampaignTutorialCue, campaignKillRewards, campaignMissionsPlan, campaignRouteTemplates, campaignTutorialComplete, campaignTutorialPlacementAction, missionTargetCount, recordCampaignTutorialAction, settleCampaignTutorial } from "../src/data/campaignPlan";
-import { accelerateCampaignSchedule, advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignRedeployCost, createCampaignState, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill, routeHasSelfIntersection, serviceCampaignBattery, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
+import { accelerateCampaignSchedule, advanceCampaignDepot, advanceCampaignMission, applyCampaignMissionOpening, buildCampaignSpawnEvents, campaignAmmoDepotPositions, campaignRedeployCost, captureCampaignAttemptCheckpoint, createCampaignState, damageCampaignDepot, finalizeCampaignMission, generateCampaignRoute, recordCampaignDefeat, recordCampaignKill, restoreCampaignAttempt, routeHasSelfIntersection, serviceCampaignBattery, serviceCampaignDepot, unlockedCampaignMissionIndex } from "../src/game/campaignMeta";
 import { campaignLaunchSectorIdsByAxis, pickCampaignLaunchSector } from "../src/game/campaignLaunchZones";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
-import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow } from "../src/game/liveSimulation";
+import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
+import { flightDurationForSpeed } from "../src/game/threatFlightModel.mjs";
+import type { LiveThreat } from "../src/types/game";
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
   assert.equal(campaignRouteTemplates.length, 36);
@@ -86,6 +88,7 @@ test("first contact is a concise mixed battle with a real Caspian cruise wave", 
     targetRegion: "Столичний кластер",
     mergeRouteId: undefined,
     rallyRatio: undefined,
+    targetAsset: undefined,
   });
   for (const groupId of new Set(events.map((event) => event.groupId))) {
     const group = events.filter((event) => event.groupId === groupId);
@@ -208,21 +211,17 @@ test("campaign onboarding advances by action and keeps five seconds between prom
   assert.equal(recordCampaignTutorialAction(campaign, "open-intel", 0), true);
   assert.equal(campaign.tutorialStep, 1);
   assert.equal(activeCampaignTutorialCue(campaign, 4_999), null);
-  assert.equal(recordCampaignTutorialAction(campaign, "place-mvg-east-of-kyiv", 1_000), false);
-  assert.equal(recordCampaignTutorialAction(campaign, "open-units", 1_000), false);
-  assert.equal(settleCampaignTutorial(campaign, 4_999), false);
-  assert.equal(settleCampaignTutorial(campaign, 5_000), true);
+  assert.equal(recordCampaignTutorialAction(campaign, "inspect-ammo-depot", 5_000), true);
   assert.equal(campaign.tutorialStep, 2);
-  assert.equal(activeCampaignTutorialCue(campaign, 9_999), null);
-  assert.equal(activeCampaignTutorialCue(campaign, 10_000)?.title, "Розгорніть дальній радар");
-
-  assert.equal(recordCampaignTutorialAction(campaign, "place-long-radar-near-kyiv", 10_000), true);
-  assert.equal(settleCampaignTutorial(campaign, 15_000), true);
-  assert.equal(campaign.tutorialStep, 4);
-  assert.equal(activeCampaignTutorialCue(campaign, 20_000)?.title, "Підтвердьте план оборони");
-  assert.equal(recordCampaignTutorialAction(campaign, "open-planning", 20_000), true);
+  assert.equal(recordCampaignTutorialAction(campaign, "open-units", 10_000), true);
+  assert.equal(recordCampaignTutorialAction(campaign, "place-long-radar-near-kyiv", 15_000), true);
+  assert.equal(recordCampaignTutorialAction(campaign, "place-mvg-east-of-kyiv", 20_000), true);
+  assert.equal(recordCampaignTutorialAction(campaign, "purchase-depot-mvg", 25_000), true);
+  assert.equal(recordCampaignTutorialAction(campaign, "place-mvg-near-depot", 30_000), true);
+  assert.equal(activeCampaignTutorialCue(campaign, 35_000)?.title, "Підтвердьте план оборони");
+  assert.equal(recordCampaignTutorialAction(campaign, "open-planning", 35_000), true);
   assert.equal(campaignTutorialComplete(campaign), true);
-  assert.equal(activeCampaignTutorialCue(campaign, 25_000), null);
+  assert.equal(activeCampaignTutorialCue(campaign, 40_000), null);
   assert.equal(campaignTutorialPlacementAction("long-radar"), "place-long-radar-near-kyiv");
   assert.equal(campaignTutorialPlacementAction("mvg"), "place-mvg-east-of-kyiv");
   assert.equal(campaignTutorialPlacementAction("radar"), null);
@@ -333,6 +332,36 @@ test("S-300 reinforcement is paired with a real Caspian warning, flight, and res
   assert.equal(game.campaign?.intermission, true);
 });
 
+test("mission two grants one stocked Patriot exactly ninety seconds before its accelerated ballistic finale", () => {
+  const random = createDeterministicRandom("campaign-patriot-reinforcement");
+  let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState(2, 16, "campaign-patriot-reinforcement");
+  game.campaign.depot.stock = 9;
+  game.campaign.spawnEvents = [{
+    id: "m2-ballistic-finale",
+    dueMs: 120_000,
+    threatKind: "iskander",
+    routeId: "R27",
+    groupId: "m2-ballistic-finale",
+    mergeBehavior: "independent",
+    priority: "critical",
+    targetRegion: "Південний портовий кластер",
+  }];
+  applyCampaignMissionOpening(game);
+  assert.equal(game.campaign.unlockedSystems.includes("patriot"), false);
+  game = startAttackNow(game, () => random.next());
+  game = tickSimulation(game, 1_000, () => random.next());
+  const patriot = game.storedBatteries.find((battery) => battery.id === "campaign-m2-patriot-reinforcement");
+  assert.ok(patriot);
+  assert.equal(game.campaign.spawnEvents[0].dueMs - (game.elapsedMs - game.cycleStartedAtMs), 90_000);
+  assert.equal(patriot.kind, "patriot");
+  assert.equal(patriot.currentAmmo, 2);
+  assert.equal(patriot.missionReserve, 4);
+  assert.equal(game.campaign.depot.stock, 9);
+  game = advanceSimulation(game, 30_000, () => random.next());
+  assert.equal([...game.batteries, ...game.storedBatteries].filter((battery) => battery.id === patriot.id).length, 1);
+});
+
 test("campaign kill earnings have no mission or wallet ceiling", () => {
   const game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
@@ -341,6 +370,16 @@ test("campaign kill earnings have no mission or wallet ceiling", () => {
   assert.equal(game.campaign.missionKillReward, 10_000);
   assert.equal(game.campaign.campaignWallet, 10_024);
   assert.equal(game.resources.budget, 10_024);
+});
+
+test("missile speed maps linearly to the shared authored flight windows", () => {
+  assert.equal(flightDurationForSpeed("kh101", 700), 145_000);
+  assert.equal(flightDurationForSpeed("kh101", 850), 120_000);
+  assert.equal(flightDurationForSpeed("kh101", 775), 132_500);
+  assert.equal(flightDurationForSpeed("low-signature-cruise", 680), 160_000);
+  assert.equal(flightDurationForSpeed("low-signature-cruise", 880), 130_000);
+  assert.equal(flightDurationForSpeed("iskander", 3_500), 50_000);
+  assert.equal(flightDurationForSpeed("iskander", 7_200), 35_000);
 });
 
 test("campaign cruise missiles require sensor acquisition and complete their authored route", () => {
@@ -366,7 +405,7 @@ test("campaign cruise missiles require sensor acquisition and complete their aut
   assert.equal(cruise.launchSectorId, "long_range_air_a");
   game = advanceSimulation(game, 10_000, () => random.next());
   assert.equal(game.liveThreats.find((threat) => threat.id === cruise.id)?.revealed, false);
-  game = advanceSimulation(game, 120_000, () => random.next());
+  game = advanceSimulation(game, 160_000, () => random.next());
   assert.equal(game.liveThreats.some((threat) => threat.id === cruise.id), false);
 });
 
@@ -381,6 +420,7 @@ test("intermission repair and resupply spend the persistent campaign wallet", ()
   battery.currentAmmo = 0;
   battery.missionReserve = 0;
   game.campaign!.intermission = true;
+  game.campaign!.depot.stock = 10;
   const before = game.campaign!.campaignWallet;
   game = serviceCampaignBattery(game, battery.id, "repair");
   assert.equal(battery.health, 100);
@@ -397,8 +437,9 @@ test("the live campaign director resolves every authored target before opening i
   let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   game.resources.budget = 0;
-  game.cities = game.cities.map((city) => ({ ...city, importance: 0 }));
+  game.cities = game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
   applyCampaignMissionOpening(game);
+  game.campaign!.spawnEvents = game.campaign!.spawnEvents.map((event) => ({ ...event, targetAsset: "ammo-depot" }));
   game = startAttackNow(game, () => random.next());
   for (let step = 0; step < 8 && !game.campaign?.intermission; step += 1) game = advanceSimulation(game, 180_000, () => random.next());
   assert.equal(game.campaign?.spawnCursor, 23);
@@ -406,4 +447,170 @@ test("the live campaign director resolves every authored target before opening i
   assert.equal(game.campaign?.previousMissionResults.length, 1);
   assert.equal(game.campaign?.previousMissionResults[0].totalTargets, 23);
   assert.equal(game.liveThreats.length, 0);
+});
+
+test("the authored depot targets preserve every mission target budget", () => {
+  const expectedIds = [
+    ["m1-w1-t2", "m1-w2-t2"],
+    ["m2-w3-t2", "m2-w5-t2", "m2-w11-t2"],
+    ["m3-w2-t2", "m3-w4-t1", "m3-w10-t2", "m3-w14-t1"],
+    ["m4-w4-t2", "m4-w10-t1", "m4-w10-t3", "m4-w13-t1"],
+    ["m5-w6-t2", "m5-w6-t4", "m5-w9-t2", "m5-w13-t3", "m5-w13-t6", "m5-w13-t9", "m5-w14-t3", "m5-w18-t1"],
+  ];
+  for (const mission of campaignMissionsPlan) {
+    const events = buildCampaignSpawnEvents(mission.index);
+    assert.equal(events.length, missionTargetCount(mission));
+    assert.deepEqual(events.filter((event) => event.targetAsset === "ammo-depot").map((event) => event.id), expectedIds[mission.index - 1]);
+  }
+});
+
+test("campaign depot is seeded, uncapped, damageable and repaired only during active combat", () => {
+  const positions = new Set(campaignAmmoDepotPositions.map((position) => `${position.lat}:${position.lng}`));
+  const seededPositions = new Set(Array.from({ length: 32 }, (_, index) => {
+    const depot = createCampaignState(1, 0, `depot-seed-${index}`).depot;
+    assert.ok(positions.has(`${depot.position.lat}:${depot.position.lng}`));
+    return `${depot.position.lat}:${depot.position.lng}`;
+  }));
+  assert.ok(seededPositions.size > 1);
+  for (const position of campaignAmmoDepotPositions) {
+    const placementGame = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+    const placed = placeBattery(placementGame, "mvg", { lat: position.lat + .03, lng: position.lng }, () => .5);
+    assert.equal(placed.batteries.length, placementGame.batteries.length + 1, `depot at ${position.lat},${position.lng} must allow close defense`);
+  }
+
+  const game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState(1, 24, "depot-production");
+  game.resources.budget = 24;
+  advanceCampaignDepot(game, 60_000, false);
+  assert.equal(game.campaign.depot.stock, 2);
+  advanceCampaignDepot(game, 60_000, false);
+  assert.equal(game.campaign.depot.stock, 4);
+  game.campaign.depot.health = 50;
+  advanceCampaignDepot(game, 60_000, false);
+  assert.equal(game.campaign.depot.stock, 5);
+  game.campaign.depot.stock = 10_001;
+  advanceCampaignDepot(game, 60_000, false);
+  assert.equal(game.campaign.depot.stock, 10_002);
+
+  game.campaign.depot.health = 10;
+  const firstImpact = damageCampaignDepot(game, 10);
+  assert.equal(firstImpact.damage, 12.5);
+  assert.equal(game.campaign.depot.health, 0);
+  assert.equal(game.campaign.depot.stock, 5_001);
+  assert.equal(firstImpact.stockLost, 5_001);
+  assert.equal(damageCampaignDepot(game, 50).stockLost, 0);
+
+  serviceCampaignDepot(game);
+  assert.equal(game.campaign.campaignWallet, 12);
+  assert.equal(game.campaign.depot.repairRemainingMs, 120_000);
+  advanceCampaignDepot(game, 60_000, false);
+  assert.equal(game.campaign.depot.repairRemainingMs, 120_000);
+  advanceCampaignDepot(game, 60_000, true);
+  assert.equal(game.campaign.depot.repairRemainingMs, 60_000);
+  advanceCampaignDepot(game, 60_000, true);
+  assert.equal(game.campaign.depot.repairRemainingMs, 0);
+  assert.equal(game.campaign.depot.health, 100);
+});
+
+test("retry restores the complete pre-attack checkpoint and adopts authored depot targets", () => {
+  const game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState(1, 24, "retry-checkpoint");
+  game.resources.budget = 24;
+  game.cities = game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
+  game.campaign.depot.stock = 7;
+  game.campaign.spawnEvents = game.campaign.spawnEvents.map((event) => ({ ...event, targetAsset: undefined }));
+  captureCampaignAttemptCheckpoint(game, 17);
+  game.campaign.campaignWallet = 99;
+  game.resources.budget = 99;
+  game.campaign.depot.stock = 42;
+  game.cities[0].infrastructure = 0;
+  game.cities[0].damage = 100;
+  recordCampaignDefeat(game, game.cities[0].id);
+
+  const restored = restoreCampaignAttempt(game)!;
+  assert.equal(restored.simulationRandomCursor, 17);
+  assert.equal(restored.game.resources.budget, 24);
+  assert.equal(restored.game.campaign?.campaignWallet, 24);
+  assert.equal(restored.game.campaign?.depot.stock, 7);
+  assert.ok(restored.game.cities.every((city) => city.infrastructure === 100 && city.damage === 0));
+  assert.equal(restored.game.campaign?.lastAttemptResult, null);
+  assert.equal(restored.game.campaign?.previousMissionResults.length, 0);
+  assert.deepEqual(restored.game.campaign?.spawnEvents.filter((event) => event.targetAsset === "ammo-depot").map((event) => event.id), ["m1-w1-t2", "m1-w2-t2"]);
+});
+
+test("100 seeded engagements meet the S-300 cruise and Patriot ballistic acceptance floors", () => {
+  function runTrial(kind: "kh101" | "iskander", unitKind: "s300" | "patriot", seed: string) {
+    const random = createDeterministicRandom(seed);
+    let game = createScenarioState(() => random.next(), "training", "first-night");
+    game.resources.budget = 999;
+    game = placeBattery(
+      game,
+      unitKind,
+      unitKind === "s300" ? { lat: 50.45, lng: 30.8 } : { lat: 46.2, lng: 30.8 },
+      () => random.next(),
+    );
+    game.campaign = createCampaignState(unitKind === "s300" ? 1 : 2, 0, seed);
+    game.campaign.spawnEvents = [];
+    game.campaign.spawnCursor = 0;
+    game.cities = game.cities.map((city) => ({ ...city, infrastructure: 100, damage: 0 }));
+    game.cyclePhase = "attack";
+    game.cycleDurationMs = 999_999;
+    const targetCityId = kind === "kh101" ? "kyiv" : "odesa";
+    const target = game.cities.find((city) => city.id === targetCityId)!.coordinates;
+    const speedKph = kind === "kh101" ? 800 : 5_200;
+    const durationMs = flightDurationForSpeed(kind, speedKph);
+    const subject: LiveThreat = {
+      id: "acceptance-subject",
+      kind,
+      status: "inbound",
+      origin: kind === "kh101" ? { lat: 50.45, lng: 32 } : { lat: 46.2, lng: 33.8 },
+      target,
+      targetCityId,
+      launchSectorId: "acceptance-sector",
+      launchSectorName: "Acceptance sector",
+      progress: 0,
+      speed: 1 / durationMs,
+      speedKph,
+      altitudeM: kind === "kh101" ? 100 : 30_000,
+      difficulty: 10,
+      damage: kind === "kh101" ? 34 : 50,
+      confidence: 22,
+      classification: "unknown",
+      displayLabel: "Невідомий контакт",
+      saturation: 1,
+      headingDeg: 270,
+      revealed: false,
+      trackQuality: 0,
+      fireControlQuality: 0,
+      speedModifier: 1,
+      damageModifier: 1,
+      reward: kind === "kh101" ? 10 : 20,
+    };
+    game.liveThreats = [subject];
+    let firedAtProgress: number | null = null;
+    for (let elapsed = 0; elapsed < durationMs + 5_000 && game.liveThreats.some((threat) => threat.id === subject.id); elapsed += 1_000) {
+      game = tickSimulation(game, 1_000, () => random.next());
+      if (firedAtProgress === null && game.engagementEvents.some((event) => event.targetId === subject.id && event.style !== "radar")) {
+        firedAtProgress = game.liveThreats.find((threat) => threat.id === subject.id)?.progress ?? 1;
+      }
+    }
+    return { firedAtProgress, intercepted: game.interceptions > 0 };
+  }
+
+  let s300FiredInTime = 0;
+  let s300Intercepted = 0;
+  let patriotFiredInTime = 0;
+  let patriotIntercepted = 0;
+  for (let index = 0; index < 100; index += 1) {
+    const s300 = runTrial("kh101", "s300", `s300-acceptance-${index}`);
+    const patriot = runTrial("iskander", "patriot", `patriot-acceptance-${index}`);
+    if (s300.firedAtProgress !== null && s300.firedAtProgress <= .9) s300FiredInTime += 1;
+    if (s300.intercepted) s300Intercepted += 1;
+    if (patriot.firedAtProgress !== null && patriot.firedAtProgress <= .85) patriotFiredInTime += 1;
+    if (patriot.intercepted) patriotIntercepted += 1;
+  }
+  assert.ok(s300FiredInTime >= 90, `S-300 fired in time for ${s300FiredInTime}/100 seeds`);
+  assert.ok(s300Intercepted >= 80, `S-300 intercepted ${s300Intercepted}/100 seeds`);
+  assert.ok(patriotFiredInTime >= 90, `Patriot fired in time for ${patriotFiredInTime}/100 seeds`);
+  assert.ok(patriotIntercepted >= 85, `Patriot intercepted ${patriotIntercepted}/100 seeds`);
 });

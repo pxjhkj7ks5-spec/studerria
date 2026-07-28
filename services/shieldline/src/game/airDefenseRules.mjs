@@ -24,10 +24,10 @@ export const UNIT_RULES = Object.freeze({
   manpads: { roleClass: "shorad", reserve: 6, sensor: { acquisitionBase: 36, classificationGain: 3, fusionValue: 0, lowSignaturePenalty: 20 }, doctrine: doctrine({ allowedTargets: [...DRONES, "cruise", "kh101", "kalibr", "low-signature-cruise"], preferredTargets: ["recon", "geran2", "drone", "kh101", "kalibr"], forbiddenByDefault: [...DECOYS, ...BALLISTIC, ...SUPPORT], minConfidenceToEngage: 48, minTrackQuality: 48, conserveAmmoThreshold: 0.34, networkRequired: false }) },
   gepard: { roleClass: "shorad", reserve: 16, sensor: { acquisitionBase: 50, classificationGain: 4, fusionValue: 0, lowSignaturePenalty: 17 }, doctrine: doctrine({ allowedTargets: [...DRONES, ...DECOYS], preferredTargets: ["recon", "saturation", "geran2", "gerbera"], forbiddenByDefault: [...CRUISE, ...BALLISTIC, ...SUPPORT], minConfidenceToEngage: 30, minTrackQuality: 34, conserveAmmoThreshold: 0.18, networkRequired: false }) },
   buk: { roleClass: "mrad", reserve: 8, doctrine: doctrine({ allowedTargets: [...CRUISE, "geran2", "jammer"], preferredTargets: ["jammer", "low-signature-cruise", "kh101", "kalibr", "cruise"], reservedFor: [...CRUISE, "jammer"], forbiddenByDefault: [...DECOYS, "gerbera", "drone", "saturation", "recon", ...BALLISTIC], minConfidenceToEngage: 58, minTrackQuality: 58, conserveAmmoThreshold: 0.5, cheapFirstPolicy: true }) },
-  s300: { roleClass: "area-defense", reserve: 8, doctrine: doctrine({ allowedTargets: [...CRUISE, ...BALLISTIC], preferredTargets: [...CRUISE, ...BALLISTIC], reservedFor: [...CRUISE, ...BALLISTIC], forbiddenByDefault: [...DRONES, ...DECOYS, ...SUPPORT], minConfidenceToEngage: 62, minTrackQuality: 62, conserveAmmoThreshold: 0.5, cheapFirstPolicy: true }) },
-  "iris-t": { roleClass: "mrad", reserve: 8, doctrine: doctrine({ allowedTargets: [...CRUISE, ...DRONES, "jammer"], preferredTargets: ["jammer", "low-signature-cruise", "kh101", "kalibr", "cruise", "geran2"], reservedFor: [...CRUISE, "jammer"], forbiddenByDefault: [...DECOYS, "gerbera", "drone", "saturation", "recon", ...BALLISTIC], minConfidenceToEngage: 60, minTrackQuality: 62, conserveAmmoThreshold: 0.5, cheapFirstPolicy: true }) },
-  nasams: { roleClass: "mrad", reserve: 12, doctrine: doctrine({ allowedTargets: [...CRUISE, ...DRONES, "jammer"], preferredTargets: ["jammer", "low-signature-cruise", "kh101", "kalibr", "cruise", "geran2"], reservedFor: [...CRUISE, "jammer"], forbiddenByDefault: [...DECOYS, "gerbera", "drone", "saturation", "recon", ...BALLISTIC], minConfidenceToEngage: 58, minTrackQuality: 60, conserveAmmoThreshold: 0.42, cheapFirstPolicy: true }) },
-  patriot: { roleClass: "upper-tier", reserve: 4, doctrine: doctrine({ allowedTargets: [...BALLISTIC, ...CRUISE], preferredTargets: ["iskander", "ballistic", "kh101"], reservedFor: [...BALLISTIC], forbiddenByDefault: [...DRONES, ...DECOYS], minConfidenceToEngage: 72, minTrackQuality: 74, conserveAmmoThreshold: 0.75, salvoPolicy: "conditional-double" }) },
+  s300: { roleClass: "area-defense", reserve: 8, sensor: { acquisitionBase: 96, classificationGain: 20, fusionValue: 3, lowSignaturePenalty: 8 }, doctrine: doctrine({ allowedTargets: [...CRUISE, ...BALLISTIC], preferredTargets: [...CRUISE, ...BALLISTIC], reservedFor: [...CRUISE, ...BALLISTIC], forbiddenByDefault: [...DRONES, ...DECOYS, ...SUPPORT], minConfidenceToEngage: 44, minTrackQuality: 32, conserveAmmoThreshold: 0.5, cheapFirstPolicy: true, networkRequired: false }) },
+  "iris-t": { roleClass: "mrad", reserve: 8, sensor: { acquisitionBase: 98, classificationGain: 22, fusionValue: 4, lowSignaturePenalty: 6 }, doctrine: doctrine({ allowedTargets: [...CRUISE, ...DRONES, "jammer"], preferredTargets: ["jammer", "low-signature-cruise", "kh101", "kalibr", "cruise", "geran2"], reservedFor: [...CRUISE, "jammer"], forbiddenByDefault: [...DECOYS, "gerbera", "drone", "saturation", "recon", ...BALLISTIC], minConfidenceToEngage: 42, minTrackQuality: 34, conserveAmmoThreshold: 0.5, cheapFirstPolicy: true, networkRequired: false }) },
+  nasams: { roleClass: "mrad", reserve: 12, sensor: { acquisitionBase: 100, classificationGain: 22, fusionValue: 6, lowSignaturePenalty: 6 }, doctrine: doctrine({ allowedTargets: [...CRUISE, ...DRONES, "jammer"], preferredTargets: ["jammer", "low-signature-cruise", "kh101", "kalibr", "cruise", "geran2"], reservedFor: [...CRUISE, "jammer"], forbiddenByDefault: [...DECOYS, "gerbera", "drone", "saturation", "recon", ...BALLISTIC], minConfidenceToEngage: 42, minTrackQuality: 34, conserveAmmoThreshold: 0.42, cheapFirstPolicy: true, networkRequired: false }) },
+  patriot: { roleClass: "upper-tier", reserve: 4, sensor: { acquisitionBase: 104, classificationGain: 24, fusionValue: 6, lowSignaturePenalty: 4 }, doctrine: doctrine({ allowedTargets: [...BALLISTIC, ...CRUISE], preferredTargets: ["iskander", "ballistic", "kh101"], reservedFor: [...BALLISTIC], forbiddenByDefault: [...DRONES, ...DECOYS], minConfidenceToEngage: 44, minTrackQuality: 36, conserveAmmoThreshold: 0.75, salvoPolicy: "conditional-double", networkRequired: false }) },
   "drone-operators": { roleClass: "specialist", reserve: 12, sensor: { acquisitionBase: 42, classificationGain: 4, fusionValue: 0, lowSignaturePenalty: 18 }, doctrine: doctrine({ allowedTargets: [...DRONES, ...DECOYS], preferredTargets: ["gerbera", "parodiya", "geran2"], forbiddenByDefault: [...CRUISE, ...BALLISTIC], minConfidenceToEngage: 42, minTrackQuality: 44, conserveAmmoThreshold: 0.25, networkRequired: false }) },
 });
 
@@ -105,7 +105,18 @@ export function classificationGain({ sensorKind, trackQuality = 0, fusionSensorC
   const sensor = unitRule(sensorKind).sensor;
   if (!sensor) return 0;
   const target = threatRule(threatKind);
-  return clamp(sensor.classificationGain + Math.max(0, fusionSensorCount - 1) * sensor.fusionValue * 0.45 + trackQuality * 0.045 + (intelFocus ? 5 : 0) - target.classificationDifficulty * 0.09 - jammerPenalty, 1, 22);
+  const autonomousFireControlSensor = ["s300", "iris-t", "nasams", "patriot"].includes(sensorKind);
+  const classificationDifficultyPenalty = autonomousFireControlSensor ? 0 : target.classificationDifficulty * 0.09;
+  return clamp(
+    sensor.classificationGain
+      + Math.max(0, fusionSensorCount - 1) * sensor.fusionValue * 0.45
+      + trackQuality * 0.045
+      + (intelFocus ? 5 : 0)
+      - classificationDifficultyPenalty
+      - jammerPenalty,
+    1,
+    autonomousFireControlSensor ? 28 : 22,
+  );
 }
 
 export function fusedTrackQuality({ bestSensorScore = 0, sensorScores = [], continuity = 1, maneuver = 1 }) {

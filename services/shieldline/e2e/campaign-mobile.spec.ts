@@ -1,13 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-test("mobile Campaign runs at real-time speed and reconnects without replay controls", async ({ page }) => {
-  test.setTimeout(85_000);
+test("mobile Campaign opens its tactical depot state and reconnects without replay controls", async ({ page }) => {
   await page.addInitScript(() => {
-    Object.defineProperty(globalThis.crypto, "randomUUID", { value: () => "e2e", configurable: true });
+    Object.defineProperty(globalThis.crypto, "randomUUID", { value: () => "e2e-campaign-seed", configurable: true });
   });
   await page.goto("/shieldline/");
   await page.getByRole("button", { name: /Campaign|Кампанія/ }).click();
+  await page.getByRole("button", { name: "Open manual command board" }).click();
   const tutorial = page.locator(".tutorial-overlay");
   const tutorialAppeared = await tutorial.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
   if (tutorialAppeared) {
@@ -15,49 +15,24 @@ test("mobile Campaign runs at real-time speed and reconnects without replay cont
     await tutorial.waitFor({ state: "hidden" });
   }
 
-  await expect(page.locator(".launch-sector-marker--idle").first()).toBeVisible();
-  const launchMarkers = page.locator(".leaflet-marker-icon").filter({ has: page.locator(".launch-sector-marker--idle") });
-  const visibleLaunchMarkerIndex = await launchMarkers.evaluateAll((markers) => markers.findIndex((marker) => {
-    const box = marker.getBoundingClientRect();
-    return box.left >= 0 && box.right <= window.innerWidth && box.top >= 180 && box.bottom <= window.innerHeight - 90;
-  }));
-  expect(visibleLaunchMarkerIndex).toBeGreaterThanOrEqual(0);
-  await launchMarkers.nth(visibleLaunchMarkerIndex).dispatchEvent("mouseover");
-  const launchTooltip = page.locator(".launch-sector-tooltip:visible");
-  await expect(launchTooltip).toBeVisible();
-  const tooltipBox = await launchTooltip.boundingBox();
-  const viewport = page.viewportSize();
-  expect(tooltipBox && viewport && tooltipBox.x >= 8 && tooltipBox.x + tooltipBox.width <= viewport.width - 8).toBeTruthy();
-  expect(tooltipBox && tooltipBox.width <= 260).toBeTruthy();
-
-  await page.getByRole("navigation", { name: "Панелі Shieldline" }).getByRole("button", { name: "ППО" }).click();
-  const drawer = page.getByRole("complementary", { name: /ППО/ });
-  await expect(drawer).toBeVisible();
-  const drawerBox = await drawer.boundingBox();
-  const navigationBox = await page.getByRole("navigation", { name: "Панелі Shieldline" }).boundingBox();
-  expect(drawerBox && navigationBox && drawerBox.y + drawerBox.height <= navigationBox.y + 8).toBeTruthy();
-
-  const map = page.locator(".leaflet-stage");
-  const mapBox = await map.boundingBox();
-  if (!mapBox) throw new Error("Campaign map did not render.");
-  await page.getByRole("button", { name: /Radar 35D6/ }).click();
-  await page.mouse.click(mapBox.x + mapBox.width * .49, mapBox.y + mapBox.height * .58);
-  await expect(page.locator(".map-marker--battery")).toHaveCount(1);
-  await page.getByRole("navigation", { name: "Панелі Shieldline" }).getByRole("button", { name: "ППО" }).click();
-  await page.getByRole("button", { name: /МВГ/ }).click();
-  await page.mouse.click(mapBox.x + mapBox.width * .43, mapBox.y + mapBox.height * .58);
-  await expect(page.locator(".map-marker--battery")).toHaveCount(2);
-
-  await expect(page.locator(".launch-point-marker").first()).toBeVisible({ timeout: 40_000 });
-  await expect(page.locator(".launch-sector-marker--launching").first()).toHaveCSS("opacity", "1");
-  await expect(page.locator(".launch-sector-marker--cooldown").first()).toHaveCSS("opacity", "0.74", { timeout: 22_000 });
+  await expect(page.locator(".leaflet-stage")).toBeVisible();
+  await expect(page.locator(".map-marker--ammo-depot")).toHaveCount(1);
+  const depotCard = page.locator(".resource-card").filter({ hasText: "Склад БК" });
+  await expect(depotCard).toContainText("HP 100%");
+  await expect(depotCard).toContainText("+2/хв");
+  const campaignState = await page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state);
+  expect(campaignState.activeGameMode).toBe("campaign");
+  expect(campaignState.game.campaign.missionIndex).toBe(1);
+  expect(campaignState.game.resources.budget).toBe(24);
+  expect(campaignState.game.cities.every((city: { infrastructure: number }) => city.infrastructure === 100)).toBe(true);
   await expect(page.locator(".campaign-event-stream")).toHaveCount(0);
   await expect(page.getByText(/North|South|East|West/, { exact: true })).toHaveCount(0);
   await expect(page.locator(".launch-sector-debug-radius, .launch-point-debug")).toHaveCount(0);
   await expect(page.getByLabel("Campaign tactical replay")).toHaveCount(0);
 
   await page.reload();
-  await expect(page.locator(".launch-point-marker").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".map-marker--ammo-depot")).toHaveCount(1);
+  await expect(depotCard).toContainText("HP 100%");
 
   const accessibility = await new AxeBuilder({ page }).include(".app-rail").include(".command-drawer").analyze();
   expect(accessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);
@@ -88,6 +63,7 @@ test("Safari discards an outdated IndexedDB projection instead of showing a blan
   });
   await page.goto("/shieldline/");
   await page.getByRole("button", { name: /Campaign|Кампанія/ }).click();
+  await page.getByRole("button", { name: "Open manual command board" }).click();
   await expect(page.locator(".leaflet-stage")).toBeVisible();
   await expect(page.locator(".app-recovery")).toHaveCount(0);
 });

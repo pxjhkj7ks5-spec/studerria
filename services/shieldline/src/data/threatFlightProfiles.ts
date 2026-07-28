@@ -1,4 +1,5 @@
 import type { ThreatKind } from "../types/game";
+import { THREAT_FLIGHT_PROFILES } from "../game/threatFlightModel.mjs";
 
 interface ThreatFlightProfile {
   label: string;
@@ -11,23 +12,31 @@ export interface ThreatTelemetry {
   altitudeM: number;
 }
 
-export const threatFlightProfiles: Record<ThreatKind, ThreatFlightProfile> = {
-  drone: { label: "UAV", speedKph: [130, 220], altitudeM: [70, 320] },
-  ballistic: { label: "OTRK", speedKph: [3_200, 6_500], altitudeM: [18_000, 50_000] },
-  cruise: { label: "Cruise", speedKph: [650, 920], altitudeM: [30, 180] },
-  decoy: { label: "Decoy", speedKph: [110, 190], altitudeM: [90, 420] },
-  combined: { label: "Combined", speedKph: [680, 900], altitudeM: [40, 220] },
-  saturation: { label: "UAV swarm", speedKph: [140, 210], altitudeM: [60, 260] },
-  geran2: { label: "Geran-2", speedKph: [150, 190], altitudeM: [60, 180] },
-  gerbera: { label: "Gerbera", speedKph: [130, 180], altitudeM: [80, 300] },
-  parodiya: { label: "Parodiya", speedKph: [110, 165], altitudeM: [100, 360] },
-  kh101: { label: "X-101", speedKph: [700, 850], altitudeM: [30, 120] },
-  kalibr: { label: "Kalibr", speedKph: [750, 950], altitudeM: [20, 100] },
-  iskander: { label: "Iskander-M", speedKph: [3_500, 7_200], altitudeM: [20_000, 50_000] },
-  recon: { label: "Recon", speedKph: [160, 260], altitudeM: [500, 1_800] },
-  "low-signature-cruise": { label: "Low-signature cruise", speedKph: [680, 880], altitudeM: [25, 100] },
-  jammer: { label: "Jammer escort", speedKph: [420, 720], altitudeM: [1_500, 5_000] },
+const labels: Record<ThreatKind, string> = {
+  drone: "UAV",
+  ballistic: "OTRK",
+  cruise: "Cruise",
+  decoy: "Decoy",
+  combined: "Combined",
+  saturation: "UAV swarm",
+  geran2: "Geran-2",
+  gerbera: "Gerbera",
+  parodiya: "Parodiya",
+  kh101: "X-101",
+  kalibr: "Kalibr",
+  iskander: "Iskander-M",
+  recon: "Recon",
+  "low-signature-cruise": "Low-signature cruise",
+  jammer: "Jammer escort",
 };
+
+export const threatFlightProfiles = Object.fromEntries(
+  Object.entries(THREAT_FLIGHT_PROFILES).map(([kind, profile]) => [kind, {
+    label: labels[kind as ThreatKind],
+    speedKph: profile.speedKph,
+    altitudeM: profile.altitudeM,
+  }]),
+) as Record<ThreatKind, ThreatFlightProfile>;
 
 function hashFraction(value: string) {
   let hash = 2166136261;

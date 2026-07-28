@@ -43,6 +43,7 @@ const mapModes: Array<{ id: MapMode; label: string }> = [
 const SIMULATION_TICK_MS = 300;
 const MAX_SIMULATION_FRAME_DELTA_MS = 1_000;
 const RADAR_KINDS = new Set<UnitKind>(["small-radar", "radar", "long-radar"]);
+const tacticalModeIds = new Set<GameModeId>(["campaign", "rapid-response", "ranked-challenge", "co-op-command", "sandbox", "training", "daily-defense"]);
 function coOpSectorForCity(cityId: string) {
   if (["chernihiv", "sumy", "kyiv", "zhytomyr", "rivne", "lutsk"].includes(cityId)) return "north";
   if (["kharkiv", "dnipro", "zaporizhzhia", "poltava", "kryvyi-rih"].includes(cityId)) return "east";
@@ -152,14 +153,17 @@ export default function App() {
   const setMapMode = useGameStore((state) => state.setMapMode);
   const dismissTutorial = useGameStore((state) => state.dismissTutorial);
   const resetCampaign = useGameStore((state) => state.resetCampaign);
+  const retryCampaignMission = useGameStore((state) => state.retryCampaignMission);
   const advanceCampaignMission = useGameStore((state) => state.advanceCampaignMission);
+  const launchTacticalMode = useGameStore((state) => state.launchTacticalMode);
   const advanceOperation = useGameStore((state) => state.advanceOperation);
   const placementKind = useGameStore((state) => state.placementKind);
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
   const activeGameMode = useGameStore((state) => state.activeGameMode);
   const operationPhase = useGameStore((state) => state.operationPhase);
   const simulationSeed = useGameStore((state) => state.simulationSeed);
-  const tacticalMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+  const tacticalModeParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+  const tacticalMode = tacticalModeParam && tacticalModeIds.has(tacticalModeParam as GameModeId) ? tacticalModeParam as GameModeId : null;
   const isMobileViewport = useMobileViewport();
   const isMobileLive = isMobileViewport;
   const [confirmReset, setConfirmReset] = useState(false);
@@ -195,11 +199,20 @@ export default function App() {
   const activeMissionTitle = game.campaign ? getCampaignMission(game.campaign.missionIndex).title : t("mission.1");
   const campaignTutorialInProgress = game.campaign?.missionIndex === 1 && operationPhase === "planning" && !campaignTutorialComplete(game.campaign);
   const planningTutorial = campaignTutorialInProgress ? activeCampaignTutorialCue(game.campaign, tutorialClockMs) : null;
-  const reinforcementTutorial = game.campaign?.missionIndex === 1
-    && operationPhase === "running"
-    && game.storedBatteries.some((battery) => battery.kind === "s300" && battery.lastAction === CAMPAIGN_REINFORCEMENT_ACTION)
-    ? { panelTarget: "units" as const, title: "Підкріплення: С-300", body: "Відкрийте «ППО» та безкоштовно розгорніть С-300 для крилатої ракети з Каспійського напрямку." }
+  const reinforcementTutorial = operationPhase === "running"
+    && game.storedBatteries.some((battery) => battery.lastAction === CAMPAIGN_REINFORCEMENT_ACTION)
+    ? game.campaign?.missionIndex === 1 && game.storedBatteries.some((battery) => battery.kind === "s300" && battery.lastAction === CAMPAIGN_REINFORCEMENT_ACTION)
+      ? { panelTarget: "units" as const, title: "Підкріплення: С-300", body: "Відкрийте «ППО» та безкоштовно розгорніть С-300 для крилатої ракети з Каспійського напрямку." }
+      : game.campaign?.missionIndex === 2 && game.storedBatteries.some((battery) => battery.kind === "patriot" && battery.lastAction === CAMPAIGN_REINFORCEMENT_ACTION)
+        ? { panelTarget: "units" as const, title: "Підкріплення: Patriot", body: "Відкрийте «ППО» та безкоштовно розгорніть Patriot біля Одеси. У магазині 2 ракети, ще 4 — у резерві для фінального «Іскандера»." }
+        : null
     : null;
+
+  useEffect(() => {
+    if (tacticalMode && (activeGameMode !== tacticalMode || (tacticalMode === "campaign" && !game.campaign))) {
+      launchTacticalMode(tacticalMode);
+    }
+  }, [activeGameMode, game.campaign, launchTacticalMode, tacticalMode]);
   const campaignTutorial = planningTutorial || reinforcementTutorial;
   const returnToCommandModes = () => {
     const url = new URL(window.location.href);
@@ -215,6 +228,11 @@ export default function App() {
     setFullscreenReportOpen(false);
     setActivePanel(isMobileLive ? null : "units");
   }, [advanceCampaignMission, isMobileLive]);
+  const retryFailedCampaignMission = useCallback(() => {
+    retryCampaignMission();
+    setFullscreenReportOpen(false);
+    setActivePanel(isMobileLive ? null : "units");
+  }, [isMobileLive, retryCampaignMission]);
   const handleResetOperation = () => {
     if (tacticalMode === "campaign") window.localStorage.removeItem("shieldline-campaign-operation-v1");
     resetCampaign();
@@ -273,7 +291,9 @@ export default function App() {
   }, [activePanel, isMobileLive]);
 
   useEffect(() => {
-    if (!campaignMode || runtimePolicy.execution !== "live" || (operationPhase !== "running" && operationPhase !== "countdown")) return undefined;
+    const simulationClockActive = operationPhase === "running" || operationPhase === "countdown";
+    const depotClockActive = resolvedMode === "campaign" && (operationPhase === "planning" || operationPhase === "paused");
+    if (!campaignMode || runtimePolicy.execution !== "live" || (!simulationClockActive && !depotClockActive)) return undefined;
     let frameId = 0;
     let active = true;
     const resetSimulationClock = () => {
@@ -318,7 +338,7 @@ export default function App() {
       window.removeEventListener("pageshow", handlePageLifecycle);
       resetSimulationClock();
     };
-  }, [advanceOperation, campaignMode, operationPhase, runtimePolicy.execution]);
+  }, [advanceOperation, campaignMode, operationPhase, resolvedMode, runtimePolicy.execution]);
 
   useEffect(() => {
     lastTickRef.current = null;
@@ -330,14 +350,21 @@ export default function App() {
     setFullscreenReportOpen(true);
     if (completedCampaignReportRef.current === game.latestReportId) return;
     completedCampaignReportRef.current = game.latestReportId;
-    const campaignResult = game.campaign?.previousMissionResults.at(-1);
+    const campaignResult = game.campaign?.lastAttemptResult || game.campaign?.previousMissionResults.at(-1);
     trackAnalytics("campaign.operation.completed", {
       reportId: game.latestReportId,
+      outcome: campaignResult?.outcome ?? null,
       missionIndex: campaignResult?.missionIndex ?? game.campaign?.missionIndex ?? null,
       durationSeconds: campaignResult?.durationSeconds ?? null,
-      missionGrant: game.campaign?.missionGrant ?? null,
+      missionGrant: campaignResult?.missionGrant ?? game.campaign?.missionGrant ?? null,
       missionKillReward: campaignResult?.killReward ?? game.campaign?.missionKillReward ?? null,
       walletAfterMission: campaignResult?.walletAfterMission ?? game.campaign?.campaignWallet ?? null,
+      minimumCityHp: campaignResult?.minimumCityHp ?? null,
+      failedCityId: campaignResult?.failedCityId ?? null,
+      depotHealth: campaignResult?.depotHealth ?? null,
+      depotStock: campaignResult?.depotStock ?? null,
+      depotProduced: campaignResult?.depotProduced ?? null,
+      depotLost: campaignResult?.depotLost ?? null,
       interceptions: game.interceptions,
       impacts: game.impacts,
     });
@@ -583,7 +610,7 @@ export default function App() {
           ) : null}
           {activePanel === "report" ? (
             <section className="drawer-section">
-              <AfterActionReport game={game} rankedResult={rankedResult} authoritativeRun={tacticalMode === "campaign" ? null : authoritativeRun} onContinueCampaign={continueCampaignMission} />
+              <AfterActionReport game={game} rankedResult={rankedResult} authoritativeRun={tacticalMode === "campaign" ? null : authoritativeRun} onContinueCampaign={continueCampaignMission} onRetryCampaign={retryFailedCampaignMission} />
             </section>
           ) : null}
           {activePanel === "settings" ? (
@@ -615,6 +642,7 @@ export default function App() {
             onInspectMap={inspectCompletedMap}
             onExit={returnToCommandModes}
             onContinueCampaign={continueCampaignMission}
+            onRetryCampaign={retryFailedCampaignMission}
           />
         </div>
       ) : null}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getUnitDefinition } from "../src/data/units";
-import { acquisitionScore, classificationGain, evaluateDoctrine, ewEffectFor, planEffectivenessForThreat, salvoSizeFor, supportLeakEffect, THREAT_RULES, threatDisplayLabel } from "../src/game/airDefenseRules.mjs";
+import { acquisitionScore, classificationGain, evaluateDoctrine, ewEffectFor, planEffectivenessForThreat, salvoSizeFor, supportLeakEffect, THREAT_RULES, threatDisplayLabel, UNIT_RULES } from "../src/game/airDefenseRules.mjs";
 import { campaignMissionObjective, createCampaignState, serviceCampaignBattery } from "../src/game/campaignMeta";
 import { createScenarioState } from "../src/game/initialState";
 import { placeBattery, setBatteryManualOverride, tickSimulation } from "../src/game/liveSimulation";
@@ -74,14 +74,14 @@ test("campaign stock is the source for intermission mission-reserve replenishmen
   game.campaign!.intermission = true;
   const battery = game.batteries[0];
   battery.missionReserve = 0;
-  game.campaign!.campaignAmmoStock = 3;
+  game.campaign!.depot.stock = 3;
   game = serviceCampaignBattery(game, battery.id, "resupply", 1);
   assert.equal(game.batteries[0].missionReserve, 3);
-  assert.equal(game.campaign!.campaignAmmoStock, 0);
+  assert.equal(game.campaign!.depot.stock, 0);
   const wallet = game.campaign!.campaignWallet;
   game = serviceCampaignBattery(game, battery.id, "resupply", 1);
   assert.equal(game.campaign!.campaignWallet, wallet);
-  assert.equal(game.placementWarning, "Стратегічний запас відсутній");
+  assert.equal(game.placementWarning, "Склад БК порожній");
 });
 
 test("low confidence UI data hides exact type until confirmed-type threshold", () => {
@@ -139,4 +139,26 @@ test("support and low-signature target classes have executable sensor-network ef
   assert.ok(THREAT_RULES["low-signature-cruise"].signature < THREAT_RULES.kh101.signature);
   assert.equal(salvoSizeFor("patriot", "iskander", 4), 2);
   assert.equal(salvoSizeFor("patriot", "kh101", 4), 1);
+});
+
+test("upper-tier batteries classify locally without becoming radar-network nodes", () => {
+  const expected = {
+    s300: [96, 20, 3, 8, 44, 32],
+    "iris-t": [98, 22, 4, 6, 42, 34],
+    nasams: [100, 22, 6, 6, 42, 34],
+    patriot: [104, 24, 6, 4, 44, 36],
+  } as const;
+  for (const [kind, [acquisitionBase, gain, fusion, lowSignaturePenalty, confidence, track]] of Object.entries(expected)) {
+    const rules = UNIT_RULES[kind];
+    assert.deepEqual(
+      [rules.sensor.acquisitionBase, rules.sensor.classificationGain, rules.sensor.fusionValue, rules.sensor.lowSignaturePenalty, rules.doctrine.minConfidenceToEngage, rules.doctrine.minTrackQuality],
+      [acquisitionBase, gain, fusion, lowSignaturePenalty, confidence, track],
+    );
+    assert.equal(rules.doctrine.networkRequired, false);
+    assert.notEqual(rules.roleClass, "sensor");
+    const clearGain = classificationGain({ sensorKind: kind, trackQuality: 70, threatKind: "kh101" });
+    const jammedGain = classificationGain({ sensorKind: kind, trackQuality: 70, threatKind: "kh101", jammerPenalty: 2.5 });
+    assert.ok(22 + clearGain * 3 >= 85);
+    assert.ok(22 + jammedGain * 5 >= 85);
+  }
 });

@@ -1,6 +1,7 @@
 import { getScenario } from "../data/scenarios";
 import { getUnitDefinition } from "../data/units";
 import { threatTelemetryFor } from "../data/threatFlightProfiles";
+import { flightDurationForSpeed } from "./threatFlightModel.mjs";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
 import { buildLogisticsState } from "./logistics";
 import { createGuidedCampaignSchedule, guidedStageForElapsed, guidedStageLaunchCount, guidedThreatKind, nextGuidedLaunchDelayMs, sectorIdsForDirection } from "./campaignPacing.mjs";
@@ -11,7 +12,7 @@ import { distanceKm, validateBatteryPlacement } from "./placementRules";
 import { chooseAttackPlan, createThreatDirectorContext, pickThreatKindForPlan } from "./threatDirector";
 import { threatCourseAtProgress, threatPositionAtProgress } from "./threatRouteVisuals";
 import { applyEngagementFatigue, applyRedeployFatigue, enterMaintenance, recoverReadiness } from "./unitReadiness";
-import { accelerateCampaignSchedule, addCampaignStoredBattery, applyCampaignMissionOpening, campaignRedeployCost, finalizeCampaignMission, generateCampaignRoute, recordCampaignKill } from "./campaignMeta";
+import { accelerateCampaignSchedule, addCampaignStoredBattery, applyCampaignMissionOpening, campaignRedeployCost, damageCampaignDepot, finalizeCampaignMission, generateCampaignRoute, recordCampaignDefeat, recordCampaignKill } from "./campaignMeta";
 import { CAMPAIGN_REINFORCEMENT_ACTION, campaignKillRewards, getCampaignRoute, isFreeCampaignDeploymentAction } from "../data/campaignPlan";
 import { pickCampaignLaunchSector } from "./campaignLaunchZones";
 import { acquisitionScore, classificationGain, classificationTier, engagementProbability, evaluateDoctrine, ewEffectFor, fireControlScore, fusedTrackQuality, salvoSizeFor, supportLeakEffect, threatDisplayLabel, threatRule, unitRule } from "./airDefenseRules.mjs";
@@ -35,6 +36,7 @@ const MAX_LIVE_THREATS = 18;
 const PLANNING_WINDOW_MS = 30000;
 const CAMPAIGN_LAUNCH_WARNING_MS = 15000;
 const FIRST_MISSION_REINFORCEMENT_LEAD_MS = 45_000;
+const SECOND_MISSION_REINFORCEMENT_LEAD_MS = 90_000;
 const MIN_ATTACK_WINDOW_MS = 90000;
 const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
 const LAUNCH_CONE_RANGE_KM = 900;
@@ -44,24 +46,6 @@ const PROBABLE_TARGET_DISTANCE_KM = 82;
 
 const fallbackThreatKinds: ThreatKind[] = ["recon", "geran2", "gerbera", "parodiya", "jammer", "low-signature-cruise", "kh101", "kalibr", "iskander"];
 const ABSTRACT_KM_PER_DEGREE = 85;
-
-const threatFlightDurationMs: Record<ThreatKind, [number, number]> = {
-  drone: [120000, 180000],
-  ballistic: [20000, 40000],
-  cruise: [70000, 110000],
-  decoy: [120000, 180000],
-  combined: [70000, 110000],
-  saturation: [130000, 190000],
-  geran2: [120000, 180000],
-  gerbera: [120000, 180000],
-  parodiya: [120000, 180000],
-  kh101: [70000, 110000],
-  kalibr: [70000, 110000],
-  iskander: [20000, 40000],
-  recon: [110000, 160000],
-  "low-signature-cruise": [75000, 115000],
-  jammer: [90000, 140000],
-};
 
 const threatBaseDifficulty: Record<ThreatKind, number> = {
   drone: 24,
@@ -96,6 +80,24 @@ const threatDamage: Record<ThreatKind, number> = {
   iskander: 9,
   recon: 0,
   "low-signature-cruise": 8,
+  jammer: 0,
+};
+
+const campaignThreatDamage: Record<ThreatKind, number> = {
+  drone: 10,
+  ballistic: 50,
+  cruise: 34,
+  decoy: 0,
+  combined: 34,
+  saturation: 10,
+  geran2: 10,
+  gerbera: 4,
+  parodiya: 0,
+  kh101: 34,
+  kalibr: 34,
+  iskander: 50,
+  recon: 0,
+  "low-signature-cruise": 36,
   jammer: 0,
 };
 
@@ -179,8 +181,10 @@ function cloneState(state: GameState): GameState {
     placementWarning: state.placementWarning,
     campaign: state.campaign ? {
       ...state.campaign,
+      depot: { ...state.campaign.depot, position: { ...state.campaign.depot.position } },
       unlockedSystems: [...state.campaign.unlockedSystems],
       previousMissionResults: state.campaign.previousMissionResults.map((result) => ({ ...result, rewardLines: result.rewardLines.map((line) => ({ ...line })) })),
+      lastAttemptResult: state.campaign.lastAttemptResult ? { ...state.campaign.lastAttemptResult, rewardLines: state.campaign.lastAttemptResult.rewardLines.map((line) => ({ ...line })) } : null,
       spawnEvents: state.campaign.spawnEvents.map((event) => ({ ...event })),
       missionKillsByKind: { ...state.campaign.missionKillsByKind },
     } : null,
@@ -292,9 +296,9 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     lastMovedMission: next.campaign?.missionIndex || 0,
   };
   if (next.campaign && typeof battery.missionReserve === "number") {
-    const allocated = Math.min(battery.missionReserve, next.campaign.campaignAmmoStock);
+    const allocated = Math.min(battery.missionReserve, next.campaign.depot.stock);
     battery.missionReserve = allocated;
-    next.campaign.campaignAmmoStock -= allocated;
+    next.campaign.depot.stock -= allocated;
   }
   if (next.planningActions.selected.includes("rapid-redeployment")) {
     applyRedeployFatigue(battery);
@@ -504,14 +508,13 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     ? state.launchSectors.find((sector) => sector.id === forcedSectorId && sectorSupportsThreat(sector, kind)) || pickLaunchSector(state.launchSectors, kind, random)
     : pickLaunchSector(state.launchSectors, kind, random);
   const carrierId = createCarrierForThreat(state, kind, launchSector, random);
-  const durationWindow = threatFlightDurationMs[kind];
-  const flightDurationMs = durationWindow[0] + random() * (durationWindow[1] - durationWindow[0]);
   const falseTrack = kind === "decoy" || kind === "parodiya" || random() < (plan?.deception || 0) * 0.045;
   const origin = forcedOrigin ? { ...forcedOrigin } : randomPointInSector(launchSector, random);
   if (SHOW_LAUNCH_DEBUG) console.debug("[Shieldline live launch]", { threatType: kind, sector: launchSector.id, point: origin });
   const heading = bearingDeg(origin, city.coordinates);
   const id = createId("live-threat", Math.floor(state.elapsedMs), random);
   const telemetry = threatTelemetryFor(kind, id);
+  const flightDurationMs = flightDurationForSpeed(kind, telemetry.speedKph);
   return {
     id,
     kind,
@@ -526,7 +529,7 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     speedKph: telemetry.speedKph,
     altitudeM: telemetry.altitudeM,
     difficulty: threatBaseDifficulty[kind] * (1 + Math.max(-0.06, Math.min(0.08, (launchSector.weight - 3) * 0.025))) + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
-    damage: falseTrack ? 0 : threatDamage[kind],
+    damage: falseTrack ? 0 : state.campaign ? campaignThreatDamage[kind] : threatDamage[kind],
     confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,
     classification: "unknown",
     displayLabel: "Невідомий контакт",
@@ -555,6 +558,7 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   if (!route) { campaign.spawnCursor += 1; return true; }
   const targetCityId = event.targetRegion.toLowerCase().includes("столич") ? "kyiv" : route.targetCityId;
   const city = state.cities.find((item) => item.id === targetCityId) || state.cities[0];
+  const targetCoordinates = event.targetAsset === "ammo-depot" ? campaign.depot.position : city.coordinates;
   const preparedSector = state.launchSectors.find((sector) => sector.state === "warning"
     && sector.activeThreatKind === event.threatKind
     && sector.targetCityId === city.id
@@ -562,23 +566,25 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
   const launchSector = preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
   const launchOrigin = preparedSector?.lastLaunchCoordinates || randomPointInSector(launchSector, random);
-  const waypoints = generateCampaignRoute(event, random, launchOrigin);
+  const waypoints = generateCampaignRoute(event, random, launchOrigin, targetCoordinates);
   const threat = spawnThreat(state, random, event.threatKind, city.id, launchSector.id, launchOrigin);
-  if (waypoints.length) waypoints[waypoints.length - 1] = { ...city.coordinates };
-  threat.target = waypoints.at(-1) || city.coordinates;
+  if (waypoints.length) waypoints[waypoints.length - 1] = { ...targetCoordinates };
+  threat.target = waypoints.at(-1) || targetCoordinates;
+  threat.targetAsset = event.targetAsset;
   threat.routeId = event.routeId;
   threat.routeWaypoints = waypoints;
   threat.campaignPriority = event.priority;
   threat.campaignGroupId = event.groupId;
-  threat.plannedTargetPriority = event.targetRegion;
+  threat.plannedTargetPriority = event.targetAsset === "ammo-depot" ? "Склад БК" : event.targetRegion;
   threat.reward = campaignKillRewards[event.threatKind] ?? threat.reward;
   threat.headingDeg = bearingDeg(threat.origin, threat.target);
   state.liveThreats.push(threat);
   campaign.spawnCursor += 1;
-  markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: city.coordinates }, launchOrigin, event.threatKind);
+  markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: targetCoordinates }, launchOrigin, event.threatKind);
   const missile = isMissileClass(event.threatKind);
   const launchPointLabel = `${launchSector.name} · маршрут ${event.routeId}`;
-  pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Пуск БПЛА", `Пускова точка ${launchPointLabel}. Цільовий сектор: ${event.targetRegion} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: launchPointLabel, soundCue: launchSoundCue(event.threatKind) });
+  const targetLabel = event.targetAsset === "ammo-depot" ? "Склад БК" : event.targetRegion;
+  pushLog(state.log, state.elapsedMs, missile ? (event.threatKind === "iskander" ? "Балістичне попередження" : "Крилата ракета") : "Пуск БПЛА", `Пускова точка ${launchPointLabel}. Цільовий сектор: ${targetLabel} · пріоритет ${event.priority}.`, missile ? "danger" : "warning", { eventType: "launch", locationLabel: launchPointLabel, soundCue: launchSoundCue(event.threatKind) });
   return true;
 }
 
@@ -593,6 +599,7 @@ function prepareCampaignLaunch(state: GameState, random: () => number) {
   if (!route) return;
   const targetCityId = event.targetRegion.toLowerCase().includes("столич") ? "kyiv" : route.targetCityId;
   const city = state.cities.find((item) => item.id === targetCityId) || state.cities[0];
+  const targetCoordinates = event.targetAsset === "ammo-depot" ? campaign.depot.position : city.coordinates;
   const existing = state.launchSectors.some((sector) => sector.state === "warning"
     && sector.activeThreatKind === event.threatKind
     && sector.targetCityId === city.id);
@@ -600,7 +607,7 @@ function prepareCampaignLaunch(state: GameState, random: () => number) {
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
   const sector = pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
   const origin = randomPointInSector(sector, random);
-  markLaunchSector(state, sector.id, "warning", untilLaunchMs + 1000, { cityId: city.id, coordinates: city.coordinates }, origin, event.threatKind);
+  markLaunchSector(state, sector.id, "warning", untilLaunchMs + 1000, { cityId: city.id, coordinates: targetCoordinates }, origin, event.threatKind);
   pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Активність у секторі «${sector.name}». До можливого пуску менше 15 секунд.`, "warning", { eventType: "launch", locationLabel: sector.name, soundCue: "alert.prelaunch" });
 }
 
@@ -702,6 +709,7 @@ function maybeSpawnThreat(state: GameState, deltaMs: number, random: () => numbe
   if (state.campaign) {
     accelerateCampaignSchedule(state);
     grantFirstMissionS300(state);
+    grantSecondMissionPatriot(state);
     prepareCampaignLaunch(state, random);
     while (state.liveThreats.length < MAX_LIVE_THREATS && spawnCampaignThreat(state, random)) { /* drain due targets */ }
     return;
@@ -753,6 +761,32 @@ function grantFirstMissionS300(state: GameState) {
   );
   if (granted) {
     pushLog(state.log, state.elapsedMs, "Підкріплення прибуло", "С-300 передано до резерву. Розгорніть комплекс для перехоплення крилатої ракети з Каспійського напрямку.", "success");
+  }
+}
+
+function grantSecondMissionPatriot(state: GameState) {
+  const campaign = state.campaign;
+  if (!campaign || campaign.missionIndex !== 2 || state.cyclePhase !== "attack") return;
+  const upcomingBallistic = campaign.spawnEvents.slice(campaign.spawnCursor).find((event) => event.threatKind === "iskander" && event.routeId === "R27");
+  if (!upcomingBallistic) return;
+  const phaseElapsedMs = state.elapsedMs - state.cycleStartedAtMs;
+  if (upcomingBallistic.dueMs - phaseElapsedMs > SECOND_MISSION_REINFORCEMENT_LEAD_MS) return;
+  const granted = addCampaignStoredBattery(
+    state,
+    "patriot",
+    { lat: 46.2, lng: 30.8 },
+    CAMPAIGN_REINFORCEMENT_ACTION,
+    "campaign-m2-patriot-reinforcement",
+  );
+  if (granted) {
+    const battery = state.storedBatteries.find((item) => item.id === "campaign-m2-patriot-reinforcement");
+    if (battery) {
+      battery.currentAmmo = 2;
+      battery.missionReserve = 4;
+      battery.assignedCityId = "odesa";
+      battery.createdAtMission = 2;
+    }
+    pushLog(state.log, state.elapsedMs, "Підкріплення прибуло", "Patriot передано до резерву. Розгорніть комплекс біля Одеси для перехоплення фінальної балістичної цілі.", "success");
   }
 }
 
@@ -1020,7 +1054,13 @@ function engagementChance(
     threatKind: threat.kind,
     coastalBonus: battery.kind === "boat" && (threat.kind === "kalibr" || threat.targetCityId === "odesa" || threat.targetCityId === "mykolaiv") ? 10 : 0,
   });
-  return shots > 1 ? Math.min(98, (1 - (1 - perShot / 100) ** shots) * 100) : perShot;
+  if (shots <= 1) return perShot;
+  const combinedSalvoChance = (1 - (1 - perShot / 100) ** shots) * 100;
+  const ballisticSalvoCoordination = unit.kind === "patriot"
+    && (threat.kind === "iskander" || threat.kind === "ballistic")
+    ? 12
+    : 0;
+  return Math.min(98, combinedSalvoChance + ballisticSalvoCoordination);
 }
 
 function engageThreats(state: GameState, random: () => number) {
@@ -1099,9 +1139,6 @@ function engageThreats(state: GameState, random: () => number) {
 }
 
 function applyImpact(state: GameState, threat: LiveThreat, random: () => number) {
-  const city = state.cities.find((item) => item.id === threat.targetCityId);
-  if (!city) return;
-
   if (threat.kind === "recon") {
     state.wavePressure = clamp(state.wavePressure + supportLeakEffect(threat.kind).wavePressure, 10, 100);
     pushLog(state.log, state.elapsedMs, "Розвідка пройшла", "Наступні контакти отримали більше маскування та хвильового тиску.", "warning");
@@ -1118,10 +1155,29 @@ function applyImpact(state: GameState, threat: LiveThreat, random: () => number)
     pushLog(state.log, state.elapsedMs, "Хибний контакт згас", "Приманка дісталася сектора, але не спричинила шкоди й не рахується як влучання.", "info");
     return;
   }
+  if (state.campaign && threat.targetAsset === "ammo-depot") {
+    const depotImpact = damageCampaignDepot(state, damage);
+    state.impactMarkers.push({ id: createId("depot-impact", Math.floor(state.elapsedMs), random), position: { ...state.campaign.depot.position }, tone: "impact", ttlMs: 2600 });
+    pushLog(
+      state.log,
+      state.elapsedMs,
+      state.campaign.depot.health <= 0 ? "Склад БК знищено" : "Удар по складу БК",
+      `Ангар отримав ${Math.round(depotImpact.damage)} пошкоджень.${depotImpact.stockLost ? ` Втрачено ${depotImpact.stockLost} БК.` : ""}`,
+      "danger",
+      { soundCue: "result.impact" },
+    );
+    return;
+  }
+
+  const city = state.cities.find((item) => item.id === threat.targetCityId);
+  if (!city) return;
   const damageChannels = threatRule(threat.kind).damageChannels;
-  if (damageChannels.includes("infrastructure")) {
-    city.damage = clamp(city.damage + damage * 0.35);
-    city.infrastructure = clamp(city.infrastructure - damage * 0.25);
+  if (state.campaign) {
+    city.infrastructure = clamp(city.infrastructure - damage, 0, 100);
+    city.damage = clamp(100 - city.infrastructure, 0, 100);
+  } else if (damageChannels.includes("infrastructure")) {
+    city.damage = clamp(city.damage + damage * .35);
+    city.infrastructure = clamp(city.infrastructure - damage * .25);
   }
   if (damageChannels.includes("energy")) {
     city.energy = clamp(city.energy - damage * 0.2);
@@ -1130,15 +1186,29 @@ function applyImpact(state: GameState, threat: LiveThreat, random: () => number)
   if (damageChannels.includes("morale")) state.resources.morale = clamp(state.resources.morale - (city.importance * 0.5 + 0.8));
   if (damageChannels.includes("logistics")) state.logistics.resupplyDelayDays = Math.min(3, state.logistics.resupplyDelayDays + 1);
   if (state.campaign && damage > 0) {
-    state.campaign.civilianResilience = clamp(state.campaign.civilianResilience - 4, 0, 100);
+    state.campaign.civilianResilience = Math.min(...state.cities.map((item) => item.infrastructure));
     for (const battery of state.batteries.filter((item) => item.assignedCityId === city.id)) {
-      battery.health = clamp(battery.health - damage * 1.2, 0, 100);
-      battery.readiness = clamp(battery.readiness - damage * .8, 0, 100);
+      battery.health = clamp(battery.health - damage * .6, 0, 100);
+      battery.readiness = clamp(battery.readiness - damage * .35, 0, 100);
     }
   }
   state.impacts += 1;
   state.impactMarkers.push({ id: createId("impact", Math.floor(state.elapsedMs), random), position: city.coordinates, tone: "impact", ttlMs: 2600 });
   pushLog(state.log, state.elapsedMs, "Impact", `${city.name} was hit by an unresolved ${threat.kind} track.`, "danger", { soundCue: "result.impact" });
+  if (state.campaign && city.infrastructure <= 0) finishCampaignDefeat(state, city.id);
+}
+
+function finishCampaignDefeat(state: GameState, failedCityId: CityId) {
+  if (!state.campaign || state.campaign.lastAttemptResult?.outcome === "defeat") return;
+  if (state.cycleSnapshot) {
+    const report = generateAfterActionReport(state, state.cycleSnapshot);
+    state.afterActionReports = [report, ...state.afterActionReports].slice(0, 8);
+    state.latestReportId = report.id;
+  }
+  const result = recordCampaignDefeat(state, failedCityId);
+  state.status = "lost";
+  state.statusReason = result?.objectiveSummary || "Місто втратило всі міські служби.";
+  pushLog(state.log, state.elapsedMs, "Місію програно", state.statusReason, "danger", { soundCue: "result.mission-failure" });
 }
 
 function updateThreats(state: GameState, deltaMs: number, random: () => number) {
@@ -1151,6 +1221,9 @@ function updateThreats(state: GameState, deltaMs: number, random: () => number) 
     }
     if (next.progress >= 1) {
       applyImpact(state, next, random);
+      if (state.status !== "active") {
+        break;
+      }
     } else {
       remaining.push(next);
     }
@@ -1345,7 +1418,9 @@ function updateCycle(state: GameState, random: () => number) {
 function evaluateLiveStatus(state: GameState) {
   const collapsedCities = state.cities.filter((city) => city.infrastructure <= 0 || city.damage >= 100).length;
   const scenario = getScenario(state.scenarioId);
-  if (state.resources.morale <= 0) {
+  if (state.campaign && collapsedCities > 0) {
+    finishCampaignDefeat(state, state.cities.find((city) => city.infrastructure <= 0 || city.damage >= 100)!.id);
+  } else if (state.resources.morale <= 0) {
     state.status = "lost";
     state.statusReason = "National morale collapsed.";
   } else if (state.resources.energy <= 0) {
@@ -1377,6 +1452,7 @@ export function tickSimulation(current: GameState, deltaMs: number, random: () =
   updateLaunchSectors(state);
   updateCycle(state, random);
   grantFirstMissionS300(state);
+  grantSecondMissionPatriot(state);
   resolvePendingLaunches(state, random);
   maybeSpawnThreat(state, safeDelta, random);
   detectThreats(state, random, Math.floor(previousElapsedMs / 1000) !== Math.floor(state.elapsedMs / 1000));

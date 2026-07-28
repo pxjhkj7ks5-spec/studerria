@@ -13,8 +13,8 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   projects: [
-    { name: "mobile-chromium", use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 } } },
-    { name: "mobile-webkit", use: { ...devices["iPhone 13"], browserName: "webkit", viewport: { width: 390, height: 844 } } },
+    { name: "mobile-chromium", testIgnore: /desktop-zoom\.spec\.ts/, use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 } } },
+    { name: "mobile-webkit", testIgnore: /desktop-zoom\.spec\.ts/, use: { ...devices["iPhone 13"], browserName: "webkit", viewport: { width: 390, height: 844 } } },
     {
       name: "mobile-live-landscape",
       testMatch: /mobile-live\.spec\.ts/,
@@ -33,7 +33,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "PORT=4175 SHIELDLINE_AUTH_REQUIRED=0 SHIELDLINE_GAME_STORE_FILE=./test-results/playwright-game-store.json npm start",
+      command: "PORT=4175 SHIELDLINE_AUTH_REQUIRED=0 SHIELDLINE_API_RATE_LIMIT_PER_MINUTE=5000 SHIELDLINE_GAME_STORE_FILE=./test-results/playwright-game-store.json npm start",
       url: "http://127.0.0.1:4175/shieldline/api/health",
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
