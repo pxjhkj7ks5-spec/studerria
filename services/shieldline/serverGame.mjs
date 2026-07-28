@@ -10,23 +10,23 @@ const RADAR_KINDS = new Set(["small-radar", "radar", "long-radar"]);
 const campaignDifficulty = { "first-contact": 38, "southern-corridor": 46, "eastern-arc": 54, saturation: 62, "mass-night": 70 };
 const campaignWave = (missionId, index, threatKind, size, etaSeconds) => ({ id: `${missionId}-wave-${String(index + 1).padStart(2, "0")}`, index: index + 1, threatKind, originSector: "east", targetSector: "hq", etaSeconds, size, difficulty: campaignDifficulty[missionId] || 38 });
 const campaignMission = (id, title, durationMinutes, grant, specs) => ({ id, title, durationMinutes, grant, waves: specs.map((spec, index) => campaignWave(id, index, ...spec)) });
-const missions = [
-  campaignMission("first-contact", "Перший контакт", 10, 42, [["parodiya",2,10],["gerbera",2,45],["geran2",3,90],["parodiya",2,145],["geran2",3,200],["kh101",1,275],["gerbera",2,335],["geran2",4,390],["geran2",4,455]]),
-  campaignMission("southern-corridor", "Південний коридор", 35, 32, [["gerbera",4,120],["parodiya",5,360],["geran2",4,660],["gerbera",3,930],["geran2",6,960],["parodiya",3,1290],["kalibr",1,1380],["geran2",8,1680],["gerbera",2,1950],["geran2",5,1980],["iskander",1,2055]]),
-  campaignMission("eastern-arc", "Східна дуга", 45, 48, [["parodiya",6,180],["geran2",6,480],["gerbera",4,810],["geran2",4,840],["kalibr",1,1200],["parodiya",4,1470],["geran2",10,1500],["kh101",2,1860],["gerbera",3,2190],["geran2",10,2220],["geran2",8,2520],["iskander",1,2610]]),
-  campaignMission("saturation", "Насичення", 50, 70, [["parodiya",8,120],["geran2",6,420],["gerbera",5,690],["geran2",5,720],["iskander",1,1080],["geran2",12,1320],["kh101",2,1710],["geran2",6,1740],["geran2",15,2100],["parodiya",10,2490],["geran2",6,2520],["iskander",1,2820],["kalibr",1,2840]]),
-  campaignMission("mass-night", "Масована ніч", 60, 100, [["parodiya",10,180],["geran2",8,480],["geran2",10,780],["kh101",2,1080],["geran2",12,1320],["gerbera",6,1650],["geran2",8,1680],["iskander",1,2040],["geran2",12,2280],["kh101",3,2640],["geran2",15,3000],["iskander",1,3360],["kh101",2,3360],["parodiya",5,3380],["geran2",8,3400]]),
+export const serverCampaignMissions = [
+  campaignMission("first-contact", "Перший контакт", 10, 24, [["parodiya",2,10],["gerbera",2,45],["geran2",3,90],["parodiya",2,145],["geran2",3,200],["kh101",1,275],["gerbera",2,335],["geran2",4,390],["geran2",4,455]]),
+  campaignMission("southern-corridor", "Південний маневр", 22, 16, [["recon",1,45],["gerbera",4,120],["parodiya",5,240],["geran2",4,360],["gerbera",4,510],["geran2",5,540],["kalibr",1,720],["parodiya",3,840],["geran2",6,870],["kalibr",1,1080],["geran2",7,1100],["iskander",1,1260]]),
+  campaignMission("eastern-arc", "Сліпа зона", 28, 24, [["recon",1,45],["parodiya",5,120],["geran2",6,240],["gerbera",4,390],["geran2",5,420],["jammer",1,570],["geran2",8,600],["low-signature-cruise",1,810],["parodiya",5,900],["geran2",8,930],["kalibr",1,1140],["gerbera",3,1260],["geran2",8,1290],["kh101",2,1470],["iskander",1,1620]]),
+  campaignMission("saturation", "Розірване небо", 34, 32, [["recon",2,45],["parodiya",8,120],["geran2",6,270],["gerbera",5,450],["geran2",6,480],["jammer",2,630],["geran2",8,660],["kh101",2,870],["parodiya",10,1020],["geran2",10,1050],["iskander",1,1290],["geran2",7,1440],["low-signature-cruise",1,1620],["geran2",8,1640],["kalibr",1,1890],["iskander",1,1910]]),
+  campaignMission("mass-night", "Масована ніч", 42, 45, [["recon",2,45],["parodiya",8,120],["geran2",8,270],["jammer",1,480],["geran2",8,510],["gerbera",6,690],["geran2",10,720],["kh101",2,960],["parodiya",7,1140],["geran2",10,1170],["low-signature-cruise",1,1380],["jammer",2,1500],["geran2",12,1530],["kh101",3,1770],["geran2",10,1980],["iskander",1,2160],["kh101",2,2160],["low-signature-cruise",1,2310],["geran2",8,2340],["iskander",1,2460]]),
 ];
 
 function missionById(missionId) {
-  return missions.find((entry) => entry.id === missionId) || missions[0];
+  return serverCampaignMissions.find((entry) => entry.id === missionId) || serverCampaignMissions[0];
 }
 
 function event(runId, sequence, type, occurredAtMs, message, extras = {}) {
   return { id: `${runId}-evt-${sequence}`, runId, sequence, type, occurredAtMs, tick: occurredAtMs, simVersion: SIM_VERSION, schemaVersion: 1, message, payload: {}, ...extras };
 }
 
-export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0, missionId = missions[0].id, plan = {}) {
+export function simulateMission(seed, now = new Date().toISOString(), defenseBonus = 0, missionId = serverCampaignMissions[0].id, plan = {}) {
   return simulateOperation({ mission: missionById(missionId), seed, defenseBonus, plan, startedAt: now });
 }
 
@@ -219,7 +219,7 @@ export async function createGameStore(file) {
         return { actorId: entry.actorId };
       });
     },
-    async runMission(seed, actorId = "web-commander", plan = {}, missionId = missions[0].id, source = "campaign") {
+    async runMission(seed, actorId = "web-commander", plan = {}, missionId = serverCampaignMissions[0].id, source = "campaign") {
       const resolvedPlan = normalizeDailyPlan(plan);
       if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before resolving the operation.");
       const defenseBonus = defenseBonusFor(resolvedPlan);
@@ -227,10 +227,10 @@ export async function createGameStore(file) {
       const run = await persistRun(simulateMission(seed, new Date().toISOString(), defenseBonus, mission.id, resolvedPlan), { source, actorId, displayName: actorId === "web-commander" ? "Web Commander" : actorId, plan: resolvedPlan, defenseBonus });
       if (source === "campaign") {
         const store = await readStore();
-        const current = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
-        const missionIndex = missions.findIndex((entry) => entry.id === mission.id);
+        const current = store.campaigns[actorId] || { currentMissionId: serverCampaignMissions[0].id, completedMissionIds: [], lastRunId: null };
+        const missionIndex = serverCampaignMissions.findIndex((entry) => entry.id === mission.id);
         current.completedMissionIds = [...new Set([...(current.completedMissionIds || []), mission.id])];
-        current.currentMissionId = missions[Math.min(missions.length - 1, missionIndex + 1)].id;
+        current.currentMissionId = serverCampaignMissions[Math.min(serverCampaignMissions.length - 1, missionIndex + 1)].id;
         current.lastRunId = run.id;
         store.campaigns[actorId] = current;
         store.events.push(event(`campaign-${actorId}`, store.events.length + 1, "mission.completed", Date.now(), `${actorId} resolved ${mission.id}.`, { payload: { runId: run.id, result: run.result } }));
@@ -299,7 +299,7 @@ export async function createGameStore(file) {
       const resolvedPlan = suppliedPlan.assetCount ? suppliedPlan : normalizeDailyPlan({ assets: city.assets });
       if (!resolvedPlan.assetCount) return { report: null, run: null, city };
       const defenseBonus = defenseBonusFor(resolvedPlan);
-      const run = simulateMission(`daily-${key}-${actorId}`, new Date().toISOString(), defenseBonus, missions[0].id, resolvedPlan);
+      const run = simulateMission(`daily-${key}-${actorId}`, new Date().toISOString(), defenseBonus, serverCampaignMissions[0].id, resolvedPlan);
       store.runs[run.id] = { ...run, metadata: { source: "daily", dayKey: key, actorId, plan: resolvedPlan, defenseBonus } };
       store.events.push(...run.events);
       const nextCity = { ...city, assets: resolvedPlan.assets.map((asset) => ({ ...asset, readiness: Math.max(35, Math.round(asset.readiness - (run.impacts ? 7 : 2)) ) })), morale: Math.max(0, city.morale - run.impacts * 3), energy: Math.max(0, city.energy - run.impacts * 2), infrastructure: Math.max(0, city.infrastructure - run.impacts * 2), damage: Math.min(100, city.damage + run.impacts * 4), lastResolvedDay: key, revision: city.revision + 1, updatedAt: new Date().toISOString() };
@@ -312,8 +312,8 @@ export async function createGameStore(file) {
     },
     async campaignState(actorId = "web-commander") {
       const store = await readStore();
-      const progress = store.campaigns[actorId] || { currentMissionId: missions[0].id, completedMissionIds: [], lastRunId: null };
-      return { ...progress, missions: missions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: progress.completedMissionIds.includes(entry.id) ? "completed" : entry.id === progress.currentMissionId ? "active" : "locked" })) };
+      const progress = store.campaigns[actorId] || { currentMissionId: serverCampaignMissions[0].id, completedMissionIds: [], lastRunId: null };
+      return { ...progress, missions: serverCampaignMissions.map((entry, index) => ({ id: entry.id, title: entry.title, index: index + 1, status: progress.completedMissionIds.includes(entry.id) ? "completed" : entry.id === progress.currentMissionId ? "active" : "locked" })) };
     },
     async getPlayerProgress(actorId) {
       const entry = (await readStore()).playerProgress[actorId];
@@ -351,7 +351,7 @@ export async function createGameStore(file) {
       const resolvedPlan = normalizeDailyPlan(plan);
       if (!resolvedPlan.assetCount) throw new Error("Deploy at least one defense asset before entering Ranked Challenge.");
       const defenseBonus = defenseBonusFor(resolvedPlan);
-      const run = simulateMission(`${challenge.seed}-${actorId}`, new Date().toISOString(), defenseBonus, missions[0].id, resolvedPlan);
+      const run = simulateMission(`${challenge.seed}-${actorId}`, new Date().toISOString(), defenseBonus, serverCampaignMissions[0].id, resolvedPlan);
       store.runs[run.id] = { ...run, metadata: { source: "ranked", challengeId, actorId, displayName: actorId, plan: resolvedPlan, defenseBonus } };
       store.events.push(...run.events);
       store.rankedSubmissions[challenge.id] = { ...(store.rankedSubmissions[challenge.id] || {}), [actorId]: run.id };
@@ -399,7 +399,7 @@ export async function createGameStore(file) {
       const room = await this.getRoom(roomId);
       if (!room.assets?.length) throw new Error("The co-op room needs at least one deployed defense asset.");
       const plan = normalizeDailyPlan({ assets: room.assets });
-      const run = await this.runMission(`coop-${roomId}-${room.revision}`, actorId, plan, missions[0].id, "co-op");
+      const run = await this.runMission(`coop-${roomId}-${room.revision}`, actorId, plan, serverCampaignMissions[0].id, "co-op");
       return { room, run };
     },
     async notificationOutbox() { return (await readStore()).notificationOutbox; },

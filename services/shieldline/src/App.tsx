@@ -330,8 +330,18 @@ export default function App() {
     setFullscreenReportOpen(true);
     if (completedCampaignReportRef.current === game.latestReportId) return;
     completedCampaignReportRef.current = game.latestReportId;
-    trackAnalytics("campaign.operation.completed", { reportId: game.latestReportId, interceptions: game.interceptions, impacts: game.impacts });
-  }, [game.impacts, game.interceptions, game.latestReportId, operationPhase, tacticalMode]);
+    const campaignResult = game.campaign?.previousMissionResults.at(-1);
+    trackAnalytics("campaign.operation.completed", {
+      reportId: game.latestReportId,
+      missionIndex: campaignResult?.missionIndex ?? game.campaign?.missionIndex ?? null,
+      durationSeconds: campaignResult?.durationSeconds ?? null,
+      missionGrant: game.campaign?.missionGrant ?? null,
+      missionKillReward: campaignResult?.killReward ?? game.campaign?.missionKillReward ?? null,
+      walletAfterMission: campaignResult?.walletAfterMission ?? game.campaign?.campaignWallet ?? null,
+      interceptions: game.interceptions,
+      impacts: game.impacts,
+    });
+  }, [game.campaign, game.impacts, game.interceptions, game.latestReportId, operationPhase, tacticalMode]);
 
   useEffect(() => {
     if (tacticalMode !== "daily-defense" || !game.batteries.length) return;

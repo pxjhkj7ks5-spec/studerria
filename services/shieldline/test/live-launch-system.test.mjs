@@ -93,8 +93,8 @@ test("separate live operations receive different compatible launch origins", () 
 test("the five-mission campaign follows the authored escalation while launch origins remain seeded", () => {
   const mission = campaignMissions[0];
   assert.equal(campaignMissions.length, 5);
-  assert.deepEqual(campaignMissions.map((entry) => entry.durationMinutes), [10, 35, 45, 50, 60]);
-  assert.deepEqual(campaignMissions.map((entry) => entry.grant), [42, 32, 48, 70, 100]);
+  assert.deepEqual(campaignMissions.map((entry) => entry.durationMinutes), [10, 22, 28, 34, 42]);
+  assert.deepEqual(campaignMissions.map((entry) => entry.grant), [24, 16, 24, 32, 45]);
   assert.ok(campaignMissions.every((entry) => !("rewardCap" in entry)));
   assert.equal(mission.waves.reduce((sum, wave) => sum + wave.size, 0), 23);
   assert.equal(campaignMissions[1].waves.reduce((sum, wave) => sum + wave.size, 0), 42);

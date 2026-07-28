@@ -10,14 +10,27 @@ import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBatt
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
   assert.equal(campaignRouteTemplates.length, 36);
-  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.title), ["Перший контакт", "Південний коридор", "Східна дуга", "Насичення", "Масована ніч"]);
-  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [10, 35, 45, 50, 60]);
-  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [42, 32, 48, 70, 100]);
+  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.title), ["Перший контакт", "Південний маневр", "Сліпа зона", "Розірване небо", "Масована ніч"]);
+  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [10, 22, 28, 34, 42]);
+  assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [24, 16, 24, 32, 45]);
   assert.ok(campaignMissionsPlan.every((mission) => !("rewardCap" in mission)));
   assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 42, 59, 78, 103]);
+  const maximumKillRewards = campaignMissionsPlan.map((mission) => mission.waves.reduce((sum, wave) => sum + wave.count * (campaignKillRewards[wave.threatKind] || 0), 0));
+  assert.deepEqual(maximumKillRewards, [50, 112, 174, 234, 341]);
+  assert.deepEqual(campaignMissionsPlan.map((mission, index) => mission.grant + maximumKillRewards[index] + (index === 0 ? 29 : 39)), [103, 167, 237, 305, 425]);
+  assert.ok(campaignMissionsPlan.every((mission) => (mission.waves.at(-1)?.timeSeconds || 0) < mission.durationMinutes * 60));
   assert.equal(campaignMissionsPlan[0].waves.some((wave) => wave.threatKind === "iskander"), false);
   assert.equal(campaignMissionsPlan[1].waves.at(-1)?.threatKind, "iskander");
   assert.equal(campaignMissionsPlan.slice(1).every((mission) => mission.waves.some((wave) => wave.threatKind === "iskander")), true);
+});
+
+test("special threats are restricted to their authored campaign corridors", () => {
+  const routesFor = (kind: "recon" | "jammer" | "low-signature-cruise") =>
+    campaignRouteTemplates.filter((route) => route.allowedThreats.includes(kind)).map((route) => route.id);
+
+  assert.deepEqual(routesFor("recon"), ["R01", "R04", "R07", "R10", "R21", "R29"]);
+  assert.deepEqual(routesFor("jammer"), ["R20", "R24", "R25", "R35"]);
+  assert.deepEqual(routesFor("low-signature-cruise"), ["R20", "R25", "R31", "R35"]);
 });
 
 test("campaign mission selection unlocks only the next sequential mission", () => {
@@ -141,22 +154,25 @@ test("campaign economy credits every authored kill reward and preserves units wi
   game.campaign = createCampaignState();
   game.resources.budget = 0;
   applyCampaignMissionOpening(game);
-  assert.equal(game.resources.budget, 42);
-  game = placeBattery(game, "radar", { lat: 49.2, lng: 29.4 }, () => .4);
+  assert.equal(game.resources.budget, 24);
+  game = placeBattery(game, "small-radar", { lat: 49.2, lng: 29.4 }, () => .4);
   game = placeBattery(game, "mvg", { lat: 49.1, lng: 29.7 }, () => .6);
-  assert.equal(game.resources.budget, 11);
+  assert.equal(game.resources.budget, 6);
   const mvg = game.batteries.find((battery) => battery.kind === "mvg")!;
   mvg.currentAmmo = 1;
   mvg.health = 76;
   const originalPosition = { ...mvg.position };
   for (let index = 0; index < 60; index += 1) recordCampaignKill(game, "parodiya", 1);
-  assert.equal(game.resources.budget, 71);
-  assert.equal(game.campaign?.campaignWallet, 71);
+  assert.equal(game.resources.budget, 66);
+  assert.equal(game.campaign?.campaignWallet, 66);
   game.interceptions = 30;
+  game.cycleStartedAtMs = 12_000;
+  game.elapsedMs = 112_000;
   const result = finalizeCampaignMission(game)!;
+  assert.equal(result.durationSeconds, 100);
   assert.equal(result.killReward, 60);
   assert.equal(result.bonusRewards, 29);
-  assert.equal(result.walletAfterMission, 100);
+  assert.equal(result.walletAfterMission, 95);
   assert.equal(mvg.currentAmmo, 1);
   assert.equal(mvg.health, 76);
   assert.equal(mvg.experienceLevel, 1);
@@ -164,7 +180,7 @@ test("campaign economy credits every authored kill reward and preserves units wi
 
   game = advanceCampaignMission(game);
   assert.equal(game.campaign?.missionIndex, 2);
-  assert.equal(game.resources.budget, 132);
+  assert.equal(game.resources.budget, 111);
   assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, 1);
   assert.ok(game.campaign?.unlockedSystems.includes("gepard"));
 });
@@ -177,8 +193,8 @@ test("campaign redeployment always costs one million regardless of the air-defen
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   applyCampaignMissionOpening(game);
-  game = placeBattery(game, "radar", { lat: 49.2, lng: 29.4 }, () => .5);
-  const radar = game.batteries.find((battery) => battery.kind === "radar")!;
+  game = placeBattery(game, "small-radar", { lat: 49.2, lng: 29.4 }, () => .5);
+  const radar = game.batteries.find((battery) => battery.kind === "small-radar")!;
   game = moveBatteryToStorage(game, radar.id);
   const walletBeforeRedeployment = game.campaign!.campaignWallet;
   game = deployStoredBattery(game, radar.id, { lat: 48.7, lng: 30.1 });
@@ -211,8 +227,8 @@ test("campaign onboarding advances by action and keeps five seconds between prom
   assert.equal(campaignTutorialPlacementAction("mvg"), "place-mvg-east-of-kyiv");
   assert.equal(campaignTutorialPlacementAction("radar"), null);
   assert.deepEqual(
-    ["parodiya", "gerbera", "geran2", "kh101", "kalibr", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
-    [1, 2, 2, 10, 10, 20],
+    ["parodiya", "gerbera", "geran2", "recon", "kh101", "kalibr", "jammer", "low-signature-cruise", "iskander"].map((kind) => campaignKillRewards[kind as keyof typeof campaignKillRewards]),
+    [1, 2, 2, 4, 10, 10, 12, 14, 20],
   );
   assert.equal(buildCampaignSpawnEvents(1)[0].dueMs, 10_000);
 });
@@ -222,13 +238,13 @@ test("first mission provides the tutorial radar and mobile fire group without sp
   let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   applyCampaignMissionOpening(game);
-  assert.equal(game.campaign?.campaignWallet, 42);
+  assert.equal(game.campaign?.campaignWallet, 24);
   assert.ok(game.campaign?.unlockedSystems.includes("long-radar"));
   assert.equal(game.campaign?.unlockedSystems.includes("s300"), false);
   assert.deepEqual(game.storedBatteries.map((battery) => battery.kind).sort(), ["long-radar", "mvg"]);
   const radar = game.storedBatteries.find((battery) => battery.kind === "long-radar")!;
   game = deployStoredBattery(game, radar.id, { lat: 50.2, lng: 30.3 });
-  assert.equal(game.campaign?.campaignWallet, 42);
+  assert.equal(game.campaign?.campaignWallet, 24);
   assert.equal(game.batteries.some((battery) => battery.kind === "long-radar"), true);
   assert.equal(game.log[0].soundCue, "placement.success");
 });
@@ -323,8 +339,8 @@ test("campaign kill earnings have no mission or wallet ceiling", () => {
   applyCampaignMissionOpening(game);
   for (let index = 0; index < 10_000; index += 1) recordCampaignKill(game, "parodiya", 1);
   assert.equal(game.campaign.missionKillReward, 10_000);
-  assert.equal(game.campaign.campaignWallet, 10_042);
-  assert.equal(game.resources.budget, 10_042);
+  assert.equal(game.campaign.campaignWallet, 10_024);
+  assert.equal(game.resources.budget, 10_024);
 });
 
 test("campaign cruise missiles require sensor acquisition and complete their authored route", () => {

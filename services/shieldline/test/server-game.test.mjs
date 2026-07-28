@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { simulateMission } from "../serverGame.mjs";
+import { serverCampaignMissions, simulateMission } from "../serverGame.mjs";
 import { campaignMissions } from "../src/data/missions.ts";
 import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 import { calculateDefenseBonus } from "../src/game/simulationCore.mjs";
@@ -13,6 +13,24 @@ test("production image includes every authoritative simulation runtime module", 
   assert.match(dockerfile, /src\/game\/campaignPacing\.mjs/);
   assert.match(dockerfile, /src\/game\/airDefenseRules\.mjs/);
   assert.match(dockerfile, /serverTelegramAuth\.mjs/);
+});
+
+test("server and browser campaign catalogs stay in parity", () => {
+  const browserCatalog = campaignMissions.map(({ id, title, durationMinutes, grant, waves }) => ({
+    id,
+    title,
+    durationMinutes,
+    grant,
+    waves: waves.map(({ threatKind, size, etaSeconds }) => ({ threatKind, size, etaSeconds })),
+  }));
+  const serverCatalog = serverCampaignMissions.map(({ id, title, durationMinutes, grant, waves }) => ({
+    id,
+    title,
+    durationMinutes,
+    grant,
+    waves: waves.map(({ threatKind, size, etaSeconds }) => ({ threatKind, size, etaSeconds })),
+  }));
+  assert.deepEqual(serverCatalog, browserCatalog);
 });
 
 test("authoritative mission output is stable for a golden seed", () => {

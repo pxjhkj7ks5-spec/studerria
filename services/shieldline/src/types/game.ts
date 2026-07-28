@@ -366,6 +366,7 @@ export interface CampaignMissionResult {
   missionIndex: number;
   missionId: string;
   title: string;
+  durationSeconds: number;
   totalTargets: number;
   interceptions: number;
   impacts: number;

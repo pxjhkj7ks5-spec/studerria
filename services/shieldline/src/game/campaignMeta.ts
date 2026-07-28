@@ -143,6 +143,7 @@ export function finalizeCampaignMission(state: GameState): CampaignMissionResult
     missionIndex: campaign.missionIndex,
     missionId: mission.id,
     title: mission.title,
+    durationSeconds: Math.max(0, Math.round((state.elapsedMs - state.cycleStartedAtMs) / 1_000)),
     totalTargets,
     interceptions,
     impacts,

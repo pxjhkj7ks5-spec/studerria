@@ -1,17 +1,11 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { createClient } from "redis";
-import { simulateMission } from "./serverGame.mjs";
+import { serverCampaignMissions, simulateMission } from "./serverGame.mjs";
 import { calculateDefenseBonus, stableHash } from "./src/game/simulationCore.mjs";
 
 const { Pool } = pg;
-const CAMPAIGN_MISSIONS = [
-  { id: "first-contact", title: "Перший контакт" },
-  { id: "southern-corridor", title: "Південний коридор" },
-  { id: "eastern-arc", title: "Східна дуга" },
-  { id: "saturation", title: "Насичення" },
-  { id: "mass-night", title: "Масована ніч" },
-];
+const CAMPAIGN_MISSIONS = serverCampaignMissions.map(({ id, title }) => ({ id, title }));
 
 export const SHIELDLINE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS shieldline_users (
