@@ -1,7 +1,7 @@
 import { getScenario } from "../data/scenarios";
 import { getUnitDefinition } from "../data/units";
 import { threatTelemetryFor } from "../data/threatFlightProfiles";
-import { flightDurationForSpeed } from "./threatFlightModel.mjs";
+import { flightDurationForDistance, routeDistanceKm, trimRouteToTrackedDistance } from "./threatFlightModel.mjs";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
 import { buildLogisticsState } from "./logistics";
 import { createGuidedCampaignSchedule, guidedStageForElapsed, guidedStageLaunchCount, guidedThreatKind, nextGuidedLaunchDelayMs, sectorIdsForDirection } from "./campaignPacing.mjs";
@@ -40,8 +40,8 @@ const SECOND_MISSION_REINFORCEMENT_LEAD_MS = 90_000;
 const MIN_ATTACK_WINDOW_MS = 90000;
 const LAUNCH_CONE_HALF_ANGLE_DEG = 12;
 const LAUNCH_CONE_RANGE_KM = 900;
-const AIR_RAID_TRACK_DISTANCE_KM = 55;
-const AIR_RAID_TARGET_DISTANCE_KM = 60;
+const AIR_RAID_TRACK_DISTANCE_KM = 50;
+const AIR_RAID_HOLD_MS = 90_000;
 const PROBABLE_TARGET_DISTANCE_KM = 82;
 
 const fallbackThreatKinds: ThreatKind[] = ["recon", "geran2", "gerbera", "parodiya", "jammer", "low-signature-cruise", "kh101", "kalibr", "iskander"];
@@ -287,7 +287,7 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     cooldownMs: next.planningActions.selected.includes("rapid-redeployment") ? 900 : 0,
     reloadRemainingMs: 0,
     currentAmmo: unit.ammoCapacity,
-    missionReserve: unit.missionReserveCapacity,
+    missionReserve: next.campaign && unit.missionReserveCapacity !== "infinite" ? 0 : unit.missionReserveCapacity,
     manualOverrideTargets: [],
     assignedCityId: nearestCityId(next, position),
     health: 100,
@@ -295,11 +295,6 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
     createdAtMission: next.campaign?.missionIndex || 0,
     lastMovedMission: next.campaign?.missionIndex || 0,
   };
-  if (next.campaign && typeof battery.missionReserve === "number") {
-    const allocated = Math.min(battery.missionReserve, next.campaign.depot.stock);
-    battery.missionReserve = allocated;
-    next.campaign.depot.stock -= allocated;
-  }
   if (next.planningActions.selected.includes("rapid-redeployment")) {
     applyRedeployFatigue(battery);
   }
@@ -358,6 +353,7 @@ export function deployStoredBattery(state: GameState, batteryId: string, positio
   next.batteries.push({
     ...battery,
     position: { ...position },
+    missionReserve: next.campaign && battery.missionReserve !== "infinite" ? 0 : battery.missionReserve,
     assignedCityId: nearestCityId(next, position),
     lastAction: freeCampaignDeployment ? battery.kind === "s300" ? "reinforcement deployed" : "tutorial asset deployed" : "redeployed from storage",
     lastMovedMission: next.campaign?.missionIndex || battery.lastMovedMission,
@@ -508,19 +504,21 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     ? state.launchSectors.find((sector) => sector.id === forcedSectorId && sectorSupportsThreat(sector, kind)) || pickLaunchSector(state.launchSectors, kind, random)
     : pickLaunchSector(state.launchSectors, kind, random);
   const carrierId = createCarrierForThreat(state, kind, launchSector, random);
-  const falseTrack = kind === "decoy" || kind === "parodiya" || random() < (plan?.deception || 0) * 0.045;
+  const falseTrack = kind === "decoy" || kind === "parodiya";
   const origin = forcedOrigin ? { ...forcedOrigin } : randomPointInSector(launchSector, random);
   if (SHOW_LAUNCH_DEBUG) console.debug("[Shieldline live launch]", { threatType: kind, sector: launchSector.id, point: origin });
   const heading = bearingDeg(origin, city.coordinates);
   const id = createId("live-threat", Math.floor(state.elapsedMs), random);
   const telemetry = threatTelemetryFor(kind, id);
-  const flightDurationMs = flightDurationForSpeed(kind, telemetry.speedKph);
+  const trackedRoute = trimRouteToTrackedDistance(kind, [origin, city.coordinates]);
+  const flightDurationMs = flightDurationForDistance(kind, telemetry.speedKph, routeDistanceKm(trackedRoute));
   return {
     id,
     kind,
     status: "inbound",
     origin,
     target: city.coordinates,
+    routeWaypoints: trackedRoute,
     targetCityId: city.id,
     launchSectorId: launchSector.id,
     launchSectorName: launchSector.name,
@@ -566,7 +564,7 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
   const launchSector = preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
   const launchOrigin = preparedSector?.lastLaunchCoordinates || randomPointInSector(launchSector, random);
-  const waypoints = generateCampaignRoute(event, random, launchOrigin, targetCoordinates);
+  const waypoints = trimRouteToTrackedDistance(event.threatKind, generateCampaignRoute(event, random, launchOrigin, targetCoordinates));
   const threat = spawnThreat(state, random, event.threatKind, city.id, launchSector.id, launchOrigin);
   if (waypoints.length) waypoints[waypoints.length - 1] = { ...targetCoordinates };
   threat.target = waypoints.at(-1) || targetCoordinates;
@@ -578,6 +576,11 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   threat.plannedTargetPriority = event.targetAsset === "ammo-depot" ? "Склад БК" : event.targetRegion;
   threat.reward = campaignKillRewards[event.threatKind] ?? threat.reward;
   threat.headingDeg = bearingDeg(threat.origin, threat.target);
+  threat.speed = 1 / flightDurationForDistance(
+    threat.kind,
+    threat.speedKph,
+    routeDistanceKm(threat.routeWaypoints?.length ? threat.routeWaypoints : [threat.origin, threat.target]),
+  );
   state.liveThreats.push(threat);
   campaign.spawnCursor += 1;
   markLaunchSector(state, launchSector.id, "launching", 16000, { cityId: city.id, coordinates: targetCoordinates }, launchOrigin, event.threatKind);
@@ -782,7 +785,7 @@ function grantSecondMissionPatriot(state: GameState) {
     const battery = state.storedBatteries.find((item) => item.id === "campaign-m2-patriot-reinforcement");
     if (battery) {
       battery.currentAmmo = 2;
-      battery.missionReserve = 4;
+      battery.missionReserve = 0;
       battery.assignedCityId = "odesa";
       battery.createdAtMission = 2;
     }
@@ -920,10 +923,10 @@ function updateEngagements(state: GameState, deltaMs: number, random: () => numb
       if (battery && battery.status === "engaging") {
         const unit = getUnitDefinition(battery.kind);
         if (unit.ammoCapacity !== "infinite" && unit.ammoCapacity !== 0 && battery.currentAmmo === 0) {
-          const canReload = battery.missionReserve === "infinite" || Number(battery.missionReserve || 0) > 0;
+          const canReload = Boolean(state.campaign) || battery.missionReserve === "infinite" || Number(battery.missionReserve || 0) > 0;
           battery.status = canReload ? "reloading" : "strained";
-          battery.lastAction = canReload ? "reloading" : "mission reserve exhausted";
-          if (canReload) pushLog(state.log, state.elapsedMs, "Перезарядження", `${unit.shortName}: поповнення магазину із запасу місії.`, "info", { soundCue: "engagement.reload" });
+          battery.lastAction = canReload ? "reloading" : "reserve exhausted";
+          if (canReload) pushLog(state.log, state.elapsedMs, "Перезарядження", state.campaign ? `${unit.shortName}: магазин готується до автоматичного поповнення зі складу БК.` : `${unit.shortName}: поповнення магазину з локального резерву.`, "info", { soundCue: "engagement.reload" });
         } else {
           battery.status = battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
         }
@@ -943,7 +946,7 @@ function hasLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: Defen
   return typeof battery.currentAmmo === "number" && battery.currentAmmo > 0;
 }
 
-function consumeLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery, shots: number) {
+function consumeLocalAmmo(state: GameState, unit: ReturnType<typeof getUnitDefinition>, battery: DefenseBattery, shots: number) {
   if (unit.ammoCapacity === "infinite") {
     battery.currentAmmo = "infinite";
     return;
@@ -953,9 +956,11 @@ function consumeLocalAmmo(unit: ReturnType<typeof getUnitDefinition>, battery: D
   }
   battery.currentAmmo = Math.max(0, battery.currentAmmo - Math.max(1, shots));
   if (battery.currentAmmo === 0) {
-    const reserveAvailable = battery.missionReserve === "infinite" || Number(battery.missionReserve || 0) > 0;
+    const reserveAvailable = Boolean(state.campaign) || battery.missionReserve === "infinite" || Number(battery.missionReserve || 0) > 0;
     battery.reloadRemainingMs = reserveAvailable ? unit.reloadMs : 0;
-    battery.lastEngagementResult = reserveAvailable ? "Перезаряджання із запасу місії" : "Запас місії вичерпано";
+    battery.lastEngagementResult = state.campaign
+      ? "Цикл перезаряджання; далі автоматичне поповнення зі складу БК"
+      : reserveAvailable ? "Перезаряджання з локального резерву" : "Локальний резерв вичерпано";
     if (!reserveAvailable) battery.status = "strained";
   }
 }
@@ -1090,12 +1095,13 @@ function engageThreats(state: GameState, random: () => number) {
         if (otherDistance > otherUnit.outerRangeKm) return false;
         return evaluateDoctrine({ unitKind: other.kind, threatKind: threat.kind, confidence: threat.confidence, trackQuality: threat.fireControlQuality || threat.trackQuality, reserveRatio: 1, networkAvailable, coastalApproach: true }).allowed;
       });
+      const magazineCapacity = typeof unit.ammoCapacity === "number" ? unit.ammoCapacity : 1;
       const totalAmmo = unit.ammoCapacity === "infinite" || battery.missionReserve === "infinite"
         ? 1
-        : Math.max(1, Number(unit.ammoCapacity) + Number(unit.missionReserveCapacity));
+        : state.campaign ? magazineCapacity * 3 : Math.max(1, Number(unit.ammoCapacity) + Number(unit.missionReserveCapacity));
       const availableAmmo = unit.ammoCapacity === "infinite" || battery.missionReserve === "infinite"
         ? totalAmmo
-        : Number(battery.currentAmmo) + Number(battery.missionReserve || 0);
+        : Number(battery.currentAmmo) + (state.campaign ? state.campaign.depot.stock : Number(battery.missionReserve || 0));
       const doctrineResult = evaluateDoctrine({
         unitKind: battery.kind,
         threatKind: threat.kind,
@@ -1121,7 +1127,7 @@ function engageThreats(state: GameState, random: () => number) {
     if (!candidate) { battery.lastEngagementResult = lastDoctrineReason; continue; }
 
     const style = engagementStyleForUnit(battery.kind);
-    consumeLocalAmmo(unit, battery, candidate.shots);
+    consumeLocalAmmo(state, unit, battery, candidate.shots);
     setShotCooldown(battery, unit, random, candidate.outerBand);
     const ewResult = style === "ew" ? ewEffectFor({ threatKind: candidate.threat.kind, confidence: candidate.threat.confidence, trackQuality: candidate.threat.trackQuality, random: random() }) : null;
     const success = ewResult ? ewResult.success : weightedChance(candidate.chance, random);
@@ -1194,7 +1200,14 @@ function applyImpact(state: GameState, threat: LiveThreat, random: () => number)
   }
   state.impacts += 1;
   state.impactMarkers.push({ id: createId("impact", Math.floor(state.elapsedMs), random), position: city.coordinates, tone: "impact", ttlMs: 2600 });
-  pushLog(state.log, state.elapsedMs, "Impact", `${city.name} was hit by an unresolved ${threat.kind} track.`, "danger", { soundCue: "result.impact" });
+  pushLog(
+    state.log,
+    state.elapsedMs,
+    "Удар по місту",
+    `${city.name}: −${Math.round(damage)} HP, залишилося ${Math.round(city.infrastructure)} HP.`,
+    "danger",
+    { soundCue: "result.impact" },
+  );
   if (state.campaign && city.infrastructure <= 0) finishCampaignDefeat(state, city.id);
 }
 
@@ -1265,6 +1278,19 @@ function updateCityAlerts(state: GameState) {
 
   for (const city of state.cities) {
     let alert: NonNullable<typeof city.alertState> = "calm";
+    const nearbyThreat = state.liveThreats.some((threat) =>
+      threat.status !== "intercepted"
+      && threat.status !== "impact"
+      && distanceKm(city.coordinates, threatPosition(threat)) <= AIR_RAID_TRACK_DISTANCE_KM
+    );
+    if (nearbyThreat) {
+      city.alertUntilMs = Math.max(city.alertUntilMs || 0, state.elapsedMs + AIR_RAID_HOLD_MS);
+    }
+    if ((city.alertUntilMs || 0) > state.elapsedMs) {
+      city.alertState = "air-raid";
+      continue;
+    }
+    city.alertUntilMs = 0;
     if (launchCorridors.some((sector) => cityInLaunchCone(city.coordinates, sector))) {
       alert = raiseAlert(alert, "launch-corridor");
     }
@@ -1272,19 +1298,10 @@ function updateCityAlerts(state: GameState) {
       alert = raiseAlert(alert, "probable-target");
     }
     for (const threat of state.liveThreats) {
-      if (!threat.revealed) continue;
       const position = threatPosition(threat);
       const trackDistance = distanceKm(city.coordinates, position);
       const targetDistance = distanceKm(city.coordinates, threat.target);
-      if (
-        trackDistance <= AIR_RAID_TRACK_DISTANCE_KM
-        || (isMissileClass(threat.kind) && threat.progress >= 0.62 && targetDistance <= AIR_RAID_TARGET_DISTANCE_KM)
-        || (isDroneClass(threat.kind) && trackDistance <= AIR_RAID_TRACK_DISTANCE_KM)
-      ) {
-        alert = raiseAlert(alert, "air-raid");
-        break;
-      }
-      if (targetDistance <= PROBABLE_TARGET_DISTANCE_KM || trackDistance <= PROBABLE_TARGET_DISTANCE_KM) {
+      if (threat.revealed && (targetDistance <= PROBABLE_TARGET_DISTANCE_KM || trackDistance <= PROBABLE_TARGET_DISTANCE_KM)) {
         alert = raiseAlert(alert, "probable-target");
       }
     }
@@ -1300,7 +1317,7 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
       battery.currentAmmo = unit.ammoCapacity;
     }
     if (battery.missionReserve === undefined || battery.missionReserve === null) {
-      battery.missionReserve = unit.missionReserveCapacity;
+      battery.missionReserve = state.campaign && unit.missionReserveCapacity !== "infinite" ? 0 : unit.missionReserveCapacity;
     }
     if (!battery.manualOverrideTargets) battery.manualOverrideTargets = [];
     if (battery.reloadRemainingMs === undefined || battery.reloadRemainingMs === null) {
@@ -1310,22 +1327,29 @@ function updateResourcesAndTimers(state: GameState, deltaMs: number) {
     if (battery.status === "reloading") {
       battery.reloadRemainingMs = Math.max(0, battery.reloadRemainingMs - deltaMs);
       if (battery.reloadRemainingMs <= 0) {
+        const campaignMagazine = state.campaign && typeof unit.ammoCapacity === "number" ? unit.ammoCapacity : 0;
+        const campaignStockReady = Boolean(state.campaign && state.campaign.depot.stock >= campaignMagazine);
         const transfer = unit.ammoCapacity === "infinite" || battery.missionReserve === "infinite"
           ? unit.ammoCapacity
-          : Math.min(Number(unit.ammoCapacity), Number(battery.missionReserve || 0));
+          : state.campaign
+            ? campaignStockReady ? campaignMagazine : 0
+            : Math.min(Number(unit.ammoCapacity), Number(battery.missionReserve || 0));
+        if (state.campaign && campaignStockReady) state.campaign.depot.stock -= campaignMagazine;
         battery.currentAmmo = transfer;
-        if (typeof battery.missionReserve === "number") battery.missionReserve = Math.max(0, battery.missionReserve - Number(transfer));
+        if (!state.campaign && typeof battery.missionReserve === "number") battery.missionReserve = Math.max(0, battery.missionReserve - Number(transfer));
         battery.reloadRemainingMs = 0;
-        battery.lastAction = Number(transfer) > 0 ? "reload complete" : "reserve exhausted";
-        battery.lastEngagementResult = Number(transfer) > 0 ? `Магазин поповнено із запасу місії: ${transfer}` : "Запас місії вичерпано";
-        battery.status = Number(transfer) <= 0 ? "strained" : battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
+        battery.lastAction = Number(transfer) > 0 ? "reload complete" : state.campaign ? "waiting for depot ammo" : "reserve exhausted";
+        battery.lastEngagementResult = Number(transfer) > 0
+          ? state.campaign ? `Магазин автоматично поповнено зі складу: ${transfer} БК` : `Магазин поповнено з локального резерву: ${transfer}`
+          : state.campaign ? `Очікує ${campaignMagazine} БК зі складу` : "Локальний резерв вичерпано";
+        battery.status = Number(transfer) <= 0 ? state.campaign ? "reloading" : "strained" : battery.fatigue >= 82 || battery.readiness < 38 ? "exhausted" : battery.fatigue >= 58 || battery.readiness < 62 ? "strained" : "ready";
       }
     }
     battery.supplyStatus = state.logistics.unitSupply[battery.id] || "strained";
     recoverReadiness(battery, deltaMs, false, battery.supplyStatus);
-    if (battery.currentAmmo === 0 && battery.missionReserve === 0 && unit.engagementMode !== "detect") {
+    if (!state.campaign && battery.currentAmmo === 0 && battery.missionReserve === 0 && unit.engagementMode !== "detect") {
       battery.status = "strained";
-      battery.lastEngagementResult = "Запас місії вичерпано";
+      battery.lastEngagementResult = "Локальний резерв вичерпано";
     }
     if (state.planningActions.selected.includes("high-alert")) {
       battery.fatigue = clamp(battery.fatigue + deltaMs * 0.00009, 0, 100);

@@ -23,7 +23,7 @@ export function ResourceBar({ game, operationPhase, mobile = false }: ResourceBa
   const depotDelta = depot?.repairRemainingMs
     ? `HP ${Math.round(depot.health)}% · ремонт ${Math.ceil(depot.repairRemainingMs / 1000)} с`
     : depotRate > 0
-      ? `HP ${Math.round(depot!.health)}% · +${depotRate}/хв · ${Math.ceil((60_000 - depot!.productionProgressMs) / 1000)} с`
+      ? `HP ${Math.round(depot!.health)}% · +${depotRate}/45 с · ${Math.ceil((45_000 - depot!.productionProgressMs) / 1000)} с`
       : `HP ${Math.round(depot?.health || 0)}% · виробництво зупинено`;
   const items = [
     { label: "Бюджет", value: Math.round(game.resources.budget), icon: Coins, delta: "постачання" },

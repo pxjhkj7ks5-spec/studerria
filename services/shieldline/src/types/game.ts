@@ -167,6 +167,7 @@ export interface City {
   importance: number;
   damage: number;
   alertState?: CityAlertState;
+  alertUntilMs?: number;
 }
 
 export interface InfrastructureNode {

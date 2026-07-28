@@ -1356,9 +1356,9 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
                 <span>Кампанійна логістика</span>
                 <strong>Склад БК</strong>
                 <small>Стан {Math.round(visibleDepot.health)}% · запас {Math.round(visibleDepot.stock)} БК</small>
-                <small>{visibleDepot.repairRemainingMs > 0 ? `Ремонт: ${Math.ceil(visibleDepot.repairRemainingMs / 1000)} с активного бою` : visibleDepot.health <= 0 ? "Виробництво зупинено" : `Виробництво +${visibleDepot.health <= 50 ? 1 : 2} БК/хв`}</small>
+                <small>{visibleDepot.repairRemainingMs > 0 ? `Ремонт: ${Math.ceil(visibleDepot.repairRemainingMs / 1000)} с активного бою` : visibleDepot.health <= 0 ? "Виробництво зупинено" : `Виробництво +${visibleDepot.health <= 50 ? 1 : 2} БК/45 с`}</small>
                 {visibleDepot.repairRemainingMs <= 0 && visibleDepot.health > 0
-                  ? <small>Наступна партія через {Math.ceil((60_000 - visibleDepot.productionProgressMs) / 1000)} с</small>
+                  ? <small>Наступна партія через {Math.ceil((45_000 - visibleDepot.productionProgressMs) / 1000)} с</small>
                   : null}
                 {readOnly || visibleDepot.health >= 100 || visibleDepot.repairRemainingMs > 0 ? null : <button type="button" onClick={serviceCampaignDepot}>Повний ремонт · 12 млн ₴</button>}
               </div>
@@ -1376,14 +1376,16 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
                 const unit = getUnitDefinition(battery.kind);
                 const ammo = battery.currentAmmo === "infinite" ? "∞" : `${battery.currentAmmo}/${unit.ammoCapacity}`;
                 const hasAmmo = battery.currentAmmo === "infinite" || Number(battery.currentAmmo) > 0;
-                const reload = battery.reloadRemainingMs > 0 ? `${Math.ceil(battery.reloadRemainingMs / 1000)} с` : hasAmmo ? "готова" : "очікує запуску";
+                const reload = battery.reloadRemainingMs > 0
+                  ? `перезаряджання ${Math.ceil(battery.reloadRemainingMs / 1000)} с`
+                  : hasAmmo ? "готова" : game.campaign ? "очікує БК зі складу" : "очікує локальний резерв";
                 return <div className="battery-action-popup__content">
                   <span>Встановлена одиниця</span>
                   <strong>{unit.name}</strong>
                   <small>Зона дії {unit.primaryRangeKm}/{unit.outerRangeKm} км</small>
                   <small>Готовність {Math.round(battery.readiness)}% · {battery.status}</small>
                   <small>Стан {Math.round(battery.health)}% · досвід L{battery.experienceLevel}</small>
-                  <small>БК {ammo} · запас місії {battery.missionReserve === "infinite" ? "∞" : battery.missionReserve} · {reload}</small>
+                  <small>Магазин {ammo} · {game.campaign ? `склад ${Math.round(game.campaign.depot.stock)} БК` : `локальний резерв ${battery.missionReserve === "infinite" ? "∞" : battery.missionReserve}`} · {reload}</small>
                   <small>{battery.lastEngagementResult}</small>
                   {readOnly ? null : <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Передислокувати · 1 млн ₴ при розміщенні</button>}
                 </div>;

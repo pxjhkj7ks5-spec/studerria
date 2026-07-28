@@ -104,7 +104,7 @@ export const campaignMissionsPlan: CampaignMissionDefinition[] = [
     w("06:30", "geran2", 4, ["R01", "R02"], 4, "hardMerge", "Столичний кластер", 0, 12, "high"),
     w("07:35", "geran2", 4, ["R02", "R03"], 4, "fullGroup", "Столичний кластер", 0, 12, "critical"),
   ] },
-  { id: "southern-corridor", index: 2, title: "Південний маневр", durationMinutes: 22, focusRegion: "Південний портовий кластер", grant: 16, objective: "Передислокувати збережену мережу до Одеси, витримати морські коридори й зустріти перший балістичний фінал.", expectedThreatClasses: ["Recon", "Decoy", "Gerbera", "Shahed", "Cruise", "Ballistic"], broadAzimuth: "Чорне море, Крим, Приазов’я і південний балістичний напрямок", briefing: "Після оборони Києва противник переносить тиск на Одесу та морську логістику. Перемістіть наявну мережу, підготуйте катер і Gepard проти дронів та збережіть С-300 для двох морських ракет і фінального швидкісного контакту.", unlocks: ["boat", "gepard"], waves: [
+  { id: "southern-corridor", index: 2, title: "Південний маневр", durationMinutes: 22, focusRegion: "Південний портовий кластер", grant: 16, objective: "Передислокувати збережену мережу до Одеси, витримати морські коридори й зустріти перший балістичний фінал.", expectedThreatClasses: ["Recon", "Decoy", "Gerbera", "Shahed", "Cruise", "Ballistic"], broadAzimuth: "Чорне море, Крим, Приазов’я і південний балістичний напрямок", briefing: "Після оборони Києва противник переносить тиск на Одесу та морську логістику. На початку місії штаб безкоштовно передає радар середньої дальності. Перемістіть наявну мережу, підготуйте катер і Gepard проти дронів та збережіть С-300 для двох морських ракет і фінального швидкісного контакту.", unlocks: ["boat", "gepard"], waves: [
     w("00:45", "recon", 1, ["R10"], 1, "independent", "Портовий", 0, 0, "medium"),
     w("02:00", "gerbera", 4, ["R10", "R30"], 2, "twoAxisScreen", "Портовий / тиловий", .25, 35, "low"),
     w("04:00", "parodiya", 5, ["R10", "R14"], 2, "splitFeint", "Портовий / логістичний", .4, 40, "low"),
@@ -178,7 +178,6 @@ export const campaignMissionsPlan: CampaignMissionDefinition[] = [
 ];
 
 export const campaignKillRewards: Partial<Record<ThreatKind, number>> = { parodiya: 1, decoy: 1, gerbera: 2, geran2: 2, drone: 2, recon: 4, kh101: 10, kalibr: 10, cruise: 10, jammer: 12, "low-signature-cruise": 14, iskander: 20, ballistic: 20 };
-export const campaignResupplyCosts: Partial<Record<UnitKind, number>> = { mvg: 1, boat: 1.4, manpads: 4, gepard: 2, "drone-operators": 4, buk: 12, s300: 16, "iris-t": 18, nasams: 16, patriot: 25 };
 
 export const CAMPAIGN_TUTORIAL_COOLDOWN_MS = 5_000;
 export const CAMPAIGN_TUTORIAL_ASSET_ACTION = "tutorial asset awaiting deployment";

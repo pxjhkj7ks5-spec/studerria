@@ -228,11 +228,12 @@ test("campaign batteries refill a full magazine after the reload timer and expos
   const battery = game.batteries[0];
   const unit = getUnitDefinition("mvg");
   battery.currentAmmo = 0;
-  battery.missionReserve = Number(unit.missionReserveCapacity);
+  battery.missionReserve = 0;
   battery.status = "reloading";
   battery.reloadRemainingMs = 1_000;
   battery.readiness = 73;
   battery.fatigue = 60;
+  game.campaign!.depot.stock = 4;
 
   game = tickSimulation(game, 500, () => .5);
   assert.equal(game.batteries[0].currentAmmo, 0);
@@ -241,10 +242,43 @@ test("campaign batteries refill a full magazine after the reload timer and expos
   assert.equal(tacticalUnitStatus(unit, game.batteries[0]).label, "RELOADING");
 
   game = tickSimulation(game, 500, () => .5);
+  assert.equal(game.batteries[0].currentAmmo, 0);
+  assert.equal(game.batteries[0].reloadRemainingMs, 0);
+  assert.equal(game.batteries[0].status, "reloading");
+  assert.equal(game.campaign!.depot.stock, 4);
+
+  game.campaign!.depot.stock = 5;
+  game = tickSimulation(game, 1, () => .5);
   assert.equal(game.batteries[0].currentAmmo, unit.ammoCapacity);
   assert.equal(game.batteries[0].reloadRemainingMs, 0);
   assert.equal(game.batteries[0].status, "strained");
+  assert.equal(game.campaign!.depot.stock, 0);
   assert.equal(tacticalUnitStatus(unit, game.batteries[0]).label, "READY");
+});
+
+test("an unrevealed target within fifty kilometers holds a city air raid for ninety seconds", () => {
+  let game = createScenarioState(() => .5, "training", "first-night");
+  game.cyclePhase = "attack";
+  game.cycleDurationMs = 999_999;
+  const kyiv = game.cities.find((city) => city.id === "kyiv")!;
+  game.liveThreats = [{
+    ...testThreat(),
+    id: "silent-nearby-track",
+    origin: { ...kyiv.coordinates },
+    target: { ...kyiv.coordinates },
+    revealed: false,
+    confidence: 0,
+    speed: 1 / 999_999,
+  }];
+  game = tickSimulation(game, 100, () => .999);
+  assert.equal(game.cities.find((city) => city.id === "kyiv")?.alertState, "air-raid");
+  const heldUntil = game.cities.find((city) => city.id === "kyiv")?.alertUntilMs || 0;
+  assert.ok(heldUntil >= game.elapsedMs + 89_000);
+  game.liveThreats = [];
+  game = advanceSimulation(game, 60_000, () => .999);
+  assert.equal(game.cities.find((city) => city.id === "kyiv")?.alertState, "air-raid");
+  game = advanceSimulation(game, 31_000, () => .999);
+  assert.notEqual(game.cities.find((city) => city.id === "kyiv")?.alertState, "air-raid");
 });
 
 test("real impacts reduce live city resilience once while decoys do no damage", () => {

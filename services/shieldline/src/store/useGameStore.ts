@@ -89,7 +89,7 @@ function recordPlacedTutorialAssets(game: GameState, nowMs: number) {
   return advanced;
 }
 
-export function normalizePersistedGame(game: GameState | null, persistedVersion = 22, campaignSeed = "campaign-migrated") {
+export function normalizePersistedGame(game: GameState | null, persistedVersion = 23, campaignSeed = "campaign-migrated") {
   if (!game) return game;
   const persistedSectorById = new Map((Array.isArray(game.launchSectors) ? game.launchSectors : []).map((sector) => [sector.id, sector]));
   const launchSectors = createLaunchSectorState().map((sector) => {
@@ -171,7 +171,7 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
       experienceLevel: Number.isFinite(battery.experienceLevel) ? battery.experienceLevel : 0,
       createdAtMission: Number.isFinite(battery.createdAtMission) ? battery.createdAtMission : 0,
       lastMovedMission: Number.isFinite(battery.lastMovedMission) ? battery.lastMovedMission : 0,
-      missionReserve: battery.missionReserve ?? unit.missionReserveCapacity,
+      missionReserve: game.campaign && unit.missionReserveCapacity !== "infinite" ? 0 : battery.missionReserve ?? unit.missionReserveCapacity,
       manualOverrideTargets: Array.isArray(battery.manualOverrideTargets) ? battery.manualOverrideTargets : [],
     };
   };
@@ -198,6 +198,10 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
   } : migratedDepot;
   const normalizedGame: GameState = {
     ...game,
+    cities: game.cities.map((city) => ({
+      ...city,
+      alertUntilMs: Number.isFinite(city.alertUntilMs) ? Math.max(0, Number(city.alertUntilMs)) : 0,
+    })),
     campaignAttackSchedule: normalizeCampaignSchedule(game),
     launchSectors,
     pendingLaunches,
@@ -566,7 +570,7 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 23,
+      version: 24,
       migrate: (persistedState, persistedVersion) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         const migratedGame = normalizePersistedGame(state.game || null, persistedVersion, state.simulationSeed || "campaign-migrated");

@@ -14,12 +14,13 @@ test("every threat kind has deterministic realistic label telemetry", () => {
     const first = threatTelemetryFor(kind as keyof typeof threatFlightProfiles, `${kind}-one`);
     const repeated = threatTelemetryFor(kind as keyof typeof threatFlightProfiles, `${kind}-one`);
     assert.deepEqual(first, repeated);
-    assert.ok(first.speedKph >= profile.speedKph[0] && first.speedKph <= profile.speedKph[1]);
+    assert.equal(first.speedKph, profile.speedKph);
     assert.ok(first.altitudeM >= profile.altitudeM[0] && first.altitudeM <= profile.altitudeM[1]);
     assert.ok(threatDisplayName(kind as keyof typeof threatFlightProfiles).length > 0);
   }
 
-  assert.notDeepEqual(threatTelemetryFor("geran2", "track-one"), threatTelemetryFor("geran2", "track-two"));
+  assert.equal(threatTelemetryFor("geran2", "track-one").speedKph, threatTelemetryFor("geran2", "track-two").speedKph);
+  assert.notEqual(threatTelemetryFor("geran2", "track-one").altitudeM, threatTelemetryFor("geran2", "track-two").altitudeM);
   assert.equal(formatThreatSpeed(183), "180 км/год");
   assert.equal(formatThreatAltitude(120), "120 м");
   assert.equal(formatThreatAltitude(10_500), "10.5 км");

@@ -16,17 +16,8 @@ const chanceKinds: Array<{ kind: ThreatKind; label: string }> = [
   { kind: "iskander", label: "OTRK" },
 ];
 
-const doctrineTargetLabels: Partial<Record<ThreatKind, string>> = {
-  geran2: "Geran-2",
-  gerbera: "Gerbera",
-  decoy: "приманка",
-  parodiya: "Parodiya",
-  recon: "розвідник",
-  jammer: "постановник перешкод",
-  kh101: "X-101",
-  kalibr: "Kalibr",
-  iskander: "балістична ціль",
-};
+const droneOverrideKinds: ThreatKind[] = ["drone", "saturation", "geran2", "gerbera", "recon"];
+const doctrineOverrideUnits = new Set(["s300", "iris-t", "nasams", "patriot"]);
 
 function maintenanceRisk(readiness: number) {
   if (readiness < 70) return "високий";
@@ -40,9 +31,10 @@ function fatigueLabel(fatigue: number) {
   return "нормальна";
 }
 
-function ammoLabel(unit: UnitDefinition) {
+function ammoLabel(unit: UnitDefinition, battery?: ReturnType<typeof useGameStore.getState>["game"]["batteries"][number], campaign = false) {
   if (unit.ammoCapacity === "infinite") return "∞";
-  return `${unit.ammoCapacity}/${unit.ammoCapacity} · запас ${unit.missionReserveCapacity}`;
+  const current = typeof battery?.currentAmmo === "number" ? battery.currentAmmo : unit.ammoCapacity;
+  return campaign && current === 0 ? `0/${unit.ammoCapacity} · очікує склад` : `${current}/${unit.ammoCapacity}`;
 }
 
 function seconds(ms: number) {
@@ -114,7 +106,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
           const readiness = referenceBattery ? referenceBattery.readiness : unit.readiness;
           const fatigue = referenceBattery ? referenceBattery.fatigue : 0;
           const reloadText = referenceBattery?.reloadRemainingMs ? seconds(referenceBattery.reloadRemainingMs) : seconds(unit.reloadMs);
-          const ammoText = ammoLabel(unit);
+          const ammoText = ammoLabel(unit, referenceBattery, Boolean(game.campaign));
           const tacticalStatus = tacticalUnitStatus(unit, referenceBattery);
           const isRadar = unit.engagementMode === "detect";
           const showStatus = tacticalStatus.label !== "READY";
@@ -158,7 +150,10 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <span><small>{isRadar ? "Радіус" : "Зона"}</small><b>{isRadar ? `${unit.outerRangeKm} км` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</b></span>
                 <span><small>Вартість</small><b>{storedUnits.length ? storedDeploymentCost ? "1 млн ₴" : "0 ₴" : unit.costLabel}</b></span>
               </div>
-              {!isRadar ? <div className="unit-chance-row" aria-label={`Імовірність ураження для ${unit.name}`}>
+              {!isRadar ? <div
+                className="unit-chance-row"
+                aria-label={`Базова імовірність ураження для ${unit.name}. Фактична залежить від дальності, готовності та якості супроводу.`}
+              >
                 {chanceKinds.map(({ kind, label }) => (
                   <span key={kind} className={unit.engagementChanceByThreat[kind] <= 0 ? "unit-chance--muted" : ""}>
                     <b>{Math.round(unit.engagementChanceByThreat[kind])}%</b>
@@ -177,7 +172,8 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                   ) : (
                     <>
                       <span>Основна зона {unit.primaryRangeKm} км · зовнішня {unit.outerRangeKm} км</span>
-                      <span>БК {ammoText} · перезаряджання {reloadText} · пауза {seconds(unit.shotCooldownMs)}</span>
+                      <span>Магазин {ammoText} · перезаряджання {reloadText} · пауза {seconds(unit.shotCooldownMs)}</span>
+                      {game.campaign ? <span>Після завершення циклу повний магазин автоматично надходить зі складу БК.</span> : null}
                       <span>Точність: {unit.primaryAccuracy}% · зовнішня зона {unit.outerAccuracy}%</span>
                       <span>Доктрина: поріг {unit.doctrine.minConfidenceToEngage}% · резерв {Math.round(unit.doctrine.conserveAmmoThreshold * 100)}%{unit.doctrine.cheapFirstPolicy ? " · дешевий ешелон першим" : ""}</span>
                     </>
@@ -186,15 +182,26 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                   <span>Готовність {Math.round(readiness)}% · втома {Math.round(fatigue)}% ({fatigueLabel(fatigue)})</span>
                   {referenceBattery ? <span>Стан {Math.round(referenceBattery.health)}% · досвід L{referenceBattery.experienceLevel}</span> : null}
                   <span>{storedBattery ? storedDeploymentCost ? "На складі · передислокація 1 млн ₴" : "На складі · підкріплення" : localBattery ? `${localBattery.supplyStatus} · передислокація через маркер 1 млн ₴` : "Не розміщена"}</span>
-                  {localBattery && unit.doctrine.allowManualOverride && unit.doctrine.forbiddenByDefault.length ? (
+                  {localBattery && doctrineOverrideUnits.has(unit.kind) ? (
                     <div className="campaign-service-actions" aria-label="Ручні дозволи доктрини">
-                      {unit.doctrine.forbiddenByDefault.slice(0, 4).map((targetKind) => {
-                        const enabled = localBattery.manualOverrideTargets.includes(targetKind);
-                        return <button type="button" key={targetKind} data-sound-cue="planning.toggle" aria-pressed={enabled} onClick={(event) => { event.stopPropagation(); setManualOverride(localBattery.id, targetKind, !enabled); }}>{enabled ? "Заборонити" : "Дозволити"} {doctrineTargetLabels[targetKind] || targetKind}</button>;
-                      })}
+                      {(() => {
+                        const targets = droneOverrideKinds.filter((targetKind) => unit.doctrine.forbiddenByDefault.includes(targetKind));
+                        const enabled = targets.length > 0 && targets.every((targetKind) => localBattery.manualOverrideTargets.includes(targetKind));
+                        return <button
+                          type="button"
+                          data-sound-cue="planning.toggle"
+                          aria-pressed={enabled}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            for (const targetKind of targets) setManualOverride(localBattery.id, targetKind, !enabled);
+                            setExpandedKind(null);
+                            event.currentTarget.blur();
+                          }}
+                        >{enabled ? "Заборонити дрони" : "Дозволити дрони"}</button>;
+                      })()}
                     </div>
                   ) : null}
-                  {game.campaign?.intermission && referenceBattery ? <div className="campaign-service-actions"><button type="button" data-sound="none" onClick={(event) => { event.stopPropagation(); service(referenceBattery.id, "resupply", .5); }}>+50% БК</button><button type="button" data-sound="none" onClick={(event) => { event.stopPropagation(); service(referenceBattery.id, "repair", 1); }}>Ремонт</button></div> : null}
+                  {game.campaign?.intermission && referenceBattery ? <div className="campaign-service-actions"><button type="button" data-sound="none" onClick={(event) => { event.stopPropagation(); service(referenceBattery.id, "repair", 1); }}>Ремонт</button></div> : null}
                 </div>
               </div>
               <div className={`fatigue-track fatigue-track--${fatigue > 70 ? "danger" : fatigue > 45 ? "warning" : "stable"}`} aria-label={`Втома ${unit.name}`}>

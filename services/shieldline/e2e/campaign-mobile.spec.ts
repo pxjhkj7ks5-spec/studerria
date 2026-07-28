@@ -19,7 +19,7 @@ test("mobile Campaign opens its tactical depot state and reconnects without repl
   await expect(page.locator(".map-marker--ammo-depot")).toHaveCount(1);
   const depotCard = page.locator(".resource-card").filter({ hasText: "Склад БК" });
   await expect(depotCard).toContainText("HP 100%");
-  await expect(depotCard).toContainText("+2/хв");
+  await expect(depotCard).toContainText("+2/45 с");
   const campaignState = await page.evaluate(() => JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}").state);
   expect(campaignState.activeGameMode).toBe("campaign");
   expect(campaignState.game.campaign.missionIndex).toBe(1);

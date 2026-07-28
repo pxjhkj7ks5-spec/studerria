@@ -7,8 +7,8 @@ import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
-import { flightDurationForSpeed } from "../src/game/threatFlightModel.mjs";
-import type { LiveThreat } from "../src/types/game";
+import { flightDurationForDistance, flightDurationForSpeed, routeDistanceKm, THREAT_FLIGHT_PROFILES, trimRouteToTrackedDistance } from "../src/game/threatFlightModel.mjs";
+import type { LiveThreat, ThreatKind } from "../src/types/game";
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
   assert.equal(campaignRouteTemplates.length, 36);
@@ -264,7 +264,8 @@ test("live campaign launches from and animates a named geographic direction", ()
   assert.ok(threat);
   assert.notEqual(threat.launchSectorId, threat.routeId);
   assert.equal(sectorSupportsThreat(game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!, threat.kind), true);
-  assert.deepEqual(threat.routeWaypoints?.[0], threat.origin);
+  assert.notDeepEqual(threat.routeWaypoints?.[0], threat.origin);
+  assert.ok(flightDurationForDistance(threat.kind, threat.speedKph, routeDistanceKm(threat.routeWaypoints!)) <= 150_000);
   const activeSector = game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!;
   assert.equal(activeSector.state, "launching");
   assert.deepEqual(activeSector.lastLaunchCoordinates, threat.origin);
@@ -326,7 +327,7 @@ test("S-300 reinforcement is paired with a real Caspian warning, flight, and res
   assert.equal(cruise.launchSectorId, "long_range_air_b");
   assert.equal(game.log.some((entry) => entry.eventType === "launch" && entry.locationLabel?.includes("Каспійський")), true);
   const cruiseId = cruise.id;
-  game = advanceSimulation(game, 180_000, () => random.next());
+  game = advanceSimulation(game, Math.ceil(1 / cruise.speed) + 10_000, () => random.next());
   assert.equal(game.liveThreats.some((threat) => threat.id === cruiseId), false);
   assert.equal(game.campaign?.spawnCursor, 1);
   assert.equal(game.campaign?.intermission, true);
@@ -349,6 +350,10 @@ test("mission two grants one stocked Patriot exactly ninety seconds before its a
   }];
   applyCampaignMissionOpening(game);
   assert.equal(game.campaign.unlockedSystems.includes("patriot"), false);
+  const mediumRadar = game.storedBatteries.find((battery) => battery.id === "campaign-m2-medium-radar");
+  assert.ok(mediumRadar);
+  assert.equal(mediumRadar.kind, "radar");
+  assert.equal(mediumRadar.lastAction, CAMPAIGN_REINFORCEMENT_ACTION);
   game = startAttackNow(game, () => random.next());
   game = tickSimulation(game, 1_000, () => random.next());
   const patriot = game.storedBatteries.find((battery) => battery.id === "campaign-m2-patriot-reinforcement");
@@ -356,8 +361,8 @@ test("mission two grants one stocked Patriot exactly ninety seconds before its a
   assert.equal(game.campaign.spawnEvents[0].dueMs - (game.elapsedMs - game.cycleStartedAtMs), 90_000);
   assert.equal(patriot.kind, "patriot");
   assert.equal(patriot.currentAmmo, 2);
-  assert.equal(patriot.missionReserve, 4);
-  assert.equal(game.campaign.depot.stock, 9);
+  assert.equal(patriot.missionReserve, 0);
+  assert.equal(game.campaign.depot.stock, 10);
   game = advanceSimulation(game, 30_000, () => random.next());
   assert.equal([...game.batteries, ...game.storedBatteries].filter((battery) => battery.id === patriot.id).length, 1);
 });
@@ -372,14 +377,45 @@ test("campaign kill earnings have no mission or wallet ceiling", () => {
   assert.equal(game.resources.budget, 10_024);
 });
 
-test("missile speed maps linearly to the shared authored flight windows", () => {
-  assert.equal(flightDurationForSpeed("kh101", 700), 145_000);
-  assert.equal(flightDurationForSpeed("kh101", 850), 120_000);
-  assert.equal(flightDurationForSpeed("kh101", 775), 132_500);
-  assert.equal(flightDurationForSpeed("low-signature-cruise", 680), 160_000);
-  assert.equal(flightDurationForSpeed("low-signature-cruise", 880), 130_000);
-  assert.equal(flightDurationForSpeed("iskander", 3_500), 50_000);
-  assert.equal(flightDurationForSpeed("iskander", 7_200), 35_000);
+test("fixed model speeds drive route-distance flight time instead of an authored arrival deadline", () => {
+  assert.equal(THREAT_FLIGHT_PROFILES.geran2.speedKph, 170);
+  assert.equal(THREAT_FLIGHT_PROFILES.kh101.speedKph, 780);
+  assert.equal(THREAT_FLIGHT_PROFILES.iskander.speedKph, 5_200);
+  const shortGeran = flightDurationForDistance("geran2", 170, 340);
+  const longGeran = flightDurationForDistance("geran2", 170, 680);
+  assert.equal(shortGeran, 144_000);
+  assert.equal(longGeran, shortGeran * 2);
+  assert.equal(flightDurationForSpeed("kh101", 780), flightDurationForDistance("kh101", 780, THREAT_FLIGHT_PROFILES.kh101.representativeDistanceKm));
+  const tracked = trimRouteToTrackedDistance("kh101", [{ lat: 44.8, lng: 47.2 }, { lat: 50.45, lng: 30.52 }]);
+  assert.ok(routeDistanceKm(tracked) < routeDistanceKm([{ lat: 44.8, lng: 47.2 }, { lat: 50.45, lng: 30.52 }]));
+  assert.ok(flightDurationForDistance("kh101", 780, routeDistanceKm(tracked)) <= 150_000);
+});
+
+test("campaign tracking windows stay balanced while each model keeps one canonical speed", () => {
+  const durationRanges = new Map<ThreatKind, { min: number; max: number; speeds: Set<number> }>();
+  for (const mission of campaignMissionsPlan) {
+    for (const wave of mission.waves) {
+      for (const routeId of wave.routeIds) {
+        const route = campaignRouteTemplates.find((item) => item.id === routeId)!;
+        const speedKph = THREAT_FLIGHT_PROFILES[wave.threatKind].speedKph;
+        const trackedRoute = trimRouteToTrackedDistance(wave.threatKind, route.baseWaypoints);
+        const durationMs = flightDurationForDistance(wave.threatKind, speedKph, routeDistanceKm(trackedRoute));
+        const range = durationRanges.get(wave.threatKind) || { min: Infinity, max: 0, speeds: new Set<number>() };
+        range.min = Math.min(range.min, durationMs);
+        range.max = Math.max(range.max, durationMs);
+        range.speeds.add(speedKph);
+        durationRanges.set(wave.threatKind, range);
+      }
+    }
+  }
+  for (const [kind, range] of durationRanges) {
+    assert.equal(range.speeds.size, 1, `${kind} must use one canonical speed`);
+    if (kind === "iskander" || kind === "ballistic") {
+      assert.ok(range.min >= 35_000 && range.max <= 50_000, `${kind} must stay inside its ballistic tracking window`);
+    } else {
+      assert.ok(range.min >= 80_000 && range.max <= 150_000, `${kind} must stay inside the 80–150 second tracking window`);
+    }
+  }
 });
 
 test("campaign cruise missiles require sensor acquisition and complete their authored route", () => {
@@ -405,11 +441,11 @@ test("campaign cruise missiles require sensor acquisition and complete their aut
   assert.equal(cruise.launchSectorId, "long_range_air_a");
   game = advanceSimulation(game, 10_000, () => random.next());
   assert.equal(game.liveThreats.find((threat) => threat.id === cruise.id)?.revealed, false);
-  game = advanceSimulation(game, 160_000, () => random.next());
+  game = advanceSimulation(game, Math.ceil(1 / cruise.speed) + 10_000, () => random.next());
   assert.equal(game.liveThreats.some((threat) => threat.id === cruise.id), false);
 });
 
-test("intermission repair and resupply spend the persistent campaign wallet", () => {
+test("intermission repair spends the wallet while manual mission-reserve resupply stays retired", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   game.resources.budget = 0;
@@ -427,8 +463,9 @@ test("intermission repair and resupply spend the persistent campaign wallet", ()
   assert.ok(game.campaign!.campaignWallet < before);
   const afterRepair = game.campaign!.campaignWallet;
   game = serviceCampaignBattery(game, battery.id, "resupply", .5);
-  assert.ok((battery.missionReserve as number) > 0);
-  assert.ok(game.campaign!.campaignWallet < afterRepair);
+  assert.equal(battery.missionReserve, 0);
+  assert.equal(game.campaign!.campaignWallet, afterRepair);
+  assert.match(game.placementWarning || "", /автоматично/);
   assert.equal(game.resources.budget, game.campaign!.campaignWallet);
 });
 
@@ -481,15 +518,16 @@ test("campaign depot is seeded, uncapped, damageable and repaired only during ac
   const game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState(1, 24, "depot-production");
   game.resources.budget = 24;
-  advanceCampaignDepot(game, 60_000, false);
-  assert.equal(game.campaign.depot.stock, 2);
-  advanceCampaignDepot(game, 60_000, false);
-  assert.equal(game.campaign.depot.stock, 4);
+  assert.equal(game.campaign.depot.stock, 10);
+  advanceCampaignDepot(game, 45_000, false);
+  assert.equal(game.campaign.depot.stock, 12);
+  advanceCampaignDepot(game, 45_000, false);
+  assert.equal(game.campaign.depot.stock, 14);
   game.campaign.depot.health = 50;
-  advanceCampaignDepot(game, 60_000, false);
-  assert.equal(game.campaign.depot.stock, 5);
+  advanceCampaignDepot(game, 45_000, false);
+  assert.equal(game.campaign.depot.stock, 15);
   game.campaign.depot.stock = 10_001;
-  advanceCampaignDepot(game, 60_000, false);
+  advanceCampaignDepot(game, 45_000, false);
   assert.equal(game.campaign.depot.stock, 10_002);
 
   game.campaign.depot.health = 10;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getUnitDefinition } from "../src/data/units";
 import { acquisitionScore, classificationGain, evaluateDoctrine, ewEffectFor, planEffectivenessForThreat, salvoSizeFor, supportLeakEffect, THREAT_RULES, threatDisplayLabel, UNIT_RULES } from "../src/game/airDefenseRules.mjs";
-import { campaignMissionObjective, createCampaignState, serviceCampaignBattery } from "../src/game/campaignMeta";
+import { campaignMissionObjective, createCampaignState } from "../src/game/campaignMeta";
 import { createScenarioState } from "../src/game/initialState";
 import { placeBattery, setBatteryManualOverride, tickSimulation } from "../src/game/liveSimulation";
 import { validateBatteryPlacement } from "../src/game/placementRules";
@@ -63,25 +63,24 @@ test("combat reload transfers a magazine from mission reserve and stops when res
   assert.equal(game.batteries[0].status, "strained");
 });
 
-test("campaign stock is the source for intermission mission-reserve replenishment", () => {
+test("campaign batteries wait for a complete magazine and then draw it automatically from the depot", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   game.campaign.missionGrantApplied = true;
-  game.campaign.intermission = true;
-  game.campaign.campaignWallet = 100;
-  game.resources.budget = 100;
-  game = placeBattery({ ...game, campaign: { ...game.campaign, intermission: false } }, "mvg", { lat: 49.1, lng: 29.7 }, () => .5);
-  game.campaign!.intermission = true;
+  game = placeBattery(game, "mvg", { lat: 49.1, lng: 29.7 }, () => .5);
   const battery = game.batteries[0];
-  battery.missionReserve = 0;
+  battery.currentAmmo = 0;
+  battery.status = "reloading";
+  battery.reloadRemainingMs = 100;
   game.campaign!.depot.stock = 3;
-  game = serviceCampaignBattery(game, battery.id, "resupply", 1);
-  assert.equal(game.batteries[0].missionReserve, 3);
+  game = tickSimulation(game, 100, () => .99);
+  assert.equal(game.batteries[0].currentAmmo, 0);
+  assert.equal(game.batteries[0].status, "reloading");
+  assert.equal(game.campaign!.depot.stock, 3);
+  game.campaign!.depot.stock = 5;
+  game = tickSimulation(game, 1, () => .99);
+  assert.equal(game.batteries[0].currentAmmo, 5);
   assert.equal(game.campaign!.depot.stock, 0);
-  const wallet = game.campaign!.campaignWallet;
-  game = serviceCampaignBattery(game, battery.id, "resupply", 1);
-  assert.equal(game.campaign!.campaignWallet, wallet);
-  assert.equal(game.placementWarning, "Склад БК порожній");
 });
 
 test("low confidence UI data hides exact type until confirmed-type threshold", () => {

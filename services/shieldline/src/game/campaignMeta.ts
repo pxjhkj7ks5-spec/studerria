@@ -1,4 +1,4 @@
-import { CAMPAIGN_TUTORIAL_ASSET_ACTION, campaignKillRewards, campaignResupplyCosts, getCampaignMission, getCampaignRoute, missionTargetCount } from "../data/campaignPlan";
+import { CAMPAIGN_REINFORCEMENT_ACTION, CAMPAIGN_TUTORIAL_ASSET_ACTION, campaignKillRewards, getCampaignMission, getCampaignRoute, missionTargetCount } from "../data/campaignPlan";
 import { getUnitDefinition } from "../data/units";
 import type { CampaignAmmoDepot, CampaignMissionResult, CampaignSpawnEvent, CampaignState, CityId, Coordinates, DefenseBattery, GameState, ThreatKind, UnitKind } from "../types/game";
 import { clamp } from "./math";
@@ -6,7 +6,7 @@ import { clamp } from "./math";
 const KM_PER_DEGREE = 100;
 export const CAMPAIGN_DEPOT_REPAIR_COST = 12;
 export const CAMPAIGN_DEPOT_REPAIR_DURATION_MS = 120_000;
-export const CAMPAIGN_DEPOT_PRODUCTION_INTERVAL_MS = 60_000;
+export const CAMPAIGN_DEPOT_PRODUCTION_INTERVAL_MS = 45_000;
 
 export const campaignAmmoDepotPositions: readonly Coordinates[] = [
   { lat: 49.73, lng: 23.52 },
@@ -37,7 +37,7 @@ function stableIndex(seed: string, length: number) {
   return (hash >>> 0) % Math.max(1, length);
 }
 
-export function createCampaignAmmoDepot(seed = "campaign-default", stock = 0): CampaignAmmoDepot {
+export function createCampaignAmmoDepot(seed = "campaign-default", stock = 10): CampaignAmmoDepot {
   return {
     id: "campaign-ammo-depot",
     position: { ...campaignAmmoDepotPositions[stableIndex(seed, campaignAmmoDepotPositions.length)] },
@@ -116,12 +116,23 @@ export function applyCampaignMissionOpening(state: GameState) {
     addCampaignStoredBattery(state, "long-radar", { lat: 50.2, lng: 30.1 }, CAMPAIGN_TUTORIAL_ASSET_ACTION, "campaign-m1-long-radar");
     addCampaignStoredBattery(state, "mvg", { lat: 50.2, lng: 31.0 }, CAMPAIGN_TUTORIAL_ASSET_ACTION, "campaign-m1-mvg");
   }
+  if (mission.index === 2) {
+    const granted = addCampaignStoredBattery(state, "radar", { lat: 46.4, lng: 30.4 }, CAMPAIGN_REINFORCEMENT_ACTION, "campaign-m2-medium-radar");
+    if (granted) {
+      const radar = state.storedBatteries.find((battery) => battery.id === "campaign-m2-medium-radar");
+      if (radar) {
+        radar.assignedCityId = "odesa";
+        radar.lastEngagementResult = "Підкріплення для південного угруповання";
+      }
+    }
+  }
   state.campaign.unlockedSystems = [...new Set([...state.campaign.unlockedSystems, ...mission.unlocks])];
   if (state.campaign.missionGrantApplied) return;
   state.campaign.missionGrant = mission.grant;
   state.campaign.campaignWallet = Math.max(0, state.campaign.campaignWallet + mission.grant);
   state.resources.budget = state.campaign.campaignWallet;
   state.campaign.missionGrantApplied = true;
+  state.campaign.depot.stock = Math.max(10, state.campaign.depot.stock);
   state.campaign.missionInterceptionsAtStart = state.interceptions;
   state.campaign.missionImpactsAtStart = state.impacts;
   state.campaign.missionDepotProducedAtStart = state.campaign.depot.producedTotal;
@@ -428,12 +439,12 @@ export function addCampaignStoredBattery(state: GameState, kind: UnitKind, posit
     cooldownMs: 0,
     reloadRemainingMs: 0,
     currentAmmo: unit.ammoCapacity,
-    missionReserve: unit.missionReserveCapacity,
+    missionReserve: unit.missionReserveCapacity === "infinite" ? "infinite" : 0,
     manualOverrideTargets: [],
-    assignedCityId: "kyiv",
+    assignedCityId: state.campaign.missionIndex === 2 ? "odesa" : "kyiv",
     health: 100,
     experienceLevel: 0,
-    createdAtMission: 1,
+    createdAtMission: state.campaign.missionIndex,
     lastMovedMission: 0,
   });
   return true;
@@ -557,31 +568,21 @@ export function routeHasSelfIntersection(points: Coordinates[]) {
 
 export function campaignRedeployCost(_kind: UnitKind) { return 1; }
 export function campaignRepairCost(battery: DefenseBattery) { const unit = getUnitDefinition(battery.kind); return Math.max(1, Math.ceil(unit.cost * ((100 - battery.health) / 100) * .25)); }
-export function campaignResupplyCost(kind: UnitKind, portion: .5 | 1 = .5) { return Math.ceil((campaignResupplyCosts[kind] || 0) * portion * 10) / 10; }
 
-export function serviceCampaignBattery(state: GameState, batteryId: string, action: "repair" | "resupply", portion: .5 | 1 = .5): GameState {
+export function serviceCampaignBattery(state: GameState, batteryId: string, action: "repair" | "resupply", _portion: .5 | 1 = .5): GameState {
   if (!state.campaign || !state.campaign.intermission) return state;
   const battery = [...state.batteries, ...state.storedBatteries].find((item) => item.id === batteryId);
   if (!battery) return state;
-  const unit = getUnitDefinition(battery.kind);
-  const reserveCapacity = unit.missionReserveCapacity === "infinite" ? 0 : Number(unit.missionReserveCapacity);
-  const reserveNow = battery.missionReserve === "infinite" ? reserveCapacity : Number(battery.missionReserve || 0);
-  const requestedAmmo = action === "resupply" ? Math.min(Math.ceil(reserveCapacity * portion), Math.max(0, reserveCapacity - reserveNow), state.campaign.depot.stock) : 0;
-  if (action === "resupply" && requestedAmmo <= 0) {
-    state.placementWarning = state.campaign.depot.stock <= 0 ? "Склад БК порожній" : "Запас місії вже заповнено";
+  if (action === "resupply") {
+    state.placementWarning = "БК тепер автоматично надходить зі складу після циклу перезаряджання";
     return state;
   }
-  const cost = action === "repair"
-    ? campaignRepairCost(battery)
-    : Math.ceil((campaignResupplyCosts[battery.kind] || 0) * (requestedAmmo / Math.max(1, reserveCapacity)) * 10) / 10;
+  const cost = campaignRepairCost(battery);
   if (cost <= 0 || state.campaign.campaignWallet < cost) return state;
   state.campaign.campaignWallet -= cost;
   state.resources.budget = state.campaign.campaignWallet;
-  if (action === "repair") { battery.health = 100; battery.readiness = Math.max(battery.readiness, 90); }
-  else {
-    battery.missionReserve = reserveNow + requestedAmmo;
-    state.campaign.depot.stock -= requestedAmmo;
-  }
+  battery.health = 100;
+  battery.readiness = Math.max(battery.readiness, 90);
   state.placementWarning = null;
   return state;
 }

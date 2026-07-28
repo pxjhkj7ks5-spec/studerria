@@ -5,6 +5,7 @@ import { serverCampaignMissions, simulateMission } from "../serverGame.mjs";
 import { campaignMissions } from "../src/data/missions.ts";
 import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 import { calculateDefenseBonus } from "../src/game/simulationCore.mjs";
+import { flightDurationForDistance, routeDistanceKm, THREAT_FLIGHT_PROFILES, trimRouteToTrackedDistance } from "../src/game/threatFlightModel.mjs";
 
 test("production image includes every authoritative simulation runtime module", async () => {
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
@@ -44,13 +45,17 @@ test("authoritative mission output is stable for a golden seed", () => {
   assert.ok(left.events.some((event) => event.type === "threat.launched"));
   assert.ok(left.events.some((event) => event.type === "track.detected"));
   assert.ok(left.events.some((event) => event.type === "battery.fired"));
-  assert.equal(left.simVersion, "3.0.0");
+  assert.equal(left.simVersion, "3.1.0");
   assert.equal(left.snapshots.length, 2);
-  const windows = { geran2: [120_000, 180_000], gerbera: [120_000, 180_000], parodiya: [120_000, 180_000], kh101: [120_000, 145_000], kalibr: [120_000, 145_000], iskander: [35_000, 50_000] };
   for (const launched of left.events.filter((event) => event.type === "threat.launched")) {
     const duration = Number(launched.payload.flightDurationMs);
-    const [minimum, maximum] = windows[launched.payload.threatKind];
-    assert.ok(duration >= minimum && duration <= maximum);
+    assert.equal(launched.payload.speedKph, THREAT_FLIGHT_PROFILES[launched.payload.threatKind].speedKph);
+    const trackedRoute = trimRouteToTrackedDistance(launched.payload.threatKind, [
+      { lat: launched.payload.originLat, lng: launched.payload.originLng },
+      { lat: launched.payload.targetLat, lng: launched.payload.targetLng },
+    ]);
+    const distanceKm = routeDistanceKm(trackedRoute);
+    assert.equal(duration, flightDurationForDistance(launched.payload.threatKind, launched.payload.speedKph, distanceKm));
     const impact = left.events.find((event) => event.waveId === launched.waveId && event.type === "impact");
     if (impact) assert.equal(impact.occurredAtMs - launched.occurredAtMs, duration);
     const interception = left.events.find((event) => event.waveId === launched.waveId && event.type === "interception");

@@ -3,7 +3,7 @@ import { THREAT_FLIGHT_PROFILES } from "../game/threatFlightModel.mjs";
 
 interface ThreatFlightProfile {
   label: string;
-  speedKph: readonly [number, number];
+  speedKph: number;
   altitudeM: readonly [number, number];
 }
 
@@ -54,7 +54,7 @@ function rangedValue(range: readonly [number, number], seed: string, step: numbe
 export function threatTelemetryFor(kind: ThreatKind, seed: string): ThreatTelemetry {
   const profile = threatFlightProfiles[kind];
   return {
-    speedKph: rangedValue(profile.speedKph, `${seed}:speed`, 10),
+    speedKph: profile.speedKph,
     altitudeM: rangedValue(profile.altitudeM, `${seed}:altitude`, profile.altitudeM[1] >= 10_000 ? 100 : 10),
   };
 }
