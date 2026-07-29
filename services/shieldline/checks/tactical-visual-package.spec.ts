@@ -55,6 +55,8 @@ test("unidentified contacts use red tactical symbols instead of generic target a
   assert.match(mapSource, /threat\.confidence < 35 \? "\?" : "•"/);
   assert.doesNotMatch(mapSource, /classSprite|unknownThreatSprite/);
   assert.doesNotMatch(spriteCatalog, /unknownThreatSprite/);
+  assert.match(spriteCatalog, /import threatRecon from "\.\/threats\/recon\.png"/);
+  assert.match(spriteCatalog, /recon: threatRecon/);
   assert.match(styles, /\.target-contact[\s\S]*?color: #ff625a/);
 });
 

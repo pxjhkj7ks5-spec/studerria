@@ -88,6 +88,8 @@ test("low confidence UI data hides exact type until confirmed-type threshold", (
   assert.equal(threatDisplayLabel("kh101", 48), "Ймовірно крилата ціль");
   assert.equal(threatDisplayLabel("kh101", 72), "Підтверджено: крилата ціль");
   assert.equal(threatDisplayLabel("kh101", 90), "Тип підтверджено: X-101");
+  assert.equal(threatDisplayLabel("recon", 48), "Ймовірно спеціальна ціль");
+  assert.equal(threatDisplayLabel("recon", 90), "Тип підтверджено: розвідувальна ціль");
 });
 
 test("mission one objective has executable impact and resilience thresholds", () => {

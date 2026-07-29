@@ -61,7 +61,7 @@ export function classificationTier(confidence) {
 }
 
 const typeLabels = { drone: "БПЛА", saturation: "група БПЛА", geran2: "Geran-2", gerbera: "Gerbera", decoy: "приманка", parodiya: "Parodiya", cruise: "крилата ціль", combined: "комбінована ціль", kh101: "X-101", kalibr: "Kalibr", ballistic: "балістична ціль", iskander: "балістична ціль", recon: "розвідувальна ціль", "low-signature-cruise": "малопомітна крилата ціль", jammer: "постановник перешкод" };
-const classLabels = { drone: "БПЛА", decoy: "хибний контакт", cruise: "крилата ціль", ballistic: "балістична ціль", support: "ціль підтримки" };
+const classLabels = { drone: "БПЛА", decoy: "хибний контакт", cruise: "крилата ціль", ballistic: "балістична ціль", support: "спеціальна ціль" };
 export function threatDisplayLabel(kind, confidence) {
   const tier = classificationTier(confidence);
   if (tier === "unknown") return "Невідомий контакт";
