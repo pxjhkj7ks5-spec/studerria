@@ -56,13 +56,13 @@ test("visual presets persist and completed operations open the full-screen repor
   const report = page.getByRole("dialog", { name: "Післяопераційний звіт" });
   await expect(report).toBeVisible();
   await expect(report.getByRole("button", { name: "Оглянути мапу" })).toBeVisible();
-  await expect(report.getByRole("button", { name: "До вибору режимів" })).toBeVisible();
+  await expect(report.getByRole("button", { name: "До головного меню" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(report).toBeHidden();
   await expect(page.locator(".map-stage")).toBeVisible();
 
   await completeOperation(page, "visual-report-2");
   await expect(report).toBeVisible();
-  await report.getByRole("button", { name: "До вибору режимів" }).click();
+  await report.getByRole("button", { name: "До головного меню" }).click();
   await expect(page).toHaveURL(/\/shieldline\/?$/);
 });

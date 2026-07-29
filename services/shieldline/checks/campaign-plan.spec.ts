@@ -27,6 +27,9 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.durationMinutes), [10, 22, 28, 34, 42]);
   assert.deepEqual(campaignMissionsPlan.map((mission) => mission.grant), [24, 16, 24, 32, 45]);
   assert.ok(campaignMissionsPlan.every((mission) => mission.attackRegionHint.length >= 60));
+  assert.ok(campaignMissionsPlan.every((mission) => mission.briefingHighlights.length === 2));
+  assert.match(campaignMissionsPlan[1].briefingHighlights[0], /радар середньої дальності/);
+  assert.match(campaignMissionsPlan[4].briefingHighlights[0], /Patriot/);
   assert.ok(campaignMissionsPlan.every((mission) => !("rewardCap" in mission)));
   assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 42, 59, 78, 103]);
   const maximumKillRewards = campaignMissionsPlan.map((mission) => mission.waves.reduce((sum, wave) => sum + wave.count * (campaignKillRewards[wave.threatKind] || 0), 0));

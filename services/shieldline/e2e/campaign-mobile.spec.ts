@@ -6,8 +6,15 @@ test("mobile Campaign opens its tactical depot state and reconnects without repl
     Object.defineProperty(globalThis.crypto, "randomUUID", { value: () => "e2e-campaign-seed", configurable: true });
   });
   await page.goto("/shieldline/");
-  await page.getByRole("button", { name: /Campaign|Кампанія/ }).click();
-  await page.getByRole("button", { name: "Open manual command board" }).click();
+  await expect(page.getByRole("heading", { name: "Утримайте рубіж." })).toBeVisible();
+  await expect(page.getByText("0 з 5 місій")).toBeVisible();
+  await page.getByRole("button", { name: "Почати кампанію" }).click();
+  await expect(page.getByRole("heading", { name: "Перший контакт" })).toBeVisible();
+  await expect(page.getByText("Ймовірний район атаки")).toBeVisible();
+  await expect(page.getByText("10 БК · повні магазини")).toBeVisible();
+  const shellAccessibility = await new AxeBuilder({ page }).include(".briefing-screen").analyze();
+  expect(shellAccessibility.violations.filter((violation) => violation.impact === "critical")).toEqual([]);
+  await page.getByRole("button", { name: "Перейти до розгортання" }).click();
   const tutorial = page.locator(".tutorial-overlay");
   const tutorialAppeared = await tutorial.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
   if (tutorialAppeared) {
@@ -62,8 +69,8 @@ test("Safari discards an outdated IndexedDB projection instead of showing a blan
     });
   });
   await page.goto("/shieldline/");
-  await page.getByRole("button", { name: /Campaign|Кампанія/ }).click();
-  await page.getByRole("button", { name: "Open manual command board" }).click();
+  await page.getByRole("button", { name: "Почати кампанію" }).click();
+  await page.getByRole("button", { name: "Перейти до розгортання" }).click();
   await expect(page.locator(".leaflet-stage")).toBeVisible();
   await expect(page.locator(".app-recovery")).toHaveCount(0);
 });

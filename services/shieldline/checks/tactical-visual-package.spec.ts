@@ -102,6 +102,7 @@ test("completion opens the accessible full-screen report with both exits", async
   assert.match(appSource, /setFullscreenReportOpen\(true\)/);
   assert.match(appSource, /role="dialog" aria-modal="true"/);
   assert.match(reportSource, /Оглянути мапу/);
-  assert.match(reportSource, /До вибору режимів/);
+  assert.match(reportSource, /До головного меню/);
+  assert.match(reportSource, /Детальна статистика/);
   assert.match(reportSource, /event\.key !== "Escape"/);
 });

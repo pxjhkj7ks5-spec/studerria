@@ -1,9 +1,10 @@
-import { ArrowLeft, ArrowRight, ClipboardList, LogOut, RotateCcw } from "lucide-react";
-import { useEffect, useRef, type CSSProperties } from "react";
+import { ArrowLeft, ArrowRight, ChevronDown, ClipboardList, LogOut, RotateCcw, Shield, Warehouse } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { archetypeLabel } from "../game/threatDirector";
+import { buildAfterActionPresentation } from "../game/campaignPresentation";
 import type { GameState } from "../types/game";
 import type { MissionRun, RankedResult } from "../domain/contracts";
-import { formatNumber, t } from "../platform/i18n";
+import { formatNumber } from "../platform/i18n";
 
 interface AfterActionReportProps {
   game: GameState;
@@ -18,18 +19,21 @@ interface AfterActionReportProps {
 
 export function AfterActionReport({ game, rankedResult, authoritativeRun, variant = "panel", onInspectMap, onExit, onContinueCampaign, onRetryCampaign }: AfterActionReportProps) {
   const report = game.afterActionReports[0];
+  const view = buildAfterActionPresentation(game, authoritativeRun);
+  const { campaignResult } = view;
   const reportRef = useRef<HTMLElement | null>(null);
-  const outcomeTitle = authoritativeRun
-    ? authoritativeRun.result === "victory" ? "Оборону втримано" : authoritativeRun.result === "contained" ? "Атаку локалізовано" : "Оборона зазнала втрат"
-    : game.status === "won" ? "Операцію завершено успішно" : game.status === "lost" ? "Операцію завершено з втратами" : "Операцію завершено";
-  const fallbackRecommendation = game.resources.ammo < 25
-    ? "Conserve ammo and restore logistics."
-    : game.resources.energy < 45
-      ? "Prioritize energy resilience."
-      : game.liveThreats.length > 6
-        ? "Expand detection coverage."
-      : "Maintain layered coverage.";
-  const campaignResult = game.campaign?.lastAttemptResult || game.campaign?.previousMissionResults.at(-1);
+  const damagedCities = report?.damageReport.damagedCities || [];
+  const depotNeedsAttention = Boolean(campaignResult && (campaignResult.depotHealth < 100 || campaignResult.depotProduced || campaignResult.depotLost));
+  const defenseNeedsAttention = Boolean(report && (report.defensePerformance.missedThreats > 0 || Math.abs(report.defensePerformance.averageReadinessChange) >= 1));
+  const nextMissionIndex = game.campaign && !game.campaign.completed ? Math.min(5, game.campaign.missionIndex + 1) : null;
+  const primaryAction = campaignResult?.outcome === "defeat" && onRetryCampaign
+    ? { label: "Повторити місію", icon: RotateCcw, action: onRetryCampaign }
+    : game.campaign?.intermission && nextMissionIndex && onContinueCampaign
+      ? { label: `До місії ${nextMissionIndex}`, icon: ArrowRight, action: onContinueCampaign }
+      : game.campaign?.completed && onExit
+        ? { label: "Завершити кампанію", icon: ArrowRight, action: onExit }
+        : null;
+  const PrimaryActionIcon = primaryAction?.icon;
 
   useEffect(() => {
     if (variant !== "fullscreen") return undefined;
@@ -48,93 +52,72 @@ export function AfterActionReport({ game, rankedResult, authoritativeRun, varian
   }, [onInspectMap, variant]);
 
   return (
-    <section ref={reportRef} tabIndex={variant === "fullscreen" ? -1 : undefined} className={`aar-card aar-card--${variant}`} aria-label="After action report">
-      <div className="aar-heading">
-        <ClipboardList size={20} />
+    <section ref={reportRef} tabIndex={variant === "fullscreen" ? -1 : undefined} className={`aar-card aar-card--${variant} aar-card--${view.outcome}`} aria-label="Післяопераційний звіт">
+      <header className="aar-heading">
+        <ClipboardList size={22} />
         <div>
-          {variant === "fullscreen" ? <><span className="aar-eyebrow">{t("aar.title")}</span><h1>{outcomeTitle}</h1></> : <strong>{t("aar.title")}</strong>}
-          <span>{report ? `Cycle ${formatNumber(report.day)} · ${report.archetype ? archetypeLabel(report.archetype) : "contact cycle"}` : t("aar.pending")}</span>
+          <span className="aar-eyebrow">Післяопераційний звіт</span>
+          <strong className="aar-outcome">{view.outcomeLabel}</strong>
+          <h1>{view.title}</h1>
+          <p>{view.objectiveSummary}</p>
         </div>
-      </div>
-      {authoritativeRun ? <div className="aar-section aar-section--ranked"><strong>{t("aar.server")}</strong><span>{formatNumber(authoritativeRun.interceptions)} {t("aar.intercepts")} · {formatNumber(authoritativeRun.impacts)} {t("aar.impacts")} · seed {authoritativeRun.seed.slice(-12)}</span></div> : null}
-      {report ? (
-        <>
-          <p className="aar-summary">{report.situationSummary}</p>
-          <div className="aar-grid">
-            <span><strong>{report.threatOverview.totalTracks}</strong> Tracks</span>
-            <span><strong>{report.threatOverview.confirmedThreats}</strong> Confirmed</span>
-            <span><strong>{report.threatOverview.decoys}</strong> Decoys</span>
-            <span><strong>{report.threatOverview.unidentifiedTracks}</strong> Unknown</span>
-            <span><strong>{report.defensePerformance.interceptions}</strong> Intercepts</span>
-            <span><strong>{report.defensePerformance.missedThreats}</strong> Missed</span>
-          </div>
-          <div className="aar-section">
-            <strong>Defense Performance</strong>
-            <span>Ammo spent {Math.round(report.defensePerformance.ammoSpent)} · readiness {Math.round(report.defensePerformance.averageReadinessChange)}%</span>
-            <span>Strongest {report.defensePerformance.strongestUnit} · weakest area {report.defensePerformance.weakestCoverageArea}</span>
-          </div>
-          <div className="aar-section">
-            <strong>Damage Report</strong>
-            <span>{report.damageReport.damagedCities.length ? report.damageReport.damagedCities.join(", ") : "No new city damage reported"}</span>
-            <span>Energy {Math.round(report.damageReport.systems.energy)}% · Logistics {Math.round(report.damageReport.systems.logistics)}% · Morale {Math.round(report.damageReport.systems.civilMorale)}%</span>
-          </div>
-          <div className="aar-section">
-            <strong>Resource Changes</strong>
-            <span>Budget {signed(report.resourceChanges.budget)} · Ammo {signed(report.resourceChanges.ammo)} · Energy {signed(report.resourceChanges.energy)}</span>
-            <span>Morale {signed(report.resourceChanges.morale)} · Political {signed(report.resourceChanges.political)}</span>
-          </div>
-          <p>{report.recommendation}</p>
-          {campaignResult ? <div className="aar-section aar-section--campaign"><strong>{campaignResult.outcome === "defeat" ? "Місію програно" : campaignResult.objectiveMet ? "Завдання місії виконано" : "Завдання місії не виконано"}</strong><span>{campaignResult.objectiveSummary}</span><strong>Економіка місії · гаманець {campaignResult.walletAfterMission} млн ₴</strong>{campaignResult.rewardLines.map((line) => <span key={`${line.kind}-${line.label}`}>{line.label}: {line.amount > 0 ? "+" : ""}{line.amount} млн</span>)}<span>Мінімальний стан міста: {Math.round(campaignResult.minimumCityHp)}% · збито {campaignResult.interceptions}/{campaignResult.totalTargets} · влучань {campaignResult.impacts}</span><span>Склад БК: {Math.round(campaignResult.depotHealth)}% · запас {Math.round(campaignResult.depotStock)} · вироблено {campaignResult.depotProduced} · втрачено {campaignResult.depotLost}</span></div> : null}
-          {rankedResult ? <div className="aar-section aar-section--ranked"><strong>Ranked result</strong><span>#{rankedResult.entry.rank} · {rankedResult.entry.score} score · {rankedResult.challenge.title}</span></div> : null}
-        </>
-      ) : (
-        authoritativeRun ? (
-          <>
-            <p className="aar-summary">Campaign outcome projected from simulation events sequence 1–{authoritativeRun.events.at(-1)?.sequence || 0}.</p>
-            <div className="aar-grid">
-              <span><strong>{formatNumber(authoritativeRun.interceptions)}</strong> {t("aar.intercepts")}</span>
-              <span><strong>{formatNumber(authoritativeRun.impacts)}</strong> {t("aar.impacts")}</span>
-              <span><strong>{formatNumber(authoritativeRun.ammoSpent)}</strong> {t("aar.ammo")}</span>
-              <span><strong>{authoritativeRun.simVersion || "—"}</strong> {t("aar.version")}</span>
-            </div>
-            <div className="aar-sector-heatmap" aria-label="Campaign sector pressure heatmap">
-              {Object.entries(authoritativeRun.sectorSummary).map(([sector, summary]) => (
-                <span key={sector} style={{ "--sector-risk": `${Math.min(100, summary.pressure + summary.damage * 2)}%` } as CSSProperties}>
-                  <b>{sector}</b><strong>{formatNumber(summary.pressure)}%</strong><small>{formatNumber(summary.damage)}% {t("aar.damage")}</small>
-                </span>
-              ))}
-            </div>
-            <p>{authoritativeRun.result === "victory" ? "Coverage held across every campaign sector." : authoritativeRun.result === "contained" ? "The attack was contained; reinforce damaged sectors before the next mission." : "Rebuild coverage and preserve the reserve before retrying this mission."}</p>
-          </>
-        ) : (
-          <>
-            <div className="aar-grid">
-              <span><strong>{game.interceptions}</strong> Intercepts</span>
-              <span><strong>{game.impacts}</strong> Impacts</span>
-              <span><strong>{game.liveThreats.length}</strong> Active tracks</span>
-              <span><strong>{Math.round(game.wavePressure)}</strong> Pressure</span>
-            </div>
-            <p>{fallbackRecommendation}</p>
-          </>
-        )
-      )}
+      </header>
+
+      <section className="aar-key-metrics" aria-label="Ключові результати">
+        <Metric value={`${formatNumber(view.interceptions)}/${formatNumber(view.totalTargets)}`} label="Збито" />
+        <Metric value={formatNumber(view.impacts)} label="Влучань" critical={view.impacts > 0} />
+        <Metric value={`${formatNumber(view.minimumCityHp)}%`} label="Найнижчий HP міста" critical={view.minimumCityHp <= 30} />
+        <Metric value={view.depotHealth === null ? "—" : `${formatNumber(view.depotHealth)}% · ${formatNumber(view.depotStock || 0)} БК`} label="Склад БК" critical={(view.depotHealth || 100) <= 30} />
+      </section>
+
+      {campaignResult ? (
+        <section className="aar-economy" aria-label="Економіка місії">
+          <header><span>Економіка місії</span><strong>{formatNumber(view.finalWallet || 0)} млн ₴</strong><small>Фінальний гаманець</small></header>
+          <div>{view.economy.map((line) => <span className={line.tone ? `is-${line.tone}` : ""} key={line.label}><small>{line.label}</small><strong>{line.value > 0 ? "+" : ""}{formatNumber(line.value)} млн ₴</strong></span>)}</div>
+        </section>
+      ) : null}
+
+      {(damagedCities.length || depotNeedsAttention || defenseNeedsAttention) ? <section className="aar-notables" aria-label="Важливі наслідки">
+        {damagedCities.length ? <div><Shield size={18} /><span><strong>Пошкоджені міста</strong><small>{damagedCities.join(", ")}</small></span></div> : null}
+        {depotNeedsAttention && campaignResult ? <div><Warehouse size={18} /><span><strong>Логістика складу</strong><small>Вироблено {formatNumber(campaignResult.depotProduced)} БК · втрачено {formatNumber(campaignResult.depotLost)} БК · стан {formatNumber(campaignResult.depotHealth)}%</small></span></div> : null}
+        {defenseNeedsAttention && report ? <div><Shield size={18} /><span><strong>Стан оборони</strong><small>Готовність {formatNumber(report.defensePerformance.averageReadinessChange)}% · пропущено {formatNumber(report.defensePerformance.missedThreats)}</small></span></div> : null}
+      </section> : null}
+
+      <details className="aar-details">
+        <summary><span>Детальна статистика</span><ChevronDown size={16} /></summary>
+        <div className="aar-details__grid">
+          <Detail label="Усього контактів" value={report ? formatNumber(report.threatOverview.totalTracks) : formatNumber(view.totalTargets)} />
+          <Detail label="Підтверджені цілі" value={report ? formatNumber(report.threatOverview.confirmedThreats) : "—"} />
+          <Detail label="Приманки" value={report ? formatNumber(report.threatOverview.decoys) : "—"} />
+          <Detail label="Невідомі контакти" value={report ? formatNumber(report.threatOverview.unidentifiedTracks) : "—"} />
+          <Detail label="Витрачено БК" value={report ? formatNumber(report.defensePerformance.ammoSpent) : authoritativeRun ? formatNumber(authoritativeRun.ammoSpent) : "—"} />
+          <Detail label="Зміна готовності" value={report ? `${formatNumber(report.defensePerformance.averageReadinessChange)}%` : "—"} />
+          <Detail label="Найсильніша система" value={report?.defensePerformance.strongestUnit || "—"} />
+          <Detail label="Слабка зона" value={report?.defensePerformance.weakestCoverageArea || "—"} />
+          <Detail label="Зерно симуляції" value={authoritativeRun?.seed ? authoritativeRun.seed.slice(-12) : "—"} mono />
+          <Detail label="Версія симуляції" value={authoritativeRun?.simVersion || "—"} mono />
+        </div>
+        {report?.archetype ? <p>Профіль атаки: {archetypeLabel(report.archetype)}.</p> : null}
+        {rankedResult ? <p>Рейтинг: #{rankedResult.entry.rank} · {rankedResult.entry.score} балів · {rankedResult.challenge.title}.</p> : null}
+      </details>
+
       {variant === "fullscreen" ? (
         <footer className="aar-actions">
-          <button type="button" onClick={onInspectMap}><ArrowLeft size={17} /> Оглянути мапу</button>
-          {campaignResult?.outcome === "defeat" && onRetryCampaign ? <button type="button" onClick={onRetryCampaign}><RotateCcw size={17} /> Повторити місію</button> : null}
-          {game.campaign?.intermission && !game.campaign.completed && onContinueCampaign ? <button type="button" onClick={onContinueCampaign}><ArrowRight size={17} /> До місії {game.campaign.missionIndex + 1}</button> : null}
-          <button type="button" onClick={onExit}><LogOut size={17} /> До вибору режимів</button>
+          {primaryAction && PrimaryActionIcon ? <button className="aar-action aar-action--primary" type="button" onClick={primaryAction.action}><PrimaryActionIcon size={17} />{primaryAction.label}</button> : null}
+          {onInspectMap ? <button className="aar-action aar-action--secondary" type="button" onClick={onInspectMap}><ArrowLeft size={17} /> Оглянути мапу</button> : null}
+          {onExit && !game.campaign?.completed ? <button className="aar-action aar-action--tertiary" type="button" onClick={onExit}><LogOut size={17} /> До головного меню</button> : null}
         </footer>
-      ) : campaignResult?.outcome === "defeat" && onRetryCampaign ? (
-        <footer className="aar-actions aar-actions--inline"><button type="button" onClick={onRetryCampaign}><RotateCcw size={17} /> Повторити місію</button></footer>
-      ) : game.campaign?.intermission && !game.campaign.completed && onContinueCampaign ? (
-        <footer className="aar-actions aar-actions--inline"><button type="button" onClick={onContinueCampaign}><ArrowRight size={17} /> До місії {game.campaign.missionIndex + 1}</button></footer>
+      ) : primaryAction && PrimaryActionIcon ? (
+        <footer className="aar-actions aar-actions--inline"><button className="aar-action aar-action--primary" type="button" onClick={primaryAction.action}><PrimaryActionIcon size={17} />{primaryAction.label}</button></footer>
       ) : null}
     </section>
   );
 }
 
-function signed(value: number) {
-  const rounded = Math.round(value);
-  return `${rounded >= 0 ? "+" : ""}${rounded}`;
+function Metric({ value, label, critical = false }: { value: string; label: string; critical?: boolean }) {
+  return <span className={critical ? "is-critical" : ""}><strong>{value}</strong><small>{label}</small></span>;
+}
+
+function Detail({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return <span><small>{label}</small><strong className={mono ? "is-mono" : ""}>{value}</strong></span>;
 }

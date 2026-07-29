@@ -110,6 +110,7 @@ export interface MissionDefinition {
   expectedThreatClasses?: string[];
   broadAzimuth?: string;
   attackRegionHint?: string;
+  briefingHighlights?: string[];
   waves: ThreatWave[];
 }
 
