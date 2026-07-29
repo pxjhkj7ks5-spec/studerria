@@ -49,6 +49,8 @@ test("combat results use tactical effects and desktop unit details keep readable
   assert.match(rail, /ammoLabel\(unit, referenceBattery, Boolean\(game\.campaign\)\)/);
   assert.doesNotMatch(rail, /запас місії/);
   assert.match(rail, /Дозволити дрони/);
+  assert.match(rail, /Дрони дозволені · вимкнути/);
+  assert.doesNotMatch(rail, /setExpandedKind\(null\)[\s\S]{0,120}setDismissedKind\(unit\.kind\)/);
   assert.match(map, /battery\.currentAmmo === "infinite" \? "∞" : `\$\{battery\.currentAmmo\}\/\$\{unit\.ammoCapacity\}`/);
   assert.match(rail, /Радіус виявлення/);
   assert.match(map, /#63c7d4/);

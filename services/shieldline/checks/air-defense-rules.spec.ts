@@ -6,6 +6,7 @@ import { campaignMissionObjective, createCampaignState } from "../src/game/campa
 import { createScenarioState } from "../src/game/initialState";
 import { placeBattery, setBatteryManualOverride, tickSimulation } from "../src/game/liveSimulation";
 import { validateBatteryPlacement } from "../src/game/placementRules";
+import type { LiveThreat } from "../src/types/game";
 
 const doctrineInput = { confidence: 90, trackQuality: 90, networkAvailable: true, reserveRatio: 1, coastalApproach: true };
 
@@ -23,6 +24,60 @@ test("upper-tier doctrine reserves Patriot and only explicit manual override ope
   const battery = game.batteries[0];
   game = setBatteryManualOverride(game, battery.id, "geran2", true);
   assert.deepEqual(game.batteries[0].manualOverrideTargets, ["geran2"]);
+});
+
+test("manual drone permission leaves every upper-tier system with a real firing chance", () => {
+  for (const unitKind of ["s300", "iris-t", "nasams", "patriot"] as const) {
+    const unit = getUnitDefinition(unitKind);
+    for (const threatKind of ["drone", "saturation", "geran2", "gerbera", "recon"] as const) {
+      if (!unit.doctrine.forbiddenByDefault.includes(threatKind)) continue;
+      assert.ok(unit.engagementChanceByThreat[threatKind] > 0, `${unitKind} must have a firing chance against ${threatKind}`);
+      assert.equal(evaluateDoctrine({ ...doctrineInput, unitKind, threatKind, manualOverride: true }).allowed, true);
+    }
+  }
+  assert.equal(getUnitDefinition("s300").engagementChanceByThreat.geran2, 42);
+  assert.equal(getUnitDefinition("s300").engagementChanceByThreat.gerbera, 43);
+});
+
+test("an S-300 with manual permission actually launches at a drone", () => {
+  let game = createScenarioState(() => .5, "training", "first-night");
+  game.resources.budget = 999;
+  game = placeBattery(game, "s300", { lat: 49.1, lng: 29.7 }, () => .5);
+  const battery = game.batteries[0];
+  game = setBatteryManualOverride(game, battery.id, "gerbera", true);
+  game.cyclePhase = "attack";
+  game.cycleDurationMs = 999_999;
+  const drone: LiveThreat = {
+    id: "manual-s300-drone",
+    kind: "gerbera",
+    status: "inbound",
+    origin: { lat: 49.1, lng: 29.7 },
+    target: { lat: 49.2, lng: 29.8 },
+    targetCityId: "kyiv",
+    launchSectorId: "manual-test",
+    launchSectorName: "Тестовий напрямок",
+    progress: .3,
+    speed: 1 / 120_000,
+    speedKph: 150,
+    altitudeM: 140,
+    difficulty: 10,
+    damage: 4,
+    confidence: 90,
+    classification: "confirmed-type",
+    displayLabel: "Gerbera",
+    saturation: 1,
+    headingDeg: 0,
+    revealed: true,
+    trackQuality: 90,
+    fireControlQuality: 90,
+    speedModifier: 1,
+    damageModifier: 1,
+    reward: 2,
+  };
+  game.liveThreats = [drone];
+  game = tickSimulation(game, 100, () => .5);
+  assert.ok(game.engagementEvents.some((event) => event.unitId === battery.id && event.targetId === drone.id));
+  assert.equal(game.batteries[0].currentAmmo, 3);
 });
 
 test("network SAM doctrine yields drone work to an available cheaper layer", () => {

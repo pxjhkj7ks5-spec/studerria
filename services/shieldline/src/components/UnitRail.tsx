@@ -103,7 +103,8 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
             : game.resources.budget >= unit.cost;
           const selected = placementKind === unit.kind;
           const disabled = !active || !affordable || !allowed;
-          const localBattery = game.batteries.find((item) => item.kind === unit.kind);
+          const localBatteries = game.batteries.filter((item) => item.kind === unit.kind);
+          const localBattery = localBatteries[0];
           const referenceBattery = localBattery || storedBattery;
           const readiness = referenceBattery ? referenceBattery.readiness : unit.readiness;
           const fatigue = referenceBattery ? referenceBattery.fatigue : 0;
@@ -187,23 +188,22 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                   <span>Готовність {Math.round(readiness)}% · втома {Math.round(fatigue)}% ({fatigueLabel(fatigue)})</span>
                   {referenceBattery ? <span>Стан {Math.round(referenceBattery.health)}% · досвід L{referenceBattery.experienceLevel}</span> : null}
                   <span>{storedBattery ? storedDeploymentCost ? "На складі · передислокація 1 млн ₴" : "На складі · підкріплення" : localBattery ? `${localBattery.supplyStatus} · передислокація через маркер 1 млн ₴` : "Не розміщена"}</span>
-                  {localBattery && doctrineOverrideUnits.has(unit.kind) ? (
+                  {localBatteries.length > 0 && doctrineOverrideUnits.has(unit.kind) ? (
                     <div className="campaign-service-actions" aria-label="Ручні дозволи доктрини">
                       {(() => {
                         const targets = droneOverrideKinds.filter((targetKind) => unit.doctrine.forbiddenByDefault.includes(targetKind));
-                        const enabled = targets.length > 0 && targets.every((targetKind) => localBattery.manualOverrideTargets.includes(targetKind));
+                        const enabled = targets.length > 0 && localBatteries.every((battery) => targets.every((targetKind) => battery.manualOverrideTargets.includes(targetKind)));
                         return <button
                           type="button"
                           data-sound-cue="planning.toggle"
                           aria-pressed={enabled}
                           onClick={(event) => {
                             event.stopPropagation();
-                            for (const targetKind of targets) setManualOverride(localBattery.id, targetKind, !enabled);
-                            setExpandedKind(null);
-                            setDismissedKind(unit.kind);
-                            event.currentTarget.blur();
+                            for (const battery of localBatteries) {
+                              for (const targetKind of targets) setManualOverride(battery.id, targetKind, !enabled);
+                            }
                           }}
-                        >{enabled ? "Заборонити дрони" : "Дозволити дрони"}</button>;
+                        >{enabled ? "Дрони дозволені · вимкнути" : "Дозволити дрони"}</button>;
                       })()}
                     </div>
                   ) : null}
