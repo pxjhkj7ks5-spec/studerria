@@ -7,8 +7,18 @@ import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
-import { flightDurationForDistance, flightDurationForSpeed, routeDistanceKm, THREAT_FLIGHT_PROFILES, trimRouteToTrackedDistance } from "../src/game/threatFlightModel.mjs";
-import type { LiveThreat, ThreatKind } from "../src/types/game";
+import { flightDurationForDistance, flightDurationForSpeed, routeDistanceKm, THREAT_FLIGHT_PROFILES } from "../src/game/threatFlightModel.mjs";
+import type { GameState, LiveThreat, ThreatKind } from "../src/types/game";
+
+function advanceInRuntimeChunks(game: GameState, durationMs: number, random: () => number) {
+  let next = game;
+  for (let remainingMs = durationMs; remainingMs > 0;) {
+    const stepMs = Math.min(60_000, remainingMs);
+    next = advanceSimulation(next, stepMs, random);
+    remainingMs -= stepMs;
+  }
+  return next;
+}
 
 test("campaign catalog matches the five authored missions and target budgets", () => {
   assert.equal(campaignRouteTemplates.length, 36);
@@ -259,13 +269,18 @@ test("live campaign launches from and animates a named geographic direction", ()
   assert.ok(warningSector);
   assert.ok(warningSector.lastLaunchCoordinates);
   assert.equal(game.liveThreats.length, 0);
-  game = advanceSimulation(game, 10_000, () => random.next());
+  game = advanceSimulation(game, 20_000, () => random.next());
   const threat = game.liveThreats[0];
   assert.ok(threat);
   assert.notEqual(threat.launchSectorId, threat.routeId);
   assert.equal(sectorSupportsThreat(game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!, threat.kind), true);
-  assert.notDeepEqual(threat.routeWaypoints?.[0], threat.origin);
-  assert.ok(flightDurationForDistance(threat.kind, threat.speedKph, routeDistanceKm(threat.routeWaypoints!)) <= 150_000);
+  assert.deepEqual(threat.routeWaypoints?.[0], threat.origin);
+  assert.equal(Math.ceil(1 / threat.speed), flightDurationForDistance(threat.kind, threat.speedKph, routeDistanceKm(threat.routeWaypoints!)));
+  const depotDecoy = game.liveThreats.find((item) => item.targetAsset === "ammo-depot");
+  assert.ok(depotDecoy);
+  assert.deepEqual(depotDecoy.routeWaypoints?.[0], depotDecoy.origin);
+  const kyiv = game.cities.find((city) => city.id === "kyiv")!;
+  assert.ok(routeDistanceKm([depotDecoy.origin, kyiv.coordinates]) > 150);
   const activeSector = game.launchSectors.find((sector) => sector.id === threat.launchSectorId)!;
   assert.equal(activeSector.state, "launching");
   assert.deepEqual(activeSector.lastLaunchCoordinates, threat.origin);
@@ -327,7 +342,7 @@ test("S-300 reinforcement is paired with a real Caspian warning, flight, and res
   assert.equal(cruise.launchSectorId, "long_range_air_b");
   assert.equal(game.log.some((entry) => entry.eventType === "launch" && entry.locationLabel?.includes("Каспійський")), true);
   const cruiseId = cruise.id;
-  game = advanceSimulation(game, Math.ceil(1 / cruise.speed) + 10_000, () => random.next());
+  game = advanceInRuntimeChunks(game, Math.ceil(1 / cruise.speed) + 10_000, () => random.next());
   assert.equal(game.liveThreats.some((threat) => threat.id === cruiseId), false);
   assert.equal(game.campaign?.spawnCursor, 1);
   assert.equal(game.campaign?.intermission, true);
@@ -386,20 +401,16 @@ test("fixed model speeds drive route-distance flight time instead of an authored
   assert.equal(shortGeran, 144_000);
   assert.equal(longGeran, shortGeran * 2);
   assert.equal(flightDurationForSpeed("kh101", 780), flightDurationForDistance("kh101", 780, THREAT_FLIGHT_PROFILES.kh101.representativeDistanceKm));
-  const tracked = trimRouteToTrackedDistance("kh101", [{ lat: 44.8, lng: 47.2 }, { lat: 50.45, lng: 30.52 }]);
-  assert.ok(routeDistanceKm(tracked) < routeDistanceKm([{ lat: 44.8, lng: 47.2 }, { lat: 50.45, lng: 30.52 }]));
-  assert.ok(flightDurationForDistance("kh101", 780, routeDistanceKm(tracked)) <= 150_000);
 });
 
-test("campaign tracking windows stay balanced while each model keeps one canonical speed", () => {
+test("full campaign corridors keep one canonical speed without trimming their launch point", () => {
   const durationRanges = new Map<ThreatKind, { min: number; max: number; speeds: Set<number> }>();
   for (const mission of campaignMissionsPlan) {
     for (const wave of mission.waves) {
       for (const routeId of wave.routeIds) {
         const route = campaignRouteTemplates.find((item) => item.id === routeId)!;
         const speedKph = THREAT_FLIGHT_PROFILES[wave.threatKind].speedKph;
-        const trackedRoute = trimRouteToTrackedDistance(wave.threatKind, route.baseWaypoints);
-        const durationMs = flightDurationForDistance(wave.threatKind, speedKph, routeDistanceKm(trackedRoute));
+        const durationMs = flightDurationForDistance(wave.threatKind, speedKph, routeDistanceKm(route.baseWaypoints));
         const range = durationRanges.get(wave.threatKind) || { min: Infinity, max: 0, speeds: new Set<number>() };
         range.min = Math.min(range.min, durationMs);
         range.max = Math.max(range.max, durationMs);
@@ -411,9 +422,9 @@ test("campaign tracking windows stay balanced while each model keeps one canonic
   for (const [kind, range] of durationRanges) {
     assert.equal(range.speeds.size, 1, `${kind} must use one canonical speed`);
     if (kind === "iskander" || kind === "ballistic") {
-      assert.ok(range.min >= 35_000 && range.max <= 50_000, `${kind} must stay inside its ballistic tracking window`);
+      assert.ok(range.min >= 45_000 && range.max <= 90_000, `${kind} must stay inside its ballistic corridor window`);
     } else {
-      assert.ok(range.min >= 80_000 && range.max <= 150_000, `${kind} must stay inside the 80–150 second tracking window`);
+      assert.ok(range.min >= 80_000 && range.max <= 400_000, `${kind} must use its complete authored corridor`);
     }
   }
 });
@@ -441,7 +452,7 @@ test("campaign cruise missiles require sensor acquisition and complete their aut
   assert.equal(cruise.launchSectorId, "long_range_air_a");
   game = advanceSimulation(game, 10_000, () => random.next());
   assert.equal(game.liveThreats.find((threat) => threat.id === cruise.id)?.revealed, false);
-  game = advanceSimulation(game, Math.ceil(1 / cruise.speed) + 10_000, () => random.next());
+  game = advanceInRuntimeChunks(game, Math.ceil(1 / cruise.speed) + 10_000, () => random.next());
   assert.equal(game.liveThreats.some((threat) => threat.id === cruise.id), false);
 });
 

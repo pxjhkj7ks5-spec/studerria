@@ -1,9 +1,9 @@
 import { createLaunchSectorState, launchSectorCategory, pickWeightedSector, randomPointInSector } from "./launchSystem.mjs";
 import { createGuidedOperationWaves, GUIDED_THREE_STAGE_PROFILE, sectorIdsForDirection } from "./campaignPacing.mjs";
 import { AIR_DEFENSE_RULES_VERSION, planEffectivenessForThreat, supportLeakEffect } from "./airDefenseRules.mjs";
-import { routeDistanceKm, sampledThreatTelemetry, trimRouteToTrackedDistance } from "./threatFlightModel.mjs";
+import { routeDistanceKm, sampledThreatTelemetry } from "./threatFlightModel.mjs";
 
-export const SIM_VERSION = "3.1.0";
+export const SIM_VERSION = "3.1.1";
 // Geography changes must not silently rebalance established mission outcomes.
 const OUTCOME_RANDOM_VERSION = "2.1.0";
 
@@ -198,8 +198,7 @@ export function simulateOperation({ mission, seed, plan = {}, defenseBonus, star
     const launchSector = pickWeightedSector(directionalSectors, wave.threatKind, launchRandom);
     const origin = randomPointInSector(launchSector, launchRandom);
     const target = mission.randomWaveCount || mission.pacingProfile ? targetPointForSector(wave.targetSector, targetRandom) : targetSectorCoordinates[wave.targetSector] || targetSectorCoordinates.hq;
-    const trackedRoute = trimRouteToTrackedDistance(wave.threatKind, [origin, target]);
-    const telemetry = sampledThreatTelemetry(wave.threatKind, timingRandom, routeDistanceKm(trackedRoute));
+    const telemetry = sampledThreatTelemetry(wave.threatKind, timingRandom, routeDistanceKm([origin, target]));
     const flightDurationMs = telemetry.flightDurationMs;
     const detectedAt = launchedAt + Math.round(flightDurationMs * (0.2 + timingRandom() * 0.08));
     const interceptProgress = 0.62 + timingRandom() * 0.12;

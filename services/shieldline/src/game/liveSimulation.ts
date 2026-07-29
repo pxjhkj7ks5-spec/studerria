@@ -1,7 +1,7 @@
 import { getScenario } from "../data/scenarios";
 import { getUnitDefinition } from "../data/units";
 import { threatTelemetryFor } from "../data/threatFlightProfiles";
-import { flightDurationForDistance, routeDistanceKm, trimRouteToTrackedDistance } from "./threatFlightModel.mjs";
+import { flightDurationForDistance, routeDistanceKm } from "./threatFlightModel.mjs";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
 import { buildLogisticsState } from "./logistics";
 import { createGuidedCampaignSchedule, guidedStageForElapsed, guidedStageLaunchCount, guidedThreatKind, nextGuidedLaunchDelayMs, sectorIdsForDirection } from "./campaignPacing.mjs";
@@ -510,15 +510,15 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
   const heading = bearingDeg(origin, city.coordinates);
   const id = createId("live-threat", Math.floor(state.elapsedMs), random);
   const telemetry = threatTelemetryFor(kind, id);
-  const trackedRoute = trimRouteToTrackedDistance(kind, [origin, city.coordinates]);
-  const flightDurationMs = flightDurationForDistance(kind, telemetry.speedKph, routeDistanceKm(trackedRoute));
+  const flightRoute = [origin, city.coordinates];
+  const flightDurationMs = flightDurationForDistance(kind, telemetry.speedKph, routeDistanceKm(flightRoute));
   return {
     id,
     kind,
     status: "inbound",
     origin,
     target: city.coordinates,
-    routeWaypoints: trackedRoute,
+    routeWaypoints: flightRoute,
     targetCityId: city.id,
     launchSectorId: launchSector.id,
     launchSectorName: launchSector.name,
@@ -564,7 +564,7 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
   const launchSector = preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
   const launchOrigin = preparedSector?.lastLaunchCoordinates || randomPointInSector(launchSector, random);
-  const waypoints = trimRouteToTrackedDistance(event.threatKind, generateCampaignRoute(event, random, launchOrigin, targetCoordinates));
+  const waypoints = generateCampaignRoute(event, random, launchOrigin, targetCoordinates);
   const threat = spawnThreat(state, random, event.threatKind, city.id, launchSector.id, launchOrigin);
   if (waypoints.length) waypoints[waypoints.length - 1] = { ...targetCoordinates };
   threat.target = waypoints.at(-1) || targetCoordinates;

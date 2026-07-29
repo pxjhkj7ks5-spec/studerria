@@ -5,7 +5,7 @@ import { serverCampaignMissions, simulateMission } from "../serverGame.mjs";
 import { campaignMissions } from "../src/data/missions.ts";
 import { runDeterministicMission } from "../src/game/deterministicMission.ts";
 import { calculateDefenseBonus } from "../src/game/simulationCore.mjs";
-import { flightDurationForDistance, routeDistanceKm, THREAT_FLIGHT_PROFILES, trimRouteToTrackedDistance } from "../src/game/threatFlightModel.mjs";
+import { flightDurationForDistance, routeDistanceKm, THREAT_FLIGHT_PROFILES } from "../src/game/threatFlightModel.mjs";
 
 test("production image includes every authoritative simulation runtime module", async () => {
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
@@ -45,16 +45,16 @@ test("authoritative mission output is stable for a golden seed", () => {
   assert.ok(left.events.some((event) => event.type === "threat.launched"));
   assert.ok(left.events.some((event) => event.type === "track.detected"));
   assert.ok(left.events.some((event) => event.type === "battery.fired"));
-  assert.equal(left.simVersion, "3.1.0");
+  assert.equal(left.simVersion, "3.1.1");
   assert.equal(left.snapshots.length, 2);
   for (const launched of left.events.filter((event) => event.type === "threat.launched")) {
     const duration = Number(launched.payload.flightDurationMs);
     assert.equal(launched.payload.speedKph, THREAT_FLIGHT_PROFILES[launched.payload.threatKind].speedKph);
-    const trackedRoute = trimRouteToTrackedDistance(launched.payload.threatKind, [
+    const fullRoute = [
       { lat: launched.payload.originLat, lng: launched.payload.originLng },
       { lat: launched.payload.targetLat, lng: launched.payload.targetLng },
-    ]);
-    const distanceKm = routeDistanceKm(trackedRoute);
+    ];
+    const distanceKm = routeDistanceKm(fullRoute);
     assert.equal(duration, flightDurationForDistance(launched.payload.threatKind, launched.payload.speedKph, distanceKm));
     const impact = left.events.find((event) => event.waveId === launched.waveId && event.type === "impact");
     if (impact) assert.equal(impact.occurredAtMs - launched.occurredAtMs, duration);
