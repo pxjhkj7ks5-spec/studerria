@@ -31,10 +31,10 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.match(campaignMissionsPlan[1].briefingHighlights[0], /радар середньої дальності/);
   assert.match(campaignMissionsPlan[4].briefingHighlights[0], /Patriot/);
   assert.ok(campaignMissionsPlan.every((mission) => !("rewardCap" in mission)));
-  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 46, 65, 86, 113]);
+  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 46, 66, 86, 115]);
   const maximumKillRewards = campaignMissionsPlan.map((mission) => mission.waves.reduce((sum, wave) => sum + wave.count * (campaignKillRewards[wave.threatKind] || 0), 0));
-  assert.deepEqual(maximumKillRewards, [50, 120, 186, 250, 361]);
-  assert.deepEqual(campaignMissionsPlan.map((mission, index) => mission.grant + maximumKillRewards[index] + (index === 0 ? 29 : 39)), [103, 175, 249, 321, 445]);
+  assert.deepEqual(maximumKillRewards, [50, 120, 198, 250, 385]);
+  assert.deepEqual(campaignMissionsPlan.map((mission, index) => mission.grant + maximumKillRewards[index] + (index === 0 ? 29 : 39)), [103, 175, 261, 321, 469]);
   assert.ok(campaignMissionsPlan.every((mission) => (mission.waves.at(-1)?.timeSeconds || 0) < mission.durationMinutes * 60));
   assert.equal(campaignMissionsPlan[0].waves.some((wave) => wave.threatKind === "iskander"), false);
   assert.equal(campaignMissionsPlan[1].waves.at(-1)?.threatKind, "iskander");
@@ -80,6 +80,17 @@ test("authored waves expand to deterministic individual spawn events with groupi
   assert.deepEqual(missionTwoPair.map((event) => event.routeId), ["R10", "R10"]);
   assert.deepEqual(missionTwoPair.map((event) => event.trailPosition), [0, 1]);
   assert.equal(missionTwoPair[1].dueMs - missionTwoPair[0].dueMs, 7_000);
+
+  const missionThreeJammerPair = buildCampaignSpawnEvents(3).filter((event) => event.groupId === "m3-w6-g1");
+  assert.equal(missionThreeJammerPair.length, 2);
+  assert.equal(new Set(missionThreeJammerPair.map((event) => event.routeId)).size, 1);
+  assert.equal(missionThreeJammerPair[1].dueMs - missionThreeJammerPair[0].dueMs, 6_000);
+
+  const finalMissionJammerGroups = buildCampaignSpawnEvents(5).filter((event) => event.threatKind === "jammer");
+  assert.equal(finalMissionJammerGroups.length, 5);
+  assert.equal(finalMissionJammerGroups.filter((event) => event.groupId === "m5-w4-g1").length, 2);
+  assert.equal(finalMissionJammerGroups.filter((event) => event.groupId === "m5-w12-g1").length, 2);
+  assert.equal(finalMissionJammerGroups.filter((event) => event.groupId === "m5-w12-g2").length, 1);
 
   const finalTenTargetTrail = buildCampaignSpawnEvents(5).filter((event) => event.groupId === "m5-w15-g1");
   assert.equal(finalTenTargetTrail.length, 10);

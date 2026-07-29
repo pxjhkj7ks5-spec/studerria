@@ -99,11 +99,11 @@ test("the five-mission campaign follows the authored escalation while launch ori
   assert.equal(mission.waves.reduce((sum, wave) => sum + wave.size, 0), 23);
   assert.equal(campaignMissions[1].waves.reduce((sum, wave) => sum + wave.size, 0), 46);
   assert.equal(campaignMissions[1].waves.at(-1).threatKind, "iskander");
-  assert.equal(campaignMissions[2].waves.reduce((sum, wave) => sum + wave.size, 0), 65);
+  assert.equal(campaignMissions[2].waves.reduce((sum, wave) => sum + wave.size, 0), 66);
   assert.equal(campaignMissions[2].waves.at(-1).threatKind, "iskander");
   assert.equal(campaignMissions[3].waves.some((wave) => wave.threatKind === "iskander"), true);
   assert.equal(campaignMissions[3].waves.reduce((sum, wave) => sum + wave.size, 0), 86);
-  assert.equal(campaignMissions[4].waves.reduce((sum, wave) => sum + wave.size, 0), 113);
+  assert.equal(campaignMissions[4].waves.reduce((sum, wave) => sum + wave.size, 0), 115);
   const left = runDeterministicMission(mission, "campaign-sector-left");
   const right = runDeterministicMission(mission, "campaign-sector-right");
   const leftLaunches = left.events.filter((event) => event.type === "threat.launched");
