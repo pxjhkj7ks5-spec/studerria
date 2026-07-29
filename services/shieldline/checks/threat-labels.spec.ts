@@ -24,6 +24,7 @@ test("every threat kind has deterministic realistic label telemetry", () => {
   assert.equal(formatThreatSpeed(183), "180 км/год");
   assert.equal(formatThreatAltitude(120), "120 м");
   assert.equal(formatThreatAltitude(10_500), "10.5 км");
+  assert.equal(threatDisplayName("jammer"), "Постановник перешкод");
 });
 
 test("target labels stay inside the imperative Leaflet marker and avoid per-frame DOM replacement", async () => {

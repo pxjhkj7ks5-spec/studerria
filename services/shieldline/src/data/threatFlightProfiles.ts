@@ -27,7 +27,7 @@ const labels: Record<ThreatKind, string> = {
   iskander: "Iskander-M",
   recon: "Recon",
   "low-signature-cruise": "Low-signature cruise",
-  jammer: "Jammer escort",
+  jammer: "Постановник перешкод",
 };
 
 export const threatFlightProfiles = Object.fromEntries(

@@ -26,7 +26,7 @@ test("runtime model sprites are clean 96px RGBA assets", async () => {
         const [red, green, blue, alpha] = data.subarray(index, index + 4);
         const magentaFringe = alpha > 0 && green < 105 && red > 125 && blue > 95 && red > green * 1.3 && blue > green * 1.22;
         assert.equal(magentaFringe, false, `${folder}/${file} contains magenta fringe`);
-        if (folder === "threats" && file === "recon.png" && alpha > 128) {
+        if (folder === "threats" && (file === "recon.png" || file === "jammer.png") && alpha > 128) {
           assert.ok(red > green * 1.25 && red > blue * 1.25, `${folder}/${file} must remain entirely red`);
           assert.ok(red >= 45 || green >= 45 || blue >= 45, `${folder}/${file} must not contain black components`);
         }

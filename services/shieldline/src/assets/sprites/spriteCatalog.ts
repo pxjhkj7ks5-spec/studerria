@@ -5,6 +5,7 @@ import threatDrone from "./threats/drone.png";
 import threatGeran2 from "./threats/geran2.png";
 import threatGerbera from "./threats/gerbera.png";
 import threatIskander from "./threats/iskander.png";
+import threatJammer from "./threats/jammer.png";
 import threatKalibr from "./threats/kalibr.png";
 import threatKh101 from "./threats/kh101.png";
 import threatParodiya from "./threats/parodiya.png";
@@ -54,7 +55,7 @@ export const threatSprites: Record<ThreatKind, string> = {
   iskander: threatIskander,
   recon: threatRecon,
   "low-signature-cruise": threatKh101,
-  jammer: threatCruise,
+  jammer: threatJammer,
 };
 
 export const unitSprites: Record<UnitKind, string> = {
