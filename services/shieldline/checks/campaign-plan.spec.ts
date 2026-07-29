@@ -8,6 +8,7 @@ import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { flightDurationForDistance, flightDurationForSpeed, GAMEPLAY_FLIGHT_SPEED_SCALE, routeDistanceKm, THREAT_FLIGHT_PROFILES } from "../src/game/threatFlightModel.mjs";
+import { getUnitDefinition } from "../src/data/units";
 import type { GameState, LiveThreat, ThreatKind } from "../src/types/game";
 
 function advanceInRuntimeChunks(game: GameState, durationMs: number, random: () => number) {
@@ -203,7 +204,7 @@ test("long-range and southern cruise presets stay connected to their authored co
   }
 });
 
-test("campaign economy credits every authored kill reward and preserves units without free ammo between missions", () => {
+test("campaign economy credits every authored kill reward and starts each new mission with full magazines and ten depot rounds", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState();
   game.resources.budget = 0;
@@ -231,12 +232,20 @@ test("campaign economy credits every authored kill reward and preserves units wi
   assert.equal(mvg.health, 76);
   assert.equal(mvg.experienceLevel, 1);
   assert.deepEqual(mvg.position, originalPosition);
+  game.campaign!.depot.stock = 42;
 
   game = advanceCampaignMission(game);
   assert.equal(game.campaign?.missionIndex, 2);
   assert.equal(game.resources.budget, 111);
-  assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, 1);
+  assert.equal(game.batteries.find((battery) => battery.id === mvg.id)?.currentAmmo, getUnitDefinition("mvg").ammoCapacity);
+  assert.equal(game.campaign?.depot.stock, 10);
   assert.ok(game.campaign?.unlockedSystems.includes("gepard"));
+  const reloadedMvg = game.batteries.find((battery) => battery.id === mvg.id)!;
+  reloadedMvg.currentAmmo = 2;
+  game.campaign!.depot.stock = 14;
+  applyCampaignMissionOpening(game);
+  assert.equal(reloadedMvg.currentAmmo, 2);
+  assert.equal(game.campaign?.depot.stock, 14);
 });
 
 test("campaign redeployment always costs one million regardless of the air-defense system", () => {

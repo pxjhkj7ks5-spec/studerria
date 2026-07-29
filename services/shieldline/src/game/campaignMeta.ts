@@ -149,7 +149,20 @@ export function applyCampaignMissionOpening(state: GameState) {
   state.campaign.campaignWallet = Math.max(0, state.campaign.campaignWallet + mission.grant);
   state.resources.budget = state.campaign.campaignWallet;
   state.campaign.missionGrantApplied = true;
-  state.campaign.depot.stock = Math.max(10, state.campaign.depot.stock);
+  state.campaign.depot.stock = 10;
+  for (const battery of [...state.batteries, ...state.storedBatteries]) {
+    const unit = getUnitDefinition(battery.kind);
+    battery.currentAmmo = unit.ammoCapacity;
+    battery.missionReserve = unit.missionReserveCapacity === "infinite" ? "infinite" : 0;
+    battery.reloadRemainingMs = 0;
+    if (battery.status === "reloading") {
+      battery.status = battery.fatigue >= 82 || battery.readiness < 38
+        ? "exhausted"
+        : battery.fatigue >= 58 || battery.readiness < 62
+          ? "strained"
+          : "ready";
+    }
+  }
   state.campaign.missionInterceptionsAtStart = state.interceptions;
   state.campaign.missionImpactsAtStart = state.impacts;
   state.campaign.missionDepotProducedAtStart = state.campaign.depot.producedTotal;
