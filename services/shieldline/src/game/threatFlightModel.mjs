@@ -16,6 +16,8 @@ export const THREAT_FLIGHT_PROFILES = Object.freeze({
   jammer: { speedKph: 520, altitudeM: [1_500, 5_000], timeCompression: 25, representativeDistanceKm: 500 },
 });
 
+export const GAMEPLAY_FLIGHT_SPEED_SCALE = 1.1;
+
 function segmentDistanceKm(left, right) {
   const latitudeKm = (right.lat - left.lat) * 111;
   const middleLatitude = (left.lat + right.lat) * Math.PI / 360;
@@ -32,7 +34,7 @@ export function flightDurationForDistance(kind, speedKph, distanceKm) {
   const profile = THREAT_FLIGHT_PROFILES[kind] || THREAT_FLIGHT_PROFILES.drone;
   const safeSpeed = Math.max(1, Number(speedKph) || profile.speedKph);
   const safeDistance = Math.max(1, Number(distanceKm) || profile.representativeDistanceKm);
-  return Math.max(5_000, Math.round((safeDistance / safeSpeed) * 3_600_000 / profile.timeCompression));
+  return Math.max(5_000, Math.round((safeDistance / safeSpeed) * 3_600_000 / (profile.timeCompression * GAMEPLAY_FLIGHT_SPEED_SCALE)));
 }
 
 export function flightDurationForSpeed(kind, speedKph) {

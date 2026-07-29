@@ -8,6 +8,7 @@ export interface SharedThreatFlightProfile {
 }
 
 export const THREAT_FLIGHT_PROFILES: Readonly<Record<ThreatKind, SharedThreatFlightProfile>>;
+export const GAMEPLAY_FLIGHT_SPEED_SCALE: number;
 
 export function routeDistanceKm(points: ReadonlyArray<{ lat: number; lng: number }>): number;
 export function flightDurationForDistance(kind: ThreatKind, speedKph: number, distanceKm: number): number;
