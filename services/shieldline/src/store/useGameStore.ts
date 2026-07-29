@@ -7,7 +7,7 @@ import { threatTelemetryFor } from "../data/threatFlightProfiles";
 import { getUnitDefinition } from "../data/units";
 import { classificationTier, threatDisplayLabel } from "../game/airDefenseRules.mjs";
 import { createDeterministicRandom } from "../game/deterministicRandom";
-import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBatteryToStorageState, placeBattery, sellBattery as sellBatteryState, setBatteryManualOverride, startAttackNow } from "../game/liveSimulation";
+import { advanceSimulation, deployStoredBattery, moveBatteryToStorage as moveBatteryToStorageState, placeBattery, sellBattery as sellBatteryState, setBatteryManualOverride, startAttackNow, topUpCampaignBatteryNow as topUpCampaignBatteryNowState } from "../game/liveSimulation";
 import { createInitialState, createScenarioState } from "../game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../game/launchSystem.mjs";
 import { togglePlanningAction } from "../game/planningActions";
@@ -265,6 +265,7 @@ export interface GameStore {
   placeSelectedBattery: (position: Coordinates) => void;
   moveBatteryToStorage: (batteryId: string) => void;
   sellBattery: (batteryId: string) => void;
+  topUpCampaignBatteryNow: (batteryId: string) => void;
   setBatteryManualOverride: (batteryId: string, threatKind: ThreatKind, enabled: boolean) => void;
   togglePlanningAction: (actionId: PlanningActionId) => void;
   startOperation: () => void;
@@ -491,6 +492,15 @@ export const useGameStore = create<GameStore>()(
           dailyCityGame: state.activeGameMode === "daily-defense" ? game : state.dailyCityGame,
           placementKind: null,
           placementStoredBatteryId: null,
+        };
+      }),
+      topUpCampaignBatteryNow: (batteryId) => set((state) => {
+        const game = topUpCampaignBatteryNowState(state.game, batteryId);
+        if (game === state.game) return state;
+        return {
+          ...state,
+          game,
+          dailyCityGame: state.activeGameMode === "daily-defense" ? game : state.dailyCityGame,
         };
       }),
       setBatteryManualOverride: (batteryId, threatKind, enabled) => set((state) => {

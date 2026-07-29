@@ -52,7 +52,10 @@ test("combat results use tactical effects and desktop unit details keep readable
   assert.match(rail, /Дрони дозволені · вимкнути/);
   assert.match(rail, /Продати зі складу/);
   assert.match(map, /Продати ·/);
+  assert.match(map, /Дозарядити зараз ·/);
+  assert.match(map, /ammoNeeded - depotStock/);
   assert.match(styles, /\.battery-action-popup__sell/);
+  assert.match(styles, /\.battery-action-popup__reload/);
   assert.doesNotMatch(rail, /setExpandedKind\(null\)[\s\S]{0,120}setDismissedKind\(unit\.kind\)/);
   assert.match(map, /battery\.currentAmmo === "infinite" \? "∞" : `\$\{battery\.currentAmmo\}\/\$\{unit\.ammoCapacity\}`/);
   assert.match(rail, /Радіус виявлення/);

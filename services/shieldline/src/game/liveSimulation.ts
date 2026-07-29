@@ -340,6 +340,44 @@ export function removeBattery(state: GameState, batteryId: string): GameState {
   return sellBattery(state, batteryId);
 }
 
+export function batteryAmmoNeeded(battery: DefenseBattery) {
+  const capacity = getUnitDefinition(battery.kind).ammoCapacity;
+  if (capacity === "infinite" || capacity <= 0 || battery.currentAmmo === "infinite") return 0;
+  return Math.max(0, capacity - Number(battery.currentAmmo || 0));
+}
+
+export function topUpCampaignBatteryNow(state: GameState, batteryId: string): GameState {
+  const battery = state.batteries.find((item) => item.id === batteryId);
+  const needed = battery ? batteryAmmoNeeded(battery) : 0;
+  if (
+    !state.campaign
+    || state.status !== "active"
+    || !battery
+    || needed <= 0
+    || battery.status === "maintenance"
+    || state.campaign.depot.stock < needed
+  ) return state;
+
+  const next = cloneState(state);
+  const nextBattery = next.batteries.find((item) => item.id === batteryId)!;
+  const unit = getUnitDefinition(nextBattery.kind);
+  next.campaign!.depot.stock -= needed;
+  nextBattery.currentAmmo = unit.ammoCapacity;
+  nextBattery.reloadRemainingMs = 0;
+  nextBattery.lastAction = "manual depot top-up";
+  nextBattery.lastEngagementResult = `Дозаряджено зі складу: ${needed} БК`;
+  if (nextBattery.status === "reloading") {
+    nextBattery.status = nextBattery.fatigue >= 82 || nextBattery.readiness < 38
+      ? "exhausted"
+      : nextBattery.fatigue >= 58 || nextBattery.readiness < 62
+        ? "strained"
+        : "ready";
+  }
+  next.logistics = buildLogisticsState(next);
+  pushLog(next.log, next.elapsedMs, "Термінове дозарядження", `${unit.shortName}: зі складу передано ${needed} БК. Бойовий кулдаун не змінено.`, "success", { soundCue: "placement.service" });
+  return next;
+}
+
 export function moveBatteryToStorage(state: GameState, batteryId: string): GameState {
   const next = cloneState(state);
   const battery = next.batteries.find((item) => item.id === batteryId);

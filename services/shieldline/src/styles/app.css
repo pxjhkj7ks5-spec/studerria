@@ -1320,6 +1320,19 @@ button {
 }
 
 .battery-action-popup__content button:hover { background: rgba(242, 200, 101, 0.2); }
+.battery-action-popup__content button:disabled {
+  border-color: rgba(198, 218, 231, .14);
+  color: rgba(198, 218, 231, .42);
+  background: rgba(198, 218, 231, .05);
+  cursor: not-allowed;
+}
+.battery-action-popup__content button:disabled:hover { background: rgba(198, 218, 231, .05); }
+.battery-action-popup__content .battery-action-popup__reload {
+  border-color: rgba(99, 199, 212, .38);
+  color: #d9fbff;
+  background: rgba(99, 199, 212, .1);
+}
+.battery-action-popup__content .battery-action-popup__reload:hover { background: rgba(99, 199, 212, .18); }
 .battery-action-popup__content .battery-action-popup__sell,
 .campaign-service-actions .campaign-service-action--sell,
 .unit-card__stored-sale {

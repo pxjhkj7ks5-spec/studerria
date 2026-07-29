@@ -6,7 +6,7 @@ import { getUnitDefinition } from "../src/data/units";
 import { applyCampaignMissionOpening, captureCampaignAttemptCheckpoint, createCampaignState, finalizeCampaignMission, restoreCampaignAttempt } from "../src/game/campaignMeta";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
-import { advanceSimulation, batteryCanBeSold, batterySaleValue, CAMPAIGN_THREAT_DAMAGE, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, sellBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
+import { advanceSimulation, batteryAmmoNeeded, batteryCanBeSold, batterySaleValue, CAMPAIGN_THREAT_DAMAGE, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, sellBattery, startAttackNow, tickSimulation, topUpCampaignBatteryNow } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
 import { applyAccountProgressState, campaignCycleCompleted, normalizePersistedGame, readAccountProgressState, useGameStore } from "../src/store/useGameStore";
@@ -288,6 +288,42 @@ test("campaign batteries refill a full magazine after the reload timer and expos
   assert.equal(game.batteries[0].status, "strained");
   assert.equal(game.campaign!.depot.stock, 0);
   assert.equal(tacticalUnitStatus(unit, game.batteries[0]).label, "READY");
+});
+
+test("manual depot top-up fills only the missing rounds and preserves the firing cooldown", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => .5);
+  const battery = game.batteries[0];
+  battery.currentAmmo = 2;
+  battery.status = "reloading";
+  battery.reloadRemainingMs = 30_000;
+  battery.cooldownMs = 8_000;
+  game.campaign.depot.stock = 3;
+
+  assert.equal(batteryAmmoNeeded(battery), 3);
+  game = topUpCampaignBatteryNow(game, battery.id);
+  assert.equal(game.batteries[0].currentAmmo, 5);
+  assert.equal(game.batteries[0].reloadRemainingMs, 0);
+  assert.equal(game.batteries[0].cooldownMs, 8_000);
+  assert.equal(game.campaign.depot.stock, 0);
+  assert.match(game.batteries[0].lastEngagementResult, /3 БК/);
+});
+
+test("manual depot top-up waits until the complete missing amount is available", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => .5);
+  const battery = game.batteries[0];
+  battery.currentAmmo = 0;
+  battery.status = "reloading";
+  battery.reloadRemainingMs = 30_000;
+  game.campaign.depot.stock = 4;
+
+  const unchanged = topUpCampaignBatteryNow(game, battery.id);
+  assert.equal(unchanged, game);
+  assert.equal(unchanged.batteries[0].currentAmmo, 0);
+  assert.equal(unchanged.campaign?.depot.stock, 4);
 });
 
 test("an unrevealed target within fifty kilometers holds a city air raid for ninety seconds", () => {
