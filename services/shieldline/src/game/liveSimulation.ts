@@ -84,21 +84,21 @@ const threatDamage: Record<ThreatKind, number> = {
   jammer: 0,
 };
 
-const campaignThreatDamage: Record<ThreatKind, number> = {
-  drone: 10,
-  ballistic: 50,
-  cruise: 34,
+export const CAMPAIGN_THREAT_DAMAGE: Readonly<Record<ThreatKind, number>> = {
+  drone: 12,
+  ballistic: 55,
+  cruise: 38,
   decoy: 0,
-  combined: 34,
-  saturation: 10,
-  geran2: 10,
-  gerbera: 4,
+  combined: 38,
+  saturation: 12,
+  geran2: 12,
+  gerbera: 5,
   parodiya: 0,
-  kh101: 34,
-  kalibr: 34,
-  iskander: 50,
+  kh101: 38,
+  kalibr: 38,
+  iskander: 55,
   recon: 0,
-  "low-signature-cruise": 36,
+  "low-signature-cruise": 40,
   jammer: 0,
 };
 
@@ -528,7 +528,7 @@ function spawnThreat(state: GameState, random: () => number, forcedKind?: Threat
     speedKph: telemetry.speedKph,
     altitudeM: telemetry.altitudeM,
     difficulty: threatBaseDifficulty[kind] * (1 + Math.max(-0.06, Math.min(0.08, (launchSector.weight - 3) * 0.025))) + state.wavePressure * 0.13 + (plan?.intensity || 1) * 3.4,
-    damage: falseTrack ? 0 : state.campaign ? campaignThreatDamage[kind] : threatDamage[kind],
+    damage: falseTrack ? 0 : state.campaign ? CAMPAIGN_THREAT_DAMAGE[kind] : threatDamage[kind],
     confidence: falseTrack ? 14 + random() * 18 : 22 + random() * 24,
     classification: "unknown",
     displayLabel: "Невідомий контакт",

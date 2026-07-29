@@ -31,10 +31,10 @@ test("campaign catalog matches the five authored missions and target budgets", (
   assert.match(campaignMissionsPlan[1].briefingHighlights[0], /радар середньої дальності/);
   assert.match(campaignMissionsPlan[4].briefingHighlights[0], /Patriot/);
   assert.ok(campaignMissionsPlan.every((mission) => !("rewardCap" in mission)));
-  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 42, 59, 78, 103]);
+  assert.deepEqual(campaignMissionsPlan.map(missionTargetCount), [23, 46, 65, 86, 113]);
   const maximumKillRewards = campaignMissionsPlan.map((mission) => mission.waves.reduce((sum, wave) => sum + wave.count * (campaignKillRewards[wave.threatKind] || 0), 0));
-  assert.deepEqual(maximumKillRewards, [50, 112, 174, 234, 341]);
-  assert.deepEqual(campaignMissionsPlan.map((mission, index) => mission.grant + maximumKillRewards[index] + (index === 0 ? 29 : 39)), [103, 167, 237, 305, 425]);
+  assert.deepEqual(maximumKillRewards, [50, 120, 186, 250, 361]);
+  assert.deepEqual(campaignMissionsPlan.map((mission, index) => mission.grant + maximumKillRewards[index] + (index === 0 ? 29 : 39)), [103, 175, 249, 321, 445]);
   assert.ok(campaignMissionsPlan.every((mission) => (mission.waves.at(-1)?.timeSeconds || 0) < mission.durationMinutes * 60));
   assert.equal(campaignMissionsPlan[0].waves.some((wave) => wave.threatKind === "iskander"), false);
   assert.equal(campaignMissionsPlan[1].waves.at(-1)?.threatKind, "iskander");
@@ -679,7 +679,7 @@ test("100 seeded engagements meet the S-300 cruise and Patriot ballistic accepta
       speedKph,
       altitudeM: kind === "kh101" ? 100 : 30_000,
       difficulty: 10,
-      damage: kind === "kh101" ? 34 : 50,
+      damage: kind === "kh101" ? 38 : 55,
       confidence: 22,
       classification: "unknown",
       displayLabel: "Невідомий контакт",

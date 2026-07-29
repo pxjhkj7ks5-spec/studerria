@@ -6,7 +6,7 @@ import { getUnitDefinition } from "../src/data/units";
 import { applyCampaignMissionOpening, captureCampaignAttemptCheckpoint, createCampaignState, finalizeCampaignMission, restoreCampaignAttempt } from "../src/game/campaignMeta";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
-import { advanceSimulation, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
+import { advanceSimulation, CAMPAIGN_THREAT_DAMAGE, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
 import { applyAccountProgressState, campaignCycleCompleted, normalizePersistedGame, readAccountProgressState, useGameStore } from "../src/store/useGameStore";
@@ -326,13 +326,13 @@ test("two ballistic impacts destroy a campaign city and retry restores the check
     ...testThreat(),
     kind: "iskander" as const,
     targetCityId: "kyiv" as const,
-    damage: 50,
+    damage: 55,
     progress: .999,
     speed: .01,
   };
   game.liveThreats = [{ ...ballistic, id: "ballistic-one" }];
   game = tickSimulation(game, 100, () => .5);
-  assert.equal(game.cities.find((city) => city.id === "kyiv")?.infrastructure, 50);
+  assert.equal(game.cities.find((city) => city.id === "kyiv")?.infrastructure, 45);
   assert.equal(game.status, "active");
   game.liveThreats = [{ ...ballistic, id: "ballistic-two" }];
   game = tickSimulation(game, 100, () => .5);
@@ -351,6 +351,20 @@ test("two ballistic impacts destroy a campaign city and retry restores the check
   assert.equal(retry.game.campaign?.lastAttemptResult, null);
 });
 
+test("campaign impact damage preserves the intended threat hierarchy", () => {
+  assert.deepEqual(
+    {
+      parodiya: CAMPAIGN_THREAT_DAMAGE.parodiya,
+      gerbera: CAMPAIGN_THREAT_DAMAGE.gerbera,
+      geran2: CAMPAIGN_THREAT_DAMAGE.geran2,
+      kh101: CAMPAIGN_THREAT_DAMAGE.kh101,
+      lowSignature: CAMPAIGN_THREAT_DAMAGE["low-signature-cruise"],
+      iskander: CAMPAIGN_THREAT_DAMAGE.iskander,
+    },
+    { parodiya: 0, gerbera: 5, geran2: 12, kh101: 38, lowSignature: 40, iskander: 55 },
+  );
+});
+
 test("depot impacts use their own damage path and never count as city impacts", () => {
   let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
   game.campaign = createCampaignState(1, 24, "depot-impact");
@@ -363,12 +377,12 @@ test("depot impacts use their own damage path and never count as city impacts", 
     kind: "kh101",
     target: { ...game.campaign.depot.position },
     targetAsset: "ammo-depot",
-    damage: 34,
+    damage: 38,
     progress: .999,
     speed: .01,
   }];
   game = tickSimulation(game, 100, () => .5);
-  assert.equal(game.campaign.depot.health, 57.5);
+  assert.equal(game.campaign.depot.health, 52.5);
   assert.equal(game.impacts, 0);
   assert.ok(game.cities.every((city) => city.infrastructure === 100));
   assert.equal(game.status, "active");
