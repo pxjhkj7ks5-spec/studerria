@@ -6,7 +6,7 @@ import { getUnitDefinition } from "../src/data/units";
 import { applyCampaignMissionOpening, captureCampaignAttemptCheckpoint, createCampaignState, finalizeCampaignMission, restoreCampaignAttempt } from "../src/game/campaignMeta";
 import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { mapZoomInputProfile } from "../src/game/mapZoom";
-import { advanceSimulation, CAMPAIGN_THREAT_DAMAGE, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
+import { advanceSimulation, batteryCanBeSold, batterySaleValue, CAMPAIGN_THREAT_DAMAGE, deployStoredBattery, engagementStyleForUnit, moveBatteryToStorage, placeBattery, sellBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState } from "../src/game/launchSystem.mjs";
 import { applyAccountProgressState, campaignCycleCompleted, normalizePersistedGame, readAccountProgressState, useGameStore } from "../src/store/useGameStore";
@@ -219,6 +219,40 @@ test("a battery keeps its condition and costs nothing when redeployed from stora
   assert.equal(game.batteries[0].currentAmmo, 2);
   assert.equal(game.batteries[0].readiness, 73);
   assert.equal(game.resources.budget, budgetAfterPurchase);
+});
+
+test("purchased batteries sell from the map or storage for exactly half price outside combat", () => {
+  let game = createScenarioState(() => .5, "training", "first-night");
+  const initialBudget = game.resources.budget;
+  game = placeBattery(game, "radar", { lat: 49.2, lng: 29.4 }, () => .5);
+  const deployed = game.batteries[0];
+  assert.equal(batterySaleValue("radar"), 12.5);
+  assert.equal(batteryCanBeSold(game, deployed), true);
+  game = sellBattery(game, deployed.id);
+  assert.equal(game.batteries.length, 0);
+  assert.equal(game.resources.budget, initialBudget - 12.5);
+
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => .5);
+  const stored = game.batteries[0];
+  game = moveBatteryToStorage(game, stored.id);
+  game = sellBattery(game, stored.id);
+  assert.equal(game.storedBatteries.length, 0);
+  assert.equal(game.resources.budget, initialBudget - 15.5);
+});
+
+test("sales are blocked during combat and for authored campaign reinforcements", () => {
+  let game = createScenarioState(() => .5, "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState();
+  applyCampaignMissionOpening(game);
+  const authored = game.storedBatteries.find((battery) => battery.id === "campaign-m1-long-radar")!;
+  assert.equal(batteryCanBeSold(game, authored), false);
+  assert.equal(sellBattery(game, authored.id), game);
+
+  game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => .5);
+  const purchased = game.batteries.find((battery) => !battery.id.startsWith("campaign-"))!;
+  game.cyclePhase = "attack";
+  assert.equal(batteryCanBeSold(game, purchased), false);
+  assert.equal(sellBattery(game, purchased.id), game);
 });
 
 test("campaign batteries refill a full magazine after the reload timer and expose the correct status", () => {

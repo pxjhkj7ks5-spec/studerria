@@ -44,10 +44,11 @@ test("campaign catalog presentation covers new, active and completed states", ()
 
   game.campaign = createCampaignState();
   game.campaign.previousMissionResults.push(missionResult());
-  game.campaign.campaignWallet = 86;
+  game.campaign.campaignWallet = 86.5;
   game.campaign.depot.stock = 18;
   game.campaign.intermission = true;
   const active = buildCampaignCatalogPresentation(game);
+  assert.equal(active.wallet, 86.5);
   assert.equal(active.currentIndex, 2);
   assert.equal(active.ctaLabel, "Продовжити кампанію");
   assert.equal(active.timeline[0].state, "completed");

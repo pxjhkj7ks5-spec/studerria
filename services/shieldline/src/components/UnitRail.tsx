@@ -7,6 +7,8 @@ import { tacticalUnitStatus } from "../game/unitStatusDisplay";
 import { useGameStore } from "../store/useGameStore";
 import { playSound } from "../audio/audioEngine";
 import { isFreeCampaignDeploymentAction } from "../data/campaignPlan";
+import { batteryCanBeSold, batterySaleValue } from "../game/liveSimulation";
+import { formatNumber } from "../platform/i18n";
 import type { ThreatKind, UnitDefinition } from "../types/game";
 
 const chanceKinds: Array<{ kind: ThreatKind; label: string }> = [
@@ -59,11 +61,15 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
   const [dismissedKind, setDismissedKind] = useState<UnitDefinition["kind"] | null>(null);
   const game = useGameStore((state) => state.game);
   const placementKind = useGameStore((state) => state.placementKind);
+  const operationPhase = useGameStore((state) => state.operationPhase);
   const beginPlacement = useGameStore((state) => state.beginPlacement);
   const cancelPlacement = useGameStore((state) => state.cancelPlacement);
+  const sellBattery = useGameStore((state) => state.sellBattery);
   const serviceBattery = useGameStore((state) => state.serviceCampaignBattery);
   const setManualOverride = useGameStore((state) => state.setBatteryManualOverride);
   const active = game.status === "active";
+  const canSellNow = operationPhase === "planning"
+    || (operationPhase === "completed" && Boolean(game.campaign?.intermission && !game.campaign.completed));
   const scenario = getScenario(game.scenarioId);
   const storedBatteries = game.storedBatteries || [];
   const expandCard = (card: HTMLElement, kind: UnitDefinition["kind"]) => {
@@ -78,6 +84,14 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
     serviceBattery(batteryId, action, portion);
     const after = useGameStore.getState().game.campaign?.campaignWallet;
     void playSound(typeof before === "number" && typeof after === "number" && after < before ? "placement.service" : "ui.error");
+  };
+  const sell = (batteryId: string, unit: UnitDefinition) => {
+    const refund = batterySaleValue(unit.kind);
+    if (typeof window !== "undefined" && !window.confirm(`Продати ${unit.name} за ${formatNumber(refund, { maximumFractionDigits: 1 })} млн ₴?`)) return;
+    const before = useGameStore.getState().game.resources.budget;
+    sellBattery(batteryId);
+    const after = useGameStore.getState().game.resources.budget;
+    void playSound(after > before ? "placement.service" : "ui.error");
   };
 
   return (
@@ -156,6 +170,19 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                 <span><small>{isRadar ? "Радіус" : "Зона"}</small><b>{isRadar ? `${unit.outerRangeKm} км` : `${unit.primaryRangeKm}/${unit.outerRangeKm} км`}</b></span>
                 <span><small>Вартість</small><b>{storedUnits.length ? storedDeploymentCost ? "1 млн ₴" : "0 ₴" : unit.costLabel}</b></span>
               </div>
+              {storedBattery && canSellNow && batteryCanBeSold(game, storedBattery) ? (
+                <button
+                  className="unit-card__stored-sale"
+                  type="button"
+                  data-sound="none"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    sell(storedBattery.id, unit);
+                  }}
+                >
+                  Продати зі складу · {formatNumber(batterySaleValue(unit.kind), { maximumFractionDigits: 1 })} млн ₴
+                </button>
+              ) : null}
               {!isRadar ? <div
                 className="unit-chance-row"
                 aria-label={`Базова імовірність ураження для ${unit.name}. Фактична залежить від дальності, готовності та якості супроводу.`}

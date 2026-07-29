@@ -11,8 +11,10 @@ import { batteryCoverageState } from "../game/coverageVisuals";
 import { SHOW_LAUNCH_DEBUG, launchSectorCategory, launchSectorCenter, launchSectorThreatClasses } from "../game/launchSystem.mjs";
 import { launcherVariantForSector } from "../game/launcherVariants";
 import { mapZoomInputProfile } from "../game/mapZoom";
+import { batteryCanBeSold, batterySaleValue } from "../game/liveSimulation";
 import { advanceVisualThreatProgress, classifyThreatRoute, threatCourseAtProgress, threatPositionAtProgress, threatRouteAtProgress, type ThreatRouteVisual } from "../game/threatRouteVisuals";
 import { resolveReducedQuality } from "../platform/displayPreferences";
+import { formatNumber } from "../platform/i18n";
 import { useGameStore } from "../store/useGameStore";
 import type {
   City,
@@ -1057,12 +1059,16 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
   const storedGame = useGameStore((state) => state.game);
   const storedMapMode = useGameStore((state) => state.mapMode);
   const storedPlacementKind = useGameStore((state) => state.placementKind);
+  const operationPhase = useGameStore((state) => state.operationPhase);
   const moveBatteryToStorage = useGameStore((state) => state.moveBatteryToStorage);
+  const sellBattery = useGameStore((state) => state.sellBattery);
   const serviceCampaignDepot = useGameStore((state) => state.serviceCampaignDepot);
   const recordCampaignTutorialAction = useGameStore((state) => state.recordCampaignTutorialAction);
   const game = gameOverride || storedGame;
   const mapMode = mapModeOverride || storedMapMode;
   const placementKind = readOnly ? null : storedPlacementKind;
+  const canSellNow = !readOnly && (operationPhase === "planning"
+    || (operationPhase === "completed" && Boolean(game.campaign?.intermission && !game.campaign.completed)));
   const [renderBounds, setRenderBounds] = useState<RenderBounds | null>(null);
   const chunkCacheRef = useRef(new Set<string>());
   const [cachedChunkCount, setCachedChunkCount] = useState(0);
@@ -1388,6 +1394,19 @@ export function TacticalMap({ forcedReducedQuality = false, gameOverride, mapMod
                   <small>Магазин {ammo} · {game.campaign ? `склад ${Math.round(game.campaign.depot.stock)} БК` : `локальний резерв ${battery.missionReserve === "infinite" ? "∞" : battery.missionReserve}`} · {reload}</small>
                   <small>{battery.lastEngagementResult}</small>
                   {readOnly ? null : <button type="button" onClick={() => moveBatteryToStorage(battery.id)}>Передислокувати · 1 млн ₴ при розміщенні</button>}
+                  {canSellNow && batteryCanBeSold(game, battery) ? (
+                    <button
+                      className="battery-action-popup__sell"
+                      type="button"
+                      onClick={() => {
+                        const refund = batterySaleValue(battery.kind);
+                        if (typeof window !== "undefined" && !window.confirm(`Продати ${unit.name} за ${formatNumber(refund, { maximumFractionDigits: 1 })} млн ₴?`)) return;
+                        sellBattery(battery.id);
+                      }}
+                    >
+                      Продати · {formatNumber(batterySaleValue(battery.kind), { maximumFractionDigits: 1 })} млн ₴
+                    </button>
+                  ) : null}
                 </div>;
               })()}
             </Popup>

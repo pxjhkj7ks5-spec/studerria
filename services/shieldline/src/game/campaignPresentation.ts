@@ -35,7 +35,7 @@ export function buildCampaignCatalogPresentation(game: GameState) {
     currentIndex,
     completedCount,
     progressPercent: Math.round((completedCount / campaignMissions.length) * 100),
-    wallet: Math.round(campaign?.campaignWallet || 0),
+    wallet: campaign?.campaignWallet || 0,
     depotStock: Math.round(campaign?.depot.stock ?? 10),
     minimumCityHp: campaign ? minimumCityHealth(game) : 100,
     ctaLabel: campaign?.completed ? "Кампанію завершено" : campaign ? "Продовжити кампанію" : "Почати кампанію",

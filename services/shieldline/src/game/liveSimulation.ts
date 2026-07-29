@@ -306,16 +306,38 @@ export function placeBattery(state: GameState, kind: UnitKind, position: Coordin
   return next;
 }
 
-export function removeBattery(state: GameState, batteryId: string): GameState {
+export function batterySaleValue(kind: UnitKind) {
+  return getUnitDefinition(kind).cost * .5;
+}
+
+export function batteryCanBeSold(state: GameState, battery: DefenseBattery) {
+  return state.status === "active"
+    && state.cyclePhase !== "attack"
+    && !battery.id.startsWith("campaign-");
+}
+
+export function sellBattery(state: GameState, batteryId: string): GameState {
   const next = cloneState(state);
-  const battery = next.batteries.find((item) => item.id === batteryId);
-  if (!battery) return next;
+  const battery = [...next.batteries, ...next.storedBatteries].find((item) => item.id === batteryId);
+  if (!battery || !batteryCanBeSold(next, battery)) return state;
   const unit = getUnitDefinition(battery.kind);
+  const refund = batterySaleValue(battery.kind);
   next.batteries = next.batteries.filter((item) => item.id !== batteryId);
-  next.resources.budget = clamp(next.resources.budget + Math.round(unit.cost * 0.45), 0, 999);
+  next.storedBatteries = next.storedBatteries.filter((item) => item.id !== batteryId);
+  if (next.campaign) {
+    next.campaign.campaignWallet = Math.max(0, next.campaign.campaignWallet + refund);
+    next.resources.budget = next.campaign.campaignWallet;
+  } else {
+    next.resources.budget = Math.max(0, next.resources.budget + refund);
+  }
+  next.placementWarning = null;
   next.logistics = buildLogisticsState(next);
-  pushLog(next.log, next.elapsedMs, `${unit.shortName} Recalled`, "A defense unit was recalled and partial budget was recovered.", "info");
+  pushLog(next.log, next.elapsedMs, `${unit.shortName} продано`, `Повернено ${refund} млн ₴ — 50% базової вартості.`, "info", { soundCue: "placement.service" });
   return next;
+}
+
+export function removeBattery(state: GameState, batteryId: string): GameState {
+  return sellBattery(state, batteryId);
 }
 
 export function moveBatteryToStorage(state: GameState, batteryId: string): GameState {

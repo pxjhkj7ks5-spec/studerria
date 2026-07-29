@@ -3,6 +3,7 @@ import { formatClock } from "../game/liveSimulation";
 import type { GameState } from "../types/game";
 import type { OperationPhase } from "../domain/contracts";
 import { getCampaignMission } from "../data/campaignPlan";
+import { formatNumber } from "../platform/i18n";
 import type { ReactNode } from "react";
 
 interface ResourceBarProps {
@@ -26,7 +27,7 @@ export function ResourceBar({ game, operationPhase, mobile = false }: ResourceBa
       ? `HP ${Math.round(depot!.health)}% · +${depotRate}/45 с · ${Math.ceil((45_000 - depot!.productionProgressMs) / 1000)} с`
       : `HP ${Math.round(depot?.health || 0)}% · виробництво зупинено`;
   const items = [
-    { label: "Бюджет", value: Math.round(game.resources.budget), icon: Coins, delta: "постачання" },
+    { label: "Бюджет", value: formatNumber(game.resources.budget, { maximumFractionDigits: 1 }), icon: Coins, delta: "постачання" },
     { label: game.campaign ? "Склад БК" : "БК", value: game.campaign ? Math.round(depot?.stock || 0) : Math.round(game.resources.ammo), icon: Landmark, delta: game.campaign ? depotDelta : "запас" },
     { label: game.campaign ? "Стійкість" : "Мораль", value: `${Math.round(game.campaign?.civilianResilience ?? game.resources.morale)}%`, icon: Users, delta: "цивільні" },
     { label: game.campaign ? `Місія ${game.campaign.missionIndex}/5` : "Час", value: campaignTime, icon: CalendarDays, delta: operationPhase === "paused" ? "пауза" : "реальний час", className: "resource-card--mission-time" },
