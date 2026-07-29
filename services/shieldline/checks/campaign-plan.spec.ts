@@ -7,7 +7,7 @@ import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
-import { flightDurationForDistance, flightDurationForSpeed, GAMEPLAY_FLIGHT_SPEED_SCALE, routeDistanceKm, THREAT_FLIGHT_PROFILES } from "../src/game/threatFlightModel.mjs";
+import { flightDurationForDistance, flightDurationForSpeed, GAMEPLAY_FLIGHT_SPEED_SCALE, MISSILE_FLIGHT_SPEED_SCALE, routeDistanceKm, THREAT_FLIGHT_PROFILES } from "../src/game/threatFlightModel.mjs";
 import { getUnitDefinition } from "../src/data/units";
 import type { GameState, LiveThreat, ThreatKind } from "../src/types/game";
 
@@ -447,6 +447,7 @@ test("campaign kill earnings have no mission or wallet ceiling", () => {
 
 test("fixed model speeds drive route-distance flight time instead of an authored arrival deadline", () => {
   assert.equal(GAMEPLAY_FLIGHT_SPEED_SCALE, 1.1);
+  assert.equal(MISSILE_FLIGHT_SPEED_SCALE, 1.06);
   assert.equal(THREAT_FLIGHT_PROFILES.geran2.speedKph, 170);
   assert.equal(THREAT_FLIGHT_PROFILES.kh101.speedKph, 780);
   assert.equal(THREAT_FLIGHT_PROFILES.iskander.speedKph, 5_200);
@@ -454,6 +455,8 @@ test("fixed model speeds drive route-distance flight time instead of an authored
   const longGeran = flightDurationForDistance("geran2", 170, 680);
   assert.equal(shortGeran, 130_909);
   assert.equal(longGeran, shortGeran * 2);
+  assert.equal(flightDurationForSpeed("kh101", 780), 109_953);
+  assert.equal(flightDurationForSpeed("iskander", 5_200), 39_583);
   assert.equal(flightDurationForSpeed("kh101", 780), flightDurationForDistance("kh101", 780, THREAT_FLIGHT_PROFILES.kh101.representativeDistanceKm));
 });
 
@@ -476,7 +479,7 @@ test("full campaign corridors keep one canonical speed without trimming their la
   for (const [kind, range] of durationRanges) {
     assert.equal(range.speeds.size, 1, `${kind} must use one canonical speed`);
     if (kind === "iskander" || kind === "ballistic") {
-      assert.ok(range.min >= 40_000 && range.max <= 85_000, `${kind} must stay inside its ballistic corridor window`);
+      assert.ok(range.min >= 37_000 && range.max <= 80_000, `${kind} must stay inside its ballistic corridor window`);
     } else {
       assert.ok(range.min >= 80_000 && range.max <= 400_000, `${kind} must use its complete authored corridor`);
     }
