@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile, stat } from "node:fs/promises";
 import test from "node:test";
 import { normalizeAudioPreferences } from "../src/platform/audioPreferences";
-import { collectUnseenSoundCues } from "../src/audio/useGameAudio";
+import { airRaidTransitionCue, collectUnseenSoundCues } from "../src/audio/useGameAudio";
 import { cueAllowedAt, selectSoundVariant, soundCueDefinitions, soundCueNames } from "../src/audio/soundCues";
 import { getSoundSource, getSoundSources } from "../src/audio/soundSources";
 import { createScenarioState } from "../src/game/initialState";
@@ -81,6 +81,18 @@ test("hydrated entries form a baseline and only new semantic cues play in chrono
   const latest: IntelEntry = { id: "latest", time: "20:02", title: "Latest", body: "Latest", tone: "success", soundCue: "result.intercept" };
   const earlier: IntelEntry = { id: "earlier", time: "20:01", title: "Earlier", body: "Earlier", tone: "warning", soundCue: "contact.detected" };
   assert.deepEqual(collectUnseenSoundCues([latest, earlier, existing], seen), ["contact.detected", "result.intercept"]);
+});
+
+test("each newly alerted city retriggers the air-raid cue without false all-clear chatter", () => {
+  const none = new Set<string>();
+  const kyiv = new Set(["kyiv"]);
+  const kyivAndLviv = new Set(["kyiv", "lviv"]);
+  const lviv = new Set(["lviv"]);
+  assert.equal(airRaidTransitionCue(none, kyiv), "alert.air-raid");
+  assert.equal(airRaidTransitionCue(kyiv, kyivAndLviv), "alert.air-raid");
+  assert.equal(airRaidTransitionCue(kyivAndLviv, lviv), null);
+  assert.equal(airRaidTransitionCue(lviv, lviv), null);
+  assert.equal(airRaidTransitionCue(lviv, none), "alert.clear");
 });
 
 test("shipped audio is fully registered, CC0 documented, and remains below the six megabyte budget", async () => {

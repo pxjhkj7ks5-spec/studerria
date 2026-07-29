@@ -24,11 +24,21 @@ export function collectUnseenSoundCues(entries: IntelEntry[], seenIds: ReadonlyS
     .map((entry) => entry.soundCue!);
 }
 
+export function airRaidTransitionCue(previousCityIds: ReadonlySet<string>, currentCityIds: ReadonlySet<string>) {
+  if ([...currentCityIds].some((cityId) => !previousCityIds.has(cityId))) return "alert.air-raid" as const;
+  if (previousCityIds.size > 0 && currentCityIds.size === 0) return "alert.clear" as const;
+  return null;
+}
+
+function activeAirRaidCityIds(game: GameState) {
+  return new Set(game.cities.filter((city) => city.alertState === "air-raid").map((city) => city.id));
+}
+
 export function useGameAudio({ game, operationPhase, simulationSeed, preferences }: GameAudioInput) {
   const gameRef = useRef(game);
   const seenLogIds = useRef(new Set(game.log.map((entry) => entry.id)));
   const previousPhase = useRef(operationPhase);
-  const airRaidActive = useRef(game.cities.some((city) => city.alertState === "air-raid"));
+  const airRaidCityIds = useRef(activeAirRaidCityIds(game));
   const previousSeed = useRef(simulationSeed);
   gameRef.current = game;
 
@@ -41,7 +51,7 @@ export function useGameAudio({ game, operationPhase, simulationSeed, preferences
     previousSeed.current = simulationSeed;
     seenLogIds.current = new Set(game.log.map((entry) => entry.id));
     previousPhase.current = operationPhase;
-    airRaidActive.current = game.cities.some((city) => city.alertState === "air-raid");
+    airRaidCityIds.current = activeAirRaidCityIds(game);
   }, [game.cities, game.log, operationPhase, simulationSeed]);
 
   useEffect(() => {
@@ -72,11 +82,11 @@ export function useGameAudio({ game, operationPhase, simulationSeed, preferences
   }, [operationPhase]);
 
   useEffect(() => {
-    const active = game.cities.some((city) => city.alertState === "air-raid");
-    const wasActive = airRaidActive.current;
-    airRaidActive.current = active;
-    if (document.hidden || active === wasActive) return;
-    void playSound(active ? "alert.air-raid" : "alert.clear");
+    const currentCityIds = activeAirRaidCityIds(game);
+    const cue = airRaidTransitionCue(airRaidCityIds.current, currentCityIds);
+    airRaidCityIds.current = currentCityIds;
+    if (document.hidden || !cue) return;
+    void playSound(cue);
   }, [game.cities]);
 }
 
