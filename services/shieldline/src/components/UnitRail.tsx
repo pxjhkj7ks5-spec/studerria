@@ -56,6 +56,7 @@ function keepExpandedCardVisible(card: HTMLElement) {
 
 export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }) {
   const [expandedKind, setExpandedKind] = useState<UnitDefinition["kind"] | null>(null);
+  const [dismissedKind, setDismissedKind] = useState<UnitDefinition["kind"] | null>(null);
   const game = useGameStore((state) => state.game);
   const placementKind = useGameStore((state) => state.placementKind);
   const beginPlacement = useGameStore((state) => state.beginPlacement);
@@ -68,6 +69,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
   const expandCard = (card: HTMLElement, kind: UnitDefinition["kind"]) => {
     const details = card.querySelector<HTMLElement>(".unit-hover-card__content");
     card.style.setProperty("--unit-details-height", `${(details?.scrollHeight || 0) + 24}px`);
+    setDismissedKind(null);
     setExpandedKind(kind);
     keepExpandedCardVisible(card);
   };
@@ -113,14 +115,17 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
 
           return (
             <article
-              className={`unit-card unit-card--state-${tacticalStatus.tone} ${isRadar ? "unit-card--radar" : ""} ${showStatus ? "unit-card--has-status" : ""} ${storedUnits.length ? "unit-card--has-storage" : ""} ${expandedKind === unit.kind ? "unit-card--expanded" : ""} ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
+              className={`unit-card unit-card--state-${tacticalStatus.tone} ${isRadar ? "unit-card--radar" : ""} ${showStatus ? "unit-card--has-status" : ""} ${storedUnits.length ? "unit-card--has-storage" : ""} ${expandedKind === unit.kind ? "unit-card--expanded" : ""} ${dismissedKind === unit.kind ? "unit-card--details-dismissed" : ""} ${selected ? "unit-card--selected" : ""} ${disabled ? "unit-card--disabled" : ""}`}
               key={unit.kind}
               tabIndex={0}
               role="button"
               data-sound-cue="placement.select"
               aria-disabled={disabled}
               onMouseEnter={(event) => expandCard(event.currentTarget, unit.kind)}
-              onMouseLeave={() => setExpandedKind((current) => current === unit.kind ? null : current)}
+              onMouseLeave={() => {
+                setExpandedKind((current) => current === unit.kind ? null : current);
+                setDismissedKind((current) => current === unit.kind ? null : current);
+              }}
               onFocus={(event) => expandCard(event.currentTarget, unit.kind)}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget)) setExpandedKind((current) => current === unit.kind ? null : current);
@@ -195,6 +200,7 @@ export function UnitRail({ onPlacementStart }: { onPlacementStart?: () => void }
                             event.stopPropagation();
                             for (const targetKind of targets) setManualOverride(localBattery.id, targetKind, !enabled);
                             setExpandedKind(null);
+                            setDismissedKind(unit.kind);
                             event.currentTarget.blur();
                           }}
                         >{enabled ? "Заборонити дрони" : "Дозволити дрони"}</button>;

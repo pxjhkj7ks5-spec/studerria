@@ -2118,7 +2118,14 @@ button {
 .unit-card:hover .unit-hover-card,
 .unit-card:focus-within .unit-hover-card {
   opacity: 1;
+  pointer-events: auto;
   transform: translateY(0);
+}
+
+.unit-card.unit-card--details-dismissed .unit-hover-card {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
 }
 
 .unit-card--selected {
@@ -3006,8 +3013,19 @@ button {
   padding: 11px;
   border-width: 1px;
   opacity: 1;
+  pointer-events: auto;
   visibility: visible;
   transition: height 220ms ease, margin 180ms ease, padding 180ms ease, opacity 140ms ease, visibility 0s;
+}
+
+.command-drawer .unit-card.unit-card--details-dismissed .unit-hover-card {
+  height: 0;
+  margin: 0;
+  padding: 0 11px;
+  border-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .command-drawer .unit-card--selected {
