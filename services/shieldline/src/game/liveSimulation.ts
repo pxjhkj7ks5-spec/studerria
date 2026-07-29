@@ -3,6 +3,7 @@ import { getUnitDefinition } from "../data/units";
 import { threatTelemetryFor } from "../data/threatFlightProfiles";
 import { flightDurationForDistance, routeDistanceKm } from "./threatFlightModel.mjs";
 import { createCycleSnapshot, generateAfterActionReport } from "./afterActionReport";
+import { createDeterministicRandom } from "./deterministicRandom";
 import { buildLogisticsState } from "./logistics";
 import { createGuidedCampaignSchedule, guidedStageForElapsed, guidedStageLaunchCount, guidedThreatKind, nextGuidedLaunchDelayMs, sectorIdsForDirection } from "./campaignPacing.mjs";
 import { SHOW_LAUNCH_DEBUG, launchSectorCenter, pickWeightedSector, randomPointInSector, sectorSupportsThreat } from "./launchSystem.mjs";
@@ -554,6 +555,10 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
   if (!event || event.dueMs > state.elapsedMs - state.cycleStartedAtMs) return false;
   const route = getCampaignRoute(event.routeId);
   if (!route) { campaign.spawnCursor += 1; return true; }
+  const trailRandom = (event.trailLength || 0) > 1
+    ? createDeterministicRandom(`campaign-trail:${event.groupId}:${event.targetAsset || "city"}`)
+    : null;
+  const routeRandom = trailRandom ? () => trailRandom.next() : random;
   const targetCityId = event.targetRegion.toLowerCase().includes("столич") ? "kyiv" : route.targetCityId;
   const city = state.cities.find((item) => item.id === targetCityId) || state.cities[0];
   const targetCoordinates = event.targetAsset === "ammo-depot" ? campaign.depot.position : city.coordinates;
@@ -562,9 +567,11 @@ function spawnCampaignThreat(state: GameState, random: () => number) {
     && sector.targetCityId === city.id
     && sectorSupportsThreat(sector, event.threatKind));
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
-  const launchSector = preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
-  const launchOrigin = preparedSector?.lastLaunchCoordinates || randomPointInSector(launchSector, random);
-  const waypoints = generateCampaignRoute(event, random, launchOrigin, targetCoordinates);
+  const launchSector = trailRandom
+    ? pickCampaignLaunchSector(state.launchSectors, route.launchSector, event.threatKind, routeRandom, route.preferredLaunchSectorIds)
+    : preparedSector || pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
+  const launchOrigin = trailRandom ? randomPointInSector(launchSector, routeRandom) : preparedSector?.lastLaunchCoordinates || randomPointInSector(launchSector, random);
+  const waypoints = generateCampaignRoute(event, routeRandom, launchOrigin, targetCoordinates);
   const threat = spawnThreat(state, random, event.threatKind, city.id, launchSector.id, launchOrigin);
   if (waypoints.length) waypoints[waypoints.length - 1] = { ...targetCoordinates };
   threat.target = waypoints.at(-1) || targetCoordinates;
@@ -608,8 +615,18 @@ function prepareCampaignLaunch(state: GameState, random: () => number) {
     && sector.targetCityId === city.id);
   if (existing) return;
   const availableSectors = state.launchSectors.filter((sector) => !sector.state || sector.state === "idle");
-  const sector = pickCampaignLaunchSector(availableSectors.length ? availableSectors : state.launchSectors, route.launchSector, event.threatKind, random, route.preferredLaunchSectorIds);
-  const origin = randomPointInSector(sector, random);
+  const trailRandom = (event.trailLength || 0) > 1
+    ? createDeterministicRandom(`campaign-trail:${event.groupId}:${event.targetAsset || "city"}`)
+    : null;
+  const launchRandom = trailRandom ? () => trailRandom.next() : random;
+  const sector = pickCampaignLaunchSector(
+    trailRandom ? state.launchSectors : availableSectors.length ? availableSectors : state.launchSectors,
+    route.launchSector,
+    event.threatKind,
+    launchRandom,
+    route.preferredLaunchSectorIds,
+  );
+  const origin = randomPointInSector(sector, launchRandom);
   markLaunchSector(state, sector.id, "warning", untilLaunchMs + 1000, { cityId: city.id, coordinates: targetCoordinates }, origin, event.threatKind);
   pushLog(state.log, state.elapsedMs, "Підготовка пуску", `Активність у секторі «${sector.name}». До можливого пуску менше 15 секунд.`, "warning", { eventType: "launch", locationLabel: sector.name, soundCue: "alert.prelaunch" });
 }

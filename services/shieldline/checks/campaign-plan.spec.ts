@@ -66,6 +66,46 @@ test("authored waves expand to deterministic individual spawn events with groupi
   }
   const merged = buildCampaignSpawnEvents(3).find((event) => event.mergeRouteId && event.routeId !== event.mergeRouteId);
   assert.ok(merged?.rallyRatio && merged.rallyRatio >= .35 && merged.rallyRatio <= .6);
+
+  const firstMissionSplit = buildCampaignSpawnEvents(1).filter((event) => event.groupId === "m1-w1-g1");
+  assert.deepEqual(firstMissionSplit.map((event) => event.routeId), ["R01", "R29"]);
+  assert.equal(firstMissionSplit.every((event) => event.trailPosition === undefined), true);
+
+  const missionTwoPair = buildCampaignSpawnEvents(2).filter((event) => event.groupId === "m2-w2-g1");
+  assert.deepEqual(missionTwoPair.map((event) => event.routeId), ["R10", "R10"]);
+  assert.deepEqual(missionTwoPair.map((event) => event.trailPosition), [0, 1]);
+  assert.equal(missionTwoPair[1].dueMs - missionTwoPair[0].dueMs, 7_000);
+
+  const finalTenTargetTrail = buildCampaignSpawnEvents(5).filter((event) => event.groupId === "m5-w15-g1");
+  assert.equal(finalTenTargetTrail.length, 10);
+  assert.equal(new Set(finalTenTargetTrail.map((event) => event.routeId)).size, 1);
+  assert.equal(new Set(finalTenTargetTrail.map((event) => event.trailLength)).size, 1);
+  assert.equal(finalTenTargetTrail[0].trailLength, 10);
+  assert.deepEqual(finalTenTargetTrail.slice(1).map((event, index) => event.dueMs - finalTenTargetTrail[index].dueMs), Array(9).fill(4_000));
+});
+
+test("live trail targets reuse one route and retain launch spacing", () => {
+  const random = createDeterministicRandom("campaign-live-trail");
+  let game = createScenarioState(() => random.next(), "crisis", "thirty-days-under-pressure");
+  game.campaign = createCampaignState(2);
+  const pair = buildCampaignSpawnEvents(2)
+    .filter((event) => event.groupId === "m2-w2-g1")
+    .map((event, index) => ({ ...event, dueMs: 1_000 + index * 7_000 }));
+  game.campaign.spawnEvents = pair;
+  applyCampaignMissionOpening(game);
+  game = startAttackNow(game, () => random.next());
+  game = advanceSimulation(game, 500, () => random.next());
+  const warnedSector = game.launchSectors.find((sector) => sector.state === "warning");
+  assert.ok(warnedSector?.lastLaunchCoordinates);
+  game = advanceSimulation(game, 9_500, () => random.next());
+  const livePair = game.liveThreats.filter((threat) => threat.campaignGroupId === "m2-w2-g1");
+  assert.equal(livePair.length, 2);
+  assert.equal(livePair[0].launchSectorId, warnedSector.id);
+  assert.deepEqual(livePair[0].origin, warnedSector.lastLaunchCoordinates);
+  assert.deepEqual(livePair[0].origin, livePair[1].origin);
+  assert.equal(livePair[0].launchSectorId, livePair[1].launchSectorId);
+  assert.deepEqual(livePair[0].routeWaypoints, livePair[1].routeWaypoints);
+  assert.ok(livePair[0].progress > livePair[1].progress);
 });
 
 test("every campaign mission starts its next cleared wave without a long idle gate", () => {

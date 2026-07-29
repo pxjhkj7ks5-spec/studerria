@@ -168,7 +168,7 @@ export const campaignMissionsPlan: CampaignMissionDefinition[] = [
     w("25:00", "jammer", 2, ["R20", "R24"], 1, "dualEscort", "Столичний / прикордонний", .5, 20, "veryHigh"),
     w("25:30", "geran2", 12, ["R01", "R02", "R18"], 6, "mainCorridorPlusDiversion", "Столичний / логістичний", .25, 65, "critical"),
     w("29:30", "kh101", 3, ["R03", "R20", "R24"], 1, "staggeredIndependent", "Столичний / енергетичний / прикордонний", .33, 25, "veryHigh"),
-    w("33:00", "geran2", 10, ["R01", "R02"], 5, "hardMerge", "Столичний", 0, 55, "critical"),
+    w("33:00", "geran2", 10, ["R01"], 10, "singleRouteTrail", "Столичний", 0, 55, "critical"),
     w("36:00", "iskander", 1, ["R26"], 1, "independent", "Столичний кластер", 0, 0, "critical"),
     w("36:00", "kh101", 2, ["R20", "R03"], 1, "independent", "Столичний кластер", 0, 10, "veryHigh"),
     w("38:30", "low-signature-cruise", 1, ["R35"], 1, "independent", "Столичний", 0, 0, "veryHigh"),

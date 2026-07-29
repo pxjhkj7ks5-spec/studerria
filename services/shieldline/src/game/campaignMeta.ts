@@ -7,6 +7,7 @@ const KM_PER_DEGREE = 100;
 export const CAMPAIGN_DEPOT_REPAIR_COST = 12;
 export const CAMPAIGN_DEPOT_REPAIR_DURATION_MS = 120_000;
 export const CAMPAIGN_DEPOT_PRODUCTION_INTERVAL_MS = 45_000;
+const CAMPAIGN_TRAIL_INTERVAL_SEC_BY_MISSION = [0, 0, 7, 6, 5, 4] as const;
 
 export const campaignAmmoDepotPositions: readonly Coordinates[] = [
   { lat: 49.73, lng: 23.52 },
@@ -54,8 +55,23 @@ export function createCampaignAmmoDepot(seed = "campaign-default", stock = 10): 
 export function buildCampaignSpawnEvents(missionIndex: number): CampaignSpawnEvent[] {
   const mission = getCampaignMission(missionIndex);
   return mission.waves.flatMap((wave, waveIndex) => Array.from({ length: wave.count }, (_, targetIndex) => {
-    const routeId = wave.routeIds[targetIndex % wave.routeIds.length];
-    const spread = wave.count <= 1 ? 0 : wave.spawnSpreadSec * targetIndex / (wave.count - 1);
+    const trailEnabled = missionIndex >= 2 && wave.groupSize > 1;
+    const trailSize = trailEnabled ? Math.min(wave.count, Math.max(2, wave.groupSize)) : 1;
+    const trailIndex = trailEnabled ? Math.floor(targetIndex / trailSize) : Math.floor(targetIndex / Math.max(1, wave.groupSize));
+    const trailPosition = trailEnabled ? targetIndex % trailSize : 0;
+    const trailLength = trailEnabled ? Math.min(trailSize, wave.count - trailIndex * trailSize) : 1;
+    const trailCount = trailEnabled ? Math.ceil(wave.count / trailSize) : 1;
+    const trailIntervalSec = CAMPAIGN_TRAIL_INTERVAL_SEC_BY_MISSION[missionIndex] || 4;
+    const finalTrailLength = trailEnabled ? wave.count - (trailCount - 1) * trailSize : 1;
+    const finalTrailDurationSec = Math.max(0, finalTrailLength - 1) * trailIntervalSec;
+    const trailStartWindowSec = Math.max(0, wave.spawnSpreadSec - finalTrailDurationSec);
+    const trailStartSec = trailEnabled && trailCount > 1 ? trailStartWindowSec * trailIndex / (trailCount - 1) : 0;
+    const spread = trailEnabled
+      ? trailStartSec + trailPosition * trailIntervalSec
+      : wave.count <= 1 ? 0 : wave.spawnSpreadSec * targetIndex / (wave.count - 1);
+    const routeId = trailEnabled
+      ? wave.routeIds[trailIndex % wave.routeIds.length]
+      : wave.routeIds[targetIndex % wave.routeIds.length];
     const merges = /merge/i.test(wave.mergeBehavior) && wave.routeIds.length > 1;
     const id = `m${missionIndex}-w${waveIndex + 1}-t${targetIndex + 1}`;
     return {
@@ -63,7 +79,8 @@ export function buildCampaignSpawnEvents(missionIndex: number): CampaignSpawnEve
       dueMs: Math.round((wave.timeSeconds + spread) * 1_000),
       threatKind: wave.threatKind,
       routeId,
-      groupId: `m${missionIndex}-w${waveIndex + 1}-g${Math.floor(targetIndex / Math.max(1, wave.groupSize)) + 1}`,
+      groupId: `m${missionIndex}-w${waveIndex + 1}-g${trailIndex + 1}`,
+      ...(trailEnabled ? { trailPosition, trailLength } : {}),
       mergeBehavior: wave.mergeBehavior,
       priority: wave.priority,
       targetRegion: wave.targetRegion,

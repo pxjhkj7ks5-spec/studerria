@@ -351,6 +351,8 @@ export interface CampaignSpawnEvent {
   threatKind: ThreatKind;
   routeId: string;
   groupId: string;
+  trailPosition?: number;
+  trailLength?: number;
   mergeBehavior: string;
   priority: "low" | "medium" | "high" | "veryHigh" | "critical";
   targetRegion: string;
