@@ -20,6 +20,7 @@ export const campaignMissions: MissionDefinition[] = campaignMissionsPlan.map((m
   focusRegion: mission.focusRegion,
   expectedThreatClasses: mission.expectedThreatClasses,
   broadAzimuth: mission.broadAzimuth,
+  attackRegionHint: mission.attackRegionHint,
   mainRisk: mission.expectedThreatClasses.join(" + "),
   victoryCondition: mission.objective,
   briefing: mission.briefing || `${mission.focusRegion}. ${mission.objective}`,

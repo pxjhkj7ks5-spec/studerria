@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, ArrowLeft, BarChart3, Check, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Lock, Play, Radio, Shield, Swords, Trophy, UserRound, Users, Waves, Zap } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, Check, ChevronRight, CircleHelp, Clock3, Command, Crosshair, FileText, Flag, Gamepad2, Headphones, Home, Lock, MapPin, Play, Radio, Shield, Swords, Trophy, UserRound, Users, Waves, Zap } from "lucide-react";
 import { AccountSettings } from "./AccountSettings";
 import { BrandMark } from "./BrandMark";
 import { useAuth } from "./AuthGate";
@@ -185,6 +185,7 @@ function Briefing({ modeId, missionIndex, onBack, onStart, isRunning }: { modeId
       <span className="hero-chip"><Waves size={14} /> {mission.subtitle}</span>
       <h1>{modeId === "campaign" ? mission.title : mode.title}</h1>
       <p className="briefing-lead">{modeId === "campaign" ? mission.briefing : mode.description}</p>
+      {modeId === "campaign" && mission.attackRegionHint ? <section className="recommendation briefing-region-hint"><MapPin size={19} /><div><strong>Попередня оцінка розвідки</strong><span>{mission.attackRegionHint}</span></div></section> : null}
       <section className="briefing-facts"><Fact label="Тривалість" value={`${mission.durationMinutes} хв`} /><Fact label="Основний театр" value={mission.focusRegion || mission.mainRisk} /><Fact label="Очікувані загрози" value={mission.expectedThreatClasses?.join(" · ") || mission.mainRisk} /><Fact label="Широкий азимут" value={mission.broadAzimuth || "невизначений"} /><Fact label="Завдання" value={mission.victoryCondition} /></section>
       <section className="reserve-bar"><span>Склад БК</span><b>Грант {mission.grant || mission.resources.budget} млн ₴</b><b>Нагорода за кожне збиття</b><b>Стійкість 100%</b></section>
       <button className="primary-command" type="button" onClick={onStart} disabled={isRunning}><Play size={19} />{isRunning ? "Synchronizing command…" : modeId === "daily-defense" ? "Open daily report" : "Open manual command board"}</button>

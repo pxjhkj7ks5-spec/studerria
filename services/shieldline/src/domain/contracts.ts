@@ -109,6 +109,7 @@ export interface MissionDefinition {
   focusRegion?: string;
   expectedThreatClasses?: string[];
   broadAzimuth?: string;
+  attackRegionHint?: string;
   waves: ThreatWave[];
 }
 
