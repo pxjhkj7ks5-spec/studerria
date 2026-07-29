@@ -8,8 +8,8 @@ export const THREAT_FLIGHT_PROFILES = Object.freeze({
   geran2: { speedKph: 170, altitudeM: [60, 180], timeCompression: 50, representativeDistanceKm: 300 },
   gerbera: { speedKph: 150, altitudeM: [80, 300], timeCompression: 55, representativeDistanceKm: 280 },
   parodiya: { speedKph: 130, altitudeM: [100, 360], timeCompression: 65, representativeDistanceKm: 280 },
-  kh101: { speedKph: 780, altitudeM: [30, 120], timeCompression: 18, representativeDistanceKm: 500 },
-  kalibr: { speedKph: 850, altitudeM: [20, 100], timeCompression: 12, representativeDistanceKm: 400 },
+  kh101: { speedKph: 780, altitudeM: [30, 120], timeCompression: 20, representativeDistanceKm: 500 },
+  kalibr: { speedKph: 850, altitudeM: [20, 100], timeCompression: 18, representativeDistanceKm: 400 },
   iskander: { speedKph: 5_200, altitudeM: [20_000, 50_000], timeCompression: 3, representativeDistanceKm: 200 },
   recon: { speedKph: 200, altitudeM: [500, 1_800], timeCompression: 44, representativeDistanceKm: 300 },
   "low-signature-cruise": { speedKph: 760, altitudeM: [25, 100], timeCompression: 28, representativeDistanceKm: 800 },
@@ -18,16 +18,16 @@ export const THREAT_FLIGHT_PROFILES = Object.freeze({
 
 export const GAMEPLAY_FLIGHT_SPEED_SCALE = 1.1;
 export const MISSILE_FLIGHT_SPEED_SCALE = 1.06;
+export const CRUISE_FLIGHT_SPEED_SCALE = 1.16;
 
-const MISSILE_THREAT_KINDS = new Set([
-  "ballistic",
+const CRUISE_THREAT_KINDS = new Set([
   "combined",
   "cruise",
-  "iskander",
   "kalibr",
   "kh101",
   "low-signature-cruise",
 ]);
+const BALLISTIC_THREAT_KINDS = new Set(["ballistic", "iskander"]);
 
 function segmentDistanceKm(left, right) {
   const latitudeKm = (right.lat - left.lat) * 111;
@@ -45,8 +45,12 @@ export function flightDurationForDistance(kind, speedKph, distanceKm) {
   const profile = THREAT_FLIGHT_PROFILES[kind] || THREAT_FLIGHT_PROFILES.drone;
   const safeSpeed = Math.max(1, Number(speedKph) || profile.speedKph);
   const safeDistance = Math.max(1, Number(distanceKm) || profile.representativeDistanceKm);
-  const missileScale = MISSILE_THREAT_KINDS.has(kind) ? MISSILE_FLIGHT_SPEED_SCALE : 1;
-  return Math.max(5_000, Math.round((safeDistance / safeSpeed) * 3_600_000 / (profile.timeCompression * GAMEPLAY_FLIGHT_SPEED_SCALE * missileScale)));
+  const threatScale = CRUISE_THREAT_KINDS.has(kind)
+    ? CRUISE_FLIGHT_SPEED_SCALE
+    : BALLISTIC_THREAT_KINDS.has(kind)
+      ? MISSILE_FLIGHT_SPEED_SCALE
+      : 1;
+  return Math.max(5_000, Math.round((safeDistance / safeSpeed) * 3_600_000 / (profile.timeCompression * GAMEPLAY_FLIGHT_SPEED_SCALE * threatScale)));
 }
 
 export function flightDurationForSpeed(kind, speedKph) {

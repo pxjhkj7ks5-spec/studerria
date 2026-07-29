@@ -7,7 +7,7 @@ import { createDeterministicRandom } from "../src/game/deterministicRandom";
 import { createScenarioState } from "../src/game/initialState";
 import { createLaunchSectorState, sectorSupportsThreat } from "../src/game/launchSystem.mjs";
 import { advanceSimulation, deployStoredBattery, moveBatteryToStorage, placeBattery, startAttackNow, tickSimulation } from "../src/game/liveSimulation";
-import { flightDurationForDistance, flightDurationForSpeed, GAMEPLAY_FLIGHT_SPEED_SCALE, MISSILE_FLIGHT_SPEED_SCALE, routeDistanceKm, THREAT_FLIGHT_PROFILES } from "../src/game/threatFlightModel.mjs";
+import { CRUISE_FLIGHT_SPEED_SCALE, flightDurationForDistance, flightDurationForSpeed, GAMEPLAY_FLIGHT_SPEED_SCALE, MISSILE_FLIGHT_SPEED_SCALE, routeDistanceKm, THREAT_FLIGHT_PROFILES } from "../src/game/threatFlightModel.mjs";
 import { getUnitDefinition } from "../src/data/units";
 import type { GameState, LiveThreat, ThreatKind } from "../src/types/game";
 
@@ -448,6 +448,7 @@ test("campaign kill earnings have no mission or wallet ceiling", () => {
 test("fixed model speeds drive route-distance flight time instead of an authored arrival deadline", () => {
   assert.equal(GAMEPLAY_FLIGHT_SPEED_SCALE, 1.1);
   assert.equal(MISSILE_FLIGHT_SPEED_SCALE, 1.06);
+  assert.equal(CRUISE_FLIGHT_SPEED_SCALE, 1.16);
   assert.equal(THREAT_FLIGHT_PROFILES.geran2.speedKph, 170);
   assert.equal(THREAT_FLIGHT_PROFILES.kh101.speedKph, 780);
   assert.equal(THREAT_FLIGHT_PROFILES.iskander.speedKph, 5_200);
@@ -455,9 +456,21 @@ test("fixed model speeds drive route-distance flight time instead of an authored
   const longGeran = flightDurationForDistance("geran2", 170, 680);
   assert.equal(shortGeran, 130_909);
   assert.equal(longGeran, shortGeran * 2);
-  assert.equal(flightDurationForSpeed("kh101", 780), 109_953);
+  assert.equal(flightDurationForSpeed("kh101", 780), 90_427);
   assert.equal(flightDurationForSpeed("iskander", 5_200), 39_583);
   assert.equal(flightDurationForSpeed("kh101", 780), flightDurationForDistance("kh101", 780, THREAT_FLIGHT_PROFILES.kh101.representativeDistanceKm));
+});
+
+test("every cruise missile moves at least twice as fast as the fastest drone over the same route", () => {
+  const distanceKm = 500;
+  const fastestDroneDuration = Math.min(
+    ...(["drone", "saturation", "geran2", "gerbera"] as const).map((kind) =>
+      flightDurationForDistance(kind, THREAT_FLIGHT_PROFILES[kind].speedKph, distanceKm)),
+  );
+  for (const kind of ["cruise", "combined", "kh101", "kalibr", "low-signature-cruise"] as const) {
+    const cruiseDuration = flightDurationForDistance(kind, THREAT_FLIGHT_PROFILES[kind].speedKph, distanceKm);
+    assert.ok(cruiseDuration * 2 <= fastestDroneDuration, `${kind} must be at least twice as fast as the fastest drone`);
+  }
 });
 
 test("full campaign corridors keep one canonical speed without trimming their launch point", () => {
@@ -480,6 +493,8 @@ test("full campaign corridors keep one canonical speed without trimming their la
     assert.equal(range.speeds.size, 1, `${kind} must use one canonical speed`);
     if (kind === "iskander" || kind === "ballistic") {
       assert.ok(range.min >= 37_000 && range.max <= 80_000, `${kind} must stay inside its ballistic corridor window`);
+    } else if (kind === "cruise" || kind === "combined" || kind === "kh101" || kind === "kalibr" || kind === "low-signature-cruise") {
+      assert.ok(range.min >= 50_000 && range.max <= 260_000, `${kind} must stay fast without becoming an instant impact`);
     } else {
       assert.ok(range.min >= 80_000 && range.max <= 400_000, `${kind} must use its complete authored corridor`);
     }
