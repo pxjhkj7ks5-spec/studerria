@@ -4,6 +4,8 @@ set -eu
 SCHEMA_FILE="prisma/schema.prisma"
 SCHEMA_HASH_FILE="/data/.schema-prisma.sha256"
 SEED_MARKER_FILE="/data/.seeded-v1"
+CATALOG_FILE="${CATALOG_FILE:-catalog/products.json}"
+CATALOG_HASH_FILE="/data/.catalog-products.sha256"
 
 if [ -f "$SCHEMA_FILE" ]; then
   current_schema_hash="$(sha256sum "$SCHEMA_FILE" | awk '{print $1}')"
@@ -27,6 +29,22 @@ if [ ! -f "$SEED_MARKER_FILE" ]; then
   : > "$SEED_MARKER_FILE"
 else
   echo "[entrypoint] seed marker found; skipping seed"
+fi
+
+if [ -f "$CATALOG_FILE" ]; then
+  current_catalog_hash="$(sha256sum "$CATALOG_FILE" | awk '{print $1}')"
+  previous_catalog_hash=""
+  if [ -f "$CATALOG_HASH_FILE" ]; then
+    previous_catalog_hash="$(cat "$CATALOG_HASH_FILE" 2>/dev/null || true)"
+  fi
+
+  if [ "$current_catalog_hash" != "$previous_catalog_hash" ]; then
+    echo "[entrypoint] catalog changed; importing products"
+    ./node_modules/.bin/tsx prisma/import-catalog.ts
+    printf '%s\n' "$current_catalog_hash" > "$CATALOG_HASH_FILE"
+  else
+    echo "[entrypoint] catalog unchanged; skipping import"
+  fi
 fi
 
 exec node server.js

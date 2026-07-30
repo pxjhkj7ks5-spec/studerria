@@ -35,6 +35,7 @@ COPY --chown=nextjs:nodejs --from=builder /app/public ./public
 COPY --chown=nextjs:nodejs --from=builder /app/.next/standalone ./
 COPY --chown=nextjs:nodejs --from=builder /app/.next/static ./.next/static
 COPY --chown=nextjs:nodejs --from=builder /app/prisma ./prisma
+COPY --chown=nextjs:nodejs --from=builder /app/catalog ./catalog
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
 
 RUN chmod +x ./docker-entrypoint.sh \
