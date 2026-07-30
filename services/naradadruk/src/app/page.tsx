@@ -56,9 +56,6 @@ export default async function HomePage() {
     baseUrl: settings.telegramUrl,
     intent: "custom",
   });
-  const heroProduct = featuredProducts[0];
-  const heroImage = heroProduct?.coverImage?.urlPath ?? "/naradadruk-hero.webp";
-  const heroAlt = heroProduct?.coverImage?.alt || heroProduct?.title || "Ескіз і прототип функціонального кріплення";
 
   const processSteps = [
     {
@@ -113,14 +110,24 @@ export default async function HomePage() {
     <PublicFrame telegramUrl={settings.telegramUrl}>
       <main>
         <section className="hero-section">
+          <Image
+            src={withBasePath("/naradadruk-hero-v2.jpg")}
+            alt="Функціональні 3D-друковані вироби у світлій майстерні"
+            width={1717}
+            height={916}
+            loading="eager"
+            fetchPriority="high"
+            className="hero-section__image"
+          />
+          <div className="hero-section__veil" aria-hidden />
+
           <div className="site-container hero-layout">
             <div className="hero-copy">
-              <p className="eyebrow">3D-друк під вашу задачу</p>
-              <h1>Від ідеї до готової деталі.</h1>
+              <p className="eyebrow">Майстерня 3D-друку · Київ</p>
+              <h1>Речі, яких не було в готовому вигляді.</h1>
               <p className="hero-copy__body">
-                Персональний 3D-друк для дому, хобі та практичних задач.
-                Від прототипів до функціональних виробів — точно, швидко й
-                без зайвого процесу.
+                Перетворюємо ескіз, фото або ідею на точну функціональну
+                деталь. Один екземпляр чи мала серія — без зайвого процесу.
               </p>
 
               <div className="hero-actions">
@@ -132,7 +139,7 @@ export default async function HomePage() {
                   eventName="Custom Lead"
                   eventProps={{ location: "hero", intent: "custom" }}
                 >
-                  Надрукувати своє
+                  Розрахувати свій виріб
                   <ArrowRight aria-hidden size={18} />
                 </TrackedLink>
                 <TrackedLink
@@ -141,22 +148,16 @@ export default async function HomePage() {
                   eventName="Catalog Open"
                   eventProps={{ location: "hero", intent: "catalog" }}
                 >
-                  Переглянути каталог
+                  Дивитися готові рішення
                   <ArrowRight aria-hidden size={18} />
                 </TrackedLink>
               </div>
-            </div>
 
-            <div className="hero-visual">
-              <Image
-                src={withBasePath(heroImage)}
-                alt={heroAlt}
-                width={1600}
-                height={1000}
-                loading="eager"
-                fetchPriority="high"
-                className="hero-visual__image"
-              />
+              <div className="hero-proof" aria-label="Переваги майстерні">
+                <span>Від 1 деталі</span>
+                <span>PLA · PETG · TPU</span>
+                <span>Доставка по Україні</span>
+              </div>
             </div>
           </div>
         </section>
@@ -190,56 +191,22 @@ export default async function HomePage() {
                 <strong>{category.name}</strong>
                 <small>{category.publishedCount} позицій</small>
               </span>
+              <ArrowRight
+                className="category-dock__arrow"
+                aria-hidden
+                size={18}
+              />
             </TrackedLink>
           ))}
         </section>
 
-        <section className="site-section" id="process">
-          <div className="site-container">
-            <div className="section-heading section-heading--center">
-              <p className="eyebrow">Простий процес</p>
-              <h2>Як ми працюємо</h2>
-              <p>Від першого повідомлення до готового виробу — три зрозумілі кроки.</p>
-            </div>
-
-            <div className="process-grid">
-              {processSteps.map((step, index) => {
-                const Icon = step.icon;
-                return (
-                  <article key={step.title} className="process-step">
-                    <span className="process-step__icon">
-                      <Icon aria-hidden size={24} />
-                    </span>
-                    <p className="process-step__number">0{index + 1}</p>
-                    <h3>{step.title}</h3>
-                    <p>{step.body}</p>
-                    {index === 0 ? (
-                      <TrackedLink
-                        className="process-step__link"
-                        href={customUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        eventName="Custom Lead"
-                        eventProps={{ location: "process", intent: "custom" }}
-                        aria-label="Показати задачу в Telegram"
-                      >
-                        <ArrowRight aria-hidden size={20} />
-                      </TrackedLink>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="site-section site-section--compact">
+        <section className="site-section site-section--featured">
           <div className="site-container">
             <div className="section-heading section-heading--split">
               <div>
-                <p className="eyebrow">Каталог</p>
-                <h2>Готові рішення</h2>
-                <p>Популярні вироби, які вже можна замовити або взяти за основу.</p>
+                <p className="eyebrow">Вибір майстерні</p>
+                <h2>Вже продумані. Готові працювати.</h2>
+                <p>Практичні вироби, які можна замовити або адаптувати під себе.</p>
               </div>
               <TrackedLink
                 className="text-link"
@@ -288,12 +255,57 @@ export default async function HomePage() {
           </div>
         </section>
 
+        <section className="site-section site-section--process" id="process">
+          <div className="site-container process-layout">
+            <div className="section-heading">
+              <p className="eyebrow">Від задачі до деталі</p>
+              <h2>Три кроки. Без технічної бюрократії.</h2>
+              <p>Пишете як є — ми допомагаємо з матеріалом, моделлю та виробництвом.</p>
+            </div>
+
+            <div className="process-grid">
+              {processSteps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <article key={step.title} className="process-step">
+                    <div className="process-step__topline">
+                      <span className="process-step__icon">
+                        <Icon aria-hidden size={23} />
+                      </span>
+                      <p className="process-step__number">0{index + 1}</p>
+                    </div>
+                    <h3>{step.title}</h3>
+                    <p>{step.body}</p>
+                    {index === 0 ? (
+                      <TrackedLink
+                        className="process-step__link"
+                        href={customUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        eventName="Custom Lead"
+                        eventProps={{ location: "process", intent: "custom" }}
+                        aria-label="Показати задачу в Telegram"
+                      >
+                        Почати з повідомлення
+                        <ArrowRight aria-hidden size={18} />
+                      </TrackedLink>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         {showcaseImages.length > 0 ? (
-          <section className="site-section site-section--compact">
+          <section className="site-section site-section--showcase">
             <div className="site-container">
-              <div className="section-heading">
-                <p className="eyebrow">Реальні роботи</p>
-                <h2>Подивіться ближче</h2>
+              <div className="section-heading section-heading--split">
+                <div>
+                  <p className="eyebrow">Надруковано нами</p>
+                  <h2>Фактура, форма, результат.</h2>
+                </div>
+                <p>Живі приклади виробів із каталогу.</p>
               </div>
               <div className="showcase-grid">
                 {showcaseImages.map((image) => (

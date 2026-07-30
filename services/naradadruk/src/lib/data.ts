@@ -144,7 +144,7 @@ export async function getVisibleCategories() {
 }
 
 export async function getFeaturedProducts(limit = 6) {
-  const products = await prisma.product.findMany({
+  const featuredProducts = await prisma.product.findMany({
     where: {
       status: ProductStatus.published,
       isFeatured: true,
@@ -154,6 +154,19 @@ export async function getFeaturedProducts(limit = 6) {
     take: limit,
     orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
   });
+
+  const products =
+    featuredProducts.length > 0
+      ? featuredProducts
+      : await prisma.product.findMany({
+          where: {
+            status: ProductStatus.published,
+            category: { isVisible: true },
+          },
+          include: publicProductInclude,
+          take: limit,
+          orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+        });
 
   return products.map((product) => ({
     ...product,

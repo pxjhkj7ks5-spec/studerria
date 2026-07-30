@@ -15,12 +15,20 @@ export function SiteFooter({ telegramUrl }: SiteFooterProps) {
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
-        <div>
-          <div className="site-wordmark">Narada Druk</div>
+        <div className="site-footer__brand">
+          <div className="site-wordmark">
+            <span className="site-wordmark__mark" aria-hidden>
+              N
+            </span>
+            <span className="site-wordmark__text">
+              Narada
+              <small>druk</small>
+            </span>
+          </div>
           <p>
-            Каталог готових рішень і кастомного 3D-друку з прямим
-            замовленням у Telegram.
+            Функціональний 3D-друк від першого ескізу до готової деталі.
           </p>
+          <small className="site-footer__location">Київ · доставка по Україні</small>
         </div>
 
         <nav className="site-footer__nav" aria-label="Навігація у футері">

@@ -16,14 +16,24 @@ export function SiteHeader({ telegramUrl }: SiteHeaderProps) {
   return (
     <header className="site-header">
       <div className="site-header__inner">
-        <a className="site-wordmark" href={withBasePath("/")}>
-          Narada Druk
+        <a
+          className="site-wordmark"
+          href={withBasePath("/")}
+          aria-label="Narada Druk — головна"
+        >
+          <span className="site-wordmark__mark" aria-hidden>
+            N
+          </span>
+          <span className="site-wordmark__text">
+            Narada
+            <small>druk</small>
+          </span>
         </a>
 
         <nav className="site-nav" aria-label="Головна навігація">
           <a href={withBasePath("/catalog")}>Каталог</a>
-          <a href={withBasePath("/#process")}>Як замовити</a>
-          <a href={withBasePath("/#delivery")}>Доставка й оплата</a>
+          <a href={withBasePath("/#process")}>Як це працює</a>
+          <a href={withBasePath("/#delivery")}>Доставка</a>
         </nav>
 
         <TrackedLink
@@ -35,7 +45,7 @@ export function SiteHeader({ telegramUrl }: SiteHeaderProps) {
           eventProps={{ location: "header", intent: "custom" }}
         >
           <PaperPlaneTilt aria-hidden size={18} weight="fill" />
-          <span>Написати в Telegram</span>
+          <span>Розрахувати виріб</span>
         </TrackedLink>
       </div>
     </header>

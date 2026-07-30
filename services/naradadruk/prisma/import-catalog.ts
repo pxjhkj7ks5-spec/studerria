@@ -45,6 +45,14 @@ type CatalogPayload = {
   products: CatalogProduct[];
 };
 
+type ProductImageData = {
+  fileName: string;
+  urlPath: string;
+  alt: string;
+  sortOrder: number;
+  isCover: boolean;
+};
+
 const prisma = new PrismaClient();
 const serviceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const catalogFile = path.resolve(
@@ -90,7 +98,7 @@ async function importProduct(
     throw new Error(`Unknown category "${product.categorySlug}" for "${product.title}".`);
   }
 
-  const imageData = [];
+  const imageData: ProductImageData[] = [];
 
   for (const image of product.images) {
     const sourcePath = resolveCatalogImage(image.localPath);

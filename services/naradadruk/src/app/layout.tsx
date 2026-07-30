@@ -10,6 +10,7 @@ import {
   siteShareTitle,
 } from "@/lib/constants";
 import "./globals.css";
+import "./storefront.css";
 
 const bodyFont = Manrope({
   subsets: ["latin", "cyrillic"],
