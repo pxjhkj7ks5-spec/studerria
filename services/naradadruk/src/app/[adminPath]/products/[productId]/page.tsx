@@ -56,6 +56,16 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
         </div>
 
         <div className="flex flex-wrap gap-3">
+          {product.sourceTelegramUrl ? (
+            <a
+              className="ghost-pill"
+              href={product.sourceTelegramUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Вихідний допис
+            </a>
+          ) : null}
           <a className="ghost-pill" href={withBasePath(`/product/${product.slug}`)} target="_blank" rel="noreferrer">
             Відкрити публічну сторінку
           </a>

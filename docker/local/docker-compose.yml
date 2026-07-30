@@ -172,6 +172,9 @@ services:
       ADMIN_PASSWORD: ${NARADADRUK_ADMIN_PASSWORD:-change-me-naradadruk-admin}
       SESSION_SECRET: ${NARADADRUK_SESSION_SECRET:-change-me-naradadruk-session-secret-change-this}
       TELEGRAM_CHANNEL_URL: ${NARADADRUK_TELEGRAM_CHANNEL_URL:-https://web.telegram.org/k/#@naradaprint}
+      TELEGRAM_AUTO_IMPORT_ENABLED: ${NARADADRUK_TELEGRAM_AUTO_IMPORT_ENABLED:-true}
+      TELEGRAM_CHANNEL_USERNAME: ${NARADADRUK_TELEGRAM_CHANNEL_USERNAME:-naradaprint}
+      TELEGRAM_POLL_INTERVAL_MS: ${NARADADRUK_TELEGRAM_POLL_INTERVAL_MS:-300000}
     volumes:
       - naradadruk_data:/data
     read_only: true

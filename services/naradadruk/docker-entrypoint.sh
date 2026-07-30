@@ -47,4 +47,14 @@ if [ -f "$CATALOG_FILE" ]; then
   fi
 fi
 
+case "${TELEGRAM_AUTO_IMPORT_ENABLED:-true}" in
+  0|false|FALSE|no|NO|off|OFF)
+    echo "[entrypoint] Telegram catalog sync disabled"
+    ;;
+  *)
+    echo "[entrypoint] starting Telegram catalog sync"
+    ./node_modules/.bin/tsx scripts/telegram-catalog-worker.ts &
+    ;;
+esac
+
 exec node server.js

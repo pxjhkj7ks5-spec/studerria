@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/admin";
 import { LoginForm } from "@/components/admin/login-form";
 import { SubmitButton } from "@/components/admin/submit-button";
+import { telegramProductTemplate } from "@/lib/telegram-product-template";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,18 @@ function Message({ ok, error }: { ok?: string; error?: string }) {
   return null;
 }
 
+function formatSyncDate(value?: Date | null) {
+  if (!value) {
+    return "Ще не запускалась";
+  }
+
+  return new Intl.DateTimeFormat("uk-UA", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "Europe/Kyiv",
+  }).format(value);
+}
+
 export default async function AdminPage({ params, searchParams }: AdminPageProps) {
   const [{ adminPath }, query] = await Promise.all([params, searchParams]);
   assertAdminPath(adminPath);
@@ -43,7 +56,8 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
     );
   }
 
-  const { categories, products, settings } = await getAdminDashboardData();
+  const { categories, products, settings, telegramAutomation } =
+    await getAdminDashboardData();
 
   return (
     <main className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-6 md:py-8">
@@ -206,6 +220,129 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
         </section>
 
         <section className="grid gap-6">
+          <div className="glass-panel rounded-[2rem] p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">
+                  Telegram → каталог
+                </p>
+                <h2 className="mt-2 font-display text-3xl tracking-[-0.05em] text-white">
+                  Автоматичний імпорт
+                </h2>
+              </div>
+              <span
+                className={
+                  telegramAutomation.enabled
+                    ? "rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-200"
+                    : "rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100"
+                }
+              >
+                {telegramAutomation.enabled ? "Активний" : "Вимкнений"}
+              </span>
+            </div>
+
+            <p className="mt-4 text-sm leading-7 text-[--muted]">
+              Канал @{telegramAutomation.channel} перевіряється автоматично. Допис із
+              маркером <strong className="text-white">#товар</strong> стає товаром,
+              звичайні повідомлення ігноруються. Поле «Публікація: так» одразу показує
+              повністю заповнений товар у каталозі; без нього створюється чернетка.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-[--muted]">
+                  Остання перевірка
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white">
+                  {formatSyncDate(telegramAutomation.sync?.lastCheckedAt)}
+                </div>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-[--muted]">
+                  Останній допис
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white">
+                  {telegramAutomation.sync?.lastSeenMessageId
+                    ? `#${telegramAutomation.sync.lastSeenMessageId}`
+                    : "Ще немає"}
+                </div>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-[--muted]">
+                  Імпортовано
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white">
+                  {telegramAutomation.sync?.importedCount ?? 0}
+                </div>
+              </div>
+            </div>
+
+            {telegramAutomation.sync?.lastError ? (
+              <div className="status-message status-message--error mt-4">
+                {telegramAutomation.sync.lastError}
+              </div>
+            ) : null}
+
+            <div className="mt-6">
+              <div className="text-xs uppercase tracking-[0.2em] text-[--muted]">
+                Шаблон допису
+              </div>
+              <textarea
+                aria-label="Шаблон Telegram-допису для товару"
+                readOnly
+                value={telegramProductTemplate}
+                className="mt-3 min-h-72 w-full resize-y rounded-[1.5rem] border border-white/10 bg-black/20 p-4 font-mono text-sm leading-6 text-white outline-none"
+              />
+              <p className="mt-3 text-xs leading-6 text-[--muted]">
+                Додайте до допису хоча б одне фото. Доступні категорії:{" "}
+                {categories.map((category) => category.name).join(", ")}. Для кількох
+                цін замініть «Ціна» на блок «Варіанти:» і рядки формату
+                «Чорний — 350 грн».
+              </p>
+            </div>
+
+            {telegramAutomation.recentImports.length > 0 ? (
+              <div className="mt-6 grid gap-3">
+                <div className="text-xs uppercase tracking-[0.2em] text-[--muted]">
+                  Останні спроби
+                </div>
+                {telegramAutomation.recentImports.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <a
+                        href={item.messageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-semibold text-white transition hover:text-[--accent]"
+                      >
+                        {item.title || `Telegram #${item.messageId}`}
+                      </a>
+                      <span className="text-xs uppercase tracking-[0.18em] text-[--muted]">
+                        {item.status === "imported" ? "Імпортовано" : "Потрібне виправлення"}
+                      </span>
+                    </div>
+                    {item.error ? (
+                      <p className="mt-2 text-xs leading-6 text-rose-200">{item.error}</p>
+                    ) : null}
+                    {item.product ? (
+                      <a
+                        className="mt-3 inline-flex text-xs font-semibold text-[--accent]"
+                        href={withBasePath(
+                          `${getAdminRoute()}/products/${item.product.id}`,
+                        )}
+                      >
+                        Відкрити товар
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           <div className="glass-panel rounded-[2rem] p-6">
             <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">Новий товар</p>
             <h2 className="mt-2 font-display text-3xl tracking-[-0.05em] text-white">Створити чернетку</h2>

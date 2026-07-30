@@ -37,6 +37,12 @@ type CatalogProduct = {
     sortOrder: number;
     isCover: boolean;
   }>;
+  source?: {
+    channel: string;
+    messageId: number;
+    messageUrl: string;
+    publishedAt: string | null;
+  };
 };
 
 type CatalogPayload = {
@@ -132,6 +138,12 @@ async function importProduct(
         deliveryNote: product.deliveryNote,
         paymentNote: product.paymentNote,
         sortOrder: product.sortOrder,
+        sourceTelegramChannel: product.source?.channel ?? null,
+        sourceTelegramMessageId: product.source?.messageId ?? null,
+        sourceTelegramUrl: product.source?.messageUrl ?? "",
+        sourceTelegramPublishedAt: product.source?.publishedAt
+          ? new Date(product.source.publishedAt)
+          : null,
       },
       create: {
         title: product.title,
@@ -148,6 +160,12 @@ async function importProduct(
         deliveryNote: product.deliveryNote,
         paymentNote: product.paymentNote,
         sortOrder: product.sortOrder,
+        sourceTelegramChannel: product.source?.channel ?? null,
+        sourceTelegramMessageId: product.source?.messageId ?? null,
+        sourceTelegramUrl: product.source?.messageUrl ?? "",
+        sourceTelegramPublishedAt: product.source?.publishedAt
+          ? new Date(product.source.publishedAt)
+          : null,
       },
     });
 

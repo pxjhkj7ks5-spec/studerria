@@ -12,20 +12,25 @@ enum ProductStatus {
   published
 }
 
+enum TelegramImportStatus {
+  imported
+  failed
+}
+
 model SiteSetting {
-  id             Int      @id
-  heroTitle      String
-  heroSubtitle   String
-  supportTitle   String
-  supportBody    String
-  materialsNote  String
-  leadTimeNote   String
-  deliveryNote   String
-  paymentNote    String
-  telegramUrl    String
-  contactNote    String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            Int      @id
+  heroTitle     String
+  heroSubtitle  String
+  supportTitle  String
+  supportBody   String
+  materialsNote String
+  leadTimeNote  String
+  deliveryNote  String
+  paymentNote   String
+  telegramUrl   String
+  contactNote   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Category {
@@ -41,26 +46,33 @@ model Category {
 }
 
 model Product {
-  id               Int            @id @default(autoincrement())
-  title            String
-  slug             String         @unique
-  categoryId       Int
-  shortDescription String         @default("")
-  fullDescription  String         @default("")
-  status           ProductStatus  @default(draft)
-  isFeatured       Boolean        @default(false)
-  basePrice        Int?
-  priceFrom        Boolean        @default(false)
-  leadTime         String         @default("")
-  materialNote     String         @default("")
-  deliveryNote     String         @default("")
-  paymentNote      String         @default("")
-  sortOrder        Int            @default(0)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  category         Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  variants         ProductVariant[]
-  images           ProductImage[]
+  id                        Int                 @id @default(autoincrement())
+  title                     String
+  slug                      String              @unique
+  categoryId                Int
+  shortDescription          String              @default("")
+  fullDescription           String              @default("")
+  status                    ProductStatus       @default(draft)
+  isFeatured                Boolean             @default(false)
+  basePrice                 Int?
+  priceFrom                 Boolean             @default(false)
+  leadTime                  String              @default("")
+  materialNote              String              @default("")
+  deliveryNote              String              @default("")
+  paymentNote               String              @default("")
+  sortOrder                 Int                 @default(0)
+  sourceTelegramChannel     String?
+  sourceTelegramMessageId   Int?
+  sourceTelegramUrl         String              @default("")
+  sourceTelegramPublishedAt DateTime?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  category                  Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants                  ProductVariant[]
+  images                    ProductImage[]
+  telegramImport            TelegramPostImport?
+
+  @@unique([sourceTelegramChannel, sourceTelegramMessageId])
 }
 
 model ProductVariant {
@@ -86,4 +98,33 @@ model ProductImage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model TelegramChannelSync {
+  channel           String    @id
+  lastSeenMessageId Int       @default(0)
+  lastCheckedAt     DateTime?
+  lastSuccessfulAt  DateTime?
+  lastError         String    @default("")
+  importedCount     Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model TelegramPostImport {
+  id          Int                  @id @default(autoincrement())
+  channel     String
+  messageId   Int
+  messageUrl  String
+  contentHash String
+  title       String               @default("")
+  status      TelegramImportStatus
+  error       String               @default("")
+  productId   Int?                 @unique
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  product     Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@unique([channel, messageId])
+  @@index([status, updatedAt])
 }

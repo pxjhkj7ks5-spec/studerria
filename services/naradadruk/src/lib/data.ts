@@ -287,7 +287,10 @@ export async function getRelatedProducts(
 }
 
 export async function getAdminDashboardData() {
-  const [settings, categories, products] = await Promise.all([
+  const telegramChannel = (process.env.TELEGRAM_CHANNEL_USERNAME || "naradaprint")
+    .trim()
+    .replace(/^@/, "");
+  const [settings, categories, products, telegramSync, recentTelegramImports] = await Promise.all([
     getSiteSettings(),
     prisma.category.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -311,6 +314,23 @@ export async function getAdminDashboardData() {
       },
       orderBy: [{ updatedAt: "desc" }],
     }),
+    prisma.telegramChannelSync.findUnique({
+      where: { channel: telegramChannel },
+    }),
+    prisma.telegramPostImport.findMany({
+      where: { channel: telegramChannel },
+      include: {
+        product: {
+          select: {
+            id: true,
+            slug: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 8,
+    }),
   ]);
 
   return {
@@ -321,6 +341,14 @@ export async function getAdminDashboardData() {
       coverImage: resolveCoverImage(product),
       priceLabel: resolveProductPrice(product),
     })),
+    telegramAutomation: {
+      channel: telegramChannel,
+      enabled: !/^(0|false|no|off)$/i.test(
+        process.env.TELEGRAM_AUTO_IMPORT_ENABLED || "true",
+      ),
+      sync: telegramSync,
+      recentImports: recentTelegramImports,
+    },
   };
 }
 
