@@ -110,24 +110,14 @@ export default async function HomePage() {
     <PublicFrame telegramUrl={settings.telegramUrl}>
       <main>
         <section className="hero-section">
-          <Image
-            src={withBasePath("/naradadruk-hero-v2.jpg")}
-            alt="Функціональні 3D-друковані вироби у світлій майстерні"
-            width={1717}
-            height={916}
-            loading="eager"
-            fetchPriority="high"
-            className="hero-section__image"
-          />
-          <div className="hero-section__veil" aria-hidden />
-
           <div className="site-container hero-layout">
             <div className="hero-copy">
-              <p className="eyebrow">Майстерня 3D-друку · Київ</p>
-              <h1>Речі, яких не було в готовому вигляді.</h1>
+              <p className="eyebrow">3D-друк під вашу задачу</p>
+              <h1>Від ідеї до готової деталі.</h1>
               <p className="hero-copy__body">
-                Перетворюємо ескіз, фото або ідею на точну функціональну
-                деталь. Один екземпляр чи мала серія — без зайвого процесу.
+                Персональний 3D-друк для дому, хобі та практичних задач.
+                Від прототипу до функціонального виробу — точно, швидко й без
+                зайвого процесу.
               </p>
 
               <div className="hero-actions">
@@ -139,7 +129,7 @@ export default async function HomePage() {
                   eventName="Custom Lead"
                   eventProps={{ location: "hero", intent: "custom" }}
                 >
-                  Розрахувати свій виріб
+                  Надрукувати своє
                   <ArrowRight aria-hidden size={18} />
                 </TrackedLink>
                 <TrackedLink
@@ -148,16 +138,22 @@ export default async function HomePage() {
                   eventName="Catalog Open"
                   eventProps={{ location: "hero", intent: "catalog" }}
                 >
-                  Дивитися готові рішення
+                  Переглянути каталог
                   <ArrowRight aria-hidden size={18} />
                 </TrackedLink>
               </div>
+            </div>
 
-              <div className="hero-proof" aria-label="Переваги майстерні">
-                <span>Від 1 деталі</span>
-                <span>PLA · PETG · TPU</span>
-                <span>Доставка по Україні</span>
-              </div>
+            <div className="hero-visual">
+              <Image
+                src={withBasePath("/naradadruk-hero.webp")}
+                alt="Ескіз і готова 3D-друкована деталь"
+                width={1600}
+                height={1000}
+                loading="eager"
+                fetchPriority="high"
+                className="hero-visual__image"
+              />
             </div>
           </div>
         </section>
