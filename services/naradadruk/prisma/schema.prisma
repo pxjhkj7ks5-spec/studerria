@@ -128,3 +128,19 @@ model TelegramPostImport {
   @@unique([channel, messageId])
   @@index([status, updatedAt])
 }
+
+model AnalyticsEvent {
+  id          Int      @id @default(autoincrement())
+  name        String
+  path        String   @default("")
+  location    String   @default("")
+  intent      String   @default("")
+  productSlug String   @default("")
+  category    String   @default("")
+  sessionId   String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([name, createdAt])
+  @@index([productSlug, createdAt])
+}

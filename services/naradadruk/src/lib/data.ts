@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { defaultTelegramUrl } from "@/lib/constants";
 import { deleteUploadFile } from "@/lib/storage";
 import { formatPrice, slugify } from "@/lib/utils";
+import {
+  buildAnalyticsReport,
+  getAnalyticsQueryStart,
+  type AnalyticsRange,
+} from "@/lib/analytics-report";
 
 const publicProductInclude = {
   category: true,
@@ -286,11 +291,15 @@ export async function getRelatedProducts(
   }));
 }
 
-export async function getAdminDashboardData() {
+export async function getAdminDashboardData(input?: {
+  analyticsRange?: AnalyticsRange;
+}) {
   const telegramChannel = (process.env.TELEGRAM_CHANNEL_USERNAME || "naradaprint")
     .trim()
     .replace(/^@/, "");
-  const [settings, categories, products, telegramSync, recentTelegramImports] = await Promise.all([
+  const analyticsRange = input?.analyticsRange ?? 30;
+  const analyticsNow = new Date();
+  const [settings, categories, products, telegramSync, recentTelegramImports, analyticsEvents] = await Promise.all([
     getSiteSettings(),
     prisma.category.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -331,6 +340,15 @@ export async function getAdminDashboardData() {
       orderBy: [{ updatedAt: "desc" }],
       take: 8,
     }),
+    prisma.analyticsEvent.findMany({
+      where: {
+        createdAt: {
+          gte: getAnalyticsQueryStart(analyticsRange, analyticsNow),
+        },
+      },
+      orderBy: [{ createdAt: "desc" }],
+      take: 100_000,
+    }),
   ]);
 
   return {
@@ -349,6 +367,11 @@ export async function getAdminDashboardData() {
       sync: telegramSync,
       recentImports: recentTelegramImports,
     },
+    analytics: buildAnalyticsReport(
+      analyticsEvents,
+      analyticsRange,
+      analyticsNow,
+    ),
   };
 }
 

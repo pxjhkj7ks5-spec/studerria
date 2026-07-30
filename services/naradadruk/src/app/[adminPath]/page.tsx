@@ -11,13 +11,15 @@ import {
 } from "@/app/actions/admin";
 import { LoginForm } from "@/components/admin/login-form";
 import { SubmitButton } from "@/components/admin/submit-button";
+import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { telegramProductTemplate } from "@/lib/telegram-product-template";
+import { parseAnalyticsRange } from "@/lib/analytics-report";
 
 export const dynamic = "force-dynamic";
 
 type AdminPageProps = {
   params: Promise<{ adminPath: string }>;
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ ok?: string; error?: string; range?: string }>;
 };
 
 function Message({ ok, error }: { ok?: string; error?: string }) {
@@ -56,21 +58,31 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
     );
   }
 
-  const { categories, products, settings, telegramAutomation } =
-    await getAdminDashboardData();
+  const analyticsRange = parseAnalyticsRange(query.range);
+  const { categories, products, settings, telegramAutomation, analytics } =
+    await getAdminDashboardData({ analyticsRange });
+  const productTitles = Object.fromEntries(
+    products.map((product) => [product.slug, product.title]),
+  );
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-6 md:py-8">
-      <div className="flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-[--accent]">Narada Druk admin</p>
-          <h1 className="mt-3 font-display text-5xl tracking-[-0.06em] text-white">Керування каталогом</h1>
-          <p className="mt-3 max-w-[60ch] text-sm leading-7 text-[--muted]">
-            Окрема адмінка для storefront-текстів, категорій, товарів, варіантів і зображень.
-          </p>
+    <main className="admin-main mx-auto w-full max-w-[1440px] px-4 py-4 md:px-6 md:py-6">
+      <header className="admin-topbar">
+        <div className="admin-brand">
+          <span className="admin-brand__mark" aria-hidden>N</span>
+          <span>
+            <strong>Narada Druk</strong>
+            <small>Адміністрування</small>
+          </span>
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <nav className="admin-nav" aria-label="Розділи адмінки">
+          <a href="#analytics">Статистика</a>
+          <a href="#products">Товари</a>
+          <a href="#storefront">Вітрина</a>
+        </nav>
+
+        <div className="admin-topbar__actions">
           <a className="ghost-pill" href={withBasePath("/catalog")}>
             Відкрити каталог
           </a>
@@ -80,15 +92,26 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
             </button>
           </form>
         </div>
+      </header>
+
+      <div className="admin-intro">
+        <p className="admin-kicker">Narada Druk admin</p>
+        <h1>Огляд та керування</h1>
+        <p>
+          Реальна активність відвідувачів, стан каталогу та всі налаштування
+          в одному робочому просторі.
+        </p>
       </div>
 
       <div className="mt-6">
         <Message ok={query.ok} error={query.error} />
       </div>
 
+      <AnalyticsDashboard report={analytics} productTitles={productTitles} />
+
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.56fr_0.44fr]">
         <section className="grid gap-6">
-          <div className="glass-panel rounded-[2rem] p-6">
+          <div className="glass-panel rounded-[2rem] p-6" id="storefront">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">Storefront</p>
@@ -369,7 +392,7 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
             </form>
           </div>
 
-          <div className="glass-panel rounded-[2rem] p-6">
+          <div className="glass-panel rounded-[2rem] p-6" id="products">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">Товари</p>
