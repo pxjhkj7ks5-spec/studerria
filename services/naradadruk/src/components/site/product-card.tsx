@@ -1,5 +1,8 @@
 import Image from "next/image";
 import { withBasePath } from "@/lib/base-path";
+import { siteBaseUrl } from "@/lib/constants";
+import { buildTelegramLink } from "@/lib/telegram";
+import { TrackedLink } from "@/components/site/tracked-link";
 
 type ProductCardProps = {
   product: {
@@ -12,12 +15,35 @@ type ProductCardProps = {
     coverImage: { urlPath: string; alt: string } | null;
   };
   telegramUrl: string;
+  priority?: boolean;
 };
 
-export function ProductCard({ product, telegramUrl }: ProductCardProps) {
+export function ProductCard({
+  product,
+  telegramUrl,
+  priority = false,
+}: ProductCardProps) {
+  const productPath = withBasePath(`/product/${product.slug}`);
+  const productUrl = new URL(productPath, siteBaseUrl).toString();
+  const orderUrl = buildTelegramLink({
+    baseUrl: telegramUrl,
+    intent: "product",
+    productTitle: product.title,
+    productUrl,
+  });
+
   return (
-    <article className="interactive-card product-card-shell group grid gap-4 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 md:p-5">
-      <a className="product-media block overflow-hidden rounded-[1.5rem] bg-[--surface-strong]" href={withBasePath(`/product/${product.slug}`)}>
+    <article className="product-card group">
+      <TrackedLink
+        className="product-card__media"
+        href={productPath}
+        eventName="Product Open"
+        eventProps={{
+          location: "product-card-image",
+          product_slug: product.slug,
+          category: product.category.name,
+        }}
+      >
         {product.coverImage ? (
           <Image
             src={withBasePath(product.coverImage.urlPath)}
@@ -25,41 +51,55 @@ export function ProductCard({ product, telegramUrl }: ProductCardProps) {
             width={1200}
             height={900}
             unoptimized
-            className="aspect-[4/3] h-full w-full object-cover"
+            priority={priority}
+            className="product-card__image"
           />
         ) : (
-          <div className="product-placeholder aspect-[4/3] h-full w-full">
+          <div className="product-placeholder">
             <span>{product.category.name}</span>
           </div>
         )}
-      </a>
+      </TrackedLink>
 
-      <div className="grid gap-3">
-        <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-[--muted]">
+      <div className="product-card__body">
+        <div className="product-card__meta">
           <span>{product.category.name}</span>
           {product.leadTime ? <span>{product.leadTime}</span> : null}
         </div>
 
         <div>
-          <a
-            href={withBasePath(`/product/${product.slug}`)}
-            className="product-title-link font-display text-2xl tracking-[-0.05em] text-white"
+          <TrackedLink
+            href={productPath}
+            className="product-card__title"
+            eventName="Product Open"
+            eventProps={{
+              location: "product-card-title",
+              product_slug: product.slug,
+              category: product.category.name,
+            }}
           >
             {product.title}
-          </a>
-          <p className="mt-2 line-clamp-3 text-sm leading-6 text-[--muted]">{product.shortDescription}</p>
+          </TrackedLink>
+          <p className="product-card__description">{product.shortDescription}</p>
         </div>
 
-        <div className="flex items-end justify-between gap-3">
-          <p className="text-lg font-semibold text-white">{product.priceLabel}</p>
-          <div className="flex flex-wrap gap-2">
-            <a className="ghost-pill" href={withBasePath(`/product/${product.slug}`)}>
-              Деталі
-            </a>
-            <a className="accent-pill" href={telegramUrl} target="_blank" rel="noreferrer">
-              Замовити
-            </a>
-          </div>
+        <div className="product-card__footer">
+          <p className="product-card__price">{product.priceLabel}</p>
+          <TrackedLink
+            className="accent-pill"
+            href={orderUrl}
+            target="_blank"
+            rel="noreferrer"
+            eventName="Telegram Lead"
+            eventProps={{
+              location: "product-card",
+              intent: "product",
+              product_slug: product.slug,
+              category: product.category.name,
+            }}
+          >
+            Замовити
+          </TrackedLink>
         </div>
       </div>
     </article>

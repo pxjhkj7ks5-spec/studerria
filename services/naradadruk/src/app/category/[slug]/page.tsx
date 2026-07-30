@@ -1,7 +1,16 @@
+import { ArrowLeft, ArrowRight } from "@phosphor-icons/react/ssr";
 import { notFound } from "next/navigation";
 import { ProductCard } from "@/components/site/product-card";
-import { getCatalogProducts, getCategoryBySlug, getSiteSettings, getVisibleCategories } from "@/lib/data";
+import { PublicFrame } from "@/components/site/public-frame";
+import { TrackedLink } from "@/components/site/tracked-link";
+import {
+  getCatalogProducts,
+  getCategoryBySlug,
+  getSiteSettings,
+  getVisibleCategories,
+} from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
+import { buildTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -24,55 +33,105 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     notFound();
   }
 
+  const customUrl = buildTelegramLink({
+    baseUrl: settings.telegramUrl,
+    intent: "custom",
+  });
+
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-4 py-8 md:px-6 md:py-10">
-      <a className="reveal-up delay-1 text-sm text-[--muted] transition hover:text-white" href={withBasePath("/catalog")}>
-        Повернутися до каталогу
-      </a>
+    <PublicFrame telegramUrl={settings.telegramUrl}>
+      <main className="catalog-page">
+        <section className="site-container category-hero">
+          <a className="back-link" href={withBasePath("/catalog")}>
+            <ArrowLeft aria-hidden size={18} />
+            Увесь каталог
+          </a>
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[0.34fr_0.66fr]">
-        <aside className="glass-panel reveal-up delay-2 h-fit rounded-[2rem] p-5">
-          <p className="text-xs uppercase tracking-[0.32em] text-[--accent]">Категорія</p>
-          <h1 className="mt-3 font-display text-5xl tracking-[-0.06em] text-white">{category.name}</h1>
-          <p className="mt-4 text-sm leading-7 text-[--muted]">{category.description}</p>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <a className="accent-pill" href={settings.telegramUrl} target="_blank" rel="noreferrer">
-              Замовити
-            </a>
-            <a className="ghost-pill" href={withBasePath("/catalog")}>
-              Увесь каталог
-            </a>
+          <div className="category-hero__body">
+            <div>
+              <p className="eyebrow">Категорія</p>
+              <h1>{category.name}</h1>
+              <p>{category.description}</p>
+            </div>
+            <TrackedLink
+              className="accent-pill accent-pill--large"
+              href={customUrl}
+              target="_blank"
+              rel="noreferrer"
+              eventName="Custom Lead"
+              eventProps={{ location: "category-hero", intent: "custom", category: category.slug }}
+            >
+              Потрібен свій варіант
+              <ArrowRight aria-hidden size={18} />
+            </TrackedLink>
           </div>
+        </section>
 
-          <div className="stagger-list mt-8 grid gap-3 border-t border-white/10 pt-6">
+        <section className="site-container catalog-toolbar catalog-toolbar--category">
+          <div className="category-chips" aria-label="Інші категорії">
             {categories.map((item) => (
-              <a
+              <TrackedLink
                 key={item.id}
-                href={withBasePath(`/category/${item.slug}`)}
-                className={`interactive-card rounded-[1.25rem] border px-4 py-3 transition ${
+                className={
                   item.slug === category.slug
-                    ? "border-[rgba(255,156,74,0.45)] bg-[rgba(255,156,74,0.08)]"
-                    : "border-white/10 bg-white/[0.03] hover:border-white/20"
-                }`}
+                    ? "category-chip is-active"
+                    : "category-chip"
+                }
+                href={withBasePath(`/category/${item.slug}`)}
+                eventName="Catalog Filter"
+                eventProps={{
+                  location: "category-chip",
+                  category: item.slug,
+                }}
               >
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-white">{item.name}</span>
-                  <span className="text-xs uppercase tracking-[0.2em] text-[--muted]">{item.publishedCount}</span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </aside>
-
-        <section className="self-start">
-          <div className="stagger-grid grid gap-5 xl:grid-cols-2">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} telegramUrl={settings.telegramUrl} />
+                {item.name}
+                <span>{item.publishedCount}</span>
+              </TrackedLink>
             ))}
           </div>
         </section>
-      </div>
-    </main>
+
+        <section className="site-container catalog-results">
+          <div className="catalog-results__heading">
+            <h2>Товари категорії</h2>
+            <p>{products.length} позицій</p>
+          </div>
+
+          {products.length > 0 ? (
+            <div className="product-grid">
+              {products.map((product, index) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  telegramUrl={settings.telegramUrl}
+                  priority={index === 0}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-catalog empty-catalog--light">
+              <div>
+                <p className="eyebrow">Категорія наповнюється</p>
+                <h3>Можемо зробити потрібне індивідуально.</h3>
+                <p>
+                  Надішліть опис або приклад — уточнимо матеріал, термін і
+                  вартість до початку друку.
+                </p>
+              </div>
+              <TrackedLink
+                className="accent-pill"
+                href={customUrl}
+                target="_blank"
+                rel="noreferrer"
+                eventName="Custom Lead"
+                eventProps={{ location: "category-empty", intent: "custom", category: category.slug }}
+              >
+                Написати в Telegram
+              </TrackedLink>
+            </div>
+          )}
+        </section>
+      </main>
+    </PublicFrame>
   );
 }

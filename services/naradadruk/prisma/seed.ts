@@ -18,7 +18,7 @@ async function main() {
       leadTimeNote: "Від кількох годин до 3 днів залежно від складності.",
       deliveryNote: "Доставка по Україні, самовивіз у Києві.",
       paymentNote: "Оплата на картку: часткова або повна передплата.",
-      telegramUrl: process.env.TELEGRAM_CHANNEL_URL || "https://web.telegram.org/k/#@naradaprint",
+      telegramUrl: process.env.TELEGRAM_CHANNEL_URL || "https://t.me/naradaprint",
       contactNote: "Для індивідуального виробу надішліть опис або фото прикладу в Telegram.",
     },
   });

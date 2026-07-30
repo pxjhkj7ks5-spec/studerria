@@ -96,7 +96,7 @@ export async function getSiteSettings() {
 }
 
 export async function getVisibleCategories() {
-  const [categories, counts] = await Promise.all([
+  const [categories, counts, representativeProducts] = await Promise.all([
     prisma.category.findMany({
       where: { isVisible: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -106,13 +106,40 @@ export async function getVisibleCategories() {
       where: { status: ProductStatus.published },
       _count: { _all: true },
     }),
+    prisma.product.findMany({
+      where: {
+        status: ProductStatus.published,
+        category: { isVisible: true },
+        images: { some: {} },
+      },
+      include: {
+        images: {
+          orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { id: "asc" }],
+          take: 1,
+        },
+      },
+      orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
+    }),
   ]);
 
   const countMap = new Map(counts.map((entry) => [entry.categoryId, entry._count._all]));
+  const imageMap = new Map<number, { urlPath: string; alt: string }>();
+
+  for (const product of representativeProducts) {
+    const image = product.images[0];
+
+    if (image && !imageMap.has(product.categoryId)) {
+      imageMap.set(product.categoryId, {
+        urlPath: image.urlPath,
+        alt: image.alt || product.title,
+      });
+    }
+  }
 
   return categories.map((category) => ({
     ...category,
     publishedCount: countMap.get(category.id) ?? 0,
+    representativeImage: imageMap.get(category.id) ?? null,
   }));
 }
 
@@ -196,6 +223,54 @@ export async function getProductBySlug(slug: string) {
     priceLabel: resolveProductPrice(product),
     telegramUrl: getTelegramUrl((await getSiteSettings()).telegramUrl),
   };
+}
+
+export async function getShowcaseImages(limit = 6) {
+  return prisma.productImage.findMany({
+    where: {
+      product: {
+        status: ProductStatus.published,
+        category: { isVisible: true },
+      },
+    },
+    include: {
+      product: {
+        select: {
+          title: true,
+          slug: true,
+          category: {
+            select: { name: true },
+          },
+        },
+      },
+    },
+    orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+    take: limit,
+  });
+}
+
+export async function getRelatedProducts(
+  categoryId: number,
+  excludeProductId: number,
+  limit = 4,
+) {
+  const products = await prisma.product.findMany({
+    where: {
+      id: { not: excludeProductId },
+      categoryId,
+      status: ProductStatus.published,
+      category: { isVisible: true },
+    },
+    include: publicProductInclude,
+    orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
+    take: limit,
+  });
+
+  return products.map((product) => ({
+    ...product,
+    coverImage: resolveCoverImage(product),
+    priceLabel: resolveProductPrice(product),
+  }));
 }
 
 export async function getAdminDashboardData() {

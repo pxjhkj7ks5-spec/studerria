@@ -1,32 +1,47 @@
 import { withBasePath } from "@/lib/base-path";
+import { buildTelegramLink } from "@/lib/telegram";
+import { TrackedLink } from "@/components/site/tracked-link";
 
-export function SiteFooter() {
+type SiteFooterProps = {
+  telegramUrl: string;
+};
+
+export function SiteFooter({ telegramUrl }: SiteFooterProps) {
+  const customUrl = buildTelegramLink({
+    baseUrl: telegramUrl,
+    intent: "custom",
+  });
+
   return (
-    <footer className="relative z-10 mt-16 border-t border-white/10">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-4 py-8 text-sm text-[--muted] md:flex-row md:items-center md:justify-between md:px-6">
+    <footer className="site-footer">
+      <div className="site-footer__inner">
         <div>
-          <div className="font-display text-base text-white">Narada Druk</div>
-          <p className="mt-1 max-w-[48ch]">
-            Каталог готових рішень і кастомного 3D друку з прямим переходом у Telegram.
+          <div className="site-wordmark">Narada Druk</div>
+          <p>
+            Каталог готових рішень і кастомного 3D-друку з прямим
+            замовленням у Telegram.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
-          <a className="footer-link transition hover:text-white" href={withBasePath("/")}>
+        <nav className="site-footer__nav" aria-label="Навігація у футері">
+          <a href={withBasePath("/")}>
             Головна
           </a>
-          <a className="footer-link transition hover:text-white" href={withBasePath("/catalog")}>
+          <a href={withBasePath("/catalog")}>
             Каталог
           </a>
-          <a
-            className="footer-link transition hover:text-white"
-            href="https://web.telegram.org/k/#@naradaprint"
+          <a href={withBasePath("/#process")}>Як замовити</a>
+          <a href={withBasePath("/#delivery")}>Доставка й оплата</a>
+          <TrackedLink
+            href={customUrl}
             target="_blank"
             rel="noreferrer"
+            eventName="Custom Lead"
+            eventProps={{ location: "footer", intent: "custom" }}
           >
             Telegram
-          </a>
-        </div>
+          </TrackedLink>
+        </nav>
       </div>
     </footer>
   );

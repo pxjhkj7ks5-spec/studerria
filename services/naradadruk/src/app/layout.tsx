@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Manrope, Outfit } from "next/font/google";
-import { SiteFooter } from "@/components/site/site-footer";
+import { Manrope } from "next/font/google";
+import { AnalyticsScript } from "@/components/site/analytics-script";
 import {
   siteBaseUrl,
   siteDescription,
@@ -10,11 +10,6 @@ import {
   siteShareTitle,
 } from "@/lib/constants";
 import "./globals.css";
-
-const displayFont = Outfit({
-  subsets: ["latin"],
-  variable: "--font-display",
-});
 
 const bodyFont = Manrope({
   subsets: ["latin", "cyrillic"],
@@ -51,13 +46,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="uk">
-      <body className={`${displayFont.variable} ${bodyFont.variable}`}>
-        <div className="relative min-h-screen overflow-x-hidden bg-[--ink] text-white">
-          <div className="relative flex min-h-screen flex-col">
-            <div className="flex-1">{children}</div>
-            <SiteFooter />
-          </div>
-        </div>
+      <body className={bodyFont.variable}>
+        {children}
+        <AnalyticsScript />
       </body>
     </html>
   );

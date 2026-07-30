@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@prisma/client": "6.19.3",
     "clsx": "^2.1.1",
     "maplibre-gl": "^5.13.0",
