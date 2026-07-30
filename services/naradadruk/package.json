@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "catalog:build": "node scripts/build-telegram-catalog.mjs",
+    "catalog:refresh": "npm run catalog:scrape && npm run catalog:build",
+    "catalog:scrape": "node scripts/scrape-telegram-channel.mjs naradaprint catalog/telegram-posts.json --download-images",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts"
@@ -27,6 +30,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cheerio": "^1.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "prisma": "6.19.3",
