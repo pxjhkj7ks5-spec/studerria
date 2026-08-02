@@ -198,27 +198,39 @@ docker compose ps
 
 ### Narada Druk owner bot
 
-The MakerWorld flow reuses the existing Narada Druk order bot and owner chat. Add that
-bot as an administrator to the Narada Print destination channel and configure only the
-numeric destination channel ID in addition to the existing order variables:
+The MakerWorld flow reuses the existing Narada Druk order bot and the same configured
+owner group that receives new-order notifications. Publishing still uses a separate
+Narada Print destination channel:
 
 ```env
 NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN=bot-token-from-botfather
-NARADADRUK_ORDER_TELEGRAM_CHAT_ID=123456789
+NARADADRUK_ORDER_TELEGRAM_CHAT_ID=-1001111111111
+NARADADRUK_ORDER_TELEGRAM_OWNER_USER_IDS=123456789
 NARADADRUK_POSTS_TELEGRAM_CHAT_ID=-1001234567890
 ```
 
 Create the bot in `@BotFather` with `/newbot`, copy its token into
-`NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN`, open the bot from the owner account and send
-`/start`. Then call `getUpdates` once and copy `message.chat.id` into
-`NARADADRUK_ORDER_TELEGRAM_CHAT_ID`; this must be the owner's private chat/user ID.
+`NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN`, add it to the owner group and send an explicit
+command such as `/help@bot_username`. With the owner worker stopped, call `getUpdates`
+once: copy the negative `message.chat.id` to `NARADADRUK_ORDER_TELEGRAM_CHAT_ID` and
+the positive `message.from.id` of every manager to the comma-separated owner allowlist.
 
 - `NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN` continues to send order notifications and
   also receives owner-only order, review-moderation, manual-order and MakerWorld commands.
-- `NARADADRUK_ORDER_TELEGRAM_CHAT_ID` is the numeric ID of the owner's private chat;
-  that same Telegram user is the only account allowed to operate callbacks and commands.
+- `NARADADRUK_ORDER_TELEGRAM_CHAT_ID` is the numeric owner group ID (normally `-100…`)
+  or, for backward-compatible private operation, a positive private chat ID.
+- `NARADADRUK_ORDER_TELEGRAM_OWNER_USER_IDS` contains positive Telegram user IDs,
+  separated by commas. Only these actors can run management commands or callbacks in
+  the configured group. It is required for groups. In a positive private chat it may
+  be omitted, in which case the chat/user ID is the sole owner.
 - `NARADADRUK_POSTS_TELEGRAM_CHAT_ID` is the required numeric destination channel ID
   for albums and posts. Do not put the public `@naradaprint` username here.
+
+Telegram Privacy Mode may stay enabled for explicit commands and direct replies to bot
+messages. The guided `/manual` and `/makerworld` flows also expect ordinary text such
+as a URL, title, description and price. For seamless non-reply input, either make the
+bot an owner-group administrator or disable Privacy Mode with `@BotFather` `/setprivacy`
+and re-add it to the group. The application allowlist still rejects every unlisted user.
 
 To obtain the numeric channel ID, add the existing bot to the channel and call the
 Telegram Bot API `getChat` method with `@naradaprint`; copy the numeric `result.id`
@@ -232,7 +244,7 @@ curl -sS -X POST "https://api.telegram.org/bot${NARADADRUK_ORDER_TELEGRAM_BOT_TO
   --data-urlencode "chat_id=@naradaprint"
 ```
 
-Send `/makerworld` in an allowed private chat, then provide a public MakerWorld model
+Send `/makerworld` in the configured owner chat as an allowed user, then provide a public MakerWorld model
 URL. The bot creates a non-public product draft, downloads up to six public preview
 images (8 MB each, 24 MB total), and exposes buttons and commands for title, full site
 description, separate compact Telegram text, selected images, and price. `/publish`
@@ -252,7 +264,7 @@ move them through `Прийнято в роботу`, `Відправлено`, 
 internal comments retained in order history. The dashboard is intentionally not pinned
 automatically because chat permissions vary. New public reviews also arrive in this
 same owner chat with `Опублікувати` and `Видалити` buttons and remain hidden until
-approved. These flows require no additional environment variables.
+approved. All buttons and commands use the same chat and actor allowlist.
 
 Server `.env` baseline:
 

@@ -72,6 +72,13 @@ const awaitingOrderComments = new Map<string, string>();
 let dashboardMessageId: number | null = null;
 const botToken = process.env.NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN?.trim() || "";
 const ownerChatId = process.env.NARADADRUK_ORDER_TELEGRAM_CHAT_ID?.trim() || "";
+const configuredOwnerUserIds = (process.env.NARADADRUK_ORDER_TELEGRAM_OWNER_USER_IDS || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const hasInvalidOwnerUserId = configuredOwnerUserIds.some((value) => !/^[1-9]\d*$/.test(value));
+const ownerUserIds = new Set(configuredOwnerUserIds.filter((value) => /^[1-9]\d*$/.test(value)));
+if (ownerUserIds.size === 0 && /^[1-9]\d*$/.test(ownerChatId)) ownerUserIds.add(ownerChatId);
 const postsChatId = process.env.NARADADRUK_POSTS_TELEGRAM_CHAT_ID?.trim() || "";
 const publicSiteBaseUrl = new URL("https://studerria.com/naradadruk/");
 const maxImages = 6;
@@ -794,7 +801,7 @@ async function createManualOrder(chatId: string, session: ManualOrderSession) {
 }
 
 function isAuthorizedOwnerChat(message: TelegramMessage, actorId = message.from?.id) {
-  return String(message.chat.id) === ownerChatId && String(actorId ?? "") === ownerChatId;
+  return String(message.chat.id) === ownerChatId && ownerUserIds.has(String(actorId ?? ""));
 }
 
 function splitCommand(text: string) {
@@ -1191,13 +1198,17 @@ async function configureCommands() {
 }
 
 async function run() {
-  if (!botToken || !/^[1-9]\d*$/.test(ownerChatId)) {
-    console.log("[owner-bot] disabled: order bot token or positive private owner chat ID is absent");
+  if (!botToken || !/^-?[1-9]\d*$/.test(ownerChatId)) {
+    console.log("[owner-bot] disabled: order bot token or numeric configured chat ID is absent");
+    return;
+  }
+  if (hasInvalidOwnerUserId || ownerUserIds.size === 0) {
+    console.log("[owner-bot] disabled: positive owner user ID allowlist is missing or invalid");
     return;
   }
 
   await configureCommands();
-  console.log("[owner-bot] started for the configured private owner chat");
+  console.log("[owner-bot] started for the configured owner chat and actor allowlist");
   const pending = await telegramJson<TelegramUpdate[]>("getUpdates", {
     offset: -1,
     timeout: 0,
