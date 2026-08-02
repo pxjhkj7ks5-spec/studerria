@@ -61,7 +61,7 @@ type DraftSession = {
   images: DraftImage[];
   awaiting: AwaitingField;
   manualSetup: "title" | "description" | null;
-  albumSent: boolean;
+  postSent: boolean;
 };
 
 type DownloadedImage = {
@@ -505,7 +505,7 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
       })),
       awaiting: null,
       manualSetup: null,
-      albumSent: false,
+      postSent: false,
     };
     sessions.set(chatId, session);
     return session;
@@ -651,7 +651,6 @@ function parseImageSelection(value: string, maximum: number) {
 async function finalizeProduct(session: DraftSession) {
   const chosen = selectedImages(session);
   if (!session.price || session.price <= 0) throw new Error("Спочатку вкажіть ціну кнопкою «Ціна» або /price 450.");
-  if (chosen.length === 0) throw new Error("Для публікації залиште хоча б одне зображення.");
   const chosenIds = chosen.map((image) => image.id);
   const removed = session.images.filter((image) => !image.selected);
 
@@ -669,17 +668,22 @@ async function finalizeProduct(session: DraftSession) {
     const saved = await prisma.$transaction(async (transaction) => {
       await transaction.productImage.deleteMany({ where: { productId: existing.id } });
       await transaction.productImage.deleteMany({
-        where: { productId: session.draftProductId, id: { notIn: chosenIds } },
-      });
-      await transaction.productImage.updateMany({
-        where: { productId: session.draftProductId, id: { in: chosenIds } },
-        data: {
-          productId: existing.id,
-          isCover: false,
-          alt: `${session.title} — фото товару`,
+        where: {
+          productId: session.draftProductId,
+          ...(chosenIds.length > 0 ? { id: { notIn: chosenIds } } : {}),
         },
       });
-      await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
+      if (chosenIds.length > 0) {
+        await transaction.productImage.updateMany({
+          where: { productId: session.draftProductId, id: { in: chosenIds } },
+          data: {
+            productId: existing.id,
+            isCover: false,
+            alt: `${session.title} — фото товару`,
+          },
+        });
+        await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
+      }
       await transaction.productVariant.deleteMany({ where: { productId: existing.id } });
       const updated = await transaction.product.update({
         where: { id: existing.id },
@@ -707,13 +711,18 @@ async function finalizeProduct(session: DraftSession) {
 
   const saved = await prisma.$transaction(async (transaction) => {
     await transaction.productImage.deleteMany({
-      where: { productId: session.draftProductId, id: { notIn: chosenIds } },
+      where: {
+        productId: session.draftProductId,
+        ...(chosenIds.length > 0 ? { id: { notIn: chosenIds } } : {}),
+      },
     });
-    await transaction.productImage.updateMany({
-      where: { productId: session.draftProductId, id: { in: chosenIds } },
-      data: { isCover: false, alt: `${session.title} — фото товару` },
-    });
-    await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
+    if (chosenIds.length > 0) {
+      await transaction.productImage.updateMany({
+        where: { productId: session.draftProductId, id: { in: chosenIds } },
+        data: { isCover: false, alt: `${session.title} — фото товару` },
+      });
+      await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
+    }
     return transaction.product.update({
       where: { id: session.draftProductId },
       data: {
@@ -744,36 +753,34 @@ async function publishProductPost(session: DraftSession) {
     session.draftProductId = product.id;
   }
 
-  const chosen = selectedImages(session);
-  let albumWarning = "";
-  if (!session.albumSent) {
-    try {
-      await sendPhotoSet(postsChatId, chosen, session.title);
-      session.albumSent = true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "невідома помилка";
-      console.warn(`[makerworld-bot] destination album failed: ${shortText(message, 200)}`);
-      albumWarning = "Telegram не прийняв альбом, але текстовий пост і товар опубліковані.";
-    }
-  }
-
   const productUrl = publicProductUrl(session.publishedSlug);
   const inlineKeyboard = [
     [{ text: "Замовити на сайті", url: productUrl }],
   ];
-  if (contactLink) {
-    inlineKeyboard.push([{ text: "Telegram Narada Druk", url: contactLink }]);
+  if (!session.postSent) {
+    const caption = telegramPostText(session, contactLink, channelLink);
+    const primaryImage = selectedImages(session)[0];
+    if (primaryImage) {
+      const form = new FormData();
+      const buffer = await readFile(path.join(uploadDirectory(), primaryImage.fileName));
+      form.set("chat_id", postsChatId);
+      form.set("photo", new Blob([new Uint8Array(buffer)], { type: mimeTypeForFile(primaryImage.fileName) }), primaryImage.fileName);
+      form.set("caption", caption);
+      form.set("parse_mode", "HTML");
+      form.set("reply_markup", JSON.stringify({ inline_keyboard: inlineKeyboard }));
+      await telegramMultipart("sendPhoto", form);
+    } else {
+      await telegramJson("sendMessage", {
+        chat_id: postsChatId,
+        text: caption,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+        reply_markup: { inline_keyboard: inlineKeyboard },
+      });
+    }
+    session.postSent = true;
   }
-  await telegramJson("sendMessage", {
-    chat_id: postsChatId,
-    text: telegramPostText(session, contactLink, channelLink),
-    parse_mode: "HTML",
-    disable_web_page_preview: true,
-    reply_markup: {
-      inline_keyboard: inlineKeyboard,
-    },
-  });
-  return { productUrl, albumWarning };
+  return { productUrl };
 }
 
 async function cancelSession(session: DraftSession) {
@@ -1008,7 +1015,7 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
       images: [],
       awaiting: "url",
       manualSetup: null,
-      albumSent: false,
+      postSent: false,
     };
     sessions.set(chatId, session);
     const rejectedStatus = message.match(/HTTP\s+(403|429)\b/i)?.[1];
@@ -1149,7 +1156,7 @@ async function handleMessage(message: TelegramMessage) {
       images: [],
       awaiting: "url",
       manualSetup: null,
-      albumSent: false,
+      postSent: false,
     });
     return;
   }
@@ -1214,12 +1221,15 @@ async function handleMessage(message: TelegramMessage) {
 
   if (command?.command === "publish") {
     try {
-      const { productUrl, albumWarning } = await publishProductPost(session);
+      const { productUrl } = await publishProductPost(session);
       sessions.delete(chatId);
-      await sendMessage(chatId, `Готово: товар активний, а пост опублікований.${albumWarning ? `\n${escapeHtml(albumWarning)}` : ""}\n<a href="${escapeHtml(productUrl)}">Відкрити сторінку товару</a>`);
+      await sendMessage(chatId, `Готово: товар активний, а пост опублікований одним повідомленням.\n<a href="${escapeHtml(productUrl)}">Відкрити сторінку товару</a>`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Не вдалося опублікувати товар.";
-      await sendMessage(chatId, `${escapeHtml(shortText(message, 500))}\nЧернетку збережено. Виправте налаштування або дані й повторіть /publish.`, editorKeyboard());
+      const stateNote = session.publishedProductId
+        ? "Товар уже активний на сайті, але Telegram-допис не підтверджено. Повторіть /publish."
+        : "Чернетку збережено. Виправте налаштування або дані й повторіть /publish.";
+      await sendMessage(chatId, `${escapeHtml(shortText(message, 500))}\n${stateNote}`, editorKeyboard());
     }
     return;
   }

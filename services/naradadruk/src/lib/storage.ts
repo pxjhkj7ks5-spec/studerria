@@ -33,7 +33,7 @@ export function resolveUploadDir() {
 }
 
 export function isSafeUploadFileName(fileName: string) {
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*-\d+\.(?:avif|gif|jpe?g|png|webp)$/i.test(fileName);
+  return /^(?=.{1,220}$)[a-z0-9]+(?:-[a-z0-9]+)*\.(?:avif|gif|jpe?g|png|webp)$/i.test(fileName);
 }
 
 export function contentTypeForUpload(fileName: string) {

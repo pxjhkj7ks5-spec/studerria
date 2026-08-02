@@ -224,7 +224,7 @@ the positive `message.from.id` of every manager to the comma-separated owner all
   the configured group. It is required for groups. In a positive private chat it may
   be omitted, in which case the chat/user ID is the sole owner.
 - `NARADADRUK_POSTS_TELEGRAM_CHAT_ID` is the required numeric destination channel ID
-  for albums and posts. Do not put the public `@naradaprint` username here.
+  for single-message product posts. Do not put the public `@naradaprint` username here.
 
 Telegram Privacy Mode may stay enabled for explicit commands and direct replies to bot
 messages. The guided `/manual` and `/makerworld` flows also expect ordinary text such
@@ -236,8 +236,9 @@ To obtain the numeric channel ID, add the existing bot to the channel and call t
 Telegram Bot API `getChat` method with `@naradaprint`; copy the numeric `result.id`
 (normally beginning with `-100`) into `NARADADRUK_POSTS_TELEGRAM_CHAT_ID`. The public
 channel URL already configured for Narada Druk is reused for post links. If no safe
-Telegram link is configured, the secondary Telegram button is omitted. Product buttons
-always use `https://studerria.com/naradadruk/product/<slug>`.
+Telegram link is configured, optional text links are omitted. Each product post has only
+one inline button, `Замовити на сайті`, which always uses
+`https://studerria.com/naradadruk/product/<slug>`.
 
 ```bash
 curl -sS -X POST "https://api.telegram.org/bot${NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN}/getChat" \
@@ -248,9 +249,11 @@ Send `/makerworld` in the configured owner chat as an allowed user, then provide
 URL. The bot creates a non-public product draft, downloads up to six public preview
 images (8 MB each, 24 MB total), and exposes buttons and commands for title, full site
 description, separate compact Telegram text, selected images, and price. `/publish`
-activates the exact product first and then posts the selected album and a styled post
-whose primary button links to that product page. `/cancel` removes an unpublished
-draft and its downloaded files.
+activates the exact product first and then sends one styled channel post: the first
+selected image carries the full caption and the website-order button. All selected
+images remain in the storefront gallery, but additional channel images are deliberately
+omitted. With no selected image, the bot sends the same caption and button as one text
+message. `/cancel` removes an unpublished draft and its downloaded files.
 
 MakerWorld extraction uses only public HTML/Open Graph/JSON-LD data. Private, removed,
 access-restricted, or challenge-protected pages are not bypassed, and some pages may
@@ -259,6 +262,10 @@ owner can keep the source URL, enter title and description manually, and upload 
 six Telegram photos before setting price and publishing through the same draft flow.
 In-memory Telegram editing sessions do not survive a service restart; any already-created
 product remains an unpublished draft that can be reviewed in the Narada Druk admin area.
+Within one active session, a confirmed successful post is not sent again on retry. A
+network failure with an unknown Telegram outcome cannot be deduplicated without storing
+the destination message ID, so the owner should check the channel before retrying after
+an ambiguous timeout.
 
 Use `/orders` for the refreshable active-order dashboard and `/manual` for the guided
 manual-order flow. New website and manual orders start as `Обробляється`; the owner can
