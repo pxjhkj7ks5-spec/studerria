@@ -254,9 +254,11 @@ draft and its downloaded files.
 
 MakerWorld extraction uses only public HTML/Open Graph/JSON-LD data. Private, removed,
 access-restricted, or challenge-protected pages are not bypassed, and some pages may
-provide fewer metadata fields or images. In-memory Telegram editing sessions do not
-survive a service restart; any already-created product remains an unpublished draft
-that can be reviewed in the Narada Druk admin area.
+provide fewer metadata fields or images. If MakerWorld rejects the server request, the
+owner can keep the source URL, enter title and description manually, and upload up to
+six Telegram photos before setting price and publishing through the same draft flow.
+In-memory Telegram editing sessions do not survive a service restart; any already-created
+product remains an unpublished draft that can be reviewed in the Narada Druk admin area.
 
 Use `/orders` for the refreshable active-order dashboard and `/manual` for the guided
 manual-order flow. New website and manual orders start as `Обробляється`; the owner can

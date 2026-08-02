@@ -6,16 +6,21 @@ import {
   fetchMakerWorldModel,
   isAllowedMakerWorldImageUrl,
   MakerWorldFetchError,
+  parseMakerWorldUrl,
   type MakerWorldModel,
 } from "../src/lib/makerworld";
 
 type TelegramUser = { id: number };
 type TelegramChat = { id: number; type: string };
+type TelegramPhotoSize = { file_id: string; file_size?: number; width: number; height: number };
+type TelegramFile = { file_id: string; file_size?: number; file_path?: string };
 type TelegramMessage = {
   message_id: number;
   chat: TelegramChat;
   from?: TelegramUser;
   text?: string;
+  caption?: string;
+  photo?: TelegramPhotoSize[];
 };
 type TelegramCallbackQuery = {
   id: string;
@@ -55,6 +60,7 @@ type DraftSession = {
   price: number | null;
   images: DraftImage[];
   awaiting: AwaitingField;
+  manualSetup: "title" | "description" | null;
   albumSent: boolean;
 };
 
@@ -315,6 +321,68 @@ async function fetchImage(initialUrl: string) {
   throw new Error("Не вдалося завантажити зображення.");
 }
 
+async function downloadTelegramPhoto(photo: TelegramPhotoSize) {
+  if (photo.file_size && photo.file_size > maxImageBytes) {
+    throw new Error("Фото перевищує дозволені 8 MB.");
+  }
+  const file = await telegramJson<TelegramFile>("getFile", { file_id: photo.file_id });
+  const filePath = file.file_path || "";
+  if (
+    !/^photos\/[a-zA-Z0-9_./-]+$/.test(filePath) ||
+    filePath.includes("..") ||
+    (file.file_size && file.file_size > maxImageBytes)
+  ) {
+    throw new Error("Telegram повернув непідтримуваний файл фото.");
+  }
+
+  const response = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`, {
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!response.ok) throw new Error(`Telegram не віддав фото (HTTP ${response.status}).`);
+  const buffer = await readBinaryWithLimit(response, maxImageBytes);
+  if (buffer.length < 3 || buffer[0] !== 0xff || buffer[1] !== 0xd8 || buffer[2] !== 0xff) {
+    throw new Error("Telegram-фото має непідтримуваний формат.");
+  }
+  return buffer;
+}
+
+async function addTelegramPhotoToDraft(session: DraftSession, photo: TelegramPhotoSize) {
+  if (session.draftProductId <= 0) throw new Error("Спочатку завершіть назву й опис чернетки.");
+  if (session.images.length >= maxImages) throw new Error(`До чернетки можна додати не більше ${maxImages} фото.`);
+  const draft = await prisma.product.findFirst({
+    where: { id: session.draftProductId, status: ProductStatus.draft },
+    select: { id: true },
+  });
+  if (!draft) throw new Error("Неопубліковану чернетку більше не знайдено.");
+
+  const buffer = await downloadTelegramPhoto(photo);
+  await mkdir(uploadDirectory(), { recursive: true });
+  const fileName = `${slugify(session.title)}-telegram-${randomUUID()}.jpg`;
+  await writeFile(path.join(uploadDirectory(), fileName), buffer);
+  try {
+    const image = await prisma.productImage.create({
+      data: {
+        productId: session.draftProductId,
+        fileName,
+        urlPath: `/uploads/${fileName}`,
+        alt: `${session.title} — фото товару`,
+        sortOrder: (session.images.length + 1) * 10,
+        isCover: session.images.length === 0,
+      },
+    });
+    session.images.push({
+      id: image.id,
+      fileName: image.fileName,
+      urlPath: image.urlPath,
+      sourceIndex: session.images.length + 1,
+      selected: true,
+    });
+  } catch (error) {
+    await unlink(path.join(uploadDirectory(), fileName)).catch(() => undefined);
+    throw error;
+  }
+}
+
 function extensionForContentType(contentType: string) {
   if (contentType === "image/png") return "png";
   if (contentType === "image/webp") return "webp";
@@ -436,6 +504,7 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
         selected: true,
       })),
       awaiting: null,
+      manualSetup: null,
       albumSent: false,
     };
     sessions.set(chatId, session);
@@ -444,6 +513,50 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
     await deleteFiles(downloadedImages.map((image) => image.fileName));
     throw error;
   }
+}
+
+async function materializeManualDraft(session: DraftSession) {
+  const category =
+    (await prisma.category.findUnique({ where: { slug: "inshe" } })) ||
+    (await prisma.category.findFirst({ orderBy: [{ isVisible: "desc" }, { sortOrder: "asc" }] }));
+  if (!category) throw new Error("У каталозі немає категорії для нової моделі.");
+
+  const [settings, existingProduct, slug] = await Promise.all([
+    prisma.siteSetting.findUnique({ where: { id: 1 } }),
+    prisma.product.findFirst({
+      where: { sourceModelUrl: session.sourceUrl, status: ProductStatus.published },
+      orderBy: { updatedAt: "desc" },
+    }),
+    uniqueProductSlug(session.title),
+  ]);
+  session.telegramSummary = firstSentenceForDraft(session.siteDescription);
+  const draft = await prisma.product.create({
+    data: {
+      title: session.title,
+      slug,
+      categoryId: category.id,
+      shortDescription: shortText(session.telegramSummary, 220),
+      fullDescription: session.siteDescription,
+      status: ProductStatus.draft,
+      basePrice: null,
+      priceFrom: false,
+      leadTime: settings?.leadTimeNote || "Від кількох годин до 3 днів залежно від складності.",
+      materialNote: settings?.materialsNote || "Матеріал і колір узгоджуються перед друком.",
+      deliveryNote: settings?.deliveryNote || "Доставка по Україні Новою поштою.",
+      paymentNote: settings?.paymentNote || "Реквізити для оплати надійдуть після підтвердження замовлення.",
+      sourceModelUrl: session.sourceUrl,
+    },
+  });
+  session.draftProductId = draft.id;
+  session.existingProductId = existingProduct?.id || null;
+  session.awaiting = null;
+  session.manualSetup = null;
+  return session;
+}
+
+function firstSentenceForDraft(value: string) {
+  const normalized = cleanText(value, 500);
+  return normalized.match(/^[\s\S]{1,220}?(?:[.!?](?=\s|$)|$)/)?.[0]?.trim() || normalized.slice(0, 220);
 }
 
 function selectedImages(session: DraftSession) {
@@ -696,6 +809,8 @@ function helpText() {
     "/publish — активувати товар і опублікувати пост",
     "/cancel — видалити неопубліковану чернетку",
     "",
+    `Якщо MakerWorld відхиляє серверне читання, кнопка ручної чернетки збере назву й опис. Після цього надішліть до ${maxImages} фото прямо в чат.`,
+    "",
     "До фінального підтвердження товар має статус draft і не видимий покупцям.",
   ].join("\n");
 }
@@ -810,6 +925,15 @@ function splitCommand(text: string) {
 }
 
 async function requestField(session: DraftSession, field: Exclude<AwaitingField, null>) {
+  if (field === "images" && session.images.length === 0) {
+    session.awaiting = null;
+    await sendMessage(
+      session.chatId,
+      `Надішліть фото товару звичайним Telegram-фото. Можна додати до ${maxImages} фото по одному або альбомом.`,
+      editorKeyboard(),
+    );
+    return;
+  }
   session.awaiting = field;
   const prompts: Record<Exclude<AwaitingField, null>, string> = {
     url: "Надішліть публічне HTTPS-посилання на модель MakerWorld.",
@@ -854,7 +978,9 @@ async function applyFieldValue(session: DraftSession, field: Exclude<AwaitingFie
 
 async function handleMakerWorldUrl(chatId: string, value: string) {
   await sendMessage(chatId, "Отримую публічні дані MakerWorld і готую неопубліковану чернетку…");
+  let sourceUrl = "";
   try {
+    sourceUrl = parseMakerWorldUrl(value).toString();
     const model = await fetchMakerWorldModel(value);
     const session = await createDraft(chatId, model);
     const imageNote = session.images.length > 0
@@ -866,13 +992,13 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
     const message = error instanceof MakerWorldFetchError || error instanceof Error
       ? error.message
       : "Не вдалося обробити модель MakerWorld.";
-    sessions.set(chatId, {
+    const session: DraftSession = {
       chatId,
       draftProductId: 0,
       existingProductId: null,
       publishedProductId: null,
       publishedSlug: null,
-      sourceUrl: "",
+      sourceUrl,
       title: "",
       siteDescription: "",
       telegramSummary: "",
@@ -881,17 +1007,58 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
       price: null,
       images: [],
       awaiting: "url",
+      manualSetup: null,
       albumSent: false,
-    });
-    await sendMessage(chatId, `Не вдалося створити чернетку: ${escapeHtml(shortText(message, 500))}\n\nНадішліть інше публічне посилання або /cancel.`);
+    };
+    sessions.set(chatId, session);
+    const rejectedStatus = message.match(/HTTP\s+(403|429)\b/i)?.[1];
+    const guidance = rejectedStatus
+      ? `MakerWorld відхилив автоматичне читання цієї сторінки (HTTP ${rejectedStatus}). Це може бути захист сайту або обмеження для серверної мережі; ми не обходимо такі перевірки.`
+      : `Не вдалося створити чернетку: ${escapeHtml(shortText(message, 500))}`;
+    const keyboard = sourceUrl
+      ? {
+          inline_keyboard: [
+            [{ text: "📝 Заповнити чернетку вручну", callback_data: "mw:manual" }],
+            [{ text: "✖️ Скасувати", callback_data: "mw:cancel" }],
+          ],
+        }
+      : undefined;
+    await sendMessage(
+      chatId,
+      `${guidance}\n\n${sourceUrl ? "Можна зберегти це посилання як джерело й вручну додати назву, опис, фото та ціну." : "Перевірте публічне посилання MakerWorld або надішліть інше."}`,
+      keyboard,
+    );
   }
 }
 
 async function handleMessage(message: TelegramMessage) {
-  if (!isAuthorizedOwnerChat(message) || !message.text) return;
+  if (!isAuthorizedOwnerChat(message)) return;
+  if (!message.text && message.caption) message.text = message.caption;
   const chatId = String(message.chat.id);
-  const command = splitCommand(message.text);
   let session = sessions.get(chatId);
+
+  if (message.photo?.length) {
+    if (!session || session.draftProductId <= 0) {
+      await sendMessage(chatId, "Спочатку створіть чернетку: завершіть назву й опис або почніть із /makerworld.");
+      return;
+    }
+    const photo = [...message.photo].sort((left, right) => (right.width * right.height) - (left.width * left.height))[0];
+    try {
+      await addTelegramPhotoToDraft(session, photo);
+      await sendMessage(
+        chatId,
+        `Фото додано (${session.images.length}/${maxImages}). Надішліть ще фото або встановіть ціну й перевірте /preview.`,
+        editorKeyboard(),
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Не вдалося додати фото.";
+      await sendMessage(chatId, escapeHtml(shortText(errorMessage, 400)), editorKeyboard());
+    }
+    return;
+  }
+
+  if (!message.text) return;
+  const command = splitCommand(message.text);
 
   if (command?.command === "orders") {
     await showOrdersDashboard(chatId);
@@ -981,6 +1148,7 @@ async function handleMessage(message: TelegramMessage) {
       price: null,
       images: [],
       awaiting: "url",
+      manualSetup: null,
       albumSent: false,
     });
     return;
@@ -1000,6 +1168,38 @@ async function handleMessage(message: TelegramMessage) {
     sessions.delete(chatId);
     await handleMakerWorldUrl(chatId, command?.argument || message.text);
     return;
+  }
+
+  if (session?.manualSetup) {
+    if (command) {
+      await sendMessage(chatId, "Завершіть ручне створення чернетки поточним полем або використайте /cancel.");
+      return;
+    }
+    try {
+      if (session.manualSetup === "title") {
+        const title = cleanText(message.text, 140);
+        if (title.length < 3) throw new Error("Назва має містити щонайменше 3 символи.");
+        session.title = title;
+        session.manualSetup = "description";
+        await sendMessage(chatId, "Надішліть повний опис для сторінки товару (щонайменше 20 символів). Джерельне посилання MakerWorld буде збережене окремо.");
+        return;
+      }
+
+      const description = cleanText(message.text, 8000);
+      if (description.length < 20) throw new Error("Опис для сайту має містити щонайменше 20 символів.");
+      session.siteDescription = description;
+      await materializeManualDraft(session);
+      await sendMessage(
+        chatId,
+        `Чернетку #${session.draftProductId} створено й приховано від покупців. Тепер надішліть до ${maxImages} фото звичайним Telegram-фото, потім встановіть ціну та перевірте превʼю.`,
+        editorKeyboard(),
+      );
+      return;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Не вдалося створити ручну чернетку.";
+      await sendMessage(chatId, escapeHtml(shortText(errorMessage, 500)));
+      return;
+    }
   }
 
   if (!session) {
@@ -1159,6 +1359,23 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     return;
   }
   const session = sessions.get(chatId);
+  if (callback.data === "mw:manual" && session && session.draftProductId <= 0 && session.sourceUrl) {
+    session.awaiting = null;
+    session.manualSetup = "title";
+    await answerCallback(callback.id, "Переходимо до ручної чернетки.");
+    await sendMessage(chatId, "Надішліть назву товару (від 3 до 140 символів). /cancel — скасувати.");
+    return;
+  }
+  if (callback.data === "mw:cancel" && session && session.draftProductId <= 0) {
+    sessions.delete(chatId);
+    await answerCallback(callback.id, "Скасовано.");
+    await telegramJson("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: message.message_id,
+      reply_markup: { inline_keyboard: [] },
+    }).catch(() => undefined);
+    return;
+  }
   if (!session || session.draftProductId <= 0) {
     await answerCallback(callback.id, "Активної чернетки немає.");
     return;
