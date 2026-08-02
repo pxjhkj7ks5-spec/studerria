@@ -1,4 +1,4 @@
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { PrismaClient, ProductStatus, ReviewStatus } from "@prisma/client";
@@ -357,7 +357,7 @@ async function addTelegramPhotoToDraft(session: DraftSession, photo: TelegramPho
 
   const buffer = await downloadTelegramPhoto(photo);
   await mkdir(uploadDirectory(), { recursive: true });
-  const fileName = `${slugify(session.title)}-telegram-${randomUUID()}.jpg`;
+  const fileName = `telegram-${session.draftProductId}-${session.images.length + 1}-${Date.now()}.jpg`;
   await writeFile(path.join(uploadDirectory(), fileName), buffer);
   try {
     const image = await prisma.productImage.create({
@@ -377,6 +377,7 @@ async function addTelegramPhotoToDraft(session: DraftSession, photo: TelegramPho
       sourceIndex: session.images.length + 1,
       selected: true,
     });
+    console.info(`[makerworld-bot] Telegram photo persisted: draft=${session.draftProductId} image=${image.id} file=${fileName}`);
   } catch (error) {
     await unlink(path.join(uploadDirectory(), fileName)).catch(() => undefined);
     throw error;
@@ -648,9 +649,42 @@ function parseImageSelection(value: string, maximum: number) {
   return new Set(numbers);
 }
 
+async function assertSelectedDraftImages(session: DraftSession, chosen: DraftImage[]) {
+  if (chosen.length === 0) return;
+  const chosenIds = chosen.map((image) => image.id);
+  const persisted = await prisma.productImage.findMany({
+    where: { productId: session.draftProductId, id: { in: chosenIds } },
+  });
+  if (persisted.length !== chosenIds.length) {
+    throw new Error("Не всі вибрані фото прикріплені до чернетки. Додайте фото ще раз перед публікацією.");
+  }
+
+  const persistedById = new Map(persisted.map((image) => [image.id, image]));
+  for (const selected of chosen) {
+    const image = persistedById.get(selected.id);
+    if (!image || image.fileName !== selected.fileName) {
+      throw new Error("Зв’язок вибраного фото з чернеткою пошкоджений. Додайте фото ще раз перед публікацією.");
+    }
+    const canonicalUrlPath = `/uploads/${image.fileName}`;
+    if (image.urlPath !== canonicalUrlPath) {
+      await prisma.productImage.update({
+        where: { id: image.id },
+        data: { urlPath: canonicalUrlPath },
+      });
+      selected.urlPath = canonicalUrlPath;
+    }
+    try {
+      await access(path.join(uploadDirectory(), image.fileName));
+    } catch {
+      throw new Error(`Файл вибраного фото ${image.id} відсутній у сховищі. Завантажте це фото ще раз.`);
+    }
+  }
+}
+
 async function finalizeProduct(session: DraftSession) {
   const chosen = selectedImages(session);
   if (!session.price || session.price <= 0) throw new Error("Спочатку вкажіть ціну кнопкою «Ціна» або /price 450.");
+  await assertSelectedDraftImages(session, chosen);
   const chosenIds = chosen.map((image) => image.id);
   const removed = session.images.filter((image) => !image.selected);
 
@@ -683,6 +717,10 @@ async function finalizeProduct(session: DraftSession) {
           },
         });
         await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
+        const attachedCount = await transaction.productImage.count({
+          where: { productId: existing.id, id: { in: chosenIds } },
+        });
+        if (attachedCount !== chosenIds.length) throw new Error("Не вдалося прикріпити всі фото до товару.");
       }
       await transaction.productVariant.deleteMany({ where: { productId: existing.id } });
       const updated = await transaction.product.update({
@@ -722,6 +760,10 @@ async function finalizeProduct(session: DraftSession) {
         data: { isCover: false, alt: `${session.title} — фото товару` },
       });
       await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
+      const attachedCount = await transaction.productImage.count({
+        where: { productId: session.draftProductId, id: { in: chosenIds } },
+      });
+      if (attachedCount !== chosenIds.length) throw new Error("Не вдалося зберегти всі фото товару.");
     }
     return transaction.product.update({
       where: { id: session.draftProductId },

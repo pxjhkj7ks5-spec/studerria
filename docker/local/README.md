@@ -207,9 +207,26 @@ stored hashes, so the exclusions must then be added again.
 The public `app` proxy overwrites `x-studerria-client-ip` with Express `req.ip` before
 forwarding Narada Druk requests; the service never accepts a browser-supplied forwarding
 chain directly. If the public app itself is behind another trusted reverse proxy,
-configure the existing `TRUST_PROXY` setting narrowly for that topology. Exclusions
+configure the existing `TRUST_PROXY` setting narrowly for that topology. For the
+production layout with exactly one Cloudflare Tunnel/reverse-proxy hop, use
+`TRUST_PROXY=1` and keep direct origin access restricted to that proxy; keep `false`
+for direct local access. When the variable is omitted,
+the app now uses its environment-aware default (`1` in production, `false` otherwise).
+Exclusions
 apply only to events received after the entry is added and do not rewrite historical
 analytics. They cover the internal Narada Druk dashboard, not third-party analytics.
+
+This public, read-only diagnostic creates no analytics event and returns only source,
+IP family, and whether the caller matches the exclusion list; it never returns the IP:
+
+```bash
+curl -sSI https://studerria.com/naradadruk/api/analytics \
+  | grep -iE '^x-narada-analytics-ip-(source|family|match):'
+```
+
+Expected production output is `source: trusted-forwarded` and `match: excluded`. If
+the source is `socket-peer`, correct `TRUST_PROXY`, update `app`, then remove the old
+entry and add the address prefilled by the admin again.
 
 ### Narada Druk owner bot
 
@@ -275,6 +292,10 @@ access-restricted, or challenge-protected pages are not bypassed, and some pages
 provide fewer metadata fields or images. If MakerWorld rejects the server request, the
 owner can keep the source URL, enter title and description manually, and upload up to
 six Telegram photos before setting price and publishing through the same draft flow.
+Manual-fallback Telegram photos use a timestamp-suffixed safe filename, are attached to
+the draft immediately, and are verified in both persistent storage and the published
+product mapping before the public Telegram post is sent. Startup normalization repairs
+non-canonical `/uploads/<fileName>` database paths without changing image files.
 In-memory Telegram editing sessions do not survive a service restart; any already-created
 product remains an unpublished draft that can be reviewed in the Narada Druk admin area.
 Within one active session, a confirmed successful post is not sent again on retry. A

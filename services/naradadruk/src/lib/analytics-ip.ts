@@ -2,6 +2,8 @@ import { isIP } from "node:net";
 import { createPrivacyHash } from "@/lib/auth";
 
 export const trustedClientIpHeader = "x-studerria-client-ip";
+export const trustedClientIpSourceHeader = "x-studerria-client-ip-source";
+export type TrustedClientIpSource = "trusted-forwarded" | "socket-peer" | "missing";
 
 export function normalizeIpAddress(value: string) {
   let candidate = value.trim();
@@ -29,6 +31,11 @@ export function normalizeIpAddress(value: string) {
 
 export function getTrustedClientAddress(request: Request) {
   return normalizeIpAddress(request.headers.get(trustedClientIpHeader) ?? "");
+}
+
+export function getTrustedClientAddressSource(request: Request): TrustedClientIpSource {
+  const source = request.headers.get(trustedClientIpSourceHeader);
+  return source === "trusted-forwarded" || source === "socket-peer" ? source : "missing";
 }
 
 export function hashAnalyticsIp(address: string) {

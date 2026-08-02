@@ -998,6 +998,13 @@ if (isProd) {
 
 app.disable('x-powered-by');
 app.set('trust proxy', trustProxySetting);
+console.info(
+  `[startup] trust proxy=${trustProxySetting === false
+    ? 'disabled'
+    : typeof trustProxySetting === 'number'
+      ? `hop-count-${trustProxySetting}`
+      : 'custom-policy'}`
+);
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,

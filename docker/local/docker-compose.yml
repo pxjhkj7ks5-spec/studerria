@@ -509,7 +509,7 @@ services:
       REDIS_KEEPALIVE_MS: ${REDIS_KEEPALIVE_MS:-30000}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-local-session-secret}
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
-      TRUST_PROXY: ${TRUST_PROXY:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-}
       STUDERRIA_PUBLIC_URL: ${STUDERRIA_PUBLIC_URL:-https://studerria.com}
       CHARREDMAP_PROXY_TARGET: http://charredmap:8080
       CHINAMAP_PROXY_TARGET: http://china-map:8080

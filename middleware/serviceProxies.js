@@ -57,8 +57,13 @@ function createServiceProxy({ target, basePath, serviceName, logLabel, logger, f
           const resolvedClientIp = typeof req.ip === 'string' ? req.ip.trim() : '';
           if (resolvedClientIp) {
             proxyReq.setHeader('x-studerria-client-ip', resolvedClientIp);
+            proxyReq.setHeader(
+              'x-studerria-client-ip-source',
+              Array.isArray(req.ips) && req.ips.length > 0 ? 'trusted-forwarded' : 'socket-peer'
+            );
           } else {
             proxyReq.removeHeader('x-studerria-client-ip');
+            proxyReq.setHeader('x-studerria-client-ip-source', 'missing');
           }
         }
       },

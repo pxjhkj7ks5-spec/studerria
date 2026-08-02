@@ -18,7 +18,7 @@ import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { OrderDashboard } from "@/components/admin/order-dashboard";
 import { telegramProductTemplate } from "@/lib/telegram-product-template";
 import { parseAnalyticsRange } from "@/lib/analytics-report";
-import { normalizeIpAddress, trustedClientIpHeader } from "@/lib/analytics-ip";
+import { normalizeIpAddress, trustedClientIpHeader, trustedClientIpSourceHeader } from "@/lib/analytics-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +68,7 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
     await getAdminDashboardData({ analyticsRange });
   const requestHeaders = await headers();
   const currentAnalyticsIp = normalizeIpAddress(requestHeaders.get(trustedClientIpHeader) ?? "");
+  const currentAnalyticsIpSource = requestHeaders.get(trustedClientIpSourceHeader);
   const productTitles = Object.fromEntries(
     products.map((product) => [product.slug, product.title]),
   );
@@ -127,7 +128,7 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
           <label className="field-shell"><span>Позначка (необов’язково)</span><input name="label" maxLength={80} placeholder="Домашній інтернет" /></label>
           <button className="accent-pill" type="submit">Не враховувати</button>
         </form>
-        {currentAnalyticsIp ? <p className="mt-2 text-xs text-[--muted]">Поточну адресу визначено через довірений внутрішній proxy й підставлено у форму.</p> : <p className="mt-2 text-xs text-[--muted]">Поточну адресу не вдалося визначити автоматично — введіть її вручну.</p>}
+        {currentAnalyticsIp ? <p className="mt-2 text-xs text-[--muted]">Поточну адресу підставлено у форму. Джерело: {currentAnalyticsIpSource === "trusted-forwarded" ? "довірений зовнішній proxy" : "безпосередній мережевий peer"}.{currentAnalyticsIpSource === "socket-peer" ? " Якщо production працює за Cloudflare, перевірте TRUST_PROXY перед додаванням адреси." : ""}</p> : <p className="mt-2 text-xs text-[--muted]">Поточну адресу не вдалося визначити автоматично — введіть її вручну.</p>}
         <div className="mt-5 grid gap-3">
           {analyticsIpExclusions.length ? analyticsIpExclusions.map((exclusion) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4" key={exclusion.id}><div><strong className="text-white">{exclusion.label || "Без позначки"}</strong><small className="mt-1 block text-[--muted]">{exclusion.addressHint} · додано {new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeZone: "Europe/Kyiv" }).format(exclusion.createdAt)}</small></div><form action={deleteAnalyticsIpExclusionAction}><input type="hidden" name="exclusionId" value={exclusion.id} /><button className="ghost-pill" type="submit">Прибрати виключення</button></form></div>) : <p className="text-sm text-[--muted]">Виключених IP-адрес ще немає.</p>}
         </div>

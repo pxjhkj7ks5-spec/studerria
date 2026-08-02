@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { analyticsEventNames } from "@/lib/analytics";
-import { getTrustedClientAddress, hashAnalyticsIp } from "@/lib/analytics-ip";
+import { getTrustedClientAddress, getTrustedClientAddressSource, hashAnalyticsIp } from "@/lib/analytics-ip";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,43 @@ const analyticsPayloadSchema = z.object({
     .optional(),
 });
 
+async function analyticsIpState(request: Request) {
+  const address = getTrustedClientAddress(request);
+  const source = getTrustedClientAddressSource(request);
+  const exclusion = address
+    ? await prisma.analyticsIpExclusion.findUnique({
+        where: { addressHash: hashAnalyticsIp(address) },
+        select: { id: true },
+      })
+    : null;
+  return {
+    excluded: Boolean(exclusion),
+    family: address ? (address.includes(":") ? "ipv6" : "ipv4") : "missing",
+    source,
+  };
+}
+
+function analyticsIpHeaders(state: Awaited<ReturnType<typeof analyticsIpState>>) {
+  return {
+    "Cache-Control": "no-store",
+    "X-Narada-Analytics-IP-Family": state.family,
+    "X-Narada-Analytics-IP-Source": state.source,
+    "X-Narada-Analytics-IP-Match": state.excluded ? "excluded" : "included",
+  };
+}
+
+export async function GET(request: Request) {
+  try {
+    const state = await analyticsIpState(request);
+    return new NextResponse(null, { status: 204, headers: analyticsIpHeaders(state) });
+  } catch {
+    return new NextResponse(null, {
+      status: 503,
+      headers: { "Cache-Control": "no-store", "X-Narada-Analytics-IP-Source": "error" },
+    });
+  }
+}
+
 export async function POST(request: Request) {
   const fetchSite = request.headers.get("sec-fetch-site");
   const contentLength = Number(request.headers.get("content-length") ?? 0);
@@ -33,18 +70,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const clientAddress = getTrustedClientAddress(request);
-    if (clientAddress) {
-      const exclusion = await prisma.analyticsIpExclusion.findUnique({
-        where: { addressHash: hashAnalyticsIp(clientAddress) },
-        select: { id: true },
+    const ipState = await analyticsIpState(request);
+    if (ipState.excluded) {
+      return new NextResponse(null, {
+        status: 204,
+        headers: analyticsIpHeaders(ipState),
       });
-      if (exclusion) {
-        return new NextResponse(null, {
-          status: 204,
-          headers: { "Cache-Control": "no-store" },
-        });
-      }
     }
 
     const parsed = analyticsPayloadSchema.safeParse(await request.json());
@@ -77,9 +108,7 @@ export async function POST(request: Request) {
 
     return new NextResponse(null, {
       status: 204,
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers: analyticsIpHeaders(ipState),
     });
   } catch {
     return NextResponse.json({ ok: false }, { status: 400 });

@@ -22,6 +22,20 @@ async function main() {
   await prisma.$executeRawUnsafe(`UPDATE "Order" SET status = 'closed' WHERE status IN ('completed', 'cancelled')`);
   await prisma.$executeRawUnsafe(`UPDATE "Order" SET subtotal = total WHERE subtotal = 0 AND "discountAmount" = 0`);
   await prisma.$executeRawUnsafe(`UPDATE "OrderItem" SET "regularUnitPrice" = "unitPrice" WHERE "regularUnitPrice" = 0`);
+
+  const productImages = await prisma.productImage.findMany({
+    select: { id: true, fileName: true, urlPath: true },
+  });
+  const imageUrlRepairs = productImages.filter((image) => image.urlPath !== `/uploads/${image.fileName}`);
+  for (const image of imageUrlRepairs) {
+    await prisma.productImage.update({
+      where: { id: image.id },
+      data: { urlPath: `/uploads/${image.fileName}` },
+    });
+  }
+  if (imageUrlRepairs.length > 0) {
+    console.info(`[runtime-data] normalized ${imageUrlRepairs.length} product image URL path(s)`);
+  }
 }
 
 main()
