@@ -14,6 +14,7 @@
     "catalog:scrape": "node scripts/scrape-telegram-channel.mjs naradaprint catalog/telegram-posts.json --download-images",
     "catalog:sync": "tsx scripts/telegram-catalog-worker.ts --once",
     "catalog:sync:full": "tsx scripts/telegram-catalog-worker.ts --once --full",
+    "makerworld:bot": "tsx scripts/makerworld-bot-worker.ts",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts"

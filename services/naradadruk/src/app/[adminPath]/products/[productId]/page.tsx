@@ -66,6 +66,16 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
               Вихідний допис
             </a>
           ) : null}
+          {product.sourceModelUrl ? (
+            <a
+              className="ghost-pill"
+              href={product.sourceModelUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              MakerWorld
+            </a>
+          ) : null}
           <a className="ghost-pill" href={withBasePath(`/product/${product.slug}`)} target="_blank" rel="noreferrer">
             Відкрити публічну сторінку
           </a>

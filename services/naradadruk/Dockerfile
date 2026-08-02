@@ -38,6 +38,7 @@ COPY --chown=nextjs:nodejs --from=builder /app/prisma ./prisma
 COPY --chown=nextjs:nodejs --from=builder /app/catalog ./catalog
 COPY --chown=nextjs:nodejs --from=builder /app/scripts ./scripts
 COPY --chown=nextjs:nodejs --from=builder /app/src/lib/telegram-product-template.ts ./src/lib/telegram-product-template.ts
+COPY --chown=nextjs:nodejs --from=builder /app/src/lib/makerworld.ts ./src/lib/makerworld.ts
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
 
 RUN chmod +x ./docker-entrypoint.sh \

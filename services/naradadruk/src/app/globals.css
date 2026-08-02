@@ -2785,7 +2785,7 @@ html {
   font-size: clamp(1.9rem, 3vw, 3rem);
 }
 
-.product-description > p:last-child {
+.product-description__body {
   margin: 1rem 0 0;
   white-space: pre-line;
   color: var(--text-soft);

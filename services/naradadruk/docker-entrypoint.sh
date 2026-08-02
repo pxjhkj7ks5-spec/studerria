@@ -57,4 +57,11 @@ case "${TELEGRAM_AUTO_IMPORT_ENABLED:-true}" in
     ;;
 esac
 
+if [ -n "${NARADADRUK_MAKERWORLD_TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${NARADADRUK_MAKERWORLD_OWNER_CHAT_IDS:-}" ]; then
+  echo "[entrypoint] starting MakerWorld owner bot"
+  ./node_modules/.bin/tsx scripts/makerworld-bot-worker.ts &
+else
+  echo "[entrypoint] MakerWorld owner bot disabled"
+fi
+
 exec node server.js

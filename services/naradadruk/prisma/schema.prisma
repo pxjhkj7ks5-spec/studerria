@@ -92,6 +92,7 @@ model Product {
   sourceTelegramMessageId   Int?
   sourceTelegramUrl         String              @default("")
   sourceTelegramPublishedAt DateTime?
+  sourceModelUrl            String              @default("")
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   category                  Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -101,6 +102,7 @@ model Product {
   orderItems                OrderItem[]
 
   @@unique([sourceTelegramChannel, sourceTelegramMessageId])
+  @@index([sourceModelUrl])
 }
 
 model Order {

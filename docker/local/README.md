@@ -196,6 +196,47 @@ docker compose up -d naradadruk
 docker compose ps
 ```
 
+### Narada Druk MakerWorld owner bot
+
+Create a dedicated bot with `@BotFather`, add it as an administrator to the destination
+channel when the destination is a channel, and configure:
+
+```env
+NARADADRUK_MAKERWORLD_TELEGRAM_BOT_TOKEN=bot-token-from-botfather
+NARADADRUK_MAKERWORLD_OWNER_CHAT_IDS=123456789
+NARADADRUK_POSTS_TELEGRAM_CHAT_ID=@naradaprint
+NARADADRUK_POSTS_TELEGRAM_THREAD_ID=
+NARADADRUK_POSTS_TELEGRAM_CONTACT_URL=https://t.me/owner_username
+NARADADRUK_PUBLIC_SITE_URL=https://studerria.com
+```
+
+- `NARADADRUK_MAKERWORLD_TELEGRAM_BOT_TOKEN` is used only by the owner-operated
+  MakerWorld publishing flow. Order notifications continue to use
+  `NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN`.
+- `NARADADRUK_MAKERWORLD_OWNER_CHAT_IDS` is a comma-separated allowlist of private
+  Telegram chat IDs. The bot ignores commands outside these private chats.
+- `NARADADRUK_POSTS_TELEGRAM_CHAT_ID` is the destination channel/chat for product
+  albums and posts. `NARADADRUK_POSTS_TELEGRAM_THREAD_ID` is needed only for a
+  specific forum topic.
+- `NARADADRUK_POSTS_TELEGRAM_CONTACT_URL` is the owner DM used by the contact link
+  and button. When omitted, the configured Narada Druk Telegram URL is reused.
+- `NARADADRUK_PUBLIC_SITE_URL` is the public origin used for the exact product-page
+  button; the `/naradadruk` base path is added automatically.
+
+Send `/makerworld` in an allowed private chat, then provide a public MakerWorld model
+URL. The bot creates a non-public product draft, downloads up to six public preview
+images (8 MB each, 24 MB total), and exposes buttons and commands for title, full site
+description, separate compact Telegram text, selected images, and price. `/publish`
+activates the exact product first and then posts the selected album and a styled post
+whose primary button links to that product page. `/cancel` removes an unpublished
+draft and its downloaded files.
+
+MakerWorld extraction uses only public HTML/Open Graph/JSON-LD data. Private, removed,
+access-restricted, or challenge-protected pages are not bypassed, and some pages may
+provide fewer metadata fields or images. In-memory Telegram editing sessions do not
+survive a service restart; any already-created product remains an unpublished draft
+that can be reviewed in the Narada Druk admin area.
+
 Server `.env` baseline:
 
 ```env
