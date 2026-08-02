@@ -424,10 +424,11 @@ export async function moderateReviewAction(formData: FormData) {
   await requireAdminSession();
   const reviewId = parseOptionalInt(formData.get("reviewId"));
   const status = String(formData.get("status") ?? "");
-  if (!reviewId || ![ReviewStatus.approved, ReviewStatus.rejected].includes(status as ReviewStatus)) {
+  const isModeratedStatus = status === ReviewStatus.approved || status === ReviewStatus.rejected;
+  if (!reviewId || !isModeratedStatus) {
     redirect(messagePath(`${getAdminRoute()}/reviews`, "error", "Не вдалося змінити статус відгуку."));
   }
-  await setReviewStatus(reviewId, status as ReviewStatus);
+  await setReviewStatus(reviewId, status);
   redirect(messagePath(`${getAdminRoute()}/reviews/${reviewId}`, "ok", status === ReviewStatus.approved ? "Відгук опубліковано." : "Відгук приховано."));
 }
 
@@ -470,9 +471,14 @@ export async function updateOrderStatusAction(formData: FormData) {
   await requireAdminSession();
   const publicId = String(formData.get("publicId") ?? "");
   const status = String(formData.get("status") ?? "");
-  const allowedStatuses = [OrderStatus.new, OrderStatus.accepted, OrderStatus.shipped, OrderStatus.closed] as const;
-  if (!/^[0-9a-f-]{36}$/i.test(publicId) || !allowedStatuses.includes(status as (typeof allowedStatuses)[number])) redirect(getAdminRoute());
-  await updateOrderStatus(publicId, status as OrderStatus);
+  const orderStatus = status === OrderStatus.new
+    || status === OrderStatus.accepted
+    || status === OrderStatus.shipped
+    || status === OrderStatus.closed
+    ? status
+    : null;
+  if (!/^[0-9a-f-]{36}$/i.test(publicId) || !orderStatus) redirect(getAdminRoute());
+  await updateOrderStatus(publicId, orderStatus);
   redirect(messagePath(`${getAdminRoute()}/orders/${publicId}`, "ok", "Статус замовлення оновлено."));
 }
 
