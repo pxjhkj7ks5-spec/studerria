@@ -178,16 +178,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <p className="eyebrow">Про виріб</p>
             <h2>Опис і застосування</h2>
             <p className="product-description__body">{product.fullDescription}</p>
-            {product.sourceModelUrl ? (
-              <a
-                className="model-source-link"
-                href={product.sourceModelUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Джерело моделі: MakerWorld
-              </a>
-            ) : null}
           </article>
         </section>
 

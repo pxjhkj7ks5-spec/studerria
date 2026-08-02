@@ -474,7 +474,7 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
           create: downloadedImages.map((image, index) => ({
             fileName: image.fileName,
             urlPath: image.urlPath,
-            alt: `${model.title} — фото ${index + 1} із MakerWorld`,
+            alt: `${model.title} — фото ${index + 1}`,
             sortOrder: (index + 1) * 10,
             isCover: index === 0,
           })),
@@ -584,7 +584,6 @@ function telegramPostText(session: DraftSession, contactLink: string, channelLin
   if (channelLink) {
     lines.push(`✦ <a href="${escapeHtml(channelLink)}"><b>NARADA DRUK</b></a>`);
   }
-  lines.push(`🔗 <a href="${escapeHtml(session.sourceUrl)}">Модель на MakerWorld</a>`);
   return lines.join("\n");
 }
 
@@ -676,7 +675,7 @@ async function finalizeProduct(session: DraftSession) {
         data: {
           productId: existing.id,
           isCover: false,
-          alt: `${session.title} — фото з MakerWorld`,
+          alt: `${session.title} — фото товару`,
         },
       });
       await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
@@ -711,7 +710,7 @@ async function finalizeProduct(session: DraftSession) {
     });
     await transaction.productImage.updateMany({
       where: { productId: session.draftProductId, id: { in: chosenIds } },
-      data: { isCover: false, alt: `${session.title} — фото з MakerWorld` },
+      data: { isCover: false, alt: `${session.title} — фото товару` },
     });
     await transaction.productImage.update({ where: { id: chosenIds[0] }, data: { isCover: true } });
     return transaction.product.update({

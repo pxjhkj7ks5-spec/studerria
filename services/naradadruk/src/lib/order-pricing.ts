@@ -1,6 +1,5 @@
 import { ProductStatus, type PrismaClient } from "@prisma/client";
-import { withBasePath } from "@/lib/base-path";
-import { siteBaseUrl } from "@/lib/constants";
+import { absoluteSiteUrl } from "@/lib/constants";
 import { effectiveUnitPrice, calculatePromoDiscount } from "@/lib/pricing";
 
 type DbClient = Pick<PrismaClient, "product" | "promoCode">;
@@ -39,7 +38,7 @@ export async function priceRequestedItems(db: DbClient, input: RequestedItem[]) 
       productId: product.id,
       productSlug: product.slug,
       productTitle: product.title,
-      productUrl: new URL(withBasePath(`/product/${product.slug}`), siteBaseUrl).toString(),
+      productUrl: absoluteSiteUrl(`/product/${encodeURIComponent(product.slug)}`),
       variantId: variant?.id ?? null,
       variantLabel: variant?.label ?? "",
       quantity: item.quantity,

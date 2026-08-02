@@ -28,7 +28,10 @@ type NotificationOrder = {
 };
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[char] || char);
+  return value.replace(
+    /[&<>"']/g,
+    (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char,
+  );
 }
 
 function formatAmount(value: number) {
@@ -54,7 +57,10 @@ export async function notifyOwnerAboutOrder(order: NotificationOrder) {
 
   const itemLines = order.items.map((item, index) => {
     const variant = item.variantLabel ? ` — ${escapeHtml(item.variantLabel)}` : "";
-    return `${index + 1}. <a href="${escapeHtml(item.productUrl)}">${escapeHtml(item.productTitle)}</a>${variant}\n${item.quantity} × ${formatAmount(item.unitPrice)} = <b>${formatAmount(item.totalPrice)}</b>`;
+    const productLink = item.productUrl
+      ? `\n🔗 <a href="${escapeHtml(item.productUrl)}">Відкрити товар на сайті</a>`
+      : "";
+    return `${index + 1}. ${escapeHtml(item.productTitle)}${variant}${productLink}\n${item.quantity} × ${formatAmount(item.unitPrice)} = <b>${formatAmount(item.totalPrice)}</b>`;
   });
   const itemChunks: string[] = [];
   for (const line of itemLines) {
