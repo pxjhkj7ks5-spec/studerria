@@ -1,4 +1,4 @@
-import { PaperPlaneTilt } from "@phosphor-icons/react/ssr";
+import { PaperPlaneTilt, SquaresFour } from "@phosphor-icons/react/ssr";
 import { withBasePath } from "@/lib/base-path";
 import { buildTelegramLink } from "@/lib/telegram";
 import { TrackedLink } from "@/components/site/tracked-link";
@@ -39,6 +39,14 @@ export function SiteHeader({ telegramUrl }: SiteHeaderProps) {
         </nav>
 
         <div className="site-header__actions">
+          <a
+            className="mobile-catalog-link"
+            href={withBasePath("/catalog")}
+            aria-label="Відкрити каталог"
+          >
+            <SquaresFour aria-hidden size={18} weight="bold" />
+            <span>Каталог</span>
+          </a>
           <CartLink />
           <TrackedLink
             className="accent-pill site-header__cta"
