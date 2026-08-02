@@ -13,7 +13,7 @@ export const adminSessionTtlSeconds = 60 * 60 * 12;
 export const maxUploadSizeBytes = 8 * 1024 * 1024;
 export const defaultTelegramUrl = "https://t.me/naradaprint";
 export const publicPaymentNote =
-  "Післяплата або переказ після підтвердження. Для переказу власник надасть реквізити особисто в Telegram або телефоном.";
+  "Реквізити для оплати надійдуть після підтвердження замовлення.";
 
 export const supportFacts = [
   "PETG та інші матеріали під задачу",

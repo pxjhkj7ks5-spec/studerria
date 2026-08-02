@@ -55,7 +55,7 @@ export default async function OrderPage({ params }: { params: Promise<{ publicId
               <div><dt>Точка</dt><dd>{destination}</dd></div>
               <div><dt>Оплата</dt><dd>{paymentLabels[order.paymentMethod]}</dd></div>
             </dl>
-            {order.paymentMethod === "transfer" ? <div className="payment-note"><strong>Що далі</strong><p>Власник спочатку підтвердить замовлення, а потім надасть реквізити особисто в Telegram або телефоном.</p></div> : null}
+            {order.paymentMethod === "transfer" ? <div className="payment-note"><strong>Що далі</strong><p>Реквізити для оплати надійдуть після підтвердження замовлення.</p></div> : null}
           </section>
         </div>
 

@@ -239,8 +239,8 @@ export function CartCheckout() {
 
         <fieldset className="choice-group choice-group--payment">
           <legend>Оплата</legend>
+          <label className={paymentMethod === "transfer" ? "is-active" : ""}><input type="radio" name="paymentMethod" checked={paymentMethod === "transfer"} onChange={() => setPaymentMethod("transfer")} /><span><Check aria-hidden size={15} /> Переказ після підтвердження</span><small>Реквізити для оплати надійдуть після підтвердження замовлення.</small></label>
           <label className={paymentMethod === "cash_on_delivery" ? "is-active" : ""}><input type="radio" name="paymentMethod" checked={paymentMethod === "cash_on_delivery"} onChange={() => setPaymentMethod("cash_on_delivery")} /><span><Check aria-hidden size={15} /> Післяплата</span><small>Оплата під час отримання.</small></label>
-          <label className={paymentMethod === "transfer" ? "is-active" : ""}><input type="radio" name="paymentMethod" checked={paymentMethod === "transfer"} onChange={() => setPaymentMethod("transfer")} /><span><Check aria-hidden size={15} /> Переказ після підтвердження</span><small>Власник підтвердить замовлення та надасть реквізити особисто в Telegram або телефоном.</small></label>
         </fieldset>
 
         <label className="form-field"><span>Коментар <small>(необовʼязково)</small></span><textarea name="comment" rows={4} maxLength={1200} placeholder="Колір, побажання або уточнення до замовлення" /></label>
