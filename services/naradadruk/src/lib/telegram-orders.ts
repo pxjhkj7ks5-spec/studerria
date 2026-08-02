@@ -39,7 +39,7 @@ const deliveryLabels: Record<DeliveryMethod, string> = {
 
 const paymentLabels: Record<PaymentMethod, string> = {
   cash_on_delivery: "Післяплата",
-  transfer: "Переказ за реквізитами",
+  transfer: "Переказ після підтвердження",
 };
 
 export async function notifyOwnerAboutOrder(order: NotificationOrder) {

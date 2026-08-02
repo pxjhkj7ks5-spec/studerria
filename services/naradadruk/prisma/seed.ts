@@ -17,7 +17,8 @@ async function main() {
       materialsNote: "PETG та інші практичні матеріали під задачу.",
       leadTimeNote: "Від кількох годин до 3 днів залежно від складності.",
       deliveryNote: "Доставка по Україні, самовивіз у Києві.",
-      paymentNote: "Оплата на картку: часткова або повна передплата.",
+      paymentNote:
+        "Післяплата або переказ після підтвердження. Для переказу власник надасть реквізити особисто в Telegram або телефоном.",
       telegramUrl: process.env.TELEGRAM_CHANNEL_URL || "https://t.me/naradaprint",
       contactNote: "Для індивідуального виробу надішліть опис або фото прикладу в Telegram.",
     },

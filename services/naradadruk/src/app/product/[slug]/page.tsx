@@ -16,6 +16,7 @@ import {
   getSiteSettings,
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
+import { publicPaymentNote } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     {
       icon: CreditCard,
       title: "Оплата",
-      body: product.paymentNote || settings.paymentNote,
+      body: publicPaymentNote,
     },
   ];
 

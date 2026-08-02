@@ -1,6 +1,6 @@
 import { ProductStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { defaultTelegramUrl } from "@/lib/constants";
+import { defaultTelegramUrl, publicPaymentNote } from "@/lib/constants";
 import { deleteUploadFile } from "@/lib/storage";
 import { formatPrice, slugify } from "@/lib/utils";
 import {
@@ -120,7 +120,7 @@ export async function getSiteSettings() {
       materialsNote: "PETG та інші практичні матеріали під задачу.",
       leadTimeNote: "Від кількох годин до 3 днів залежно від складності.",
       deliveryNote: "Доставка по Україні, самовивіз у Києві.",
-      paymentNote: "Часткова або повна передплата на картку.",
+      paymentNote: publicPaymentNote,
       telegramUrl: defaultTelegramUrl,
       contactNote: "Надішліть приклад, розміри або ідею в Telegram, якщо потрібен індивідуальний виріб.",
     },

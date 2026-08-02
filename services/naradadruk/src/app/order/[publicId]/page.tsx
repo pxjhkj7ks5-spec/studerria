@@ -2,7 +2,6 @@ import { CheckCircle, Package, Truck } from "@phosphor-icons/react/ssr";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicFrame } from "@/components/site/public-frame";
-import { getTransferPaymentDetails } from "@/lib/checkout-config";
 import { getOrderByPublicId, getSiteSettings } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
 import { formatPrice } from "@/lib/utils";
@@ -11,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 const deliveryLabels = { branch: "Відділення Нової пошти", parcel_locker: "Поштомат Нової пошти", courier: "Курʼєр Нової пошти" } as const;
-const paymentLabels = { cash_on_delivery: "Післяплата", transfer: "Переказ за реквізитами" } as const;
+const paymentLabels = { cash_on_delivery: "Післяплата", transfer: "Переказ після підтвердження" } as const;
 const statusLabels = { new: "Нове", confirmed: "Підтверджено", processing: "Виготовляється", shipped: "Відправлено", completed: "Виконано", cancelled: "Скасовано" } as const;
 
 export default async function OrderPage({ params }: { params: Promise<{ publicId: string }> }) {
@@ -56,7 +55,7 @@ export default async function OrderPage({ params }: { params: Promise<{ publicId
               <div><dt>Точка</dt><dd>{destination}</dd></div>
               <div><dt>Оплата</dt><dd>{paymentLabels[order.paymentMethod]}</dd></div>
             </dl>
-            {order.paymentMethod === "transfer" ? <div className="payment-note"><strong>Реквізити</strong><p>{getTransferPaymentDetails()}</p></div> : null}
+            {order.paymentMethod === "transfer" ? <div className="payment-note"><strong>Що далі</strong><p>Власник спочатку підтвердить замовлення, а потім надасть реквізити особисто в Telegram або телефоном.</p></div> : null}
           </section>
         </div>
 

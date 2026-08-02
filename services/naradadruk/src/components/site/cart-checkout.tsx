@@ -20,7 +20,7 @@ type Option = { ref: string; label: string; secondary: string };
 type DeliveryMethod = "branch" | "parcel_locker" | "courier";
 type PaymentMethod = "cash_on_delivery" | "transfer";
 
-export function CartCheckout({ transferDetails }: { transferDetails: string }) {
+export function CartCheckout() {
   const { items, hydrated, total, updateQuantity, removeItem, clearCart } = useCart();
   const [cityName, setCityName] = useState("");
   const [cityRef, setCityRef] = useState("");
@@ -232,7 +232,7 @@ export function CartCheckout({ transferDetails }: { transferDetails: string }) {
         <fieldset className="choice-group choice-group--payment">
           <legend>Оплата</legend>
           <label className={paymentMethod === "cash_on_delivery" ? "is-active" : ""}><input type="radio" name="paymentMethod" checked={paymentMethod === "cash_on_delivery"} onChange={() => setPaymentMethod("cash_on_delivery")} /><span><Check aria-hidden size={15} /> Післяплата</span><small>Оплата під час отримання.</small></label>
-          <label className={paymentMethod === "transfer" ? "is-active" : ""}><input type="radio" name="paymentMethod" checked={paymentMethod === "transfer"} onChange={() => setPaymentMethod("transfer")} /><span><Check aria-hidden size={15} /> Переказ</span><small>{transferDetails}</small></label>
+          <label className={paymentMethod === "transfer" ? "is-active" : ""}><input type="radio" name="paymentMethod" checked={paymentMethod === "transfer"} onChange={() => setPaymentMethod("transfer")} /><span><Check aria-hidden size={15} /> Переказ після підтвердження</span><small>Власник підтвердить замовлення та надасть реквізити особисто в Telegram або телефоном.</small></label>
         </fieldset>
 
         <label className="form-field"><span>Коментар</span><textarea name="comment" rows={4} maxLength={1200} placeholder="Колір, побажання або уточнення до замовлення" /></label>

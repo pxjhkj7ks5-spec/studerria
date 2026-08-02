@@ -22,6 +22,7 @@ import {
   getVisibleCategories,
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
+import { publicPaymentNote } from "@/lib/constants";
 import { buildTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -103,7 +104,7 @@ export default async function HomePage() {
     ["Скільки коштує 3D-друк?", "Ціна залежить від розміру, матеріалу та складності. Надішліть задачу в Telegram — уточнимо вартість до старту."],
     ["Скільки часу займає виготовлення?", settings.leadTimeNote],
     ["Як відбувається доставка?", settings.deliveryNote],
-    ["Як оплатити замовлення?", settings.paymentNote],
+    ["Як оплатити замовлення?", publicPaymentNote],
   ];
 
   return (
