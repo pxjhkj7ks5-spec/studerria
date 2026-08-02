@@ -573,9 +573,8 @@ function telegramPostText(session: DraftSession, contactLink: string, channelLin
     "",
     `🧩 ${escapeHtml(session.telegramSummary)}`,
     "",
-    "🎨 Колір та інші параметри узгодимо перед виготовленням.",
     `💰 <b>${escapeHtml(priceLabel(session.price))}</b>`,
-    "◾ 3D-друк під замовлення з увагою до деталей.",
+    "◾ Акуратний і міцний 3D-друк під ваше замовлення.",
     "",
   ];
   lines.push(
