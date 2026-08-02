@@ -24,7 +24,8 @@ async function main() {
   await prisma.$executeRawUnsafe(`UPDATE "OrderItem" SET "regularUnitPrice" = "unitPrice" WHERE "regularUnitPrice" = 0`);
 
   const productImages = await prisma.productImage.findMany({
-    select: { id: true, fileName: true, urlPath: true },
+    select: { id: true, productId: true, fileName: true, urlPath: true },
+    orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { id: "asc" }],
   });
   const imageUrlRepairs = productImages.filter((image) => image.urlPath !== `/uploads/${image.fileName}`);
   for (const image of imageUrlRepairs) {
@@ -35,6 +36,18 @@ async function main() {
   }
   if (imageUrlRepairs.length > 0) {
     console.info(`[runtime-data] normalized ${imageUrlRepairs.length} product image URL path(s)`);
+  }
+
+  const seenProductFiles = new Set<string>();
+  const duplicateImageIds: number[] = [];
+  for (const image of productImages) {
+    const key = `${image.productId}\0${image.fileName}`;
+    if (seenProductFiles.has(key)) duplicateImageIds.push(image.id);
+    else seenProductFiles.add(key);
+  }
+  if (duplicateImageIds.length > 0) {
+    await prisma.productImage.deleteMany({ where: { id: { in: duplicateImageIds } } });
+    console.info(`[runtime-data] removed ${duplicateImageIds.length} duplicate product image row(s)`);
   }
 }
 

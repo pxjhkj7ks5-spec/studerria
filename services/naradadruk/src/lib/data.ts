@@ -30,6 +30,26 @@ function resolveCoverImage<
   return product.images.find((image) => image.isCover) ?? product.images[0] ?? null;
 }
 
+function normalizedProductImageUrl(urlPath: string) {
+  return urlPath
+    .trim()
+    .replace(/^\/naradadruk(?=\/uploads\/)/, "")
+    .replace(/[?#].*$/, "");
+}
+
+function dedupeProductImages<T extends { fileName?: string; urlPath: string }>(images: T[]) {
+  const seenFiles = new Set<string>();
+  const seenUrls = new Set<string>();
+  return images.filter((image) => {
+    const normalizedUrl = normalizedProductImageUrl(image.urlPath);
+    const fileKey = image.fileName?.trim() ?? "";
+    if ((fileKey && seenFiles.has(fileKey)) || (normalizedUrl && seenUrls.has(normalizedUrl))) return false;
+    if (fileKey) seenFiles.add(fileKey);
+    if (normalizedUrl) seenUrls.add(normalizedUrl);
+    return true;
+  });
+}
+
 function shuffled<T>(values: T[]) {
   const result = [...values];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -80,9 +100,11 @@ export function resolveProductPrice(product: {
 }
 
 function presentPublicProduct<T extends Prisma.ProductGetPayload<{ include: typeof publicProductInclude }>>(product: T) {
+  const images = dedupeProductImages(product.images);
   const pricing = productPricePresentation(product);
   return {
     ...product,
+    images,
     variants: product.variants.map((variant) => ({
       ...variant,
       regularPrice: variant.price,
@@ -90,7 +112,7 @@ function presentPublicProduct<T extends Prisma.ProductGetPayload<{ include: type
     })),
     regularBasePrice: product.basePrice,
     basePrice: product.basePrice === null ? null : effectiveUnitPrice(product, product.basePrice, true),
-    coverImage: resolveCoverImage(product),
+    coverImage: resolveCoverImage({ images }),
     ...pricing,
   };
 }
@@ -300,7 +322,7 @@ export async function getProductBySlug(slug: string) {
 }
 
 export async function getShowcaseImages(limit = 6) {
-  return prisma.productImage.findMany({
+  const images = await prisma.productImage.findMany({
     where: {
       product: {
         status: ProductStatus.published,
@@ -319,8 +341,9 @@ export async function getShowcaseImages(limit = 6) {
       },
     },
     orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
-    take: limit,
+    take: Math.max(limit * 4, limit),
   });
+  return dedupeProductImages(images).slice(0, limit);
 }
 
 export async function getRelatedProducts(
