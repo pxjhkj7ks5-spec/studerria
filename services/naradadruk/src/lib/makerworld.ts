@@ -276,7 +276,9 @@ export async function fetchMakerWorldModel(value: string): Promise<MakerWorldMod
 
   const candidates: unknown[] = [];
   $('meta[property="og:image"], meta[property="og:image:url"], meta[name="twitter:image"], meta[name="twitter:image:src"]').each(
-    (_index, element) => candidates.push($(element).attr("content")),
+    (_index, element) => {
+      candidates.push($(element).attr("content"));
+    },
   );
   candidates.push(...jsonLd.images.flatMap((image) => flattenImages(image)));
   $("img").each((_index, element) => {
