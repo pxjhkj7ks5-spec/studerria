@@ -28,9 +28,9 @@ export const orderInputSchema = z.object({
   telegramContact: z
     .string()
     .trim()
-    .min(3, "Поле «Telegram для підтвердження»: вкажіть username або номер телефону.")
-    .max(80, "Поле «Telegram для підтвердження»: максимально допустимо 80 символів.")
-    .regex(/^@?[a-zA-Z0-9_+().\-\s]+$/, "Поле «Telegram для підтвердження»: використайте username або номер телефону."),
+    .min(3, "Поле «Telegram для звʼязку»: вкажіть username або номер телефону.")
+    .max(80, "Поле «Telegram для звʼязку»: максимально допустимо 80 символів.")
+    .regex(/^@?[a-zA-Z0-9_+().\-\s]+$/, "Поле «Telegram для звʼязку»: використайте username або номер телефону."),
   cityName: trimmedText("Місто", 2, 120),
   cityRef: z.string().trim().max(80, "Поле «Місто»: некоректний ідентифікатор.").default(""),
   deliveryMethod: z.enum(["branch", "parcel_locker", "courier"]),
@@ -64,7 +64,7 @@ const fieldLabels: Record<string, string> = {
   lastName: "Прізвище",
   comment: "Коментар",
   phone: "Телефон",
-  telegramContact: "Telegram для підтвердження",
+  telegramContact: "Telegram для звʼязку",
   cityName: "Місто",
   deliveryMethod: "Спосіб доставки",
   deliveryDestination: "Точка доставки",
@@ -87,4 +87,3 @@ export function getOrderValidationMessage(error: z.ZodError) {
 }
 
 export type OrderInput = z.infer<typeof orderInputSchema>;
-

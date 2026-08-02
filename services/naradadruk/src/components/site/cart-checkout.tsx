@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   Check,
@@ -13,6 +13,7 @@ import {
   Truck,
 } from "@phosphor-icons/react";
 import { useCart } from "@/components/site/cart-provider";
+import { trackAnalytics } from "@/lib/analytics";
 import { withBasePath } from "@/lib/base-path";
 import { formatPrice } from "@/lib/utils";
 
@@ -37,7 +38,19 @@ export function CartCheckout() {
   const [promoCode, setPromoCode] = useState("");
   const [promo, setPromo] = useState<PromoPreview | null>(null);
   const [promoError, setPromoError] = useState("");
+  const checkoutTracked = useRef(false);
   const regularTotal = items.reduce((sum, item) => sum + item.regularUnitPrice * item.quantity, 0);
+
+  useEffect(() => {
+    if (!hydrated || items.length === 0 || checkoutTracked.current) return;
+    checkoutTracked.current = true;
+    trackAnalytics("Checkout Open", {
+      location: "cart",
+      intent: "product",
+      value: total,
+      items: items.reduce((sum, item) => sum + item.quantity, 0),
+    });
+  }, [hydrated, items, total]);
 
   useEffect(() => { setPromo(null); setPromoError(""); }, [total]);
 
@@ -164,8 +177,14 @@ export function CartCheckout() {
           })),
         }),
       });
-      const payload = (await response.json()) as { publicId?: string; error?: string };
+      const payload = (await response.json()) as { publicId?: string; total?: number; error?: string };
       if (!response.ok || !payload.publicId) throw new Error(payload.error || "Не вдалося оформити замовлення.");
+      trackAnalytics("Order Placed", {
+        location: "checkout-success",
+        intent: "product",
+        value: payload.total ?? promo?.total ?? total,
+        items: items.reduce((sum, item) => sum + item.quantity, 0),
+      });
       clearCart();
       window.location.assign(withBasePath(`/order/${payload.publicId}`));
     } catch (submitError) {
@@ -242,8 +261,8 @@ export function CartCheckout() {
         <div className="form-grid form-grid--two">
           <label><span>Імʼя</span><input name="firstName" autoComplete="given-name" minLength={2} maxLength={60} required /></label>
           <label><span>Прізвище</span><input name="lastName" autoComplete="family-name" minLength={2} maxLength={60} required /></label>
-          <label><span>Телефон</span><input name="phone" type="tel" autoComplete="tel" placeholder="+380…" required /><small>Для даних одержувача та уточнень.</small></label>
-          <label><span>Telegram для підтвердження</span><input name="telegramContact" placeholder="@username або номер" minLength={3} maxLength={80} required /><small>Майстерня підтвердить деталі тут.</small></label>
+          <label><span>Телефон</span><input name="phone" type="tel" autoComplete="tel" placeholder="+380…" required /><small>Для даних одержувача Нової пошти.</small></label>
+          <label><span>Telegram для звʼязку</span><input name="telegramContact" placeholder="@username або номер" minLength={3} maxLength={80} required /><small>Для підтвердження деталей замовлення.</small></label>
         </div>
 
         <label className="form-field form-field--options">
@@ -265,6 +284,9 @@ export function CartCheckout() {
             </label>
           ))}
         </fieldset>
+        <p className="checkout-delivery-note">
+          Вартість доставки розраховує Нова пошта за чинними тарифами та сплачується окремо.
+        </p>
 
         <label className="form-field form-field--options">
           <span>{deliveryMethod === "courier" ? "Адреса доставки" : deliveryMethod === "parcel_locker" ? "Поштомат" : "Відділення"}</span>
@@ -285,7 +307,7 @@ export function CartCheckout() {
         <button className="accent-pill accent-pill--large checkout-submit" type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Оформлюємо…" : `Оформити на ${formatPrice(promo?.total ?? total)}`}
         </button>
-        <p className="checkout-consent">Після оформлення ви побачите номер і статус замовлення. Вартість доставки сплачується окремо за тарифами Нової пошти.</p>
+        <p className="checkout-consent">Після оформлення ви побачите номер і статус замовлення.</p>
       </section>
     </form>
   );

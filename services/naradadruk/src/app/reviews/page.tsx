@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PublicFrame } from "@/components/site/public-frame";
 import { ReviewForm } from "@/components/site/review-form";
 import { StructuredData } from "@/components/site/structured-data";
-import { getApprovedReviews, getSiteSettings } from "@/lib/data";
+import { getApprovedReviews, getReviewOrderContext, getSiteSettings } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
 import { siteName } from "@/lib/constants";
 import { absoluteSiteUrl } from "@/lib/site-url";
@@ -23,8 +23,17 @@ function reviewDate(value: Date) {
   return new Intl.DateTimeFormat("uk-UA", { dateStyle: "long", timeZone: "Europe/Kyiv" }).format(value);
 }
 
-export default async function ReviewsPage() {
-  const [settings, reviews] = await Promise.all([getSiteSettings(), getApprovedReviews()]);
+export default async function ReviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ order?: string }>;
+}) {
+  const query = await searchParams;
+  const [settings, reviews, reviewOrder] = await Promise.all([
+    getSiteSettings(),
+    getApprovedReviews(),
+    query.order ? getReviewOrderContext(query.order) : null,
+  ]);
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
       <StructuredData data={{
@@ -49,7 +58,10 @@ export default async function ReviewsPage() {
             {reviews.length > 0 ? reviews.map((review) => (
               <article className="review-card" key={review.id}>
                 <header>
-                  <strong>{review.isAnonymous || !review.displayName ? "Анонімно" : review.displayName}</strong>
+                  <div>
+                    <strong>{review.isAnonymous || !review.displayName ? "Анонімно" : review.displayName}</strong>
+                    {review.verifiedPurchase ? <span className="review-verified">Підтверджене замовлення</span> : null}
+                  </div>
                   <time dateTime={review.createdAt.toISOString()}>{reviewDate(review.createdAt)}</time>
                 </header>
                 <p>{review.body}</p>
@@ -69,7 +81,14 @@ export default async function ReviewsPage() {
               </div>
             )}
           </div>
-          <ReviewForm />
+          <ReviewForm
+            orderContext={reviewOrder ? {
+              publicId: reviewOrder.publicId,
+              number: reviewOrder.publicId.slice(0, 8).toUpperCase(),
+              alreadySubmitted: Boolean(reviewOrder.review),
+            } : null}
+            invalidOrderLink={Boolean(query.order && !reviewOrder)}
+          />
         </section>
       </main>
     </PublicFrame>

@@ -1,7 +1,10 @@
 import { NotificationStatus, type Review, type ReviewImage } from "@prisma/client";
 import { readUploadFile, contentTypeForUpload } from "@/lib/storage";
 
-type ReviewWithImages = Review & { images: ReviewImage[] };
+type ReviewWithImages = Review & {
+  images: ReviewImage[];
+  order: { publicId: string } | null;
+};
 type TelegramResponse<T> = { ok?: boolean; result?: T; description?: string };
 
 function escapeHtml(value: string) {
@@ -71,6 +74,9 @@ export async function notifyOwnerAboutReview(review: ReviewWithImages) {
     const text = [
       "🗣 <b>Новий відгук на модерацію</b>",
       `Автор: <b>${escapeHtml(name)}</b>`,
+      review.verifiedPurchase && review.order
+        ? `✅ Підтверджене замовлення <b>#${escapeHtml(review.order.publicId.slice(0, 8).toUpperCase())}</b>`
+        : "Без привʼязки до замовлення",
       `Фото: ${review.images.length}`,
       "",
       escapeHtml(review.body.slice(0, 3000)),

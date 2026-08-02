@@ -14,6 +14,7 @@ import {
   uploadProductImageAction,
 } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/admin/submit-button";
+import { assessProductReadiness } from "@/lib/product-readiness";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
   }
 
   const { product, categories, settings } = data;
+  const readiness = assessProductReadiness(product);
 
   return (
     <main className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-6 md:py-8">
@@ -93,6 +95,28 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
         {query.ok ? <div className="status-message status-message--ok">{query.ok}</div> : null}
         {query.error ? <div className="status-message status-message--error">{query.error}</div> : null}
       </div>
+
+      <section className="glass-panel mt-6 rounded-[2rem] p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">Готовність до публікації</p>
+            <h2 className="mt-2 font-display text-3xl tracking-[-0.05em] text-white">
+              {readiness.ready ? "Картка готова" : "Картку варто доповнити"}
+            </h2>
+            <p className="mt-2 text-sm text-[--muted]">
+              Пройдено {readiness.passedCount} із {readiness.totalCount} перевірок якості.
+            </p>
+          </div>
+          <strong className="font-display text-5xl tracking-[-0.06em] text-white">{readiness.score}%</strong>
+        </div>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {readiness.checks.map((check) => (
+            <div className={check.passed ? "rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-sm text-emerald-100" : "rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-sm text-amber-100"} key={check.key}>
+              <strong>{check.passed ? "Готово" : "Додайте"}</strong> · {check.label}
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.6fr_0.4fr]">
         <section className="grid gap-6">

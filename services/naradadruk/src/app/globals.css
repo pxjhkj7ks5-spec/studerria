@@ -1022,6 +1022,109 @@ img {
   font-size: 0.68rem;
 }
 
+.admin-commerce {
+  margin-top: 2rem;
+  padding: 1.35rem 0 1.5rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-commerce__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.admin-commerce__heading h3 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 1rem;
+  font-weight: 760;
+}
+
+.admin-commerce__heading p,
+.admin-commerce__revenue small {
+  margin: 0.35rem 0 0;
+  color: var(--admin-soft);
+  font-size: 0.73rem;
+}
+
+.admin-commerce__revenue {
+  display: grid;
+  justify-items: end;
+}
+
+.admin-commerce__revenue span {
+  color: var(--admin-soft);
+  font-size: 0.68rem;
+  font-weight: 720;
+}
+
+.admin-commerce__revenue strong {
+  margin-top: 0.25rem;
+  color: var(--admin-text);
+  font-size: 1.7rem;
+  letter-spacing: -0.05em;
+}
+
+.admin-funnel {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 1.3rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--admin-border);
+  list-style: none;
+}
+
+.admin-funnel li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1rem 1rem 0 0;
+}
+
+.admin-funnel li + li {
+  padding-left: 1rem;
+  border-left: 1px solid var(--admin-border);
+}
+
+.admin-funnel li > span {
+  width: 1.65rem;
+  height: 1.65rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(244, 123, 53, 0.1);
+  color: var(--accent-strong);
+  font-size: 0.65rem;
+  font-weight: 780;
+}
+
+.admin-funnel small,
+.admin-funnel strong {
+  display: block;
+}
+
+.admin-funnel small {
+  color: var(--admin-soft);
+  font-size: 0.63rem;
+}
+
+.admin-funnel strong {
+  margin-top: 0.18rem;
+  color: var(--admin-text);
+  font-size: 1.2rem;
+}
+
+.admin-funnel em {
+  color: var(--admin-soft);
+  font-size: 0.65rem;
+  font-style: normal;
+  font-weight: 720;
+}
+
 .admin-delta {
   display: inline-flex;
   align-items: center;
@@ -1420,6 +1523,15 @@ img {
     grid-template-columns: 1fr;
   }
 
+  .admin-funnel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-funnel li:nth-child(4) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
   .admin-chart-panel {
     padding-right: 0;
     padding-bottom: 2rem;
@@ -1492,6 +1604,27 @@ img {
 
   .admin-chart-panel__header {
     flex-direction: column;
+  }
+
+  .admin-commerce__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-commerce__revenue {
+    justify-items: start;
+  }
+
+  .admin-funnel {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-funnel li,
+  .admin-funnel li + li,
+  .admin-funnel li:nth-child(4) {
+    padding: 0.85rem 0;
+    border-top: 1px solid var(--admin-border);
+    border-left: 0;
   }
 
   .admin-analytics__details {

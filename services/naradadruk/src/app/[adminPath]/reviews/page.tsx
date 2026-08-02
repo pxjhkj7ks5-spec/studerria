@@ -40,7 +40,7 @@ export default async function AdminReviewsPage({ params, searchParams }: {
           <a className="grid gap-2 rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20" href={withBasePath(`${base}/${review.id}`)} key={review.id}>
             <span className="flex flex-wrap justify-between gap-3"><strong className="text-white">{review.isAnonymous || !review.displayName ? "Анонімно" : review.displayName}</strong><span className="text-sm text-[--accent]">{reviewStatusLabels[review.status]}</span></span>
             <span className="line-clamp-2 text-sm text-[--muted]">{review.body}</span>
-            <small className="text-[--muted]">{review.images.length} фото · {new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(review.createdAt)}</small>
+            <small className="text-[--muted]">{review.verifiedPurchase ? `Підтверджене замовлення #${review.order?.publicId.slice(0, 8).toUpperCase()} · ` : ""}{review.images.length} фото · {new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(review.createdAt)}</small>
           </a>
         )) : <p className="text-sm text-[--muted]">Відгуків за цим фільтром немає.</p>}
       </section>

@@ -1,4 +1,5 @@
 import type { DeliveryMethod, PaymentMethod } from "@prisma/client";
+import { absoluteSiteUrl } from "@/lib/site-url";
 
 type NotificationOrder = {
   publicId: string;
@@ -62,6 +63,7 @@ export async function notifyOwnerAboutOrder(order: NotificationOrder) {
       : "";
     return `${index + 1}. ${escapeHtml(item.productTitle)}${variant}${productLink}\n${item.quantity} × ${formatAmount(item.unitPrice)} = <b>${formatAmount(item.totalPrice)}</b>`;
   });
+  const reviewUrl = `${absoluteSiteUrl("/reviews")}?order=${encodeURIComponent(order.publicId)}`;
   const itemChunks: string[] = [];
   for (const line of itemLines) {
     const current = itemChunks.at(-1) ?? "";
@@ -113,14 +115,16 @@ export async function notifyOwnerAboutOrder(order: NotificationOrder) {
         text,
         parse_mode: "HTML",
         disable_web_page_preview: true,
-        reply_markup: { inline_keyboard: [[
-          { text: "Відкрити замовлення", callback_data: `order:view:${order.publicId}` },
-          { text: "Прийняти в роботу", callback_data: `order:status:${order.publicId}:accepted` },
-        ]] },
+        reply_markup: { inline_keyboard: [
+          [
+            { text: "Відкрити замовлення", callback_data: `order:view:${order.publicId}` },
+            { text: "Прийняти в роботу", callback_data: `order:status:${order.publicId}:accepted` },
+          ],
+          [{ text: "Відгук для покупця", url: reviewUrl }],
+        ] },
       });
     return { status: "sent" as const, error: "" };
   } catch (error) {
     return { status: "failed" as const, error: error instanceof Error ? error.message.slice(0, 500) : "Unknown Telegram error" };
   }
 }
-

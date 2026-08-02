@@ -5,6 +5,9 @@ export const analyticsEventNames = [
   "Catalog Open",
   "Product Open",
   "Catalog Filter",
+  "Add to Cart",
+  "Checkout Open",
+  "Order Placed",
   "Telegram Lead",
   "Custom Lead",
 ] as const;
@@ -17,6 +20,8 @@ export type PlausibleEventProps = Partial<{
   intent: "product" | "custom" | "catalog";
   product_slug: string;
   category: string;
+  value: number;
+  items: number;
 }>;
 
 const analyticsSessionStorageKey = "naradadruk-analytics-session-v1";

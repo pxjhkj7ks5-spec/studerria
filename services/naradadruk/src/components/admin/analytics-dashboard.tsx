@@ -25,6 +25,9 @@ const eventLabels: Record<AnalyticsEventName, string> = {
   "Catalog Open": "Відкриття каталогу",
   "Product Open": "Відкриття товару",
   "Catalog Filter": "Пошук або фільтр",
+  "Add to Cart": "Додавання в кошик",
+  "Checkout Open": "Початок оформлення",
+  "Order Placed": "Оформлене замовлення",
   "Telegram Lead": "Перехід у Telegram",
   "Custom Lead": "Запит на власний виріб",
 };
@@ -129,6 +132,13 @@ export function AnalyticsDashboard({
     ...report.daily.flatMap((day) => [day.views, day.clicks]),
   );
   const maxActionCount = Math.max(1, ...report.actions.map((item) => item.count));
+  const commerceStages = [
+    { label: "Перегляди", value: report.current.views, rate: 100 },
+    { label: "Товари", value: report.commerce.productOpens, rate: report.commerce.viewToProductRate },
+    { label: "Кошик", value: report.commerce.addToCarts, rate: report.commerce.productToCartRate },
+    { label: "Оформлення", value: report.commerce.checkouts, rate: report.commerce.cartToCheckoutRate },
+    { label: "Замовлення", value: report.commerce.orders, rate: report.commerce.checkoutToOrderRate },
+  ];
 
   return (
     <section className="admin-analytics" id="analytics">
@@ -185,6 +195,32 @@ export function AnalyticsDashboard({
           note="анонімні сесії"
         />
       </div>
+
+      <section className="admin-commerce" aria-labelledby="commerce-funnel-title">
+        <div className="admin-commerce__heading">
+          <div>
+            <h3 id="commerce-funnel-title">Воронка замовлення</h3>
+            <p>Від перегляду сторінок до завершеного оформлення.</p>
+          </div>
+          <div className="admin-commerce__revenue">
+            <span>Оборот із сайту</span>
+            <strong>{new Intl.NumberFormat("uk-UA").format(report.commerce.revenue)} грн</strong>
+            <small>{report.commerce.viewToOrderRate}% замовлень від переглядів</small>
+          </div>
+        </div>
+        <ol className="admin-funnel">
+          {commerceStages.map((stage, index) => (
+            <li key={stage.label}>
+              <span>{index + 1}</span>
+              <div>
+                <small>{stage.label}</small>
+                <strong>{stage.value}</strong>
+              </div>
+              <em>{index === 0 ? "старт" : `${stage.rate}%`}</em>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <div className="admin-analytics__primary">
         <div className="admin-chart-panel">
@@ -305,7 +341,7 @@ export function AnalyticsDashboard({
                   <span className="admin-data-row__index">{index + 1}</span>
                   <div className="admin-data-row__main">
                     <strong>{productTitles[product.slug] ?? product.slug}</strong>
-                    <span>{product.opens} відкриттів</span>
+                    <span>{product.opens} відкриттів · {product.carts} у кошик</span>
                   </div>
                   <div className="admin-data-row__value">
                     {product.leads} у Telegram

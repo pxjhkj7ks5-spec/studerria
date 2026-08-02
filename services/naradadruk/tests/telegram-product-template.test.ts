@@ -20,7 +20,7 @@ test("parses the documented template as a published product", () => {
   }
 
   assert.equal(result.product.title, "Настінне кріплення для навушників");
-  assert.equal(result.product.category, "3D друк");
+  assert.equal(result.product.category, "Інше");
   assert.equal(result.product.basePrice, 350);
   assert.equal(result.product.shouldPublish, true);
   assert.equal(result.product.material, "PETG");

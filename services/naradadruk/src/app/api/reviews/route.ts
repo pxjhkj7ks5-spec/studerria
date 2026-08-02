@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { createPrivacyHash } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -57,6 +58,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Загальний розмір фото не може перевищувати 12 MB." }, { status: 400 });
   }
 
+  const orderPublicId = String(formData.get("orderPublicId") ?? "").trim();
+  const reviewOrder = orderPublicId
+    ? await prisma.order.findUnique({
+        where: { publicId: orderPublicId },
+        select: { id: true, review: { select: { id: true } } },
+      })
+    : null;
+  if (orderPublicId && !reviewOrder) {
+    return NextResponse.json({ error: "Посилання на замовлення недійсне." }, { status: 400 });
+  }
+  if (reviewOrder?.review) {
+    return NextResponse.json({ error: "Відгук за цим замовленням уже надіслано." }, { status: 409 });
+  }
+
   const addressHash = createPrivacyHash("review-ip", getClientAddress(request));
   const contentHash = createHash("sha256")
     .update(parsed.data.body.toLocaleLowerCase("uk-UA").replace(/\s+/g, " "))
@@ -93,6 +108,8 @@ export async function POST(request: Request) {
         body: parsed.data.body,
         ipHash: addressHash,
         contentHash,
+        orderId: reviewOrder?.id ?? null,
+        verifiedPurchase: Boolean(reviewOrder),
         images: {
           create: stored.map((image, index) => ({
             fileName: image.fileName,
@@ -102,7 +119,10 @@ export async function POST(request: Request) {
           })),
         },
       },
-      include: { images: { orderBy: { sortOrder: "asc" } } },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        order: { select: { publicId: true } },
+      },
     });
 
     const notification = await notifyOwnerAboutReview(review);
@@ -120,6 +140,9 @@ export async function POST(request: Request) {
     await Promise.all(stored.map((image) => deleteUploadFile(image.fileName)));
     if (error instanceof ReviewSubmissionError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "Відгук за цим замовленням уже надіслано." }, { status: 409 });
     }
     const message = error instanceof Error && /фото|JPG|PNG|WebP|MB/.test(error.message)
       ? error.message

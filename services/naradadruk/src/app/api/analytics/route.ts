@@ -16,6 +16,8 @@ const analyticsPayloadSchema = z.object({
       intent: z.enum(["product", "custom", "catalog"]).optional(),
       product_slug: z.string().trim().max(120).optional(),
       category: z.string().trim().max(120).optional(),
+      value: z.number().int().min(0).max(10_000_000).optional(),
+      items: z.number().int().min(0).max(1_000).optional(),
     })
     .optional(),
 });
@@ -93,6 +95,8 @@ export async function POST(request: Request) {
         intent: parsed.data.props?.intent ?? "",
         productSlug: parsed.data.props?.product_slug ?? "",
         category: parsed.data.props?.category ?? "",
+        value: parsed.data.props?.value ?? 0,
+        itemCount: parsed.data.props?.items ?? 0,
       },
     });
 

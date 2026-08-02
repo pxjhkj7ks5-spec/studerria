@@ -24,7 +24,7 @@ export default async function AdminReviewPage({ params, searchParams }: {
   return (
     <main className="mx-auto w-full max-w-[1000px] px-4 py-6 md:px-6 md:py-8">
       <a className="text-sm text-[--muted]" href={withBasePath(`${getAdminRoute()}/reviews`)}>До списку відгуків</a>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-5xl tracking-[-0.06em] text-white">Відгук #{review.id}</h1><p className="mt-2 text-[--accent]">{reviewStatusLabels[review.status]}</p></div><strong className="text-white">{review.isAnonymous || !review.displayName ? "Анонімно" : review.displayName}</strong></div>
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-5xl tracking-[-0.06em] text-white">Відгук #{review.id}</h1><p className="mt-2 text-[--accent]">{reviewStatusLabels[review.status]}</p>{review.verifiedPurchase && review.order ? <a className="mt-3 inline-flex text-sm text-white/80 underline" href={withBasePath(`${getAdminRoute()}/orders/${review.order.publicId}`)}>Підтверджене замовлення #{review.order.publicId.slice(0, 8).toUpperCase()}</a> : null}</div><strong className="text-white">{review.isAnonymous || !review.displayName ? "Анонімно" : review.displayName}</strong></div>
       {query.ok ? <div className="status-message status-message--ok mt-5">{query.ok}</div> : null}
       {query.error ? <div className="status-message status-message--error mt-5">{query.error}</div> : null}
       <section className="glass-panel mt-6 rounded-[2rem] p-6">

@@ -89,7 +89,20 @@ export function ProductCard({
             <p className="product-card__price">{product.priceLabel}</p>
             {product.isOnSale ? <small>{product.saleEndsAt ? `Акція до ${new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(product.saleEndsAt)}` : "Акційна ціна діє зараз"}</small> : null}
           </div>
-          {typeof unitPrice === "number" ? (
+          {product.variants.length > 0 ? (
+            <TrackedLink
+              className="accent-pill"
+              href={productPath}
+              eventName="Product Open"
+              eventProps={{
+                location: "product-card-variant-picker",
+                product_slug: product.slug,
+                category: product.category.name,
+              }}
+            >
+              Обрати варіант
+            </TrackedLink>
+          ) : typeof unitPrice === "number" ? (
             <AddToCartButton
               compactLabel
               item={{

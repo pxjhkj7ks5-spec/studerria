@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, ShoppingBag } from "@phosphor-icons/react";
 import { useCart } from "@/components/site/cart-provider";
+import { trackPlausible } from "@/lib/analytics";
 import type { CartProductInput } from "@/lib/cart";
 
 export function AddToCartButton({
@@ -19,6 +20,13 @@ export function AddToCartButton({
 
   function handleClick() {
     addItem(item);
+    trackPlausible("Add to Cart", {
+      location: compactLabel ? "product-card" : "product-page",
+      intent: "product",
+      product_slug: item.productSlug,
+      value: item.unitPrice,
+      items: 1,
+    });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   }
@@ -30,4 +38,3 @@ export function AddToCartButton({
     </button>
   );
 }
-

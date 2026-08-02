@@ -10,6 +10,7 @@ import {
   parseMakerWorldUrl,
   type MakerWorldModel,
 } from "../src/lib/makerworld";
+import { absoluteSiteUrl } from "../src/lib/site-url";
 
 type TelegramUser = { id: number };
 type TelegramChat = { id: number; type: string };
@@ -1144,7 +1145,8 @@ async function showOrderCard(chatId: string, publicId: string, replaceMessageId?
   const statusButtons = order.status === "new" ? [{ text: "Прийняти в роботу", callback_data: `order:status:${publicId}:accepted` }]
     : order.status === "accepted" ? [{ text: "Відправлено", callback_data: `order:status:${publicId}:shipped` }]
     : [];
-  const keyboard = { inline_keyboard: [statusButtons, [{ text: "Додати коментар", callback_data: `order:comment:${publicId}` }], order.status !== "closed" ? [{ text: "Закрити", callback_data: `order:close:${publicId}` }] : [], [{ text: "До активних", callback_data: "order:list" }]].filter((row) => row.length > 0) };
+  const reviewUrl = `${absoluteSiteUrl("/reviews")}?order=${encodeURIComponent(order.publicId)}`;
+  const keyboard = { inline_keyboard: [statusButtons, [{ text: "Додати коментар", callback_data: `order:comment:${publicId}` }], [{ text: "Відгук для покупця", url: reviewUrl }], order.status !== "closed" ? [{ text: "Закрити", callback_data: `order:close:${publicId}` }] : [], [{ text: "До активних", callback_data: "order:list" }]].filter((row) => row.length > 0) };
   if (replaceMessageId) {
     const edited = await telegramJson("editMessageText", { chat_id: chatId, message_id: replaceMessageId, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: keyboard }).catch(() => null);
     if (edited) return;
@@ -1304,7 +1306,7 @@ async function handleMessage(message: TelegramMessage) {
   if (!isAuthorizedOwnerChat(message)) return;
   if (!message.text && message.caption) message.text = message.caption;
   const chatId = String(message.chat.id);
-  let session = sessions.get(chatId);
+  const session = sessions.get(chatId);
 
   if (message.photo?.length) {
     if (!session || session.draftProductId <= 0) {

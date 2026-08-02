@@ -19,6 +19,7 @@ import { OrderDashboard } from "@/components/admin/order-dashboard";
 import { telegramProductTemplate } from "@/lib/telegram-product-template";
 import { parseAnalyticsRange } from "@/lib/analytics-report";
 import { normalizeIpAddress, trustedClientIpHeader, trustedClientIpSourceHeader } from "@/lib/analytics-ip";
+import { assessProductReadiness } from "@/lib/product-readiness";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,9 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
   const currentAnalyticsIpSource = requestHeaders.get(trustedClientIpSourceHeader);
   const productTitles = Object.fromEntries(
     products.map((product) => [product.slug, product.title]),
+  );
+  const productReadiness = Object.fromEntries(
+    products.map((product) => [product.id, assessProductReadiness(product)]),
   );
 
   return (
@@ -458,6 +462,9 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
                             <div className="text-sm font-semibold text-white">{product.priceLabel}</div>
                             <div className="mt-1 text-xs uppercase tracking-[0.2em] text-[--muted]">
                               {product.status === "published" ? "Published" : "Draft"}
+                            </div>
+                            <div className={productReadiness[product.id].ready ? "mt-1 text-xs text-emerald-200" : "mt-1 text-xs text-amber-200"}>
+                              Готовність {productReadiness[product.id].score}%
                             </div>
                           </div>
                         </div>

@@ -29,10 +29,20 @@ export type AnalyticsEventRecord = {
   productSlug: string;
   category: string;
   sessionId: string;
+  value: number;
+  itemCount: number;
   createdAt: Date;
 };
 
-type MetricKey = "views" | "clicks" | "leads" | "sessions";
+type MetricKey =
+  | "views"
+  | "clicks"
+  | "leads"
+  | "sessions"
+  | "addToCarts"
+  | "checkouts"
+  | "orders"
+  | "revenue";
 
 function dayKey(date: Date) {
   return kyivDayFormatter.format(date);
@@ -60,11 +70,18 @@ function metricSummary(events: AnalyticsEventRecord[]) {
   const leads = events.filter(
     (event) => event.name === "Telegram Lead" || event.name === "Custom Lead",
   ).length;
+  const addToCarts = events.filter((event) => event.name === "Add to Cart").length;
+  const checkouts = events.filter((event) => event.name === "Checkout Open").length;
+  const orderEvents = events.filter((event) => event.name === "Order Placed");
 
   return {
     views,
     clicks: events.length - views,
     leads,
+    addToCarts,
+    checkouts,
+    orders: orderEvents.length,
+    revenue: orderEvents.reduce((sum, event) => sum + event.value, 0),
     sessions: new Set(
       events.map((event) => event.sessionId).filter(Boolean),
     ).size,
@@ -77,6 +94,10 @@ function metricDelta(current: number, previous: number) {
   }
 
   return Math.round(((current - previous) / previous) * 100);
+}
+
+function conversionRate(current: number, previous: number) {
+  return previous > 0 ? Math.round((current / previous) * 1_000) / 10 : 0;
 }
 
 function countBy<T>(
@@ -150,7 +171,7 @@ export function buildAnalyticsReport(
     count: item.count,
   }));
 
-  const productStats = new Map<string, { opens: number; leads: number }>();
+  const productStats = new Map<string, { opens: number; carts: number; leads: number }>();
 
   for (const event of currentEvents) {
     if (!event.productSlug) {
@@ -159,6 +180,7 @@ export function buildAnalyticsReport(
 
     const currentProduct = productStats.get(event.productSlug) ?? {
       opens: 0,
+      carts: 0,
       leads: 0,
     };
 
@@ -170,6 +192,10 @@ export function buildAnalyticsReport(
       currentProduct.leads += 1;
     }
 
+    if (event.name === "Add to Cart") {
+      currentProduct.carts += 1;
+    }
+
     productStats.set(event.productSlug, currentProduct);
   }
 
@@ -177,7 +203,7 @@ export function buildAnalyticsReport(
     .map(([slug, values]) => ({
       slug,
       ...values,
-      total: values.opens + values.leads,
+      total: values.opens + values.carts + values.leads,
     }))
     .sort(
       (left, right) =>
@@ -198,9 +224,25 @@ export function buildAnalyticsReport(
     previous,
     deltas,
     conversionRate:
-      current.views > 0
-        ? Math.round((current.leads / current.views) * 1000) / 10
-        : 0,
+      conversionRate(current.leads, current.views),
+    commerce: {
+      productOpens: currentEvents.filter((event) => event.name === "Product Open").length,
+      addToCarts: current.addToCarts,
+      checkouts: current.checkouts,
+      orders: current.orders,
+      revenue: current.revenue,
+      viewToProductRate: conversionRate(
+        currentEvents.filter((event) => event.name === "Product Open").length,
+        current.views,
+      ),
+      productToCartRate: conversionRate(
+        current.addToCarts,
+        currentEvents.filter((event) => event.name === "Product Open").length,
+      ),
+      cartToCheckoutRate: conversionRate(current.checkouts, current.addToCarts),
+      checkoutToOrderRate: conversionRate(current.orders, current.checkouts),
+      viewToOrderRate: conversionRate(current.orders, current.views),
+    },
     daily,
     actions,
     topProducts,

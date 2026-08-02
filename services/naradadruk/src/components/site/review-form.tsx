@@ -3,7 +3,19 @@
 import { useState, type FormEvent } from "react";
 import { withBasePath } from "@/lib/base-path";
 
-export function ReviewForm() {
+type ReviewOrderContext = {
+  publicId: string;
+  number: string;
+  alreadySubmitted: boolean;
+};
+
+export function ReviewForm({
+  orderContext,
+  invalidOrderLink = false,
+}: {
+  orderContext?: ReviewOrderContext | null;
+  invalidOrderLink?: boolean;
+}) {
   const [anonymous, setAnonymous] = useState(false);
   const [state, setState] = useState<{ kind: "idle" | "sending" | "success" | "error"; message?: string }>({ kind: "idle" });
 
@@ -12,6 +24,7 @@ export function ReviewForm() {
     const form = event.currentTarget;
     const data = new FormData(form);
     data.set("isAnonymous", anonymous ? "true" : "false");
+    if (orderContext?.publicId) data.set("orderPublicId", orderContext.publicId);
     setState({ kind: "sending" });
     try {
       const response = await fetch(withBasePath("/api/reviews"), { method: "POST", body: data });
@@ -32,6 +45,21 @@ export function ReviewForm() {
         <h2>Залишити відгук</h2>
         <p>Усі відгуки спочатку перевіряються. Можна додати до 4 фото.</p>
       </div>
+
+      {orderContext ? (
+        <div className={orderContext.alreadySubmitted ? "status-message" : "review-order-context"}>
+          <strong>Замовлення #{orderContext.number}</strong>
+          <span>
+            {orderContext.alreadySubmitted
+              ? "Відгук за цим замовленням уже надіслано. Дякуємо!"
+              : "Ваш відгук буде позначено як підтверджене замовлення."}
+          </span>
+        </div>
+      ) : invalidOrderLink ? (
+        <div className="status-message status-message--error" role="alert">
+          Посилання на замовлення недійсне. Попросіть майстерню надіслати нове.
+        </div>
+      ) : null}
 
       <label className="form-field">
         <span>Ім’я <small>(необов’язково)</small></span>
@@ -57,7 +85,7 @@ export function ReviewForm() {
 
       {state.kind === "success" ? <div className="status-message status-message--ok" role="status">{state.message}</div> : null}
       {state.kind === "error" ? <div className="status-message status-message--error" role="alert">{state.message}</div> : null}
-      <button className="accent-pill accent-pill--large" type="submit" disabled={state.kind === "sending"}>
+      <button className="accent-pill accent-pill--large" type="submit" disabled={state.kind === "sending" || orderContext?.alreadySubmitted || invalidOrderLink}>
         {state.kind === "sending" ? "Надсилаємо…" : "Надіслати відгук"}
       </button>
     </form>

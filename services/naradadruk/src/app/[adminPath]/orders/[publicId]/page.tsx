@@ -7,6 +7,7 @@ import {
 } from "@/components/admin/order-dashboard";
 import { assertAdminPath, getAdminRoute, requireAdminSession } from "@/lib/auth";
 import { withBasePath } from "@/lib/base-path";
+import { absoluteSiteUrl } from "@/lib/site-url";
 import { getAdminOrderByPublicId } from "@/lib/data";
 import { addOrderCommentAction, permanentlyDeleteOrderAction, updateOrderStatusAction } from "@/app/actions/admin";
 
@@ -39,6 +40,7 @@ export default async function OrderDetailsPage({
   const destination = order.deliveryMethod === "courier"
     ? order.courierAddress || order.deliveryDestination
     : order.deliveryDestination;
+  const reviewUrl = `${absoluteSiteUrl("/reviews")}?order=${encodeURIComponent(order.publicId)}`;
 
   return (
     <main className="mx-auto w-full max-w-[1100px] px-4 py-6 md:px-6 md:py-8">
@@ -65,6 +67,9 @@ export default async function OrderDetailsPage({
         >
           Сторінка покупця
         </a> : null}
+        <a className="ghost-pill" href={reviewUrl} target="_blank" rel="noopener noreferrer">
+          Посилання на відгук
+        </a>
       </div>
       {query.ok ? <div className="status-message status-message--ok mt-5">{query.ok}</div> : null}
       {query.error ? <div className="status-message status-message--error mt-5">{query.error}</div> : null}

@@ -507,10 +507,27 @@ export async function getApprovedReviews(limit = 60) {
   });
 }
 
+export async function getReviewOrderContext(publicId: string) {
+  const normalized = publicId.trim();
+  if (!normalized || normalized.length > 80) return null;
+
+  return prisma.order.findUnique({
+    where: { publicId: normalized },
+    select: {
+      id: true,
+      publicId: true,
+      review: { select: { id: true } },
+    },
+  });
+}
+
 export async function getAdminReviews(status?: ReviewStatus) {
   return prisma.review.findMany({
     where: status ? { status } : undefined,
-    include: { images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    include: {
+      images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      order: { select: { publicId: true } },
+    },
     orderBy: [{ createdAt: "desc" }],
     take: 200,
   });
@@ -519,7 +536,10 @@ export async function getAdminReviews(status?: ReviewStatus) {
 export async function getAdminReview(id: number) {
   return prisma.review.findUnique({
     where: { id },
-    include: { images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    include: {
+      images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      order: { select: { publicId: true } },
+    },
   });
 }
 
