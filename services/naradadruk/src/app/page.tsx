@@ -23,21 +23,25 @@ import {
   getVisibleCategories,
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
-import { absoluteSiteUrl, publicPaymentNote, siteName, siteShareTitle } from "@/lib/constants";
+import {
+  publicPaymentNote,
+  siteDescription,
+  siteName,
+  siteShareTitle,
+} from "@/lib/constants";
+import { absoluteSiteUrl } from "@/lib/site-url";
 import { buildTelegramLink } from "@/lib/telegram";
+import { StructuredData } from "@/components/site/structured-data";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSiteSettings();
-  const cleaned = settings.heroSubtitle.replace(/\s+/g, " ").trim();
-  const description = cleaned.length > 165 ? `${cleaned.slice(0, 162).trimEnd()}…` : cleaned;
   return {
     title: { absolute: siteShareTitle },
-    description,
+    description: siteDescription,
     alternates: { canonical: absoluteSiteUrl() },
-    openGraph: { type: "website", locale: "uk_UA", url: absoluteSiteUrl(), siteName, title: siteShareTitle, description, images: [{ url: absoluteSiteUrl("/naradadruk-hero.webp"), alt: "3D-друк Narada Druk" }] },
-    twitter: { card: "summary_large_image", title: siteShareTitle, description, images: [absoluteSiteUrl("/naradadruk-hero.webp")] },
+    openGraph: { type: "website", locale: "uk_UA", url: absoluteSiteUrl(), siteName, title: siteShareTitle, description: siteDescription, images: [{ url: absoluteSiteUrl("/naradadruk-hero.webp"), alt: "3D-друк Narada Druk" }] },
+    twitter: { card: "summary_large_image", title: siteShareTitle, description: siteDescription, images: [absoluteSiteUrl("/naradadruk-hero.webp")] },
   };
 }
 
@@ -124,6 +128,20 @@ export default async function HomePage() {
 
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
+      <StructuredData data={{
+        "@context": "https://schema.org",
+        "@type": "Service",
+        "@id": `${absoluteSiteUrl()}#3d-printing-service`,
+        name: "3D-друк на замовлення",
+        serviceType: "3D-друк на замовлення",
+        description: siteDescription,
+        url: absoluteSiteUrl(),
+        provider: { "@id": `${absoluteSiteUrl()}#organization` },
+        areaServed: [
+          { "@type": "City", name: "Київ" },
+          { "@type": "Country", name: "Україна" },
+        ],
+      }} />
       <main>
         <section className="hero-section">
           <div className="site-container hero-layout">

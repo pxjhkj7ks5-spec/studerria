@@ -1,5 +1,5 @@
 import { ProductStatus, type PrismaClient } from "@prisma/client";
-import { absoluteSiteUrl } from "@/lib/constants";
+import { absoluteSiteUrl } from "@/lib/site-url";
 import { effectiveUnitPrice, calculatePromoDiscount } from "@/lib/pricing";
 
 type DbClient = Pick<PrismaClient, "product" | "promoCode">;

@@ -1,18 +1,12 @@
 export const siteName = "Narada Druk";
-export const siteBaseUrl = "https://studerria.com";
-export const sitePath = "/naradadruk";
-
-export function absoluteSiteUrl(path = "/") {
-  const normalized = path === "/" ? "" : `/${path.replace(/^\/+|\/+$/g, "")}`;
-  return new URL(`${sitePath}${normalized}`, siteBaseUrl).toString();
-}
+export const siteAlternateNames = ["Narada.Druk", "NaradaDruk", "Нарада Друк"];
 
 export const siteDescription =
-  "3D друк, страйкбольні аксесуари та декор під ваш запит. Готові позиції з кошиком і доставкою по Україні та кастомні вироби.";
+  "3D-друк на замовлення у Києві: практичні деталі, декор і страйкбольні аксесуари. Розрахунок за моделлю, фото або ескізом, доставка по Україні.";
 
-export const siteShareTitle = "Narada Druk — 3D друк та практичні аксесуари";
+export const siteShareTitle = "3D-друк на замовлення у Києві та Україні | Narada Druk";
 export const siteShareDescription =
-  "Каталог 3D друку, страйкбольних аксесуарів і декору з кошиком, доставкою Новою поштою та окремим супроводом кастомних виробів.";
+  "Практичні деталі, декор і страйкбольні аксесуари. Розрахунок 3D-друку за моделлю, фото або ескізом, доставка по Україні.";
 
 export const adminSessionTtlSeconds = 60 * 60 * 12;
 export const maxUploadSizeBytes = 8 * 1024 * 1024;

@@ -18,7 +18,8 @@ import {
   getSiteSettings,
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
-import { absoluteSiteUrl, publicPaymentNote, siteName } from "@/lib/constants";
+import { publicPaymentNote, siteName } from "@/lib/constants";
+import { absoluteSiteUrl } from "@/lib/site-url";
 
 export const dynamic = "force-dynamic";
 

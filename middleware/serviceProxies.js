@@ -8,6 +8,57 @@ const OSIX_BASE_PATH = '/osix';
 const SHIELDLINE_BASE_PATH = '/shieldline';
 const DEFAULT_SLASHTG_BASE_PATH = '/tg';
 
+function normalizePublicHost(value) {
+  const candidate = String(value || '').trim().toLowerCase();
+  if (!candidate) return '';
+
+  try {
+    const parsed = new URL(`http://${candidate}`);
+    if (
+      parsed.username
+      || parsed.password
+      || parsed.pathname !== '/'
+      || parsed.search
+      || parsed.hash
+    ) {
+      return '';
+    }
+    return parsed.hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function getRequestHostname(req) {
+  const hostname = typeof req.hostname === 'string' ? req.hostname : '';
+  const hostHeader = typeof req.headers?.host === 'string' ? req.headers.host : '';
+  return normalizePublicHost(hostname || hostHeader);
+}
+
+function isPublicHostRequest(req, publicHost) {
+  return Boolean(publicHost) && getRequestHostname(req) === publicHost;
+}
+
+function buildNaradaDrukRedirectUrl(req, publicHost) {
+  const originalUrl = String(req.originalUrl || req.url || NARADADRUK_BASE_PATH);
+  const queryIndex = originalUrl.indexOf('?');
+  const pathname = queryIndex >= 0 ? originalUrl.slice(0, queryIndex) : originalUrl;
+  const query = queryIndex >= 0 ? originalUrl.slice(queryIndex) : '';
+  const suffix = pathname === NARADADRUK_BASE_PATH
+    ? '/'
+    : pathname.slice(NARADADRUK_BASE_PATH.length) || '/';
+  return `https://${publicHost}${suffix}${query}`;
+}
+
+function redirectPermanent(res, location) {
+  if (typeof res.redirect === 'function') {
+    return res.redirect(308, location);
+  }
+  res.statusCode = 308;
+  res.setHeader('Location', location);
+  return res.end();
+}
+
 function isServiceRequest(req, basePath) {
   const pathname = typeof req.path === 'string' ? req.path : String(req.url || '').split('?')[0];
   return pathname === basePath || pathname.startsWith(`${basePath}/`);
@@ -77,6 +128,7 @@ function registerServiceProxies(app, deps = {}) {
   const charredmapProxyTarget = String(env.CHARREDMAP_PROXY_TARGET || '').trim();
   const chinaMapProxyTarget = String(env.CHINAMAP_PROXY_TARGET || '').trim();
   const naradadrukProxyTarget = String(env.NARADADRUK_PROXY_TARGET || '').trim();
+  const naradadrukPublicHost = normalizePublicHost(env.NARADADRUK_PUBLIC_HOST);
   const withlforlProxyTarget = String(env.WITHLFORL_PROXY_TARGET || '').trim();
   const osixProxyTarget = String(env.OSIX_PROXY_TARGET || '').trim();
   const shieldlineProxyTarget = String(env.SHIELDLINE_PROXY_TARGET || '').trim();
@@ -102,6 +154,14 @@ function registerServiceProxies(app, deps = {}) {
     basePath: NARADADRUK_BASE_PATH,
     serviceName: 'Narada Druk',
     logLabel: 'Narada Druk',
+    logger,
+    forwardResolvedClientIp: true,
+  });
+  const naradadrukPublicHostProxy = createServiceProxy({
+    target: naradadrukProxyTarget,
+    basePath: '',
+    serviceName: 'Narada Druk',
+    logLabel: 'Narada Druk public host',
     logger,
     forwardResolvedClientIp: true,
   });
@@ -134,6 +194,22 @@ function registerServiceProxies(app, deps = {}) {
     logger,
   });
   app.use((req, res, next) => {
+    if (!isPublicHostRequest(req, naradadrukPublicHost)) {
+      return next();
+    }
+    if (isServiceRequest(req, NARADADRUK_BASE_PATH)) {
+      return redirectPermanent(
+        res,
+        buildNaradaDrukRedirectUrl(req, naradadrukPublicHost),
+      );
+    }
+    if (!naradadrukPublicHostProxy) {
+      return respondServiceUnavailable(res, 'Narada Druk', 404);
+    }
+    return naradadrukPublicHostProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
     if (!isServiceRequest(req, CHARREDMAP_BASE_PATH)) {
       return next();
     }
@@ -156,6 +232,12 @@ function registerServiceProxies(app, deps = {}) {
   app.use((req, res, next) => {
     if (!isServiceRequest(req, NARADADRUK_BASE_PATH)) {
       return next();
+    }
+    if (naradadrukPublicHost) {
+      return redirectPermanent(
+        res,
+        buildNaradaDrukRedirectUrl(req, naradadrukPublicHost),
+      );
     }
     if (!naradadrukProxy) {
       return respondServiceUnavailable(res, 'Narada Druk', 404);
@@ -206,5 +288,7 @@ function registerServiceProxies(app, deps = {}) {
 }
 
 module.exports = {
+  buildNaradaDrukRedirectUrl,
+  normalizePublicHost,
   registerServiceProxies,
 };

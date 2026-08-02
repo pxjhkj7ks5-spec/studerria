@@ -158,7 +158,7 @@ services:
       context: ../../services/naradadruk
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BASE_PATH: /naradadruk
+        NEXT_PUBLIC_BASE_PATH: ${NARADADRUK_BASE_PATH:-/naradadruk}
     init: true
     restart: unless-stopped
     environment:
@@ -166,7 +166,8 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 8080
       TZ: Europe/Kyiv
-      NEXT_PUBLIC_BASE_PATH: /naradadruk
+      NEXT_PUBLIC_BASE_PATH: ${NARADADRUK_BASE_PATH:-/naradadruk}
+      NARADADRUK_PUBLIC_URL: ${NARADADRUK_PUBLIC_URL:-https://studerria.com/naradadruk}
       DATABASE_URL: file:/data/naradadruk.db
       UPLOAD_DIR: /data/uploads
       ADMIN_PATH: ${NARADADRUK_ADMIN_PATH:-admin}
@@ -194,7 +195,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:8080/naradadruk').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:8080${NARADADRUK_BASE_PATH:-/naradadruk}').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
         ]
       interval: 10s
       timeout: 5s
@@ -514,6 +515,7 @@ services:
       CHARREDMAP_PROXY_TARGET: http://charredmap:8080
       CHINAMAP_PROXY_TARGET: http://china-map:8080
       NARADADRUK_PROXY_TARGET: http://naradadruk:8080
+      NARADADRUK_PUBLIC_HOST: ${NARADADRUK_PUBLIC_HOST:-}
       SLASHTG_PROXY_TARGET: http://slashtg:8080
       SLASHTG_BASE_PATH: ${SLASHTG_BASE_PATH:-/tg}
       WITHLFORL_PROXY_TARGET: http://withlforl:8080

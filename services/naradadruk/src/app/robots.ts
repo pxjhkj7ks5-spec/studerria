@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { absoluteSiteUrl, sitePath } from "@/lib/constants";
+import { absoluteSiteUrl, siteBaseUrl, sitePath } from "@/lib/site-url";
 import { getAdminRoute } from "@/lib/auth";
 
 export default function robots(): MetadataRoute.Robots {
@@ -15,6 +15,6 @@ export default function robots(): MetadataRoute.Robots {
       ],
     },
     sitemap: absoluteSiteUrl("/sitemap.xml"),
-    host: "https://studerria.com",
+    host: siteBaseUrl,
   };
 }

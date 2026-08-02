@@ -1,7 +1,11 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { registerServiceProxies } = require('../middleware/serviceProxies');
+const {
+  buildNaradaDrukRedirectUrl,
+  normalizePublicHost,
+  registerServiceProxies,
+} = require('../middleware/serviceProxies');
 
 function createFakeApp() {
   const handlers = [];
@@ -32,6 +36,14 @@ function createFakeResponse() {
     },
     send(body) {
       this.body = body;
+      this.headersSent = true;
+    },
+    redirect(code, location) {
+      this.statusCode = code;
+      this.headers.location = location;
+      this.headersSent = true;
+    },
+    end() {
       this.headersSent = true;
     },
   };
@@ -133,4 +145,67 @@ test('shieldline child paths are claimed by service middleware', async () => {
 
   assert.equal(res.statusCode, 404);
   assert.equal(res.body, 'Not found');
+});
+
+test('naradadruk public host normalization accepts a hostname and rejects a URL', () => {
+  assert.equal(normalizePublicHost(' NaradaDruk.Studerria.com '), 'naradadruk.studerria.com');
+  assert.equal(normalizePublicHost('https://naradadruk.studerria.com'), '');
+  assert.equal(normalizePublicHost('naradadruk.studerria.com/path'), '');
+});
+
+test('naradadruk legacy URLs map to the matching subdomain path', () => {
+  assert.equal(
+    buildNaradaDrukRedirectUrl(
+      { originalUrl: '/naradadruk/product/test-model?variant=2' },
+      'naradadruk.studerria.com',
+    ),
+    'https://naradadruk.studerria.com/product/test-model?variant=2',
+  );
+  assert.equal(
+    buildNaradaDrukRedirectUrl(
+      { originalUrl: '/naradadruk' },
+      'naradadruk.studerria.com',
+    ),
+    'https://naradadruk.studerria.com/',
+  );
+});
+
+test('naradadruk subdomain claims root requests only when the cutover host is configured', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, {
+    env: { NARADADRUK_PUBLIC_HOST: 'naradadruk.studerria.com' },
+    logger: { error() {} },
+  });
+
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, {
+    path: '/',
+    url: '/',
+    headers: { host: 'naradadruk.studerria.com' },
+  }, res);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body, 'Not found');
+});
+
+test('naradadruk old paths redirect after the public host switch is enabled', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, {
+    env: { NARADADRUK_PUBLIC_HOST: 'naradadruk.studerria.com' },
+    logger: { error() {} },
+  });
+
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, {
+    path: '/naradadruk/catalog',
+    url: '/naradadruk/catalog?q=mount',
+    originalUrl: '/naradadruk/catalog?q=mount',
+    headers: { host: 'studerria.com' },
+  }, res);
+
+  assert.equal(res.statusCode, 308);
+  assert.equal(
+    res.headers.location,
+    'https://naradadruk.studerria.com/catalog?q=mount',
+  );
 });

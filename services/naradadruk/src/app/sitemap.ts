@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { ProductStatus } from "@prisma/client";
-import { absoluteSiteUrl } from "@/lib/constants";
+import { absoluteSiteUrl } from "@/lib/site-url";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";

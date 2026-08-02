@@ -5,7 +5,8 @@ import { ReviewForm } from "@/components/site/review-form";
 import { StructuredData } from "@/components/site/structured-data";
 import { getApprovedReviews, getSiteSettings } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
-import { absoluteSiteUrl, siteName } from "@/lib/constants";
+import { siteName } from "@/lib/constants";
+import { absoluteSiteUrl } from "@/lib/site-url";
 
 export const dynamic = "force-dynamic";
 

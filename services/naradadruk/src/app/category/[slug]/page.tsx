@@ -13,7 +13,8 @@ import {
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
 import { buildTelegramLink } from "@/lib/telegram";
-import { absoluteSiteUrl, siteName } from "@/lib/constants";
+import { siteName } from "@/lib/constants";
+import { absoluteSiteUrl } from "@/lib/site-url";
 
 export const dynamic = "force-dynamic";
 

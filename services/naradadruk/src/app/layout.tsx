@@ -3,14 +3,14 @@ import { Manrope } from "next/font/google";
 import { AnalyticsScript } from "@/components/site/analytics-script";
 import { StructuredData } from "@/components/site/structured-data";
 import {
-  absoluteSiteUrl,
   defaultTelegramUrl,
-  siteBaseUrl,
   siteDescription,
+  siteAlternateNames,
   siteName,
   siteShareDescription,
   siteShareTitle,
 } from "@/lib/constants";
+import { absoluteSiteUrl, siteBaseUrl } from "@/lib/site-url";
 import "./globals.css";
 import "./storefront.css";
 
@@ -61,7 +61,10 @@ export default function RootLayout({
             "@type": "Organization",
             "@id": `${absoluteSiteUrl()}#organization`,
             name: siteName,
+            alternateName: siteAlternateNames,
             url: absoluteSiteUrl(),
+            logo: absoluteSiteUrl("/icon.svg"),
+            description: siteDescription,
             sameAs: [defaultTelegramUrl],
           },
           {
@@ -69,6 +72,7 @@ export default function RootLayout({
             "@type": "WebSite",
             "@id": `${absoluteSiteUrl()}#website`,
             name: siteName,
+            alternateName: siteAlternateNames,
             url: absoluteSiteUrl(),
             description: siteDescription,
             inLanguage: "uk-UA",
