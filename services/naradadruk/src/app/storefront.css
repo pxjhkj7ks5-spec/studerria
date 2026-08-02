@@ -881,6 +881,16 @@
     position: static;
   }
 
+  .faq-layout {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .faq-layout .section-heading {
+    max-width: 34rem;
+    margin-bottom: 0;
+  }
+
   .section-heading--split,
   .closing-cta,
   .catalog-hero,
@@ -1942,6 +1952,25 @@
     margin-top: 0.65rem;
     font-size: 0.88rem;
     line-height: 1.55;
+  }
+
+  .faq-layout {
+    gap: 1rem;
+  }
+
+  .faq-list {
+    width: 100%;
+  }
+
+  .faq-list summary {
+    min-height: 4rem;
+    gap: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  .faq-list summary::after {
+    flex: 0 0 auto;
   }
 
   .text-link {
