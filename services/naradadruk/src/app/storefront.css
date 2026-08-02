@@ -1366,17 +1366,14 @@
 }
 
 .form-field--options {
-  z-index: 3;
+  z-index: auto;
 }
 
 .option-list {
-  position: absolute;
-  top: calc(100% - 0.1rem);
-  right: 0;
-  left: 0;
-  z-index: 4;
+  position: static;
   max-height: 16rem;
   overflow-y: auto;
+  margin-top: 0.1rem;
   padding: 0.4rem;
   border: 1px solid var(--border);
   border-radius: 0.9rem;

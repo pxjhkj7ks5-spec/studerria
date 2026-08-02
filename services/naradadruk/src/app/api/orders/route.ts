@@ -3,7 +3,7 @@ import { ProductStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { withBasePath } from "@/lib/base-path";
 import { siteBaseUrl } from "@/lib/constants";
-import { orderInputSchema } from "@/lib/order-validation";
+import { getOrderValidationMessage, orderInputSchema } from "@/lib/order-validation";
 import { prisma } from "@/lib/prisma";
 import { notifyOwnerAboutOrder } from "@/lib/telegram-orders";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const parsed = orderInputSchema.safeParse(payload);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues[0]?.message || "Перевірте поля замовлення." },
+      { error: getOrderValidationMessage(parsed.error) },
       { status: 400 },
     );
   }

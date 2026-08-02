@@ -6,20 +6,26 @@ export type NovaPoshtaOption = {
   secondary: string;
 };
 
-const fallbackCities = [
+const popularCityNames = [
   "Київ",
+  "Дніпро",
   "Харків",
   "Одеса",
-  "Дніпро",
   "Львів",
   "Запоріжжя",
   "Вінниця",
   "Полтава",
+];
+
+const fallbackCities = [
+  ...popularCityNames,
   "Черкаси",
   "Івано-Франківськ",
   "Тернопіль",
   "Ужгород",
 ];
+
+let popularCitiesCache: { expiresAt: number; options: NovaPoshtaOption[] } | null = null;
 
 function getApiKey() {
   return process.env.NARADADRUK_NOVA_POSHTA_API_KEY?.trim() || "";
@@ -43,8 +49,61 @@ async function callNovaPoshta<T>(modelName: string, calledMethod: string, method
   return payload.data ?? [];
 }
 
+async function getPopularCities() {
+  if (!getApiKey()) return null;
+  if (popularCitiesCache && popularCitiesCache.expiresAt > Date.now()) {
+    return popularCitiesCache.options;
+  }
+
+  const results = await Promise.allSettled(
+    popularCityNames.map((cityName) =>
+      callNovaPoshta<{
+        Ref: string;
+        Description: string;
+        AreaDescription?: string;
+        SettlementTypeDescription?: string;
+      }>("Address", "getCities", {
+        FindByString: cityName,
+        Limit: "5",
+        Page: "1",
+      }),
+    ),
+  );
+
+  const options = results.flatMap((result, index) => {
+    if (result.status !== "fulfilled" || !result.value) return [];
+    const expectedName = popularCityNames[index].toLocaleLowerCase("uk-UA");
+    const city =
+      result.value.find((entry) => entry.Description.toLocaleLowerCase("uk-UA") === expectedName) ??
+      result.value[0];
+    return city
+      ? [{
+          ref: city.Ref,
+          label: city.Description,
+          secondary: [city.SettlementTypeDescription, city.AreaDescription].filter(Boolean).join(", "),
+        }]
+      : [];
+  });
+
+  if (options.length > 0) {
+    popularCitiesCache = { expiresAt: Date.now() + 24 * 60 * 60 * 1000, options };
+  }
+  return options;
+}
+
 export async function searchCities(query: string) {
   const normalized = query.trim();
+  if (!normalized) {
+    const popularCities = await getPopularCities();
+    if (popularCities && popularCities.length > 0) {
+      return { configured: true, options: popularCities };
+    }
+    return {
+      configured: false,
+      options: popularCityNames.map((city) => ({ ref: "", label: city, secondary: "" })),
+    };
+  }
+
   const data = await callNovaPoshta<{
     Ref: string;
     Description: string;
@@ -73,7 +132,7 @@ export async function searchCities(query: string) {
     options: fallbackCities
       .filter((city) => !needle || city.toLocaleLowerCase("uk-UA").includes(needle))
       .slice(0, 8)
-      .map((city) => ({ ref: "", label: city, secondary: "Можна ввести інше місто вручну" })),
+      .map((city) => ({ ref: "", label: city, secondary: "" })),
   };
 }
 

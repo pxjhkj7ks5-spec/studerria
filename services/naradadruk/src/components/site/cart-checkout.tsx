@@ -29,6 +29,7 @@ export function CartCheckout() {
   const [destination, setDestination] = useState("");
   const [destinationRef, setDestinationRef] = useState("");
   const [destinationOptions, setDestinationOptions] = useState<Option[]>([]);
+  const [activeSuggestionField, setActiveSuggestionField] = useState<"city" | "destination" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash_on_delivery");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -86,12 +87,20 @@ export function CartCheckout() {
     setCityOptions([]);
     setDestination("");
     setDestinationRef("");
+    setActiveSuggestionField(null);
   }
 
   function chooseDestination(option: Option) {
     setDestination(option.label);
     setDestinationRef(option.ref);
     setDestinationOptions([]);
+    setActiveSuggestionField(null);
+  }
+
+  function closeSuggestions(field: "city" | "destination") {
+    window.setTimeout(() => {
+      setActiveSuggestionField((current) => (current === field ? null : current));
+    }, 150);
   }
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -198,14 +207,13 @@ export function CartCheckout() {
           <label><span>Імʼя</span><input name="firstName" autoComplete="given-name" minLength={2} maxLength={60} required /></label>
           <label><span>Прізвище</span><input name="lastName" autoComplete="family-name" minLength={2} maxLength={60} required /></label>
           <label><span>Телефон</span><input name="phone" type="tel" autoComplete="tel" placeholder="+380…" required /><small>Для даних одержувача та уточнень.</small></label>
-          <label><span>Telegram для підтвердження</span><input name="telegramContact" placeholder="@username або номер" required /><small>Майстерня підтвердить деталі тут.</small></label>
+          <label><span>Telegram для підтвердження</span><input name="telegramContact" placeholder="@username або номер" minLength={3} maxLength={80} required /><small>Майстерня підтвердить деталі тут.</small></label>
         </div>
 
         <label className="form-field form-field--options">
           <span>Місто</span>
-          <input value={cityName} onChange={(event) => { setCityName(event.target.value); setCityRef(""); }} autoComplete="address-level2" placeholder="Почніть вводити місто" required />
-          {cityOptions.length > 0 ? <div className="option-list">{cityOptions.map((option, index) => <button type="button" key={`${option.ref}:${option.label}:${index}`} onClick={() => chooseCity(option)}><strong>{option.label}</strong><small>{option.secondary}</small></button>)}</div> : null}
-          <small>Якщо API недоступний, введене місто буде збережено вручну.</small>
+          <input value={cityName} onChange={(event) => { setCityName(event.target.value); setCityRef(""); }} onFocus={() => setActiveSuggestionField("city")} onBlur={() => closeSuggestions("city")} autoComplete="address-level2" placeholder="Почніть вводити місто" minLength={2} maxLength={120} required />
+          {activeSuggestionField === "city" && cityOptions.length > 0 ? <div className="option-list">{cityOptions.map((option, index) => <button type="button" key={`${option.ref}:${option.label}:${index}`} onClick={() => chooseCity(option)}><strong>{option.label}</strong>{option.secondary ? <small>{option.secondary}</small> : null}</button>)}</div> : null}
         </label>
 
         <fieldset className="choice-group">
@@ -224,9 +232,9 @@ export function CartCheckout() {
 
         <label className="form-field form-field--options">
           <span>{deliveryMethod === "courier" ? "Адреса доставки" : deliveryMethod === "parcel_locker" ? "Поштомат" : "Відділення"}</span>
-          <input value={destination} onChange={(event) => { setDestination(event.target.value); setDestinationRef(""); }} autoComplete={deliveryMethod === "courier" ? "street-address" : "off"} placeholder={deliveryMethod === "courier" ? "Вулиця, будинок, квартира" : "Номер або адреса"} required />
-          {destinationOptions.length > 0 ? <div className="option-list">{destinationOptions.map((option) => <button type="button" key={option.ref} onClick={() => chooseDestination(option)}><strong>{option.label}</strong><small>{option.secondary}</small></button>)}</div> : null}
-          {deliveryMethod !== "courier" && !cityRef ? <small>Оберіть місто зі списку для офіційного переліку або введіть точку вручну.</small> : null}
+          <input value={destination} onChange={(event) => { setDestination(event.target.value); setDestinationRef(""); }} onFocus={() => setActiveSuggestionField("destination")} onBlur={() => closeSuggestions("destination")} autoComplete={deliveryMethod === "courier" ? "street-address" : "off"} placeholder={deliveryMethod === "courier" ? "Вулиця, будинок, квартира" : "Номер або адреса"} minLength={deliveryMethod === "courier" ? 5 : 1} maxLength={240} required />
+          {activeSuggestionField === "destination" && destinationOptions.length > 0 ? <div className="option-list">{destinationOptions.map((option) => <button type="button" key={option.ref} onClick={() => chooseDestination(option)}><strong>{option.label}</strong>{option.secondary ? <small>{option.secondary}</small> : null}</button>)}</div> : null}
+          {deliveryMethod !== "courier" && !cityRef ? <small>Вкажіть номер або повну адресу точки отримання.</small> : null}
         </label>
 
         <fieldset className="choice-group choice-group--payment">
@@ -235,7 +243,7 @@ export function CartCheckout() {
           <label className={paymentMethod === "transfer" ? "is-active" : ""}><input type="radio" name="paymentMethod" checked={paymentMethod === "transfer"} onChange={() => setPaymentMethod("transfer")} /><span><Check aria-hidden size={15} /> Переказ після підтвердження</span><small>Власник підтвердить замовлення та надасть реквізити особисто в Telegram або телефоном.</small></label>
         </fieldset>
 
-        <label className="form-field"><span>Коментар</span><textarea name="comment" rows={4} maxLength={1200} placeholder="Колір, побажання або уточнення до замовлення" /></label>
+        <label className="form-field"><span>Коментар <small>(необовʼязково)</small></span><textarea name="comment" rows={4} maxLength={1200} placeholder="Колір, побажання або уточнення до замовлення" /></label>
 
         {error ? <div className="checkout-error" role="alert">{error}</div> : null}
         <button className="accent-pill accent-pill--large checkout-submit" type="submit" disabled={isSubmitting}>
