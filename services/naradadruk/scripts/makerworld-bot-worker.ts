@@ -2,6 +2,7 @@ import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { PrismaClient, ProductStatus, ReviewStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import {
   fetchMakerWorldModel,
   isAllowedMakerWorldImageUrl,
@@ -62,6 +63,7 @@ type DraftSession = {
   awaiting: AwaitingField;
   manualSetup: "title" | "description" | null;
   postSent: boolean;
+  publishedTelegramMessageId: number | null;
 };
 
 type DownloadedImage = {
@@ -75,6 +77,8 @@ const sessions = new Map<string, DraftSession>();
 type ManualOrderSession = { step: "contact" | "items" | "amount" | "delivery" | "payment" | "confirm"; name: string; contact: string; items: string; amount: number; delivery: string; payment: "cash_on_delivery" | "transfer" };
 const manualOrders = new Map<string, ManualOrderSession>();
 const awaitingOrderComments = new Map<string, string>();
+type MarketplaceSession = { productId: number | null; postUrl: string | null };
+const marketplaceSessions = new Map<string, MarketplaceSession>();
 let dashboardMessageId: number | null = null;
 const botToken = process.env.NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN?.trim() || "";
 const ownerChatId = process.env.NARADADRUK_ORDER_TELEGRAM_CHAT_ID?.trim() || "";
@@ -156,9 +160,47 @@ function normalizeTelegramLink(value: string) {
   }
 }
 
+function configuredPublicChannelUsername() {
+  const explicitUsername = (process.env.TELEGRAM_CHANNEL_USERNAME || "").replace(/^@/, "").trim();
+  if (/^[a-zA-Z0-9_]{5,32}$/.test(explicitUsername)) return explicitUsername;
+
+  const configuredUrl = normalizeTelegramLink(process.env.TELEGRAM_CHANNEL_URL || "");
+  if (configuredUrl) {
+    const [username] = new URL(configuredUrl).pathname.split("/").filter(Boolean);
+    if (/^[a-zA-Z0-9_]{5,32}$/.test(username || "")) return username;
+  }
+  return "naradaprint";
+}
+
+function canonicalChannelPostUrl(username: string, messageId: number) {
+  return `https://t.me/${username}/${messageId}`;
+}
+
+function parseConfiguredChannelPostUrl(value: string) {
+  const normalized = normalizeTelegramLink(value);
+  if (!normalized) throw new Error("Надішліть публічне HTTPS-посилання на допис Telegram.");
+  const url = new URL(normalized);
+  const parts = url.pathname.split("/").filter(Boolean);
+  const configuredUsername = configuredPublicChannelUsername();
+  const messageId = Number(parts[1]);
+  if (
+    parts.length !== 2 ||
+    parts[0].toLowerCase() !== configuredUsername.toLowerCase() ||
+    !Number.isSafeInteger(messageId) ||
+    messageId <= 0
+  ) {
+    throw new Error(`Посилання має вести на публічний допис каналу @${configuredUsername}.`);
+  }
+  return {
+    channel: configuredUsername,
+    messageId,
+    url: canonicalChannelPostUrl(configuredUsername, messageId),
+  };
+}
+
 async function contactAndChannelLinks() {
   const settings = await prisma.siteSetting.findUnique({ where: { id: 1 } });
-  const username = (process.env.TELEGRAM_CHANNEL_USERNAME || "naradaprint").replace(/^@/, "").trim();
+  const username = configuredPublicChannelUsername();
   const channelLink =
     normalizeTelegramLink(process.env.TELEGRAM_CHANNEL_URL || "") ||
     (/^[a-zA-Z0-9_]{5,32}$/.test(username) ? `https://t.me/${username}` : "");
@@ -222,16 +264,17 @@ async function answerCallback(id: string, text?: string) {
   }).catch(() => undefined);
 }
 
-async function telegramMultipart(method: string, form: FormData) {
+async function telegramMultipart<T = unknown>(method: string, form: FormData) {
   const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
     method: "POST",
     body: form,
     signal: AbortSignal.timeout(45_000),
   });
-  const result = (await response.json().catch(() => ({}))) as TelegramResponse<unknown>;
+  const result = (await response.json().catch(() => ({}))) as TelegramResponse<T>;
   if (!response.ok || !result.ok) {
     throw new Error(`Telegram ${method}: ${cleanText(result.description || `HTTP ${response.status}`, 300)}`);
   }
+  return result.result as T;
 }
 
 function mimeTypeForFile(fileName: string) {
@@ -507,6 +550,7 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
       awaiting: null,
       manualSetup: null,
       postSent: false,
+      publishedTelegramMessageId: null,
     };
     sessions.set(chatId, session);
     return session;
@@ -587,6 +631,166 @@ function telegramPostText(session: DraftSession, contactLink: string, channelLin
     lines.push(`✦ <a href="${escapeHtml(channelLink)}"><b>NARADA DRUK</b></a>`);
   }
   return lines.join("\n");
+}
+
+const marketplaceProductSelect = {
+  id: true,
+  title: true,
+  shortDescription: true,
+  fullDescription: true,
+  basePrice: true,
+  priceFrom: true,
+  saleEnabled: true,
+  salePrice: true,
+  saleStartsAt: true,
+  saleEndsAt: true,
+  sourceTelegramChannel: true,
+  sourceTelegramMessageId: true,
+  sourceTelegramUrl: true,
+  updatedAt: true,
+  variants: { select: { price: true } },
+} satisfies Prisma.ProductSelect;
+
+type MarketplaceProduct = Prisma.ProductGetPayload<{ select: typeof marketplaceProductSelect }>;
+
+function originalChannelPostUrl(product: MarketplaceProduct) {
+  if (product.sourceTelegramUrl) {
+    try {
+      return parseConfiguredChannelPostUrl(product.sourceTelegramUrl).url;
+    } catch {
+      // Ignore stale or foreign links and require an explicit valid Narada Print post link.
+    }
+  }
+  const configuredUsername = configuredPublicChannelUsername();
+  const savedChannel = product.sourceTelegramChannel?.replace(/^@/, "").trim() || "";
+  if (
+    savedChannel.toLowerCase() === configuredUsername.toLowerCase() &&
+    product.sourceTelegramMessageId &&
+    product.sourceTelegramMessageId > 0
+  ) {
+    return canonicalChannelPostUrl(configuredUsername, product.sourceTelegramMessageId);
+  }
+  return "";
+}
+
+function marketplacePriceLabel(product: MarketplaceProduct) {
+  const regularPrice = product.basePrice ?? (
+    product.variants.length > 0 ? Math.min(...product.variants.map((variant) => variant.price)) : null
+  );
+  if (regularPrice === null) return "Ціна уточнюється";
+
+  const now = Date.now();
+  const saleIsActive = product.saleEnabled &&
+    product.salePrice !== null &&
+    product.salePrice > 0 &&
+    product.salePrice < regularPrice &&
+    (!product.saleStartsAt || product.saleStartsAt.getTime() <= now) &&
+    (!product.saleEndsAt || product.saleEndsAt.getTime() > now);
+  const currentPrice = saleIsActive ? product.salePrice! : regularPrice;
+  return `${product.priceFrom ? "від " : ""}${money(currentPrice)}`;
+}
+
+function marketplaceCopyText(product: MarketplaceProduct, postUrl: string) {
+  const summary = shortText(product.shortDescription || firstSentenceForDraft(product.fullDescription), 500);
+  const lines = [
+    `✦ <b>${escapeHtml(product.title)}</b>`,
+    "",
+  ];
+  if (summary) lines.push(`🧩 ${escapeHtml(summary)}`, "");
+  lines.push(
+    `💰 <b>${escapeHtml(marketplacePriceLabel(product))}</b>`,
+    "◾ Акуратний і міцний 3D-друк під ваше замовлення.",
+    "",
+    `📩 <a href="${escapeHtml(postUrl)}"><b>ЗАМОВИТИ</b></a>`,
+  );
+  return lines.join("\n");
+}
+
+async function getMarketplaceProduct(productId: number) {
+  return prisma.product.findFirst({
+    where: { id: productId, status: ProductStatus.published },
+    select: marketplaceProductSelect,
+  });
+}
+
+async function sendMarketplaceCopy(chatId: string, product: MarketplaceProduct, postUrl: string) {
+  await sendMessage(chatId, marketplaceCopyText(product, postUrl));
+  marketplaceSessions.delete(chatId);
+}
+
+async function attachMarketplacePost(product: MarketplaceProduct, rawUrl: string) {
+  const parsed = parseConfiguredChannelPostUrl(rawUrl);
+  const conflict = await prisma.product.findFirst({
+    where: {
+      id: { not: product.id },
+      sourceTelegramMessageId: parsed.messageId,
+    },
+    select: marketplaceProductSelect,
+  });
+  if (conflict && originalChannelPostUrl(conflict) === parsed.url) {
+    throw new Error(`Цей допис уже прив’язаний до товару «${conflict.title}».`);
+  }
+  return prisma.product.update({
+    where: { id: product.id },
+    data: {
+      sourceTelegramChannel: parsed.channel,
+      sourceTelegramMessageId: parsed.messageId,
+      sourceTelegramUrl: parsed.url,
+    },
+    select: marketplaceProductSelect,
+  });
+}
+
+async function recentMarketplaceProducts() {
+  return prisma.product.findMany({
+    where: { status: ProductStatus.published },
+    select: marketplaceProductSelect,
+    orderBy: [{ sourceTelegramPublishedAt: "desc" }, { updatedAt: "desc" }],
+    take: 10,
+  });
+}
+
+async function showMarketplaceProducts(chatId: string, intro: string) {
+  const products = await recentMarketplaceProducts();
+  if (products.length === 0) {
+    marketplaceSessions.delete(chatId);
+    await sendMessage(chatId, "Опублікованих товарів для репоста ще немає.");
+    return;
+  }
+  await sendMessage(chatId, intro, {
+    inline_keyboard: [
+      ...products.map((product) => [{
+        text: `${originalChannelPostUrl(product) ? "🔗" : "▫️"} ${shortText(product.title, 48)}`,
+        callback_data: `marketplace:product:${product.id}`,
+      }]),
+      [{ text: "Скасувати", callback_data: "marketplace:cancel" }],
+    ],
+  });
+}
+
+async function startMarketplaceFlow(chatId: string, rawPostUrl = "") {
+  if (rawPostUrl) {
+    const parsed = parseConfiguredChannelPostUrl(rawPostUrl);
+    const products = await recentMarketplaceProducts();
+    const matched = products.find((product) => originalChannelPostUrl(product) === parsed.url) ||
+      await prisma.product.findFirst({
+        where: { status: ProductStatus.published, sourceTelegramMessageId: parsed.messageId },
+        select: marketplaceProductSelect,
+      });
+    if (matched && originalChannelPostUrl(matched) === parsed.url) {
+      await sendMarketplaceCopy(chatId, matched, parsed.url);
+      return;
+    }
+    marketplaceSessions.set(chatId, { productId: null, postUrl: parsed.url });
+    await showMarketplaceProducts(chatId, "Посилання прийнято. Оберіть товар, до якого належить цей допис:");
+    return;
+  }
+
+  marketplaceSessions.set(chatId, { productId: null, postUrl: null });
+  await showMarketplaceProducts(
+    chatId,
+    "Оберіть товар. Позначка 🔗 означає, що точне посилання на вихідний допис уже збережено:",
+  );
 }
 
 async function showPreview(session: DraftSession, includeAlbum = false) {
@@ -802,6 +1006,7 @@ async function publishProductPost(session: DraftSession) {
   if (!session.postSent) {
     const caption = telegramPostText(session, contactLink, channelLink);
     const primaryImage = selectedImages(session)[0];
+    let publishedMessage: TelegramMessage;
     if (primaryImage) {
       const form = new FormData();
       const buffer = await readFile(path.join(uploadDirectory(), primaryImage.fileName));
@@ -810,9 +1015,9 @@ async function publishProductPost(session: DraftSession) {
       form.set("caption", caption);
       form.set("parse_mode", "HTML");
       form.set("reply_markup", JSON.stringify({ inline_keyboard: inlineKeyboard }));
-      await telegramMultipart("sendPhoto", form);
+      publishedMessage = await telegramMultipart<TelegramMessage>("sendPhoto", form);
     } else {
-      await telegramJson("sendMessage", {
+      publishedMessage = await telegramJson<TelegramMessage>("sendMessage", {
         chat_id: postsChatId,
         text: caption,
         parse_mode: "HTML",
@@ -820,7 +1025,20 @@ async function publishProductPost(session: DraftSession) {
         reply_markup: { inline_keyboard: inlineKeyboard },
       });
     }
+    session.publishedTelegramMessageId = publishedMessage.message_id;
     session.postSent = true;
+  }
+  if (session.publishedTelegramMessageId) {
+    const channel = configuredPublicChannelUsername();
+    await prisma.product.update({
+      where: { id: session.publishedProductId },
+      data: {
+        sourceTelegramChannel: channel,
+        sourceTelegramMessageId: session.publishedTelegramMessageId,
+        sourceTelegramUrl: canonicalChannelPostUrl(channel, session.publishedTelegramMessageId),
+        sourceTelegramPublishedAt: new Date(),
+      },
+    });
   }
   return { productUrl };
 }
@@ -846,6 +1064,7 @@ function helpText() {
     "<b>Narada Druk — керування</b>",
     "/orders — активні замовлення та їх статуси",
     "/manual — створити ручне замовлення з чату",
+    "/marketplace — підготувати текст товару для копіювання",
     "",
     "<b>MakerWorld → Narada Druk</b>",
     "/makerworld — почати й надіслати публічне посилання на модель",
@@ -1058,6 +1277,7 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
       awaiting: "url",
       manualSetup: null,
       postSent: false,
+      publishedTelegramMessageId: null,
     };
     sessions.set(chatId, session);
     const rejectedStatus = message.match(/HTTP\s+(403|429)\b/i)?.[1];
@@ -1109,12 +1329,48 @@ async function handleMessage(message: TelegramMessage) {
   if (!message.text) return;
   const command = splitCommand(message.text);
 
+  if (command && ["marketplace", "repost"].includes(command.command)) {
+    try {
+      await startMarketplaceFlow(chatId, command.argument);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Не вдалося підготувати репост.";
+      await sendMessage(chatId, escapeHtml(shortText(errorMessage, 500)));
+    }
+    return;
+  }
   if (command?.command === "orders") {
     await showOrdersDashboard(chatId);
     return;
   }
   if (command?.command === "manual") {
     await startManualOrder(chatId);
+    return;
+  }
+
+  const marketplace = marketplaceSessions.get(chatId);
+  if (marketplace) {
+    if (command?.command === "cancel") {
+      marketplaceSessions.delete(chatId);
+      await sendMessage(chatId, "Підготовку тексту для маркетплейсу скасовано.");
+      return;
+    }
+    if (command) {
+      await sendMessage(chatId, "Оберіть товар кнопкою або надішліть публічне посилання на його допис. /cancel — скасувати.");
+      return;
+    }
+    try {
+      if (marketplace.productId) {
+        const product = await getMarketplaceProduct(marketplace.productId);
+        if (!product) throw new Error("Товар більше не опублікований або видалений.");
+        const attached = await attachMarketplacePost(product, message.text);
+        await sendMarketplaceCopy(chatId, attached, originalChannelPostUrl(attached));
+      } else {
+        await startMarketplaceFlow(chatId, message.text);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Не вдалося зберегти посилання на допис.";
+      await sendMessage(chatId, `${escapeHtml(shortText(errorMessage, 500))}\nНадішліть правильне посилання або /cancel.`);
+    }
     return;
   }
 
@@ -1199,6 +1455,7 @@ async function handleMessage(message: TelegramMessage) {
       awaiting: "url",
       manualSetup: null,
       postSent: false,
+      publishedTelegramMessageId: null,
     });
     return;
   }
@@ -1354,6 +1611,46 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     await startManualOrder(chatId);
     return;
   }
+  if (callback.data === "marketplace:cancel") {
+    marketplaceSessions.delete(chatId);
+    await answerCallback(callback.id, "Скасовано.");
+    return;
+  }
+  if (callback.data?.startsWith("marketplace:product:")) {
+    const productId = Number(callback.data.split(":")[2]);
+    if (!Number.isSafeInteger(productId) || productId <= 0) {
+      await answerCallback(callback.id, "Некоректний товар.");
+      return;
+    }
+    try {
+      const product = await getMarketplaceProduct(productId);
+      if (!product) throw new Error("Товар більше не опублікований або видалений.");
+      const state = marketplaceSessions.get(chatId);
+      if (state?.postUrl) {
+        const attached = await attachMarketplacePost(product, state.postUrl);
+        await answerCallback(callback.id, "Товар вибрано.");
+        await sendMarketplaceCopy(chatId, attached, originalChannelPostUrl(attached));
+        return;
+      }
+      const savedPostUrl = originalChannelPostUrl(product);
+      if (savedPostUrl) {
+        await answerCallback(callback.id, "Текст підготовлено.");
+        await sendMarketplaceCopy(chatId, product, savedPostUrl);
+        return;
+      }
+      marketplaceSessions.set(chatId, { productId, postUrl: null });
+      await answerCallback(callback.id, "Потрібне посилання на допис.");
+      await sendMessage(
+        chatId,
+        `Для «${escapeHtml(product.title)}» ще немає точного посилання. Надішліть публічне посилання формату <code>https://t.me/${configuredPublicChannelUsername()}/123</code> або /cancel.`,
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Не вдалося підготувати репост.";
+      await answerCallback(callback.id, "Не вдалося виконати дію.");
+      await sendMessage(chatId, escapeHtml(shortText(errorMessage, 500)));
+    }
+    return;
+  }
   if (callback.data?.startsWith("manual:")) {
     const [, action, value] = callback.data.split(":");
     const manual = manualOrders.get(chatId);
@@ -1451,6 +1748,7 @@ async function configureCommands() {
     commands: [
       { command: "orders", description: "Активні замовлення та керування статусами" },
       { command: "manual", description: "Створити ручне замовлення" },
+      { command: "marketplace", description: "Текст товару для копіювання на маркетплейси" },
       { command: "makerworld", description: "Створити товар із публічної моделі MakerWorld" },
       { command: "help", description: "Показати всі команди редагування" },
       { command: "preview", description: "Оновити превʼю активної чернетки" },
