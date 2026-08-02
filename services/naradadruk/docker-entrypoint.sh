@@ -34,11 +34,11 @@ owner_bot_allowlist_state="MISSING"
 if [ -n "${NARADADRUK_ORDER_TELEGRAM_OWNER_USER_IDS:-}" ]; then
   if printf '%s' "$NARADADRUK_ORDER_TELEGRAM_OWNER_USER_IDS" | awk -F, '
     {
-      for (index = 1; index <= NF; index += 1) {
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $index)
-        if ($index == "") continue
+      for (field_number = 1; field_number <= NF; field_number += 1) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $field_number)
+        if ($field_number == "") continue
         found = 1
-        if ($index !~ /^[1-9][0-9]*$/) exit 1
+        if ($field_number !~ /^[1-9][0-9]*$/) exit 1
       }
     }
     END { if (!found) exit 1 }
