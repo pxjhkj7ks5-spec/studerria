@@ -19,6 +19,7 @@ import { formatPrice } from "@/lib/utils";
 type Option = { ref: string; label: string; secondary: string };
 type DeliveryMethod = "branch" | "parcel_locker" | "courier";
 type PaymentMethod = "cash_on_delivery" | "transfer";
+type PromoPreview = { code: string; subtotal: number; saleDiscountAmount: number; discountAmount: number; total: number; label: string };
 
 export function CartCheckout() {
   const { items, hydrated, total, updateQuantity, removeItem, clearCart } = useCart();
@@ -33,6 +34,30 @@ export function CartCheckout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash_on_delivery");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [promoCode, setPromoCode] = useState("");
+  const [promo, setPromo] = useState<PromoPreview | null>(null);
+  const [promoError, setPromoError] = useState("");
+  const regularTotal = items.reduce((sum, item) => sum + item.regularUnitPrice * item.quantity, 0);
+
+  useEffect(() => { setPromo(null); setPromoError(""); }, [total]);
+
+  async function applyPromo() {
+    setPromoError("");
+    try {
+      const response = await fetch(withBasePath("/api/promo-codes/validate"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCode, items: items.map((item) => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })) }),
+      });
+      const payload = await response.json() as Partial<PromoPreview> & { error?: string };
+      if (!response.ok || !payload?.code) throw new Error(payload?.error || "Промокод недійсний.");
+      setPromo(payload as PromoPreview);
+      setPromoCode(payload.code);
+    } catch (promoFailure) {
+      setPromo(null);
+      setPromoError(promoFailure instanceof Error ? promoFailure.message : "Промокод недійсний.");
+    }
+  }
 
   useEffect(() => {
     if (cityRef) {
@@ -106,6 +131,10 @@ export function CartCheckout() {
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (items.length === 0 || isSubmitting) return;
+    if (promoCode.trim() && !promo) {
+      setError("Застосуйте промокод або очистьте поле перед оформленням.");
+      return;
+    }
     setIsSubmitting(true);
     setError("");
     const form = new FormData(event.currentTarget);
@@ -127,6 +156,7 @@ export function CartCheckout() {
           destinationRef,
           courierAddress: deliveryMethod === "courier" ? destination : "",
           paymentMethod,
+          promoCode: promo?.code ?? "",
           items: items.map((item) => ({
             productId: item.productId,
             variantId: item.variantId,
@@ -181,7 +211,7 @@ export function CartCheckout() {
               <div className="cart-item__body">
                 <a href={withBasePath(`/product/${item.productSlug}`)}><strong>{item.productTitle}</strong></a>
                 {item.variantLabel ? <span>{item.variantLabel}</span> : null}
-                <small>{formatPrice(item.unitPrice)} за одиницю</small>
+                <small>{item.regularUnitPrice > item.unitPrice ? <><del className="old-price">{formatPrice(item.regularUnitPrice)}</del> <strong>{formatPrice(item.unitPrice)}</strong> за одиницю</> : <>{formatPrice(item.unitPrice)} за одиницю</>}</small>
               </div>
               <div className="quantity-control" aria-label={`Кількість ${item.productTitle}`}>
                 <button type="button" onClick={() => updateQuantity(item.key, item.quantity - 1)} aria-label="Зменшити кількість"><Minus aria-hidden size={15} /></button>
@@ -194,7 +224,13 @@ export function CartCheckout() {
           ))}
         </div>
 
+        {regularTotal > total ? <div className="cart-total"><span>Звичайна ціна</span><del className="old-price">{formatPrice(regularTotal)}</del><span>Знижка на товари</span><strong>−{formatPrice(regularTotal - total)}</strong></div> : null}
         <div className="cart-total"><span>Разом за товари</span><strong>{formatPrice(total)}</strong></div>
+        <div className="promo-box">
+          <label className="form-field"><span>Промокод</span><div className="promo-box__row"><input value={promoCode} onChange={(event) => { setPromoCode(event.target.value.toUpperCase()); setPromo(null); }} maxLength={32} placeholder="Введіть код" /><button className="ghost-pill" type="button" onClick={applyPromo}>Застосувати</button></div></label>
+          {promo ? <div className="promo-summary"><span>Промокод {promo.code} ({promo.label})</span><strong>− {formatPrice(promo.discountAmount)}</strong><span>Фінальна сума</span><strong>{formatPrice(promo.total)}</strong></div> : null}
+          {promoError ? <p className="checkout-error" role="alert">{promoError}</p> : null}
+        </div>
       </section>
 
       <section className="checkout-panel">
@@ -247,7 +283,7 @@ export function CartCheckout() {
 
         {error ? <div className="checkout-error" role="alert">{error}</div> : null}
         <button className="accent-pill accent-pill--large checkout-submit" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Оформлюємо…" : `Оформити на ${formatPrice(total)}`}
+          {isSubmitting ? "Оформлюємо…" : `Оформити на ${formatPrice(promo?.total ?? total)}`}
         </button>
         <p className="checkout-consent">Після оформлення ви побачите номер і статус замовлення. Вартість доставки сплачується окремо за тарифами Нової пошти.</p>
       </section>

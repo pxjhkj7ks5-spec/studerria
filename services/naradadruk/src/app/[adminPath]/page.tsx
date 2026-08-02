@@ -12,6 +12,7 @@ import {
 import { LoginForm } from "@/components/admin/login-form";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
+import { OrderDashboard } from "@/components/admin/order-dashboard";
 import { telegramProductTemplate } from "@/lib/telegram-product-template";
 import { parseAnalyticsRange } from "@/lib/analytics-report";
 
@@ -59,7 +60,7 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
   }
 
   const analyticsRange = parseAnalyticsRange(query.range);
-  const { categories, products, settings, telegramAutomation, analytics } =
+  const { categories, products, settings, telegramAutomation, analytics, orders } =
     await getAdminDashboardData({ analyticsRange });
   const productTitles = Object.fromEntries(
     products.map((product) => [product.slug, product.title]),
@@ -78,6 +79,9 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
 
         <nav className="admin-nav" aria-label="Розділи адмінки">
           <a href="#analytics">Статистика</a>
+          <a href="#orders">Замовлення</a>
+          <a href={withBasePath(`${getAdminRoute()}/reviews`)}>Відгуки</a>
+          <a href={withBasePath(`${getAdminRoute()}/promo-codes`)}>Промокоди</a>
           <a href="#products">Товари</a>
           <a href="#storefront">Вітрина</a>
         </nav>
@@ -108,6 +112,7 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
       </div>
 
       <AnalyticsDashboard report={analytics} productTitles={productTitles} />
+      <OrderDashboard summary={orders} />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.56fr_0.44fr]">
         <section className="grid gap-6">

@@ -1,8 +1,10 @@
 import { ArrowRight } from "@phosphor-icons/react/ssr";
+import type { Metadata } from "next";
 import { CatalogFilters } from "@/components/site/catalog-filters";
 import { ProductCard } from "@/components/site/product-card";
 import { PublicFrame } from "@/components/site/public-frame";
 import { TrackedLink } from "@/components/site/tracked-link";
+import { StructuredData } from "@/components/site/structured-data";
 import {
   getCatalogProducts,
   getSiteSettings,
@@ -10,6 +12,7 @@ import {
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
 import { buildTelegramLink } from "@/lib/telegram";
+import { absoluteSiteUrl, siteName } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,20 @@ type CatalogPageProps = {
     category?: string;
   }>;
 };
+
+export async function generateMetadata({ searchParams }: CatalogPageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const filtered = Boolean(params.q?.trim() || params.category?.trim());
+  const description = "Каталог готових виробів Narada Druk: декор, практичні аксесуари та товари для страйкболу з доставкою по Україні.";
+  return {
+    title: "Каталог 3D-друку",
+    description,
+    alternates: { canonical: absoluteSiteUrl("/catalog") },
+    robots: filtered ? { index: false, follow: true } : undefined,
+    openGraph: { type: "website", locale: "uk_UA", url: absoluteSiteUrl("/catalog"), siteName, title: `Каталог 3D-друку | ${siteName}`, description, images: [{ url: absoluteSiteUrl("/naradadruk-hero.webp"), alt: "Каталог 3D-друку Narada Druk" }] },
+    twitter: { card: "summary_large_image", title: `Каталог 3D-друку | ${siteName}`, description, images: [absoluteSiteUrl("/naradadruk-hero.webp")] },
+  };
+}
 
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const params = await searchParams;
@@ -40,6 +57,14 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
+      <StructuredData data={{
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: siteName, item: absoluteSiteUrl() },
+          { "@type": "ListItem", position: 2, name: "Каталог", item: absoluteSiteUrl("/catalog") },
+        ],
+      }} />
       <main className="catalog-page">
         <section className="site-container catalog-hero">
           <div>
@@ -82,7 +107,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                     ? "category-chip is-active"
                     : "category-chip"
                 }
-                href={withBasePath(`/catalog?category=${category.slug}`)}
+                href={withBasePath(`/category/${category.slug}`)}
                 eventName="Catalog Filter"
                 eventProps={{
                   location: "catalog-chip",

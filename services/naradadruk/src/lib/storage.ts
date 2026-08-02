@@ -1,5 +1,6 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import { maxUploadSizeBytes } from "@/lib/constants";
 import { slugify } from "@/lib/utils";
 
@@ -87,6 +88,34 @@ export async function saveProductImage(file: File, baseName: string): Promise<St
     fileName,
     urlPath: `/uploads/${fileName}`,
   };
+}
+
+export async function saveReviewImage(file: File, baseName: string): Promise<StoredUpload> {
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+  if (!allowedTypes.has(file.type)) {
+    throw new Error("Для відгуку дозволені лише JPG, PNG або WebP.");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Одне фото відгуку не може перевищувати 5 MB.");
+  }
+
+  const source = Buffer.from(await file.arrayBuffer());
+  let output: Buffer;
+  try {
+    output = await sharp(source, { failOn: "warning", limitInputPixels: 25_000_000 })
+      .rotate()
+      .resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 84, effort: 4 })
+      .toBuffer();
+  } catch {
+    throw new Error("Фото пошкоджене або має непідтримуваний формат.");
+  }
+
+  const uploadDir = resolveUploadDir();
+  await mkdir(uploadDir, { recursive: true });
+  const fileName = `${slugify(baseName)}-${Date.now()}.webp`;
+  await writeFile(path.join(uploadDir, fileName), output);
+  return { fileName, urlPath: `/uploads/${fileName}` };
 }
 
 export async function readUploadFile(fileName: string) {

@@ -1,8 +1,10 @@
 import { ArrowLeft, ArrowRight } from "@phosphor-icons/react/ssr";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductCard } from "@/components/site/product-card";
 import { PublicFrame } from "@/components/site/public-frame";
 import { TrackedLink } from "@/components/site/tracked-link";
+import { StructuredData } from "@/components/site/structured-data";
 import {
   getCatalogProducts,
   getCategoryBySlug,
@@ -11,6 +13,7 @@ import {
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
 import { buildTelegramLink } from "@/lib/telegram";
+import { absoluteSiteUrl, siteName } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,25 @@ type CategoryPageProps = {
     slug: string;
   }>;
 };
+
+export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const category = await getCategoryBySlug(slug);
+  if (!category) return { title: "Категорію не знайдено", robots: { index: false, follow: false } };
+  const canonical = absoluteSiteUrl(`/category/${category.slug}`);
+  const rawDescription = category.description.trim() || `Товари категорії «${category.name}» від Narada Druk з оформленням замовлення на сайті та доставкою по Україні.`;
+  const description = rawDescription.length > 165 ? `${rawDescription.slice(0, 162).trimEnd()}…` : rawDescription;
+  const title = `${category.name} — каталог`;
+  const categoryImage = category.products[0]?.images[0];
+  const images = categoryImage ? [{ url: absoluteSiteUrl(categoryImage.urlPath), alt: categoryImage.alt || category.name }] : [];
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { type: "website", locale: "uk_UA", url: canonical, siteName, title: `${title} | ${siteName}`, description, images },
+    twitter: { card: images.length ? "summary_large_image" : "summary", title: `${title} | ${siteName}`, description, images: images.map((image) => image.url) },
+  };
+}
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
@@ -40,6 +62,15 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
+      <StructuredData data={{
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: siteName, item: absoluteSiteUrl() },
+          { "@type": "ListItem", position: 2, name: "Каталог", item: absoluteSiteUrl("/catalog") },
+          { "@type": "ListItem", position: 3, name: category.name, item: absoluteSiteUrl(`/category/${category.slug}`) },
+        ],
+      }} />
       <main className="catalog-page">
         <section className="site-container category-hero">
           <a className="back-link" href={withBasePath("/catalog")}>

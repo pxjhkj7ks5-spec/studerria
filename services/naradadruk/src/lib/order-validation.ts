@@ -38,6 +38,7 @@ export const orderInputSchema = z.object({
   destinationRef: z.string().trim().max(80, "Поле «Точка доставки»: некоректний ідентифікатор.").default(""),
   courierAddress: z.string().trim().max(240, "Поле «Адреса доставки»: максимально допустимо 240 символів.").default(""),
   paymentMethod: z.enum(["cash_on_delivery", "transfer"]),
+  promoCode: z.string().trim().max(32, "Промокод занадто довгий.").optional().default(""),
   items: z
     .array(
       z.object({

@@ -19,11 +19,24 @@ enum TelegramImportStatus {
 
 enum OrderStatus {
   new
+  accepted
+  shipped
+  closed
+  // Legacy values remain in the database enum so schema push can migrate existing orders safely.
   confirmed
   processing
-  shipped
   completed
   cancelled
+}
+
+enum OrderSource {
+  website
+  manual
+}
+
+enum DiscountType {
+  percentage
+  fixed
 }
 
 enum DeliveryMethod {
@@ -83,6 +96,11 @@ model Product {
   isFeatured                Boolean             @default(false)
   basePrice                 Int?
   priceFrom                 Boolean             @default(false)
+  saleEnabled               Boolean             @default(false)
+  salePrice                 Int?
+  salePercent               Int?
+  saleStartsAt              DateTime?
+  saleEndsAt                DateTime?
   leadTime                  String              @default("")
   materialNote              String              @default("")
   deliveryNote              String              @default("")
@@ -105,49 +123,99 @@ model Product {
   @@index([sourceModelUrl])
 }
 
+enum ReviewStatus {
+  pending
+  approved
+  rejected
+}
+
 model Order {
-  id                    Int                @id @default(autoincrement())
-  publicId              String             @unique
-  status                OrderStatus        @default(new)
-  firstName             String
-  lastName              String
-  comment               String             @default("")
-  phone                 String
-  telegramContact       String
-  cityName              String
-  cityRef               String             @default("")
-  deliveryMethod        DeliveryMethod
-  deliveryDestination   String
-  destinationRef        String             @default("")
-  courierAddress        String             @default("")
-  paymentMethod         PaymentMethod
-  total                 Int
-  currency              String             @default("UAH")
-  notificationStatus    NotificationStatus @default(pending)
-  notificationError     String             @default("")
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  items                 OrderItem[]
+  id                  Int                @id @default(autoincrement())
+  publicId            String             @unique
+  status              OrderStatus        @default(new)
+  source              OrderSource        @default(website)
+  firstName           String
+  lastName            String
+  comment             String             @default("")
+  phone               String
+  telegramContact     String
+  cityName            String
+  cityRef             String             @default("")
+  deliveryMethod      DeliveryMethod
+  deliveryDestination String
+  destinationRef      String             @default("")
+  courierAddress      String             @default("")
+  paymentMethod       PaymentMethod
+  subtotal            Int                @default(0)
+  saleDiscountAmount  Int                @default(0)
+  discountAmount      Int                @default(0)
+  promoCodeId         Int?
+  promoCodeSnapshot   String             @default("")
+  promoTypeSnapshot   DiscountType?
+  promoValueSnapshot  Int?
+  total               Int
+  currency            String             @default("UAH")
+  notificationStatus  NotificationStatus @default(pending)
+  notificationError   String             @default("")
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  items               OrderItem[]
+  events              OrderEvent[]
+  promoCode           PromoCode?         @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([status, createdAt])
+  @@index([source, createdAt])
+  @@index([promoCodeId])
+}
+
+model OrderEvent {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  eventType  String
+  fromStatus String   @default("")
+  toStatus   String   @default("")
+  comment    String   @default("")
+  actor      String   @default("owner")
+  createdAt  DateTime @default(now())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model PromoCode {
+  id         Int          @id @default(autoincrement())
+  code       String       @unique
+  type       DiscountType
+  value      Int
+  usageLimit Int?
+  useCount   Int          @default(0)
+  expiresAt  DateTime?
+  enabled    Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  orders     Order[]
+
+  @@index([enabled, expiresAt])
 }
 
 model OrderItem {
-  id             Int      @id @default(autoincrement())
-  orderId        Int
-  productId      Int?
-  productSlug    String
-  productTitle   String
-  productUrl     String
-  variantId      Int?
-  variantLabel   String   @default("")
-  quantity       Int
-  unitPrice      Int
-  totalPrice     Int
-  createdAt      DateTime @default(now())
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  id                 Int      @id @default(autoincrement())
+  orderId            Int
+  productId          Int?
+  productSlug        String
+  productTitle       String
+  productUrl         String
+  variantId          Int?
+  variantLabel       String   @default("")
+  quantity           Int
+  unitPrice          Int
+  regularUnitPrice   Int      @default(0)
+  saleDiscountAmount Int      @default(0)
+  totalPrice         Int
+  createdAt          DateTime @default(now())
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product            Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])
@@ -221,4 +289,38 @@ model AnalyticsEvent {
   @@index([createdAt])
   @@index([name, createdAt])
   @@index([productSlug, createdAt])
+}
+
+model Review {
+  id                 Int                @id @default(autoincrement())
+  displayName        String             @default("")
+  isAnonymous        Boolean            @default(false)
+  body               String
+  status             ReviewStatus       @default(pending)
+  ipHash             String
+  contentHash        String
+  notificationStatus NotificationStatus @default(pending)
+  notificationError  String             @default("")
+  telegramMessageId  Int?
+  moderatedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  images             ReviewImage[]
+
+  @@index([status, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([contentHash, createdAt])
+}
+
+model ReviewImage {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int
+  fileName  String
+  urlPath   String
+  alt       String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
 }

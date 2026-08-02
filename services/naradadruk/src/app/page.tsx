@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { Metadata } from "next";
 import {
   ArrowRight,
   ChatText,
@@ -16,16 +17,29 @@ import { ProductCard } from "@/components/site/product-card";
 import { PublicFrame } from "@/components/site/public-frame";
 import { TrackedLink } from "@/components/site/tracked-link";
 import {
-  getFeaturedProducts,
+  getHomepageProductSections,
   getShowcaseImages,
   getSiteSettings,
   getVisibleCategories,
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
-import { publicPaymentNote } from "@/lib/constants";
+import { absoluteSiteUrl, publicPaymentNote, siteName, siteShareTitle } from "@/lib/constants";
 import { buildTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  const cleaned = settings.heroSubtitle.replace(/\s+/g, " ").trim();
+  const description = cleaned.length > 165 ? `${cleaned.slice(0, 162).trimEnd()}…` : cleaned;
+  return {
+    title: { absolute: siteShareTitle },
+    description,
+    alternates: { canonical: absoluteSiteUrl() },
+    openGraph: { type: "website", locale: "uk_UA", url: absoluteSiteUrl(), siteName, title: siteShareTitle, description, images: [{ url: absoluteSiteUrl("/naradadruk-hero.webp"), alt: "3D-друк Narada Druk" }] },
+    twitter: { card: "summary_large_image", title: siteShareTitle, description, images: [absoluteSiteUrl("/naradadruk-hero.webp")] },
+  };
+}
 
 function CategoryIcon({ slug }: { slug: string }) {
   const props = { size: 25, weight: "regular" as const, "aria-hidden": true };
@@ -46,12 +60,13 @@ function CategoryIcon({ slug }: { slug: string }) {
 }
 
 export default async function HomePage() {
-  const [settings, categories, featuredProducts, showcaseImages] = await Promise.all([
+  const [settings, categories, productSections, showcaseImages] = await Promise.all([
     getSiteSettings(),
     getVisibleCategories(),
-    getFeaturedProducts(),
+    getHomepageProductSections(),
     getShowcaseImages(),
   ]);
+  const { saleProducts, popularProducts, newProducts } = productSections;
 
   const customUrl = buildTelegramLink({
     baseUrl: settings.telegramUrl,
@@ -114,11 +129,9 @@ export default async function HomePage() {
           <div className="site-container hero-layout">
             <div className="hero-copy">
               <p className="eyebrow">3D-друк під вашу задачу</p>
-              <h1>Від ідеї до готової деталі.</h1>
+              <h1>{settings.heroTitle}</h1>
               <p className="hero-copy__body">
-                Персональний 3D-друк для дому, хобі та практичних задач.
-                Від прототипу до функціонального виробу — точно, швидко й без
-                зайвого процесу.
+                {settings.heroSubtitle}
               </p>
 
               <div className="hero-actions">
@@ -197,13 +210,25 @@ export default async function HomePage() {
           ))}
         </section>
 
+        {saleProducts.length > 0 ? (
+          <section className="site-section site-section--featured">
+            <div className="site-container">
+              <div className="section-heading section-heading--split">
+                <div><p className="eyebrow">Активні пропозиції</p><h2>Знижки</h2><p>Товари з чинною акційною ціною. Без штучних таймерів або вигаданого дефіциту.</p></div>
+                <TrackedLink className="text-link" href={withBasePath("/catalog")} eventName="Catalog Open" eventProps={{ location: "sale-heading", intent: "catalog" }}>До каталогу<ArrowRight aria-hidden size={18} /></TrackedLink>
+              </div>
+              <div className="product-grid product-grid--featured">{saleProducts.map((product) => <ProductCard key={product.id} product={product} />)}</div>
+            </div>
+          </section>
+        ) : null}
+
         <section className="site-section site-section--featured">
           <div className="site-container">
             <div className="section-heading section-heading--split">
               <div>
                 <p className="eyebrow">Вибір майстерні</p>
-                <h2>Вже продумані. Готові працювати.</h2>
-                <p>Практичні вироби, які можна замовити або адаптувати під себе.</p>
+                <h2>Популярне</h2>
+                <p>Добірка виробів, які команда Narada Druk рекомендує переглянути першими.</p>
               </div>
               <TrackedLink
                 className="text-link"
@@ -216,9 +241,9 @@ export default async function HomePage() {
               </TrackedLink>
             </div>
 
-            {featuredProducts.length > 0 ? (
+            {popularProducts.length > 0 ? (
               <div className="product-grid product-grid--featured">
-                {featuredProducts.map((product) => (
+                {popularProducts.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
@@ -250,6 +275,35 @@ export default async function HomePage() {
             )}
           </div>
         </section>
+
+        {newProducts.length > 0 ? (
+          <section className="site-section">
+            <div className="site-container">
+              <div className="section-heading section-heading--split">
+                <div>
+                  <p className="eyebrow">Щойно в каталозі</p>
+                  <h2>Новинки</h2>
+                  <p>Останні додані позиції без повторів із добірки вище.</p>
+                </div>
+                <TrackedLink
+                  className="text-link"
+                  href={withBasePath("/catalog")}
+                  eventName="Catalog Open"
+                  eventProps={{ location: "new-products-heading", intent: "catalog" }}
+                >
+                  Переглянути весь каталог
+                  <ArrowRight aria-hidden size={18} />
+                </TrackedLink>
+              </div>
+
+              <div className="product-grid product-grid--featured">
+                {newProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="site-section site-section--process" id="process">
           <div className="site-container process-layout">

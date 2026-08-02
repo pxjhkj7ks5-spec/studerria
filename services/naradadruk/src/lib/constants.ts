@@ -2,6 +2,11 @@ export const siteName = "Narada Druk";
 export const siteBaseUrl = "https://studerria.com";
 export const sitePath = "/naradadruk";
 
+export function absoluteSiteUrl(path = "/") {
+  const normalized = path === "/" ? "" : `/${path.replace(/^\/+|\/+$/g, "")}`;
+  return new URL(`${sitePath}${normalized}`, siteBaseUrl).toString();
+}
+
 export const siteDescription =
   "3D друк, страйкбольні аксесуари та декор під ваш запит. Готові позиції з кошиком і доставкою по Україні та кастомні вироби.";
 

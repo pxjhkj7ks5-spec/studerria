@@ -11,6 +11,7 @@ type ProductVariant = {
   id: number;
   label: string;
   price: number;
+  regularPrice: number;
   description: string;
 };
 
@@ -21,7 +22,11 @@ type ProductPurchasePanelProps = {
   productTitle: string;
   coverImageUrl: string;
   basePrice: number | null;
+  regularBasePrice: number | null;
   priceLabel: string;
+  regularPriceLabel: string;
+  isOnSale: boolean;
+  saleEndsAt: string | null;
   shortDescription: string;
   telegramUrl: string;
   variants: ProductVariant[];
@@ -34,7 +39,11 @@ export function ProductPurchasePanel({
   productTitle,
   coverImageUrl,
   basePrice,
+  regularBasePrice,
   priceLabel,
+  regularPriceLabel,
+  isOnSale,
+  saleEndsAt,
   shortDescription,
   telegramUrl,
   variants,
@@ -45,6 +54,9 @@ export function ProductPurchasePanel({
   const selectedVariant =
     variants.find((variant) => variant.id === selectedVariantId) ?? null;
   const currentPrice = selectedVariant ? formatPrice(selectedVariant.price) : priceLabel;
+  const oldPrice = selectedVariant && selectedVariant.price < selectedVariant.regularPrice
+    ? formatPrice(selectedVariant.regularPrice)
+    : regularPriceLabel;
   const customUrl = buildTelegramLink({
     baseUrl: telegramUrl,
     intent: "custom",
@@ -58,12 +70,14 @@ export function ProductPurchasePanel({
     variantId: selectedVariant?.id ?? null,
     variantLabel: selectedVariant?.label ?? "",
     unitPrice,
+    regularUnitPrice: selectedVariant?.regularPrice ?? regularBasePrice ?? unitPrice,
     imageUrl: coverImageUrl,
   } : null;
 
   return (
     <>
       <div className="purchase-panel">
+        {isOnSale ? <span className="sale-badge">Знижка</span> : null}
         <div className="purchase-panel__meta">
           <span>{category}</span>
           <span>
@@ -87,7 +101,7 @@ export function ProductPurchasePanel({
                   onClick={() => setSelectedVariantId(variant.id)}
                 >
                   <span>{variant.label}</span>
-                  <strong>{formatPrice(variant.price)}</strong>
+                  <strong>{variant.price < variant.regularPrice ? <><del className="old-price">{formatPrice(variant.regularPrice)}</del> {formatPrice(variant.price)}</> : formatPrice(variant.price)}</strong>
                   {variant.description ? <small>{variant.description}</small> : null}
                 </button>
               ))}
@@ -98,7 +112,8 @@ export function ProductPurchasePanel({
         <div className="purchase-panel__action">
           <div>
             <span>Орієнтовна ціна</span>
-            <strong>{currentPrice}</strong>
+            <span className="sale-price-line">{oldPrice ? <del className="old-price">{oldPrice}</del> : null}<strong>{currentPrice}</strong></span>
+            {isOnSale ? <small>{saleEndsAt ? `Акція до ${new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(saleEndsAt))}` : "Акційна ціна діє зараз"}</small> : null}
           </div>
           {cartItem ? <AddToCartButton className="accent-pill accent-pill--large" item={cartItem} /> : null}
         </div>
@@ -119,7 +134,7 @@ export function ProductPurchasePanel({
       <div className="mobile-purchase-bar">
         <div>
           <span>{productTitle}</span>
-          <strong>{currentPrice}</strong>
+          <span className="sale-price-line">{oldPrice ? <del className="old-price">{oldPrice}</del> : null}<strong>{currentPrice}</strong></span>
         </div>
         {cartItem ? <AddToCartButton className="accent-pill" compactLabel item={cartItem} /> : null}
       </div>

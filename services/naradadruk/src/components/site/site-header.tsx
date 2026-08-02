@@ -33,6 +33,7 @@ export function SiteHeader({ telegramUrl }: SiteHeaderProps) {
 
         <nav className="site-nav" aria-label="Головна навігація">
           <a href={withBasePath("/catalog")}>Каталог</a>
+          <a href={withBasePath("/reviews")}>Відгуки</a>
           <a href={withBasePath("/#process")}>Як це працює</a>
           <a href={withBasePath("/#delivery")}>Доставка</a>
         </nav>

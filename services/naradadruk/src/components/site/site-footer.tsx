@@ -38,6 +38,7 @@ export function SiteFooter({ telegramUrl }: SiteFooterProps) {
           <a href={withBasePath("/catalog")}>
             Каталог
           </a>
+          <a href={withBasePath("/reviews")}>Відгуки</a>
           <a href={withBasePath("/cart")}>Кошик</a>
           <a href={withBasePath("/#process")}>Як замовити</a>
           <a href={withBasePath("/#delivery")}>Доставка й оплата</a>

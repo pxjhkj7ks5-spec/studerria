@@ -22,6 +22,10 @@ type ProductEditorPageProps = {
   searchParams: Promise<{ ok?: string; error?: string }>;
 };
 
+function dateTimeInput(value: Date | null) {
+  return value ? new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : "";
+}
+
 export default async function ProductEditorPage({ params, searchParams }: ProductEditorPageProps) {
   await requireAdminSession();
 
@@ -141,6 +145,16 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
                   <span>Featured</span>
                   <input name="isFeatured" type="checkbox" defaultChecked={product.isFeatured} className="h-5 w-5" />
                 </label>
+                <div className="md:col-span-2 rounded-[1.35rem] border border-red-400/20 bg-red-400/[0.04] p-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="field-shell"><span>Активувати знижку</span><input name="saleEnabled" type="checkbox" defaultChecked={product.saleEnabled} className="h-5 w-5" /></label>
+                    <p className="text-xs leading-5 text-[--muted]">Вкажіть або акційну ціну (варіанти зменшаться пропорційно), або відсоток для всіх цін. Одночасно обидва поля не заповнюйте.</p>
+                    <div className="field-shell"><span>Акційна ціна, грн</span><input name="salePrice" type="number" min="0" defaultValue={product.salePrice ?? ""} /></div>
+                    <div className="field-shell"><span>Знижка, %</span><input name="salePercent" type="number" min="1" max="99" defaultValue={product.salePercent ?? ""} /></div>
+                    <div className="field-shell"><span>Початок (необов’язково)</span><input name="saleStartsAt" type="datetime-local" defaultValue={dateTimeInput(product.saleStartsAt)} /></div>
+                    <div className="field-shell"><span>Завершення (необов’язково)</span><input name="saleEndsAt" type="datetime-local" defaultValue={dateTimeInput(product.saleEndsAt)} /></div>
+                  </div>
+                </div>
                 <div className="field-shell md:col-span-2">
                   <span>Короткий опис</span>
                   <textarea name="shortDescription" defaultValue={product.shortDescription} />

@@ -1,8 +1,9 @@
-import { ProductStatus, Prisma } from "@prisma/client";
+import { OrderStatus, ProductStatus, ReviewStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { defaultTelegramUrl, publicPaymentNote } from "@/lib/constants";
 import { deleteUploadFile } from "@/lib/storage";
 import { formatPrice, slugify } from "@/lib/utils";
+import { effectiveUnitPrice, isSaleActive, productPricePresentation } from "@/lib/pricing";
 import {
   buildAnalyticsReport,
   getAnalyticsQueryStart,
@@ -59,6 +60,11 @@ function selectAcrossCategories<T extends { categoryId: number }>(values: T[], l
 export function resolveProductPrice(product: {
   basePrice: number | null;
   priceFrom: boolean;
+  saleEnabled: boolean;
+  salePrice: number | null;
+  salePercent: number | null;
+  saleStartsAt: Date | null;
+  saleEndsAt: Date | null;
   variants: Array<{ price: number }>;
 }) {
   if (typeof product.basePrice === "number") {
@@ -71,6 +77,22 @@ export function resolveProductPrice(product: {
   }
 
   return "Ціна за запитом";
+}
+
+function presentPublicProduct<T extends Prisma.ProductGetPayload<{ include: typeof publicProductInclude }>>(product: T) {
+  const pricing = productPricePresentation(product);
+  return {
+    ...product,
+    variants: product.variants.map((variant) => ({
+      ...variant,
+      regularPrice: variant.price,
+      price: effectiveUnitPrice(product, variant.price, false),
+    })),
+    regularBasePrice: product.basePrice,
+    basePrice: product.basePrice === null ? null : effectiveUnitPrice(product, product.basePrice, true),
+    coverImage: resolveCoverImage(product),
+    ...pricing,
+  };
 }
 
 async function generateUniqueSlug(
@@ -175,21 +197,36 @@ export async function getVisibleCategories() {
   }));
 }
 
-export async function getFeaturedProducts(limit = 6) {
+export async function getHomepageProductSections(popularLimit = 6, newLimit = 6, saleLimit = 6) {
   const products = await prisma.product.findMany({
     where: {
       status: ProductStatus.published,
       category: { isVisible: true },
     },
     include: publicProductInclude,
-    orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
+    orderBy: [{ createdAt: "desc" }, { updatedAt: "desc" }],
   });
 
-  return selectAcrossCategories(products, limit).map((product) => ({
-    ...product,
-    coverImage: resolveCoverImage(product),
-    priceLabel: resolveProductPrice(product),
-  }));
+  const saleProducts = selectAcrossCategories(
+    products.filter((product) => isSaleActive(product)),
+    saleLimit,
+  );
+  const saleIds = new Set(saleProducts.map((product) => product.id));
+  const popularProducts = selectAcrossCategories(
+    products.filter((product) => product.isFeatured && !saleIds.has(product.id)),
+    popularLimit,
+  );
+  const popularIds = new Set(popularProducts.map((product) => product.id));
+  const newProducts = products
+    .filter((product) => !popularIds.has(product.id) && !saleIds.has(product.id))
+    .slice(0, newLimit);
+  const toPresentation = (product: (typeof products)[number]) => presentPublicProduct(product);
+
+  return {
+    saleProducts: saleProducts.map(toPresentation),
+    popularProducts: popularProducts.map(toPresentation),
+    newProducts: newProducts.map(toPresentation),
+  };
 }
 
 export async function getCatalogProducts(input?: { categorySlug?: string; search?: string }) {
@@ -215,11 +252,7 @@ export async function getCatalogProducts(input?: { categorySlug?: string; search
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
   });
 
-  return products.map((product) => ({
-    ...product,
-    coverImage: resolveCoverImage(product),
-    priceLabel: resolveProductPrice(product),
-  }));
+  return products.map(presentPublicProduct);
 }
 
 export async function getCategoryBySlug(slug: string) {
@@ -227,6 +260,19 @@ export async function getCategoryBySlug(slug: string) {
     where: {
       slug,
       isVisible: true,
+    },
+    include: {
+      products: {
+        where: { status: ProductStatus.published, images: { some: {} } },
+        select: {
+          images: {
+            orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { id: "asc" }],
+            take: 1,
+          },
+        },
+        orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
+        take: 1,
+      },
     },
   });
 
@@ -248,9 +294,7 @@ export async function getProductBySlug(slug: string) {
   }
 
   return {
-    ...product,
-    coverImage: resolveCoverImage(product),
-    priceLabel: resolveProductPrice(product),
+    ...presentPublicProduct(product),
     telegramUrl: getTelegramUrl((await getSiteSettings()).telegramUrl),
   };
 }
@@ -295,11 +339,7 @@ export async function getRelatedProducts(
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
   });
 
-  return shuffled(products).slice(0, limit).map((product) => ({
-    ...product,
-    coverImage: resolveCoverImage(product),
-    priceLabel: resolveProductPrice(product),
-  }));
+  return shuffled(products).slice(0, limit).map(presentPublicProduct);
 }
 
 export async function getOrderByPublicId(publicId: string) {
@@ -313,6 +353,177 @@ export async function getOrderByPublicId(publicId: string) {
   });
 }
 
+async function getAdminOrderSummary(now: Date) {
+  const workflowStatuses = [OrderStatus.new, OrderStatus.accepted, OrderStatus.shipped, OrderStatus.closed] as const;
+  const recentStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const [statusGroups, allTimeValue, recentOrderCount, recentOrderValue, recentOrders] =
+    await Promise.all([
+      prisma.order.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+      }),
+      prisma.order.aggregate({
+        _sum: { total: true },
+      }),
+      prisma.order.count({
+        where: { createdAt: { gte: recentStart } },
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: recentStart },
+        },
+        _sum: { total: true },
+      }),
+      prisma.order.findMany({
+        select: {
+          publicId: true,
+          status: true,
+          firstName: true,
+          lastName: true,
+          total: true,
+          createdAt: true,
+          _count: { select: { items: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
+    ]);
+
+  const byStatus = Object.fromEntries(
+    workflowStatuses.map((status) => [status, 0]),
+  ) as Record<(typeof workflowStatuses)[number], number>;
+  for (const group of statusGroups) {
+    if (workflowStatuses.includes(group.status as (typeof workflowStatuses)[number])) {
+      byStatus[group.status as (typeof workflowStatuses)[number]] = group._count._all;
+    }
+  }
+
+  return {
+    totalCount: Object.values(byStatus).reduce((sum, count) => sum + count, 0),
+    newCount: byStatus.new,
+    activeCount: byStatus.new + byStatus.accepted + byStatus.shipped,
+    acceptedCount: byStatus.accepted,
+    shippedCount: byStatus.shipped,
+    closedCount: byStatus.closed,
+    byStatus,
+    allTimeOrderValue: allTimeValue._sum.total ?? 0,
+    recent: {
+      days: 30,
+      count: recentOrderCount,
+      orderValue: recentOrderValue._sum.total ?? 0,
+    },
+    recentOrders,
+  };
+}
+
+export async function getAdminOrders(status?: OrderStatus) {
+  return prisma.order.findMany({
+    where: status ? { status } : undefined,
+    include: {
+      _count: { select: { items: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+}
+
+export async function getAdminOrderByPublicId(publicId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(publicId)) return null;
+  return prisma.order.findUnique({
+    where: { publicId },
+    include: {
+      items: { orderBy: { id: "asc" } },
+      events: { orderBy: { createdAt: "asc" } },
+      promoCode: { select: { id: true, code: true } },
+    },
+  });
+}
+
+export async function updateOrderStatus(publicId: string, status: OrderStatus, actor = "admin") {
+  return prisma.$transaction(async (transaction) => {
+    const order = await transaction.order.findUnique({ where: { publicId }, select: { id: true, status: true } });
+    if (!order) throw new Error("Замовлення не знайдено.");
+    if (order.status === status) return order;
+    await transaction.order.update({ where: { id: order.id }, data: { status } });
+    await transaction.orderEvent.create({ data: { orderId: order.id, eventType: "status", fromStatus: order.status, toStatus: status, actor } });
+    return { ...order, status };
+  });
+}
+
+export async function addOrderComment(publicId: string, comment: string, actor = "admin") {
+  const order = await prisma.order.findUnique({ where: { publicId }, select: { id: true, status: true } });
+  if (!order) throw new Error("Замовлення не знайдено.");
+  return prisma.orderEvent.create({ data: { orderId: order.id, eventType: "comment", toStatus: order.status, comment, actor } });
+}
+
+export async function getApprovedReviews(limit = 60) {
+  return prisma.review.findMany({
+    where: { status: ReviewStatus.approved },
+    include: { images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    orderBy: [{ createdAt: "desc" }],
+    take: limit,
+  });
+}
+
+export async function getAdminReviews(status?: ReviewStatus) {
+  return prisma.review.findMany({
+    where: status ? { status } : undefined,
+    include: { images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    orderBy: [{ createdAt: "desc" }],
+    take: 200,
+  });
+}
+
+export async function getAdminReview(id: number) {
+  return prisma.review.findUnique({
+    where: { id },
+    include: { images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+  });
+}
+
+export async function setReviewStatus(id: number, status: ReviewStatus) {
+  return prisma.review.update({
+    where: { id },
+    data: { status, moderatedAt: new Date() },
+  });
+}
+
+export async function deleteReview(id: number) {
+  const review = await getAdminReview(id);
+  if (!review) return;
+  await prisma.review.delete({ where: { id } });
+  await Promise.all(review.images.map((image) => deleteUploadFile(image.fileName)));
+}
+
+export async function getAdminPromoCodes() {
+  return prisma.promoCode.findMany({
+    include: { orders: { select: { publicId: true, total: true, createdAt: true, source: true }, orderBy: { createdAt: "desc" }, take: 8 } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function getAdminPromoCode(id: number) {
+  return prisma.promoCode.findUnique({
+    where: { id },
+    include: { orders: { select: { publicId: true, total: true, discountAmount: true, createdAt: true, source: true }, orderBy: { createdAt: "desc" }, take: 100 } },
+  });
+}
+
+export async function savePromoCode(input: {
+  id?: number;
+  code: string;
+  type: "percentage" | "fixed";
+  value: number;
+  usageLimit: number | null;
+  expiresAt: Date | null;
+  enabled: boolean;
+}) {
+  const { id, ...values } = input;
+  const data = { ...values, code: input.code.trim().toUpperCase() };
+  if (id) return prisma.promoCode.update({ where: { id }, data });
+  return prisma.promoCode.create({ data });
+}
+
 export async function getAdminDashboardData(input?: {
   analyticsRange?: AnalyticsRange;
 }) {
@@ -321,7 +532,7 @@ export async function getAdminDashboardData(input?: {
     .replace(/^@/, "");
   const analyticsRange = input?.analyticsRange ?? 30;
   const analyticsNow = new Date();
-  const [settings, categories, products, telegramSync, recentTelegramImports, analyticsEvents] = await Promise.all([
+  const [settings, categories, products, telegramSync, recentTelegramImports, analyticsEvents, orders] = await Promise.all([
     getSiteSettings(),
     prisma.category.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -371,6 +582,7 @@ export async function getAdminDashboardData(input?: {
       orderBy: [{ createdAt: "desc" }],
       take: 100_000,
     }),
+    getAdminOrderSummary(analyticsNow),
   ]);
 
   return {
@@ -394,6 +606,7 @@ export async function getAdminDashboardData(input?: {
       analyticsRange,
       analyticsNow,
     ),
+    orders,
   };
 }
 
@@ -551,6 +764,11 @@ export async function updateProduct(input: {
   isFeatured: boolean;
   basePrice: number | null;
   priceFrom: boolean;
+  saleEnabled: boolean;
+  salePrice: number | null;
+  salePercent: number | null;
+  saleStartsAt: Date | null;
+  saleEndsAt: Date | null;
   leadTime: string;
   materialNote: string;
   deliveryNote: string;
@@ -575,6 +793,11 @@ export async function updateProduct(input: {
       isFeatured: input.isFeatured,
       basePrice: input.basePrice,
       priceFrom: input.priceFrom,
+      saleEnabled: input.saleEnabled,
+      salePrice: input.salePrice,
+      salePercent: input.salePercent,
+      saleStartsAt: input.saleStartsAt,
+      saleEndsAt: input.saleEndsAt,
       leadTime: input.leadTime,
       materialNote: input.materialNote,
       deliveryNote: input.deliveryNote,

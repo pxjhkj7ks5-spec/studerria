@@ -23,6 +23,9 @@ if [ -f "$SCHEMA_FILE" ]; then
   fi
 fi
 
+echo "[entrypoint] normalizing persisted order data"
+./node_modules/.bin/tsx prisma/migrate-runtime-data.ts
+
 if [ ! -f "$SEED_MARKER_FILE" ]; then
   echo "[entrypoint] running one-time seed"
   ./node_modules/.bin/tsx prisma/seed.ts
@@ -57,11 +60,11 @@ case "${TELEGRAM_AUTO_IMPORT_ENABLED:-true}" in
     ;;
 esac
 
-if [ -n "${NARADADRUK_MAKERWORLD_TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${NARADADRUK_MAKERWORLD_OWNER_CHAT_IDS:-}" ]; then
-  echo "[entrypoint] starting MakerWorld owner bot"
+if [ -n "${NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${NARADADRUK_ORDER_TELEGRAM_CHAT_ID:-}" ]; then
+  echo "[entrypoint] starting Narada Druk owner bot"
   ./node_modules/.bin/tsx scripts/makerworld-bot-worker.ts &
 else
-  echo "[entrypoint] MakerWorld owner bot disabled"
+  echo "[entrypoint] Narada Druk owner bot disabled"
 fi
 
 exec node server.js

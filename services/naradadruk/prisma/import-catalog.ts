@@ -231,6 +231,19 @@ async function main() {
     await importProduct(product, categoryIds);
   }
 
+  const activeCategoryIds = [...categoryIds.values()];
+  const fallbackCategoryId = categoryIds.get("inshe");
+  if (!fallbackCategoryId) {
+    throw new Error('Catalog must include the fallback category "inshe".');
+  }
+  await prisma.product.updateMany({
+    where: { categoryId: { notIn: activeCategoryIds } },
+    data: { categoryId: fallbackCategoryId },
+  });
+  await prisma.category.deleteMany({
+    where: { id: { notIn: activeCategoryIds } },
+  });
+
   console.log(
     `[catalog] imported ${payload.products.length} products from ${catalogFile}`,
   );

@@ -6,16 +6,9 @@ function registerPublicRoutes(app, deps) {
   } = deps;
 
   app.get('/', (req, res) => {
-    if (req.session && req.session.user) {
-      return res.redirect('/home');
-    }
-    const lang = getPreferredLang(req);
-    const loginErrorText = buildLoginErrorMessage(lang, req.query.error);
-    res.render('login', {
-      error: Boolean(loginErrorText),
-      loginErrorText,
-      layout: false,
-    });
+    const queryStart = req.originalUrl.indexOf('?');
+    const query = queryStart >= 0 ? req.originalUrl.slice(queryStart) : '';
+    return res.redirect(307, `/naradadruk${query}`);
   });
 
   app.get('/login', (req, res) => {

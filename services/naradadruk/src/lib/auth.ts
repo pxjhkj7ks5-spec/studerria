@@ -82,6 +82,12 @@ function sign(value: string) {
   return createHmac("sha256", getSessionSecret()).update(value).digest("base64url");
 }
 
+export function createPrivacyHash(namespace: string, value: string) {
+  return createHmac("sha256", getSessionSecret())
+    .update(`${namespace}\0${value}`)
+    .digest("base64url");
+}
+
 function serializeSession(payload: SessionPayload) {
   const serializedPayload = encode(JSON.stringify(payload));
   const signature = sign(serializedPayload);

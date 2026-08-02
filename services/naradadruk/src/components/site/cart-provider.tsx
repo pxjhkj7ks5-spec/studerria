@@ -42,6 +42,7 @@ function isStoredCartItem(value: unknown): value is CartItem {
     (typeof item.variantId === "number" || item.variantId === null) &&
     typeof item.variantLabel === "string" &&
     typeof item.unitPrice === "number" &&
+    (typeof item.regularUnitPrice === "number" || typeof item.regularUnitPrice === "undefined") &&
     typeof item.quantity === "number" &&
     typeof item.imageUrl === "string"
   );
@@ -58,6 +59,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setItems(
           stored.filter(isStoredCartItem).map((item) => ({
             ...item,
+            regularUnitPrice: item.regularUnitPrice ?? item.unitPrice,
             quantity: clampCartQuantity(item.quantity),
           })),
         );

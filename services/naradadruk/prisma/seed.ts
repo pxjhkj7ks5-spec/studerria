@@ -26,36 +26,46 @@ async function main() {
 
   const categories = [
     {
-      name: "3D друк",
-      slug: "3d-druk",
-      description: "Функціональні деталі, кріплення та кастомні рішення під техніку або побут.",
-      sortOrder: 10,
-    },
-    {
-      name: "Страйкбол",
-      slug: "strajkbol",
-      description: "Аксесуари та комплектуючі для спорядження, приводів і комфортнішого користування.",
-      sortOrder: 20,
-    },
-    {
       name: "Декор",
       slug: "dekor",
-      description: "Практичний і атмосферний декор для робочого простору або дому.",
-      sortOrder: 30,
+      description: "Тематичні вироби для столу, полиці та робочого простору.",
+      sortOrder: 10,
     },
     {
       name: "Інше",
       slug: "inshe",
-      description: "Різні корисні вироби, які не вкладаються в одну категорію.",
-      sortOrder: 40,
+      description: "Практичні вироби, підставки, органайзери та аксесуари.",
+      sortOrder: 20,
+    },
+    {
+      name: "STRIKEBALL",
+      slug: "strajkbol",
+      description: "Аксесуари, кріплення та комплектуючі для спорядження.",
+      sortOrder: 30,
     },
   ];
 
   for (const category of categories) {
     await prisma.category.upsert({
       where: { slug: category.slug },
-      update: {},
-      create: category,
+      update: { ...category, isVisible: true },
+      create: { ...category, isVisible: true },
+    });
+  }
+
+  const activeCategories = await prisma.category.findMany({
+    where: { slug: { in: categories.map((category) => category.slug) } },
+    select: { id: true, slug: true },
+  });
+  const fallbackCategory = activeCategories.find((category) => category.slug === "inshe");
+  if (fallbackCategory) {
+    const activeIds = activeCategories.map((category) => category.id);
+    await prisma.product.updateMany({
+      where: { categoryId: { notIn: activeIds } },
+      data: { categoryId: fallbackCategory.id },
+    });
+    await prisma.category.deleteMany({
+      where: { id: { notIn: activeIds } },
     });
   }
 }

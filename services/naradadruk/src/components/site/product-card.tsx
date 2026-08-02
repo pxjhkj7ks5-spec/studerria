@@ -11,8 +11,12 @@ type ProductCardProps = {
     shortDescription: string;
     leadTime: string;
     priceLabel: string;
+    regularPriceLabel: string;
+    isOnSale: boolean;
+    saleEndsAt: Date | null;
     basePrice: number | null;
-    variants: Array<{ id: number; label: string; price: number }>;
+    regularBasePrice: number | null;
+    variants: Array<{ id: number; label: string; price: number; regularPrice: number }>;
     category: { name: string };
     coverImage: { urlPath: string; alt: string } | null;
   };
@@ -39,6 +43,7 @@ export function ProductCard({
           category: product.category.name,
         }}
       >
+        {product.isOnSale ? <span className="sale-badge">Знижка</span> : null}
         {product.coverImage ? (
           <Image
             src={withBasePath(product.coverImage.urlPath)}
@@ -79,7 +84,11 @@ export function ProductCard({
         </div>
 
         <div className="product-card__footer">
-          <p className="product-card__price">{product.priceLabel}</p>
+          <div className="product-card__price-wrap">
+            {product.regularPriceLabel ? <del className="old-price">{product.regularPriceLabel}</del> : null}
+            <p className="product-card__price">{product.priceLabel}</p>
+            {product.isOnSale ? <small>{product.saleEndsAt ? `Акція до ${new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(product.saleEndsAt)}` : "Акційна ціна діє зараз"}</small> : null}
+          </div>
           {typeof unitPrice === "number" ? (
             <AddToCartButton
               compactLabel
@@ -90,6 +99,7 @@ export function ProductCard({
                 variantId: defaultVariant?.id ?? null,
                 variantLabel: defaultVariant?.label ?? "",
                 unitPrice,
+                regularUnitPrice: defaultVariant?.regularPrice ?? product.regularBasePrice ?? unitPrice,
                 imageUrl: product.coverImage?.urlPath ?? "",
               }}
             />

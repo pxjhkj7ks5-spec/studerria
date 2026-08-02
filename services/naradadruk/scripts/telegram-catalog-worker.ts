@@ -260,7 +260,7 @@ async function deleteDownloadedImages(images: DownloadedImage[]) {
 }
 
 async function resolveCategory(categoryValue: string) {
-  const categories = await prisma.category.findMany();
+  const categories = await prisma.category.findMany({ where: { isVisible: true } });
   const normalized = categoryValue.trim().toLocaleLowerCase("uk-UA");
   const slug = slugify(categoryValue);
 

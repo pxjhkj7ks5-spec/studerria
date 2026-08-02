@@ -196,32 +196,41 @@ docker compose up -d naradadruk
 docker compose ps
 ```
 
-### Narada Druk MakerWorld owner bot
+### Narada Druk owner bot
 
-Create a dedicated bot with `@BotFather`, add it as an administrator to the destination
-channel when the destination is a channel, and configure:
+The MakerWorld flow reuses the existing Narada Druk order bot and owner chat. Add that
+bot as an administrator to the Narada Print destination channel and configure only the
+numeric destination channel ID in addition to the existing order variables:
 
 ```env
-NARADADRUK_MAKERWORLD_TELEGRAM_BOT_TOKEN=bot-token-from-botfather
-NARADADRUK_MAKERWORLD_OWNER_CHAT_IDS=123456789
-NARADADRUK_POSTS_TELEGRAM_CHAT_ID=@naradaprint
-NARADADRUK_POSTS_TELEGRAM_THREAD_ID=
-NARADADRUK_POSTS_TELEGRAM_CONTACT_URL=https://t.me/owner_username
-NARADADRUK_PUBLIC_SITE_URL=https://studerria.com
+NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN=bot-token-from-botfather
+NARADADRUK_ORDER_TELEGRAM_CHAT_ID=123456789
+NARADADRUK_POSTS_TELEGRAM_CHAT_ID=-1001234567890
 ```
 
-- `NARADADRUK_MAKERWORLD_TELEGRAM_BOT_TOKEN` is used only by the owner-operated
-  MakerWorld publishing flow. Order notifications continue to use
-  `NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN`.
-- `NARADADRUK_MAKERWORLD_OWNER_CHAT_IDS` is a comma-separated allowlist of private
-  Telegram chat IDs. The bot ignores commands outside these private chats.
-- `NARADADRUK_POSTS_TELEGRAM_CHAT_ID` is the destination channel/chat for product
-  albums and posts. `NARADADRUK_POSTS_TELEGRAM_THREAD_ID` is needed only for a
-  specific forum topic.
-- `NARADADRUK_POSTS_TELEGRAM_CONTACT_URL` is the owner DM used by the contact link
-  and button. When omitted, the configured Narada Druk Telegram URL is reused.
-- `NARADADRUK_PUBLIC_SITE_URL` is the public origin used for the exact product-page
-  button; the `/naradadruk` base path is added automatically.
+Create the bot in `@BotFather` with `/newbot`, copy its token into
+`NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN`, open the bot from the owner account and send
+`/start`. Then call `getUpdates` once and copy `message.chat.id` into
+`NARADADRUK_ORDER_TELEGRAM_CHAT_ID`; this must be the owner's private chat/user ID.
+
+- `NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN` continues to send order notifications and
+  also receives owner-only order, review-moderation, manual-order and MakerWorld commands.
+- `NARADADRUK_ORDER_TELEGRAM_CHAT_ID` is the numeric ID of the owner's private chat;
+  that same Telegram user is the only account allowed to operate callbacks and commands.
+- `NARADADRUK_POSTS_TELEGRAM_CHAT_ID` is the required numeric destination channel ID
+  for albums and posts. Do not put the public `@naradaprint` username here.
+
+To obtain the numeric channel ID, add the existing bot to the channel and call the
+Telegram Bot API `getChat` method with `@naradaprint`; copy the numeric `result.id`
+(normally beginning with `-100`) into `NARADADRUK_POSTS_TELEGRAM_CHAT_ID`. The public
+channel URL already configured for Narada Druk is reused for post links. If no safe
+Telegram link is configured, the secondary Telegram button is omitted. Product buttons
+always use `https://studerria.com/naradadruk/product/<slug>`.
+
+```bash
+curl -sS -X POST "https://api.telegram.org/bot${NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN}/getChat" \
+  --data-urlencode "chat_id=@naradaprint"
+```
 
 Send `/makerworld` in an allowed private chat, then provide a public MakerWorld model
 URL. The bot creates a non-public product draft, downloads up to six public preview
@@ -236,6 +245,14 @@ access-restricted, or challenge-protected pages are not bypassed, and some pages
 provide fewer metadata fields or images. In-memory Telegram editing sessions do not
 survive a service restart; any already-created product remains an unpublished draft
 that can be reviewed in the Narada Druk admin area.
+
+Use `/orders` for the refreshable active-order dashboard and `/manual` for the guided
+manual-order flow. New website and manual orders start as `Обробляється`; the owner can
+move them through `Прийнято в роботу`, `Відправлено`, and confirmed `Закрито`, with
+internal comments retained in order history. The dashboard is intentionally not pinned
+automatically because chat permissions vary. New public reviews also arrive in this
+same owner chat with `Опублікувати` and `Видалити` buttons and remain hidden until
+approved. These flows require no additional environment variables.
 
 Server `.env` baseline:
 

@@ -2,7 +2,7 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
-import { ProductStatus } from "@prisma/client";
+import { OrderStatus, ProductStatus, ReviewStatus } from "@prisma/client";
 import { z } from "zod";
 import {
   clearAdminSession,
@@ -17,13 +17,18 @@ import {
   deleteCategory,
   deleteProduct,
   deleteProductImage,
+  deleteReview,
   deleteVariant,
   saveCategory,
   saveSiteSettings,
+  savePromoCode,
   saveVariant,
   setCoverImage,
+  setReviewStatus,
   updateProduct,
   updateProductImage,
+  updateOrderStatus,
+  addOrderComment,
 } from "@/lib/data";
 import { saveProductImage } from "@/lib/storage";
 import { parseCheckbox, parseOptionalInt } from "@/lib/utils";
@@ -74,11 +79,21 @@ const productUpdateSchema = z.object({
   isFeatured: z.boolean(),
   basePrice: z.number().int().nonnegative().nullable(),
   priceFrom: z.boolean(),
+  saleEnabled: z.boolean(),
+  salePrice: z.number().int().nonnegative().nullable(),
+  salePercent: z.number().int().min(1).max(99).nullable(),
+  saleStartsAt: z.date().nullable(),
+  saleEndsAt: z.date().nullable(),
   leadTime: z.string().trim().max(120),
   materialNote: z.string().trim().max(160),
   deliveryNote: z.string().trim().max(160),
   paymentNote: z.string().trim().max(160),
   sortOrder: z.number().int(),
+}).superRefine((value, context) => {
+  if (value.saleEnabled && value.salePrice === null && value.salePercent === null) context.addIssue({ code: "custom", path: ["salePrice"], message: "Для акції вкажіть акційну ціну або відсоток." });
+  if (value.salePrice !== null && value.salePercent !== null) context.addIssue({ code: "custom", path: ["salePercent"], message: "Оберіть акційну ціну або відсоток, не обидва одночасно." });
+  if (value.salePrice !== null && (value.basePrice === null || value.salePrice >= value.basePrice)) context.addIssue({ code: "custom", path: ["salePrice"], message: "Акційна ціна має бути нижчою за базову." });
+  if (value.saleStartsAt && value.saleEndsAt && value.saleEndsAt <= value.saleStartsAt) context.addIssue({ code: "custom", path: ["saleEndsAt"], message: "Завершення акції має бути пізніше за початок." });
 });
 
 const variantSchema = z.object({
@@ -95,6 +110,18 @@ const imageMetaSchema = z.object({
   imageId: z.number().int().positive().optional(),
   alt: z.string().trim().max(140),
   sortOrder: z.number().int(),
+});
+
+const promoCodeSchema = z.object({
+  id: z.number().int().positive().optional(),
+  code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{3,32}$/, "Код: 3–32 латинські літери, цифри, _ або -."),
+  type: z.enum(["percentage", "fixed"]),
+  value: z.number().int().positive("Знижка має бути більшою за нуль."),
+  usageLimit: z.number().int().positive().nullable(),
+  expiresAt: z.date().nullable(),
+  enabled: z.boolean(),
+}).superRefine((value, context) => {
+  if (value.type === "percentage" && value.value > 99) context.addIssue({ code: "custom", path: ["value"], message: "Відсоткова знижка має бути від 1% до 99%." });
 });
 
 function compareSecret(left: string, right: string) {
@@ -219,6 +246,8 @@ export async function createProductAction(formData: FormData) {
 export async function updateProductAction(formData: FormData) {
   await requireAdminSession();
 
+  const saleStartsAt = String(formData.get("saleStartsAt") ?? "").trim();
+  const saleEndsAt = String(formData.get("saleEndsAt") ?? "").trim();
   const parsed = productUpdateSchema.safeParse({
     productId: parseOptionalInt(formData.get("productId")),
     title: String(formData.get("title") ?? ""),
@@ -230,6 +259,11 @@ export async function updateProductAction(formData: FormData) {
     isFeatured: parseCheckbox(formData.get("isFeatured")),
     basePrice: parseOptionalInt(formData.get("basePrice")),
     priceFrom: parseCheckbox(formData.get("priceFrom")),
+    saleEnabled: parseCheckbox(formData.get("saleEnabled")),
+    salePrice: parseOptionalInt(formData.get("salePrice")),
+    salePercent: parseOptionalInt(formData.get("salePercent")),
+    saleStartsAt: saleStartsAt ? new Date(saleStartsAt) : null,
+    saleEndsAt: saleEndsAt ? new Date(saleEndsAt) : null,
     leadTime: String(formData.get("leadTime") ?? ""),
     materialNote: String(formData.get("materialNote") ?? ""),
     deliveryNote: String(formData.get("deliveryNote") ?? ""),
@@ -384,4 +418,69 @@ export async function deleteProductImageAction(formData: FormData) {
 
   await deleteProductImage(imageId);
   redirect(messagePath(adminProductPath(productId), "ok", "Зображення видалено."));
+}
+
+export async function moderateReviewAction(formData: FormData) {
+  await requireAdminSession();
+  const reviewId = parseOptionalInt(formData.get("reviewId"));
+  const status = String(formData.get("status") ?? "");
+  if (!reviewId || ![ReviewStatus.approved, ReviewStatus.rejected].includes(status as ReviewStatus)) {
+    redirect(messagePath(`${getAdminRoute()}/reviews`, "error", "Не вдалося змінити статус відгуку."));
+  }
+  await setReviewStatus(reviewId, status as ReviewStatus);
+  redirect(messagePath(`${getAdminRoute()}/reviews/${reviewId}`, "ok", status === ReviewStatus.approved ? "Відгук опубліковано." : "Відгук приховано."));
+}
+
+export async function deleteReviewAction(formData: FormData) {
+  await requireAdminSession();
+  const reviewId = parseOptionalInt(formData.get("reviewId"));
+  if (!reviewId) {
+    redirect(messagePath(`${getAdminRoute()}/reviews`, "error", "Відгук не знайдено."));
+  }
+  await deleteReview(reviewId);
+  redirect(messagePath(`${getAdminRoute()}/reviews`, "ok", "Відгук і його фото видалено."));
+}
+
+export async function savePromoCodeAction(formData: FormData) {
+  await requireAdminSession();
+  const expiry = String(formData.get("expiresAt") ?? "").trim();
+  const parsed = promoCodeSchema.safeParse({
+    id: parseOptionalInt(formData.get("id")) ?? undefined,
+    code: String(formData.get("code") ?? ""),
+    type: String(formData.get("type") ?? "percentage"),
+    value: parseOptionalInt(formData.get("value")),
+    usageLimit: parseOptionalInt(formData.get("usageLimit")),
+    expiresAt: expiry ? new Date(expiry) : null,
+    enabled: parseCheckbox(formData.get("enabled")),
+  });
+  const base = `${getAdminRoute()}/promo-codes`;
+  const returnPath = parsed.success && parsed.data.id ? `${base}/${parsed.data.id}` : base;
+  if (!parsed.success || (expiry && Number.isNaN(parsed.data.expiresAt?.getTime()))) {
+    redirect(messagePath(returnPath, "error", parsed.success ? "Некоректна дата завершення." : parsed.error.issues[0]?.message ?? "Перевірте промокод."));
+  }
+  try {
+    const promo = await savePromoCode(parsed.data);
+    redirect(messagePath(`${base}/${promo.id}`, "ok", "Промокод збережено."));
+  } catch {
+    redirect(messagePath(returnPath, "error", "Не вдалося зберегти промокод. Перевірте, чи код унікальний."));
+  }
+}
+
+export async function updateOrderStatusAction(formData: FormData) {
+  await requireAdminSession();
+  const publicId = String(formData.get("publicId") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const allowedStatuses = [OrderStatus.new, OrderStatus.accepted, OrderStatus.shipped, OrderStatus.closed] as const;
+  if (!/^[0-9a-f-]{36}$/i.test(publicId) || !allowedStatuses.includes(status as (typeof allowedStatuses)[number])) redirect(getAdminRoute());
+  await updateOrderStatus(publicId, status as OrderStatus);
+  redirect(messagePath(`${getAdminRoute()}/orders/${publicId}`, "ok", "Статус замовлення оновлено."));
+}
+
+export async function addOrderCommentAction(formData: FormData) {
+  await requireAdminSession();
+  const publicId = String(formData.get("publicId") ?? "");
+  const comment = String(formData.get("comment") ?? "").trim().slice(0, 1000);
+  if (!/^[0-9a-f-]{36}$/i.test(publicId) || comment.length < 2) redirect(messagePath(`${getAdminRoute()}/orders/${publicId}`, "error", "Введіть внутрішній коментар."));
+  await addOrderComment(publicId, comment);
+  redirect(messagePath(`${getAdminRoute()}/orders/${publicId}`, "ok", "Внутрішній коментар додано."));
 }
