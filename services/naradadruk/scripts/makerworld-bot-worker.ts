@@ -11,6 +11,13 @@ import {
   type MakerWorldModel,
 } from "../src/lib/makerworld";
 import { absoluteSiteUrl } from "../src/lib/site-url";
+import {
+  buildTelegramProductPost,
+  calculatePrivatePriceGuidance,
+  parseProductContentPackage,
+  productContentPackageTemplate,
+  type ProductContentPackage,
+} from "../src/lib/product-content-package";
 
 type TelegramUser = { id: number };
 type TelegramChat = { id: number; type: string };
@@ -45,7 +52,24 @@ type DraftImage = {
   selected: boolean;
 };
 
-type AwaitingField = "url" | "title" | "description" | "summary" | "images" | "price" | null;
+type AwaitingField =
+  | "url"
+  | "package"
+  | "title"
+  | "shortDescription"
+  | "description"
+  | "useCase"
+  | "benefits"
+  | "specifications"
+  | "compatibility"
+  | "packageContents"
+  | "summary"
+  | "material"
+  | "leadTime"
+  | "weight"
+  | "images"
+  | "price"
+  | null;
 
 type DraftSession = {
   chatId: string;
@@ -55,14 +79,26 @@ type DraftSession = {
   publishedSlug: string | null;
   sourceUrl: string;
   title: string;
+  category: string;
+  shortDescription: string;
   siteDescription: string;
   telegramSummary: string;
+  useCaseNote: string;
+  benefitsNote: string;
+  specificationsNote: string;
+  compatibilityNote: string;
+  packageContentsNote: string;
+  materialNote: string;
+  leadTime: string;
+  printWeightGrams: number | null;
   metadata: string[];
   author: string;
+  license: string;
+  sourceLicenseChecked: boolean;
   price: number | null;
   images: DraftImage[];
   awaiting: AwaitingField;
-  manualSetup: "title" | "description" | null;
+  manualSetup: "title" | "description" | "package" | null;
   postSent: boolean;
   publishedTelegramMessageId: number | null;
 };
@@ -230,16 +266,33 @@ function editorKeyboard() {
     inline_keyboard: [
       [
         { text: "✏️ Назва", callback_data: "mw:title" },
+        { text: "🏷 Короткий опис", callback_data: "mw:shortDescription" },
+      ],
+      [
         { text: "📝 Опис сайту", callback_data: "mw:description" },
+        { text: "👤 Для кого", callback_data: "mw:useCase" },
+      ],
+      [
+        { text: "✅ Переваги", callback_data: "mw:benefits" },
+        { text: "📋 Характеристики", callback_data: "mw:specifications" },
+      ],
+      [
+        { text: "🔗 Сумісність", callback_data: "mw:compatibility" },
+        { text: "📦 Комплектація", callback_data: "mw:packageContents" },
       ],
       [
         { text: "📣 Текст Telegram", callback_data: "mw:summary" },
-        { text: "🖼 Фото", callback_data: "mw:images" },
+        { text: "🧱 Матеріал", callback_data: "mw:material" },
+      ],
+      [
+        { text: "⏱ Термін", callback_data: "mw:leadTime" },
+        { text: "⚖️ Вага", callback_data: "mw:weight" },
       ],
       [
         { text: "💰 Ціна", callback_data: "mw:price" },
-        { text: "👁 Оновити превʼю", callback_data: "mw:preview" },
+        { text: "🖼 Фото", callback_data: "mw:images" },
       ],
+      [{ text: "👁 Оновити превʼю", callback_data: "mw:preview" }],
       [
         { text: "✅ Опублікувати", callback_data: "mw:publish" },
         { text: "✖️ Скасувати", callback_data: "mw:cancel" },
@@ -474,18 +527,70 @@ async function uniqueProductSlug(title: string) {
   return candidate;
 }
 
-function descriptionWithMetadata(model: MakerWorldModel) {
-  const details = [
-    model.author ? `Автор моделі: ${model.author}.` : "",
-    model.metadata.length > 0 ? `Дані моделі: ${model.metadata.join(" · ")}.` : "",
-  ].filter(Boolean);
-  return cleanText([model.description, ...details].join("\n\n"), 8000);
+async function resolveDraftCategory(categoryName = "") {
+  const categories = await prisma.category.findMany({
+    orderBy: [{ isVisible: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
+  });
+  const normalized = categoryName.trim().toLocaleLowerCase("uk-UA");
+  return (
+    categories.find((category) =>
+      normalized && [category.name, category.slug].some((value) => value.toLocaleLowerCase("uk-UA") === normalized)
+    ) ||
+    categories.find((category) => category.slug === "inshe") ||
+    categories[0] ||
+    null
+  );
+}
+
+function productContentData(session: DraftSession) {
+  return {
+    title: session.title,
+    shortDescription: shortText(session.shortDescription, 220),
+    fullDescription: session.siteDescription,
+    telegramDescription: session.telegramSummary,
+    useCaseNote: session.useCaseNote,
+    benefitsNote: session.benefitsNote,
+    specificationsNote: session.specificationsNote,
+    compatibilityNote: session.compatibilityNote,
+    packageContentsNote: session.packageContentsNote,
+    materialNote: session.materialNote,
+    leadTime: session.leadTime,
+    basePrice: session.price,
+    printWeightGrams: session.printWeightGrams,
+    sourceModelUrl: session.sourceUrl,
+    sourceModelAuthor: session.author,
+    sourceModelLicense: session.license,
+    sourceLicenseChecked: session.sourceLicenseChecked,
+  };
+}
+
+function applyContentPackageToSession(session: DraftSession, product: ProductContentPackage) {
+  session.title = product.title;
+  session.category = product.category;
+  session.shortDescription = product.shortDescription;
+  session.siteDescription = product.fullDescription;
+  session.telegramSummary = product.telegramDescription;
+  session.useCaseNote = product.useCaseNote;
+  session.benefitsNote = product.benefitsNote;
+  session.specificationsNote = product.specificationsNote;
+  session.compatibilityNote = product.compatibilityNote;
+  session.packageContentsNote = product.packageContentsNote;
+  session.materialNote = product.materialNote;
+  session.leadTime = product.leadTime;
+  session.printWeightGrams = product.printWeightGrams;
+  session.price = product.price;
+  session.sourceUrl = product.sourceModelUrl || session.sourceUrl;
+  session.author = product.sourceModelAuthor;
+  session.license = product.sourceModelLicense;
+  session.sourceLicenseChecked = false;
+}
+
+function descriptionFromModel(model: MakerWorldModel) {
+  return cleanText(model.description || model.summary, 8000);
 }
 
 async function createDraft(chatId: string, model: MakerWorldModel) {
-  const category =
-    (await prisma.category.findUnique({ where: { slug: "inshe" } })) ||
-    (await prisma.category.findFirst({ orderBy: [{ isVisible: "desc" }, { sortOrder: "asc" }] }));
+  const category = await resolveDraftCategory();
   if (!category) throw new Error("У каталозі немає категорії для нової моделі.");
 
   const [settings, existingProduct, downloadedImages, slug] = await Promise.all([
@@ -497,7 +602,9 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
     downloadModelImages(model),
     uniqueProductSlug(model.title),
   ]);
-  const siteDescription = descriptionWithMetadata(model);
+  const siteDescription = descriptionFromModel(model);
+  const shortDescription = shortText(model.summary || firstSentenceForDraft(siteDescription), 220);
+  const telegramDescription = shortText(model.summary || firstSentenceForDraft(siteDescription), 500);
 
   try {
     const draft = await prisma.product.create({
@@ -505,8 +612,9 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
         title: model.title,
         slug,
         categoryId: category.id,
-        shortDescription: shortText(model.summary, 220),
+        shortDescription,
         fullDescription: siteDescription,
+        telegramDescription,
         status: ProductStatus.draft,
         basePrice: null,
         priceFrom: false,
@@ -515,6 +623,8 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
         deliveryNote: settings?.deliveryNote || "Доставка по Україні Новою поштою.",
         paymentNote: settings?.paymentNote || "Реквізити для оплати надійдуть після підтвердження замовлення.",
         sourceModelUrl: model.sourceUrl,
+        sourceModelAuthor: model.author,
+        sourceLicenseChecked: false,
         images: {
           create: downloadedImages.map((image, index) => ({
             fileName: image.fileName,
@@ -536,10 +646,22 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
       publishedSlug: null,
       sourceUrl: model.sourceUrl,
       title: model.title,
+      category: category.name,
+      shortDescription,
       siteDescription,
-      telegramSummary: shortText(model.summary, 500),
+      telegramSummary: telegramDescription,
+      useCaseNote: "",
+      benefitsNote: "",
+      specificationsNote: "",
+      compatibilityNote: "",
+      packageContentsNote: "",
+      materialNote: model.metadata[0] || settings?.materialsNote || "Матеріал і колір узгоджуються перед друком.",
+      leadTime: settings?.leadTimeNote || "Від кількох годин до 3 днів залежно від складності.",
+      printWeightGrams: null,
       metadata: model.metadata,
       author: model.author,
+      license: "",
+      sourceLicenseChecked: false,
       price: null,
       images: draft.images.map((image, index) => ({
         id: image.id,
@@ -562,9 +684,7 @@ async function createDraft(chatId: string, model: MakerWorldModel) {
 }
 
 async function materializeManualDraft(session: DraftSession) {
-  const category =
-    (await prisma.category.findUnique({ where: { slug: "inshe" } })) ||
-    (await prisma.category.findFirst({ orderBy: [{ isVisible: "desc" }, { sortOrder: "asc" }] }));
+  const category = await resolveDraftCategory(session.category);
   if (!category) throw new Error("У каталозі немає категорії для нової моделі.");
 
   const [settings, existingProduct, slug] = await Promise.all([
@@ -575,22 +695,19 @@ async function materializeManualDraft(session: DraftSession) {
     }),
     uniqueProductSlug(session.title),
   ]);
-  session.telegramSummary = firstSentenceForDraft(session.siteDescription);
+  session.shortDescription ||= firstSentenceForDraft(session.siteDescription);
+  session.telegramSummary ||= firstSentenceForDraft(session.siteDescription);
+  session.materialNote ||= settings?.materialsNote || "Матеріал і колір узгоджуються перед друком.";
+  session.leadTime ||= settings?.leadTimeNote || "Від кількох годин до 3 днів залежно від складності.";
   const draft = await prisma.product.create({
     data: {
-      title: session.title,
+      ...productContentData(session),
       slug,
       categoryId: category.id,
-      shortDescription: shortText(session.telegramSummary, 220),
-      fullDescription: session.siteDescription,
       status: ProductStatus.draft,
-      basePrice: null,
       priceFrom: false,
-      leadTime: settings?.leadTimeNote || "Від кількох годин до 3 днів залежно від складності.",
-      materialNote: settings?.materialsNote || "Матеріал і колір узгоджуються перед друком.",
       deliveryNote: settings?.deliveryNote || "Доставка по Україні Новою поштою.",
       paymentNote: settings?.paymentNote || "Реквізити для оплати надійдуть після підтвердження замовлення.",
-      sourceModelUrl: session.sourceUrl,
     },
   });
   session.draftProductId = draft.id;
@@ -613,25 +730,25 @@ function priceLabel(price: number | null) {
   return price == null ? "не вказано" : `${new Intl.NumberFormat("uk-UA").format(price)} грн`;
 }
 
-function telegramPostText(session: DraftSession, contactLink: string, channelLink: string) {
-  const lines = [
-    `✦ <b>${escapeHtml(session.title)}</b>`,
-    "",
-    `🧩 ${escapeHtml(session.telegramSummary)}`,
-    "",
-    `💰 <b>${escapeHtml(priceLabel(session.price))}</b>`,
-    "◾ Акуратний і міцний 3D-друк під ваше замовлення.",
-    "",
-  ];
-  lines.push(
-    contactLink
-      ? `📩 <a href="${escapeHtml(contactLink)}"><b>ЗАМОВИТИ</b></a>`
-      : "📩 <b>ЗАМОВИТИ</b>",
-  );
-  if (channelLink) {
-    lines.push(`✦ <a href="${escapeHtml(channelLink)}"><b>NARADA DRUK</b></a>`);
+function privatePricingNote(session: DraftSession) {
+  const pricing = calculatePrivatePriceGuidance(session.printWeightGrams, session.price);
+  if (session.printWeightGrams === null || pricing.minimumPrice === null || pricing.suggestedPrice === null) {
+    return "⚖️ Вага не вказана — приватну цінову підказку не розраховано.";
   }
-  return lines.join("\n");
+  const warning = pricing.belowMinimum
+    ? "\n⚠️ Вказана ціна нижча за приватний мінімум. Публікація не блокується."
+    : "";
+  return `⚖️ Приватно: ${session.printWeightGrams} г · мінімум ${priceLabel(pricing.minimumPrice)} · підказка ${priceLabel(pricing.suggestedPrice)}.${warning}`;
+}
+
+function telegramPostText(session: DraftSession, contactLink: string, channelLink: string) {
+  return buildTelegramProductPost({
+    title: session.title,
+    telegramDescription: session.telegramSummary,
+    priceLabel: priceLabel(session.price),
+    contactLink,
+    channelLink,
+  });
 }
 
 const marketplaceProductSelect = {
@@ -639,6 +756,7 @@ const marketplaceProductSelect = {
   title: true,
   shortDescription: true,
   fullDescription: true,
+  telegramDescription: true,
   basePrice: true,
   priceFrom: true,
   saleEnabled: true,
@@ -692,19 +810,13 @@ function marketplacePriceLabel(product: MarketplaceProduct) {
 }
 
 function marketplaceCopyText(product: MarketplaceProduct, postUrl: string) {
-  const summary = shortText(product.shortDescription || firstSentenceForDraft(product.fullDescription), 500);
-  const lines = [
-    `✦ <b>${escapeHtml(product.title)}</b>`,
-    "",
-  ];
-  if (summary) lines.push(`🧩 ${escapeHtml(summary)}`, "");
-  lines.push(
-    `💰 <b>${escapeHtml(marketplacePriceLabel(product))}</b>`,
-    "◾ Акуратний і міцний 3D-друк під ваше замовлення.",
-    "",
-    `📩 <a href="${escapeHtml(postUrl)}"><b>ЗАМОВИТИ</b></a>`,
-  );
-  return lines.join("\n");
+  const description = product.telegramDescription || product.shortDescription || firstSentenceForDraft(product.fullDescription);
+  return buildTelegramProductPost({
+    title: product.title,
+    telegramDescription: description,
+    priceLabel: marketplacePriceLabel(product),
+    contactLink: postUrl,
+  });
 }
 
 async function getMarketplaceProduct(productId: number) {
@@ -809,6 +921,15 @@ async function showPreview(session: DraftSession, includeAlbum = false) {
   const replacement = session.existingProductId
     ? "\n♻️ Після підтвердження буде оновлено наявний товар із цього джерела."
     : "";
+  const contentSections = [
+    ["Короткий опис", session.shortDescription],
+    ["Опис сайту", session.siteDescription],
+    ["Для кого", session.useCaseNote],
+    ["Переваги", session.benefitsNote],
+    ["Характеристики", session.specificationsNote],
+    ["Сумісність", session.compatibilityNote],
+    ["Комплектація", session.packageContentsNote],
+  ].filter((entry) => entry[1]);
   const preview = [
     `<b>Чернетка товару #${session.draftProductId}</b>${replacement}`,
     "",
@@ -816,12 +937,17 @@ async function showPreview(session: DraftSession, includeAlbum = false) {
     `<b>Ціна:</b> ${escapeHtml(priceLabel(session.price))}`,
     `<b>Фото:</b> ${photoState}`,
     `<b>Джерело:</b> <a href="${escapeHtml(session.sourceUrl)}">MakerWorld</a>`,
+    `<b>Автор:</b> ${escapeHtml(session.author || "не вказано")}`,
+    `<b>Ліцензія:</b> ${escapeHtml(session.license || "не вказано")} · ${session.sourceLicenseChecked ? "перевірено" : "не перевірено"}`,
+    privatePricingNote(session),
     "",
-    `<b>Опис сторінки товару:</b>\n${escapeHtml(shortText(session.siteDescription, 1200))}`,
-    "",
+    ...contentSections.flatMap(([label, value]) => [
+      `<b>${label}:</b>\n${escapeHtml(shortText(value, 900))}`,
+      "",
+    ]),
     `<b>Окремий Telegram-допис:</b>\n${telegramPostText(session, contactLink, channelLink)}`,
     "",
-    "Редагування: /title, /description, /summary, /images, /price. Потім /publish або /cancel.",
+    "Редагування доступне кнопками або командами з /help. Потім /publish або /cancel.",
   ].join("\n");
   await sendMessage(session.chatId, preview, editorKeyboard());
 }
@@ -831,10 +957,7 @@ async function syncDraft(session: DraftSession) {
   await prisma.product.update({
     where: { id: session.draftProductId },
     data: {
-      title: session.title,
-      shortDescription: shortText(session.telegramSummary, 220),
-      fullDescription: session.siteDescription,
-      basePrice: session.price,
+      ...productContentData(session),
     },
   });
 }
@@ -931,18 +1054,12 @@ async function finalizeProduct(session: DraftSession) {
       const updated = await transaction.product.update({
         where: { id: existing.id },
         data: {
-          title: session.title,
+          ...productContentData(session),
           categoryId: draft.categoryId,
-          shortDescription: shortText(session.telegramSummary, 220),
-          fullDescription: session.siteDescription,
           status: ProductStatus.published,
-          basePrice: session.price,
           priceFrom: false,
-          leadTime: draft.leadTime,
-          materialNote: draft.materialNote,
           deliveryNote: draft.deliveryNote,
           paymentNote: draft.paymentNote,
-          sourceModelUrl: session.sourceUrl,
         },
       });
       await transaction.product.delete({ where: { id: session.draftProductId } });
@@ -973,11 +1090,8 @@ async function finalizeProduct(session: DraftSession) {
     return transaction.product.update({
       where: { id: session.draftProductId },
       data: {
-        title: session.title,
-        shortDescription: shortText(session.telegramSummary, 220),
-        fullDescription: session.siteDescription,
+        ...productContentData(session),
         status: ProductStatus.published,
-        basePrice: session.price,
         priceFrom: false,
       },
     });
@@ -1070,15 +1184,24 @@ function helpText() {
     "<b>MakerWorld → Narada Druk</b>",
     "/makerworld — почати й надіслати публічне посилання на модель",
     "/title Нова назва — змінити назву",
+    "/short Короткий опис — текст для картки каталогу",
     "/description Повний опис — змінити розгорнутий опис сторінки товару",
-    "/summary Короткий текст — окремо змінити Telegram-опис",
+    "/usecase Для кого — змінити сценарій використання",
+    "/benefits Переваги — змінити переваги",
+    "/specs Характеристики — змінити характеристики",
+    "/compatibility Сумісність — змінити сумісність",
+    "/package Комплектація — змінити комплектацію",
+    "/summary Текст — окремо змінити Telegram-опис",
+    "/material PETG — змінити матеріал",
+    "/leadtime 1–3 дні — змінити термін",
+    "/weight 125 — приватна вага для цінової підказки",
     "/images 1,3,4 — залишити вибрані фото",
     "/price 450 — встановити ціну у гривнях",
     "/preview — оновити превʼю",
     "/publish — активувати товар і опублікувати пост",
     "/cancel — видалити неопубліковану чернетку",
     "",
-    `Якщо MakerWorld відхиляє серверне читання, кнопка ручної чернетки збере назву й опис. Після цього надішліть до ${maxImages} фото прямо в чат.`,
+    `Якщо MakerWorld відхиляє серверне читання, вставте готовий пакет одним повідомленням або скористайтеся покроковим режимом. Після цього надішліть до ${maxImages} фото прямо в чат.`,
     "",
     "До фінального підтвердження товар має статус draft і не видимий покупцям.",
   ].join("\n");
@@ -1207,9 +1330,19 @@ async function requestField(session: DraftSession, field: Exclude<AwaitingField,
   session.awaiting = field;
   const prompts: Record<Exclude<AwaitingField, null>, string> = {
     url: "Надішліть публічне HTTPS-посилання на модель MakerWorld.",
+    package: `Вставте весь пакет одним повідомленням у цьому форматі:\n\n<pre>${escapeHtml(productContentPackageTemplate)}</pre>`,
     title: "Надішліть нову назву товару (до 140 символів).",
+    shortDescription: "Надішліть короткий опис для картки каталогу (8–220 символів).",
     description: "Надішліть повний опис для сторінки товару. Він зберігається окремо від Telegram-тексту.",
-    summary: "Надішліть короткий Telegram-текст про головну користь виробу (до 500 символів).",
+    useCase: "Опишіть, для кого або для якого сценарію призначений виріб.",
+    benefits: "Надішліть 2–4 конкретні переваги, кожну з нового рядка.",
+    specifications: "Надішліть підтверджені характеристики, кожну з нового рядка.",
+    compatibility: "Опишіть сумісність або обмеження. Якщо їх немає — надішліть «—».",
+    packageContents: "Опишіть комплектацію товару. Якщо даних немає — надішліть «—».",
+    summary: "Надішліть окремий Telegram-текст про сценарій використання та 2–4 конкретні переваги (до 700 символів).",
+    material: "Вкажіть матеріал або коротку примітку про нього.",
+    leadTime: "Вкажіть орієнтовний термін виготовлення.",
+    weight: "Вкажіть вагу друку цілим числом у грамах або «невідомо». Це приватне поле.",
     images: `Надішліть номери фото, які слід залишити, наприклад: 1, 3, 4. Доступно: ${session.images.length}.`,
     price: "Надішліть ціну у гривнях одним числом, наприклад: 450.",
   };
@@ -1217,18 +1350,59 @@ async function requestField(session: DraftSession, field: Exclude<AwaitingField,
 }
 
 async function applyFieldValue(session: DraftSession, field: Exclude<AwaitingField, "url" | null>, raw: string) {
+  if (field === "package") {
+    const result = parseProductContentPackage(raw);
+    if (!result.ok) throw new Error(result.errors.join("\n"));
+    applyContentPackageToSession(session, result.product);
+    session.awaiting = null;
+    if (session.draftProductId <= 0) await materializeManualDraft(session);
+    else await syncDraft(session);
+    if (result.warnings.length > 0) {
+      await sendMessage(session.chatId, `Пакет прийнято з примітками:\n${escapeHtml(result.warnings.join("\n"))}`);
+    }
+    await showPreview(session);
+    return;
+  }
   if (field === "title") {
     const value = cleanText(raw, 140);
     if (value.length < 3) throw new Error("Назва має містити щонайменше 3 символи.");
     session.title = value;
+  } else if (field === "shortDescription") {
+    const value = cleanText(raw, 220);
+    if (value.length < 8) throw new Error("Короткий опис має містити щонайменше 8 символів.");
+    session.shortDescription = value;
   } else if (field === "description") {
     const value = cleanText(raw, 8000);
     if (value.length < 20) throw new Error("Опис для сайту має містити щонайменше 20 символів.");
     session.siteDescription = value;
+  } else if (field === "useCase") {
+    session.useCaseNote = cleanText(raw === "—" ? "" : raw, 2000);
+  } else if (field === "benefits") {
+    session.benefitsNote = cleanText(raw === "—" ? "" : raw, 3000);
+  } else if (field === "specifications") {
+    session.specificationsNote = cleanText(raw === "—" ? "" : raw, 3000);
+  } else if (field === "compatibility") {
+    session.compatibilityNote = cleanText(raw === "—" ? "" : raw, 2000);
+  } else if (field === "packageContents") {
+    session.packageContentsNote = cleanText(raw === "—" ? "" : raw, 2000);
   } else if (field === "summary") {
-    const value = cleanText(raw, 500);
+    const value = cleanText(raw, 700);
     if (value.length < 10) throw new Error("Telegram-текст має містити щонайменше 10 символів.");
     session.telegramSummary = value;
+  } else if (field === "material") {
+    session.materialNote = cleanText(raw === "—" ? "" : raw, 160);
+  } else if (field === "leadTime") {
+    session.leadTime = cleanText(raw === "—" ? "" : raw, 120);
+  } else if (field === "weight") {
+    const normalized = raw.trim();
+    if (/^(?:невідомо|немає|—|-)$/iu.test(normalized)) session.printWeightGrams = null;
+    else {
+      const weight = Number(normalized.replace(/[\sг.,]/gi, ""));
+      if (!Number.isInteger(weight) || weight < 1 || weight > 1_000_000) {
+        throw new Error("Вкажіть цілу вагу від 1 до 1 000 000 г або «невідомо».");
+      }
+      session.printWeightGrams = weight;
+    }
   } else if (field === "images") {
     if (session.images.length === 0) throw new Error("MakerWorld не надав доступних фото для вибору.");
     const selected = parseImageSelection(raw, session.images.length);
@@ -1270,10 +1444,22 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
       publishedSlug: null,
       sourceUrl,
       title: "",
+      category: "",
+      shortDescription: "",
       siteDescription: "",
       telegramSummary: "",
+      useCaseNote: "",
+      benefitsNote: "",
+      specificationsNote: "",
+      compatibilityNote: "",
+      packageContentsNote: "",
+      materialNote: "",
+      leadTime: "",
+      printWeightGrams: null,
       metadata: [],
       author: "",
+      license: "",
+      sourceLicenseChecked: false,
       price: null,
       images: [],
       awaiting: "url",
@@ -1289,14 +1475,15 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
     const keyboard = sourceUrl
       ? {
           inline_keyboard: [
-            [{ text: "📝 Заповнити чернетку вручну", callback_data: "mw:manual" }],
+            [{ text: "📦 Вставити готовий пакет", callback_data: "mw:package" }],
+            [{ text: "📝 Заповнити покроково", callback_data: "mw:manual" }],
             [{ text: "✖️ Скасувати", callback_data: "mw:cancel" }],
           ],
         }
       : undefined;
     await sendMessage(
       chatId,
-      `${guidance}\n\n${sourceUrl ? "Можна зберегти це посилання як джерело й вручну додати назву, опис, фото та ціну." : "Перевірте публічне посилання MakerWorld або надішліть інше."}`,
+      `${guidance}\n\n${sourceUrl ? "Можна зберегти посилання як джерело й вставити весь готовий пакет одним повідомленням або заповнити чернетку покроково." : "Перевірте публічне посилання MakerWorld або надішліть інше."}`,
       keyboard,
     );
   }
@@ -1448,10 +1635,22 @@ async function handleMessage(message: TelegramMessage) {
       publishedSlug: null,
       sourceUrl: "",
       title: "",
+      category: "",
+      shortDescription: "",
       siteDescription: "",
       telegramSummary: "",
+      useCaseNote: "",
+      benefitsNote: "",
+      specificationsNote: "",
+      compatibilityNote: "",
+      packageContentsNote: "",
+      materialNote: "",
+      leadTime: "",
+      printWeightGrams: null,
       metadata: [],
       author: "",
+      license: "",
+      sourceLicenseChecked: false,
       price: null,
       images: [],
       awaiting: "url",
@@ -1483,7 +1682,18 @@ async function handleMessage(message: TelegramMessage) {
       await sendMessage(chatId, "Завершіть ручне створення чернетки поточним полем або використайте /cancel.");
       return;
     }
+    const manualSetup = session.manualSetup;
     try {
+      if (session.manualSetup === "package") {
+        session.manualSetup = null;
+        await applyFieldValue(session, "package", message.text);
+        await sendMessage(
+          chatId,
+          `Пакет розібрано в чернетку #${session.draftProductId}. Додайте фото, перевірте приватну цінову підказку та за потреби відредагуйте секції кнопками.`,
+          editorKeyboard(),
+        );
+        return;
+      }
       if (session.manualSetup === "title") {
         const title = cleanText(message.text, 140);
         if (title.length < 3) throw new Error("Назва має містити щонайменше 3 символи.");
@@ -1504,6 +1714,7 @@ async function handleMessage(message: TelegramMessage) {
       );
       return;
     } catch (error) {
+      if (manualSetup === "package" && session.draftProductId <= 0) session.manualSetup = "package";
       const errorMessage = error instanceof Error ? error.message : "Не вдалося створити ручну чернетку.";
       await sendMessage(chatId, escapeHtml(shortText(errorMessage, 500)));
       return;
@@ -1537,8 +1748,17 @@ async function handleMessage(message: TelegramMessage) {
 
   const commandToField: Record<string, Exclude<AwaitingField, "url" | null>> = {
     title: "title",
+    short: "shortDescription",
     description: "description",
+    usecase: "useCase",
+    benefits: "benefits",
+    specs: "specifications",
+    compatibility: "compatibility",
+    package: "packageContents",
     summary: "summary",
+    material: "material",
+    leadtime: "leadTime",
+    weight: "weight",
     images: "images",
     price: "price",
   };
@@ -1710,6 +1930,16 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     return;
   }
   const session = sessions.get(chatId);
+  if (callback.data === "mw:package" && session && session.draftProductId <= 0 && session.sourceUrl) {
+    session.awaiting = null;
+    session.manualSetup = "package";
+    await answerCallback(callback.id, "Готово до вставлення пакета.");
+    await sendMessage(
+      chatId,
+      `Вставте весь пакет одним повідомленням. Невідомі дані залишайте порожніми або пишіть «невідомо».\n\n<pre>${escapeHtml(productContentPackageTemplate)}</pre>\n\n/cancel — скасувати.`,
+    );
+    return;
+  }
   if (callback.data === "mw:manual" && session && session.draftProductId <= 0 && session.sourceUrl) {
     session.awaiting = null;
     session.manualSetup = "title";
@@ -1740,7 +1970,22 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     await handleMessage({ ...message, from: callback.from, text: "/publish" });
   } else if (action === "cancel") {
     await handleMessage({ ...message, from: callback.from, text: "/cancel" });
-  } else if (["title", "description", "summary", "images", "price"].includes(action)) {
+  } else if ([
+    "title",
+    "shortDescription",
+    "description",
+    "useCase",
+    "benefits",
+    "specifications",
+    "compatibility",
+    "packageContents",
+    "summary",
+    "material",
+    "leadTime",
+    "weight",
+    "images",
+    "price",
+  ].includes(action)) {
     await requestField(session, action as Exclude<AwaitingField, "url" | null>);
   }
 }
@@ -1755,8 +2000,17 @@ async function configureCommands() {
       { command: "help", description: "Показати всі команди редагування" },
       { command: "preview", description: "Оновити превʼю активної чернетки" },
       { command: "title", description: "Змінити назву товару" },
+      { command: "short", description: "Змінити короткий опис для каталогу" },
       { command: "description", description: "Змінити повний опис для сайту" },
+      { command: "usecase", description: "Змінити сценарій використання" },
+      { command: "benefits", description: "Змінити переваги" },
+      { command: "specs", description: "Змінити характеристики" },
+      { command: "compatibility", description: "Змінити сумісність" },
+      { command: "package", description: "Змінити комплектацію" },
       { command: "summary", description: "Змінити окремий Telegram-текст" },
+      { command: "material", description: "Змінити матеріал" },
+      { command: "leadtime", description: "Змінити термін виготовлення" },
+      { command: "weight", description: "Приватна вага та цінова підказка" },
       { command: "images", description: "Вибрати фото для товару й альбому" },
       { command: "price", description: "Встановити ціну" },
       { command: "publish", description: "Активувати товар і опублікувати пост" },

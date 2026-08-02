@@ -15,6 +15,7 @@ import {
 } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { assessProductReadiness } from "@/lib/product-readiness";
+import { calculatePrivatePriceGuidance } from "@/lib/product-content-package";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
 
   const { product, categories, settings } = data;
   const readiness = assessProductReadiness(product);
+  const privatePricing = calculatePrivatePriceGuidance(product.printWeightGrams, product.basePrice);
 
   return (
     <main className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-6 md:py-8">
@@ -187,6 +189,30 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
                   <span>Повний опис</span>
                   <textarea name="fullDescription" defaultValue={product.fullDescription} />
                 </div>
+                <div className="field-shell md:col-span-2">
+                  <span>Окремий текст Telegram</span>
+                  <textarea name="telegramDescription" defaultValue={product.telegramDescription} />
+                </div>
+                <div className="field-shell md:col-span-2">
+                  <span>Для кого / сценарій використання</span>
+                  <textarea name="useCaseNote" defaultValue={product.useCaseNote} />
+                </div>
+                <div className="field-shell md:col-span-2">
+                  <span>Переваги, кожна з нового рядка</span>
+                  <textarea name="benefitsNote" defaultValue={product.benefitsNote} />
+                </div>
+                <div className="field-shell md:col-span-2">
+                  <span>Характеристики, кожна з нового рядка</span>
+                  <textarea name="specificationsNote" defaultValue={product.specificationsNote} />
+                </div>
+                <div className="field-shell md:col-span-2">
+                  <span>Сумісність</span>
+                  <textarea name="compatibilityNote" defaultValue={product.compatibilityNote} />
+                </div>
+                <div className="field-shell md:col-span-2">
+                  <span>Комплектація</span>
+                  <textarea name="packageContentsNote" defaultValue={product.packageContentsNote} />
+                </div>
                 <div className="field-shell">
                   <span>Lead time</span>
                   <input name="leadTime" defaultValue={product.leadTime} />
@@ -202,6 +228,42 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
                 <div className="field-shell">
                   <span>Payment note</span>
                   <input name="paymentNote" defaultValue={product.paymentNote} />
+                </div>
+                <div className="md:col-span-2 rounded-[1.35rem] border border-amber-300/20 bg-amber-300/[0.04] p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-amber-200">Приватні дані — не показуються покупцям</p>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="field-shell">
+                      <span>Вага друку, г</span>
+                      <input name="printWeightGrams" type="number" min="1" defaultValue={product.printWeightGrams ?? ""} />
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/10 p-4 text-sm leading-6 text-[--muted]">
+                      {privatePricing.minimumPrice === null || privatePricing.suggestedPrice === null ? (
+                        "Вкажіть вагу, щоб отримати приватну підказку."
+                      ) : (
+                        <>
+                          Мінімум: <strong className="text-white">{privatePricing.minimumPrice} грн</strong><br />
+                          Підказка: <strong className="text-white">{privatePricing.suggestedPrice} грн</strong>
+                          {privatePricing.belowMinimum ? <span className="mt-2 block text-amber-200">Поточна ціна нижча за мінімум.</span> : null}
+                        </>
+                      )}
+                    </div>
+                    <div className="field-shell md:col-span-2">
+                      <span>Джерело MakerWorld</span>
+                      <input name="sourceModelUrl" type="url" defaultValue={product.sourceModelUrl} />
+                    </div>
+                    <div className="field-shell">
+                      <span>Автор моделі</span>
+                      <input name="sourceModelAuthor" defaultValue={product.sourceModelAuthor} />
+                    </div>
+                    <div className="field-shell">
+                      <span>Ліцензія</span>
+                      <input name="sourceModelLicense" defaultValue={product.sourceModelLicense} />
+                    </div>
+                    <label className="field-shell justify-end md:col-span-2">
+                      <span>Ліцензію перевірено вручну</span>
+                      <input name="sourceLicenseChecked" type="checkbox" defaultChecked={product.sourceLicenseChecked} className="h-5 w-5" />
+                    </label>
+                  </div>
                 </div>
               </div>
 

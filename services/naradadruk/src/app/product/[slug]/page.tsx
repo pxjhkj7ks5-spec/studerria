@@ -34,6 +34,13 @@ function metaDescription(value: string) {
   return cleaned.length > 165 ? `${cleaned.slice(0, 162).trimEnd()}…` : cleaned;
 }
 
+function contentList(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-–—•]\s*/u, "").trim())
+    .filter(Boolean);
+}
+
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
@@ -85,6 +92,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
       body: publicPaymentNote,
     },
   ];
+  const meaningSections = [
+    { title: "Для кого", body: product.useCaseNote, list: false },
+    { title: "Переваги", body: product.benefitsNote, list: true },
+    { title: "Характеристики", body: product.specificationsNote, list: true },
+    { title: "Сумісність", body: product.compatibilityNote, list: false },
+    { title: "Комплектація", body: product.packageContentsNote, list: false },
+  ].filter((section) => section.body.trim());
   const productUrl = absoluteSiteUrl(`/product/${product.slug}`);
   const offers = (product.variants.length > 0
     ? product.variants.map((variant) => ({ name: variant.label, price: variant.price }))
@@ -180,6 +194,29 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <h2>Опис і застосування</h2>
             <p className="product-description__body">{product.fullDescription}</p>
           </article>
+
+          {meaningSections.length > 0 ? (
+            <section className="product-meaning" aria-labelledby="product-meaning-title">
+              <div className="product-meaning__heading">
+                <p className="eyebrow">Коротко по суті</p>
+                <h2 id="product-meaning-title">Що варто знати про виріб</h2>
+              </div>
+              <div className="product-meaning__grid">
+                {meaningSections.map((section) => (
+                  <article className="product-meaning__card" key={section.title}>
+                    <h3>{section.title}</h3>
+                    {section.list ? (
+                      <ul>
+                        {contentList(section.body).map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    ) : (
+                      <p>{section.body}</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </section>
 
         {relatedProducts.length > 0 ? (

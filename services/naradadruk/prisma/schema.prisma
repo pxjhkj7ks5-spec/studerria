@@ -92,6 +92,12 @@ model Product {
   categoryId                Int
   shortDescription          String              @default("")
   fullDescription           String              @default("")
+  telegramDescription       String              @default("")
+  useCaseNote               String              @default("")
+  benefitsNote              String              @default("")
+  specificationsNote        String              @default("")
+  compatibilityNote         String              @default("")
+  packageContentsNote       String              @default("")
   status                    ProductStatus       @default(draft)
   isFeatured                Boolean             @default(false)
   basePrice                 Int?
@@ -111,6 +117,10 @@ model Product {
   sourceTelegramUrl         String              @default("")
   sourceTelegramPublishedAt DateTime?
   sourceModelUrl            String              @default("")
+  printWeightGrams          Int?
+  sourceModelAuthor         String              @default("")
+  sourceModelLicense        String              @default("")
+  sourceLicenseChecked      Boolean             @default(false)
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   category                  Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -314,7 +324,7 @@ model Review {
   notificationError  String             @default("")
   telegramMessageId  Int?
   orderId            Int?               @unique
-  verifiedPurchase  Boolean            @default(false)
+  verifiedPurchase   Boolean            @default(false)
   moderatedAt        DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt

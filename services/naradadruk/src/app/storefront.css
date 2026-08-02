@@ -746,6 +746,7 @@
 
 .product-details__facts,
 .product-description,
+.product-meaning__card,
 .not-found-card,
 .empty-catalog--light {
   background: rgba(255, 255, 255, 0.54);

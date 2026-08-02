@@ -10,7 +10,44 @@ import {
   type AnalyticsRange,
 } from "@/lib/analytics-report";
 
-const publicProductInclude = {
+const publicProductSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  categoryId: true,
+  shortDescription: true,
+  fullDescription: true,
+  useCaseNote: true,
+  benefitsNote: true,
+  specificationsNote: true,
+  compatibilityNote: true,
+  packageContentsNote: true,
+  status: true,
+  isFeatured: true,
+  basePrice: true,
+  priceFrom: true,
+  saleEnabled: true,
+  salePrice: true,
+  salePercent: true,
+  saleStartsAt: true,
+  saleEndsAt: true,
+  leadTime: true,
+  materialNote: true,
+  deliveryNote: true,
+  paymentNote: true,
+  sortOrder: true,
+  createdAt: true,
+  updatedAt: true,
+  category: true,
+  variants: {
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  },
+  images: {
+    orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { id: "asc" }],
+  },
+} satisfies Prisma.ProductSelect;
+
+const adminProductInclude = {
   category: true,
   variants: {
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -19,8 +56,6 @@ const publicProductInclude = {
     orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { id: "asc" }],
   },
 } satisfies Prisma.ProductInclude;
-
-const adminProductInclude = publicProductInclude;
 
 function resolveCoverImage<
   T extends {
@@ -99,7 +134,7 @@ export function resolveProductPrice(product: {
   return "Ціна за запитом";
 }
 
-function presentPublicProduct<T extends Prisma.ProductGetPayload<{ include: typeof publicProductInclude }>>(product: T) {
+function presentPublicProduct<T extends Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>>(product: T) {
   const images = dedupeProductImages(product.images);
   const pricing = productPricePresentation(product);
   return {
@@ -225,7 +260,7 @@ export async function getHomepageProductSections(popularLimit = 6, newLimit = 6,
       status: ProductStatus.published,
       category: { isVisible: true },
     },
-    include: publicProductInclude,
+    select: publicProductSelect,
     orderBy: [{ createdAt: "desc" }, { updatedAt: "desc" }],
   });
 
@@ -270,7 +305,7 @@ export async function getCatalogProducts(input?: { categorySlug?: string; search
           }
         : {}),
     },
-    include: publicProductInclude,
+    select: publicProductSelect,
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
   });
 
@@ -308,7 +343,7 @@ export async function getProductBySlug(slug: string) {
       status: ProductStatus.published,
       category: { isVisible: true },
     },
-    include: publicProductInclude,
+    select: publicProductSelect,
   });
 
   if (!product) {
@@ -358,7 +393,7 @@ export async function getRelatedProducts(
       status: ProductStatus.published,
       category: { isVisible: true },
     },
-    include: publicProductInclude,
+    select: publicProductSelect,
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
   });
 
@@ -856,6 +891,12 @@ export async function updateProduct(input: {
   categoryId: number;
   shortDescription: string;
   fullDescription: string;
+  telegramDescription: string;
+  useCaseNote: string;
+  benefitsNote: string;
+  specificationsNote: string;
+  compatibilityNote: string;
+  packageContentsNote: string;
   status: ProductStatus;
   isFeatured: boolean;
   basePrice: number | null;
@@ -869,6 +910,11 @@ export async function updateProduct(input: {
   materialNote: string;
   deliveryNote: string;
   paymentNote: string;
+  printWeightGrams: number | null;
+  sourceModelUrl: string;
+  sourceModelAuthor: string;
+  sourceModelLicense: string;
+  sourceLicenseChecked: boolean;
   sortOrder: number;
 }) {
   const slug = await generateUniqueSlug("product", input.slug || input.title, input.productId);
@@ -885,6 +931,12 @@ export async function updateProduct(input: {
       categoryId: input.categoryId,
       shortDescription: input.shortDescription,
       fullDescription: input.fullDescription,
+      telegramDescription: input.telegramDescription,
+      useCaseNote: input.useCaseNote,
+      benefitsNote: input.benefitsNote,
+      specificationsNote: input.specificationsNote,
+      compatibilityNote: input.compatibilityNote,
+      packageContentsNote: input.packageContentsNote,
       status: input.status,
       isFeatured: input.isFeatured,
       basePrice: input.basePrice,
@@ -898,6 +950,11 @@ export async function updateProduct(input: {
       materialNote: input.materialNote,
       deliveryNote: input.deliveryNote,
       paymentNote: input.paymentNote,
+      printWeightGrams: input.printWeightGrams,
+      sourceModelUrl: input.sourceModelUrl,
+      sourceModelAuthor: input.sourceModelAuthor,
+      sourceModelLicense: input.sourceModelLicense,
+      sourceLicenseChecked: input.sourceLicenseChecked,
       sortOrder: input.sortOrder,
     },
   });

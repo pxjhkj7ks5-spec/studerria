@@ -2925,6 +2925,52 @@ html {
   line-height: 1.75;
 }
 
+.product-meaning {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+}
+
+.product-meaning__heading h2 {
+  margin-top: 0.45rem;
+  font-size: clamp(1.9rem, 3vw, 3rem);
+}
+
+.product-meaning__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.product-meaning__card {
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.product-meaning__card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.product-meaning__card p,
+.product-meaning__card ul {
+  margin: 0.7rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.product-meaning__card ul {
+  padding-left: 1.15rem;
+}
+
+.product-meaning__card li + li {
+  margin-top: 0.35rem;
+}
+
 .related-products {
   padding-top: 5rem;
 }
@@ -3342,6 +3388,10 @@ html {
   }
 
   .product-details__facts {
+    grid-template-columns: 1fr;
+  }
+
+  .product-meaning__grid {
     grid-template-columns: 1fr;
   }
 
