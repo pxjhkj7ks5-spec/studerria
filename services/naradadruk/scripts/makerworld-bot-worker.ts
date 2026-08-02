@@ -255,7 +255,7 @@ async function sendPhotoSet(
     const image = images[0];
     const buffer = await readFile(path.join(uploadDirectory(), image.fileName));
     form.set("photo", new Blob([new Uint8Array(buffer)], { type: mimeTypeForFile(image.fileName) }), image.fileName);
-    form.set("caption", `🖥️ ${shortText(title, 900)}`);
+    form.set("caption", `✦ ${shortText(title, 900)}`);
     await telegramMultipart("sendPhoto", form);
     return;
   }
@@ -268,7 +268,7 @@ async function sendPhotoSet(
     media.push({
       type: "photo",
       media: `attach://${fieldName}`,
-      ...(index === 0 ? { caption: `🖥️ ${shortText(title, 900)}` } : {}),
+      ...(index === 0 ? { caption: `✦ ${shortText(title, 900)}` } : {}),
     });
   }
   form.set("media", JSON.stringify(media));
@@ -569,11 +569,13 @@ function priceLabel(price: number | null) {
 
 function telegramPostText(session: DraftSession, contactLink: string, channelLink: string) {
   const lines = [
-    `🖥️ <b>${escapeHtml(session.title)}</b>`,
-    "🎨 Колір і розмір узгодимо перед друком.",
-    `🛡️ ${escapeHtml(session.telegramSummary)}`,
+    `✦ <b>${escapeHtml(session.title)}</b>`,
+    "",
+    `🧩 ${escapeHtml(session.telegramSummary)}`,
+    "",
+    "🎨 Колір та інші параметри узгодимо перед виготовленням.",
     `💰 <b>${escapeHtml(priceLabel(session.price))}</b>`,
-    "◾ Акуратний 3D-друк під ваше замовлення.",
+    "◾ 3D-друк під замовлення з увагою до деталей.",
     "",
   ];
   lines.push(
