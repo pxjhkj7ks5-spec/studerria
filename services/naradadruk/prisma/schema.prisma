@@ -291,6 +291,14 @@ model AnalyticsEvent {
   @@index([productSlug, createdAt])
 }
 
+model AnalyticsIpExclusion {
+  id          Int      @id @default(autoincrement())
+  addressHash String   @unique
+  addressHint String
+  label       String   @default("")
+  createdAt   DateTime @default(now())
+}
+
 model Review {
   id                 Int                @id @default(autoincrement())
   displayName        String             @default("")

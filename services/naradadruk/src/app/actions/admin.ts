@@ -2,7 +2,7 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
-import { OrderStatus, ProductStatus, ReviewStatus } from "@prisma/client";
+import { OrderStatus, Prisma, ProductStatus, ReviewStatus } from "@prisma/client";
 import { z } from "zod";
 import {
   clearAdminSession,
@@ -12,13 +12,17 @@ import {
   requireAdminSession,
 } from "@/lib/auth";
 import {
+  createAnalyticsIpExclusion,
   createProduct,
   createProductImage,
+  deleteAnalyticsIpExclusion,
   deleteCategory,
   deleteProduct,
   deleteProductImage,
   deleteReview,
+  deleteUnusedPromoCode,
   deleteVariant,
+  permanentlyDeleteOrder,
   saveCategory,
   saveSiteSettings,
   savePromoCode,
@@ -30,6 +34,7 @@ import {
   updateOrderStatus,
   addOrderComment,
 } from "@/lib/data";
+import { analyticsIpHint, hashAnalyticsIp, normalizeIpAddress } from "@/lib/analytics-ip";
 import { saveProductImage } from "@/lib/storage";
 import { parseCheckbox, parseOptionalInt } from "@/lib/utils";
 
@@ -114,7 +119,7 @@ const imageMetaSchema = z.object({
 
 const promoCodeSchema = z.object({
   id: z.number().int().positive().optional(),
-  code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{3,32}$/, "Код: 3–32 латинські літери, цифри, _ або -."),
+  code: z.string().trim().regex(/^[A-Za-zА-Яа-яІіЇїЄєҐґ0-9_-]{3,32}$/u, "Код: 3–32 українські або латинські літери, цифри, _ чи -."),
   type: z.enum(["percentage", "fixed"]),
   value: z.number().int().positive("Знижка має бути більшою за нуль."),
   usageLimit: z.number().int().positive().nullable(),
@@ -187,6 +192,44 @@ export async function saveSettingsAction(formData: FormData) {
 
   await saveSiteSettings(parsed.data);
   redirect(messagePath(getAdminRoute(), "ok", "Storefront збережено."));
+}
+
+export async function addAnalyticsIpExclusionAction(formData: FormData) {
+  await requireAdminSession();
+  const address = normalizeIpAddress(String(formData.get("address") ?? ""));
+  const label = String(formData.get("label") ?? "").trim().slice(0, 80);
+  const returnPath = getAdminRoute();
+  const withAnchor = (path: string) => `${path}#analytics-exclusions`;
+  if (!address) {
+    redirect(withAnchor(messagePath(returnPath, "error", "Введіть коректну IPv4 або IPv6 адресу.")));
+  }
+
+  try {
+    await createAnalyticsIpExclusion({
+      addressHash: hashAnalyticsIp(address),
+      addressHint: analyticsIpHint(address),
+      label,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      redirect(withAnchor(messagePath(returnPath, "error", "Ця IP-адреса вже виключена з аналітики.")));
+    }
+    console.error("[admin] failed to add analytics IP exclusion", error);
+    redirect(withAnchor(messagePath(returnPath, "error", "Не вдалося додати IP-адресу. Спробуйте ще раз.")));
+  }
+  redirect(withAnchor(messagePath(returnPath, "ok", "IP-адресу виключено з нових подій аналітики.")));
+}
+
+export async function deleteAnalyticsIpExclusionAction(formData: FormData) {
+  await requireAdminSession();
+  const exclusionId = parseOptionalInt(formData.get("exclusionId"));
+  const returnPath = getAdminRoute();
+  const withAnchor = (path: string) => `${path}#analytics-exclusions`;
+  if (!exclusionId) {
+    redirect(withAnchor(messagePath(returnPath, "error", "Запис виключення не знайдено.")));
+  }
+  const deleted = await deleteAnalyticsIpExclusion(exclusionId);
+  redirect(withAnchor(messagePath(returnPath, deleted.count ? "ok" : "error", deleted.count ? "IP-виключення видалено. Нові події з цієї адреси знову враховуватимуться." : "IP-виключення вже видалено або не знайдено.")));
 }
 
 export async function saveCategoryAction(formData: FormData) {
@@ -459,12 +502,44 @@ export async function savePromoCodeAction(formData: FormData) {
   if (!parsed.success || (expiry && Number.isNaN(parsed.data.expiresAt?.getTime()))) {
     redirect(messagePath(returnPath, "error", parsed.success ? "Некоректна дата завершення." : parsed.error.issues[0]?.message ?? "Перевірте промокод."));
   }
+  let promo: Awaited<ReturnType<typeof savePromoCode>>;
   try {
-    const promo = await savePromoCode(parsed.data);
-    redirect(messagePath(`${base}/${promo.id}`, "ok", "Промокод збережено."));
-  } catch {
-    redirect(messagePath(returnPath, "error", "Не вдалося зберегти промокод. Перевірте, чи код унікальний."));
+    promo = await savePromoCode(parsed.data);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      redirect(messagePath(returnPath, "error", `Промокод «${parsed.data.code.trim()}» уже існує.`));
+    }
+    console.error("[admin] failed to save promo code", error);
+    redirect(messagePath(returnPath, "error", "Не вдалося зберегти промокод через помилку сервера. Спробуйте ще раз."));
   }
+  redirect(messagePath(`${base}/${promo.id}`, "ok", "Промокод збережено."));
+}
+
+export async function deletePromoCodeAction(formData: FormData) {
+  await requireAdminSession();
+  const promoId = parseOptionalInt(formData.get("promoId"));
+  const base = `${getAdminRoute()}/promo-codes`;
+  if (!promoId) {
+    redirect(messagePath(base, "error", "Промокод не знайдено."));
+  }
+  if (formData.get("confirmDelete") !== "yes") {
+    redirect(messagePath(`${base}/${promoId}`, "error", "Підтвердьте видалення промокоду."));
+  }
+
+  let result: Awaited<ReturnType<typeof deleteUnusedPromoCode>>;
+  try {
+    result = await deleteUnusedPromoCode(promoId);
+  } catch (error) {
+    console.error("[admin] failed to delete promo code", error);
+    redirect(messagePath(`${base}/${promoId}`, "error", "Не вдалося видалити промокод через помилку сервера. Спробуйте ще раз."));
+  }
+  if (result === "used") {
+    redirect(messagePath(`${base}/${promoId}`, "error", "Цей промокод уже використано. Його не можна видалити — вимкніть код, щоб зберегти історію замовлень."));
+  }
+  if (result === "missing") {
+    redirect(messagePath(base, "error", "Промокод уже видалено або не знайдено."));
+  }
+  redirect(messagePath(base, "ok", "Невикористаний промокод видалено."));
 }
 
 export async function updateOrderStatusAction(formData: FormData) {
@@ -489,4 +564,30 @@ export async function addOrderCommentAction(formData: FormData) {
   if (!/^[0-9a-f-]{36}$/i.test(publicId) || comment.length < 2) redirect(messagePath(`${getAdminRoute()}/orders/${publicId}`, "error", "Введіть внутрішній коментар."));
   await addOrderComment(publicId, comment);
   redirect(messagePath(`${getAdminRoute()}/orders/${publicId}`, "ok", "Внутрішній коментар додано."));
+}
+
+export async function permanentlyDeleteOrderAction(formData: FormData) {
+  await requireAdminSession();
+  const publicId = String(formData.get("publicId") ?? "");
+  const confirmation = String(formData.get("confirmation") ?? "").trim().toUpperCase();
+  const ordersPath = `${getAdminRoute()}/orders`;
+  if (!/^[0-9a-f-]{36}$/i.test(publicId)) {
+    redirect(messagePath(ordersPath, "error", "Замовлення не знайдено."));
+  }
+  const expected = publicId.slice(0, 8).toUpperCase();
+  if (confirmation !== expected) {
+    redirect(messagePath(`${ordersPath}/${publicId}`, "error", `Для видалення введіть код ${expected}.`));
+  }
+
+  let result: Awaited<ReturnType<typeof permanentlyDeleteOrder>>;
+  try {
+    result = await permanentlyDeleteOrder(publicId);
+  } catch (error) {
+    console.error("[admin] failed to permanently delete order", error);
+    redirect(messagePath(`${ordersPath}/${publicId}`, "error", "Не вдалося видалити замовлення. Спробуйте ще раз."));
+  }
+  if (result === "missing") {
+    redirect(messagePath(ordersPath, "error", "Замовлення вже видалено або не знайдено."));
+  }
+  redirect(messagePath(ordersPath, "ok", "Замовлення видалено назавжди. Статистику та використання промокоду оновлено."));
 }

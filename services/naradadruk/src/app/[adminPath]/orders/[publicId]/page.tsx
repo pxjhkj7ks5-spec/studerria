@@ -8,7 +8,7 @@ import {
 import { assertAdminPath, getAdminRoute, requireAdminSession } from "@/lib/auth";
 import { withBasePath } from "@/lib/base-path";
 import { getAdminOrderByPublicId } from "@/lib/data";
-import { addOrderCommentAction, updateOrderStatusAction } from "@/app/actions/admin";
+import { addOrderCommentAction, permanentlyDeleteOrderAction, updateOrderStatusAction } from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +135,15 @@ export default async function OrderDetailsPage({
         </section>
       </div>
       <section className="glass-panel mt-6 rounded-[2rem] p-6"><h2 className="font-display text-3xl text-white">Історія та внутрішні коментарі</h2><div className="mt-4 grid gap-3">{order.events.map((event) => <article className="rounded-xl border border-white/10 p-4" key={event.id}><strong className="text-white">{event.eventType === "comment" ? "Коментар" : event.eventType === "created" ? "Створено" : `${event.fromStatus ? orderStatusLabel(event.fromStatus) : ""} → ${orderStatusLabel(event.toStatus)}`}</strong>{event.comment ? <p className="mt-2 whitespace-pre-wrap text-sm text-[--muted]">{event.comment}</p> : null}<small className="mt-2 block text-[--muted]">{formatOrderDate(event.createdAt)} · {event.actor}</small></article>)}</div></section>
+      <section className="glass-panel mt-6 rounded-[2rem] border border-red-400/20 p-6">
+        <h2 className="font-display text-3xl text-white">Видалити замовлення назавжди</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-[--muted]">Дія незворотна: замовлення, товари, історія статусів і внутрішні коментарі буде видалено. Воно одразу зникне зі списку та статистики. Якщо застосовано промокод, лічильник використань буде зменшено атомарно.</p>
+        <form action={permanentlyDeleteOrderAction} className="mt-5 grid max-w-xl gap-3">
+          <input type="hidden" name="publicId" value={order.publicId} />
+          <label className="field-shell"><span>Для підтвердження введіть {order.publicId.slice(0, 8).toUpperCase()}</span><input name="confirmation" autoComplete="off" required /></label>
+          <button className="ghost-pill w-fit border-red-400/30 text-red-200" type="submit">Видалити назавжди</button>
+        </form>
+      </section>
     </main>
   );
 }

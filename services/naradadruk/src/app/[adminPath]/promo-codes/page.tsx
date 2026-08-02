@@ -18,7 +18,7 @@ export default async function PromoCodesPage({ params, searchParams }: { params:
     {query.ok ? <div className="status-message status-message--ok mt-5">{query.ok}</div> : null}{query.error ? <div className="status-message status-message--error mt-5">{query.error}</div> : null}
     <div className="mt-6 grid gap-6 lg:grid-cols-[.42fr_.58fr]">
       <section className="glass-panel rounded-[2rem] p-6"><h2 className="font-display text-3xl text-white">Створити код</h2><form action={savePromoCodeAction} className="mt-5 grid gap-4">
-        <div className="field-shell"><span>Код</span><input name="code" placeholder="NARADA10" required /></div>
+        <div className="field-shell"><span>Код</span><input name="code" placeholder="НАРАДА-10" minLength={3} maxLength={32} required /><small>Українські або латинські літери, цифри, _ чи -.</small></div>
         <div className="grid grid-cols-2 gap-3"><div className="field-shell"><span>Тип</span><select name="type"><option value="percentage">Відсоток</option><option value="fixed">Фіксована сума, грн</option></select></div><div className="field-shell"><span>Значення</span><input name="value" type="number" min="1" required /></div></div>
         <div className="field-shell"><span>Ліміт використань (необов’язково)</span><input name="usageLimit" type="number" min="1" /></div>
         <div className="field-shell"><span>Діє до (необов’язково)</span><input name="expiresAt" type="datetime-local" /></div>

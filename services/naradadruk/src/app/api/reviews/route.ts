@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   ]);
   if (recentCount >= 3) {
     return NextResponse.json(
-      { error: "З цієї мережі вже надіслано 3 відгуки за 24 години. Спробуйте пізніше." },
+      { error: "З цієї мережі вже надіслано забагато відгуків. Спробуйте пізніше." },
       { status: 429 },
     );
   }

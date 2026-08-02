@@ -1757,7 +1757,7 @@
 .review-card, .review-form { border: 1px solid var(--border); background: var(--paper-solid); border-radius: 1.75rem; box-shadow: 0 24px 70px rgba(58, 50, 42, 0.1); }
 .review-card { padding: 1.4rem; }
 .review-card header { display: flex; justify-content: space-between; gap: 1rem; color: var(--text); }
-.review-card time, .review-form__policy { color: var(--text-soft); font-size: 0.8rem; }
+.review-card time { color: var(--text-soft); font-size: 0.8rem; }
 .review-card > p { margin-top: 1rem; white-space: pre-wrap; line-height: 1.75; }
 .review-card__images { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.65rem; margin-top: 1.25rem; }
 .review-card__images img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 1rem; }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getTrustedClientAddress } from "@/lib/analytics-ip";
 
 function cleanText(value: string) {
   return value
@@ -34,11 +35,5 @@ export const reviewInputSchema = z.object({
 });
 
 export function getClientAddress(request: Request) {
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp.slice(0, 80);
-  const forwarded = request.headers.get("x-forwarded-for")
-    ?.split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  return (forwarded?.[0] || "unknown").slice(0, 80);
+  return getTrustedClientAddress(request) ?? "unknown";
 }

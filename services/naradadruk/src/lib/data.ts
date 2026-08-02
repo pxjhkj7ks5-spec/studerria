@@ -456,6 +456,25 @@ export async function addOrderComment(publicId: string, comment: string, actor =
   return prisma.orderEvent.create({ data: { orderId: order.id, eventType: "comment", toStatus: order.status, comment, actor } });
 }
 
+export async function permanentlyDeleteOrder(publicId: string) {
+  return prisma.$transaction(async (transaction) => {
+    const order = await transaction.order.findUnique({
+      where: { publicId },
+      select: { id: true, promoCodeId: true },
+    });
+    if (!order) return "missing" as const;
+
+    await transaction.order.delete({ where: { id: order.id } });
+    if (order.promoCodeId) {
+      await transaction.promoCode.updateMany({
+        where: { id: order.promoCodeId, useCount: { gt: 0 } },
+        data: { useCount: { decrement: 1 } },
+      });
+    }
+    return "deleted" as const;
+  });
+}
+
 export async function getApprovedReviews(limit = 60) {
   return prisma.review.findMany({
     where: { status: ReviewStatus.approved },
@@ -519,9 +538,38 @@ export async function savePromoCode(input: {
   enabled: boolean;
 }) {
   const { id, ...values } = input;
-  const data = { ...values, code: input.code.trim().toUpperCase() };
+  const data = { ...values, code: input.code.trim().normalize("NFKC").toLocaleUpperCase("uk-UA") };
   if (id) return prisma.promoCode.update({ where: { id }, data });
   return prisma.promoCode.create({ data });
+}
+
+export async function deleteUnusedPromoCode(id: number) {
+  const deleted = await prisma.promoCode.deleteMany({
+    where: {
+      id,
+      useCount: 0,
+      orders: { none: {} },
+    },
+  });
+  if (deleted.count === 1) return "deleted" as const;
+
+  const exists = await prisma.promoCode.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  return exists ? "used" as const : "missing" as const;
+}
+
+export async function createAnalyticsIpExclusion(input: {
+  addressHash: string;
+  addressHint: string;
+  label: string;
+}) {
+  return prisma.analyticsIpExclusion.create({ data: input });
+}
+
+export async function deleteAnalyticsIpExclusion(id: number) {
+  return prisma.analyticsIpExclusion.deleteMany({ where: { id } });
 }
 
 export async function getAdminDashboardData(input?: {
@@ -532,7 +580,7 @@ export async function getAdminDashboardData(input?: {
     .replace(/^@/, "");
   const analyticsRange = input?.analyticsRange ?? 30;
   const analyticsNow = new Date();
-  const [settings, categories, products, telegramSync, recentTelegramImports, analyticsEvents, orders] = await Promise.all([
+  const [settings, categories, products, telegramSync, recentTelegramImports, analyticsEvents, analyticsIpExclusions, orders] = await Promise.all([
     getSiteSettings(),
     prisma.category.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -582,6 +630,10 @@ export async function getAdminDashboardData(input?: {
       orderBy: [{ createdAt: "desc" }],
       take: 100_000,
     }),
+    prisma.analyticsIpExclusion.findMany({
+      orderBy: [{ createdAt: "desc" }],
+      take: 100,
+    }),
     getAdminOrderSummary(analyticsNow),
   ]);
 
@@ -606,6 +658,7 @@ export async function getAdminDashboardData(input?: {
       analyticsRange,
       analyticsNow,
     ),
+    analyticsIpExclusions,
     orders,
   };
 }

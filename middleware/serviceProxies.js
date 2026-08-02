@@ -37,7 +37,7 @@ function respondServiceUnavailable(res, serviceName, statusCode = 503) {
   }
 }
 
-function createServiceProxy({ target, basePath, serviceName, logLabel, logger }) {
+function createServiceProxy({ target, basePath, serviceName, logLabel, logger, forwardResolvedClientIp = false }) {
   if (!/^https?:\/\//i.test(target)) return null;
   return createProxyMiddleware({
     target,
@@ -51,8 +51,16 @@ function createServiceProxy({ target, basePath, serviceName, logLabel, logger })
         logger.error(`${logLabel} proxy error`, err);
         respondServiceUnavailable(res, serviceName, 503);
       },
-      proxyReq(proxyReq) {
+      proxyReq(proxyReq, req) {
         proxyReq.setHeader('x-forwarded-prefix', basePath);
+        if (forwardResolvedClientIp) {
+          const resolvedClientIp = typeof req.ip === 'string' ? req.ip.trim() : '';
+          if (resolvedClientIp) {
+            proxyReq.setHeader('x-studerria-client-ip', resolvedClientIp);
+          } else {
+            proxyReq.removeHeader('x-studerria-client-ip');
+          }
+        }
       },
     },
   });
@@ -90,6 +98,7 @@ function registerServiceProxies(app, deps = {}) {
     serviceName: 'Narada Druk',
     logLabel: 'Narada Druk',
     logger,
+    forwardResolvedClientIp: true,
   });
   const withlforlProxy = createServiceProxy({
     target: withlforlProxyTarget,

@@ -1,10 +1,13 @@
 import Image from "next/image";
+import { headers } from "next/headers";
 import { assertAdminPath, getAdminRoute, isAdminAuthenticated } from "@/lib/auth";
 import { getAdminDashboardData } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
 import {
   createProductAction,
+  addAnalyticsIpExclusionAction,
   deleteCategoryAction,
+  deleteAnalyticsIpExclusionAction,
   logoutAction,
   saveCategoryAction,
   saveSettingsAction,
@@ -15,6 +18,7 @@ import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { OrderDashboard } from "@/components/admin/order-dashboard";
 import { telegramProductTemplate } from "@/lib/telegram-product-template";
 import { parseAnalyticsRange } from "@/lib/analytics-report";
+import { normalizeIpAddress, trustedClientIpHeader } from "@/lib/analytics-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -60,8 +64,10 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
   }
 
   const analyticsRange = parseAnalyticsRange(query.range);
-  const { categories, products, settings, telegramAutomation, analytics, orders } =
+  const { categories, products, settings, telegramAutomation, analytics, analyticsIpExclusions, orders } =
     await getAdminDashboardData({ analyticsRange });
+  const requestHeaders = await headers();
+  const currentAnalyticsIp = normalizeIpAddress(requestHeaders.get(trustedClientIpHeader) ?? "");
   const productTitles = Object.fromEntries(
     products.map((product) => [product.slug, product.title]),
   );
@@ -112,6 +118,20 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
       </div>
 
       <AnalyticsDashboard report={analytics} productTitles={productTitles} />
+      <section className="glass-panel mt-6 rounded-[2rem] p-6" id="analytics-exclusions">
+        <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">Внутрішній трафік</p>
+        <h2 className="mt-2 font-display text-3xl tracking-[-0.05em] text-white">IP-адреси без обліку в аналітиці</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-[--muted]">Нові перегляди, переходи, кліки та звернення з доданих адрес не потрапляють у внутрішню статистику Narada Druk. Уже збережені події не перераховуються заднім числом.</p>
+        <form action={addAnalyticsIpExclusionAction} className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <label className="field-shell"><span>IPv4 або IPv6</span><input name="address" defaultValue={currentAnalyticsIp ?? ""} placeholder="203.0.113.10" required /></label>
+          <label className="field-shell"><span>Позначка (необов’язково)</span><input name="label" maxLength={80} placeholder="Домашній інтернет" /></label>
+          <button className="accent-pill" type="submit">Не враховувати</button>
+        </form>
+        {currentAnalyticsIp ? <p className="mt-2 text-xs text-[--muted]">Поточну адресу визначено через довірений внутрішній proxy й підставлено у форму.</p> : <p className="mt-2 text-xs text-[--muted]">Поточну адресу не вдалося визначити автоматично — введіть її вручну.</p>}
+        <div className="mt-5 grid gap-3">
+          {analyticsIpExclusions.length ? analyticsIpExclusions.map((exclusion) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4" key={exclusion.id}><div><strong className="text-white">{exclusion.label || "Без позначки"}</strong><small className="mt-1 block text-[--muted]">{exclusion.addressHint} · додано {new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeZone: "Europe/Kyiv" }).format(exclusion.createdAt)}</small></div><form action={deleteAnalyticsIpExclusionAction}><input type="hidden" name="exclusionId" value={exclusion.id} /><button className="ghost-pill" type="submit">Прибрати виключення</button></form></div>) : <p className="text-sm text-[--muted]">Виключених IP-адрес ще немає.</p>}
+        </div>
+      </section>
       <OrderDashboard summary={orders} />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.56fr_0.44fr]">

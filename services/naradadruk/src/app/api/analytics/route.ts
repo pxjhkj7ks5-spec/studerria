@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { analyticsEventNames } from "@/lib/analytics";
+import { getTrustedClientAddress, hashAnalyticsIp } from "@/lib/analytics-ip";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,20 @@ export async function POST(request: Request) {
   }
 
   try {
+    const clientAddress = getTrustedClientAddress(request);
+    if (clientAddress) {
+      const exclusion = await prisma.analyticsIpExclusion.findUnique({
+        where: { addressHash: hashAnalyticsIp(clientAddress) },
+        select: { id: true },
+      });
+      if (exclusion) {
+        return new NextResponse(null, {
+          status: 204,
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+    }
+
     const parsed = analyticsPayloadSchema.safeParse(await request.json());
 
     if (!parsed.success) {

@@ -8,7 +8,7 @@ type RequestedItem = { productId: number; variantId: number | null; quantity: nu
 export class OrderPricingError extends Error {}
 
 export function normalizePromoCode(value: string) {
-  return value.trim().toUpperCase().replace(/\s+/g, "");
+  return value.trim().normalize("NFKC").toLocaleUpperCase("uk-UA").replace(/\s+/g, "");
 }
 
 export async function priceRequestedItems(db: DbClient, input: RequestedItem[]) {
@@ -56,7 +56,9 @@ export async function priceRequestedItems(db: DbClient, input: RequestedItem[]) 
 export async function validatePromoCode(db: DbClient, rawCode: string, promoBase: number, now = new Date()) {
   const code = normalizePromoCode(rawCode);
   if (!code) return null;
-  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) throw new OrderPricingError("Промокод має некоректний формат.");
+  if (!/^[A-ZА-ЯІЇЄҐ0-9_-]{3,32}$/u.test(code)) {
+    throw new OrderPricingError("Промокод має містити 3–32 українські або латинські літери, цифри, _ чи -.");
+  }
   const promo = await db.promoCode.findUnique({ where: { code } });
   if (!promo || !promo.enabled) throw new OrderPricingError("Промокод недійсний або вимкнений.");
   if (promo.expiresAt && promo.expiresAt <= now) throw new OrderPricingError("Термін дії промокоду завершився.");

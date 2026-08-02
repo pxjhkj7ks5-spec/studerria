@@ -31,7 +31,7 @@ export function CartCheckout() {
   const [destinationRef, setDestinationRef] = useState("");
   const [destinationOptions, setDestinationOptions] = useState<Option[]>([]);
   const [activeSuggestionField, setActiveSuggestionField] = useState<"city" | "destination" | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash_on_delivery");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [promoCode, setPromoCode] = useState("");
@@ -191,7 +191,7 @@ export function CartCheckout() {
   }
 
   return (
-    <form className="checkout-layout" onSubmit={submitOrder}>
+    <form className="checkout-layout" onSubmit={submitOrder} onReset={() => setPaymentMethod("transfer")}>
       <section className="cart-column">
         <a className="back-link" href={withBasePath("/catalog")}><ArrowLeft aria-hidden size={18} /> Продовжити покупки</a>
         <div className="checkout-heading">

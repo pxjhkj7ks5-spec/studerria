@@ -60,7 +60,6 @@ export function ReviewForm() {
       <button className="accent-pill accent-pill--large" type="submit" disabled={state.kind === "sending"}>
         {state.kind === "sending" ? "Надсилаємо…" : "Надіслати відгук"}
       </button>
-      <p className="review-form__policy">Ліміт захисту від спаму: до 3 відгуків з однієї мережі за 24 години.</p>
     </form>
   );
 }

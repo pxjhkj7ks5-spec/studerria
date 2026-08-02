@@ -196,6 +196,21 @@ docker compose up -d naradadruk
 docker compose ps
 ```
 
+### Narada Druk internal analytics exclusions
+
+The Narada Druk admin can add labelled IPv4 or IPv6 addresses that must not contribute
+new events to its internal analytics dashboard. Full addresses are not stored: the
+service keeps a purpose-specific HMAC derived from the existing `SESSION_SECRET`, plus
+a short masked hint and the optional label. Changing `SESSION_SECRET` invalidates the
+stored hashes, so the exclusions must then be added again.
+
+The public `app` proxy overwrites `x-studerria-client-ip` with Express `req.ip` before
+forwarding Narada Druk requests; the service never accepts a browser-supplied forwarding
+chain directly. If the public app itself is behind another trusted reverse proxy,
+configure the existing `TRUST_PROXY` setting narrowly for that topology. Exclusions
+apply only to events received after the entry is added and do not rewrite historical
+analytics. They cover the internal Narada Druk dashboard, not third-party analytics.
+
 ### Narada Druk owner bot
 
 The MakerWorld flow reuses the existing Narada Druk order bot and the same configured

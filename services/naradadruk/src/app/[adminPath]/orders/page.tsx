@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 type OrdersPageProps = {
   params: Promise<{ adminPath: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; ok?: string; error?: string }>;
 };
 
 export default async function OrdersPage({ params, searchParams }: OrdersPageProps) {
@@ -43,6 +43,9 @@ export default async function OrdersPage({ params, searchParams }: OrdersPagePro
           </p>
         </div>
       </div>
+
+      {query.ok ? <div className="status-message status-message--ok mt-5">{query.ok}</div> : null}
+      {query.error ? <div className="status-message status-message--error mt-5">{query.error}</div> : null}
 
       <nav className="mt-6 flex flex-wrap gap-2" aria-label="Фільтр статусу замовлень">
         <a className={!status ? "accent-pill" : "ghost-pill"} href={withBasePath(ordersPath)}>
