@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
+import { AddToCartButton } from "@/components/site/add-to-cart-button";
 import { TrackedLink } from "@/components/site/tracked-link";
 import { buildTelegramLink } from "@/lib/telegram";
 import { formatPrice } from "@/lib/utils";
@@ -15,9 +16,11 @@ type ProductVariant = {
 
 type ProductPurchasePanelProps = {
   category: string;
+  productId: number;
   productSlug: string;
   productTitle: string;
-  productUrl: string;
+  coverImageUrl: string;
+  basePrice: number | null;
   priceLabel: string;
   shortDescription: string;
   telegramUrl: string;
@@ -26,9 +29,11 @@ type ProductPurchasePanelProps = {
 
 export function ProductPurchasePanel({
   category,
+  productId,
   productSlug,
   productTitle,
-  productUrl,
+  coverImageUrl,
+  basePrice,
   priceLabel,
   shortDescription,
   telegramUrl,
@@ -40,13 +45,21 @@ export function ProductPurchasePanel({
   const selectedVariant =
     variants.find((variant) => variant.id === selectedVariantId) ?? null;
   const currentPrice = selectedVariant ? formatPrice(selectedVariant.price) : priceLabel;
-  const orderUrl = buildTelegramLink({
+  const customUrl = buildTelegramLink({
     baseUrl: telegramUrl,
-    intent: "product",
+    intent: "custom",
     productTitle,
-    productUrl,
-    variantLabel: selectedVariant?.label,
   });
+  const unitPrice = selectedVariant?.price ?? basePrice;
+  const cartItem = typeof unitPrice === "number" ? {
+    productId,
+    productSlug,
+    productTitle,
+    variantId: selectedVariant?.id ?? null,
+    variantLabel: selectedVariant?.label ?? "",
+    unitPrice,
+    imageUrl: coverImageUrl,
+  } : null;
 
   return (
     <>
@@ -87,23 +100,20 @@ export function ProductPurchasePanel({
             <span>Орієнтовна ціна</span>
             <strong>{currentPrice}</strong>
           </div>
+          {cartItem ? <AddToCartButton className="accent-pill accent-pill--large" item={cartItem} /> : null}
+        </div>
+        <p className="purchase-panel__custom">
+          Потрібні інші розміри, колір або власна модель? Індивідуальні замовлення погоджуємо окремо.
           <TrackedLink
-            className="accent-pill accent-pill--large"
-            href={orderUrl}
+            href={customUrl}
             target="_blank"
             rel="noreferrer"
-            eventName="Telegram Lead"
-            eventProps={{
-              location: "product-purchase-panel",
-              intent: "product",
-              product_slug: productSlug,
-              category,
-            }}
+            eventName="Custom Lead"
+            eventProps={{ location: "product-purchase-panel", intent: "custom", product_slug: productSlug, category }}
           >
-            Замовити
-            <ArrowRight aria-hidden size={18} />
+            Написати в Telegram <ArrowRight aria-hidden size={16} />
           </TrackedLink>
-        </div>
+        </p>
       </div>
 
       <div className="mobile-purchase-bar">
@@ -111,21 +121,7 @@ export function ProductPurchasePanel({
           <span>{productTitle}</span>
           <strong>{currentPrice}</strong>
         </div>
-        <TrackedLink
-          className="accent-pill"
-          href={orderUrl}
-          target="_blank"
-          rel="noreferrer"
-          eventName="Telegram Lead"
-          eventProps={{
-            location: "mobile-purchase-bar",
-            intent: "product",
-            product_slug: productSlug,
-            category,
-          }}
-        >
-          Замовити
-        </TrackedLink>
+        {cartItem ? <AddToCartButton className="accent-pill" compactLabel item={cartItem} /> : null}
       </div>
     </>
   );

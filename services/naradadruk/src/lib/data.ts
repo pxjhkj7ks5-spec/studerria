@@ -29,6 +29,33 @@ function resolveCoverImage<
   return product.images.find((image) => image.isCover) ?? product.images[0] ?? null;
 }
 
+function shuffled<T>(values: T[]) {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(Math.random() * (index + 1));
+    [result[index], result[target]] = [result[target], result[index]];
+  }
+  return result;
+}
+
+function selectAcrossCategories<T extends { categoryId: number }>(values: T[], limit: number) {
+  const groups = new Map<number, T[]>();
+  for (const value of shuffled(values)) {
+    groups.set(value.categoryId, [...(groups.get(value.categoryId) ?? []), value]);
+  }
+
+  const categoryGroups = shuffled([...groups.values()]).map((group) => shuffled(group));
+  const selected: T[] = [];
+  while (selected.length < limit && categoryGroups.some((group) => group.length > 0)) {
+    for (const group of categoryGroups) {
+      const next = group.shift();
+      if (next) selected.push(next);
+      if (selected.length === limit) break;
+    }
+  }
+  return selected;
+}
+
 export function resolveProductPrice(product: {
   basePrice: number | null;
   priceFrom: boolean;
@@ -149,31 +176,16 @@ export async function getVisibleCategories() {
 }
 
 export async function getFeaturedProducts(limit = 6) {
-  const featuredProducts = await prisma.product.findMany({
+  const products = await prisma.product.findMany({
     where: {
       status: ProductStatus.published,
-      isFeatured: true,
       category: { isVisible: true },
     },
     include: publicProductInclude,
-    take: limit,
-    orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+    orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
   });
 
-  const products =
-    featuredProducts.length > 0
-      ? featuredProducts
-      : await prisma.product.findMany({
-          where: {
-            status: ProductStatus.published,
-            category: { isVisible: true },
-          },
-          include: publicProductInclude,
-          take: limit,
-          orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
-        });
-
-  return products.map((product) => ({
+  return selectAcrossCategories(products, limit).map((product) => ({
     ...product,
     coverImage: resolveCoverImage(product),
     priceLabel: resolveProductPrice(product),
@@ -281,14 +293,24 @@ export async function getRelatedProducts(
     },
     include: publicProductInclude,
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
-    take: limit,
   });
 
-  return products.map((product) => ({
+  return shuffled(products).slice(0, limit).map((product) => ({
     ...product,
     coverImage: resolveCoverImage(product),
     priceLabel: resolveProductPrice(product),
   }));
+}
+
+export async function getOrderByPublicId(publicId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(publicId)) return null;
+
+  return prisma.order.findUnique({
+    where: { publicId },
+    include: {
+      items: { orderBy: { id: "asc" } },
+    },
+  });
 }
 
 export async function getAdminDashboardData(input?: {

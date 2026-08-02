@@ -15,7 +15,6 @@ import {
   getRelatedProducts,
   getSiteSettings,
 } from "@/lib/data";
-import { siteBaseUrl } from "@/lib/constants";
 import { withBasePath } from "@/lib/base-path";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +37,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
     getSiteSettings(),
     getRelatedProducts(product.categoryId, product.id),
   ]);
-  const productPath = withBasePath(`/product/${product.slug}`);
-  const productUrl = new URL(productPath, siteBaseUrl).toString();
   const detailItems = [
     {
       icon: Cube,
@@ -81,9 +78,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <aside className="product-layout__aside">
               <ProductPurchasePanel
                 category={product.category.name}
+                productId={product.id}
                 productSlug={product.slug}
                 productTitle={product.title}
-                productUrl={productUrl}
+                coverImageUrl={product.coverImage?.urlPath ?? ""}
+                basePrice={product.basePrice}
                 priceLabel={product.priceLabel}
                 shortDescription={product.shortDescription}
                 telegramUrl={settings.telegramUrl}
@@ -127,7 +126,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <ProductCard
                   key={relatedProduct.id}
                   product={relatedProduct}
-                  telegramUrl={settings.telegramUrl}
                 />
               ))}
             </div>

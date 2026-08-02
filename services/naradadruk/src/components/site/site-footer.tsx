@@ -18,7 +18,7 @@ export function SiteFooter({ telegramUrl }: SiteFooterProps) {
         <div className="site-footer__brand">
           <div className="site-wordmark">
             <span className="site-wordmark__mark" aria-hidden>
-              N
+              Н
             </span>
             <span className="site-wordmark__text">
               Narada
@@ -38,6 +38,7 @@ export function SiteFooter({ telegramUrl }: SiteFooterProps) {
           <a href={withBasePath("/catalog")}>
             Каталог
           </a>
+          <a href={withBasePath("/cart")}>Кошик</a>
           <a href={withBasePath("/#process")}>Як замовити</a>
           <a href={withBasePath("/#delivery")}>Доставка й оплата</a>
           <TrackedLink

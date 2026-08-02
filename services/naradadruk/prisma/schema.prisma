@@ -17,6 +17,33 @@ enum TelegramImportStatus {
   failed
 }
 
+enum OrderStatus {
+  new
+  confirmed
+  processing
+  shipped
+  completed
+  cancelled
+}
+
+enum DeliveryMethod {
+  branch
+  parcel_locker
+  courier
+}
+
+enum PaymentMethod {
+  cash_on_delivery
+  transfer
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  skipped
+  failed
+}
+
 model SiteSetting {
   id            Int      @id
   heroTitle     String
@@ -71,8 +98,57 @@ model Product {
   variants                  ProductVariant[]
   images                    ProductImage[]
   telegramImport            TelegramPostImport?
+  orderItems                OrderItem[]
 
   @@unique([sourceTelegramChannel, sourceTelegramMessageId])
+}
+
+model Order {
+  id                    Int                @id @default(autoincrement())
+  publicId              String             @unique
+  status                OrderStatus        @default(new)
+  firstName             String
+  lastName              String
+  comment               String             @default("")
+  phone                 String
+  telegramContact       String
+  cityName              String
+  cityRef               String             @default("")
+  deliveryMethod        DeliveryMethod
+  deliveryDestination   String
+  destinationRef        String             @default("")
+  courierAddress        String             @default("")
+  paymentMethod         PaymentMethod
+  total                 Int
+  currency              String             @default("UAH")
+  notificationStatus    NotificationStatus @default(pending)
+  notificationError     String             @default("")
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  items                 OrderItem[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id             Int      @id @default(autoincrement())
+  orderId        Int
+  productId      Int?
+  productSlug    String
+  productTitle   String
+  productUrl     String
+  variantId      Int?
+  variantLabel   String   @default("")
+  quantity       Int
+  unitPrice      Int
+  totalPrice     Int
+  createdAt      DateTime @default(now())
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model ProductVariant {

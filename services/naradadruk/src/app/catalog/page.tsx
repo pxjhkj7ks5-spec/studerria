@@ -115,7 +115,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  telegramUrl={settings.telegramUrl}
                   priority={index === 0}
                 />
               ))}

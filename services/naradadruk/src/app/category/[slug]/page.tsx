@@ -103,7 +103,6 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  telegramUrl={settings.telegramUrl}
                   priority={index === 0}
                 />
               ))}

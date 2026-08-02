@@ -1,36 +1,31 @@
 import Image from "next/image";
 import { withBasePath } from "@/lib/base-path";
-import { siteBaseUrl } from "@/lib/constants";
-import { buildTelegramLink } from "@/lib/telegram";
 import { TrackedLink } from "@/components/site/tracked-link";
+import { AddToCartButton } from "@/components/site/add-to-cart-button";
 
 type ProductCardProps = {
   product: {
+    id: number;
     slug: string;
     title: string;
     shortDescription: string;
     leadTime: string;
     priceLabel: string;
+    basePrice: number | null;
+    variants: Array<{ id: number; label: string; price: number }>;
     category: { name: string };
     coverImage: { urlPath: string; alt: string } | null;
   };
-  telegramUrl: string;
   priority?: boolean;
 };
 
 export function ProductCard({
   product,
-  telegramUrl,
   priority = false,
 }: ProductCardProps) {
   const productPath = withBasePath(`/product/${product.slug}`);
-  const productUrl = new URL(productPath, siteBaseUrl).toString();
-  const orderUrl = buildTelegramLink({
-    baseUrl: telegramUrl,
-    intent: "product",
-    productTitle: product.title,
-    productUrl,
-  });
+  const defaultVariant = product.variants[0] ?? null;
+  const unitPrice = defaultVariant?.price ?? product.basePrice;
 
   return (
     <article className="product-card group">
@@ -85,21 +80,20 @@ export function ProductCard({
 
         <div className="product-card__footer">
           <p className="product-card__price">{product.priceLabel}</p>
-          <TrackedLink
-            className="accent-pill"
-            href={orderUrl}
-            target="_blank"
-            rel="noreferrer"
-            eventName="Telegram Lead"
-            eventProps={{
-              location: "product-card",
-              intent: "product",
-              product_slug: product.slug,
-              category: product.category.name,
-            }}
-          >
-            Замовити
-          </TrackedLink>
+          {typeof unitPrice === "number" ? (
+            <AddToCartButton
+              compactLabel
+              item={{
+                productId: product.id,
+                productSlug: product.slug,
+                productTitle: product.title,
+                variantId: defaultVariant?.id ?? null,
+                variantLabel: defaultVariant?.label ?? "",
+                unitPrice,
+                imageUrl: product.coverImage?.urlPath ?? "",
+              }}
+            />
+          ) : null}
         </div>
       </div>
     </article>

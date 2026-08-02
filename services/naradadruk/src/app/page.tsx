@@ -221,7 +221,6 @@ export default async function HomePage() {
                   <ProductCard
                     key={product.id}
                     product={product}
-                    telegramUrl={settings.telegramUrl}
                   />
                 ))}
               </div>
