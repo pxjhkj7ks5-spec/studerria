@@ -4,6 +4,8 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="docker/local/docker-compose.yml"
 LOG_TAIL="${LOG_TAIL:-80}"
+HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-120}"
+HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-2}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups/server-update}"
 SERVICE="app"
 BUILD=1
@@ -201,6 +203,60 @@ backup_stateful_data() {
   esac
 }
 
+wait_for_service_ready() {
+  service_name="$1"
+  elapsed_seconds=0
+  previous_state=""
+
+  echo "Waiting for $service_name to become healthy (timeout: ${HEALTH_WAIT_SECONDS}s)..."
+
+  while [ "$elapsed_seconds" -lt "$HEALTH_WAIT_SECONDS" ]; do
+    container_id="$(docker compose ps -a -q "$service_name" 2>/dev/null || true)"
+    current_state="missing"
+
+    if [ -n "$container_id" ]; then
+      inspected_state="$(
+        docker inspect "$container_id" \
+          --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+          2>/dev/null || true
+      )"
+      if [ -n "$inspected_state" ]; then
+        current_state="$inspected_state"
+      fi
+    fi
+
+    if [ "$current_state" != "$previous_state" ]; then
+      echo "$service_name state: $current_state"
+      previous_state="$current_state"
+    fi
+
+    case "$current_state" in
+      healthy|running)
+        echo "$service_name is ready."
+        return 0
+        ;;
+      unhealthy|exited|dead)
+        echo "$service_name failed to become ready (state: $current_state)." >&2
+        docker compose logs --tail="$LOG_TAIL" "$service_name" >&2 || true
+        return 1
+        ;;
+    esac
+
+    sleep "$HEALTH_POLL_INTERVAL_SECONDS"
+    elapsed_seconds=$((elapsed_seconds + HEALTH_POLL_INTERVAL_SECONDS))
+  done
+
+  echo "$service_name did not become ready within ${HEALTH_WAIT_SECONDS}s (last state: $previous_state)." >&2
+  docker compose logs --tail="$LOG_TAIL" "$service_name" >&2 || true
+  return 1
+}
+
+if ! [[ "$HEALTH_WAIT_SECONDS" =~ ^[1-9][0-9]*$ ]] ||
+  ! [[ "$HEALTH_POLL_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "HEALTH_WAIT_SECONDS and HEALTH_POLL_INTERVAL_SECONDS must be positive integers." >&2
+  exit 2
+fi
+
 cd "$ROOT_DIR"
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -248,6 +304,11 @@ compose_up+=("${update_targets[@]}")
 
 echo "Updating Docker Compose service set: ${update_targets[*]}"
 "${compose_up[@]}"
+
+for updated_service in "${update_targets[@]}"; do
+  wait_for_service_ready "$updated_service"
+done
+
 docker compose ps "${update_targets[@]}"
 
 if [ "$SHOW_LOGS" -eq 1 ]; then
