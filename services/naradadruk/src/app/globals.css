@@ -1125,6 +1125,27 @@ img {
   font-weight: 720;
 }
 
+.admin-commerce__insight {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 1.15rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(244, 123, 53, 0.24);
+  border-radius: 0.9rem;
+  background: rgba(244, 123, 53, 0.07);
+}
+
+.admin-commerce__insight strong {
+  color: var(--admin-text);
+  font-size: 0.78rem;
+}
+
+.admin-commerce__insight span {
+  color: var(--admin-soft);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
 .admin-delta {
   display: inline-flex;
   align-items: center;

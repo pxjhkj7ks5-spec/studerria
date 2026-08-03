@@ -220,6 +220,14 @@ export function AnalyticsDashboard({
             </li>
           ))}
         </ol>
+        {report.funnelInsight ? (
+          <div className="admin-commerce__insight" role="status">
+            <strong>{report.funnelInsight.title}</strong>
+            <span>
+              Конверсія на цьому кроці: {report.funnelInsight.rate}%. {report.funnelInsight.message}
+            </span>
+          </div>
+        ) : null}
       </section>
 
       <div className="admin-analytics__primary">

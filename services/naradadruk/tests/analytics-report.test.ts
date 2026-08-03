@@ -137,5 +137,32 @@ test("buildAnalyticsReport separates periods and aggregates useful admin metrics
     checkoutToOrderRate: 100,
     viewToOrderRate: 50,
   });
+  assert.deepEqual(report.funnelInsight, {
+    stage: "product",
+    title: "Відвідувачі рідко відкривають товари",
+    message: "Перевірте перші фото, назви та помітність карток у каталозі.",
+    rate: 50,
+  });
   assert.equal(report.recentEvents[0]?.id, 10);
+});
+
+test("buildAnalyticsReport identifies the weakest measured funnel stage", () => {
+  const report = buildAnalyticsReport(
+    [
+      event(1, "Page View", "2026-07-30T10:00:00.000Z", { sessionId: "session-a" }),
+      event(2, "Product Open", "2026-07-30T10:01:00.000Z", {
+        sessionId: "session-a",
+        productSlug: "stand",
+      }),
+    ],
+    7,
+    new Date("2026-07-30T20:00:00.000Z"),
+  );
+
+  assert.deepEqual(report.funnelInsight, {
+    stage: "cart",
+    title: "Найбільше губляться між товаром і кошиком",
+    message: "Перевірте фото, опис, ціну та помітність кнопки «У кошик».",
+    rate: 0,
+  });
 });

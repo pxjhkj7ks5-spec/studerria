@@ -44,6 +44,13 @@ type MetricKey =
   | "orders"
   | "revenue";
 
+export type FunnelInsight = {
+  stage: "product" | "cart" | "checkout" | "order";
+  title: string;
+  message: string;
+  rate: number;
+};
+
 function dayKey(date: Date) {
   return kyivDayFormatter.format(date);
 }
@@ -98,6 +105,66 @@ function metricDelta(current: number, previous: number) {
 
 function conversionRate(current: number, previous: number) {
   return previous > 0 ? Math.round((current / previous) * 1_000) / 10 : 0;
+}
+
+function buildFunnelInsight(commerce: {
+  views: number;
+  productOpens: number;
+  addToCarts: number;
+  checkouts: number;
+  orders: number;
+  viewToProductRate: number;
+  productToCartRate: number;
+  cartToCheckoutRate: number;
+  checkoutToOrderRate: number;
+}): FunnelInsight | null {
+  const stages: Array<FunnelInsight & { denominator: number }> = [
+    {
+      stage: "product",
+      title: "Відвідувачі рідко відкривають товари",
+      message: "Перевірте перші фото, назви та помітність карток у каталозі.",
+      rate: commerce.viewToProductRate,
+      denominator: commerce.views,
+    },
+    {
+      stage: "cart",
+      title: "Найбільше губляться між товаром і кошиком",
+      message: "Перевірте фото, опис, ціну та помітність кнопки «У кошик».",
+      rate: commerce.productToCartRate,
+      denominator: commerce.productOpens,
+    },
+    {
+      stage: "checkout",
+      title: "Найбільше губляться між кошиком і оформленням",
+      message: "Перевірте зрозумілість підсумку та наступного кроку в кошику.",
+      rate: commerce.cartToCheckoutRate,
+      denominator: commerce.addToCarts,
+    },
+    {
+      stage: "order",
+      title: "Найбільше губляться під час оформлення",
+      message: "Перевірте поля доставки, способи звʼязку та повідомлення після оформлення.",
+      rate: commerce.checkoutToOrderRate,
+      denominator: commerce.checkouts,
+    },
+  ];
+
+  const measuredStages = stages.filter((stage) => stage.denominator > 0);
+
+  if (measuredStages.length === 0) {
+    return null;
+  }
+
+  const weakest = measuredStages.reduce((weakest, stage) =>
+    stage.rate < weakest.rate ? stage : weakest,
+  );
+
+  return {
+    stage: weakest.stage,
+    title: weakest.title,
+    message: weakest.message,
+    rate: weakest.rate,
+  };
 }
 
 function countBy<T>(
@@ -218,6 +285,25 @@ export function buildAnalyticsReport(
     (event) => event.path,
   ).slice(0, 8);
 
+  const commerce = {
+    productOpens: currentEvents.filter((event) => event.name === "Product Open").length,
+    addToCarts: current.addToCarts,
+    checkouts: current.checkouts,
+    orders: current.orders,
+    revenue: current.revenue,
+    viewToProductRate: conversionRate(
+      currentEvents.filter((event) => event.name === "Product Open").length,
+      current.views,
+    ),
+    productToCartRate: conversionRate(
+      current.addToCarts,
+      currentEvents.filter((event) => event.name === "Product Open").length,
+    ),
+    cartToCheckoutRate: conversionRate(current.checkouts, current.addToCarts),
+    checkoutToOrderRate: conversionRate(current.orders, current.checkouts),
+    viewToOrderRate: conversionRate(current.orders, current.views),
+  };
+
   return {
     range,
     current,
@@ -225,24 +311,8 @@ export function buildAnalyticsReport(
     deltas,
     conversionRate:
       conversionRate(current.leads, current.views),
-    commerce: {
-      productOpens: currentEvents.filter((event) => event.name === "Product Open").length,
-      addToCarts: current.addToCarts,
-      checkouts: current.checkouts,
-      orders: current.orders,
-      revenue: current.revenue,
-      viewToProductRate: conversionRate(
-        currentEvents.filter((event) => event.name === "Product Open").length,
-        current.views,
-      ),
-      productToCartRate: conversionRate(
-        current.addToCarts,
-        currentEvents.filter((event) => event.name === "Product Open").length,
-      ),
-      cartToCheckoutRate: conversionRate(current.checkouts, current.addToCarts),
-      checkoutToOrderRate: conversionRate(current.orders, current.checkouts),
-      viewToOrderRate: conversionRate(current.orders, current.views),
-    },
+    commerce,
+    funnelInsight: buildFunnelInsight({ views: current.views, ...commerce }),
     daily,
     actions,
     topProducts,
