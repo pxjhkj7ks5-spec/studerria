@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { withBasePath } from "@/lib/base-path";
 
 type ReviewOrderContext = {
@@ -16,6 +17,7 @@ export function ReviewForm({
   orderContext?: ReviewOrderContext | null;
   invalidOrderLink?: boolean;
 }) {
+  const router = useRouter();
   const [anonymous, setAnonymous] = useState(false);
   const [state, setState] = useState<{ kind: "idle" | "sending" | "success" | "error"; message?: string }>({ kind: "idle" });
 
@@ -32,7 +34,8 @@ export function ReviewForm({
       if (!response.ok) throw new Error(result.error || "Не вдалося надіслати відгук.");
       form.reset();
       setAnonymous(false);
-      setState({ kind: "success", message: "Дякуємо! Відгук надіслано на модерацію. Після схвалення він з’явиться на сайті." });
+      setState({ kind: "success", message: "Дякуємо! Відгук уже опубліковано на сайті." });
+      router.refresh();
     } catch (error) {
       setState({ kind: "error", message: error instanceof Error ? error.message : "Не вдалося надіслати відгук." });
     }
@@ -43,7 +46,7 @@ export function ReviewForm({
       <div className="review-form__heading">
         <p className="eyebrow">Поділіться досвідом</p>
         <h2>Залишити відгук</h2>
-        <p>Усі відгуки спочатку перевіряються. Можна додати до 4 фото.</p>
+        <p>Новий відгук одразу з’явиться на сайті. Можна додати до 4 фото.</p>
       </div>
 
       {orderContext ? (

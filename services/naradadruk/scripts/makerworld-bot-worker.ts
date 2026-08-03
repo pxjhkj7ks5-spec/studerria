@@ -18,6 +18,7 @@ import {
   productContentPackageTemplate,
   type ProductContentPackage,
 } from "../src/lib/product-content-package";
+import { moderateReview, type ReviewModerationStatus } from "../src/lib/review-moderation";
 
 type TelegramUser = { id: number };
 type TelegramChat = { id: number; type: string };
@@ -1900,33 +1901,42 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (callback.data?.startsWith("review:")) {
     const [, action, rawId] = callback.data.split(":");
     const reviewId = Number(rawId);
-    if (!Number.isInteger(reviewId) || !["approve", "delete"].includes(action)) {
+    if (!Number.isInteger(reviewId) || !["approve", "reject", "delete"].includes(action)) {
       await answerCallback(callback.id, "Некоректна дія.");
       return;
     }
-    let changedCount = 0;
-    if (action === "approve") {
-      const changed = await prisma.review.updateMany({ where: { id: reviewId, status: ReviewStatus.pending }, data: { status: ReviewStatus.approved, moderatedAt: new Date() } });
-      changedCount = changed.count;
-    } else {
-      const review = await prisma.review.findFirst({ where: { id: reviewId, status: ReviewStatus.pending }, include: { images: true } });
-      if (review) {
-        await prisma.review.delete({ where: { id: review.id } });
-        await deleteFiles(review.images.map((image) => image.fileName));
-        changedCount = 1;
-      }
+    const moderationAction = action === "approve" ? "approve" : "reject";
+    const outcome = await moderateReview({
+      async getStatus(id) {
+        const review = await prisma.review.findUnique({ where: { id }, select: { status: true } });
+        return review?.status as ReviewModerationStatus | undefined ?? null;
+      },
+      async transition(id, from, to, moderatedAt) {
+        const changed = await prisma.review.updateMany({
+          where: { id, status: from as ReviewStatus },
+          data: { status: to as ReviewStatus, moderatedAt },
+        });
+        return changed.count > 0;
+      },
+    }, reviewId, moderationAction);
+
+    if (moderationAction === "reject" && (outcome === "hidden" || outcome === "already_hidden")) {
+      await telegramJson("editMessageReplyMarkup", {
+        chat_id: chatId,
+        message_id: message.message_id,
+        reply_markup: { inline_keyboard: [] },
+      }).catch(() => undefined);
     }
-    await telegramJson("editMessageReplyMarkup", {
-      chat_id: chatId,
-      message_id: message.message_id,
-      reply_markup: { inline_keyboard: [] },
-    }).catch(() => undefined);
-    await answerCallback(
-      callback.id,
-      changedCount > 0
-        ? action === "approve" ? "Відгук опубліковано." : "Відгук видалено."
-        : "Відгук уже опрацьовано або видалено.",
-    );
+
+    const moderationMessages = {
+      published: "Відгук опубліковано.",
+      already_published: "Відгук уже опубліковано.",
+      hidden: "Відгук приховано.",
+      already_hidden: "Відгук уже приховано.",
+      missing: "Відгук не знайдено.",
+      conflict: "Стан відгуку змінився. Спробуйте ще раз.",
+    };
+    await answerCallback(callback.id, moderationMessages[outcome]);
     return;
   }
   const session = sessions.get(chatId);

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Prisma } from "@prisma/client";
+import { Prisma, ReviewStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { createPrivacyHash } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     );
   }
   if (duplicate) {
-    return NextResponse.json({ error: "Такий відгук уже надіслано на модерацію." }, { status: 409 });
+    return NextResponse.json({ error: "Такий відгук уже надіслано." }, { status: 409 });
   }
 
   const stored: StoredUpload[] = [];
@@ -106,6 +106,7 @@ export async function POST(request: Request) {
         displayName: parsed.data.isAnonymous ? "" : parsed.data.displayName,
         isAnonymous: parsed.data.isAnonymous || !parsed.data.displayName,
         body: parsed.data.body,
+        status: ReviewStatus.approved,
         ipHash: addressHash,
         contentHash,
         orderId: reviewOrder?.id ?? null,
@@ -135,7 +136,7 @@ export async function POST(request: Request) {
       },
     }).catch((error) => console.error("[reviews] notification status update failed", error));
 
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ ok: true, published: true }, { status: 201 });
   } catch (error) {
     await Promise.all(stored.map((image) => deleteUploadFile(image.fileName)));
     if (error instanceof ReviewSubmissionError) {

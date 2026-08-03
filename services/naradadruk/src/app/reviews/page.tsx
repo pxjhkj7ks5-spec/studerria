@@ -10,7 +10,7 @@ import { absoluteSiteUrl } from "@/lib/site-url";
 
 export const dynamic = "force-dynamic";
 
-const description = "Схвалені після модерації відгуки клієнтів про Narada Druk та форма для надсилання власного відгуку з фото.";
+const description = "Опубліковані відгуки клієнтів про NaradaDruk та форма для надсилання власного відгуку з фото.";
 export const metadata: Metadata = {
   title: "Відгуки",
   description,
@@ -48,8 +48,8 @@ export default async function ReviewsPage({
         <section className="site-section review-hero">
           <div className="site-container section-heading">
             <p className="eyebrow">Реальний досвід</p>
-            <h1>Відгуки про Narada Druk</h1>
-            <p>Тут показані лише відгуки, схвалені після модерації. Ми не додаємо оцінок або позначок підтвердженої покупки без перевірених даних.</p>
+            <h1>Відгуки про NaradaDruk</h1>
+            <p>Нові відгуки з’являються тут одразу. Власник може приховати відгук після перевірки, а позначку підтвердженої покупки додаємо лише за перевіреними даними.</p>
           </div>
         </section>
 

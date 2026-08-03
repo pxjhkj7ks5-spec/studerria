@@ -72,7 +72,7 @@ export async function notifyOwnerAboutReview(review: ReviewWithImages) {
     await sendReviewPhotos(token, chatId, review);
     const name = review.isAnonymous || !review.displayName ? "Анонімно" : review.displayName;
     const text = [
-      "🗣 <b>Новий відгук на модерацію</b>",
+      "🗣 <b>Новий опублікований відгук</b>",
       `Автор: <b>${escapeHtml(name)}</b>`,
       review.verifiedPurchase && review.order
         ? `✅ Підтверджене замовлення <b>#${escapeHtml(review.order.publicId.slice(0, 8).toUpperCase())}</b>`
@@ -81,7 +81,7 @@ export async function notifyOwnerAboutReview(review: ReviewWithImages) {
       "",
       escapeHtml(review.body.slice(0, 3000)),
       "",
-      "Відгук не видно на сайті, доки ви його не опублікуєте.",
+      "Відгук уже видно на сайті. Підтвердження не змінить його стан, а відхилення одразу приховає відгук.",
     ].join("\n");
     const message = await telegramJson<{ message_id: number }>(token, "sendMessage", {
       chat_id: chatId,
@@ -90,8 +90,8 @@ export async function notifyOwnerAboutReview(review: ReviewWithImages) {
       disable_web_page_preview: true,
       reply_markup: {
         inline_keyboard: [[
-          { text: "Опублікувати", callback_data: `review:approve:${review.id}` },
-          { text: "Видалити", callback_data: `review:delete:${review.id}` },
+          { text: "Підтвердити", callback_data: `review:approve:${review.id}` },
+          { text: "Відхилити", callback_data: `review:reject:${review.id}` },
         ]],
       },
     });
