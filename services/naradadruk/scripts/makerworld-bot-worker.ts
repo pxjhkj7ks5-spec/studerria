@@ -23,12 +23,18 @@ import {
   applyManualOrderText,
   buildManualOrderCreateData,
   chooseManualOrderKind,
-  createManualOrderSession,
   selectManualCatalogItem,
   type ManualCatalogItem,
   type ManualOrderSession,
 } from "../src/lib/manual-order";
 import { effectiveUnitPrice } from "../src/lib/pricing";
+import {
+  beginManualOrder,
+  handleManualOrderTextUpdate,
+  isAuthorizedOwnerMessage,
+  isOwnerAdminGroup,
+  type OwnerBotAccess,
+} from "../src/lib/manual-order-entry";
 
 type TelegramUser = { id: number };
 type TelegramChat = { id: number; type: string };
@@ -137,6 +143,7 @@ const hasInvalidOwnerUserId = configuredOwnerUserIds.some((value) => !/^[1-9]\d*
 const ownerUserIds = new Set(configuredOwnerUserIds.filter((value) => /^[1-9]\d*$/.test(value)));
 if (ownerUserIds.size === 0 && /^[1-9]\d*$/.test(ownerChatId)) ownerUserIds.add(ownerChatId);
 const postsChatId = process.env.NARADADRUK_POSTS_TELEGRAM_CHAT_ID?.trim() || "";
+const ownerBotAccess: OwnerBotAccess = { ownerChatId, postsChatId, ownerUserIds };
 const publicSiteBaseUrl = new URL("https://studerria.com/naradadruk/");
 const maxImages = 6;
 const maxImageAttempts = 12;
@@ -1405,8 +1412,7 @@ async function showManualCatalog(chatId: string, requestedPage = 0) {
 }
 
 async function startManualOrder(chatId: string) {
-  manualOrders.set(chatId, createManualOrderSession());
-  await sendMessage(chatId, "<b>Ручне замовлення</b>\nКрок 1 із 4: надішліть імʼя клієнта.", manualCancelKeyboard());
+  await beginManualOrder(chatId, manualOrders, sendMessage);
 }
 
 async function createManualOrder(chatId: string, session: ManualOrderSession) {
@@ -1427,7 +1433,7 @@ async function createManualOrder(chatId: string, session: ManualOrderSession) {
 }
 
 function isAuthorizedOwnerChat(message: TelegramMessage, actorId = message.from?.id) {
-  return String(message.chat.id) === ownerChatId && ownerUserIds.has(String(actorId ?? ""));
+  return isAuthorizedOwnerMessage(message, ownerBotAccess, actorId);
 }
 
 function splitCommand(text: string) {
@@ -1608,6 +1614,7 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
 }
 
 async function handleMessage(message: TelegramMessage) {
+  if (await handleManualOrderTextUpdate(message, ownerBotAccess, manualOrders, sendMessage)) return;
   if (!isAuthorizedOwnerChat(message)) return;
   if (!message.text && message.caption) message.text = message.caption;
   const chatId = String(message.chat.id);
@@ -1649,14 +1656,7 @@ async function handleMessage(message: TelegramMessage) {
     await showOrdersDashboard(chatId);
     return;
   }
-  if (command?.command === "manual") {
-    if (message.chat.type !== "private") {
-      await sendMessage(chatId, "Команда /manual доступна лише в приватному чаті адміністратора з ботом.");
-      return;
-    }
-    await startManualOrder(chatId);
-    return;
-  }
+  if (command?.command === "manual") return;
 
   const marketplace = marketplaceSessions.get(chatId);
   if (marketplace) {
@@ -1947,8 +1947,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     return;
   }
   if (callback.data === "manual:start") {
-    if (message.chat.type !== "private") {
-      await answerCallback(callback.id, "Лише в приватному чаті.");
+    if (!isOwnerAdminGroup(message, ownerBotAccess)) {
+      await answerCallback(callback.id, "Лише в адміністраторському груповому чаті.");
       return;
     }
     await answerCallback(callback.id);
@@ -2003,7 +2003,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       await answerCallback(callback.id, "Скасовано.");
       return;
     }
-    if (message.chat.type !== "private") { await answerCallback(callback.id, "Лише в приватному чаті."); return; }
+    if (!isOwnerAdminGroup(message, ownerBotAccess)) { await answerCallback(callback.id, "Лише в адміністраторському груповому чаті."); return; }
     if (!manual) { await answerCallback(callback.id, "Чернетка вже неактуальна."); return; }
     if (action === "kind" && ["catalog", "unique"].includes(value) && manual.step === "kind") {
       const next = chooseManualOrderKind(manual, value as "catalog" | "unique");
@@ -2198,6 +2198,10 @@ async function run() {
   }
   if (hasInvalidOwnerUserId || ownerUserIds.size === 0) {
     console.log("[owner-bot] disabled: positive owner user ID allowlist is missing or invalid");
+    return;
+  }
+  if (ownerChatId === postsChatId) {
+    console.log("[owner-bot] disabled: owner admin chat must differ from the public posts channel");
     return;
   }
 
