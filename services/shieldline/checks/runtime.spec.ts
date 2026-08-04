@@ -199,6 +199,33 @@ test("persisted operations reconcile stale launch data with the current catalog"
   assert.deepEqual(normalized.storedBatteries, []);
 });
 
+test("incomplete version 24 progress repairs itself without opening the recovery screen", () => {
+  const corrupted = {
+    scenarioId: "thirty-days-under-pressure",
+    campaign: { missionIndex: 2, campaignWallet: 41 },
+    resources: { budget: 41 },
+    cities: null,
+    storedBatteries: [{ id: "removed-unit", kind: "legacy-system", position: { lat: 50.4, lng: 30.5 } }],
+    liveThreats: null,
+    afterActionReports: null,
+    planningActions: null,
+    logistics: null,
+  };
+
+  const normalized = normalizePersistedGame(corrupted, 24, "repair-test");
+  assert.ok(normalized);
+  assert.equal(normalized.campaign?.missionIndex, 2);
+  assert.equal(normalized.campaign?.campaignWallet, 41);
+  assert.ok(normalized.campaign?.depot);
+  assert.ok(normalized.cities.length > 0);
+  assert.deepEqual(normalized.liveThreats, []);
+  assert.deepEqual(normalized.afterActionReports, []);
+  assert.equal(normalized.storedBatteries.some((battery) => battery.id === "removed-unit"), false);
+  assert.equal(normalized.storedBatteries.some((battery) => battery.id === "campaign-m2-medium-radar"), true);
+  assert.deepEqual(normalized.planningActions.selected, []);
+  assert.deepEqual(normalized.logistics.nodes, []);
+});
+
 test("a battery keeps its condition and costs nothing when redeployed from storage", () => {
   let game = createScenarioState(() => 0.5, "training", "first-night");
   game = placeBattery(game, "mvg", { lat: 49.2, lng: 29.4 }, () => 0.5);

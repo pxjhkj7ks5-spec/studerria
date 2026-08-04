@@ -39,6 +39,78 @@ function validCoordinates(value: unknown): value is Coordinates {
   return Boolean(point && Number.isFinite(point.lat) && Number.isFinite(point.lng));
 }
 
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function finiteNumber(value: unknown, fallback: number) {
+  return Number.isFinite(value) ? Number(value) : fallback;
+}
+
+function preparePersistedGame(value: unknown): GameState | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const persisted = value as Partial<GameState>;
+  const fallback = createInitialState(() => .5, persisted.campaign ? "crisis" : "training");
+  const resources = objectValue(persisted.resources);
+  const planningActions = objectValue(persisted.planningActions);
+  const logistics = objectValue(persisted.logistics);
+  const persistedCities = Array.isArray(persisted.cities)
+    ? persisted.cities.filter((city) => city && typeof city === "object" && validCoordinates(city.coordinates))
+    : [];
+
+  return {
+    ...fallback,
+    ...persisted,
+    campaign: persisted.campaign && typeof persisted.campaign === "object" && !Array.isArray(persisted.campaign)
+      ? persisted.campaign
+      : null,
+    day: Math.max(1, Math.round(finiteNumber(persisted.day, fallback.day))),
+    cycleStartedAtMs: Math.max(0, finiteNumber(persisted.cycleStartedAtMs, fallback.cycleStartedAtMs)),
+    cycleDurationMs: Math.max(1, finiteNumber(persisted.cycleDurationMs, fallback.cycleDurationMs)),
+    attackPlanHistory: Array.isArray(persisted.attackPlanHistory) ? persisted.attackPlanHistory : [],
+    afterActionReports: Array.isArray(persisted.afterActionReports) ? persisted.afterActionReports : [],
+    planningActions: {
+      selected: Array.isArray(planningActions.selected) ? planningActions.selected as PlanningActionId[] : [],
+      cooldowns: objectValue(planningActions.cooldowns) as GameState["planningActions"]["cooldowns"],
+      usageCounts: objectValue(planningActions.usageCounts) as GameState["planningActions"]["usageCounts"],
+      pendingAid: Array.isArray(planningActions.pendingAid) ? planningActions.pendingAid as GameState["planningActions"]["pendingAid"] : [],
+    },
+    logistics: {
+      nodes: Array.isArray(logistics.nodes) ? logistics.nodes as GameState["logistics"]["nodes"] : [],
+      routes: Array.isArray(logistics.routes) ? logistics.routes as GameState["logistics"]["routes"] : [],
+      citySupply: objectValue(logistics.citySupply) as GameState["logistics"]["citySupply"],
+      unitSupply: objectValue(logistics.unitSupply) as GameState["logistics"]["unitSupply"],
+      resupplyDelayDays: Math.max(0, finiteNumber(logistics.resupplyDelayDays, 0)),
+      ammoRecoveryMultiplier: Math.max(0, finiteNumber(logistics.ammoRecoveryMultiplier, 1)),
+      repairRecoveryMultiplier: Math.max(0, finiteNumber(logistics.repairRecoveryMultiplier, 1)),
+    },
+    elapsedMs: Math.max(0, finiteNumber(persisted.elapsedMs, 0)),
+    wavePressure: Math.max(0, finiteNumber(persisted.wavePressure, fallback.wavePressure)),
+    resources: {
+      budget: finiteNumber(resources.budget, fallback.resources.budget),
+      ammo: Math.max(0, finiteNumber(resources.ammo, fallback.resources.ammo)),
+      energy: Math.max(0, finiteNumber(resources.energy, fallback.resources.energy)),
+      morale: Math.max(0, finiteNumber(resources.morale, fallback.resources.morale)),
+      political: Math.max(0, finiteNumber(resources.political, fallback.resources.political)),
+    },
+    cities: persistedCities.length ? persistedCities : fallback.cities,
+    infrastructure: Array.isArray(persisted.infrastructure) ? persisted.infrastructure : fallback.infrastructure,
+    launchSectors: Array.isArray(persisted.launchSectors) ? persisted.launchSectors : [],
+    carriers: Array.isArray(persisted.carriers) ? persisted.carriers : [],
+    pendingLaunches: Array.isArray(persisted.pendingLaunches) ? persisted.pendingLaunches : [],
+    units: Array.isArray(persisted.units) ? persisted.units : fallback.units,
+    batteries: Array.isArray(persisted.batteries) ? persisted.batteries : [],
+    storedBatteries: Array.isArray(persisted.storedBatteries) ? persisted.storedBatteries : [],
+    liveThreats: Array.isArray(persisted.liveThreats) ? persisted.liveThreats : [],
+    engagementEvents: Array.isArray(persisted.engagementEvents) ? persisted.engagementEvents : [],
+    impactMarkers: Array.isArray(persisted.impactMarkers) ? persisted.impactMarkers : [],
+    log: Array.isArray(persisted.log) ? persisted.log : fallback.log,
+    interceptions: Math.max(0, finiteNumber(persisted.interceptions, 0)),
+    softKills: Math.max(0, finiteNumber(persisted.softKills, 0)),
+    impacts: Math.max(0, finiteNumber(persisted.impacts, 0)),
+  } as GameState;
+}
+
 const launchDirections: LaunchDirection[] = ["north", "east", "south"];
 
 function normalizeCampaignSchedule(game: GameState): CampaignAttackSchedule | null {
@@ -89,8 +161,9 @@ function recordPlacedTutorialAssets(game: GameState, nowMs: number) {
   return advanced;
 }
 
-export function normalizePersistedGame(game: GameState | null, persistedVersion = 23, campaignSeed = "campaign-migrated") {
-  if (!game) return game;
+export function normalizePersistedGame(value: unknown, persistedVersion = 24, campaignSeed = "campaign-migrated"): GameState | null {
+  const game = preparePersistedGame(value);
+  if (!game) return null;
   const persistedSectorById = new Map((Array.isArray(game.launchSectors) ? game.launchSectors : []).map((sector) => [sector.id, sector]));
   const launchSectors = createLaunchSectorState().map((sector) => {
     const persisted = persistedSectorById.get(sector.id);
@@ -112,6 +185,7 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
   const authoritativeSectorById = new Map(launchSectors.map((sector) => [sector.id, sector]));
   const pendingLaunches = (Array.isArray(game.pendingLaunches) ? game.pendingLaunches : [])
     .filter((launch) => {
+      if (!launch) return false;
       const sector = authoritativeSectorById.get(launch.sectorId);
       return Boolean(sector && validCoordinates(launch.origin) && sectorSupportsThreat(sector, launch.kind));
     })
@@ -134,7 +208,8 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
     }));
   const engagedTargetIds = new Set(engagementEvents.filter((event) => event.style !== "radar" && !event.resolved).map((event) => event.targetId));
   const liveThreats = (Array.isArray(game.liveThreats) ? game.liveThreats : [])
-    .filter((threat) => threat.id !== "opening-track-1"
+    .filter((threat) => threat
+      && threat.id !== "opening-track-1"
       && validCoordinates(threat.origin)
       && validCoordinates(threat.target)
       && Number.isFinite(threat.progress)
@@ -163,23 +238,34 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
       damageModifier: Number.isFinite(threat.damageModifier) ? threat.damageModifier : 1,
     }));
   const normalizeBattery = (battery: GameState["batteries"][number]) => {
-    const unit = getUnitDefinition(battery.kind);
-    return {
-      ...battery,
-      position: { ...battery.position },
-      health: Number.isFinite(battery.health) ? battery.health : battery.readiness,
-      experienceLevel: Number.isFinite(battery.experienceLevel) ? battery.experienceLevel : 0,
-      createdAtMission: Number.isFinite(battery.createdAtMission) ? battery.createdAtMission : 0,
-      lastMovedMission: Number.isFinite(battery.lastMovedMission) ? battery.lastMovedMission : 0,
-      missionReserve: game.campaign && unit.missionReserveCapacity !== "infinite" ? 0 : battery.missionReserve ?? unit.missionReserveCapacity,
-      manualOverrideTargets: Array.isArray(battery.manualOverrideTargets) ? battery.manualOverrideTargets : [],
-    };
+    if (!battery || !validCoordinates(battery.position)) return null;
+    try {
+      const unit = getUnitDefinition(battery.kind);
+      return {
+        ...battery,
+        position: { ...battery.position },
+        health: Number.isFinite(battery.health) ? battery.health : battery.readiness,
+        experienceLevel: Number.isFinite(battery.experienceLevel) ? battery.experienceLevel : 0,
+        createdAtMission: Number.isFinite(battery.createdAtMission) ? battery.createdAtMission : 0,
+        lastMovedMission: Number.isFinite(battery.lastMovedMission) ? battery.lastMovedMission : 0,
+        missionReserve: game.campaign && unit.missionReserveCapacity !== "infinite" ? 0 : battery.missionReserve ?? unit.missionReserveCapacity,
+        manualOverrideTargets: Array.isArray(battery.manualOverrideTargets) ? battery.manualOverrideTargets : [],
+      };
+    } catch {
+      return null;
+    }
   };
   type LegacyCampaignState = NonNullable<GameState["campaign"]> & { campaignAmmoStock?: number };
   const persistedCampaign = game.campaign as LegacyCampaignState | null;
   const campaignWithoutLegacyAmmo: Omit<LegacyCampaignState, "campaignAmmoStock"> | null = persistedCampaign
     ? (({ campaignAmmoStock: _legacyAmmoStock, ...campaign }) => campaign)(persistedCampaign)
     : null;
+  const missionIndex = Math.max(1, Math.min(5, Math.round(finiteNumber(persistedCampaign?.missionIndex, 1))));
+  const campaignFallback = createCampaignState(
+    missionIndex,
+    Math.max(0, finiteNumber(persistedCampaign?.campaignWallet, 0)),
+    campaignSeed,
+  );
   const migratedDepot = createCampaignAmmoDepot(
     campaignSeed,
     Number.isFinite(persistedCampaign?.campaignAmmoStock) ? Number(persistedCampaign?.campaignAmmoStock) : 0,
@@ -206,14 +292,24 @@ export function normalizePersistedGame(game: GameState | null, persistedVersion 
     launchSectors,
     pendingLaunches,
     carriers: Array.isArray(game.carriers) ? game.carriers : [],
-    batteries: (Array.isArray(game.batteries) ? game.batteries : []).map(normalizeBattery),
-    storedBatteries: (Array.isArray(game.storedBatteries) ? game.storedBatteries : []).map(normalizeBattery),
+    batteries: (Array.isArray(game.batteries) ? game.batteries : []).map(normalizeBattery).filter((battery): battery is NonNullable<typeof battery> => Boolean(battery)),
+    storedBatteries: (Array.isArray(game.storedBatteries) ? game.storedBatteries : []).map(normalizeBattery).filter((battery): battery is NonNullable<typeof battery> => Boolean(battery)),
     liveThreats,
     engagementEvents,
     softKills: Number.isFinite(game.softKills) ? game.softKills : 0,
     campaign: persistedCampaign ? {
+      ...campaignFallback,
       ...campaignWithoutLegacyAmmo!,
+      missionIndex,
       depot,
+      campaignWallet: Math.max(0, finiteNumber(persistedCampaign.campaignWallet, campaignFallback.campaignWallet)),
+      unlockedSystems: Array.isArray(persistedCampaign.unlockedSystems) ? persistedCampaign.unlockedSystems : campaignFallback.unlockedSystems,
+      previousMissionResults: Array.isArray(persistedCampaign.previousMissionResults) ? persistedCampaign.previousMissionResults : [],
+      spawnEvents: Array.isArray(persistedCampaign.spawnEvents) ? persistedCampaign.spawnEvents : campaignFallback.spawnEvents,
+      missionKillsByKind: objectValue(persistedCampaign.missionKillsByKind),
+      missionGrantApplied: typeof persistedCampaign.missionGrantApplied === "boolean"
+        ? persistedCampaign.missionGrantApplied
+        : persistedVersion >= 23,
       lastAttemptResult: persistedCampaign.lastAttemptResult || null,
       retryCheckpoint: persistedCampaign.retryCheckpoint || null,
       missionDepotProducedAtStart: Number.isFinite(persistedCampaign.missionDepotProducedAtStart) ? persistedCampaign.missionDepotProducedAtStart : depot.producedTotal,
@@ -595,13 +691,13 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "shieldline-live-v7",
-      version: 24,
+      version: 25,
       migrate: (persistedState, persistedVersion) => {
         const { selectedBatteryId: _discardedSelection, ...state } = persistedState as Partial<GameStore> & { selectedBatteryId?: string | null };
         const migratedGame = normalizePersistedGame(state.game || null, persistedVersion, state.simulationSeed || "campaign-migrated");
         return {
           ...state,
-          ...(migratedGame ? { game: migratedGame } : {}),
+          game: migratedGame || createInitialState(() => .5),
           activeGameMode: state.activeGameMode === "campaign" && !migratedGame?.campaign ? null : state.activeGameMode,
           dailyCityGame: normalizePersistedGame(state.dailyCityGame || null, persistedVersion, state.simulationSeed || "daily-migrated"),
           simulationSpeed: 1,

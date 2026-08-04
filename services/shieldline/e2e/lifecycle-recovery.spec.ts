@@ -1,5 +1,41 @@
 import { expect, test } from "@playwright/test";
 
+test("an incomplete version 24 campaign snapshot self-recovers on mobile", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("shieldline-tutorial-complete-v1", "true");
+    localStorage.setItem("shieldline-live-v7", JSON.stringify({
+      state: {
+        game: {
+          scenarioId: "thirty-days-under-pressure",
+          campaign: { missionIndex: 2, campaignWallet: 41 },
+          resources: { budget: 41 },
+          cities: null,
+          liveThreats: null,
+          storedBatteries: [{ id: "removed-unit", kind: "legacy-system", position: { lat: 50.4, lng: 30.5 } }],
+        },
+        campaignMode: "crisis",
+        activeGameMode: "campaign",
+        operationPhase: "planning",
+        simulationSeed: "repair-test",
+      },
+      version: 24,
+    }));
+  });
+
+  await page.goto("/shieldline/?legacy=1&mode=campaign");
+  await expect(page.getByRole("heading", { name: "Shieldline не вдалося відкрити" })).toHaveCount(0);
+  await expect(page.locator(".leaflet-stage")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const persisted = JSON.parse(localStorage.getItem("shieldline-live-v7") || "{}");
+    return {
+      version: persisted.version,
+      missionIndex: persisted.state?.game?.campaign?.missionIndex,
+      cityCount: persisted.state?.game?.cities?.length || 0,
+      storedBatteryCount: persisted.state?.game?.storedBatteries?.length || 0,
+    };
+  })).toEqual({ version: 25, missionIndex: 2, cityCount: 22, storedBatteryCount: 1 });
+});
+
 test("a running operation recovers after backgrounding and a stale offline projection", async ({ page }) => {
   test.setTimeout(40_000);
   await page.addInitScript(() => {
@@ -86,5 +122,5 @@ test("a running operation recovers after backgrounding and a stale offline proje
       };
     };
     request.onerror = () => resolve(null);
-  }))).toBe(4);
+  }))).toBe(5);
 });
