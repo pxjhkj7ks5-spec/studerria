@@ -493,8 +493,22 @@ export async function moderateReviewAction(formData: FormData) {
   if (!reviewId || !isModeratedStatus) {
     redirect(messagePath(`${getAdminRoute()}/reviews`, "error", "Не вдалося змінити статус відгуку."));
   }
-  await setReviewStatus(reviewId, status);
-  redirect(messagePath(`${getAdminRoute()}/reviews/${reviewId}`, "ok", status === ReviewStatus.approved ? "Відгук опубліковано." : "Відгук приховано."));
+  const outcome = await setReviewStatus(reviewId, status);
+  const reviewPath = `${getAdminRoute()}/reviews/${reviewId}`;
+  if (outcome === "rejection_locked") {
+    redirect(messagePath(reviewPath, "error", "Після підтвердження відгук не можна приховати."));
+  }
+  if (outcome === "missing" || outcome === "conflict") {
+    redirect(messagePath(reviewPath, "error", "Не вдалося змінити статус відгуку."));
+  }
+  const successMessages = {
+    published: "Відгук опубліковано.",
+    confirmed: "Відгук підтверджено.",
+    already_confirmed: "Відгук уже підтверджено.",
+    hidden: "Відгук приховано.",
+    already_hidden: "Відгук уже приховано.",
+  } as const;
+  redirect(messagePath(reviewPath, "ok", successMessages[outcome]));
 }
 
 export async function deleteReviewAction(formData: FormData) {

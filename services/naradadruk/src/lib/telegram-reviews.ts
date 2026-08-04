@@ -81,7 +81,7 @@ export async function notifyOwnerAboutReview(review: ReviewWithImages) {
       "",
       escapeHtml(review.body.slice(0, 3000)),
       "",
-      "Відгук уже видно на сайті. Підтвердження не змінить його стан, а відхилення одразу приховає відгук.",
+      "Відгук уже видно на сайті. Після підтвердження його більше не можна буде відхилити, а відхилення до підтвердження одразу приховає відгук.",
     ].join("\n");
     const message = await telegramJson<{ message_id: number }>(token, "sendMessage", {
       chat_id: chatId,

@@ -31,8 +31,8 @@ export default async function AdminReviewPage({ params, searchParams }: {
         <p className="whitespace-pre-wrap text-white/90">{review.body}</p>
         {review.images.length ? <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">{review.images.map((image) => <a href={withBasePath(image.urlPath)} target="_blank" rel="noreferrer" key={image.id}><Image className="aspect-square w-full rounded-2xl object-cover" src={withBasePath(image.urlPath)} alt={image.alt} width={500} height={500} unoptimized /></a>)}</div> : null}
         <div className="mt-6 flex flex-wrap gap-3">
-          <form action={moderateReviewAction}><input type="hidden" name="reviewId" value={review.id} /><input type="hidden" name="status" value="approved" /><button className="accent-pill" type="submit">Опублікувати</button></form>
-          <form action={moderateReviewAction}><input type="hidden" name="reviewId" value={review.id} /><input type="hidden" name="status" value="rejected" /><button className="ghost-pill" type="submit">Приховати</button></form>
+          {review.status === ReviewStatus.pending || (review.status === ReviewStatus.approved && !review.moderatedAt) ? <form action={moderateReviewAction}><input type="hidden" name="reviewId" value={review.id} /><input type="hidden" name="status" value="approved" /><button className="accent-pill" type="submit">{review.status === ReviewStatus.pending ? "Опублікувати" : "Підтвердити"}</button></form> : null}
+          {review.status !== ReviewStatus.rejected && !review.moderatedAt ? <form action={moderateReviewAction}><input type="hidden" name="reviewId" value={review.id} /><input type="hidden" name="status" value="rejected" /><button className="ghost-pill" type="submit">Приховати</button></form> : null}
           <form action={deleteReviewAction}><input type="hidden" name="reviewId" value={review.id} /><button className="ghost-pill" type="submit">Видалити назавжди</button></form>
         </div>
       </section>

@@ -4,6 +4,7 @@ import { defaultTelegramUrl, publicPaymentNote } from "@/lib/constants";
 import { deleteUploadFile } from "@/lib/storage";
 import { formatPrice, slugify } from "@/lib/utils";
 import { effectiveUnitPrice, isSaleActive, productPricePresentation } from "@/lib/pricing";
+import { moderateReview } from "@/lib/review-moderation";
 import {
   buildAnalyticsReport,
   getAnalyticsQueryStart,
@@ -579,10 +580,26 @@ export async function getAdminReview(id: number) {
 }
 
 export async function setReviewStatus(id: number, status: ReviewStatus) {
-  return prisma.review.update({
-    where: { id },
-    data: { status, moderatedAt: new Date() },
-  });
+  return moderateReview({
+    async getState(reviewId) {
+      const review = await prisma.review.findUnique({
+        where: { id: reviewId },
+        select: { status: true, moderatedAt: true },
+      });
+      return review ? { status: review.status, moderatedAt: review.moderatedAt } : null;
+    },
+    async transition(reviewId, from, to, moderatedAt, requireUnmoderated) {
+      const changed = await prisma.review.updateMany({
+        where: {
+          id: reviewId,
+          status: from,
+          ...(requireUnmoderated ? { moderatedAt: null } : {}),
+        },
+        data: { status: to, moderatedAt },
+      });
+      return changed.count > 0;
+    },
+  }, id, status === ReviewStatus.approved ? "approve" : "reject");
 }
 
 export async function deleteReview(id: number) {

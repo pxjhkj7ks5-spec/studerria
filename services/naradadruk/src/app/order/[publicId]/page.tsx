@@ -23,6 +23,7 @@ export default async function OrderPage({ params }: { params: Promise<{ publicId
   const [settings, order] = await Promise.all([getSiteSettings(), getOrderByPublicId(publicId)]);
   if (!order) notFound();
   const destination = order.deliveryMethod === "courier" ? order.courierAddress : order.deliveryDestination;
+  const isManualOrder = order.source === "manual";
 
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
@@ -41,7 +42,7 @@ export default async function OrderPage({ params }: { params: Promise<{ publicId
             <div className="order-summary__items">
               {order.items.map((item) => (
                 <article key={item.id}>
-                  <div><a href={item.productUrl}>{item.productTitle}</a>{item.variantLabel ? <span>{item.variantLabel}</span> : null}<small>{item.quantity} × {item.regularUnitPrice > item.unitPrice ? <><del className="old-price">{formatPrice(item.regularUnitPrice)}</del> {formatPrice(item.unitPrice)}</> : formatPrice(item.unitPrice)}</small></div>
+                  <div>{item.productUrl ? <a href={item.productUrl}>{item.productTitle}</a> : <span>{item.productTitle}</span>}{item.variantLabel ? <span>{item.variantLabel}</span> : null}<small>{item.quantity} × {item.regularUnitPrice > item.unitPrice ? <><del className="old-price">{formatPrice(item.regularUnitPrice)}</del> {formatPrice(item.unitPrice)}</> : formatPrice(item.unitPrice)}</small></div>
                   <strong>{formatPrice(item.totalPrice)}</strong>
                 </article>
               ))}
@@ -58,12 +59,18 @@ export default async function OrderPage({ params }: { params: Promise<{ publicId
               <div><dt>Одержувач</dt><dd>{order.firstName} {order.lastName}</dd></div>
               <div><dt>Телефон</dt><dd>{order.phone}</dd></div>
               <div><dt>Telegram</dt><dd>{order.telegramContact}</dd></div>
-              <div><dt>Доставка</dt><dd>{deliveryLabels[order.deliveryMethod]}</dd></div>
-              <div><dt>Місто</dt><dd>{order.cityName}</dd></div>
-              <div><dt>Точка</dt><dd>{destination}</dd></div>
-              <div><dt>Оплата</dt><dd>{paymentLabels[order.paymentMethod]}</dd></div>
+              {isManualOrder ? (
+                <div><dt>Відділення / адреса Нової пошти</dt><dd>{order.deliveryDestination}</dd></div>
+              ) : (
+                <>
+                  <div><dt>Доставка</dt><dd>{deliveryLabels[order.deliveryMethod]}</dd></div>
+                  <div><dt>Місто</dt><dd>{order.cityName}</dd></div>
+                  <div><dt>Точка</dt><dd>{destination}</dd></div>
+                  <div><dt>Оплата</dt><dd>{paymentLabels[order.paymentMethod]}</dd></div>
+                </>
+              )}
             </dl>
-            {order.paymentMethod === "transfer" ? <div className="payment-note"><strong>Що далі</strong><p>Реквізити для оплати надійдуть після підтвердження замовлення.</p></div> : null}
+            {!isManualOrder && order.paymentMethod === "transfer" ? <div className="payment-note"><strong>Що далі</strong><p>Реквізити для оплати надійдуть після підтвердження замовлення.</p></div> : null}
           </section>
         </div>
 

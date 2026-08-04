@@ -19,6 +19,16 @@ import {
   type ProductContentPackage,
 } from "../src/lib/product-content-package";
 import { moderateReview, type ReviewModerationStatus } from "../src/lib/review-moderation";
+import {
+  applyManualOrderText,
+  buildManualOrderCreateData,
+  chooseManualOrderKind,
+  createManualOrderSession,
+  selectManualCatalogItem,
+  type ManualCatalogItem,
+  type ManualOrderSession,
+} from "../src/lib/manual-order";
+import { effectiveUnitPrice } from "../src/lib/pricing";
 
 type TelegramUser = { id: number };
 type TelegramChat = { id: number; type: string };
@@ -112,7 +122,6 @@ type DownloadedImage = {
 
 const prisma = new PrismaClient();
 const sessions = new Map<string, DraftSession>();
-type ManualOrderSession = { step: "contact" | "items" | "amount" | "delivery" | "payment" | "confirm"; name: string; contact: string; items: string; amount: number; delivery: string; payment: "cash_on_delivery" | "transfer" };
 const manualOrders = new Map<string, ManualOrderSession>();
 const awaitingOrderComments = new Map<string, string>();
 type MarketplaceSession = { productId: number | null; postUrl: string | null };
@@ -133,6 +142,7 @@ const maxImages = 6;
 const maxImageAttempts = 12;
 const maxImageBytes = 8 * 1024 * 1024;
 const maxTotalImageBytes = 24 * 1024 * 1024;
+const manualCatalogPageSize = 8;
 const userAgent =
   "Mozilla/5.0 (compatible; NaradaDrukMakerWorldBot/1.0; +https://t.me/naradaprint)";
 
@@ -1292,21 +1302,128 @@ async function changeOrderStatus(publicId: string, nextStatus: keyof typeof orde
   });
 }
 
+function manualCancelKeyboard() {
+  return { inline_keyboard: [[{ text: "Скасувати", callback_data: "manual:cancel" }]] };
+}
+
+function manualKindKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "Товар із каталогу", callback_data: "manual:kind:catalog" }],
+      [{ text: "Унікальне замовлення", callback_data: "manual:kind:unique" }],
+      [{ text: "Скасувати", callback_data: "manual:cancel" }],
+    ],
+  };
+}
+
+function manualSelectionText(session: ManualOrderSession) {
+  if (!session.selection) return "Не вибрано";
+  if (session.selection.kind === "unique") return session.selection.description;
+  return [session.selection.item.productTitle, session.selection.item.variantLabel].filter(Boolean).join(" — ");
+}
+
+function manualSelectionPrice(session: ManualOrderSession) {
+  if (!session.selection) return 0;
+  return session.selection.kind === "unique"
+    ? session.selection.agreedPrice
+    : session.selection.item.unitPrice;
+}
+
+async function showManualOrderSummary(chatId: string, session: ManualOrderSession) {
+  await sendMessage(chatId, [
+    "<b>Перевірте ручне замовлення</b>",
+    `<b>Клієнт:</b> ${escapeHtml(session.customerName)}`,
+    `<b>Телефон:</b> ${escapeHtml(session.phone)}`,
+    `<b>Telegram:</b> ${escapeHtml(session.telegramContact)}`,
+    `<b>Нова пошта:</b> ${escapeHtml(session.deliveryText)}`,
+    `<b>Товар:</b> ${escapeHtml(manualSelectionText(session))}`,
+    `<b>Сума:</b> ${money(manualSelectionPrice(session))}`,
+  ].join("\n"), {
+    inline_keyboard: [
+      [{ text: "Створити", callback_data: "manual:confirm" }],
+      [{ text: "Скасувати", callback_data: "manual:cancel" }],
+    ],
+  });
+}
+
+async function getManualCatalogItems(): Promise<ManualCatalogItem[]> {
+  const products = await prisma.product.findMany({
+    where: { status: ProductStatus.published, category: { isVisible: true } },
+    include: { variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { title: "asc" }],
+  });
+  return products.flatMap<ManualCatalogItem>((product) => {
+    if (product.variants.length > 0) {
+      return product.variants.map((variant) => ({
+        productId: product.id,
+        productSlug: product.slug,
+        productTitle: product.title,
+        productUrl: absoluteSiteUrl(`/product/${encodeURIComponent(product.slug)}`),
+        variantId: variant.id,
+        variantLabel: variant.label,
+        unitPrice: effectiveUnitPrice(product, variant.price, false),
+        regularUnitPrice: variant.price,
+      }));
+    }
+    if (product.basePrice === null || product.basePrice < 0) return [];
+    return [{
+      productId: product.id,
+      productSlug: product.slug,
+      productTitle: product.title,
+      productUrl: absoluteSiteUrl(`/product/${encodeURIComponent(product.slug)}`),
+      variantId: null,
+      variantLabel: "",
+      unitPrice: effectiveUnitPrice(product, product.basePrice, true),
+      regularUnitPrice: product.basePrice,
+    }];
+  });
+}
+
+async function showManualCatalog(chatId: string, requestedPage = 0) {
+  const items = await getManualCatalogItems();
+  if (items.length === 0) {
+    await sendMessage(chatId, "У каталозі зараз немає доступних товарів із ціною.", manualKindKeyboard());
+    return;
+  }
+  const pageCount = Math.ceil(items.length / manualCatalogPageSize);
+  const page = Math.min(Math.max(requestedPage, 0), pageCount - 1);
+  const pageItems = items.slice(page * manualCatalogPageSize, (page + 1) * manualCatalogPageSize);
+  const navigation = [
+    ...(page > 0 ? [{ text: "← Назад", callback_data: `manual:catalog:page:${page - 1}` }] : []),
+    ...(page + 1 < pageCount ? [{ text: "Далі →", callback_data: `manual:catalog:page:${page + 1}` }] : []),
+  ];
+  await sendMessage(chatId, `<b>Оберіть товар із каталогу</b>\nСторінка ${page + 1} з ${pageCount}`, {
+    inline_keyboard: [
+      ...pageItems.map((item) => [{
+        text: shortText(`${item.productTitle}${item.variantLabel ? ` — ${item.variantLabel}` : ""} · ${money(item.unitPrice)}`, 60),
+        callback_data: `manual:catalog:item:${item.productId}:${item.variantId ?? 0}`,
+      }]),
+      ...(navigation.length ? [navigation] : []),
+      [{ text: "Скасувати", callback_data: "manual:cancel" }],
+    ],
+  });
+}
+
 async function startManualOrder(chatId: string) {
-  manualOrders.set(chatId, { step: "contact", name: "", contact: "", items: "", amount: 0, delivery: "", payment: "transfer" });
-  await sendMessage(chatId, "<b>Ручне замовлення</b>\nНадішліть ім’я та контакт через вертикальну риску.\nНаприклад: <code>Олена | @olena або +380…</code>", { inline_keyboard: [[{ text: "Скасувати", callback_data: "manual:cancel" }]] });
+  manualOrders.set(chatId, createManualOrderSession());
+  await sendMessage(chatId, "<b>Ручне замовлення</b>\nКрок 1 із 4: надішліть імʼя клієнта.", manualCancelKeyboard());
 }
 
 async function createManualOrder(chatId: string, session: ManualOrderSession) {
-  const [firstName, ...lastParts] = session.name.split(/\s+/);
   const order = await prisma.order.create({
-    data: { publicId: randomUUID(), source: "manual", firstName: firstName || "Клієнт", lastName: lastParts.join(" "), comment: session.delivery, phone: session.contact, telegramContact: session.contact, cityName: "Ручне замовлення", deliveryMethod: "courier", deliveryDestination: session.delivery, courierAddress: session.delivery, paymentMethod: session.payment, subtotal: session.amount, total: session.amount,
-      items: { create: { productSlug: "", productTitle: session.items, productUrl: "", quantity: 1, unitPrice: session.amount, regularUnitPrice: session.amount, totalPrice: session.amount } },
-      events: { create: { eventType: "created", toStatus: "new", comment: "Створено власником у Telegram", actor: "telegram" } },
-    }, include: { items: true },
+    data: buildManualOrderCreateData(session, randomUUID()),
+    include: { items: true },
   });
   manualOrders.delete(chatId);
   await showOrderCard(chatId, order.publicId);
+  const customerUrl = absoluteSiteUrl(`/order/${encodeURIComponent(order.publicId)}`);
+  await sendMessage(chatId, [
+    "<b>Посилання для покупця</b>",
+    "Перешліть покупцю це повідомлення або посилання:",
+    escapeHtml(customerUrl),
+  ].join("\n"), {
+    inline_keyboard: [[{ text: "Відкрити сторінку замовлення", url: customerUrl }]],
+  });
 }
 
 function isAuthorizedOwnerChat(message: TelegramMessage, actorId = message.from?.id) {
@@ -1533,6 +1650,10 @@ async function handleMessage(message: TelegramMessage) {
     return;
   }
   if (command?.command === "manual") {
+    if (message.chat.type !== "private") {
+      await sendMessage(chatId, "Команда /manual доступна лише в приватному чаті адміністратора з ботом.");
+      return;
+    }
     await startManualOrder(chatId);
     return;
   }
@@ -1587,29 +1708,25 @@ async function handleMessage(message: TelegramMessage) {
       await sendMessage(chatId, "Створення ручного замовлення скасовано.");
       return;
     }
-    if (manual.step === "contact") {
-      const [name, contact] = message.text.split("|").map((value) => cleanText(value || "", 120));
-      if (!name || !contact) { await sendMessage(chatId, "Використайте формат <code>Ім’я | контакт</code> або /cancel."); return; }
-      Object.assign(manual, { name, contact, step: "items" as const });
-      await sendMessage(chatId, "Опишіть товар або склад замовлення одним повідомленням (до 500 символів)."); return;
+    const result = applyManualOrderText(manual, message.text);
+    if (!result.ok) {
+      await sendMessage(chatId, `${escapeHtml(result.error)}\n/cancel — скасувати.`);
+      return;
     }
-    if (manual.step === "items") {
-      const items = cleanText(message.text, 500);
-      if (items.length < 3) { await sendMessage(chatId, "Опис товару закороткий."); return; }
-      Object.assign(manual, { items, step: "amount" as const });
-      await sendMessage(chatId, "Вкажіть загальну суму в гривнях одним числом. Якщо ще невідома — надішліть <code>0</code>."); return;
+    manualOrders.set(chatId, result.session);
+    if (result.session.step === "phone") {
+      await sendMessage(chatId, "Крок 2 із 4: надішліть номер телефону клієнта.", manualCancelKeyboard());
+    } else if (result.session.step === "telegram") {
+      await sendMessage(chatId, "Крок 3 із 4: надішліть Telegram-контакт клієнта — username або номер.", manualCancelKeyboard());
+    } else if (result.session.step === "delivery") {
+      await sendMessage(chatId, "Крок 4 із 4: введіть відділення або адресу Нової пошти звичайним текстом.", manualCancelKeyboard());
+    } else if (result.session.step === "kind") {
+      await sendMessage(chatId, "Оберіть тип товару для замовлення.", manualKindKeyboard());
+    } else if (result.session.step === "unique_price") {
+      await sendMessage(chatId, "Вкажіть погоджену з клієнтом ціну у гривнях одним цілим числом.", manualCancelKeyboard());
+    } else if (result.session.step === "confirm") {
+      await showManualOrderSummary(chatId, result.session);
     }
-    if (manual.step === "amount") {
-      const amount = Number(message.text.replace(/\s|грн/gi, ""));
-      if (!Number.isInteger(amount) || amount < 0 || amount > 10_000_000) { await sendMessage(chatId, "Вкажіть цілу суму від 0 до 10 000 000 грн."); return; }
-      Object.assign(manual, { amount, step: "delivery" as const });
-      await sendMessage(chatId, "Додайте спосіб/адресу доставки або іншу примітку для виконання."); return;
-    }
-    if (manual.step === "delivery") {
-      Object.assign(manual, { delivery: cleanText(message.text, 500), step: "payment" as const });
-      await sendMessage(chatId, "Оберіть спосіб оплати.", { inline_keyboard: [[{ text: "Переказ після підтвердження", callback_data: "manual:payment:transfer" }, { text: "Післяплата", callback_data: "manual:payment:cash_on_delivery" }], [{ text: "Скасувати", callback_data: "manual:cancel" }]] }); return;
-    }
-    await sendMessage(chatId, "Завершіть дію кнопками в попередньому повідомленні або /cancel.");
     return;
   }
 
@@ -1830,6 +1947,10 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     return;
   }
   if (callback.data === "manual:start") {
+    if (message.chat.type !== "private") {
+      await answerCallback(callback.id, "Лише в приватному чаті.");
+      return;
+    }
     await answerCallback(callback.id);
     await startManualOrder(chatId);
     return;
@@ -1875,19 +1996,48 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     return;
   }
   if (callback.data?.startsWith("manual:")) {
-    const [, action, value] = callback.data.split(":");
+    const [, action, value, extra] = callback.data.split(":");
     const manual = manualOrders.get(chatId);
     if (action === "cancel") {
       manualOrders.delete(chatId);
       await answerCallback(callback.id, "Скасовано.");
       return;
     }
+    if (message.chat.type !== "private") { await answerCallback(callback.id, "Лише в приватному чаті."); return; }
     if (!manual) { await answerCallback(callback.id, "Чернетка вже неактуальна."); return; }
-    if (action === "payment" && ["transfer", "cash_on_delivery"].includes(value)) {
-      manual.payment = value as ManualOrderSession["payment"];
-      manual.step = "confirm";
+    if (action === "kind" && ["catalog", "unique"].includes(value) && manual.step === "kind") {
+      const next = chooseManualOrderKind(manual, value as "catalog" | "unique");
+      manualOrders.set(chatId, next);
       await answerCallback(callback.id);
-      await sendMessage(chatId, [`<b>Перевірте ручне замовлення</b>`, `Клієнт: ${escapeHtml(manual.name)} · ${escapeHtml(manual.contact)}`, `Товар: ${escapeHtml(manual.items)}`, `Сума: ${money(manual.amount)}`, `Доставка/примітка: ${escapeHtml(manual.delivery)}`, `Оплата: ${paymentText[manual.payment]}`].join("\n"), { inline_keyboard: [[{ text: "Створити", callback_data: "manual:confirm" }, { text: "Скасувати", callback_data: "manual:cancel" }]] });
+      if (next.step === "catalog") await showManualCatalog(chatId);
+      else await sendMessage(chatId, "Опишіть унікальний товар або роботу одним повідомленням.", manualCancelKeyboard());
+      return;
+    }
+    if (action === "catalog" && value === "page" && manual.step === "catalog") {
+      const page = Number(extra);
+      await answerCallback(callback.id);
+      await showManualCatalog(chatId, Number.isSafeInteger(page) ? page : 0);
+      return;
+    }
+    if (action === "catalog" && value === "item" && manual.step === "catalog") {
+      const productId = Number(extra);
+      const variantId = Number(callback.data.split(":")[4]);
+      if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(variantId) || variantId < 0) {
+        await answerCallback(callback.id, "Некоректний товар.");
+        return;
+      }
+      const item = (await getManualCatalogItems()).find((entry) =>
+        entry.productId === productId && (entry.variantId ?? 0) === variantId,
+      );
+      if (!item) {
+        await answerCallback(callback.id, "Товар уже недоступний.");
+        await showManualCatalog(chatId);
+        return;
+      }
+      const next = selectManualCatalogItem(manual, item);
+      manualOrders.set(chatId, next);
+      await answerCallback(callback.id, "Товар вибрано.");
+      await showManualOrderSummary(chatId, next);
       return;
     }
     if (action === "confirm" && manual.step === "confirm") {
@@ -1901,26 +2051,35 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (callback.data?.startsWith("review:")) {
     const [, action, rawId] = callback.data.split(":");
     const reviewId = Number(rawId);
-    if (!Number.isInteger(reviewId) || !["approve", "reject", "delete"].includes(action)) {
+    if (!Number.isInteger(reviewId) || !["approve", "reject"].includes(action)) {
       await answerCallback(callback.id, "Некоректна дія.");
       return;
     }
     const moderationAction = action === "approve" ? "approve" : "reject";
     const outcome = await moderateReview({
-      async getStatus(id) {
-        const review = await prisma.review.findUnique({ where: { id }, select: { status: true } });
-        return review?.status as ReviewModerationStatus | undefined ?? null;
+      async getState(id) {
+        const review = await prisma.review.findUnique({
+          where: { id },
+          select: { status: true, moderatedAt: true },
+        });
+        return review
+          ? { status: review.status as ReviewModerationStatus, moderatedAt: review.moderatedAt }
+          : null;
       },
-      async transition(id, from, to, moderatedAt) {
+      async transition(id, from, to, moderatedAt, requireUnmoderated) {
         const changed = await prisma.review.updateMany({
-          where: { id, status: from as ReviewStatus },
+          where: {
+            id,
+            status: from as ReviewStatus,
+            ...(requireUnmoderated ? { moderatedAt: null } : {}),
+          },
           data: { status: to as ReviewStatus, moderatedAt },
         });
         return changed.count > 0;
       },
     }, reviewId, moderationAction);
 
-    if (moderationAction === "reject" && (outcome === "hidden" || outcome === "already_hidden")) {
+    if (["published", "confirmed", "already_confirmed", "hidden", "already_hidden", "rejection_locked"].includes(outcome)) {
       await telegramJson("editMessageReplyMarkup", {
         chat_id: chatId,
         message_id: message.message_id,
@@ -1930,9 +2089,11 @@ async function handleCallback(callback: TelegramCallbackQuery) {
 
     const moderationMessages = {
       published: "Відгук опубліковано.",
-      already_published: "Відгук уже опубліковано.",
+      confirmed: "Відгук підтверджено.",
+      already_confirmed: "Відгук уже підтверджено.",
       hidden: "Відгук приховано.",
       already_hidden: "Відгук уже приховано.",
+      rejection_locked: "Після підтвердження відгук не можна відхилити.",
       missing: "Відгук не знайдено.",
       conflict: "Стан відгуку змінився. Спробуйте ще раз.",
     };
