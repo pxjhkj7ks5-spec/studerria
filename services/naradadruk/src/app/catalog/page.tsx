@@ -55,17 +55,33 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     baseUrl: settings.telegramUrl,
     intent: "custom",
   });
+  const productList = !query && !categorySlug && products.length > 0
+    ? {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "Каталог Narada Druk",
+        itemListElement: products.map((product, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          url: absoluteSiteUrl(`/product/${product.slug}`),
+          name: product.title,
+        })),
+      }
+    : null;
 
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
-      <StructuredData data={{
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: siteName, item: absoluteSiteUrl() },
-          { "@type": "ListItem", position: 2, name: "Каталог", item: absoluteSiteUrl("/catalog") },
-        ],
-      }} />
+      <StructuredData data={[
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: siteName, item: absoluteSiteUrl() },
+            { "@type": "ListItem", position: 2, name: "Каталог", item: absoluteSiteUrl("/catalog") },
+          ],
+        },
+        ...(productList ? [productList] : []),
+      ]} />
       <main className="catalog-page">
         <section className="site-container catalog-hero">
           <div>

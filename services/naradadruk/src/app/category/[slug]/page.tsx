@@ -60,18 +60,34 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     baseUrl: settings.telegramUrl,
     intent: "custom",
   });
+  const productList = products.length > 0
+    ? {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: `${category.name} — Narada Druk`,
+        itemListElement: products.map((product, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          url: absoluteSiteUrl(`/product/${product.slug}`),
+          name: product.title,
+        })),
+      }
+    : null;
 
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
-      <StructuredData data={{
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: siteName, item: absoluteSiteUrl() },
-          { "@type": "ListItem", position: 2, name: "Каталог", item: absoluteSiteUrl("/catalog") },
-          { "@type": "ListItem", position: 3, name: category.name, item: absoluteSiteUrl(`/category/${category.slug}`) },
-        ],
-      }} />
+      <StructuredData data={[
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: siteName, item: absoluteSiteUrl() },
+            { "@type": "ListItem", position: 2, name: "Каталог", item: absoluteSiteUrl("/catalog") },
+            { "@type": "ListItem", position: 3, name: category.name, item: absoluteSiteUrl(`/category/${category.slug}`) },
+          ],
+        },
+        ...(productList ? [productList] : []),
+      ]} />
       <main className="catalog-page">
         <section className="site-container category-hero">
           <a className="back-link" href={withBasePath("/catalog")}>
