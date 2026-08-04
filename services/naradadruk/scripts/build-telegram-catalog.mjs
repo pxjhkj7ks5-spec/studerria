@@ -81,7 +81,14 @@ const productDefinitions = [
   { postId: 71, title: "Глушник PBS-1 для АК/AR", slug: "glushnyk-pbs-1-ak-ar", categorySlug: "strajkbol", basePrice: 325, isFeatured: true },
   { postId: 73, title: "Кріплення GoPro Gen II", slug: "kriplennia-gopro-gen-2", categorySlug: "strajkbol", basePrice: 155 },
   { postId: 76, title: "RIS-планка M-LOK — Picatinny", slug: "ris-planka-m-lok-picatinny", categorySlug: "strajkbol", basePrice: 90, isFeatured: true },
-  { postId: 78, title: "Райзер під коліматор", slug: "raizer-pid-kolimator", categorySlug: "strajkbol", basePrice: 250 },
+  {
+    postId: 78,
+    title: "Райзер під коліматор",
+    slug: "raizer-pid-kolimator",
+    categorySlug: "strajkbol",
+    basePrice: 250,
+    sourceModelUrl: "https://makerworld.com/ru/models/759436-red-dot-riser-air-soft?from=search#profileId-693952",
+  },
   { postId: 82, title: "Стенд для HyperX QuadCast", slug: "stend-hyperx-quadcast", categorySlug: "inshe", basePrice: 380, isFeatured: true },
   {
     postId: 85,
@@ -151,6 +158,7 @@ function buildProduct(definition, post, sortOrder) {
     materialNote: "",
     deliveryNote: "",
     paymentNote: "",
+    ...(definition.sourceModelUrl ? { sourceModelUrl: definition.sourceModelUrl } : {}),
     sortOrder,
     variants,
     images: post.photos.map((photo, index) => ({

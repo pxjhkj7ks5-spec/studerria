@@ -10,7 +10,7 @@ import {
   type AnalyticsRange,
 } from "@/lib/analytics-report";
 
-const publicProductSelect = {
+export const publicProductSelect = {
   id: true,
   title: true,
   slug: true,

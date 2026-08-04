@@ -24,6 +24,7 @@ type CatalogProduct = {
   materialNote: string;
   deliveryNote: string;
   paymentNote: string;
+  sourceModelUrl?: string;
   sortOrder: number;
   variants: Array<{
     label: string;
@@ -137,6 +138,9 @@ async function importProduct(
         materialNote: product.materialNote,
         deliveryNote: product.deliveryNote,
         paymentNote: product.paymentNote,
+        ...(product.sourceModelUrl !== undefined
+          ? { sourceModelUrl: product.sourceModelUrl }
+          : {}),
         sortOrder: product.sortOrder,
         sourceTelegramChannel: product.source?.channel ?? null,
         sourceTelegramMessageId: product.source?.messageId ?? null,
@@ -159,6 +163,7 @@ async function importProduct(
         materialNote: product.materialNote,
         deliveryNote: product.deliveryNote,
         paymentNote: product.paymentNote,
+        sourceModelUrl: product.sourceModelUrl ?? "",
         sortOrder: product.sortOrder,
         sourceTelegramChannel: product.source?.channel ?? null,
         sourceTelegramMessageId: product.source?.messageId ?? null,
