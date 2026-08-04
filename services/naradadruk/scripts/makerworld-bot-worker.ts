@@ -35,6 +35,14 @@ import {
   isOwnerAdminGroup,
   type OwnerBotAccess,
 } from "../src/lib/manual-order-entry";
+import {
+  advanceOwnerBotTransient,
+  clearOwnerBotTransient,
+  completeOwnerBotTransient,
+  rememberOwnerBotCorrection,
+  type OwnerBotTransientScope,
+  type OwnerBotTransientStates,
+} from "../src/lib/owner-bot-transient-messages";
 
 type TelegramUser = { id: number };
 type TelegramChat = { id: number; type: string };
@@ -129,9 +137,10 @@ type DownloadedImage = {
 const prisma = new PrismaClient();
 const sessions = new Map<string, DraftSession>();
 const manualOrders = new Map<string, ManualOrderSession>();
-const awaitingOrderComments = new Map<string, string>();
+const awaitingOrderComments = new Map<string, { publicId: string; cardMessageId: number }>();
 type MarketplaceSession = { productId: number | null; postUrl: string | null };
 const marketplaceSessions = new Map<string, MarketplaceSession>();
+const ownerBotTransientStates: OwnerBotTransientStates = new Map();
 let dashboardMessageId: number | null = null;
 const botToken = process.env.NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN?.trim() || "";
 const ownerChatId = process.env.NARADADRUK_ORDER_TELEGRAM_CHAT_ID?.trim() || "";
@@ -327,6 +336,27 @@ async function sendMessage(chatId: string, text: string, replyMarkup?: Record<st
     disable_web_page_preview: true,
     ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
   });
+}
+
+async function deleteOwnerMessage(chatId: string, messageId: number) {
+  await telegramJson("deleteMessage", { chat_id: chatId, message_id: messageId });
+}
+
+async function sendTransientPrompt(
+  scope: OwnerBotTransientScope,
+  chatId: string,
+  triggerMessageId: number,
+  text: string,
+  replyMarkup?: Record<string, unknown>,
+) {
+  return advanceOwnerBotTransient(
+    ownerBotTransientStates,
+    scope,
+    chatId,
+    triggerMessageId,
+    () => sendMessage(chatId, text, replyMarkup),
+    deleteOwnerMessage,
+  );
 }
 
 async function answerCallback(id: string, text?: string) {
@@ -844,9 +874,16 @@ async function getMarketplaceProduct(productId: number) {
   });
 }
 
-async function sendMarketplaceCopy(chatId: string, product: MarketplaceProduct, postUrl: string) {
-  await sendMessage(chatId, marketplaceCopyText(product, postUrl));
+async function sendMarketplaceCopy(chatId: string, product: MarketplaceProduct, postUrl: string, triggerMessageId: number) {
   marketplaceSessions.delete(chatId);
+  await completeOwnerBotTransient(
+    ownerBotTransientStates,
+    "marketplace",
+    chatId,
+    triggerMessageId,
+    () => sendMessage(chatId, marketplaceCopyText(product, postUrl)),
+    deleteOwnerMessage,
+  );
 }
 
 async function attachMarketplacePost(product: MarketplaceProduct, rawUrl: string) {
@@ -881,14 +918,21 @@ async function recentMarketplaceProducts() {
   });
 }
 
-async function showMarketplaceProducts(chatId: string, intro: string) {
+async function showMarketplaceProducts(chatId: string, intro: string, triggerMessageId: number) {
   const products = await recentMarketplaceProducts();
   if (products.length === 0) {
     marketplaceSessions.delete(chatId);
-    await sendMessage(chatId, "Опублікованих товарів для репоста ще немає.");
+    await completeOwnerBotTransient(
+      ownerBotTransientStates,
+      "marketplace",
+      chatId,
+      triggerMessageId,
+      () => sendMessage(chatId, "Опублікованих товарів для репоста ще немає."),
+      deleteOwnerMessage,
+    );
     return;
   }
-  await sendMessage(chatId, intro, {
+  await sendTransientPrompt("marketplace", chatId, triggerMessageId, intro, {
     inline_keyboard: [
       ...products.map((product) => [{
         text: `${originalChannelPostUrl(product) ? "🔗" : "▫️"} ${shortText(product.title, 48)}`,
@@ -899,7 +943,7 @@ async function showMarketplaceProducts(chatId: string, intro: string) {
   });
 }
 
-async function startMarketplaceFlow(chatId: string, rawPostUrl = "") {
+async function startMarketplaceFlow(chatId: string, rawPostUrl: string, triggerMessageId: number) {
   if (rawPostUrl) {
     const parsed = parseConfiguredChannelPostUrl(rawPostUrl);
     const products = await recentMarketplaceProducts();
@@ -909,11 +953,11 @@ async function startMarketplaceFlow(chatId: string, rawPostUrl = "") {
         select: marketplaceProductSelect,
       });
     if (matched && originalChannelPostUrl(matched) === parsed.url) {
-      await sendMarketplaceCopy(chatId, matched, parsed.url);
+      await sendMarketplaceCopy(chatId, matched, parsed.url, triggerMessageId);
       return;
     }
     marketplaceSessions.set(chatId, { productId: null, postUrl: parsed.url });
-    await showMarketplaceProducts(chatId, "Посилання прийнято. Оберіть товар, до якого належить цей допис:");
+    await showMarketplaceProducts(chatId, "Посилання прийнято. Оберіть товар, до якого належить цей допис:", triggerMessageId);
     return;
   }
 
@@ -921,6 +965,7 @@ async function startMarketplaceFlow(chatId: string, rawPostUrl = "") {
   await showMarketplaceProducts(
     chatId,
     "Оберіть товар. Позначка 🔗 означає, що точне посилання на вихідний допис уже збережено:",
+    triggerMessageId,
   );
 }
 
@@ -967,7 +1012,18 @@ async function showPreview(session: DraftSession, includeAlbum = false) {
     "",
     "Редагування доступне кнопками або командами з /help. Потім /publish або /cancel.",
   ].join("\n");
-  await sendMessage(session.chatId, preview, editorKeyboard());
+  return sendMessage(session.chatId, preview, editorKeyboard());
+}
+
+async function showTransientPreview(session: DraftSession, triggerMessageId: number, includeAlbum = false) {
+  return advanceOwnerBotTransient(
+    ownerBotTransientStates,
+    "makerworld",
+    session.chatId,
+    triggerMessageId,
+    () => showPreview(session, includeAlbum),
+    deleteOwnerMessage,
+  );
 }
 
 async function syncDraft(session: DraftSession) {
@@ -1337,7 +1393,7 @@ function manualSelectionPrice(session: ManualOrderSession) {
 }
 
 async function showManualOrderSummary(chatId: string, session: ManualOrderSession) {
-  await sendMessage(chatId, [
+  return sendMessage(chatId, [
     "<b>Перевірте ручне замовлення</b>",
     `<b>Клієнт:</b> ${escapeHtml(session.customerName)}`,
     `<b>Телефон:</b> ${escapeHtml(session.phone)}`,
@@ -1389,8 +1445,7 @@ async function getManualCatalogItems(): Promise<ManualCatalogItem[]> {
 async function showManualCatalog(chatId: string, requestedPage = 0) {
   const items = await getManualCatalogItems();
   if (items.length === 0) {
-    await sendMessage(chatId, "У каталозі зараз немає доступних товарів із ціною.", manualKindKeyboard());
-    return;
+    return sendMessage(chatId, "У каталозі зараз немає доступних товарів із ціною.", manualKindKeyboard());
   }
   const pageCount = Math.ceil(items.length / manualCatalogPageSize);
   const page = Math.min(Math.max(requestedPage, 0), pageCount - 1);
@@ -1399,7 +1454,7 @@ async function showManualCatalog(chatId: string, requestedPage = 0) {
     ...(page > 0 ? [{ text: "← Назад", callback_data: `manual:catalog:page:${page - 1}` }] : []),
     ...(page + 1 < pageCount ? [{ text: "Далі →", callback_data: `manual:catalog:page:${page + 1}` }] : []),
   ];
-  await sendMessage(chatId, `<b>Оберіть товар із каталогу</b>\nСторінка ${page + 1} з ${pageCount}`, {
+  return sendMessage(chatId, `<b>Оберіть товар із каталогу</b>\nСторінка ${page + 1} з ${pageCount}`, {
     inline_keyboard: [
       ...pageItems.map((item) => [{
         text: shortText(`${item.productTitle}${item.variantLabel ? ` — ${item.variantLabel}` : ""} · ${money(item.unitPrice)}`, 60),
@@ -1411,25 +1466,41 @@ async function showManualCatalog(chatId: string, requestedPage = 0) {
   });
 }
 
-async function startManualOrder(chatId: string) {
-  await beginManualOrder(chatId, manualOrders, sendMessage);
+async function startManualOrder(chatId: string, triggerMessageId: number) {
+  await beginManualOrder(
+    chatId,
+    triggerMessageId,
+    manualOrders,
+    ownerBotTransientStates,
+    sendMessage,
+    deleteOwnerMessage,
+  );
 }
 
-async function createManualOrder(chatId: string, session: ManualOrderSession) {
+async function createManualOrder(chatId: string, session: ManualOrderSession, triggerMessageId: number) {
   const order = await prisma.order.create({
     data: buildManualOrderCreateData(session, randomUUID()),
     include: { items: true },
   });
   manualOrders.delete(chatId);
-  await showOrderCard(chatId, order.publicId);
-  const customerUrl = absoluteSiteUrl(`/order/${encodeURIComponent(order.publicId)}`);
-  await sendMessage(chatId, [
-    "<b>Посилання для покупця</b>",
-    "Перешліть покупцю це повідомлення або посилання:",
-    escapeHtml(customerUrl),
-  ].join("\n"), {
-    inline_keyboard: [[{ text: "Відкрити сторінку замовлення", url: customerUrl }]],
-  });
+  await completeOwnerBotTransient(
+    ownerBotTransientStates,
+    "manual",
+    chatId,
+    triggerMessageId,
+    async () => {
+      await showOrderCard(chatId, order.publicId);
+      const customerUrl = absoluteSiteUrl(`/order/${encodeURIComponent(order.publicId)}`);
+      await sendMessage(chatId, [
+        "<b>Посилання для покупця</b>",
+        "Перешліть покупцю це повідомлення або посилання:",
+        escapeHtml(customerUrl),
+      ].join("\n"), {
+        inline_keyboard: [[{ text: "Відкрити сторінку замовлення", url: customerUrl }]],
+      });
+    },
+    deleteOwnerMessage,
+  );
 }
 
 function isAuthorizedOwnerChat(message: TelegramMessage, actorId = message.from?.id) {
@@ -1441,13 +1512,12 @@ function splitCommand(text: string) {
   return match ? { command: match[1].toLowerCase(), argument: (match[2] || "").trim() } : null;
 }
 
-async function requestField(session: DraftSession, field: Exclude<AwaitingField, null>) {
+async function requestField(session: DraftSession, field: Exclude<AwaitingField, null>, triggerMessageId: number) {
   if (field === "images" && session.images.length === 0) {
     session.awaiting = null;
     await sendMessage(
       session.chatId,
       `Надішліть фото товару звичайним Telegram-фото. Можна додати до ${maxImages} фото по одному або альбомом.`,
-      editorKeyboard(),
     );
     return;
   }
@@ -1470,10 +1540,15 @@ async function requestField(session: DraftSession, field: Exclude<AwaitingField,
     images: `Надішліть номери фото, які слід залишити, наприклад: 1, 3, 4. Доступно: ${session.images.length}.`,
     price: "Надішліть ціну у гривнях одним числом, наприклад: 450.",
   };
-  await sendMessage(session.chatId, prompts[field]);
+  await sendTransientPrompt("makerworld", session.chatId, triggerMessageId, prompts[field]);
 }
 
-async function applyFieldValue(session: DraftSession, field: Exclude<AwaitingField, "url" | null>, raw: string) {
+async function applyFieldValue(
+  session: DraftSession,
+  field: Exclude<AwaitingField, "url" | null>,
+  raw: string,
+  triggerMessageId: number,
+) {
   if (field === "package") {
     const result = parseProductContentPackage(raw);
     if (!result.ok) throw new Error(result.errors.join("\n"));
@@ -1484,7 +1559,7 @@ async function applyFieldValue(session: DraftSession, field: Exclude<AwaitingFie
     if (result.warnings.length > 0) {
       await sendMessage(session.chatId, `Пакет прийнято з примітками:\n${escapeHtml(result.warnings.join("\n"))}`);
     }
-    await showPreview(session);
+    await showTransientPreview(session, triggerMessageId);
     return;
   }
   if (field === "title") {
@@ -1541,11 +1616,16 @@ async function applyFieldValue(session: DraftSession, field: Exclude<AwaitingFie
   }
   session.awaiting = null;
   await syncDraft(session);
-  await showPreview(session, field === "images");
+  await showTransientPreview(session, triggerMessageId, field === "images");
 }
 
-async function handleMakerWorldUrl(chatId: string, value: string) {
-  await sendMessage(chatId, "Отримую публічні дані MakerWorld і готую неопубліковану чернетку…");
+async function handleMakerWorldUrl(chatId: string, value: string, triggerMessageId: number) {
+  await sendTransientPrompt(
+    "makerworld",
+    chatId,
+    triggerMessageId,
+    "Отримую публічні дані MakerWorld і готую неопубліковану чернетку…",
+  );
   let sourceUrl = "";
   try {
     sourceUrl = parseMakerWorldUrl(value).toString();
@@ -1555,7 +1635,7 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
       ? `Збережено ${session.images.length} фото. Усі вибрані за замовчуванням.`
       : "Публічних фото не знайдено. Чернетку створено, але без фото її не можна опублікувати.";
     await sendMessage(chatId, `Чернетку #${session.draftProductId} створено. ${imageNote}`);
-    await showPreview(session, true);
+    await showTransientPreview(session, 0, true);
   } catch (error) {
     const message = error instanceof MakerWorldFetchError || error instanceof Error
       ? error.message
@@ -1605,16 +1685,30 @@ async function handleMakerWorldUrl(chatId: string, value: string) {
           ],
         }
       : undefined;
-    await sendMessage(
+    await completeOwnerBotTransient(
+      ownerBotTransientStates,
+      "makerworld",
       chatId,
-      `${guidance}\n\n${sourceUrl ? "Можна зберегти посилання як джерело й вставити весь готовий пакет одним повідомленням або заповнити чернетку покроково." : "Перевірте публічне посилання MakerWorld або надішліть інше."}`,
-      keyboard,
+      0,
+      () => sendMessage(
+        chatId,
+        `${guidance}\n\n${sourceUrl ? "Можна зберегти посилання як джерело й вставити весь готовий пакет одним повідомленням або заповнити чернетку покроково." : "Перевірте публічне посилання MakerWorld або надішліть інше."}`,
+        keyboard,
+      ),
+      deleteOwnerMessage,
     );
   }
 }
 
 async function handleMessage(message: TelegramMessage) {
-  if (await handleManualOrderTextUpdate(message, ownerBotAccess, manualOrders, sendMessage)) return;
+  if (await handleManualOrderTextUpdate(
+    message,
+    ownerBotAccess,
+    manualOrders,
+    ownerBotTransientStates,
+    sendMessage,
+    deleteOwnerMessage,
+  )) return;
   if (!isAuthorizedOwnerChat(message)) return;
   if (!message.text && message.caption) message.text = message.caption;
   const chatId = String(message.chat.id);
@@ -1628,8 +1722,10 @@ async function handleMessage(message: TelegramMessage) {
     const photo = [...message.photo].sort((left, right) => (right.width * right.height) - (left.width * left.height))[0];
     try {
       await addTelegramPhotoToDraft(session, photo);
-      await sendMessage(
+      await sendTransientPrompt(
+        "makerworld",
         chatId,
+        message.message_id,
         `Фото додано (${session.images.length}/${maxImages}). Надішліть ще фото або встановіть ціну й перевірте /preview.`,
         editorKeyboard(),
       );
@@ -1645,7 +1741,7 @@ async function handleMessage(message: TelegramMessage) {
 
   if (command && ["marketplace", "repost"].includes(command.command)) {
     try {
-      await startMarketplaceFlow(chatId, command.argument);
+      await startMarketplaceFlow(chatId, command.argument, message.message_id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Не вдалося підготувати репост.";
       await sendMessage(chatId, escapeHtml(shortText(errorMessage, 500)));
@@ -1662,11 +1758,24 @@ async function handleMessage(message: TelegramMessage) {
   if (marketplace) {
     if (command?.command === "cancel") {
       marketplaceSessions.delete(chatId);
-      await sendMessage(chatId, "Підготовку тексту для маркетплейсу скасовано.");
+      await completeOwnerBotTransient(
+        ownerBotTransientStates,
+        "marketplace",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, "Підготовку тексту для маркетплейсу скасовано."),
+        deleteOwnerMessage,
+      );
       return;
     }
     if (command) {
-      await sendMessage(chatId, "Оберіть товар кнопкою або надішліть публічне посилання на його допис. /cancel — скасувати.");
+      await rememberOwnerBotCorrection(
+        ownerBotTransientStates,
+        "marketplace",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, "Оберіть товар кнопкою або надішліть публічне посилання на його допис. /cancel — скасувати."),
+      );
       return;
     }
     try {
@@ -1674,30 +1783,59 @@ async function handleMessage(message: TelegramMessage) {
         const product = await getMarketplaceProduct(marketplace.productId);
         if (!product) throw new Error("Товар більше не опублікований або видалений.");
         const attached = await attachMarketplacePost(product, message.text);
-        await sendMarketplaceCopy(chatId, attached, originalChannelPostUrl(attached));
+        await sendMarketplaceCopy(chatId, attached, originalChannelPostUrl(attached), message.message_id);
       } else {
-        await startMarketplaceFlow(chatId, message.text);
+        await startMarketplaceFlow(chatId, message.text, message.message_id);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Не вдалося зберегти посилання на допис.";
-      await sendMessage(chatId, `${escapeHtml(shortText(errorMessage, 500))}\nНадішліть правильне посилання або /cancel.`);
+      await rememberOwnerBotCorrection(
+        ownerBotTransientStates,
+        "marketplace",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, `${escapeHtml(shortText(errorMessage, 500))}\nНадішліть правильне посилання або /cancel.`),
+      );
     }
     return;
   }
 
-  const commentOrderId = awaitingOrderComments.get(chatId);
-  if (commentOrderId) {
+  const commentOrder = awaitingOrderComments.get(chatId);
+  if (commentOrder) {
     if (command?.command === "cancel") {
       awaitingOrderComments.delete(chatId);
-      await sendMessage(chatId, "Додавання коментаря скасовано.");
+      await completeOwnerBotTransient(
+        ownerBotTransientStates,
+        "order-comment",
+        chatId,
+        message.message_id,
+        () => showOrderCard(chatId, commentOrder.publicId, commentOrder.cardMessageId),
+        deleteOwnerMessage,
+      );
       return;
     }
     const comment = cleanText(message.text, 1000);
-    if (comment.length < 2) { await sendMessage(chatId, "Коментар закороткий. Надішліть щонайменше 2 символи або /cancel."); return; }
-    const order = await prisma.order.findUnique({ where: { publicId: commentOrderId }, select: { id: true, status: true } });
+    if (comment.length < 2) {
+      await rememberOwnerBotCorrection(
+        ownerBotTransientStates,
+        "order-comment",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, "Коментар закороткий. Надішліть щонайменше 2 символи або /cancel."),
+      );
+      return;
+    }
+    const order = await prisma.order.findUnique({ where: { publicId: commentOrder.publicId }, select: { id: true, status: true } });
     if (order) await prisma.orderEvent.create({ data: { orderId: order.id, eventType: "comment", toStatus: order.status, comment, actor: "telegram" } });
     awaitingOrderComments.delete(chatId);
-    await showOrderCard(chatId, commentOrderId);
+    await completeOwnerBotTransient(
+      ownerBotTransientStates,
+      "order-comment",
+      chatId,
+      message.message_id,
+      () => showOrderCard(chatId, commentOrder.publicId, commentOrder.cardMessageId),
+      deleteOwnerMessage,
+    );
     return;
   }
 
@@ -1705,28 +1843,55 @@ async function handleMessage(message: TelegramMessage) {
   if (manual) {
     if (command?.command === "cancel") {
       manualOrders.delete(chatId);
-      await sendMessage(chatId, "Створення ручного замовлення скасовано.");
+      await completeOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, "Створення ручного замовлення скасовано."),
+        deleteOwnerMessage,
+      );
       return;
     }
     const result = applyManualOrderText(manual, message.text);
     if (!result.ok) {
-      await sendMessage(chatId, `${escapeHtml(result.error)}\n/cancel — скасувати.`);
+      await rememberOwnerBotCorrection(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, `${escapeHtml(result.error)}\n/cancel — скасувати.`),
+      );
       return;
     }
+    const sendNextPrompt = () => {
+      if (result.session.step === "phone") {
+        return sendMessage(chatId, "Крок 2 із 4: надішліть номер телефону клієнта.", manualCancelKeyboard());
+      }
+      if (result.session.step === "telegram") {
+        return sendMessage(chatId, "Крок 3 із 4: надішліть Telegram-контакт клієнта — username або номер.", manualCancelKeyboard());
+      }
+      if (result.session.step === "delivery") {
+        return sendMessage(chatId, "Крок 4 із 4: введіть відділення або адресу Нової пошти звичайним текстом.", manualCancelKeyboard());
+      }
+      if (result.session.step === "kind") {
+        return sendMessage(chatId, "Оберіть тип товару для замовлення.", manualKindKeyboard());
+      }
+      if (result.session.step === "unique_price") {
+        return sendMessage(chatId, "Вкажіть погоджену з клієнтом ціну у гривнях одним цілим числом.", manualCancelKeyboard());
+      }
+      if (result.session.step === "confirm") return showManualOrderSummary(chatId, result.session);
+      throw new Error("Unexpected manual-order text step.");
+    };
+    await advanceOwnerBotTransient(
+      ownerBotTransientStates,
+      "manual",
+      chatId,
+      message.message_id,
+      sendNextPrompt,
+      deleteOwnerMessage,
+    );
     manualOrders.set(chatId, result.session);
-    if (result.session.step === "phone") {
-      await sendMessage(chatId, "Крок 2 із 4: надішліть номер телефону клієнта.", manualCancelKeyboard());
-    } else if (result.session.step === "telegram") {
-      await sendMessage(chatId, "Крок 3 із 4: надішліть Telegram-контакт клієнта — username або номер.", manualCancelKeyboard());
-    } else if (result.session.step === "delivery") {
-      await sendMessage(chatId, "Крок 4 із 4: введіть відділення або адресу Нової пошти звичайним текстом.", manualCancelKeyboard());
-    } else if (result.session.step === "kind") {
-      await sendMessage(chatId, "Оберіть тип товару для замовлення.", manualKindKeyboard());
-    } else if (result.session.step === "unique_price") {
-      await sendMessage(chatId, "Вкажіть погоджену з клієнтом ціну у гривнях одним цілим числом.", manualCancelKeyboard());
-    } else if (result.session.step === "confirm") {
-      await showManualOrderSummary(chatId, result.session);
-    }
     return;
   }
 
@@ -1737,14 +1902,19 @@ async function handleMessage(message: TelegramMessage) {
 
   if (command?.command === "makerworld") {
     if (session) {
-      await sendMessage(chatId, "У вас уже є активна чернетка. Опублікуйте її або використайте /cancel.", editorKeyboard());
+      await sendMessage(chatId, "У вас уже є активна чернетка. Опублікуйте її або використайте /cancel.");
       return;
     }
     if (command.argument) {
-      await handleMakerWorldUrl(chatId, command.argument);
+      await handleMakerWorldUrl(chatId, command.argument, message.message_id);
       return;
     }
-    await sendMessage(chatId, "Надішліть публічне HTTPS-посилання на модель MakerWorld. /cancel — скасувати.");
+    await sendTransientPrompt(
+      "makerworld",
+      chatId,
+      message.message_id,
+      "Надішліть публічне HTTPS-посилання на модель MakerWorld. /cancel — скасувати.",
+    );
     sessions.set(chatId, {
       chatId,
       draftProductId: 0,
@@ -1782,16 +1952,31 @@ async function handleMessage(message: TelegramMessage) {
   if (command?.command === "cancel" && session) {
     if (session.draftProductId <= 0) {
       sessions.delete(chatId);
-      await sendMessage(chatId, "Дію скасовано. Можна почати знову командою /makerworld.");
+      await completeOwnerBotTransient(
+        ownerBotTransientStates,
+        "makerworld",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, "Дію скасовано. Можна почати знову командою /makerworld."),
+        deleteOwnerMessage,
+      );
     } else {
-      await sendMessage(chatId, escapeHtml(await cancelSession(session)));
+      const result = escapeHtml(await cancelSession(session));
+      await completeOwnerBotTransient(
+        ownerBotTransientStates,
+        "makerworld",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, result),
+        deleteOwnerMessage,
+      );
     }
     return;
   }
 
   if (session?.awaiting === "url") {
     sessions.delete(chatId);
-    await handleMakerWorldUrl(chatId, command?.argument || message.text);
+    await handleMakerWorldUrl(chatId, command?.argument || message.text, message.message_id);
     return;
   }
 
@@ -1804,11 +1989,10 @@ async function handleMessage(message: TelegramMessage) {
     try {
       if (session.manualSetup === "package") {
         session.manualSetup = null;
-        await applyFieldValue(session, "package", message.text);
+        await applyFieldValue(session, "package", message.text, message.message_id);
         await sendMessage(
           chatId,
           `Пакет розібрано в чернетку #${session.draftProductId}. Додайте фото, перевірте приватну цінову підказку та за потреби відредагуйте секції кнопками.`,
-          editorKeyboard(),
         );
         return;
       }
@@ -1817,7 +2001,12 @@ async function handleMessage(message: TelegramMessage) {
         if (title.length < 3) throw new Error("Назва має містити щонайменше 3 символи.");
         session.title = title;
         session.manualSetup = "description";
-        await sendMessage(chatId, "Надішліть повний опис для сторінки товару (щонайменше 20 символів). Джерельне посилання MakerWorld буде збережене окремо.");
+        await sendTransientPrompt(
+          "makerworld",
+          chatId,
+          message.message_id,
+          "Надішліть повний опис для сторінки товару (щонайменше 20 символів). Джерельне посилання MakerWorld буде збережене окремо.",
+        );
         return;
       }
 
@@ -1825,8 +2014,10 @@ async function handleMessage(message: TelegramMessage) {
       if (description.length < 20) throw new Error("Опис для сайту має містити щонайменше 20 символів.");
       session.siteDescription = description;
       await materializeManualDraft(session);
-      await sendMessage(
+      await sendTransientPrompt(
+        "makerworld",
         chatId,
+        message.message_id,
         `Чернетку #${session.draftProductId} створено й приховано від покупців. Тепер надішліть до ${maxImages} фото звичайним Telegram-фото, потім встановіть ціну та перевірте превʼю.`,
         editorKeyboard(),
       );
@@ -1845,7 +2036,7 @@ async function handleMessage(message: TelegramMessage) {
   }
 
   if (command?.command === "preview") {
-    await showPreview(session, true);
+    await showTransientPreview(session, message.message_id, true);
     return;
   }
 
@@ -1853,13 +2044,20 @@ async function handleMessage(message: TelegramMessage) {
     try {
       const { productUrl } = await publishProductPost(session);
       sessions.delete(chatId);
-      await sendMessage(chatId, `Готово: товар активний, а пост опублікований одним повідомленням.\n<a href="${escapeHtml(productUrl)}">Відкрити сторінку товару</a>`);
+      await completeOwnerBotTransient(
+        ownerBotTransientStates,
+        "makerworld",
+        chatId,
+        message.message_id,
+        () => sendMessage(chatId, `Готово: товар активний, а пост опублікований одним повідомленням.\n<a href="${escapeHtml(productUrl)}">Відкрити сторінку товару</a>`),
+        deleteOwnerMessage,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Не вдалося опублікувати товар.";
       const stateNote = session.publishedProductId
         ? "Товар уже активний на сайті, але Telegram-допис не підтверджено. Повторіть /publish."
         : "Чернетку збережено. Виправте налаштування або дані й повторіть /publish.";
-      await sendMessage(chatId, `${escapeHtml(shortText(message, 500))}\n${stateNote}`, editorKeyboard());
+      await sendMessage(chatId, `${escapeHtml(shortText(message, 500))}\n${stateNote}`);
     }
     return;
   }
@@ -1883,29 +2081,34 @@ async function handleMessage(message: TelegramMessage) {
   const field = command ? commandToField[command.command] : null;
   if (field) {
     if (!command?.argument) {
-      await requestField(session, field);
+      await requestField(session, field, message.message_id);
       return;
     }
     try {
-      await applyFieldValue(session, field, command.argument);
+      await applyFieldValue(session, field, command.argument, message.message_id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Некоректне значення.";
-      await sendMessage(chatId, escapeHtml(message), editorKeyboard());
+      await sendMessage(chatId, escapeHtml(message));
     }
     return;
   }
 
   if (session.awaiting) {
     try {
-      await applyFieldValue(session, session.awaiting as Exclude<AwaitingField, "url" | null>, message.text);
+      await applyFieldValue(
+        session,
+        session.awaiting as Exclude<AwaitingField, "url" | null>,
+        message.text,
+        message.message_id,
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Некоректне значення.";
-      await sendMessage(chatId, escapeHtml(errorMessage), editorKeyboard());
+      await sendMessage(chatId, escapeHtml(errorMessage));
     }
     return;
   }
 
-  await sendMessage(chatId, "Оберіть поле кнопкою або скористайтеся /help.", editorKeyboard());
+  await sendMessage(chatId, "Оберіть поле кнопкою або скористайтеся /help.");
 }
 
 async function handleCallback(callback: TelegramCallbackQuery) {
@@ -1931,12 +2134,27 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       await answerCallback(callback.id, result.changed ? "Статус оновлено." : "Кнопка вже неактуальна.");
       await showOrderCard(chatId, publicId, message.message_id);
     } else if (action === "comment") {
-      awaitingOrderComments.set(chatId, publicId);
+      awaitingOrderComments.set(chatId, { publicId, cardMessageId: message.message_id });
       await answerCallback(callback.id);
-      await sendMessage(chatId, `Надішліть внутрішній коментар для #${orderNumber(publicId)}. /cancel — скасувати.`);
+      await sendTransientPrompt(
+        "order-comment",
+        chatId,
+        0,
+        `Надішліть внутрішній коментар для #${orderNumber(publicId)}. /cancel — скасувати.`,
+      );
+      await telegramJson("editMessageReplyMarkup", {
+        chat_id: chatId,
+        message_id: message.message_id,
+        reply_markup: { inline_keyboard: [] },
+      }).catch(() => undefined);
     } else if (action === "close") {
       await answerCallback(callback.id);
-      await sendMessage(chatId, `Закрити замовлення #${orderNumber(publicId)}? Це прибере його з активного списку.`, { inline_keyboard: [[{ text: "Так, закрити", callback_data: `order:confirmclose:${publicId}` }, { text: "Назад", callback_data: `order:view:${publicId}` }]] });
+      await telegramJson("editMessageText", {
+        chat_id: chatId,
+        message_id: message.message_id,
+        text: `Закрити замовлення #${orderNumber(publicId)}? Це прибере його з активного списку.`,
+        reply_markup: { inline_keyboard: [[{ text: "Так, закрити", callback_data: `order:confirmclose:${publicId}` }, { text: "Назад", callback_data: `order:view:${publicId}` }]] },
+      });
     } else if (action === "confirmclose") {
       const result = await changeOrderStatus(publicId, "closed");
       await answerCallback(callback.id, result.changed ? "Замовлення закрито." : "Замовлення вже закрито або кнопка неактуальна.");
@@ -1952,12 +2170,19 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       return;
     }
     await answerCallback(callback.id);
-    await startManualOrder(chatId);
+    await startManualOrder(chatId, message.message_id);
     return;
   }
   if (callback.data === "marketplace:cancel") {
     marketplaceSessions.delete(chatId);
     await answerCallback(callback.id, "Скасовано.");
+    await clearOwnerBotTransient(
+      ownerBotTransientStates,
+      "marketplace",
+      chatId,
+      message.message_id,
+      deleteOwnerMessage,
+    );
     return;
   }
   if (callback.data?.startsWith("marketplace:product:")) {
@@ -1973,19 +2198,21 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       if (state?.postUrl) {
         const attached = await attachMarketplacePost(product, state.postUrl);
         await answerCallback(callback.id, "Товар вибрано.");
-        await sendMarketplaceCopy(chatId, attached, originalChannelPostUrl(attached));
+        await sendMarketplaceCopy(chatId, attached, originalChannelPostUrl(attached), message.message_id);
         return;
       }
       const savedPostUrl = originalChannelPostUrl(product);
       if (savedPostUrl) {
         await answerCallback(callback.id, "Текст підготовлено.");
-        await sendMarketplaceCopy(chatId, product, savedPostUrl);
+        await sendMarketplaceCopy(chatId, product, savedPostUrl, message.message_id);
         return;
       }
       marketplaceSessions.set(chatId, { productId, postUrl: null });
       await answerCallback(callback.id, "Потрібне посилання на допис.");
-      await sendMessage(
+      await sendTransientPrompt(
+        "marketplace",
         chatId,
+        message.message_id,
         `Для «${escapeHtml(product.title)}» ще немає точного посилання. Надішліть публічне посилання формату <code>https://t.me/${configuredPublicChannelUsername()}/123</code> або /cancel.`,
       );
     } catch (error) {
@@ -2001,22 +2228,44 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     if (action === "cancel") {
       manualOrders.delete(chatId);
       await answerCallback(callback.id, "Скасовано.");
+      await clearOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        deleteOwnerMessage,
+      );
       return;
     }
     if (!isOwnerAdminGroup(message, ownerBotAccess)) { await answerCallback(callback.id, "Лише в адміністраторському груповому чаті."); return; }
     if (!manual) { await answerCallback(callback.id, "Чернетка вже неактуальна."); return; }
     if (action === "kind" && ["catalog", "unique"].includes(value) && manual.step === "kind") {
       const next = chooseManualOrderKind(manual, value as "catalog" | "unique");
-      manualOrders.set(chatId, next);
       await answerCallback(callback.id);
-      if (next.step === "catalog") await showManualCatalog(chatId);
-      else await sendMessage(chatId, "Опишіть унікальний товар або роботу одним повідомленням.", manualCancelKeyboard());
+      await advanceOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => next.step === "catalog"
+          ? showManualCatalog(chatId)
+          : sendMessage(chatId, "Опишіть унікальний товар або роботу одним повідомленням.", manualCancelKeyboard()),
+        deleteOwnerMessage,
+      );
+      manualOrders.set(chatId, next);
       return;
     }
     if (action === "catalog" && value === "page" && manual.step === "catalog") {
       const page = Number(extra);
       await answerCallback(callback.id);
-      await showManualCatalog(chatId, Number.isSafeInteger(page) ? page : 0);
+      await advanceOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => showManualCatalog(chatId, Number.isSafeInteger(page) ? page : 0),
+        deleteOwnerMessage,
+      );
       return;
     }
     if (action === "catalog" && value === "item" && manual.step === "catalog") {
@@ -2035,14 +2284,21 @@ async function handleCallback(callback: TelegramCallbackQuery) {
         return;
       }
       const next = selectManualCatalogItem(manual, item);
-      manualOrders.set(chatId, next);
       await answerCallback(callback.id, "Товар вибрано.");
-      await showManualOrderSummary(chatId, next);
+      await advanceOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => showManualOrderSummary(chatId, next),
+        deleteOwnerMessage,
+      );
+      manualOrders.set(chatId, next);
       return;
     }
     if (action === "confirm" && manual.step === "confirm") {
       await answerCallback(callback.id, "Створюю замовлення.");
-      await createManualOrder(chatId, manual);
+      await createManualOrder(chatId, manual, message.message_id);
       return;
     }
     await answerCallback(callback.id, "Дія вже неактуальна.");
@@ -2105,8 +2361,15 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     session.awaiting = null;
     session.manualSetup = "package";
     await answerCallback(callback.id, "Готово до вставлення пакета.");
-    await sendMessage(
+    await telegramJson("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: message.message_id,
+      reply_markup: { inline_keyboard: [] },
+    }).catch(() => undefined);
+    await sendTransientPrompt(
+      "makerworld",
       chatId,
+      0,
       `Вставте весь пакет одним повідомленням. Невідомі дані залишайте порожніми або пишіть «невідомо».\n\n<pre>${escapeHtml(productContentPackageTemplate)}</pre>\n\n/cancel — скасувати.`,
     );
     return;
@@ -2115,7 +2378,17 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     session.awaiting = null;
     session.manualSetup = "title";
     await answerCallback(callback.id, "Переходимо до ручної чернетки.");
-    await sendMessage(chatId, "Надішліть назву товару (від 3 до 140 символів). /cancel — скасувати.");
+    await telegramJson("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: message.message_id,
+      reply_markup: { inline_keyboard: [] },
+    }).catch(() => undefined);
+    await sendTransientPrompt(
+      "makerworld",
+      chatId,
+      0,
+      "Надішліть назву товару (від 3 до 140 символів). /cancel — скасувати.",
+    );
     return;
   }
   if (callback.data === "mw:cancel" && session && session.draftProductId <= 0) {
@@ -2126,6 +2399,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       message_id: message.message_id,
       reply_markup: { inline_keyboard: [] },
     }).catch(() => undefined);
+    await clearOwnerBotTransient(ownerBotTransientStates, "makerworld", chatId, 0, deleteOwnerMessage);
     return;
   }
   if (!session || session.draftProductId <= 0) {
@@ -2136,7 +2410,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   const action = callback.data?.replace(/^mw:/, "") || "";
   await answerCallback(callback.id);
   if (action === "preview") {
-    await showPreview(session, true);
+    await showTransientPreview(session, message.message_id, true);
   } else if (action === "publish") {
     await handleMessage({ ...message, from: callback.from, text: "/publish" });
   } else if (action === "cancel") {
@@ -2157,7 +2431,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     "images",
     "price",
   ].includes(action)) {
-    await requestField(session, action as Exclude<AwaitingField, "url" | null>);
+    await requestField(session, action as Exclude<AwaitingField, "url" | null>, message.message_id);
   }
 }
 
