@@ -20,6 +20,7 @@ import {
 import { withBasePath } from "@/lib/base-path";
 import { publicPaymentNote, siteName } from "@/lib/constants";
 import { absoluteSiteUrl } from "@/lib/site-url";
+import { buildProductOffers } from "@/lib/product-structured-data";
 
 export const dynamic = "force-dynamic";
 
@@ -100,17 +101,14 @@ export default async function ProductPage({ params }: ProductPageProps) {
     { title: "Комплектація", body: product.packageContentsNote, list: false },
   ].filter((section) => section.body.trim());
   const productUrl = absoluteSiteUrl(`/product/${product.slug}`);
-  const offers = (product.variants.length > 0
+  const offers = buildProductOffers(product.variants.length > 0
     ? product.variants.map((variant) => ({ name: variant.label, price: variant.price }))
-    : typeof product.basePrice === "number" ? [{ name: product.title, price: product.basePrice }] : [])
-    .map((offer) => ({
-      "@type": "Offer",
-      url: productUrl,
-      name: offer.name,
-      priceCurrency: "UAH",
-      price: String(offer.price),
-      seller: { "@id": `${absoluteSiteUrl()}#organization` },
-    }));
+    : typeof product.basePrice === "number" ? [{ name: product.title, price: product.basePrice }] : [], {
+      productUrl,
+      sellerId: `${absoluteSiteUrl()}#organization`,
+      isOnSale: product.isOnSale,
+      saleEndsAt: product.saleEndsAt,
+    });
   const structuredProduct: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
