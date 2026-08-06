@@ -307,6 +307,14 @@ export function CartCheckout() {
         <button className="accent-pill accent-pill--large checkout-submit" type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Оформлюємо…" : `Оформити на ${formatPrice(promo?.total ?? total)}`}
         </button>
+        <div className="checkout-next-steps" aria-label="Що відбудеться після оформлення">
+          <strong>Що буде далі</strong>
+          <ul>
+            <li><Check aria-hidden size={14} /> Ми підтвердимо деталі замовлення в Telegram.</li>
+            <li><Check aria-hidden size={14} /> {paymentMethod === "transfer" ? "Реквізити для переказу надійдуть після підтвердження." : "Післяплата сплачується під час отримання."}</li>
+            <li><Check aria-hidden size={14} /> Доставку Нова пошта розраховує окремо за чинними тарифами.</li>
+          </ul>
+        </div>
         <p className="checkout-consent">Після оформлення ви побачите номер і статус замовлення.</p>
       </section>
     </form>

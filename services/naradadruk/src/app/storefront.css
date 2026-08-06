@@ -1512,6 +1512,42 @@
   cursor: wait;
 }
 
+.checkout-next-steps {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(53, 134, 82, 0.18);
+  border-radius: 0.95rem;
+  background: rgba(53, 134, 82, 0.06);
+  color: #285e3c;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.checkout-next-steps strong {
+  font-size: 0.76rem;
+}
+
+.checkout-next-steps ul {
+  display: grid;
+  gap: 0.36rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkout-next-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.38rem;
+}
+
+.checkout-next-steps svg {
+  flex: 0 0 auto;
+  margin-top: 0.12rem;
+}
+
 .checkout-consent {
   margin: 0.7rem 0 0;
   text-align: center;
