@@ -202,6 +202,52 @@ services:
       retries: 20
       start_period: 30s
 
+  ykg:
+    image: ${YKG_IMAGE:-ghcr.io/pxjhkj7ks5-spec/studerria-ykg:latest}
+    build:
+      context: ../../services/ykg
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_PATH: ${YKG_BASE_PATH:-/ykg}
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${YKG_NODE_ENV:-production}
+      HOSTNAME: 0.0.0.0
+      PORT: 8080
+      TZ: Europe/Kyiv
+      NEXT_PUBLIC_BASE_PATH: ${YKG_BASE_PATH:-/ykg}
+      YKG_PUBLIC_URL: ${YKG_PUBLIC_URL:-https://studerria.com/ykg}
+      DATABASE_URL: file:/data/ykg.db
+      UPLOAD_DIR: /data/uploads
+      ADMIN_PATH: ${YKG_ADMIN_PATH:-admin}
+      YKG_SESSION_SECRET: ${YKG_SESSION_SECRET:-}
+      YKG_BOOTSTRAP_TOKEN: ${YKG_BOOTSTRAP_TOKEN:-}
+      YKG_TELEGRAM_BOT_TOKEN: ${YKG_TELEGRAM_BOT_TOKEN:-}
+      YKG_TELEGRAM_CHAT_ID: ${YKG_TELEGRAM_CHAT_ID:-}
+      YKG_TELEGRAM_TOPIC_ID: ${YKG_TELEGRAM_TOPIC_ID:-}
+      YKG_NOVA_POSHTA_API_KEY: ${YKG_NOVA_POSHTA_API_KEY:-}
+      NEXT_PUBLIC_PLAUSIBLE_SCRIPT_SRC: ${YKG_PLAUSIBLE_SCRIPT_SRC:-}
+    volumes:
+      - ykg_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8080${YKG_BASE_PATH:-/ykg}/api/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   slashtg:
     image: ${SLASHTG_IMAGE:-ghcr.io/pxjhkj7ks5-spec/studerria-slashtg:latest}
     build:
@@ -515,6 +561,7 @@ services:
       CHARREDMAP_PROXY_TARGET: http://charredmap:8080
       CHINAMAP_PROXY_TARGET: http://china-map:8080
       NARADADRUK_PROXY_TARGET: http://naradadruk:8080
+      YKG_PROXY_TARGET: http://ykg:8080
       NARADADRUK_PUBLIC_HOST: ${NARADADRUK_PUBLIC_HOST:-}
       SLASHTG_PROXY_TARGET: http://slashtg:8080
       SLASHTG_BASE_PATH: ${SLASHTG_BASE_PATH:-/tg}
@@ -558,6 +605,7 @@ volumes:
   redis_data:
   charredmap_data:
   naradadruk_data:
+  ykg_data:
   slashtg_data:
   shieldline_control_data:
   osix_raw_snapshots:

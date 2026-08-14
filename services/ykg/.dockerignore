@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+Dockerfile
+README.md
+changelog.json
+*.log
+.env*
+uploads/*
+!uploads/.gitkeep
+public/uploads/*
+.data

@@ -1,0 +1,399 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffRole {
+  owner
+  manager
+}
+
+enum ProductStatus {
+  draft
+  published
+}
+
+enum OrderStatus {
+  new
+  accepted
+  shipped
+  completed
+  cancelled
+}
+
+enum OrderSource {
+  website
+  manual
+}
+
+enum DiscountType {
+  percentage
+  fixed
+}
+
+enum DeliveryMethod {
+  branch
+  parcel_locker
+  courier
+}
+
+enum PaymentMethod {
+  cash_on_delivery
+  transfer
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  skipped
+  failed
+}
+
+enum ReviewStatus {
+  pending
+  approved
+  rejected
+}
+
+enum StockMovementReason {
+  order_reserved
+  order_cancelled
+  manual_adjustment
+}
+
+model StaffUser {
+  id             Int          @id @default(autoincrement())
+  username       String       @unique
+  displayName    String
+  passwordHash   String
+  role           StaffRole    @default(manager)
+  telegramUserId String?      @unique
+  isActive       Boolean      @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  sessions       StaffSession[]
+  auditEvents    AuditEvent[]
+  orderEvents    OrderEvent[]
+  stockMovements StockMovement[]
+
+  @@index([isActive, role])
+}
+
+model StaffSession {
+  id        Int       @id @default(autoincrement())
+  tokenHash String    @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  user      StaffUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+model AuditEvent {
+  id          Int        @id @default(autoincrement())
+  staffUserId Int?
+  actorLabel  String
+  action      String
+  entityType  String
+  entityId    String
+  detailsJson String     @default("{}")
+  createdAt   DateTime   @default(now())
+  staffUser   StaffUser? @relation(fields: [staffUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([staffUserId, createdAt])
+}
+
+model SiteSetting {
+  id            Int      @id
+  heroTitle     String
+  heroSubtitle  String
+  supportTitle  String
+  supportBody   String
+  materialsNote String
+  leadTimeNote  String
+  deliveryNote  String
+  paymentNote   String
+  telegramUrl   String
+  contactNote   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique
+  description String    @default("")
+  sortOrder   Int       @default(0)
+  isVisible   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id                  Int             @id @default(autoincrement())
+  title               String
+  slug                String          @unique
+  categoryId          Int
+  shortDescription    String          @default("")
+  fullDescription     String          @default("")
+  telegramDescription String          @default("")
+  useCaseNote         String          @default("")
+  benefitsNote        String          @default("")
+  specificationsNote String          @default("")
+  compatibilityNote   String          @default("")
+  packageContentsNote String          @default("")
+  status              ProductStatus   @default(draft)
+  isFeatured          Boolean         @default(false)
+  basePrice           Int?
+  priceFrom           Boolean         @default(false)
+  saleEnabled         Boolean         @default(false)
+  salePrice           Int?
+  salePercent         Int?
+  saleStartsAt        DateTime?
+  saleEndsAt          DateTime?
+  stockQuantity       Int             @default(0)
+  leadTime            String          @default("")
+  materialNote        String          @default("")
+  deliveryNote        String          @default("")
+  paymentNote         String          @default("")
+  sourceUrl           String          @default("")
+  sortOrder           Int             @default(0)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  category            Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants            ProductVariant[]
+  images              ProductImage[]
+  orderItems          OrderItem[]
+  stockMovements      StockMovement[]
+}
+
+model ProductVariant {
+  id             Int             @id @default(autoincrement())
+  productId      Int
+  label          String
+  price          Int
+  description    String          @default("")
+  stockQuantity  Int             @default(0)
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
+
+  @@index([productId, sortOrder])
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  fileName  String
+  urlPath   String
+  alt       String   @default("")
+  sortOrder Int      @default(0)
+  isCover   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model Order {
+  id                  Int                @id @default(autoincrement())
+  publicId            String             @unique
+  status              OrderStatus        @default(new)
+  source              OrderSource        @default(website)
+  firstName           String
+  lastName            String
+  comment             String             @default("")
+  phone               String
+  telegramContact     String
+  cityName            String
+  cityRef             String             @default("")
+  deliveryMethod      DeliveryMethod
+  deliveryDestination String
+  destinationRef      String             @default("")
+  courierAddress      String             @default("")
+  paymentMethod       PaymentMethod
+  subtotal            Int                @default(0)
+  saleDiscountAmount  Int                @default(0)
+  discountAmount      Int                @default(0)
+  promoCodeId         Int?
+  promoCodeSnapshot   String             @default("")
+  promoTypeSnapshot   DiscountType?
+  promoValueSnapshot  Int?
+  total               Int
+  currency            String             @default("UAH")
+  notificationStatus  NotificationStatus @default(pending)
+  notificationError   String             @default("")
+  telegramMessageId   Int?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  items               OrderItem[]
+  events              OrderEvent[]
+  review              Review?
+  promoCode           PromoCode?         @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  stockMovements      StockMovement[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([source, createdAt])
+  @@index([promoCodeId])
+}
+
+model OrderItem {
+  id                 Int             @id @default(autoincrement())
+  orderId            Int
+  productId          Int?
+  productSlug        String
+  productTitle       String
+  productUrl         String
+  variantId          Int?
+  variantLabel       String          @default("")
+  quantity           Int
+  unitPrice          Int
+  regularUnitPrice   Int             @default(0)
+  saleDiscountAmount Int             @default(0)
+  totalPrice         Int
+  createdAt          DateTime        @default(now())
+  order              Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product            Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant            ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  stockMovements     StockMovement[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model OrderEvent {
+  id          Int        @id @default(autoincrement())
+  orderId     Int
+  eventType   String
+  fromStatus  String     @default("")
+  toStatus    String     @default("")
+  comment     String     @default("")
+  actor       String     @default("system")
+  staffUserId Int?
+  isPublic    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  staffUser   StaffUser? @relation(fields: [staffUserId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([staffUserId, createdAt])
+}
+
+model StockMovement {
+  id             Int                 @id @default(autoincrement())
+  idempotencyKey String              @unique
+  productId      Int
+  variantId      Int?
+  orderId        Int?
+  orderItemId    Int?
+  staffUserId    Int?
+  delta          Int
+  balanceAfter   Int
+  reason         StockMovementReason
+  note           String              @default("")
+  createdAt      DateTime            @default(now())
+  product        Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant        ProductVariant?     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order          Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItem      OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  staffUser      StaffUser?          @relation(fields: [staffUserId], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([variantId, createdAt])
+  @@index([orderId, createdAt])
+}
+
+model PromoCode {
+  id         Int          @id @default(autoincrement())
+  code       String       @unique
+  type       DiscountType
+  value      Int
+  usageLimit Int?
+  useCount   Int          @default(0)
+  expiresAt  DateTime?
+  enabled    Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  orders     Order[]
+
+  @@index([enabled, expiresAt])
+}
+
+model AnalyticsEvent {
+  id          Int      @id @default(autoincrement())
+  name        String
+  path        String   @default("")
+  location    String   @default("")
+  intent      String   @default("")
+  productSlug String   @default("")
+  category    String   @default("")
+  sessionId   String   @default("")
+  value       Int      @default(0)
+  itemCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([name, createdAt])
+  @@index([productSlug, createdAt])
+}
+
+model AnalyticsIpExclusion {
+  id          Int      @id @default(autoincrement())
+  addressHash String   @unique
+  addressHint String
+  label       String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model Review {
+  id                 Int                @id @default(autoincrement())
+  displayName        String             @default("")
+  isAnonymous        Boolean            @default(false)
+  body               String
+  status             ReviewStatus       @default(pending)
+  ipHash             String
+  contentHash        String
+  notificationStatus NotificationStatus @default(pending)
+  notificationError  String             @default("")
+  telegramMessageId  Int?
+  orderId            Int?               @unique
+  verifiedPurchase   Boolean            @default(false)
+  moderatedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  images             ReviewImage[]
+  order              Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([contentHash, createdAt])
+}
+
+model ReviewImage {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int
+  fileName  String
+  urlPath   String
+  alt       String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+}

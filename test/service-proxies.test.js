@@ -147,6 +147,24 @@ test('shieldline child paths are claimed by service middleware', async () => {
   assert.equal(res.body, 'Not found');
 });
 
+test('ykg proxy path is claimed by its isolated service middleware', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, { env: {}, logger: { error() {} } });
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/ykg', url: '/ykg' }, res);
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body, 'Not found');
+});
+
+test('ykg proxy does not claim a similar prefix', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, { env: {}, logger: { error() {} } });
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/ykg-old', url: '/ykg-old' }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body, '');
+});
+
 test('naradadruk public host normalization accepts a hostname and rejects a URL', () => {
   assert.equal(normalizePublicHost(' NaradaDruk.Studerria.com '), 'naradadruk.studerria.com');
   assert.equal(normalizePublicHost('https://naradadruk.studerria.com'), '');

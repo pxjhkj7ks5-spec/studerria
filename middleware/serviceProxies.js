@@ -3,6 +3,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const CHARREDMAP_BASE_PATH = '/charredmap';
 const CHINAMAP_BASE_PATH = '/china-map';
 const NARADADRUK_BASE_PATH = '/naradadruk';
+const YKG_BASE_PATH = '/ykg';
 const WITHLFORL_BASE_PATH = '/withlforl';
 const OSIX_BASE_PATH = '/osix';
 const SHIELDLINE_BASE_PATH = '/shieldline';
@@ -128,6 +129,7 @@ function registerServiceProxies(app, deps = {}) {
   const charredmapProxyTarget = String(env.CHARREDMAP_PROXY_TARGET || '').trim();
   const chinaMapProxyTarget = String(env.CHINAMAP_PROXY_TARGET || '').trim();
   const naradadrukProxyTarget = String(env.NARADADRUK_PROXY_TARGET || '').trim();
+  const ykgProxyTarget = String(env.YKG_PROXY_TARGET || '').trim();
   const naradadrukPublicHost = normalizePublicHost(env.NARADADRUK_PUBLIC_HOST);
   const withlforlProxyTarget = String(env.WITHLFORL_PROXY_TARGET || '').trim();
   const osixProxyTarget = String(env.OSIX_PROXY_TARGET || '').trim();
@@ -162,6 +164,14 @@ function registerServiceProxies(app, deps = {}) {
     basePath: '',
     serviceName: 'Narada Druk',
     logLabel: 'Narada Druk public host',
+    logger,
+    forwardResolvedClientIp: true,
+  });
+  const ykgProxy = createServiceProxy({
+    target: ykgProxyTarget,
+    basePath: YKG_BASE_PATH,
+    serviceName: 'YKG Store',
+    logLabel: 'YKG Store',
     logger,
     forwardResolvedClientIp: true,
   });
@@ -243,6 +253,16 @@ function registerServiceProxies(app, deps = {}) {
       return respondServiceUnavailable(res, 'Narada Druk', 404);
     }
     return naradadrukProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (!isServiceRequest(req, YKG_BASE_PATH)) {
+      return next();
+    }
+    if (!ykgProxy) {
+      return respondServiceUnavailable(res, 'YKG Store', 404);
+    }
+    return ykgProxy(req, res, next);
   });
 
   app.use((req, res, next) => {

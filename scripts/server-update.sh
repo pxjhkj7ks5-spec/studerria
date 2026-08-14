@@ -23,6 +23,7 @@ Services:
   charredmap   /charredmap sidecar
   china-map    /china-map sidecar
   naradadruk   /naradadruk sidecar
+  ykg          /ykg sidecar
   slashtg      /tg sidecar
   withlforl    /withlforl sidecar
   osix         /osix sidecar
@@ -36,6 +37,7 @@ Examples:
   bash scripts/server-update.sh app
   bash scripts/server-update.sh charredmap
   bash scripts/server-update.sh naradadruk --pull
+  bash scripts/server-update.sh ykg --pull
   bash scripts/server-update.sh withlforl
   bash scripts/server-update.sh osix
   bash scripts/server-update.sh shieldline
@@ -48,6 +50,7 @@ normalize_service() {
     charredmap|charred-map) echo "charredmap" ;;
     china-map|chinamap|china) echo "china-map" ;;
     naradadruk|narada-druk) echo "naradadruk" ;;
+    ykg|young-killers-group|youngkillersgroup) echo "ykg" ;;
     slashtg|slash-tg|tg) echo "slashtg" ;;
     withlforl|with-l-for-l) echo "withlforl" ;;
     osix) echo "osix" ;;
@@ -187,6 +190,9 @@ backup_stateful_data() {
       ;;
     naradadruk)
       backup_compose_volume_mount naradadruk /data naradadruk-data
+      ;;
+    ykg)
+      backup_compose_volume_mount ykg /data ykg-data
       ;;
     slashtg)
       backup_compose_volume_mount slashtg /data slashtg-data
