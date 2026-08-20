@@ -8,6 +8,7 @@
   "scripts": {
     "test": "node --test",
     "start": "node app.js",
+    "preview:landing": "node scripts/landing-preview.js",
     "lint": "eslint .",
     "cleanup:audit": "node scripts/repo-cleanup-audit.js",
     "legacy:archive": "node scripts/legacy-archive.js --dry-run",

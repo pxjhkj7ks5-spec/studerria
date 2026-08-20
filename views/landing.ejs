@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="<%= landingLang %>" class="landing-no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="<%= copy.seo.description %>" />
+    <meta name="theme-color" content="#050505" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Studerria" />
+    <meta property="og:title" content="<%= copy.seo.title %>" />
+    <meta property="og:description" content="<%= copy.seo.description %>" />
+    <meta property="og:url" content="https://studerria.com/" />
+    <meta property="og:image" content="https://studerria.com/naradadruk/naradadruk-hero-v2.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="<%= copy.seo.title %>" />
+    <meta name="twitter:description" content="<%= copy.seo.description %>" />
+    <meta name="twitter:image" content="https://studerria.com/naradadruk/naradadruk-hero-v2.jpg" />
+    <link rel="canonical" href="https://studerria.com/" />
+    <link rel="alternate" hreflang="uk" href="https://studerria.com/?lang=uk" />
+    <link rel="alternate" hreflang="en" href="https://studerria.com/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://studerria.com/" />
+    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
+    <title><%= copy.seo.title %></title>
+    <link rel="stylesheet" href="/css/modal-enhanced.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/pages/landing.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <script type="application/ld+json"><%- JSON.stringify(structuredData).replace(/</g, '\\u003c') %></script>
+    <script>document.documentElement.classList.remove('landing-no-js'); document.documentElement.classList.add('landing-js');</script>
+  </head>
+  <body class="landing-page">
+    <a class="landing-skip-link" href="#products"><%= copy.hero.productsCta %></a>
+
+    <header class="landing-header" data-landing-header>
+      <a class="landing-brand" href="/" aria-label="Studerria">
+        <span class="landing-brand__mark" aria-hidden="true">S</span>
+        <span class="landing-brand__name">Studerria</span>
+        <span class="landing-brand__descriptor">digital products</span>
+      </a>
+
+      <button
+        class="landing-menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="landingNavigation"
+        aria-label="<%= copy.nav.menu %>"
+        data-menu-toggle
+        data-open-label="<%= copy.nav.menu %>"
+        data-close-label="<%= copy.nav.closeMenu %>"
+      >
+        <span></span>
+        <span></span>
+      </button>
+
+      <div class="landing-navigation" id="landingNavigation" data-navigation>
+        <nav class="landing-nav" aria-label="Studerria">
+          <a href="#products"><%= copy.nav.products %></a>
+          <a href="#team"><%= copy.nav.team %></a>
+          <a href="<%= platformUrl %>"><%= copy.nav.open %></a>
+        </nav>
+        <div class="landing-language" aria-label="<%= copy.nav.language %>">
+          <a href="/?lang=uk" lang="uk" <%= landingLang === 'uk' ? 'aria-current="page"' : '' %>>UA</a>
+          <span aria-hidden="true">/</span>
+          <a href="/?lang=en" lang="en" <%= landingLang === 'en' ? 'aria-current="page"' : '' %>>EN</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="landing-hero" aria-labelledby="landingHeroTitle">
+        <div class="landing-hero__media" aria-hidden="true">
+          <img
+            src="/naradadruk/naradadruk-hero-v2.jpg"
+            alt=""
+            width="1717"
+            height="916"
+            fetchpriority="high"
+            decoding="async"
+            data-hero-media
+          />
+        </div>
+        <div class="landing-hero__veil" aria-hidden="true"></div>
+        <div class="landing-hero__grid" aria-hidden="true"></div>
+
+        <div class="landing-hero__content">
+          <p class="landing-eyebrow landing-hero__eyebrow" data-hero-reveal><%= copy.hero.eyebrow %></p>
+          <h1 id="landingHeroTitle" data-hero-reveal>
+            <span><%= copy.hero.titleLead %></span>
+            <em><%= copy.hero.titleAccent %></em>
+          </h1>
+          <p class="landing-hero__description" data-hero-reveal><%= copy.hero.description %></p>
+          <div class="landing-actions" data-hero-reveal>
+            <a class="landing-action landing-action--primary" href="#products">
+              <span><%= copy.hero.productsCta %></span>
+              <span aria-hidden="true">↘</span>
+            </a>
+            <a class="landing-action landing-action--ghost" href="<%= platformUrl %>">
+              <span><%= copy.hero.platformCta %></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="landing-hero__index" aria-hidden="true" data-hero-reveal>
+          <span>01</span>
+          <span>06</span>
+        </div>
+        <a class="landing-scroll-cue" href="#landingIntro" data-hero-reveal>
+          <span><%= copy.hero.scroll %></span>
+          <span aria-hidden="true">↓</span>
+        </a>
+      </section>
+
+      <section class="landing-intro" id="landingIntro" data-reveal>
+        <p class="landing-eyebrow"><%= copy.intro.eyebrow %></p>
+        <div class="landing-intro__copy">
+          <h2><%= copy.intro.title %></h2>
+          <p><%= copy.intro.description %></p>
+        </div>
+      </section>
+
+      <section class="landing-products" id="products" aria-label="<%= copy.productsLabel %>">
+        <article class="product-story product-story--featured" id="naradadruk" data-reveal>
+          <div class="product-story__copy">
+            <div class="product-story__meta">
+              <span>01</span>
+              <span><%= copy.products.naradadruk.eyebrow %></span>
+            </div>
+            <h2><%= copy.products.naradadruk.title %></h2>
+            <p><%= copy.products.naradadruk.description %></p>
+            <div class="landing-actions">
+              <a class="landing-action landing-action--light" href="/naradadruk">
+                <span><%= copy.products.naradadruk.primaryCta %></span>
+                <span aria-hidden="true">↗</span>
+              </a>
+              <a class="landing-text-link" href="https://t.me/naradaprint" target="_blank" rel="noreferrer">
+                <span><%= copy.products.naradadruk.secondaryCta %></span>
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+          </div>
+          <figure class="product-story__media product-story__media--narada">
+            <img
+              src="/naradadruk/naradadruk-hero.webp"
+              alt="<%= copy.products.naradadruk.imageAlt %>"
+              width="1586"
+              height="992"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>NaradaDruk / current focus</figcaption>
+          </figure>
+        </article>
+
+        <article class="product-story product-story--platform" id="studerria-platform" data-reveal>
+          <div class="product-story__copy">
+            <div class="product-story__meta">
+              <span>02</span>
+              <span><%= copy.products.studerria.eyebrow %></span>
+            </div>
+            <h2><%= copy.products.studerria.title %></h2>
+            <p><%= copy.products.studerria.description %></p>
+            <a class="landing-text-link" href="<%= platformUrl %>">
+              <span><%= copy.products.studerria.primaryCta %></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div class="product-story__visual product-story__visual--platform" aria-hidden="true">
+            <div class="platform-orbit platform-orbit--one"></div>
+            <div class="platform-orbit platform-orbit--two"></div>
+            <img src="/assets/brand/studerria-mark-light-512.png" width="512" height="512" alt="" loading="lazy" />
+            <span class="platform-label platform-label--schedule">Schedule</span>
+            <span class="platform-label platform-label--day">My Day</span>
+            <span class="platform-label platform-label--team">Teamwork</span>
+          </div>
+        </article>
+
+        <article class="product-story product-story--telegram" id="studerria-telegram" data-reveal>
+          <div class="product-story__visual product-story__visual--telegram" aria-hidden="true">
+            <div class="telegram-phone">
+              <div class="telegram-phone__top"><span>Studerria</span><span>•••</span></div>
+              <div class="telegram-phone__hero">
+                <span>Today</span>
+                <strong><%= copy.products.telegram.visualTitle %></strong>
+              </div>
+              <div class="telegram-phone__line"><span>01</span><%= copy.products.telegram.visualLine1 %></div>
+              <div class="telegram-phone__line"><span>02</span><%= copy.products.telegram.visualLine2 %></div>
+              <div class="telegram-phone__button">Open Studerria ↗</div>
+            </div>
+          </div>
+          <div class="product-story__copy">
+            <div class="product-story__meta">
+              <span>03</span>
+              <span><%= copy.products.telegram.eyebrow %></span>
+            </div>
+            <h2><%= copy.products.telegram.title %></h2>
+            <p><%= copy.products.telegram.description %></p>
+            <a class="landing-text-link" href="https://t.me/studerria_bot" target="_blank" rel="noreferrer">
+              <span><%= copy.products.telegram.primaryCta %></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="product-story product-story--map" id="charredmap" data-reveal>
+          <div class="product-story__copy">
+            <div class="product-story__meta">
+              <span>04</span>
+              <span><%= copy.products.charredmap.eyebrow %></span>
+            </div>
+            <h2><%= copy.products.charredmap.title %></h2>
+            <p><%= copy.products.charredmap.description %></p>
+            <a class="landing-text-link" href="/charredmap">
+              <span><%= copy.products.charredmap.primaryCta %></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div class="product-story__visual product-story__visual--map" aria-hidden="true">
+            <div class="map-word">memory</div>
+            <span class="map-point map-point--one"></span>
+            <span class="map-point map-point--two"></span>
+            <span class="map-point map-point--three"></span>
+            <svg viewBox="0 0 720 460" focusable="false">
+              <path d="M65 307C119 272 132 201 208 218c69 16 102-84 170-44 58 34 78-41 146-13 60 25 64 87 132 95" />
+              <path d="M79 357c89-21 106 45 191 9 90-38 130 30 205-9 62-32 117 1 164-35" />
+            </svg>
+          </div>
+        </article>
+
+        <article class="product-story product-story--shieldline" id="shieldline" data-reveal>
+          <figure class="product-story__media product-story__media--shieldline">
+            <img
+              src="/shieldline/shieldline-logo-social.png"
+              alt="<%= copy.products.shieldline.imageAlt %>"
+              width="1254"
+              height="1254"
+              loading="lazy"
+              decoding="async"
+            />
+          </figure>
+          <div class="product-story__copy">
+            <div class="product-story__meta">
+              <span>05</span>
+              <span><%= copy.products.shieldline.eyebrow %></span>
+            </div>
+            <h2><%= copy.products.shieldline.title %></h2>
+            <p><%= copy.products.shieldline.description %></p>
+            <div class="landing-actions">
+              <a class="landing-action landing-action--light" href="/shieldline">
+                <span><%= copy.products.shieldline.primaryCta %></span>
+                <span aria-hidden="true">↗</span>
+              </a>
+              <a class="landing-text-link" href="https://t.me/ShieldLinebot" target="_blank" rel="noreferrer">
+                <span><%= copy.products.shieldline.secondaryCta %></span>
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+          </div>
+        </article>
+
+        <article class="product-story product-story--soon" id="ykg" data-reveal>
+          <div class="product-story__copy">
+            <div class="product-story__meta">
+              <span>06</span>
+              <span><%= copy.products.ykg.eyebrow %></span>
+            </div>
+            <h2><%= copy.products.ykg.title %></h2>
+            <p><%= copy.products.ykg.description %></p>
+            <span class="product-status"><span></span><%= copy.products.ykg.status %></span>
+          </div>
+          <div class="product-story__visual product-story__visual--soon" aria-hidden="true">
+            <span>Y</span><span>K</span><span>G</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="landing-manifesto" id="team" data-reveal>
+        <p class="landing-eyebrow"><%= copy.manifesto.eyebrow %></p>
+        <h2>
+          <span><%= copy.manifesto.titleLead %></span>
+          <em><%= copy.manifesto.titleAccent %></em>
+        </h2>
+        <div class="landing-manifesto__footer">
+          <p><%= copy.manifesto.description %></p>
+          <a class="landing-action landing-action--primary" href="<%= platformUrl %>">
+            <span><%= copy.manifesto.cta %></span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="landing-footer">
+      <div class="landing-footer__brand">
+        <strong>Studerria</strong>
+        <span><%= copy.footer.line %></span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/privacy"><%= copy.footer.privacy %></a>
+        <a href="/terms"><%= copy.footer.terms %></a>
+        <button type="button" data-auth-changelog-open><%= copy.footer.changelog %></button>
+      </nav>
+      <div class="landing-footer__meta">
+        <span><%= copy.footer.copyright %></span>
+        <span>v<%= appVersion %></span>
+      </div>
+    </footer>
+
+    <%- include('partials/auth-lite-changelog') %>
+    <script src="/js/landing.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
+  </body>
+</html>
