@@ -338,6 +338,33 @@ export function AnalyticsDashboard({
         <section>
           <div className="admin-detail-heading">
             <div>
+              <h3>Кампанії</h3>
+              <p>Переходи за посиланнями з <code>utm_campaign</code>.</p>
+            </div>
+          </div>
+          {report.topCampaigns.length > 0 ? (
+            <div className="admin-data-list">
+              {report.topCampaigns.map((campaign, index) => (
+                <div className="admin-data-row" key={campaign.key}>
+                  <span className="admin-data-row__index">{index + 1}</span>
+                  <div className="admin-data-row__main">
+                    <strong>{campaign.key}</strong>
+                    <span>Використовуйте ту саму назву в усіх посиланнях однієї кампанії.</span>
+                  </div>
+                  <div className="admin-data-row__value">{campaign.count}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="admin-empty-copy">
+              Додайте до посилання <code>?utm_campaign=instagram-organic</code>, щоб порівнювати органічні кампанії.
+            </p>
+          )}
+        </section>
+
+        <section>
+          <div className="admin-detail-heading">
+            <div>
               <h3>Товари з найбільшим інтересом</h3>
               <p>Відкриття карток і переходи до замовлення.</p>
             </div>

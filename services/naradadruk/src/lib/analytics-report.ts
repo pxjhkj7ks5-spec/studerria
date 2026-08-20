@@ -24,6 +24,7 @@ export type AnalyticsEventRecord = {
   id: number;
   name: string;
   path: string;
+  campaign: string;
   location: string;
   intent: string;
   productSlug: string;
@@ -285,6 +286,11 @@ export function buildAnalyticsReport(
     (event) => event.path,
   ).slice(0, 8);
 
+  const topCampaigns = countBy(
+    currentEvents,
+    (event) => event.campaign,
+  ).slice(0, 8);
+
   const commerce = {
     productOpens: currentEvents.filter((event) => event.name === "Product Open").length,
     addToCarts: current.addToCarts,
@@ -317,6 +323,7 @@ export function buildAnalyticsReport(
     actions,
     topProducts,
     topPages,
+    topCampaigns,
     recentEvents: [...currentEvents]
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice(0, 10),

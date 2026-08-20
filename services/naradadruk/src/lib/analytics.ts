@@ -16,6 +16,7 @@ export type AnalyticsEventName = (typeof analyticsEventNames)[number];
 export type PlausibleEventName = Exclude<AnalyticsEventName, "Page View">;
 
 export type PlausibleEventProps = Partial<{
+  campaign: string;
   location: string;
   intent: "product" | "custom" | "catalog";
   product_slug: string;
@@ -54,6 +55,19 @@ function getAnalyticsSessionId() {
   }
 }
 
+function getCampaign() {
+  try {
+    const campaign = new URLSearchParams(window.location.search)
+      .get("utm_campaign")
+      ?.trim()
+      .toLowerCase() ?? "";
+
+    return /^[a-z0-9][a-z0-9_-]{0,79}$/.test(campaign) ? campaign : "";
+  } catch {
+    return "";
+  }
+}
+
 function trackInternal(
   eventName: AnalyticsEventName,
   props?: PlausibleEventProps,
@@ -62,7 +76,7 @@ function trackInternal(
     name: eventName,
     path: window.location.pathname,
     sessionId: getAnalyticsSessionId(),
-    props,
+    props: { ...props, campaign: props?.campaign ?? getCampaign() },
   });
   const endpoint = withBasePath("/api/analytics");
 

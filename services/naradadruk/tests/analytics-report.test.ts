@@ -16,6 +16,7 @@ function event(
     id,
     name,
     path: "/naradadruk",
+    campaign: "",
     location: "",
     intent: "",
     productSlug: "",
@@ -165,4 +166,23 @@ test("buildAnalyticsReport identifies the weakest measured funnel stage", () => 
     message: "Перевірте фото, опис, ціну та помітність кнопки «У кошик».",
     rate: 0,
   });
+});
+
+test("buildAnalyticsReport ranks only labelled campaigns", () => {
+  const now = new Date("2026-08-07T09:00:00.000Z");
+  const report = buildAnalyticsReport(
+    [
+      event(1, "Page View", "2026-08-07T06:00:00.000Z", { campaign: "instagram-organic" }),
+      event(2, "Product Open", "2026-08-07T06:01:00.000Z", { campaign: "instagram-organic" }),
+      event(3, "Page View", "2026-08-07T06:02:00.000Z", { campaign: "telegram-post" }),
+      event(4, "Page View", "2026-08-07T06:03:00.000Z"),
+    ],
+    7,
+    now,
+  );
+
+  assert.deepEqual(report.topCampaigns, [
+    { key: "instagram-organic", count: 2 },
+    { key: "telegram-post", count: 1 },
+  ]);
 });

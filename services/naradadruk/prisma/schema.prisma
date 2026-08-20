@@ -290,6 +290,7 @@ model AnalyticsEvent {
   id          Int      @id @default(autoincrement())
   name        String
   path        String   @default("")
+  campaign    String   @default("")
   location    String   @default("")
   intent      String   @default("")
   productSlug String   @default("")
@@ -301,6 +302,7 @@ model AnalyticsEvent {
 
   @@index([createdAt])
   @@index([name, createdAt])
+  @@index([campaign, createdAt])
   @@index([productSlug, createdAt])
 }
 
