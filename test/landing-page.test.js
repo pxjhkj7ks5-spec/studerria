@@ -8,6 +8,7 @@ const {
   LANDING_PRODUCTS,
   registerPublicRoutes,
 } = require('../routes/publicRoutes');
+const { publicLegalPages } = require('../lib/legalPages');
 
 const projectRoot = path.resolve(__dirname, '..');
 const viewPath = path.join(projectRoot, 'views/landing.ejs');
@@ -45,7 +46,7 @@ async function renderLanding(lang) {
   );
   const html = await ejs.renderFile(viewPath, {
     ...rendered.locals,
-    appVersion: '1.12.69',
+    appVersion: '1.12.70',
     changelog: [],
     t: (key) => dictionary[key] || key,
   });
@@ -148,4 +149,41 @@ test('landing copy exists for every declared product in both languages', () => {
       assert.ok(LANDING_COPY[lang].products[product.id]);
     }
   }
+});
+
+test('landing uses the approved visual assets and keeps product headings intact', async () => {
+  const { html } = await renderLanding('uk');
+  const css = fs.readFileSync(path.join(projectRoot, 'public/css/pages/landing.css'), 'utf8');
+
+  assert.match(html, /studerria-team-hero-v2\.webp/);
+  assert.match(html, /studerria-mark-dark-512\.png/);
+  assert.match(html, /charredmap-mark\.webp/);
+  assert.match(html, /shieldline-mark\.svg/);
+  assert.match(html, /магазин, який наша команда розробляє для друзів/);
+  assert.match(css, /\.product-story--map h2[\s\S]*white-space:\s*nowrap/);
+  assert.match(css, /\.landing-page \.landing-action--light[\s\S]*color:\s*var\(--landing-black\)/);
+});
+
+test('public legal routes receive complete localized page copy', () => {
+  let legalHandler;
+  const app = {
+    get(route, handler) {
+      if (Array.isArray(route) && route.includes('/privacy')) legalHandler = handler;
+    },
+  };
+
+  registerPublicRoutes(app, {
+    getPreferredLang: () => 'uk',
+    buildLoginErrorMessage: () => '',
+    publicLegalPages,
+  });
+
+  let rendered;
+  legalHandler(
+    { path: '/privacy' },
+    { render(view, locals) { rendered = { view, locals }; } },
+  );
+  assert.equal(rendered.view, 'legal');
+  assert.equal(rendered.locals.legalTitle, 'Політика конфіденційності');
+  assert.ok(rendered.locals.legalSections.length > 0);
 });

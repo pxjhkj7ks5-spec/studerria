@@ -10,11 +10,11 @@
     <meta property="og:title" content="<%= copy.seo.title %>" />
     <meta property="og:description" content="<%= copy.seo.description %>" />
     <meta property="og:url" content="https://studerria.com/" />
-    <meta property="og:image" content="https://studerria.com/naradadruk/naradadruk-hero-v2.jpg" />
+    <meta property="og:image" content="https://studerria.com/assets/landing/studerria-team-hero-v2.webp" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="<%= copy.seo.title %>" />
     <meta name="twitter:description" content="<%= copy.seo.description %>" />
-    <meta name="twitter:image" content="https://studerria.com/naradadruk/naradadruk-hero-v2.jpg" />
+    <meta name="twitter:image" content="https://studerria.com/assets/landing/studerria-team-hero-v2.webp" />
     <link rel="canonical" href="https://studerria.com/" />
     <link rel="alternate" hreflang="uk" href="https://studerria.com/?lang=uk" />
     <link rel="alternate" hreflang="en" href="https://studerria.com/?lang=en" />
@@ -68,10 +68,10 @@
       <section class="landing-hero" aria-labelledby="landingHeroTitle">
         <div class="landing-hero__media" aria-hidden="true">
           <img
-            src="/naradadruk/naradadruk-hero-v2.jpg"
+            src="/assets/landing/studerria-team-hero-v2.webp"
             alt=""
-            width="1717"
-            height="916"
+            width="1672"
+            height="941"
             fetchpriority="high"
             decoding="async"
             data-hero-media
@@ -131,7 +131,7 @@
                 <span><%= copy.products.naradadruk.primaryCta %></span>
                 <span aria-hidden="true">↗</span>
               </a>
-              <a class="landing-text-link" href="https://t.me/naradaprint" target="_blank" rel="noreferrer">
+              <a class="landing-action landing-action--outline-light" href="https://t.me/naradaprint" target="_blank" rel="noreferrer">
                 <span><%= copy.products.naradadruk.secondaryCta %></span>
                 <span aria-hidden="true">↗</span>
               </a>
@@ -166,7 +166,7 @@
           <div class="product-story__visual product-story__visual--platform" aria-hidden="true">
             <div class="platform-orbit platform-orbit--one"></div>
             <div class="platform-orbit platform-orbit--two"></div>
-            <img src="/assets/brand/studerria-mark-light-512.png" width="512" height="512" alt="" loading="lazy" />
+            <img src="/assets/brand/studerria-mark-dark-512.png" width="512" height="512" alt="" loading="lazy" />
             <span class="platform-label platform-label--schedule">Schedule</span>
             <span class="platform-label platform-label--day">My Day</span>
             <span class="platform-label platform-label--team">Teamwork</span>
@@ -214,24 +214,20 @@
             </a>
           </div>
           <div class="product-story__visual product-story__visual--map" aria-hidden="true">
-            <div class="map-word">memory</div>
-            <span class="map-point map-point--one"></span>
-            <span class="map-point map-point--two"></span>
-            <span class="map-point map-point--three"></span>
-            <svg viewBox="0 0 720 460" focusable="false">
-              <path d="M65 307C119 272 132 201 208 218c69 16 102-84 170-44 58 34 78-41 146-13 60 25 64 87 132 95" />
-              <path d="M79 357c89-21 106 45 191 9 90-38 130 30 205-9 62-32 117 1 164-35" />
-            </svg>
+            <div class="map-brand-frame">
+              <img src="/assets/landing/charredmap-mark.webp" width="512" height="512" alt="" loading="lazy" />
+            </div>
+            <span class="map-visual-label">Charredmap / stories & places</span>
           </div>
         </article>
 
         <article class="product-story product-story--shieldline" id="shieldline" data-reveal>
           <figure class="product-story__media product-story__media--shieldline">
             <img
-              src="/shieldline/shieldline-logo-social.png"
+              src="/shieldline/shieldline-mark.svg"
               alt="<%= copy.products.shieldline.imageAlt %>"
-              width="1254"
-              height="1254"
+              width="64"
+              height="64"
               loading="lazy"
               decoding="async"
             />

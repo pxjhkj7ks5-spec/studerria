@@ -49,7 +49,7 @@ const LANDING_COPY = Object.freeze({
       description: 'Створюємо й розвиваємо цифрові продукти для навчання, творчості, торгівлі та взаємодії.',
       productsCta: 'Дивитися продукти',
       platformCta: 'Увійти в Studerria',
-      imageAlt: '3D-друкований виріб NaradaDruk у робочому середовищі',
+      imageAlt: 'Темна редакційна композиція, що поєднує різні цифрові продукти Studerria',
       scroll: 'Гортайте далі',
     },
     intro: {
@@ -99,7 +99,7 @@ const LANDING_COPY = Object.freeze({
       ykg: {
         eyebrow: 'Окремий магазин',
         title: 'YKG',
-        description: 'Самостійний storefront Young Killers Group. Перший публічний запуск ще готується.',
+        description: 'Окремий магазин, який наша команда розробляє для друзів. Публічний запуск ще готується.',
         status: 'Незабаром',
       },
     },
@@ -138,7 +138,7 @@ const LANDING_COPY = Object.freeze({
       description: 'We create and grow digital products for learning, making, commerce, and interaction.',
       productsCta: 'Explore products',
       platformCta: 'Open Studerria',
-      imageAlt: 'A NaradaDruk 3D-printed object in a working environment',
+      imageAlt: 'A dark editorial composition bringing together different Studerria digital products',
       scroll: 'Scroll to explore',
     },
     intro: {
@@ -188,7 +188,7 @@ const LANDING_COPY = Object.freeze({
       ykg: {
         eyebrow: 'Independent store',
         title: 'YKG',
-        description: 'A standalone Young Killers Group storefront. Its first public release is still in preparation.',
+        description: 'An independent store our team is building for friends. Its public launch is still in preparation.',
         status: 'Coming soon',
       },
     },

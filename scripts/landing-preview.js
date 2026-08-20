@@ -2,6 +2,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const express = require('express');
 const { registerPublicRoutes } = require('../routes/publicRoutes');
+const { publicLegalPages } = require('../lib/legalPages');
 
 const projectRoot = path.resolve(__dirname, '..');
 const app = express();
@@ -31,10 +32,7 @@ app.use((req, res, next) => {
 registerPublicRoutes(app, {
   getPreferredLang: (req) => (req.query.lang === 'en' ? 'en' : 'uk'),
   buildLoginErrorMessage: () => '',
-  publicLegalPages: {
-    uk: { privacy: {}, terms: {} },
-    en: { privacy: {}, terms: {} },
-  },
+  publicLegalPages,
 });
 
 app.listen(port, '127.0.0.1', () => {

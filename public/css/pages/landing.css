@@ -257,7 +257,7 @@ body.landing-page {
   height: 100%;
   object-fit: cover;
   object-position: 63% center;
-  filter: grayscale(1) contrast(1.17) brightness(0.7);
+  filter: saturate(0.86) contrast(1.12) brightness(0.76);
   transform: translate3d(0, var(--hero-shift), 0) scale(1.08);
   transition: transform 120ms linear;
 }
@@ -398,13 +398,25 @@ body.landing-page {
   border: 1px solid var(--landing-line);
 }
 
-.landing-action--light {
+.landing-page .landing-action--light {
   background: var(--landing-paper);
   color: var(--landing-black);
 }
 
-.landing-action--light span:last-child {
+.landing-page .landing-action--light span:last-child {
   background: var(--landing-red);
+  color: var(--landing-paper);
+}
+
+.landing-page .landing-action--outline-light {
+  border-color: rgba(243, 239, 232, 0.58);
+  background: rgba(5, 5, 5, 0.12);
+  color: var(--landing-paper);
+}
+
+.landing-page .landing-action--outline-light span:last-child {
+  border: 1px solid rgba(243, 239, 232, 0.4);
+  background: rgba(243, 239, 232, 0.1);
   color: var(--landing-paper);
 }
 
@@ -636,9 +648,13 @@ body.landing-page {
 
 .product-story__visual--platform img {
   z-index: 2;
-  width: min(35%, 15rem);
+  width: min(38%, 16rem);
   height: auto;
-  filter: drop-shadow(0 2rem 4rem rgba(0, 0, 0, 0.5));
+  border: 1px solid rgba(243, 239, 232, 0.16);
+  border-radius: clamp(1.65rem, 3vw, 2.6rem);
+  box-shadow:
+    0 2rem 5rem rgba(0, 0, 0, 0.56),
+    0 0 5rem rgba(228, 55, 46, 0.12);
 }
 
 .platform-orbit {
@@ -792,60 +808,71 @@ body.landing-page {
   background: #11100f;
 }
 
+.product-story--map h2 {
+  font-size: clamp(3.8rem, 6.7vw, 7.2rem);
+  white-space: nowrap;
+}
+
 .product-story__visual--map {
+  display: grid;
+  place-items: center;
   min-height: 38rem;
   background:
-    linear-gradient(rgba(243, 239, 232, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(243, 239, 232, 0.06) 1px, transparent 1px),
-    #191716;
-  background-size: 3.5rem 3.5rem;
+    radial-gradient(circle at 50% 47%, rgba(228, 55, 46, 0.16), transparent 39%),
+    linear-gradient(rgba(243, 239, 232, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(243, 239, 232, 0.045) 1px, transparent 1px),
+    #161311;
+  background-size: 100% 100%, 3.5rem 3.5rem, 3.5rem 3.5rem, 100% 100%;
 }
 
-.product-story__visual--map svg {
+.product-story__visual--map::before,
+.product-story__visual--map::after {
   position: absolute;
-  inset: 0;
+  border: 1px solid rgba(243, 239, 232, 0.12);
+  border-radius: 50%;
+  content: "";
+}
+
+.product-story__visual--map::before {
+  width: 72%;
+  aspect-ratio: 1;
+}
+
+.product-story__visual--map::after {
+  width: 94%;
+  aspect-ratio: 1;
+}
+
+.map-brand-frame {
+  position: relative;
+  z-index: 2;
+  width: min(48%, 20rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(243, 239, 232, 0.22);
+  border-radius: clamp(2rem, 4vw, 3.4rem);
+  box-shadow: 0 2.5rem 6rem rgba(0, 0, 0, 0.52);
+  transform: rotate(-3deg);
+}
+
+.map-brand-frame img {
   width: 100%;
   height: 100%;
-  fill: none;
-  stroke: rgba(243, 239, 232, 0.4);
-  stroke-dasharray: 6 9;
-  stroke-width: 1.2;
+  object-fit: cover;
+  filter: saturate(0.82) contrast(1.06) brightness(0.9);
+  transform: scale(1.02);
 }
 
-.map-word {
-  position: absolute;
-  right: -0.05em;
-  bottom: -0.13em;
-  color: rgba(243, 239, 232, 0.06);
-  font-size: clamp(7rem, 16vw, 16rem);
-  font-weight: 800;
-  letter-spacing: -0.08em;
-}
-
-.map-point {
+.map-visual-label {
   position: absolute;
   z-index: 2;
-  width: 0.85rem;
-  height: 0.85rem;
-  border: 3px solid #191716;
-  border-radius: 50%;
-  background: var(--landing-red);
-  box-shadow: 0 0 0 1px var(--landing-red), 0 0 0 1.3rem rgba(228, 55, 46, 0.12);
-}
-
-.map-point--one {
-  top: 34%;
-  left: 29%;
-}
-
-.map-point--two {
-  top: 52%;
-  left: 58%;
-}
-
-.map-point--three {
-  right: 18%;
-  bottom: 25%;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  color: var(--landing-paper-muted);
+  font-size: 0.62rem;
+  font-weight: 720;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .product-story--shieldline {
@@ -853,12 +880,19 @@ body.landing-page {
 }
 
 .product-story__media--shieldline {
-  background: #050505;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at center, rgba(246, 197, 71, 0.16), transparent 38%),
+    linear-gradient(145deg, #751b16, #46110f 72%);
+  padding: clamp(3rem, 7vw, 7rem);
 }
 
 .product-story__media--shieldline img {
-  object-fit: cover;
-  filter: grayscale(1) contrast(1.08);
+  width: min(68%, 26rem);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2.5rem 4.5rem rgba(0, 0, 0, 0.48));
 }
 
 .product-story--shieldline .product-story__meta,
@@ -1360,6 +1394,10 @@ body.landing-page {
   .product-story h2,
   .landing-manifesto h2 {
     font-size: clamp(3.15rem, 16.5vw, 5.5rem);
+  }
+
+  .product-story--map h2 {
+    font-size: clamp(2.85rem, 14vw, 4rem);
   }
 
   .product-story__copy {
