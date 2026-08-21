@@ -10,11 +10,11 @@
     <meta property="og:title" content="<%= copy.seo.title %>" />
     <meta property="og:description" content="<%= copy.seo.description %>" />
     <meta property="og:url" content="https://studerria.com/" />
-    <meta property="og:image" content="https://studerria.com/assets/landing/studerria-team-hero-v2.webp" />
+    <meta property="og:image" content="https://studerria.com/assets/landing/studerria-product-system-v2.webp" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="<%= copy.seo.title %>" />
     <meta name="twitter:description" content="<%= copy.seo.description %>" />
-    <meta name="twitter:image" content="https://studerria.com/assets/landing/studerria-team-hero-v2.webp" />
+    <meta name="twitter:image" content="https://studerria.com/assets/landing/studerria-product-system-v2.webp" />
     <link rel="canonical" href="https://studerria.com/" />
     <link rel="alternate" hreflang="uk" href="https://studerria.com/?lang=uk" />
     <link rel="alternate" hreflang="en" href="https://studerria.com/?lang=en" />
@@ -68,7 +68,7 @@
       <section class="landing-hero" aria-labelledby="landingHeroTitle">
         <div class="landing-hero__media" aria-hidden="true">
           <img
-            src="/assets/landing/studerria-team-hero-v2.webp"
+            src="/assets/landing/studerria-product-system-v2.webp"
             alt=""
             width="1672"
             height="941"
@@ -252,7 +252,7 @@
           </div>
         </article>
 
-        <article class="product-story product-story--soon" id="ykg" data-reveal>
+        <article class="product-story product-story--ykg" id="ykg" data-reveal>
           <div class="product-story__copy">
             <div class="product-story__meta">
               <span>06</span>
@@ -260,10 +260,14 @@
             </div>
             <h2><%= copy.products.ykg.title %></h2>
             <p><%= copy.products.ykg.description %></p>
-            <span class="product-status"><span></span><%= copy.products.ykg.status %></span>
+            <a class="landing-action landing-action--primary" href="/ykg">
+              <span><%= copy.products.ykg.primaryCta %></span>
+              <span aria-hidden="true">↗</span>
+            </a>
           </div>
-          <div class="product-story__visual product-story__visual--soon" aria-hidden="true">
+          <div class="product-story__visual product-story__visual--ykg" aria-hidden="true">
             <span>Y</span><span>K</span><span>G</span>
+            <small class="ykg-visual-note"><%= copy.products.ykg.visualNote %></small>
           </div>
         </article>
       </section>

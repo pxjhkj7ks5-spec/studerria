@@ -97,7 +97,7 @@ test('landing renders full Ukrainian and English versions', async () => {
   assert.match(en.html, /application\/ld\+json/);
 });
 
-test('landing includes every approved public destination and keeps YKG inactive', async () => {
+test('landing includes every approved public destination including YKG', async () => {
   const { html } = await renderLanding('uk');
   const approvedUrls = [
     '/naradadruk',
@@ -107,11 +107,11 @@ test('landing includes every approved public destination and keeps YKG inactive'
     '/charredmap',
     '/shieldline',
     'https://t.me/ShieldLinebot',
+    '/ykg',
   ];
 
   approvedUrls.forEach((url) => assert.match(html, new RegExp(`href="${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`)));
-  assert.doesNotMatch(html, /href="\/ykg(?:[/?#]|\")/i);
-  assert.match(html, /Незабаром/);
+  assert.doesNotMatch(html, /Незабаром|Coming soon/i);
   assert.deepEqual(LANDING_PRODUCTS.map((product) => product.id), [
     'naradadruk', 'studerria', 'telegram', 'charredmap', 'shieldline', 'ykg',
   ]);
@@ -155,11 +155,11 @@ test('landing uses the approved visual assets and keeps product headings intact'
   const { html } = await renderLanding('uk');
   const css = fs.readFileSync(path.join(projectRoot, 'public/css/pages/landing.css'), 'utf8');
 
-  assert.match(html, /studerria-team-hero-v2\.webp/);
+  assert.match(html, /studerria-product-system-v2\.webp/);
   assert.match(html, /studerria-mark-dark-512\.png/);
   assert.match(html, /charredmap-mark\.webp/);
   assert.match(html, /shieldline-mark\.svg/);
-  assert.match(html, /магазин, який наша команда розробляє для друзів/);
+  assert.match(html, /Магазин, який наша команда створила для друзів/);
   assert.match(css, /\.product-story--map h2[\s\S]*white-space:\s*nowrap/);
   assert.match(css, /\.landing-page \.landing-action--light[\s\S]*color:\s*var\(--landing-black\)/);
 });

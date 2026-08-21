@@ -23,8 +23,7 @@ const LANDING_PRODUCTS = Object.freeze([
   },
   {
     id: 'ykg',
-    href: '',
-    status: 'soon',
+    href: '/ykg',
   },
 ]);
 
@@ -99,8 +98,9 @@ const LANDING_COPY = Object.freeze({
       ykg: {
         eyebrow: 'Окремий магазин',
         title: 'YKG',
-        description: 'Окремий магазин, який наша команда розробляє для друзів. Публічний запуск ще готується.',
-        status: 'Незабаром',
+        description: 'Магазин, який наша команда створила для друзів — з окремим характером і спільною увагою до деталей.',
+        primaryCta: 'Відкрити магазин',
+        visualNote: 'Для друзів / однією командою',
       },
     },
     manifesto: {
@@ -188,8 +188,9 @@ const LANDING_COPY = Object.freeze({
       ykg: {
         eyebrow: 'Independent store',
         title: 'YKG',
-        description: 'An independent store our team is building for friends. Its public launch is still in preparation.',
-        status: 'Coming soon',
+        description: 'A store our team created for friends — with its own character and the same attention to detail.',
+        primaryCta: 'Open the store',
+        visualNote: 'Built for friends / by one team',
       },
     },
     manifesto: {
@@ -216,6 +217,7 @@ function buildLandingStructuredData(copy, platformUrl) {
     telegram: 'https://t.me/studerria_bot',
     charredmap: 'https://studerria.com/charredmap',
     shieldline: 'https://studerria.com/shieldline',
+    ykg: 'https://studerria.com/ykg',
   };
 
   return {
