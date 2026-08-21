@@ -164,6 +164,14 @@ test('landing uses the approved visual assets and keeps product headings intact'
   assert.match(css, /\.landing-page \.landing-action--light[\s\S]*color:\s*var\(--landing-black\)/);
 });
 
+test('landing product dividers overlay the visuals without reserving a light gap', () => {
+  const css = fs.readFileSync(path.join(projectRoot, 'public/css/pages/landing.css'), 'utf8');
+  const productStoryRule = css.match(/\.product-story\s*\{([^}]*)\}/)?.[1] || '';
+
+  assert.match(productStoryRule, /box-shadow:\s*inset 0 -1px 0 var\(--landing-line\)/);
+  assert.doesNotMatch(productStoryRule, /border-bottom/);
+});
+
 test('public legal routes receive complete localized page copy', () => {
   let legalHandler;
   const app = {
