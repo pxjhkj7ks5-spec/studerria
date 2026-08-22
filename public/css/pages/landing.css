@@ -543,7 +543,7 @@ body.landing-page {
 }
 
 .product-story .landing-actions,
-.product-story .landing-text-link,
+.product-story__copy > .landing-text-link,
 .product-status {
   margin-top: clamp(2rem, 4vw, 3.5rem);
 }

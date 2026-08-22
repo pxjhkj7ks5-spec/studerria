@@ -172,6 +172,13 @@ test('landing product dividers overlay the visuals without reserving a light gap
   assert.doesNotMatch(productStoryRule, /border-bottom/);
 });
 
+test('Shieldline actions share one horizontal alignment', () => {
+  const css = fs.readFileSync(path.join(projectRoot, 'public/css/pages/landing.css'), 'utf8');
+
+  assert.match(css, /\.product-story__copy\s*>\s*\.landing-text-link/);
+  assert.doesNotMatch(css, /\.product-story\s+\.landing-text-link\s*,/);
+});
+
 test('public legal routes receive complete localized page copy', () => {
   let legalHandler;
   const app = {
