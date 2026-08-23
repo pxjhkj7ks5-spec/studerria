@@ -6,6 +6,8 @@ SCHEMA_HASH_FILE="/data/.schema-prisma.sha256"
 SEED_MARKER_FILE="/data/.seeded-v1"
 CATALOG_FILE="${CATALOG_FILE:-catalog/products.json}"
 CATALOG_HASH_FILE="/data/.catalog-products.sha256"
+PRICING_FILE="${PRICING_FILE:-catalog/pricing.json}"
+PRICING_HASH_FILE="/data/.catalog-pricing.sha256"
 
 owner_bot_token_state="MISSING"
 if [ -n "${NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN:-}" ]; then
@@ -93,6 +95,22 @@ if [ -f "$CATALOG_FILE" ]; then
     printf '%s\n' "$current_catalog_hash" > "$CATALOG_HASH_FILE"
   else
     echo "[entrypoint] catalog unchanged; skipping import"
+  fi
+fi
+
+if [ -f "$PRICING_FILE" ]; then
+  current_pricing_hash="$(sha256sum "$PRICING_FILE" | awk '{print $1}')"
+  previous_pricing_hash=""
+  if [ -f "$PRICING_HASH_FILE" ]; then
+    previous_pricing_hash="$(cat "$PRICING_HASH_FILE" 2>/dev/null || true)"
+  fi
+
+  if [ "$current_pricing_hash" != "$previous_pricing_hash" ]; then
+    echo "[entrypoint] pricing changed; importing prices"
+    ./node_modules/.bin/tsx prisma/import-pricing.ts
+    printf '%s\n' "$current_pricing_hash" > "$PRICING_HASH_FILE"
+  else
+    echo "[entrypoint] pricing unchanged; skipping import"
   fi
 fi
 

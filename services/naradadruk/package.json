@@ -10,6 +10,7 @@
     "test": "tsx --test tests/*.test.ts",
     "catalog:build": "node scripts/build-telegram-catalog.mjs",
     "catalog:import": "tsx prisma/import-catalog.ts",
+    "pricing:import": "tsx prisma/import-pricing.ts",
     "catalog:refresh": "npm run catalog:scrape && npm run catalog:build",
     "catalog:scrape": "node scripts/scrape-telegram-channel.mjs naradaprint catalog/telegram-posts.json --download-images",
     "catalog:sync": "tsx scripts/telegram-catalog-worker.ts --once",

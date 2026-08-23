@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-23",
+  "currency": "UAH",
+  "positioning": "Нижня частина актуального ринку готових аналогів з поправкою на матеріал і комплектацію.",
+  "products": [
+    { "slug": "dvokolirnyi-nastilnyi-organaizer", "basePrice": 420, "priceFrom": false },
+    { "slug": "pidstavka-glock-17", "basePrice": 280, "priceFrom": false },
+    { "slug": "kriplennia-gopro-fast", "basePrice": 190, "priceFrom": false },
+    {
+      "slug": "aksesuary-ikea-skadis",
+      "basePrice": null,
+      "priceFrom": true,
+      "variants": [
+        { "label": "Ваза", "price": 350 },
+        { "label": "Підставка під клавіатуру", "price": 50 },
+        { "label": "Підставка під навушники", "price": 90 },
+        { "label": "Підставка під павербанк", "price": 220 },
+        { "label": "Підставка під колонку", "price": 50 },
+        { "label": "Підставка під термометр", "price": 50 },
+        { "label": "Підставка під геймпад", "price": 200 }
+      ]
+    },
+    { "slug": "glushnyk-pbs-1-ak-ar", "basePrice": 450, "priceFrom": false },
+    { "slug": "ris-planka-m-lok-picatinny", "basePrice": 180, "priceFrom": false },
+    { "slug": "stend-hyperx-quadcast", "basePrice": 450, "priceFrom": false },
+    {
+      "slug": "pidstavka-pid-videokartu",
+      "basePrice": null,
+      "priceFrom": true,
+      "variants": [
+        { "label": "Менша", "price": 80 },
+        { "label": "Більша", "price": 110 }
+      ]
+    },
+    { "slug": "m-lok-2", "basePrice": 30, "priceFrom": false },
+    { "slug": "honeycomb-m14-1-ccw-48-130", "basePrice": 350, "priceFrom": false },
+    { "slug": "makerworld-1785848490501", "basePrice": 230, "priceFrom": false },
+    { "slug": "makerworld-1785848117482", "basePrice": 220, "priceFrom": false },
+    { "slug": "m-lok-gen2", "basePrice": 420, "priceFrom": false },
+    { "slug": "perenos-vogniu-upor-45", "basePrice": 420, "priceFrom": false },
+    { "slug": "strajkbolnyi-nizh", "basePrice": 320, "priceFrom": false },
+    { "slug": "polumiagasnyk-14-mm", "basePrice": 220, "priceFrom": false },
+    { "slug": "zakhyst-prytsilu-30-mm", "basePrice": 120, "priceFrom": false },
+    { "slug": "kriplennia-kobura-ar", "basePrice": 300, "priceFrom": false },
+    { "slug": "nastinne-kriplennia-pryvoda", "basePrice": 420, "priceFrom": true },
+    { "slug": "speedloader-gbb-glock", "basePrice": 70, "priceFrom": false },
+    { "slug": "pidstavka-6-magazyniv-ar-m", "basePrice": 490, "priceFrom": false },
+    { "slug": "shvydkoznimnyi-upor-m-lok", "basePrice": 240, "priceFrom": false },
+    {
+      "slug": "taktychna-rukoiatka",
+      "basePrice": null,
+      "priceFrom": true,
+      "variants": [
+        { "label": "M-LOK із болтами", "price": 350 },
+        { "label": "Picatinny без болтів", "price": 300 }
+      ]
+    },
+    { "slug": "kryshka-bunkernogo-magazyna-ak", "basePrice": 40, "priceFrom": false },
+    { "slug": "muliazh-granaty-m67", "basePrice": 390, "priceFrom": false },
+    { "slug": "piatka-magazyna-glock-gbb", "basePrice": 100, "priceFrom": false },
+    { "slug": "pidstavka-cz-75", "basePrice": 290, "priceFrom": false },
+    { "slug": "kriplennia-gopro-gen-2", "basePrice": 220, "priceFrom": false },
+    { "slug": "raizer-pid-kolimator", "basePrice": 320, "priceFrom": false },
+    {
+      "slug": "kolektsiia-formula-1",
+      "basePrice": null,
+      "priceFrom": true,
+      "variants": [
+        { "label": "Календар Гран-прі 2026", "price": 650 },
+        { "label": "Гоночний трек", "price": 250 },
+        { "label": "Підставка LEGO Speed Champions", "price": 150 }
+      ]
+    }
+  ]
+}
