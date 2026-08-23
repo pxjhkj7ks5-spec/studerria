@@ -32,3 +32,19 @@ test("rejects price-only descriptions and missing media metadata", () => {
   assert.equal(result.checks.find((check) => check.key === "cover")?.passed, false);
   assert.equal(result.checks.find((check) => check.key === "alt")?.passed, false);
 });
+
+test("does not treat placeholder copy as product information", () => {
+  const result = assessProductReadiness({
+    ...completeProduct,
+    materialNote: "Не вказано",
+    leadTime: "—",
+    deliveryNote: "N/A",
+    paymentNote: "Невідомо",
+  });
+
+  assert.equal(result.ready, false);
+  assert.equal(result.checks.find((check) => check.key === "material")?.passed, false);
+  assert.equal(result.checks.find((check) => check.key === "lead-time")?.passed, false);
+  assert.equal(result.checks.find((check) => check.key === "delivery")?.passed, false);
+  assert.equal(result.checks.find((check) => check.key === "payment")?.passed, false);
+});

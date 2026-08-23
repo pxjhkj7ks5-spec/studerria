@@ -20,7 +20,14 @@ export type ProductReadinessCheck = {
 function usefulDescription(value: string, minimumLength: number) {
   const normalized = value.replace(/\s+/g, " ").trim();
   const priceOnly = /^(?:від\s+)?\d[\d\s]*\s*(?:грн|₴)?[.!]?$/iu.test(normalized);
-  return normalized.length >= minimumLength && !priceOnly;
+  const placeholder = /^(?:не\s+вказано|невідомо|n\/?a|none|[-—–])\.?$/iu.test(normalized);
+  return normalized.length >= minimumLength && !priceOnly && !placeholder;
+}
+
+function usefulDetail(value: string, minimumLength: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const placeholder = /^(?:не\s+вказано|невідомо|n\/?a|none|[-—–])\.?$/iu.test(normalized);
+  return normalized.length >= minimumLength && !placeholder;
 }
 
 export function assessProductReadiness(product: ProductReadinessInput) {
@@ -32,10 +39,10 @@ export function assessProductReadiness(product: ProductReadinessInput) {
     { key: "alt", label: "Фото мають описи", passed: product.images.length > 0 && product.images.every((image) => image.alt.trim().length >= 3) },
     { key: "short", label: "Короткий опис пояснює товар", passed: usefulDescription(product.shortDescription, 20) },
     { key: "full", label: "Повний опис достатньо змістовний", passed: usefulDescription(product.fullDescription, 40) },
-    { key: "material", label: "Вказано матеріал", passed: product.materialNote.trim().length >= 4 },
-    { key: "lead-time", label: "Вказано термін виготовлення", passed: product.leadTime.trim().length >= 4 },
-    { key: "delivery", label: "Вказано доставку", passed: product.deliveryNote.trim().length >= 4 },
-    { key: "payment", label: "Вказано оплату", passed: product.paymentNote.trim().length >= 4 },
+    { key: "material", label: "Вказано матеріал", passed: usefulDetail(product.materialNote, 4) },
+    { key: "lead-time", label: "Вказано термін виготовлення", passed: usefulDetail(product.leadTime, 4) },
+    { key: "delivery", label: "Вказано доставку", passed: usefulDetail(product.deliveryNote, 4) },
+    { key: "payment", label: "Вказано оплату", passed: usefulDetail(product.paymentNote, 4) },
   ];
   const passedCount = checks.filter((check) => check.passed).length;
 
