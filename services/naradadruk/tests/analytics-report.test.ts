@@ -168,6 +168,25 @@ test("buildAnalyticsReport identifies the weakest measured funnel stage", () => 
   });
 });
 
+test("buildAnalyticsReport keeps an empty period distinct from a zero-conversion funnel", () => {
+  const report = buildAnalyticsReport([], 30, new Date("2026-08-24T10:00:00.000Z"));
+
+  assert.equal(report.hasData, false);
+  assert.equal(report.funnelInsight, null);
+  assert.deepEqual(report.commerce, {
+    productOpens: 0,
+    addToCarts: 0,
+    checkouts: 0,
+    orders: 0,
+    revenue: 0,
+    viewToProductRate: 0,
+    productToCartRate: 0,
+    cartToCheckoutRate: 0,
+    checkoutToOrderRate: 0,
+    viewToOrderRate: 0,
+  });
+});
+
 test("buildAnalyticsReport ranks only labelled campaigns", () => {
   const now = new Date("2026-08-07T09:00:00.000Z");
   const report = buildAnalyticsReport(

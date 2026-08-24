@@ -220,11 +220,19 @@ export function AnalyticsDashboard({
             </li>
           ))}
         </ol>
-        {report.funnelInsight ? (
+        {report.hasData && report.funnelInsight ? (
           <div className="admin-commerce__insight" role="status">
             <strong>{report.funnelInsight.title}</strong>
             <span>
               Конверсія на цьому кроці: {report.funnelInsight.rate}%. {report.funnelInsight.message}
+            </span>
+          </div>
+        ) : !report.hasData ? (
+          <div className="admin-commerce__insight admin-commerce__insight--empty" role="status">
+            <strong>Даних для висновку про воронку ще немає</strong>
+            <span>
+              Нулі вище не є конверсією. Відкрийте магазин у звичайному браузері,
+              перегляньте товар і поверніться сюди, щоб перевірити надходження подій.
             </span>
           </div>
         ) : null}
@@ -296,10 +304,11 @@ export function AnalyticsDashboard({
             </div>
           ) : (
             <div className="admin-empty-state">
-              <strong>Статистика починає накопичуватися</strong>
+              <strong>За цей період подій ще немає</strong>
               <span>
-                Після цього оновлення тут зʼявляться реальні перегляди, кліки
-                та переходи в Telegram.
+                Це не оцінка попиту. Перевірте магазин у звичайному браузері, а
+                потім поверніться сюди: реальні перегляди, кліки та переходи в
+                Telegram зʼявляться в цьому блоці.
               </span>
             </div>
           )}

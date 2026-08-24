@@ -1135,6 +1135,11 @@ img {
   background: rgba(244, 123, 53, 0.07);
 }
 
+.admin-commerce__insight--empty {
+  border-color: rgba(77, 120, 152, 0.24);
+  background: rgba(77, 120, 152, 0.07);
+}
+
 .admin-commerce__insight strong {
   color: var(--admin-text);
   font-size: 0.78rem;
