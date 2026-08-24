@@ -647,7 +647,7 @@ const DEFAULT_SETTINGS = {
   session_idle_timeout_minutes: SESSION_SECURITY_DEFAULTS.idleTimeoutMinutes,
   session_absolute_timeout_hours: SESSION_SECURITY_DEFAULTS.absoluteTimeoutHours,
   max_file_size_mb: 20,
-  web_registration_enabled: false,
+  web_registration_enabled: true,
   allow_homework_creation: true,
   min_team_members: 2,
   allow_custom_deadlines: true,
@@ -12846,6 +12846,7 @@ function getAcademicV2RouteMessages(req) {
   return isUk ? {
     unknown: 'Не вдалося зберегти academic v2 зміни',
     programSaved: 'Програму збережено',
+    pledStructureReady: 'Структуру ПЛЕД для наборів 2024–2026 підготовлено',
     cohortSaved: 'Когорту збережено',
     groupSaved: 'Групу збережено',
     groupProjectionRebuilt: 'Сумісну legacy-проекцію перебудовано',
@@ -12860,6 +12861,7 @@ function getAcademicV2RouteMessages(req) {
     groupSubjectDeleted: 'Предмет групи видалено',
     usersAssigned: 'Користувачів перепризначено',
     scheduleSaved: 'Рядок розкладу збережено',
+    scheduleImported: 'Розклад імпортовано',
     scheduleDeleted: 'Рядок розкладу видалено',
     scheduleCleared: 'Розклад вибраного терму очищено',
     scheduleSubjectsCleared: 'Слоти вибраних предметів видалено з розкладу',
@@ -12895,6 +12897,7 @@ function getAcademicV2RouteMessages(req) {
     SCHEDULE_TARGET_REQUIRED: 'Для розкладу треба вибрати терм, предмет і режим активності',
     SCHEDULE_ENTRY_NOT_FOUND: 'Рядок розкладу не знайдено',
     SCHEDULE_WEEK_LIST_INVALID: 'Тижні треба вказати числами через кому, наприклад 1, 3, 5',
+    SCHEDULE_IMPORT_INVALID: 'Не вдалося прочитати текст розкладу',
     SCHEDULE_SUBJECT_SELECTION_REQUIRED: 'Виберіть хоча б один предмет для очищення розкладу',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Шаблон предмета не знайдено',
     STAGE_SUBJECT_ACTIVITY_REQUIRED: 'У stage subject має залишатися хоча б одна activity',
@@ -12910,6 +12913,7 @@ function getAcademicV2RouteMessages(req) {
   } : {
     unknown: 'Unable to save academic v2 changes',
     programSaved: 'Program saved',
+    pledStructureReady: 'PLED structure for the 2024–2026 cohorts is ready',
     cohortSaved: 'Cohort saved',
     groupSaved: 'Group saved',
     groupProjectionRebuilt: 'Legacy compatibility projection rebuilt',
@@ -12924,6 +12928,7 @@ function getAcademicV2RouteMessages(req) {
     groupSubjectDeleted: 'Group subject deleted',
     usersAssigned: 'Users reassigned',
     scheduleSaved: 'Schedule entry saved',
+    scheduleImported: 'Schedule imported',
     scheduleDeleted: 'Schedule entry deleted',
     scheduleCleared: 'Selected term schedule cleared',
     scheduleSubjectsCleared: 'Selected subjects removed from the schedule',
@@ -12959,6 +12964,7 @@ function getAcademicV2RouteMessages(req) {
     SCHEDULE_TARGET_REQUIRED: 'Schedule entry requires a term, subject, and activity mode',
     SCHEDULE_ENTRY_NOT_FOUND: 'Schedule entry not found',
     SCHEDULE_WEEK_LIST_INVALID: 'Weeks must be provided as comma-separated positive numbers, for example 1, 3, 5',
+    SCHEDULE_IMPORT_INVALID: 'Unable to read the schedule text',
     SCHEDULE_SUBJECT_SELECTION_REQUIRED: 'Select at least one subject to clear from the schedule',
     SUBJECT_TEMPLATE_NOT_FOUND: 'Subject template not found',
     STAGE_SUBJECT_ACTIVITY_REQUIRED: 'Stage subject must keep at least one activity',
@@ -13037,6 +13043,10 @@ function getAcademicV2ExtendedRouteMessages(req) {
 
 function resolveAcademicV2RouteMessage(req, rawError, fallbackKey = 'unknown') {
   const messages = getAcademicV2ExtendedRouteMessages(req);
+  const userMessage = rawError && rawError.userMessage
+    ? sanitizeCompactText(rawError.userMessage, 240)
+    : '';
+  if (userMessage) return userMessage;
   const errorKey = rawError && rawError.message ? String(rawError.message).trim() : '';
   return messages[errorKey] || messages[fallbackKey] || messages.unknown;
 }
@@ -51036,7 +51046,7 @@ async function handleAcademicV2MutationRoute(req, res, {
 
 app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
   if (String(req.query.legacy || '').trim() === '1') {
-    return res.redirect(buildAdminPathwaysUrl(req.query));
+    return res.redirect('/admin/pathways/legacy');
   }
   const focus = parseAcademicV2Focus(req.query);
   const pageRole = normalizeRoleKey(
@@ -51697,6 +51707,41 @@ app.post('/admin/pathways/v2/schedule/save', requirePathwaysSectionAccess, write
   })
 ));
 
+app.post('/admin/pathways/v2/pled/ensure', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.ensurePledStudentStructure(getAcademicV2Store()),
+    successMessageKey: 'pledStructureReady',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.programId) || focus.programId,
+      cohortId: Number(result && result.cohortId) || focus.cohortId,
+      groupId: Number(result && result.groupId) || focus.groupId,
+      termId: null,
+    }),
+    extraParamsBuilder: () => ({
+      structure_tab: 'courses',
+    }),
+    logContext: 'admin.pathways.v2.pled.ensure',
+  })
+));
+
+app.post('/admin/pathways/v2/schedule/import', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.importScheduleText(getAcademicV2Store(), req.body),
+    successMessageKey: 'scheduleImported',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      groupId: Number(result && result.groupId) || focus.groupId,
+      termId: Number(result && result.termId) || focus.termId,
+    }),
+    extraParamsBuilder: () => ({
+      workspace_tab: 'schedule',
+      schedule_entry_id: '',
+    }),
+    logContext: 'admin.pathways.v2.schedule.import',
+  })
+));
+
 app.post('/admin/pathways/v2/schedule/delete-subjects', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.clearScheduleEntriesForSubjects(getAcademicV2Store(), req.body),
@@ -51743,7 +51788,7 @@ app.post('/admin/pathways/v2/schedule/clear', requirePathwaysSectionAccess, writ
   })
 ));
 
-app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
+app.get('/admin/pathways/legacy', requirePathwaysSectionAccess, async (req, res) => {
   try {
     await ensureDbReady();
   } catch (err) {

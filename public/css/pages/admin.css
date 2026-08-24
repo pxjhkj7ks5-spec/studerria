@@ -1706,3 +1706,67 @@ body.theme-light.schedule-list-page .table thead th {
 .schedule-list-page .table tbody tr {
   background: transparent;
 }
+
+/* Admin performance baseline: keep depth through color and borders, not live blur. */
+.admin-nav,
+.admin-nav .theme-toggle-min,
+.admin-nav .session-health-chip,
+.admin-topbar-btn,
+.admin-page :where(.glass, .glass-card, .glass-panel, .admin-card, .admin-section, .form-control, .form-select),
+.schedule-list-page :where(.glass, .glass-card, .glass-panel, .form-control, .form-select) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.admin-nav {
+  background: #111827;
+}
+
+body.theme-light .admin-nav {
+  background: #f8fafc;
+}
+
+.admin-nav-link--primary {
+  color: #ffffff !important;
+  border-color: transparent !important;
+  background: #4f46e5 !important;
+}
+
+.admin-sidebar-advanced {
+  margin-top: 4px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  padding-top: 10px;
+}
+
+.admin-sidebar-advanced > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  list-style: none;
+  padding: 7px 10px;
+}
+
+.admin-sidebar-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-sidebar-advanced > summary::after {
+  content: "+";
+  float: right;
+}
+
+.admin-sidebar-advanced[open] > summary::after {
+  content: "−";
+}
+
+.admin-sidebar-advanced-content {
+  display: grid;
+  gap: 3px;
+  padding-top: 4px;
+}
+
+.admin-nav .theme-toggle-min {
+  font-size: 0.64rem;
+  font-weight: 700;
+}

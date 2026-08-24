@@ -1,129 +1,18 @@
-const init = require('./001_init');
-const teachers = require('./002_teachers');
-const weekTime = require('./003_week_time');
-const scheduleGenerator = require('./004_schedule_generator');
-const scheduleGeneratorMirror = require('./005_schedule_generator_mirror');
-const coursesLocation = require('./006_courses_location');
-const scheduleGeneratorRepair = require('./007_schedule_generator_repair');
-const scheduleGeneratorEntryItem = require('./008_schedule_generator_entry_item');
-const scheduleEntryLessonType = require('./009_schedule_entry_lesson_type');
-const mergeSubjectsByType = require('./010_merge_subjects_by_type');
-const scheduleGeneratorIndexes = require('./011_schedule_generator_indexes');
-const rbacRoles = require('./012_rbac_roles');
-const siteVisitEvents = require('./013_site_visit_events');
-const teamworkTeacherTaskConfig = require('./014_teamwork_teacher_task_config');
-const teamworkTaskScopeLock = require('./015_teamwork_task_scope_lock');
-const teamworkGroupsSeminarGroupNumber = require('./016_teamwork_groups_seminar_group_number');
-const subjectMaterials = require('./017_subject_materials');
-const subjectMaterialsSyllabus = require('./018_subject_materials_syllabus');
-const journalGradebook = require('./019_journal_gradebook');
-const journalWeightedConfig = require('./020_journal_weighted_config');
-const journalGradeUndoAndLock = require('./021_journal_grade_undo_and_lock');
-const attendanceMvp = require('./022_attendance_mvp');
-const journalRetakeAttempts = require('./023_journal_retake_attempts');
-const journalGradeAppeals = require('./024_journal_grade_appeals');
-const adminChangeAudit = require('./025_admin_change_audit');
-const journalSubjectClosure = require('./026_journal_subject_closure');
-const journalModerationCompetencies = require('./027_journal_moderation_competencies');
-const userRegistrationEvents = require('./028_user_registration_events');
-const securityRiskAudit = require('./029_security_risk_audit');
-const competencyAutoSources = require('./030_competency_auto_sources');
-const sessionGeneratorDrafts = require('./031_session_generator_drafts');
-const registrationPathways = require('./032_registration_pathways');
-const teacherHomeworkTemplates = require('./033_teacher_homework_templates');
-const pathwaysBulkAssignAndInsightsIndexes = require('./034_pathways_bulk_assign_and_insights_indexes');
-const supportRequests = require('./035_support_requests');
-const subjectCatalogAndBindings = require('./036_subject_catalog_and_bindings');
-const supportRequestMessages = require('./037_support_request_messages');
-const messageArchiveCleanup = require('./038_message_archive_cleanup');
-const roomsAndAssetLibrary = require('./039_rooms_and_asset_library');
-const ratingPublicationSnapshots = require('./040_rating_publication_snapshots');
-const academicSetupContexts = require('./041_academic_setup_contexts');
-const academicV2Core = require('./042_academic_v2_core');
-const academicV2StageTemplates = require('./043_academic_v2_stage_templates');
-const academicV2TeacherRegistrationDefaults = require('./044_academic_v2_teacher_registration_defaults');
-const academicV2SubjectActivities = require('./045_academic_v2_subject_activities');
-const academicV2ActivityBaselines = require('./046_academic_v2_activity_baselines');
-const academicV2SharedGroupSubjectLinks = require('./047_academic_v2_shared_group_subject_links');
-const securityMulticourseRateLimits = require('./048_security_multicourse_rate_limits');
-const securityHardeningAdminControls = require('./049_security_hardening_admin_controls');
-const adminChangeAuditAppendOnlyFkCleanup = require('./050_admin_change_audit_append_only_fk_cleanup');
-const sessionPersistenceDefaults = require('./051_session_persistence_defaults');
-const teamworkScheduleVisibility = require('./052_teamwork_schedule_visibility');
-const visitIpGeoCache = require('./053_visit_ip_geo_cache');
-const telegramMiniAppUsers = require('./054_telegram_mini_app_users');
-const telegramNotificationPreferences = require('./055_telegram_notification_preferences');
-const teamworkStrictEditing = require('./056_teamwork_strict_editing');
-const teamworkTelegramMessageRef = require('./057_teamwork_telegram_message_ref');
-const teamworkJoinOpenState = require('./058_teamwork_join_open_state');
-const teamworkJoinClosedBy = require('./059_teamwork_join_closed_by');
-const homeworkSource = require('./060_homework_source');
-const telegramRegistrationEventSource = require('./061_telegram_registration_event_source');
-const dbPerformanceIndexes = require('./062_db_performance_indexes');
-const dbPerformanceHotIndexes = require('./063_db_performance_hot_indexes');
+const fs = require('fs');
+const path = require('path');
 
-module.exports = [
-  init,
-  teachers,
-  weekTime,
-  scheduleGenerator,
-  scheduleGeneratorMirror,
-  coursesLocation,
-  scheduleGeneratorRepair,
-  scheduleGeneratorEntryItem,
-  scheduleEntryLessonType,
-  mergeSubjectsByType,
-  scheduleGeneratorIndexes,
-  rbacRoles,
-  siteVisitEvents,
-  teamworkTeacherTaskConfig,
-  teamworkTaskScopeLock,
-  teamworkGroupsSeminarGroupNumber,
-  subjectMaterials,
-  subjectMaterialsSyllabus,
-  journalGradebook,
-  journalWeightedConfig,
-  journalGradeUndoAndLock,
-  attendanceMvp,
-  journalRetakeAttempts,
-  journalGradeAppeals,
-  adminChangeAudit,
-  journalSubjectClosure,
-  journalModerationCompetencies,
-  userRegistrationEvents,
-  securityRiskAudit,
-  competencyAutoSources,
-  sessionGeneratorDrafts,
-  registrationPathways,
-  teacherHomeworkTemplates,
-  pathwaysBulkAssignAndInsightsIndexes,
-  supportRequests,
-  subjectCatalogAndBindings,
-  supportRequestMessages,
-  messageArchiveCleanup,
-  roomsAndAssetLibrary,
-  ratingPublicationSnapshots,
-  academicSetupContexts,
-  academicV2Core,
-  academicV2StageTemplates,
-  academicV2TeacherRegistrationDefaults,
-  academicV2SubjectActivities,
-  academicV2ActivityBaselines,
-  academicV2SharedGroupSubjectLinks,
-  securityMulticourseRateLimits,
-  securityHardeningAdminControls,
-  adminChangeAuditAppendOnlyFkCleanup,
-  sessionPersistenceDefaults,
-  teamworkScheduleVisibility,
-  visitIpGeoCache,
-  telegramMiniAppUsers,
-  telegramNotificationPreferences,
-  teamworkStrictEditing,
-  teamworkTelegramMessageRef,
-  teamworkJoinOpenState,
-  teamworkJoinClosedBy,
-  homeworkSource,
-  telegramRegistrationEventSource,
-  dbPerformanceIndexes,
-  dbPerformanceHotIndexes,
-];
+const migrationFilePattern = /^\d{3}_[a-z0-9_]+\.js$/;
+
+const migrations = fs.readdirSync(__dirname)
+  .filter((fileName) => migrationFilePattern.test(fileName))
+  .sort((left, right) => left.localeCompare(right, 'en'))
+  .map((fileName) => require(path.join(__dirname, fileName)));
+
+const migrationIds = migrations.map((migration) => String(migration?.id || '').trim());
+const duplicateIds = migrationIds.filter((id, index) => !id || migrationIds.indexOf(id) !== index);
+
+if (duplicateIds.length) {
+  throw new Error(`Invalid migration catalog: ${[...new Set(duplicateIds)].join(', ')}`);
+}
+
+module.exports = migrations;

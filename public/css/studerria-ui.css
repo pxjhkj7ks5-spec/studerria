@@ -4144,3 +4144,39 @@ body.theme-light.page-app-shell.studerria-theme :where(
       inset 0 1px 0 rgba(255, 255, 255, 0.86);
   }
 }
+
+/* Performance baseline: opaque surfaces avoid expensive nested live blurs. */
+body.page-app-shell.studerria-theme :where(
+  .studerria-nav-shell,
+  .glass,
+  .glass-card,
+  .glass-panel,
+  .day-card,
+  .density-summary,
+  .week-rail,
+  .schedule-card,
+  .schedule-hero-shell,
+  .schedule-day-switcher,
+  .schedule-overview-card,
+  .cockpit-page,
+  .form-control,
+  .form-select,
+  .btn-glass
+) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.studerria-theme .app-footer .footer-release-pill__dot,
+.studerria-theme .app-footer .footer-sync-pill .sync-dot {
+  animation: none !important;
+  will-change: auto;
+}
+
+@media (min-width: 992px) {
+  body.page-app-shell.page-schedule.studerria-theme .schedule-content.container,
+  body.page-app-shell.page-my-day.studerria-theme .cockpit-page.container {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}

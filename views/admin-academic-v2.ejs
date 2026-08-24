@@ -681,7 +681,7 @@
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
-    <title>Academic Setup v2</title>
+    <title>Академічне керування · Studerria</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -702,60 +702,67 @@
 
     <main class="academic-v2-page">
       <form method="get" action="/admin/pathways" class="academic-v2-context-bar">
-        <span class="academic-v2-context-bar-title">Academic Setup v2</span>
+        <span class="academic-v2-context-bar-title">Академічне керування</span>
         <div class="academic-v2-context-bar-selectors">
-          <select name="program_id" title="Програма">
-            <% (programs || []).forEach((program) => { %>
-              <option value="<%= program.id %>" <%= Number(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
-            <% }); %>
-          </select>
-          <select name="cohort_id" title="Когорта">
-            <% (scopedCohorts || []).forEach((cohort) => { %>
-              <option value="<%= cohort.id %>" <%= Number(cohort.id) === activeCohortId ? 'selected' : '' %>><%= cohort.label %> · <%= cohort.admission_year %></option>
-            <% }); %>
-          </select>
-          <select name="group_id" title="Курс">
-            <% (scopedGroups || []).forEach((group) => { %>
-              <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %> · s<%= group.stage_number %> · <%= campusLabelByKey.get(group.campus_key) || group.campus_key %></option>
-            <% }); %>
-          </select>
-          <select name="term_id" title="Терм">
-            <option value="">Усі терми</option>
-            <% scopedTermsList.forEach((term) => { %>
-              <option value="<%= term.id %>" <%= Number(term.id) === activeTermId ? 'selected' : '' %>><%= term.title %></option>
-            <% }); %>
-          </select>
+          <label class="academic-v2-context-field">
+            <span>Програма</span>
+            <select name="program_id">
+              <% (programs || []).forEach((program) => { %>
+                <option value="<%= program.id %>" <%= Number(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label class="academic-v2-context-field">
+            <span>Набір</span>
+            <select name="cohort_id">
+              <% (scopedCohorts || []).forEach((cohort) => { %>
+                <option value="<%= cohort.id %>" <%= Number(cohort.id) === activeCohortId ? 'selected' : '' %>><%= cohort.label %> · <%= cohort.admission_year %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label class="academic-v2-context-field">
+            <span>Курс</span>
+            <select name="group_id">
+              <% (scopedGroups || []).forEach((group) => { %>
+                <option value="<%= group.id %>" <%= Number(group.id) === activeGroupId ? 'selected' : '' %>><%= group.label %> · <%= group.stage_number %> курс · <%= campusLabelByKey.get(group.campus_key) || group.campus_key %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label class="academic-v2-context-field">
+            <span>Семестр</span>
+            <select name="term_id">
+              <option value="">Усі семестри</option>
+              <% scopedTermsList.forEach((term) => { %>
+                <option value="<%= term.id %>" <%= Number(term.id) === activeTermId ? 'selected' : '' %>><%= term.title %></option>
+              <% }); %>
+            </select>
+          </label>
           <input type="hidden" name="template_stage" value="<%= activeTemplateStage || 1 %>" />
           <input type="hidden" name="bachelor_catalog_source" value="<%= String(activeBachelorCatalogSourceKey || '').replace(/"/g, '&quot;') %>" />
           <input type="hidden" name="bachelor_catalog_filter_enabled" value="<%= activeBachelorCatalogFilterEnabled ? '1' : '0' %>" />
           <input type="hidden" name="bachelor_catalog_stage_filter" value="<%= activeBachelorCatalogStageFilter || '' %>" />
           <input type="hidden" name="bachelor_catalog_term_filter" value="<%= activeBachelorCatalogTermFilter || '' %>" />
-          <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+          <button type="submit" class="btn btn-sm btn-primary">Показати</button>
         </div>
         <div class="academic-v2-context-bar-stats">
-          <span><strong><%= Number(summary && summary.programs_total || 0) %></strong> prog</span>
-          <span><strong><%= Number(summary && summary.groups_total || 0) %></strong> courses</span>
-          <span><strong><%= Number(summary && summary.group_subjects_total || 0) %></strong> subj</span>
-          <span><strong><%= Number(summary && summary.schedule_entries_total || 0) %></strong> slots</span>
+          <span><strong><%= Number(summary && summary.programs_total || 0) %></strong> програм</span>
+          <span><strong><%= Number(summary && summary.groups_total || 0) %></strong> курсів</span>
+          <span><strong><%= Number(summary && summary.group_subjects_total || 0) %></strong> предметів</span>
+          <span><strong><%= Number(summary && summary.schedule_entries_total || 0) %></strong> занять</span>
         </div>
       </form>
 
       <div class="academic-v2-shell">
 
         <div class="academic-v2-layout">
-          <aside class="academic-v2-sidebar">
-            <div class="academic-v2-sidebar-title">Workspace</div>
+          <nav class="academic-v2-mode-bar" aria-label="Режим академічного керування">
             <div class="academic-v2-mode-toggle academic-v2-mode-toggle--triple">
-              <button type="button" class="academic-v2-mode-button" data-mode-button="operate">Operate</button>
-              <button type="button" class="academic-v2-mode-button" data-mode-button="structure">Structure</button>
-              <button type="button" class="academic-v2-mode-button" data-mode-button="diagnostics">Diagnostics</button>
+              <button type="button" class="academic-v2-mode-button" data-mode-button="operate">Щоденна робота</button>
+              <button type="button" class="academic-v2-mode-button" data-mode-button="structure">Структура</button>
+              <button type="button" class="academic-v2-mode-button" data-mode-button="diagnostics">Перевірка</button>
             </div>
-            <div class="academic-v2-sidebar-group academic-v2-sidebar-group--utility">
-              <nav class="academic-v2-sidebar-nav">
-                <a class="academic-v2-nav-link" href="/admin"><span>Admin</span><span class="academic-v2-code">←</span></a>
-              </nav>
-            </div>
-          </aside>
+            <a class="btn btn-sm btn-outline-secondary" href="/admin">До адмінки</a>
+          </nav>
 
           <div class="academic-v2-main">
             <% if (success) { %>
@@ -784,12 +791,12 @@
               <div class="academic-v2-mode-toolbar" data-mode-panel="operate">
                 <div class="academic-v2-mode-toolbar-head">
                   <div>
-                    <h2 class="academic-v2-section-title">Workspace</h2>
+                    <h2 class="academic-v2-section-title">Щоденна робота</h2>
                   </div>
                   <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip"><%= subjectCards.length %> subjects</span>
-                    <span class="academic-v2-chip"><%= activeTermCount %> active terms</span>
-                    <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> slots</span>
+                    <span class="academic-v2-chip"><%= subjectCards.length %> предметів</span>
+                    <span class="academic-v2-chip"><%= activeTermCount %> активних семестрів</span>
+                    <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> занять</span>
                   </div>
                 </div>
                 <div class="academic-v2-workspace-tabs">
@@ -801,19 +808,23 @@
               <div class="academic-v2-mode-toolbar" data-mode-panel="structure">
                 <div class="academic-v2-mode-toolbar-head">
                   <div>
-                    <h2 class="academic-v2-section-title">Structure</h2>
+                    <h2 class="academic-v2-section-title">Структура навчання</h2>
                   </div>
                   <div class="academic-v2-chip-row">
-                    <span class="academic-v2-chip"><%= Number(summary && summary.programs_total || 0) %> programs</span>
-                    <span class="academic-v2-chip"><%= Number(summary && summary.groups_total || 0) %> courses</span>
-                    <span class="academic-v2-chip"><%= scopedStageSubjectTemplatesList.length %> stage subjects</span>
+                    <span class="academic-v2-chip"><%= Number(summary && summary.programs_total || 0) %> програм</span>
+                    <span class="academic-v2-chip"><%= Number(summary && summary.groups_total || 0) %> курсів</span>
+                    <span class="academic-v2-chip"><%= scopedStageSubjectTemplatesList.length %> предметів</span>
+                    <form method="post" action="/admin/pathways/v2/pled/ensure">
+                      <%- renderFocusFields() %>
+                      <button type="submit" class="btn btn-sm btn-primary">Підготувати ПЛЕД 2024–2026</button>
+                    </form>
                   </div>
                 </div>
                 <div class="academic-v2-workspace-tabs academic-v2-workspace-tabs--structure">
-                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="programs">Programs</button>
-                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="cohorts">Cohorts</button>
-                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="courses">Courses</button>
-                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="terms-global">Terms</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="programs">Програми</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="cohorts">Набори</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="courses">Курси</button>
+                  <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="terms-global">Семестри</button>
                   <% if (!isBachelorProgramSelected) { %>
                     <button type="button" class="academic-v2-workspace-tab" data-structure-tab-target="stage-templates">Stage Templates</button>
                   <% } %>
@@ -825,7 +836,7 @@
               <div class="academic-v2-mode-toolbar" data-mode-panel="diagnostics">
                 <div class="academic-v2-mode-toolbar-head">
                   <div>
-                    <h2 class="academic-v2-section-title">Diagnostics</h2>
+                    <h2 class="academic-v2-section-title">Перевірка даних</h2>
                   </div>
                   <div class="academic-v2-chip-row">
                     <span class="academic-v2-chip <%= Number(projectionHealthTotals.groups_with_issues || 0) ? 'academic-v2-chip--warm' : 'academic-v2-chip--ok' %>"><%= Number(projectionHealthTotals.groups_with_issues || 0) %> projection issues</span>
@@ -1743,14 +1754,14 @@
                   <div class="academic-v2-section-head academic-v2-section-head--tight">
                     <div>
                       <div class="academic-v2-subcard-topline">Каталог бакалавра</div>
-                      <h3 class="h6 mb-1">Bulk editor</h3>
+                      <h3 class="h6 mb-1">Кодовий бакалаврський каталог</h3>
                       <!-- Bachelor catalog: edit stage/term/required flags; sync adds missing only -->
                     </div>
                     <div class="academic-v2-chip-row">
-                      <span class="academic-v2-chip"><%= bachelorCatalogRowsList.length %> entries</span>
-                      <span class="academic-v2-chip academic-v2-chip--ok"><%= bachelorCatalogSummary.seeded %> seeded</span>
-                      <span class="academic-v2-chip academic-v2-chip--warm"><%= bachelorCatalogSummary.customized %> customized</span>
-                      <span class="academic-v2-chip academic-v2-chip--warm"><%= bachelorCatalogSummary.unassigned %> unassigned</span>
+                      <span class="academic-v2-chip"><%= bachelorCatalogRowsList.length %> позицій</span>
+                      <span class="academic-v2-chip academic-v2-chip--ok"><%= bachelorCatalogSummary.seeded %> додано</span>
+                      <span class="academic-v2-chip academic-v2-chip--warm"><%= bachelorCatalogSummary.customized %> змінено</span>
+                      <span class="academic-v2-chip academic-v2-chip--warm"><%= bachelorCatalogSummary.unassigned %> не призначено</span>
                     </div>
                   </div>
                   <div class="academic-v2-grid-2">
@@ -2736,7 +2747,7 @@
               <div class="academic-v2-section-head">
                 <div>
                   <h2 class="academic-v2-section-title">Розклад</h2>
-                  <div class="academic-v2-muted">Основний workspace тепер залишає тільки advanced editor. Повний список і проблемні слоти відкриваються окремо.</div>
+                  <div class="academic-v2-muted">Встав готовий текст від Codex або додай окрему пару вручну.</div>
                 </div>
                 <div class="academic-v2-chip-row">
                   <span class="academic-v2-chip"><%= selectedTermRecord ? selectedTermRecord.title : 'Терм не вибрано' %></span>
@@ -2749,11 +2760,47 @@
               </div>
               <% if (selectedGroup) { %>
                 <div class="academic-v2-stack">
+                  <form method="post" action="/admin/pathways/v2/schedule/import" class="academic-v2-subcard academic-v2-import-card">
+                    <%- renderFocusFields() %>
+                    <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />
+                    <input type="hidden" name="term_id" value="<%= selectedWorkspaceTermId || '' %>" />
+                    <div class="academic-v2-section-head academic-v2-section-head--tight">
+                      <div>
+                        <div class="academic-v2-subcard-topline">Найпростіший спосіб</div>
+                        <h3 class="h6 mb-1">Імпорт із тексту</h3>
+                        <div class="academic-v2-muted">Надішли мені PDF або таблицю, скопіюй отриманий блок сюди й натисни одну кнопку.</div>
+                      </div>
+                      <span class="academic-v2-chip"><%= selectedTermRecord ? selectedTermRecord.title : 'Спочатку вибери семестр' %></span>
+                    </div>
+                    <label class="academic-v2-field mt-3">
+                      <span>Текст розкладу</span>
+                      <textarea
+                        class="form-control academic-v2-import-textarea"
+                        name="schedule_text"
+                        rows="9"
+                        required
+                        spellcheck="false"
+                        placeholder="STUDERRIA_SCHEDULE_V1&#10;Міжнародне право | лекція | понеділок | 2 | 1-15 | усі&#10;Англійська мова | семінар | вівторок | 1 | 1-15 | 1, 2, 3"
+                      ></textarea>
+                    </label>
+                    <div class="academic-v2-import-actions mt-2">
+                      <label class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" name="replace_existing" value="1" />
+                        <span class="form-check-label">Перед імпортом очистити цей семестр</span>
+                      </label>
+                      <button type="submit" class="btn btn-primary" <%= selectedWorkspaceTermId ? '' : 'disabled' %>>Імпортувати розклад</button>
+                    </div>
+                    <details class="academic-v2-help-details mt-2">
+                      <summary>Формат для Codex</summary>
+                      <div class="academic-v2-muted mt-2">Один рядок = предмет | тип заняття | день | номер пари | тижні | групи. Лекції позначай «усі», семінари й мови — номерами груп. Діапазони тижнів можна писати як 1-15.</div>
+                    </details>
+                  </form>
+
                   <div class="academic-v2-subcard">
-                    <div class="academic-v2-subcard-topline">Schedule workspace</div>
-                    <h3 class="h6 mb-1">Тільки advanced editor</h3>
+                    <div class="academic-v2-subcard-topline">Керування</div>
+                    <h3 class="h6 mb-1">Розклад семестру</h3>
                     <div class="academic-v2-muted">
-                      У цій вкладці лишається тільки ручне редагування слотів. Повний список пар і проблемні слоти винесені на окрему сторінку, щоб workspace був коротким і стабільним.
+                      Повний список пар і проблемні рядки відкриваються окремо, щоб ця сторінка залишалась короткою.
                     </div>
                     <div class="academic-v2-chip-row mt-2">
                       <span class="academic-v2-chip"><%= scheduleEntriesForViews.length %> слотів у термі</span>
@@ -2809,7 +2856,7 @@
                     <input id="scheduleActivity" type="hidden" name="group_subject_activity_id" value="" data-editor-input="schedule.group_subject_activity_id" />
                     <div class="academic-v2-section-head academic-v2-section-head--tight">
                       <div>
-                        <div class="academic-v2-subcard-topline">Advanced editor</div>
+                        <div class="academic-v2-subcard-topline">Ручний режим</div>
                         <h3 class="h6 mb-1">Ручне редагування слотів</h3>
                       </div>
                       <div class="academic-v2-chip-row">

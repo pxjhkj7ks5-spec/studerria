@@ -135,90 +135,10 @@
       return;
     }
     layer.dataset.motionInit = '1';
-
-    const motionQuery = typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)')
-      : null;
-
-    let targetX = 0.5;
-    let targetY = 0.36;
-    let pointerX = targetX;
-    let pointerY = targetY;
-    let rafId = 0;
-    let stopped = false;
-
-    const clamp01 = (value) => Math.max(0, Math.min(1, value));
-    const setVars = (time = Date.now()) => {
-      const driftX = Math.sin(time / 3600) * 10 + Math.cos(time / 6200) * 4;
-      const driftY = Math.cos(time / 4200) * 8 + Math.sin(time / 5400) * 3;
-      layer.style.setProperty('--ambient-pointer-x', `${(pointerX * 100).toFixed(2)}%`);
-      layer.style.setProperty('--ambient-pointer-y', `${(pointerY * 100).toFixed(2)}%`);
-      layer.style.setProperty('--ambient-drift-x', `${driftX.toFixed(2)}px`);
-      layer.style.setProperty('--ambient-drift-y', `${driftY.toFixed(2)}px`);
-    };
-
-    const animate = (time) => {
-      rafId = 0;
-      if (stopped) {
-        return;
-      }
-      pointerX += (targetX - pointerX) * 0.075;
-      pointerY += (targetY - pointerY) * 0.075;
-      setVars(time);
-      rafId = window.requestAnimationFrame(animate);
-    };
-
-    const schedule = () => {
-      if (stopped || rafId) {
-        return;
-      }
-      rafId = window.requestAnimationFrame(animate);
-    };
-
-    const stop = () => {
-      if (!rafId) {
-        return;
-      }
-      window.cancelAnimationFrame(rafId);
-      rafId = 0;
-    };
-
-    const onPointerMove = (event) => {
-      if (stopped) {
-        return;
-      }
-      const width = Math.max(window.innerWidth || 1, 1);
-      const height = Math.max(window.innerHeight || 1, 1);
-      targetX = clamp01(event.clientX / width);
-      targetY = clamp01(event.clientY / height);
-      schedule();
-    };
-
-    const applyReducedState = (reduced) => {
-      stopped = Boolean(reduced);
-      if (stopped) {
-        targetX = 0.5;
-        targetY = 0.36;
-        pointerX = targetX;
-        pointerY = targetY;
-        stop();
-        setVars(Date.now());
-        return;
-      }
-      schedule();
-    };
-
-    document.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('resize', schedule);
-
-    if (motionQuery && typeof motionQuery.addEventListener === 'function') {
-      motionQuery.addEventListener('change', (event) => {
-        applyReducedState(event.matches);
-      });
-      applyReducedState(motionQuery.matches);
-    } else {
-      applyReducedState(false);
-    }
+    layer.style.setProperty('--ambient-pointer-x', '50%');
+    layer.style.setProperty('--ambient-pointer-y', '36%');
+    layer.style.setProperty('--ambient-drift-x', '0px');
+    layer.style.setProperty('--ambient-drift-y', '0px');
   }
 
   function applyGlassDock(root) {

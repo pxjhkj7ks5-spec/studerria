@@ -1042,6 +1042,19 @@ body.page-my-day.schedule-drawer-open .drawer-action:nth-child(n+4) { animation-
   }
 }
 
+/* Static ambient background: no permanent compositor work on idle pages. */
+.ambient-layer,
+.ambient-layer::before,
+.ambient-layer::after,
+.ambient-layer .ambient-glow {
+  animation: none !important;
+  will-change: auto !important;
+}
+
+.ambient-layer .ambient-pointer {
+  display: none !important;
+}
+
 .app-footer .btn-link,
 .app-footer a,
 .app-footer .footer-link,

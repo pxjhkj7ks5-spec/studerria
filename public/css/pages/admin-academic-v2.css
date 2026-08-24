@@ -1661,3 +1661,127 @@ body.theme-dark .academic-v2-disclosure-summary::before {
     justify-content: flex-start;
   }
 }
+
+/* Student-first admin: one calm workspace without nested glass layers. */
+.academic-v2-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.academic-v2-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--academic-border-light);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+body.theme-dark .academic-v2-mode-bar {
+  border-color: var(--academic-border-dark);
+  background: #101827;
+}
+
+.academic-v2-mode-bar .academic-v2-mode-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.academic-v2-context-field {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.academic-v2-context-field > span {
+  padding-left: 2px;
+  color: var(--academic-muted-light);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+body.theme-dark .academic-v2-context-field > span {
+  color: var(--academic-muted-dark);
+}
+
+.academic-v2-context-bar,
+.academic-v2-hero,
+.academic-v2-card,
+.academic-v2-sidebar,
+.academic-v2-subcard,
+.academic-v2-table thead th {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+body.theme-light .academic-v2-context-bar {
+  background: #f8fafc;
+}
+
+body.theme-dark .academic-v2-context-bar {
+  background: #0e1423;
+}
+
+body.theme-light .academic-v2-card,
+body.theme-light .academic-v2-subcard {
+  background: #ffffff;
+}
+
+body.theme-dark .academic-v2-card,
+body.theme-dark .academic-v2-subcard {
+  background: #101827;
+}
+
+.academic-v2-import-card {
+  border-color: rgba(79, 70, 229, 0.28) !important;
+}
+
+.academic-v2-import-textarea {
+  min-height: 190px;
+  resize: vertical;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.academic-v2-import-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .academic-v2-context-bar {
+    position: relative;
+    align-items: stretch;
+  }
+
+  .academic-v2-context-bar-title {
+    width: 100%;
+  }
+
+  .academic-v2-context-bar-selectors,
+  .academic-v2-context-field,
+  .academic-v2-context-field select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .academic-v2-context-bar-stats {
+    margin-left: 0;
+    overflow-x: auto;
+  }
+
+  .academic-v2-mode-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

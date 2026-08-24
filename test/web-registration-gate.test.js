@@ -6,9 +6,9 @@ const ejs = require('ejs');
 
 const rootDir = path.join(__dirname, '..');
 
-test('public web registration is closed by default and gated on both routes', () => {
+test('public web registration is open by default and can still be gated on both routes', () => {
   const source = fs.readFileSync(path.join(rootDir, 'app.js'), 'utf8');
-  assert.match(source, /web_registration_enabled:\s*false/);
+  assert.match(source, /web_registration_enabled:\s*true/);
 
   const getStart = source.indexOf("app.get('/register'");
   const postStart = source.indexOf("app.post('/register'");

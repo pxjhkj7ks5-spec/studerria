@@ -13,6 +13,12 @@ function withFallbackLocals(base = {}) {
       if (prop === Symbol.unscopables) {
         return false;
       }
+      if (
+        typeof prop === 'string'
+        && (prop.startsWith('__') || ['escapeFn', 'include', 'rethrow'].includes(prop))
+      ) {
+        return false;
+      }
       if (Object.prototype.hasOwnProperty.call(target, prop)) {
         return true;
       }

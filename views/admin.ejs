@@ -1008,11 +1008,13 @@
               class="theme-toggle-min"
               type="button"
               id="themeToggle"
-              aria-label="Toggle theme"
-              data-light-label="☀️"
-              data-dark-label="🌙"
+              aria-label="Змінити тему"
+              data-theme-toggle="true"
+              data-light-label="Світла"
+              data-dark-label="Темна"
             >
-              🌙
+              <span class="visually-hidden">Змінити тему</span>
+              <span aria-hidden="true">Тема</span>
             </button>
           </div>
           <div class="admin-topbar-actions">
@@ -1045,74 +1047,73 @@
       <aside class="admin-sidebar">
         <div class="admin-sidebar-inner">
           <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">Overview</div>
+            <div class="admin-sidebar-title">Головне</div>
             <% if (sectionAllowed('admin-overview')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-overview">Overview</button>
-            <% } %>
-            <% if (deaneryMonitoringData) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-deanery-monitoring">Deanery Monitor</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-overview">Огляд</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">Academics</div>
+            <div class="admin-sidebar-title">Навчання</div>
             <% if (canManagePathways) { %>
-              <a class="admin-nav-link" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Academic Setup</a>
-            <% } %>
-            <% if (sectionAllowed('admin-import-export')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">Import/Export (CSV)</button>
+              <a class="admin-nav-link admin-nav-link--primary" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Предмети й розклад</a>
             <% } %>
             <% if (sectionAllowed('admin-homework')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Homework</button>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-tg-homework">TG ДЗ</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Домашні завдання</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-tg-homework">Завдання з Telegram</button>
             <% } %>
             <% if (sectionAllowed('admin-teamwork')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-teamwork">Teamwork</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-teamwork">Командна робота</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">People</div>
-            <% if (sectionAllowed('admin-teachers')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-teachers">Teacher Requests</button>
-            <% } %>
+            <div class="admin-sidebar-title">Студенти</div>
             <% if (sectionAllowed('admin-users')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-users">Users</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-users">Акаунти</button>
             <% } %>
             <% if (telegramUsersSectionAllowed) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-tg-users">TG Users</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-tg-users">Telegram</button>
             <% } %>
           </div>
           <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">Communications</div>
+            <div class="admin-sidebar-title">Зв’язок</div>
             <% if (sectionAllowed('admin-support') && supportSectionVisible) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-support"><%= t('admin.supportSectionNav') %></button>
             <% } %>
             <% if (sectionAllowed('admin-messages') && settings && settings.allow_messages) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-messages">Messages</button>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-messages">Повідомлення</button>
             <% } %>
           </div>
-          <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">Activity</div>
-            <% if (sectionAllowed('admin-visit-analytics')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-visit-analytics">Security analytics</button>
-              <a class="admin-nav-link" href="<%= buildScopedHref('/admin/visit-heatmap') %>">IP heatmap</a>
-              <a class="admin-nav-link" href="<%= buildScopedHref('/admin/visit-log') %>">Усі візити</a>
-            <% } %>
-            <% if (sectionAllowed('admin-history')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-history">History</button>
-            <% } %>
-            <% if (sectionAllowed('admin-activity')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-activity">Activity log</button>
-            <% } %>
-          </div>
-          <div class="admin-sidebar-section">
-            <div class="admin-sidebar-title">System</div>
-            <% if (sectionAllowed('admin-settings')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-settings">System Settings</button>
-            <% } %>
-            <% if (sectionAllowed('admin-role-access')) { %>
-              <button class="admin-nav-link" type="button" data-admin-nav="admin-role-studio">Role Studio</button>
-            <% } %>
-          </div>
+          <details class="admin-sidebar-advanced">
+            <summary>Розширені інструменти</summary>
+            <div class="admin-sidebar-advanced-content">
+              <% if (deaneryMonitoringData) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-deanery-monitoring">Моніторинг деканату</button>
+              <% } %>
+              <% if (sectionAllowed('admin-import-export')) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-import-export">CSV імпорт та експорт</button>
+              <% } %>
+              <% if (sectionAllowed('admin-teachers')) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-teachers">Запити викладачів</button>
+              <% } %>
+              <% if (sectionAllowed('admin-visit-analytics')) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-visit-analytics">Аналітика безпеки</button>
+                <a class="admin-nav-link" href="<%= buildScopedHref('/admin/visit-heatmap') %>">Карта IP</a>
+                <a class="admin-nav-link" href="<%= buildScopedHref('/admin/visit-log') %>">Усі візити</a>
+              <% } %>
+              <% if (sectionAllowed('admin-history')) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-history">Історія змін</button>
+              <% } %>
+              <% if (sectionAllowed('admin-activity')) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-activity">Журнал активності</button>
+              <% } %>
+              <% if (sectionAllowed('admin-settings')) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-settings">Налаштування системи</button>
+              <% } %>
+              <% if (sectionAllowed('admin-role-access')) { %>
+                <button class="admin-nav-link" type="button" data-admin-nav="admin-role-studio">Ролі й доступ</button>
+              <% } %>
+            </div>
+          </details>
         </div>
       </aside>
       <div class="admin-content">
@@ -1122,7 +1123,7 @@
           <div class="admin-header-copy">
             <h1 class="h3 mb-0"><%= t('admin.dashboard') %></h1>
             <div class="admin-header-subtitle small text-muted">
-              Мобільний режим з швидким перемиканням розділів, курсом під рукою та щільнішим layout для щоденних адмін-сценаріїв.
+              Короткі щоденні дії для керування студентською Studerria.
             </div>
           </div>
         </div>
@@ -1136,7 +1137,7 @@
             <button class="btn btn-outline-secondary btn-sm admin-mobile-top" type="button" id="adminMobileTopButton">Вгору</button>
           </div>
           <% if (canManagePathways) { %>
-            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="<%= buildScopedHref('/admin/pathways') %>">Academic Setup</a>
+            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="<%= buildScopedHref('/admin/pathways') %>">Предмети й розклад</a>
           <% } %>
         </div>
       </div>
@@ -1202,20 +1203,25 @@
 
       <div class="admin-panels">
         <% if (sectionAllowed('admin-overview')) { %>
-          <div id="admin-overview" class="admin-panel" data-admin-title="Overview">
+          <div id="admin-overview" class="admin-panel" data-admin-title="Огляд">
             <div class="card mb-4">
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                   <div>
-                    <h5 class="card-title mb-1">Overview</h5>
-                    <div class="small text-muted">Швидкий стан по курсу та найближчих діях.</div>
+                    <h5 class="card-title mb-1">Що потрібно зробити</h5>
+                    <div class="small text-muted">Основні дії в одному місці.</div>
                   </div>
                   <div class="admin-overview-actions d-flex gap-2 flex-wrap">
-                    <a class="btn btn-outline-primary btn-sm" href="<%= buildScopedHref('/admin/schedule-generator') %>">Генератор розкладу</a>
-                    <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/session-generator') %>">Генератор сесій</a>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-import-export">Import/Export</button>
-                    <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-list') %>">Schedule list</a>
-                    <a class="btn btn-outline-secondary btn-sm" href="<%= buildScopedHref('/admin/schedule-summary') %>">Semester summary</a>
+                    <% if (canManagePathways) { %>
+                      <a class="btn btn-primary btn-sm" href="<%= buildScopedHref('/admin/pathways') %>">Предмети й розклад</a>
+                    <% } %>
+                    <% if (sectionAllowed('admin-homework')) { %>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-homework">Домашні завдання</button>
+                    <% } %>
+                    <% if (sectionAllowed('admin-users')) { %>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-users">Студенти</button>
+                    <% } %>
+                    <a class="btn btn-outline-secondary btn-sm" href="/schedule">Перевірити розклад</a>
                   </div>
                 </div>
                 <% if (typeof overviewCompatibilityWarning !== 'undefined' && overviewCompatibilityWarning) { %>
@@ -1225,25 +1231,20 @@
                 <% } %>
                 <div class="admin-overview-grid">
                   <div class="admin-metric-card">
-                    <div class="small text-muted">Users</div>
+                    <div class="small text-muted">Студенти й акаунти</div>
                     <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.users : '—' %></div>
                   </div>
                   <div class="admin-metric-card">
-                    <div class="small text-muted">Subjects</div>
+                    <div class="small text-muted">Предмети</div>
                     <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.subjects : '—' %></div>
                   </div>
                   <div class="admin-metric-card">
-                    <div class="small text-muted">Homework</div>
+                    <div class="small text-muted">Домашні завдання</div>
                     <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.homework : '—' %></div>
                   </div>
                   <div class="admin-metric-card">
-                    <div class="small text-muted">Teamwork tasks</div>
+                    <div class="small text-muted">Командні завдання</div>
                     <div class="admin-metric-value"><%= dashboardStatsData ? dashboardStatsData.teamworkTasks : '—' %></div>
-                  </div>
-                  <div class="admin-metric-card">
-                    <div class="small text-muted">Demo visitors</div>
-                    <div class="admin-metric-value"><%= dashboardStatsData ? (dashboardStatsData.demoVisitors || 0) : '—' %></div>
-                    <div class="small text-muted"><%= dashboardStatsData ? (dashboardStatsData.demoPageViews || 0) : 0 %> page views / 7d</div>
                   </div>
                 </div>
               </div>
