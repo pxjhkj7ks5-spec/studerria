@@ -58,50 +58,54 @@
   });
   const fallbackStudentNav = [
     { id: 'home', label: tr('nav.home', 'Home'), href: '/home' },
-    { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
-    { id: 'homework', label: tr('nav.homework', 'Homework'), href: '/schedule#homework' },
-    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/schedule?panel=messages', navAction: 'messages' },
-    { id: 'teamwork', label: tr('nav.teamwork', 'Teamwork'), href: '/teamwork' },
+    {
+      id: 'schedule',
+      label: tr('nav.schedule', 'Schedule'),
+      href: '/schedule',
+      children: [
+        { id: 'homework', label: tr('nav.homework', 'Homework'), href: '/schedule#homework' },
+        { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/schedule?panel=messages', navAction: 'messages' },
+      ],
+    },
     { id: 'subjects', label: tr('nav.subjects', 'Subjects'), href: '/subjects' },
-    { id: 'profile', label: tr('nav.profile', 'Profile'), href: '/profile' },
-    { id: 'help', label: tr('nav.help', 'Help'), href: '/help' },
-    { id: 'about', label: tr('nav.about', 'About'), href: '/about' },
-    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
+    { id: 'teamwork', label: tr('nav.teamwork', 'Teams'), href: '/teamwork' },
+    {
+      id: 'profile',
+      label: tr('nav.profile', 'Profile'),
+      href: '/profile',
+      children: [
+        { id: 'help', label: tr('nav.help', 'Help'), href: '/help' },
+        { id: 'about', label: tr('nav.about', 'About'), href: '/about' },
+        { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
+      ],
+    },
   ];
   const fallbackStaffNav = [
     { id: 'admin', label: tr('nav.dashboard', 'Dashboard'), href: '/admin' },
-    { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
-    { id: 'admin-schedule', label: tr('nav.scheduleList', 'Schedule list'), href: '/admin/schedule-list' },
-    { id: 'admin-students', label: tr('nav.students', 'Students'), href: '/admin?tab=admin-users' },
-    { id: 'admin-groups', label: tr('nav.groups', 'Groups'), href: '/admin?tab=admin-users' },
+    { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule', children: [
+      { id: 'admin-schedule', label: tr('nav.scheduleList', 'Schedule list'), href: '/admin/schedule-list' },
+      { id: 'admin-homework', label: tr('nav.homework', 'Homework'), href: '/admin?tab=admin-homework' },
+    ] },
     { id: 'admin-subjects', label: tr('nav.subjects', 'Subjects'), href: '/admin?tab=admin-subjects' },
-    { id: 'admin-homework', label: tr('nav.homework', 'Homework'), href: '/admin?tab=admin-homework' },
-    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/admin?tab=admin-messages' },
-    { id: 'setup', label: tr('nav.academicSetup', 'Academic Setup'), href: '/admin/pathways' },
-    { id: 'reports', label: tr('nav.reports', 'Reports'), href: '/admin/overview' },
+    { id: 'admin-students', label: tr('nav.students', 'Students'), href: '/admin?tab=admin-users' },
+    { id: 'setup', label: tr('nav.academicSetup', 'Structure'), href: '/admin/pathways' },
     { id: 'profile', label: tr('nav.settings', 'Settings'), href: '/profile' },
-    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackLimitedStaffNav = [
     { id: 'admin', label: tr('nav.dashboard', 'Dashboard'), href: '/admin' },
     { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
     { id: 'admin-homework', label: tr('nav.homework', 'Homework'), href: '/admin?tab=admin-homework' },
-    { id: 'admin-teamwork', label: tr('nav.teamwork', 'Teamwork'), href: '/admin?tab=admin-teamwork' },
-    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/admin?tab=admin-messages' },
+    { id: 'admin-teamwork', label: tr('nav.teamwork', 'Teams'), href: '/admin?tab=admin-teamwork' },
     { id: 'profile', label: tr('nav.settings', 'Settings'), href: '/profile' },
-    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackTeacherNav = [
     { id: 'teacher-hub', label: tr('nav.home', 'Home'), href: '/teacher' },
     { id: 'schedule', label: tr('nav.schedule', 'Schedule'), href: '/schedule' },
-    { id: 'teacher-subjects', label: tr('nav.subjects', 'Subjects'), href: '/teacher/subjects' },
-    { id: 'teacher-workspace', label: tr('nav.homework', 'Homework'), href: '/teacher/workspace' },
-    { id: 'messages', label: tr('nav.messages', 'Messages'), href: '/schedule?panel=messages', navAction: 'messages' },
-    { id: 'teamwork', label: tr('nav.teamwork', 'Teamwork'), href: '/teamwork' },
+    { id: 'teacher-subjects', label: tr('nav.subjects', 'Subjects'), href: '/teacher/subjects', children: [
+      { id: 'teacher-workspace', label: tr('nav.homework', 'Homework'), href: '/teacher/workspace' },
+    ] },
+    { id: 'teamwork', label: tr('nav.teamwork', 'Teams'), href: '/teamwork' },
     { id: 'profile', label: tr('nav.settings', 'Settings'), href: '/profile' },
-    { id: 'help', label: tr('nav.help', 'Help'), href: '/help' },
-    { id: 'about', label: tr('nav.about', 'About'), href: '/about' },
-    { id: 'theme', label: tr('nav.theme', 'Theme'), navAction: 'theme-toggle' },
   ];
   const fallbackNavItems = hasRole('admin')
     ? fallbackStaffNav
@@ -110,27 +114,6 @@
       : (hasRole('teacher') ? fallbackTeacherNav : fallbackStudentNav));
   const navSourceItems = isDemoMode ? fallbackNavItems : (providedNavItems.length ? providedNavItems : fallbackNavItems);
   const safeNavItems = markCurrent(navSourceItems);
-  const flattenSidebarItems = (items) => items.reduce((result, item) => {
-    if (!item || item.hidden || String(item.section || 'main') !== 'main') {
-      return result;
-    }
-    if (item.navAction === 'theme-toggle') {
-      return result;
-    }
-    const children = Array.isArray(item.children) ? item.children : [];
-    if (!item.hideInSidebar && ((item.href && !item.isDisabledLink) || item.navAction || !children.length || item.isCurrent || item.isCurrentContainer)) {
-      result.push({
-        ...item,
-        children: [],
-        isCurrent: Boolean(item.isCurrent),
-        isCurrentContainer: Boolean(item.isCurrentContainer),
-      });
-    }
-    if (children.length) {
-      result.push(...flattenSidebarItems(children));
-    }
-    return result;
-  }, []);
   const navOrderMap = new Map([
     ['home', 10],
     ['teacher-hub', 10],
@@ -180,7 +163,8 @@
     }
     return 500;
   };
-  const visibleNavItems = flattenSidebarItems(safeNavItems)
+  const visibleNavItems = safeNavItems
+    .filter((item) => item && !item.hidden && String(item.section || 'main') === 'main')
     .map((item, index) => ({
       ...item,
       __sidebarIndex: index,

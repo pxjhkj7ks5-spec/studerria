@@ -851,13 +851,6 @@
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'teacher-workspace', pageTitle: 'Шаблони ДЗ', settings: settings }) %>
-    <%- include('partials/desktop-menu-drawer', {
-      role,
-      t,
-      activePage: 'teacher-workspace',
-      settings: (typeof settings !== 'undefined') ? settings : null,
-    }) %>
-
     <main class="container workspace-shell">
       <% if (error) { %>
         <div class="alert alert-danger glass mb-3"><%= error %></div>
@@ -1834,14 +1827,12 @@
     </main>
 
     <%- include('partials/changelog-modal') %>
-    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'teacher-workspace' }) %>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
-    <%- include('partials/desktop-menu-drawer-script') %>
     <script>
       (function initThemeToggles() {
         function applyStandaloneTheme(rawTheme) {

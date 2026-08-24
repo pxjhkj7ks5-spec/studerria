@@ -330,7 +330,7 @@
     <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
-    <title>Academic Setup v2 · Усі слоти розкладу</title>
+    <title>Studerria · Усі заняття</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -345,8 +345,9 @@
     />
     <link rel="stylesheet" href="/css/pages/admin-academic-v2.css" />
     <link rel="stylesheet" href="/css/mobile-workflows.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/studerria-core.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
-  <body>
+  <body class="theme-light page-admin-academic-v2">
     <%- include('partials/theme-bootstrap-body') %>
 
     <main class="academic-v2-page">
@@ -354,10 +355,10 @@
         <section class="academic-v2-hero">
           <div class="academic-v2-hero-grid">
             <div>
-              <span class="academic-v2-kicker">Studerria Academic Operations</span>
-              <h1 class="academic-v2-title">Усі слоти розкладу окремо від workspace.</h1>
+              <span class="academic-v2-kicker">Studerria</span>
+              <h1 class="academic-v2-title">Усі заняття семестру</h1>
               <p class="academic-v2-subtitle">
-                Це окремий список для повного перегляду слотів і детального розбору попереджень. Основний `/admin/pathways#schedule` лишається швидким grid-first редактором, а важкий перелік слотів більше не вантажиться там повністю.
+                Перевіряй заняття, фільтруй список і виправляй попередження, не перевантажуючи основний екран розкладу.
               </p>
               <div class="academic-v2-list-hero-actions">
                 <a class="btn btn-primary btn-lg" href="<%= `${buildWorkspaceHref()}#schedule` %>">Назад у workspace розкладу</a>
@@ -405,7 +406,7 @@
           <div class="academic-v2-section-head">
             <div>
               <h2 class="academic-v2-section-title">Поточний контекст</h2>
-              <p class="academic-v2-section-copy">Це той самий scope, з якого відкрився schedule workspace. Новий список не змінює focus, лише показує детальніший і легший для браузера зріз.</p>
+              <p class="academic-v2-section-copy">Програма, курс і семестр, для яких зараз показано заняття.</p>
             </div>
             <div class="academic-v2-chip-row">
               <% workspaceScopeSummary.forEach((item) => { %>
@@ -558,9 +559,9 @@
             <div class="academic-v2-subcard-topline">Пояснення</div>
             <h2 class="h4 mb-2">Чому цей екран окремий</h2>
             <div class="academic-v2-list-card-meta">
-              <span>Основний workspace `Розклад` потрібен для швидкого placement і редагування.</span>
-              <span>Повний перелік слотів, grouped views і warning audit дають багато важкого HTML, тому вони винесені сюди окремо.</span>
-              <span>Дані лишаються тими самими: джерело правди тут і в workspace одне й те саме, `academic_v2_schedule_entries`.</span>
+              <span>На основному екрані зручно швидко додавати й редагувати заняття.</span>
+              <span>Тут зібрано повний список і всі попередження для спокійної перевірки.</span>
+              <span>Зміни одразу потрапляють у спільний розклад сайту й бота.</span>
             </div>
             <div class="academic-v2-list-card-actions">
               <a class="btn btn-outline-secondary" href="<%= `${buildWorkspaceHref()}#schedule` %>">Повернутись до календаря</a>
@@ -574,7 +575,7 @@
           <div class="academic-v2-section-head">
             <div>
               <h2 class="academic-v2-section-title">Усі слоти</h2>
-              <p class="academic-v2-section-copy">Повний перелік слотів для вибраного курсу і терму. Тут видно day/class/week/activity/groups/teachers без урізання preview.</p>
+              <p class="academic-v2-section-copy">Повний перелік занять для вибраного курсу й семестру.</p>
             </div>
             <div class="academic-v2-chip-row">
               <span class="academic-v2-chip"><%= filteredScheduleEntries.length %> слотів у поточному фільтрі</span>
@@ -593,6 +594,7 @@
                         <span class="academic-v2-chip">Тиждень <%= entry.week_number %></span>
                         <span class="academic-v2-chip"><%= entry.day_of_week %></span>
                         <span class="academic-v2-chip">Пара <%= entry.class_number %></span>
+                        <% if (entry.room_label) { %><span class="academic-v2-chip"><%= entry.room_label %></span><% } %>
                       </div>
                     </div>
                     <div class="academic-v2-chip-row">
@@ -607,6 +609,7 @@
                     <span>Підгрупи: <%= entry.target_group_label %></span>
                     <span>Викладачі: <%= entry.teacher_names.length ? entry.teacher_names.join(', ') : 'Не призначено' %></span>
                     <span>Терм: <%= entry.term_title || (selectedTermRecord ? selectedTermRecord.title : '—') %></span>
+                    <% if (entry.room_label) { %><span>Аудиторія: <%= entry.room_label %></span><% } %>
                   </div>
                   <% if (entry.warning_labels.length) { %>
                     <div class="academic-v2-chip-row mt-3">

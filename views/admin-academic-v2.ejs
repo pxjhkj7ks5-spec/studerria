@@ -696,8 +696,9 @@
     />
     <link rel="stylesheet" href="/css/pages/admin-academic-v2.css" />
     <link rel="stylesheet" href="/css/mobile-workflows.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/studerria-core.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
-  <body>
+  <body class="theme-light page-admin-academic-v2">
     <%- include('partials/theme-bootstrap-body') %>
 
     <main class="academic-v2-page">
@@ -2780,7 +2781,7 @@
                         rows="9"
                         required
                         spellcheck="false"
-                        placeholder="STUDERRIA_SCHEDULE_V1&#10;Міжнародне право | лекція | понеділок | 2 | 1-15 | усі&#10;Англійська мова | семінар | вівторок | 1 | 1-15 | 1, 2, 3"
+                        placeholder="STUDERRIA_SCHEDULE_V2&#10;Мікроекономіка | лекція | вівторок | 2 | 1-15 | усі | 7-306&#10;Англійська мова | семінар | понеділок | 1 | 1-15 | 1, 2, 3 | онлайн"
                       ></textarea>
                     </label>
                     <div class="academic-v2-import-actions mt-2">
@@ -2792,7 +2793,7 @@
                     </div>
                     <details class="academic-v2-help-details mt-2">
                       <summary>Формат для Codex</summary>
-                      <div class="academic-v2-muted mt-2">Один рядок = предмет | тип заняття | день | номер пари | тижні | групи. Лекції позначай «усі», семінари й мови — номерами груп. Діапазони тижнів можна писати як 1-15.</div>
+                      <div class="academic-v2-muted mt-2">Один рядок = предмет | тип заняття | день | номер пари | тижні | групи | аудиторія. Лекції позначай «усі», семінари й мови — номерами груп. Підійдуть і діапазони 1-15, і окремі тижні 1, 2, 7-10, 15. Аудиторію можна не вказувати.</div>
                     </details>
                   </form>
 
@@ -2854,6 +2855,7 @@
                     <%- renderFocusFields() %>
                     <input type="hidden" name="schedule_entry_id" value="" data-editor-input="schedule.id" />
                     <input id="scheduleActivity" type="hidden" name="group_subject_activity_id" value="" data-editor-input="schedule.group_subject_activity_id" />
+                    <input type="hidden" name="room_id" value="" data-editor-input="schedule.room_id" />
                     <div class="academic-v2-section-head academic-v2-section-head--tight">
                       <div>
                         <div class="academic-v2-subcard-topline">Ручний режим</div>
@@ -2924,7 +2926,7 @@
                             <div class="d-flex flex-wrap justify-content-between gap-2">
                               <div>
                                 <strong><%= entry.subject_title %></strong>
-                                <div class="academic-v2-muted"><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %> · <%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %></div>
+                                <div class="academic-v2-muted"><%= entry.day_of_week %> · пара <%= entry.class_number %> · тиждень <%= entry.week_number %> · <%= entry.activity_label || entry.activity_type %> · <%= entry.target_group_label %><%= entry.room_label ? ` · ${entry.room_label}` : '' %></div>
                               </div>
                               <div class="academic-v2-actions">
                                 <button type="button" class="btn btn-sm btn-primary" data-editor-target="schedule" data-editor-payload='<%- toAttr(entry) %>'>Редагувати</button>

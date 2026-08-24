@@ -89,7 +89,6 @@
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'subjects', pageTitle: subjectsCopy.pageTitle }) %>
-    <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'subjects' }) %>
 
     <main class="container py-4">
       <% if (messages && messages.error) { %>
@@ -240,7 +239,6 @@
     </main>
 
     <%- include('partials/app-footer') %>
-    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'subjects' }) %>
     <%- include('partials/changelog-modal') %>
 
     <script
@@ -266,7 +264,6 @@
         });
       });
     </script>
-    <%- include('partials/desktop-menu-drawer-script') %>
     <script src="/js/design-system.js" defer></script>
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>

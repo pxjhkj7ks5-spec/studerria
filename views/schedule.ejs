@@ -1149,85 +1149,9 @@
         justify-content: center;
         padding: 0 5px;
       }
-      button.mobile-menu-btn {
-        border-radius: 999px;
-        width: 38px;
-        height: 38px;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-      }
-      .mobile-menu-action {
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        background: rgba(255, 255, 255, 0.12);
-        color: rgba(255, 255, 255, 0.92);
-        text-align: left;
-        font-size: 0.95rem;
-        padding: 12px 14px;
-        width: 100%;
-      }
-      .mobile-menu-action:hover {
-        background: rgba(255, 255, 255, 0.14);
-        border-color: rgba(255, 255, 255, 0.3);
-      }
-      body.theme-dark .mobile-menu-action {
-        color: #f8fafc !important;
-      }
-      body.theme-dark .mobile-menu-action:hover {
-        color: #f8fafc !important;
-      }
-      body.theme-light .mobile-menu-action {
-        background: rgba(255, 255, 255, 0.82);
-        border-color: rgba(15, 23, 42, 0.14);
-        color: #0f172a;
-      }
-      body.theme-light .mobile-menu-action:hover {
-        background: rgba(255, 255, 255, 0.9);
-        border-color: rgba(15, 23, 42, 0.2);
-      }
-      #mobileMenuModal .modal-content {
-        border-radius: 18px;
-        background: rgba(20, 24, 36, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-      }
-      body.theme-light #mobileMenuModal .modal-content {
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid rgba(15, 23, 42, 0.1);
-      }
-      #mobileMenuModal .modal-header {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        padding: 14px 16px;
-      }
-      body.theme-light #mobileMenuModal .modal-header {
-        border-bottom: 1px solid rgba(15, 23, 42, 0.12);
-      }
-      #mobileMenuModal .modal-title {
-        font-size: 1.05rem;
-        font-weight: 700;
-      }
-      #mobileMenuModal .modal-body {
-        padding: 12px 16px 16px;
-      }
-      #mobileMenuModal .btn-close {
-        filter: brightness(1.35);
-        opacity: 0.9;
-      }
-      body.theme-dark #mobileMenuModal .btn-close {
-        filter: invert(1) brightness(1.2);
-        opacity: 0.95;
-      }
-      body.theme-light #mobileMenuModal .btn-close {
-        filter: none;
-        opacity: 0.75;
-      }
       @media (max-width: 768px) {
         .topbar-actions .desktop-only {
           display: none !important;
-        }
-        .topbar-actions .mobile-menu-btn {
-          display: inline-flex !important;
         }
         .topbar-actions {
           gap: 8px;
@@ -2199,55 +2123,6 @@
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/studerria-background') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'schedule' }) %>
-    <aside class="schedule-drawer" id="scheduleActionDrawer" aria-hidden="true">
-      <div class="drawer-head">
-        <div class="drawer-title"><%= t('schedule.drawer.title') %></div>
-        <button class="drawer-close" type="button" id="scheduleDrawerClose" aria-label="<%= t('navigation.closeMenu') %>">✕</button>
-      </div>
-      <div class="drawer-actions">
-        <% if (role === 'admin') { %>
-          <form method="POST" action="/admin/switch-to-admin" class="drawer-action-wrap">
-            <button class="drawer-action" type="submit">🛠️ <%= t('schedule.backToAdmin') %></button>
-          </form>
-        <% } else if (hasCustomAdminPanelAccess) { %>
-          <a class="drawer-action" href="<%= customAdminPanelHref || '/admin' %>">🛠️ <%= t('schedule.backToAdmin') %></a>
-        <% } %>
-        <% if (role === 'starosta') { %>
-          <a class="drawer-action" href="/starosta">🧑‍🏫 <%= t('menu.starosta') %></a>
-        <% } %>
-        <% if (role === 'deanery') { %>
-          <a class="drawer-action" href="/deanery">🏛️ <%= t('menu.deanery') %></a>
-        <% } %>
-        <a class="drawer-action" href="/home">🏠 <%= t('schedule.drawer.home') %></a>
-        <a class="drawer-action" href="/journal">📘 <%= t('schedule.drawer.journal') %></a>
-        <a class="drawer-action" href="/teamwork">🤝 <%= t('menu.teamwork') %></a>
-        <a class="drawer-action" href="/subjects">📚 <%= t('schedule.drawer.subjects') %></a>
-        <% if (role === 'teacher') { %>
-          <a class="drawer-action" href="/teacher/workspace"><%= t('teacherHub.action.workspace') %></a>
-        <% } %>
-        <% if (canUseCustomDeadlinesUi) { %>
-          <button class="drawer-action" type="button" data-bs-toggle="modal" data-bs-target="#customDeadlineModal">
-            🌀 <%= t('schedule.drawer.customDeadlines') %>
-          </button>
-        <% } %>
-        <% if (settings && settings.allow_messages) { %>
-          <button class="drawer-action" type="button" id="messagesBtn" aria-label="<%= t('messages.aria') %>">💬 <%= t('schedule.drawer.messages') %></button>
-        <% } %>
-        <a class="drawer-action" href="/profile">👤 <%= t('schedule.profile') %></a>
-        <button
-          class="drawer-action theme-toggle"
-          type="button"
-          data-light-label="☀️ <%= t('schedule.drawer.themeToggle') %>"
-          data-dark-label="🌙 <%= t('schedule.drawer.themeToggle') %>"
-        >
-          🌙 <%= t('schedule.drawer.themeToggle') %>
-        </button>
-        <form method="POST" action="/logout" class="drawer-action-wrap">
-          <button class="drawer-action" type="submit">🚪 <%= t('schedule.logout') %></button>
-        </form>
-      </div>
-    </aside>
-
     <div class="schedule-shell" id="scheduleShell">
       <main class="container pt-2 pb-4 schedule-content enter">
         <% if (subgroupError === 'exists') { %>
@@ -3387,7 +3262,6 @@
     </div>
     <% } %>
 
-    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'schedule' }) %>
 
     <% if (settings && settings.allow_messages) { %>
     <div class="modal fade" id="messagesModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
@@ -3433,7 +3307,7 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-welcome-modal">
           <div class="modal-body text-center">
-              <div class="welcome-title mb-2">👋 <%= t('schedule.welcome.title') %></div>
+              <div class="welcome-title mb-2"><%= t('schedule.welcome.title') %></div>
               <div class="welcome-subtitle mb-3">
                 <%= t('schedule.welcome.subtitle') %>
               </div>
@@ -4879,19 +4753,12 @@
       const weekTodayBtn = document.getElementById('weekTodayBtn');
       const weekCurrentBtn = document.getElementById('weekCurrentBtn');
       const weekTitlePrefix = <%- JSON.stringify(lang === 'en' ? 'WEEK' : 'ТИЖДЕНЬ').replace(/</g, '\\u003c') %>;
-      const messagesBtn = document.getElementById('messagesBtn');
-      const messagesBtnMobile = document.getElementById('messagesBtnMobile');
       const messagesList = document.getElementById('messagesList');
-      const messagesBadge = document.getElementById('messagesBadge');
-      const mobileMenuBadge = document.getElementById('mobileMenuBadge');
       const messagesSubjectFilter = document.getElementById('messagesSubjectFilter');
       const messagesTypeFilter = document.getElementById('messagesTypeFilter');
       const messagesModalEl = document.getElementById('messagesModal');
       const weekPrev = document.getElementById('weekPrev');
       const weekNext = document.getElementById('weekNext');
-      const scheduleDrawer = document.getElementById('scheduleActionDrawer');
-      const scheduleDrawerToggle = document.getElementById('scheduleDrawerToggle');
-      const scheduleDrawerClose = document.getElementById('scheduleDrawerClose');
       const densityChipBalance = document.getElementById('densityChipBalance');
       const densityChipEvening = document.getElementById('densityChipEvening');
       const densityChipPeak = document.getElementById('densityChipPeak');
@@ -4904,35 +4771,6 @@
       });
       let currentWeek = <%= currentWeek %>;
       const weekLabelText = <%- JSON.stringify(t('schedule.week')).replace(/</g, '\\u003c') %>;
-      function setDrawerOpen(open) {
-        if (!scheduleDrawer) return;
-        document.body.classList.toggle('schedule-drawer-open', open);
-        scheduleDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-        if (scheduleDrawerToggle) {
-          scheduleDrawerToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        }
-      }
-
-      if (scheduleDrawerToggle && scheduleDrawer) {
-        scheduleDrawerToggle.addEventListener('click', () => {
-          const isOpen = document.body.classList.contains('schedule-drawer-open');
-          setDrawerOpen(!isOpen);
-        });
-      }
-
-      if (scheduleDrawerClose && scheduleDrawer) {
-        scheduleDrawerClose.addEventListener('click', () => setDrawerOpen(false));
-      }
-
-      document.addEventListener('click', (event) => {
-        if (!scheduleDrawer || !document.body.classList.contains('schedule-drawer-open')) return;
-        const insideDrawer = scheduleDrawer.contains(event.target);
-        const onToggle = scheduleDrawerToggle && scheduleDrawerToggle.contains(event.target);
-        if (!insideDrawer && !onToggle) {
-          setDrawerOpen(false);
-        }
-      });
-
       let isWeekSwitching = false;
       let weekDebounceUntil = 0;
       const weekDebounceMs = 240;
@@ -5099,24 +4937,8 @@
       }
 
       window.addEventListener('resize', () => {
-        if (window.innerWidth < 992) {
-          setDrawerOpen(false);
-        }
         syncWeekPager(currentWeek);
       });
-      if (messagesBtnMobile) {
-        messagesBtnMobile.addEventListener('click', () => {
-          const mobileMenu = document.getElementById('mobileMenuModal');
-          if (mobileMenu) {
-            const menuInstance = bootstrap.Modal.getInstance(mobileMenu) || new bootstrap.Modal(mobileMenu);
-            menuInstance.hide();
-          }
-          if (!messagesModalEl) return;
-          const modal = bootstrap.Modal.getOrCreateInstance(messagesModalEl);
-          modal.show();
-        });
-      }
-
       const customDeadlineModal = document.getElementById('customDeadlineViewModal');
       const customDeadlineSubject = document.getElementById('customDeadlineSubject');
       const customDeadlineDue = document.getElementById('customDeadlineDue');
@@ -5434,20 +5256,9 @@
       applyScheduleMode(currentScheduleMode, { persist: false, bounce: false });
 
       function updateUnreadBadges(count) {
-        const targets = [messagesBadge, mobileMenuBadge].filter(Boolean);
         window.dispatchEvent(new CustomEvent('studerria:messages-unread', {
           detail: { count: Number(count) || 0 },
         }));
-        if (!targets.length) return;
-        if (count > 0) {
-          const value = count > 99 ? '99+' : String(count);
-          targets.forEach((badge) => {
-            badge.textContent = value;
-            badge.classList.remove('d-none');
-          });
-        } else {
-          targets.forEach((badge) => badge.classList.add('d-none'));
-        }
       }
 
       const scheduleContent = document.querySelector('.schedule-content');
@@ -5472,10 +5283,6 @@
       }
 
       window.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && document.body.classList.contains('schedule-drawer-open')) {
-          setDrawerOpen(false);
-          return;
-        }
         if (event.key === 'ArrowRight') {
           animateWeekChange(currentWeek + 1);
         }
@@ -5650,6 +5457,7 @@
       }
 
       function updateSmartHighlights() {
+        if (document.hidden) return;
         const now = new Date();
         const kyivToday = now.toLocaleDateString('en-CA', { timeZone: scheduleTimeZone });
         // Keep the "Next" marker working even when today's visible day exists but has no classes.
@@ -5882,8 +5690,7 @@
       let unreadBadgeRequestToken = 0;
 
       async function refreshUnreadBadges() {
-        const targets = [messagesBadge, mobileMenuBadge].filter(Boolean);
-        if (!targets.length) return;
+        if (document.hidden) return;
         const requestToken = ++unreadBadgeRequestToken;
         try {
           const res = await fetch('/messages.json', {
@@ -6084,14 +5891,6 @@
         });
       }
 
-      if (messagesBtn) {
-        messagesBtn.addEventListener('click', () => {
-          setDrawerOpen(false);
-          if (!messagesModalEl) return;
-          const modal = bootstrap.Modal.getOrCreateInstance(messagesModalEl);
-          modal.show();
-        });
-      }
       if (messagesSubjectFilter) {
         messagesSubjectFilter.addEventListener('change', () => {
           loadMessages({ markAsRead: true, showLoading: true });
@@ -6161,8 +5960,6 @@
         });
       }
 
-      refreshUnreadBadges();
-      setInterval(refreshUnreadBadges, 60000);
       if (messagesModalEl) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('panel') === 'messages') {

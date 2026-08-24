@@ -4,10 +4,10 @@ const { parseScheduleImportText } = require('../lib/scheduleTextImport');
 
 test('parses the assistant-friendly Studerria schedule format', () => {
   const result = parseScheduleImportText(`
-STUDERRIA_SCHEDULE_V1
-# Предмет | Тип | День | Пара | Тижні | Групи
-Міжнародне право | лекція | понеділок | 2 | 1-3, 5 | усі
-Англійська мова\tсемінар\tвівторок\t1\t2-4\t1, 2, 3
+STUDERRIA_SCHEDULE_V2
+# Предмет | Тип | День | Пара | Тижні | Групи | Аудиторія
+Міжнародне право | л | понеділок | 2 | 1-3, 5 | усі | 7-306
+Англійська мова\tс\tвівторок\t1\t2-4\t1, 2, 3\tонлайн
   `);
 
   assert.deepEqual(result.errors, []);
@@ -21,8 +21,16 @@ STUDERRIA_SCHEDULE_V1
     weekNumbers: [1, 2, 3, 5],
     allGroups: true,
     targetGroupNumbers: [],
+    roomLabel: '7-306',
   });
   assert.deepEqual(result.entries[1].targetGroupNumbers, [1, 2, 3]);
+  assert.equal(result.entries[1].roomLabel, 'онлайн');
+});
+
+test('keeps the six-column V1 format compatible', () => {
+  const result = parseScheduleImportText('STUDERRIA_SCHEDULE_V1\nПредмет | лекція | понеділок | 1 | 1-2 | усі');
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.entries[0].roomLabel, '');
 });
 
 test('returns line-specific validation errors', () => {

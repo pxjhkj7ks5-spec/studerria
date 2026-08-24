@@ -332,6 +332,7 @@
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/register-groups.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/studerria-core.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="studerria-theme theme-light page-register-subjects">
     <%- include('partials/theme-bootstrap-body') %>
@@ -343,10 +344,10 @@
         type="button"
         id="themeToggle"
         aria-label="Змінити тему"
-        data-light-label="☀️"
-        data-dark-label="🌙"
+        data-light-label="<%= lang === 'en' ? 'Light' : 'Світла' %>"
+        data-dark-label="<%= lang === 'en' ? 'Dark' : 'Темна' %>"
       >
-        🌙
+        <%= lang === 'en' ? 'Theme' : 'Тема' %>
       </button>
     </div>
 
@@ -413,8 +414,8 @@
                       <button type="submit" class="btn btn-primary"><%= t('registerSubjects.finish') %></button>
                       <span class="text-muted small">
                         <%= lang === 'en'
-                          ? 'Required disciplines are already assigned. Finish registration to open Home and Schedule.'
-                          : 'Обов’язкові дисципліни вже призначені. Завершіть реєстрацію, щоб відкрити Home і розклад.' %>
+                          ? 'Required disciplines are already assigned. Finish registration to open your home page and schedule.'
+                          : 'Обов’язкові предмети вже призначені. Завершіть реєстрацію, щоб відкрити головну і розклад.' %>
                       </span>
                     <% } else { %>
                       <a class="btn btn-outline-secondary" href="/register/course">
@@ -422,8 +423,8 @@
                       </a>
                       <span class="text-muted small">
                         <%= lang === 'en'
-                          ? 'This pathway currently exposes no disciplines, so the student would enter Home with an empty study route until an administrator fixes the cohort mapping.'
-                          : 'Цей pathway зараз не відкриває жодної дисципліни, тому студент потрапить на Home з порожнім навчальним маршрутом, доки адміністратор не виправить мапінг когорти.' %>
+                          ? 'Subjects for this admission year are still being prepared. Return to the previous step or try again later.'
+                          : 'Предмети для цього року вступу ще готуються. Поверніться на попередній крок або спробуйте пізніше.' %>
                       </span>
                     <% } %>
                   </div>
@@ -457,7 +458,7 @@
                   <section class="reg-groups-surface reg-groups-list-panel">
                     <div class="reg-groups-list-head">
                       <div>
-                        <span class="reg-groups-kicker"><%= lang === 'en' ? 'Registration catalog' : 'Каталог реєстрації' %></span>
+                        <span class="reg-groups-kicker"><%= lang === 'en' ? 'Subjects and groups' : 'Предмети та групи' %></span>
                         <p class="reg-groups-list-head__copy mb-0">
                           <%= lang === 'en'
                             ? `${totalVisibleCount} disciplines are visible in this route.`
@@ -466,7 +467,7 @@
                       </div>
                       <div class="reg-groups-list-head__meta" aria-label="<%= lang === 'en' ? 'Catalog summary' : 'Підсумок каталогу' %>">
                         <% if (autoAssignedCount) { %>
-                          <span class="reg-groups-list-head__pill"><%= autoAssignedCount %> <%= lang === 'en' ? 'auto-ready' : 'авто-готово' %></span>
+                          <span class="reg-groups-list-head__pill"><%= autoAssignedCount %> <%= lang === 'en' ? 'assigned' : 'призначено' %></span>
                         <% } %>
                         <% if (pendingSelectableSubjects.length) { %>
                           <span class="reg-groups-list-head__pill is-pending"><%= pendingSelectableSubjects.length %> <%= lang === 'en' ? 'need your choice' : 'потребують вибору' %></span>

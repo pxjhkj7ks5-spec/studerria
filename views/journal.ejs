@@ -496,7 +496,6 @@
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'journal', pageTitle: journalCopy.pageTitle }) %>
-    <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal' }) %>
 
     <main class="container py-4">
       <%
@@ -1351,7 +1350,6 @@
     </main>
 
     <%- include('partials/app-footer') %>
-    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'journal' }) %>
     <%- include('partials/changelog-modal') %>
 
     <div class="modal fade" id="journalCellModal" tabindex="-1" aria-hidden="true">
@@ -4223,7 +4221,6 @@
         openAttendanceQuickModal();
       }
     </script>
-    <%- include('partials/desktop-menu-drawer-script') %>
     <script src="/js/design-system.js" defer></script>
       <script src="/js/dynamic-bg.js?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" defer></script>
   </body>

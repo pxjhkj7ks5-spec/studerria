@@ -22,6 +22,7 @@ function createScheduleStore(initialEntries = []) {
       class_number: Number(row.class_number || 1),
       week_number: Number(row.week_number || 1),
       lesson_type: row.lesson_type || 'lecture',
+      room_id: Number(row.room_id || 0) || null,
     })),
   };
 
@@ -47,11 +48,16 @@ function createScheduleStore(initialEntries = []) {
           stage_subject_template_id: 70,
           stage_group_count: 1,
           stage_default_group: 1,
+          legacy_course_id: 80,
         };
       }
 
       if (query.includes('FROM academic_v2_terms') && query.includes('WHERE id = ?')) {
         return { id: Number(params[0] || 30), group_id: 50 };
+      }
+
+      if (query.includes('FROM rooms') && query.includes('WHERE id = ?')) {
+        return Number(params[0] || 0) === 90 ? { id: 90, course_id: 80 } : null;
       }
 
       if (
@@ -87,6 +93,7 @@ function createScheduleStore(initialEntries = []) {
           class_number: Number(params[6] || 0),
           week_number: Number(params[7] || 0),
           lesson_type: params[8],
+          room_id: Number(params[9] || 0) || null,
         };
         state.nextId += 1;
         state.entries.push(row);
@@ -237,4 +244,21 @@ test('saveScheduleEntry appends a new day without deleting an existing day for t
     store.state.entries.map((entry) => `${entry.day_of_week}:${entry.week_number}`).sort(),
     ['Monday:2', 'Wednesday:2']
   );
+});
+
+test('saveScheduleEntry keeps a valid room on every generated week', async () => {
+  const store = createScheduleStore();
+
+  await withMutedProjectionErrors(() => academicV2Helpers.saveScheduleEntry(store, {
+    group_subject_activity_id: 20,
+    term_id: 30,
+    day_of_week: 'Monday',
+    class_number: 3,
+    week_numbers: [2, 3],
+    group_number: 1,
+    target_group_numbers: [],
+    room_id: 90,
+  }));
+
+  assert.deepEqual(store.state.entries.map((entry) => entry.room_id), [90, 90]);
 });

@@ -610,7 +610,6 @@
     <%- include('partials/theme-bootstrap-body') %>
     <%- include('partials/dynamic-bg') %>
     <%- include('partials/topbar', { role, username, t, activePage: 'journal-insights', pageTitle: t('journalInsights.title'), settings: settings }) %>
-    <%- include('partials/desktop-menu-drawer', { role, t, activePage: 'journal-insights', settings: settings }) %>
 
     <main class="container shell">
       <% if (error) { %>
@@ -961,13 +960,11 @@
     </main>
 
     <%- include('partials/changelog-modal') %>
-    <%- include('partials/mobile-menu-modal', { role, t, activePage: 'journal-insights', settings: settings }) %>
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
-    <%- include('partials/desktop-menu-drawer-script') %>
     <script src="/js/design-system.js" defer></script>
     <script>
       (function initThemeToggles() {

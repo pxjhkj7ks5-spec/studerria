@@ -392,12 +392,12 @@
 
   function initUnreadIndicators(root) {
     if (!(root instanceof HTMLElement)) {
-      return;
+      return false;
     }
 
     const indicators = Array.from(root.querySelectorAll('[data-message-indicator]'));
     if (!indicators.length) {
-      return;
+      return false;
     }
 
     let requestToken = 0;
@@ -416,6 +416,9 @@
     };
 
     const fetchUnreadState = async () => {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
       const token = ++requestToken;
       try {
         const response = await fetch('/messages.json', {
@@ -460,6 +463,7 @@
 
     fetchUnreadState();
     window.setInterval(fetchUnreadState, 60000);
+    return true;
   }
 
   function initMessagesSocket() {
@@ -468,9 +472,18 @@
     }
     window[MESSAGE_SOCKET_BOOT_FLAG] = true;
 
+    let retryDelay = 3000;
     const connect = () => {
+      if (document.visibilityState === 'hidden') {
+        window.setTimeout(connect, retryDelay);
+        return;
+      }
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
       const socket = new window.WebSocket(`${protocol}://${window.location.host}/ws?channel=messages`);
+
+      socket.addEventListener('open', () => {
+        retryDelay = 3000;
+      });
 
       socket.addEventListener('message', (event) => {
         try {
@@ -485,7 +498,8 @@
       });
 
       socket.addEventListener('close', () => {
-        window.setTimeout(connect, 3000);
+        window.setTimeout(connect, retryDelay);
+        retryDelay = Math.min(30000, retryDelay * 2);
       });
     };
 
@@ -499,8 +513,9 @@
     root.dataset.navReady = '1';
 
     initViewportMetrics();
-    initUnreadIndicators(root);
-    initMessagesSocket();
+    if (initUnreadIndicators(root)) {
+      initMessagesSocket();
+    }
     syncMobileThemeLabels(root);
     window.addEventListener('studerria:theme-toggled', () => syncMobileThemeLabels(root));
 

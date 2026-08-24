@@ -208,15 +208,6 @@
     padding: 10px;
   }
 
-  body.page-schedule .schedule-drawer {
-    width: min(420px, calc(100vw - 12px));
-    max-width: calc(100vw - 12px);
-    height: calc(100svh - 12px);
-    max-height: calc(100svh - 12px);
-    border-radius: 22px;
-    inset: 6px 6px auto auto;
-  }
-
   body.page-journal .container,
   body.page-my-day .container,
   body.page-teamwork .container,

@@ -14,7 +14,7 @@
     : (typeof selectedTrack === 'string' && selectedTrack ? selectedTrack : 'bachelor');
   const formatTrackLabel = (trackKey, fallback) => {
     const normalized = String(trackKey || '').trim().toLowerCase();
-    if (normalized === 'bachelor') return lang === 'en' ? 'Bachelor' : 'Бакалаврат';
+    if (normalized === 'bachelor') return lang === 'en' ? 'Student' : 'Студент';
     if (normalized === 'master') return lang === 'en' ? "Master's" : 'Магістратура';
     if (normalized === 'teacher') return lang === 'en' ? 'Teaching' : 'Викладацький';
     return fallback || normalized;
@@ -22,9 +22,9 @@
   const registerCourseText = lang === 'en'
     ? {
         themeToggleAria: 'Change theme',
-        introTitle: 'Course registration',
-        stepTrack: 'Level',
-        stepTrackCopy: 'Choose bachelor, master, or teaching registration.',
+        introTitle: 'Set up your studies',
+        stepTrack: 'Your role',
+        stepTrackCopy: 'Choose the student or teaching route.',
         stepProgram: 'Program',
         stepProgramCopy: 'Program defines the next available steps.',
         programStaticBadge: 'Selected',
@@ -32,7 +32,7 @@
         stepCohort: 'Admission year',
         stepCohortCopy: 'Pick the admission year you want to join.',
         stepCampus: 'Location',
-        stepCampusCopyStudent: 'Choose the location that matches your registration.',
+        stepCampusCopyStudent: 'The available location is selected automatically.',
         stepCampusCopyTeacher: 'Choose the location that matches your teaching route.',
         chooseProgram: 'Choose a program',
         chooseProgramFirst: 'Choose a program first to see the next available steps.',
@@ -62,9 +62,9 @@
       }
     : {
         themeToggleAria: 'Змінити тему',
-        introTitle: 'Реєстрація курсу',
-        stepTrack: 'Рівень',
-        stepTrackCopy: 'Оберіть бакалаврат, магістратуру або викладацький трек.',
+        introTitle: 'Налаштування навчання',
+        stepTrack: 'Хто ви?',
+        stepTrackCopy: 'Оберіть студентський або викладацький режим.',
         stepProgram: 'Програма',
         stepProgramCopy: 'Програма визначає наступні доступні кроки.',
         programStaticBadge: 'Вибрано',
@@ -72,7 +72,7 @@
         stepCohort: 'Рік вступу',
         stepCohortCopy: 'Оберіть рік вступу, до якого хочете приєднатись.',
         stepCampus: 'Локація',
-        stepCampusCopyStudent: 'Оберіть локацію, яка відповідає вашій реєстрації.',
+        stepCampusCopyStudent: 'Доступна локація підставиться автоматично.',
         stepCampusCopyTeacher: 'Оберіть локацію, яка відповідає викладацькому маршруту.',
         chooseProgram: 'Оберіть програму',
         chooseProgramFirst: 'Спершу оберіть програму, щоб побачити доступні варіанти далі.',
@@ -674,6 +674,7 @@
     <link rel="stylesheet" href="/css/design-system.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/studerria-ui.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
     <link rel="stylesheet" href="/css/dynamic-bg.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/studerria-core.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
   </head>
   <body class="studerria-theme theme-light page-register-course">
     <%- include('partials/theme-bootstrap-body') %>
@@ -684,14 +685,14 @@
         type="button"
         id="themeToggle"
         aria-label="<%= registerCourseText.themeToggleAria %>"
-        data-light-label="☀️"
-        data-dark-label="🌙"
+        data-light-label="<%= lang === 'en' ? 'Light' : 'Світла' %>"
+        data-dark-label="<%= lang === 'en' ? 'Dark' : 'Темна' %>"
       >
-        🌙
+        <%= lang === 'en' ? 'Theme' : 'Тема' %>
       </button>
     </div>
     <div class="container">
-      <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
+      <div class="row justify-content-center align-items-center" style="min-height: 100dvh;">
         <div class="col-11 col-md-10 col-lg-8 col-xl-7">
             <div class="card auth-card glass">
             <div class="card-body">
@@ -702,7 +703,7 @@
               <div class="alert alert-danger" role="alert"><%= error %></div>
               <% } %>
               <form method="POST" action="/register/course" id="registerCourseForm">
-                <section class="registration-step">
+                <section class="registration-step" id="trackStep">
                   <div class="registration-step-header">
                     <span class="registration-step-index" id="trackStepIndex">1</span>
                     <div>
@@ -711,8 +712,8 @@
                     </div>
                   </div>
                   <div class="track-grid" id="trackGrid">
-                    <% (scopeMatrix.tracks || []).forEach((track) => { %>
-                      <label class="track-option <%= track.enabled ? '' : 'is-diagnostic' %>" data-track-card="<%= track.key %>">
+                    <% (scopeMatrix.tracks || []).filter((track) => track.enabled).forEach((track) => { %>
+                      <label class="track-option" data-track-card="<%= track.key %>">
                         <input
                           type="radio"
                           name="study_track"
@@ -726,7 +727,7 @@
                   </div>
                 </section>
 
-                <section class="registration-step">
+                <section class="registration-step" id="programStep">
                   <div class="registration-step-header">
                     <span class="registration-step-index" id="programStepIndex">2</span>
                     <div>
@@ -804,7 +805,9 @@
       const scopeMatrix = <%- JSON.stringify(scopeMatrix) %>;
       const trackDiagnostics = <%- JSON.stringify(trackDiagnostics) %>;
       const trackStepIndex = document.getElementById('trackStepIndex');
+      const trackStep = document.getElementById('trackStep');
       const programStepIndex = document.getElementById('programStepIndex');
+      const programStep = document.getElementById('programStep');
       const cohortStepIndex = document.getElementById('cohortStepIndex');
       const campusStepIndex = document.getElementById('campusStepIndex');
       const trackInputs = Array.from(document.querySelectorAll('input[name="study_track"]'));
@@ -866,7 +869,7 @@
         const normalized = normalizeTrackKey(trackKey);
         if (normalized === 'master') return currentLang === 'en' ? "Master's" : 'Магістратура';
         if (normalized === 'teacher') return currentLang === 'en' ? 'Teaching' : 'Викладацький';
-        return currentLang === 'en' ? 'Bachelor' : 'Бакалаврат';
+        return currentLang === 'en' ? 'Student' : 'Студент';
       }
 
       function formatCampusLabelClient(campusKey) {
@@ -908,7 +911,7 @@
       function resolveTrackKey(preferredTrack) {
         const normalizedPreferred = normalizeTrackKey(preferredTrack);
         const trackRows = getTrackOptions();
-        if (trackRows.some((track) => track && normalizeTrackKey(track.key) === normalizedPreferred)) {
+        if (trackRows.some((track) => track && track.enabled && normalizeTrackKey(track.key) === normalizedPreferred)) {
           return normalizedPreferred;
         }
         return normalizeTrackKey((trackRows.find((track) => track && track.enabled) || trackRows[0] || {}).key || 'bachelor');
@@ -969,6 +972,9 @@
       }
 
       function syncTrackCards() {
+        if (trackStep) {
+          trackStep.classList.toggle('is-collapsed', trackInputs.length === 1);
+        }
         document.querySelectorAll('[data-track-card]').forEach((card) => {
           const trackKey = normalizeTrackKey(card.dataset.trackCard);
           const selected = trackKey === normalizeTrackKey(state.trackKey);
@@ -990,6 +996,7 @@
           clearSelectionBelowProgram();
         }
         if (!programs.length) {
+          if (programStep) programStep.classList.remove('is-collapsed');
           programField.style.display = '';
           programStaticField.style.display = 'none';
           programSelect.innerHTML = '';
@@ -997,6 +1004,7 @@
           return;
         }
         if (programs.length === 1) {
+          if (programStep) programStep.classList.add('is-collapsed');
           const onlyProgram = programs[0];
           programSelect.innerHTML = '';
           const option = document.createElement('option');
@@ -1017,6 +1025,7 @@
           return;
         }
         programField.style.display = '';
+        if (programStep) programStep.classList.remove('is-collapsed');
         programStaticField.style.display = 'none';
         programSelect.innerHTML = '';
         programs.forEach((program) => {
@@ -1127,6 +1136,7 @@
         if (!(campusOptions instanceof HTMLElement)) return;
         const teacherMode = isTeacherTrack(state.trackKey);
         campusOptions.innerHTML = '';
+        if (campusStep) campusStep.classList.remove('is-collapsed');
         if (campusStepCopy) {
           campusStepCopy.textContent = teacherMode
             ? registerCourseText.stepCampusCopyTeacher
@@ -1158,6 +1168,21 @@
 
         if (teacherMode) {
           applyTeacherDefaultCampus(campusChoices);
+        }
+
+        const selectableChoices = campusChoices.filter((choice) => choice && choice.is_selectable);
+        if (!teacherMode && selectableChoices.length === 1 && !state.campusConfirmed) {
+          const onlyChoice = selectableChoices[0];
+          state.campusKey = normalizeCampusKey(onlyChoice.campus_key);
+          state.groupId = Number(onlyChoice.group_id || 0) || null;
+          state.studyContextId = Number(onlyChoice.study_context_id || onlyChoice.group_id || 0) || null;
+          state.courseId = Number(onlyChoice.course_id || 0) || null;
+          state.cohortId = Number(onlyChoice.cohort_id || state.cohortId || 0) || state.cohortId;
+          state.cohortConfirmed = true;
+          state.campusConfirmed = true;
+        }
+        if (campusStep) {
+          campusStep.classList.toggle('is-collapsed', !teacherMode && selectableChoices.length === 1);
         }
 
         const hasSelectableCampus = campusChoices.some((choice) => choice && choice.is_selectable);
