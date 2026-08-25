@@ -424,8 +424,14 @@ test('bachelor catalog source registry exposes the expected seed size', () => {
   const source = sources.find((item) => item.key === DEFAULT_BACHELOR_CATALOG_SOURCE_KEY);
 
   assert.ok(source);
-  assert.equal(source.entry_count, 77);
-  assert.equal(listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY).length, 77);
+  assert.equal(source.entry_count, 80);
+  assert.equal(listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY).length, 80);
+  const sociology = listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY)
+    .find((item) => item.template_name === 'Соціологія');
+  assert.ok(sociology);
+  assert.equal(sociology.suggested_stage_number, 2);
+  assert.deepEqual(sociology.suggested_term_numbers, [1]);
+  assert.equal(sociology.default_group_count, 2);
 });
 
 test('bachelor catalog keeps workbook-derived third-semester placements in the source registry', () => {

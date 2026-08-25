@@ -25,6 +25,7 @@ const academicV2Helpers = require('./lib/academicV2');
 const academicV2StudentHelpers = require('./lib/academicV2Students');
 const academicV2RuntimeHelpers = require('./lib/academicV2Runtime');
 const academicSetupHelpers = require('./lib/academicSetup');
+const { collapseAcademicCourseOptions } = require('./lib/adminCourseOptions');
 const journalInsightHelpers = require('./lib/journalInsights');
 const registerSubjectHelpers = require('./lib/registerSubjects');
 const roomHelpers = require('./lib/rooms');
@@ -12848,6 +12849,7 @@ function getAcademicV2RouteMessages(req) {
     programSaved: 'Програму збережено',
     pledStructureReady: 'Структуру ПЛЕД для наборів 2024–2026 підготовлено',
     cohortSaved: 'Когорту збережено',
+    intakeCreated: 'Новий набір створено',
     groupSaved: 'Групу збережено',
     groupProjectionRebuilt: 'Сумісну legacy-проекцію перебудовано',
     termSaved: 'Терм збережено',
@@ -12868,6 +12870,8 @@ function getAcademicV2RouteMessages(req) {
     PROGRAM_NAME_REQUIRED: 'Назва програми обов’язкова',
     PROGRAM_REQUIRED: 'Спочатку виберіть програму',
     COHORT_REQUIRED: 'Спочатку виберіть когорту',
+    COHORT_YEAR_INVALID: 'Вкажіть коректний рік набору',
+    COHORT_YEAR_ALREADY_EXISTS: 'Набір цього року вже існує',
     GROUP_LABEL_REQUIRED: 'Назва групи обов’язкова',
     GROUP_REQUIRED: 'Спочатку виберіть групу',
     TERM_NOT_FOUND: 'Терм не знайдено',
@@ -12915,6 +12919,7 @@ function getAcademicV2RouteMessages(req) {
     programSaved: 'Program saved',
     pledStructureReady: 'PLED structure for the 2024–2026 cohorts is ready',
     cohortSaved: 'Cohort saved',
+    intakeCreated: 'New intake created',
     groupSaved: 'Group saved',
     groupProjectionRebuilt: 'Legacy compatibility projection rebuilt',
     termSaved: 'Term saved',
@@ -12935,6 +12940,8 @@ function getAcademicV2RouteMessages(req) {
     PROGRAM_NAME_REQUIRED: 'Program name is required',
     PROGRAM_REQUIRED: 'Select a program first',
     COHORT_REQUIRED: 'Select a cohort first',
+    COHORT_YEAR_INVALID: 'Enter a valid intake year',
+    COHORT_YEAR_ALREADY_EXISTS: 'An intake for this year already exists',
     GROUP_LABEL_REQUIRED: 'Group label is required',
     GROUP_REQUIRED: 'Select a group first',
     TERM_NOT_FOUND: 'Term not found',
@@ -49861,6 +49868,33 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
         : (courses.length ? Number(courses[0].id || baseCourseId) : baseCourseId),
       includeAcademicGroups: true,
     });
+    const collapsedCourseOptions = collapseAcademicCourseOptions(
+      courses,
+      adminAcademicScope && adminAcademicScope.availableAcademicGroups
+    );
+    const originalScopeCourseId = Number(adminAcademicScope && adminAcademicScope.courseId || 0);
+    const canonicalScopeCourseId = collapsedCourseOptions.resolveCourseId(originalScopeCourseId);
+    courses = collapsedCourseOptions.courses;
+    const visibleCourseIds = courses.map((course) => Number(course.id || 0)).filter((courseIdValue) => courseIdValue > 0);
+    adminAcademicScope.allowedCourseIds = visibleCourseIds;
+    if (canonicalScopeCourseId && canonicalScopeCourseId !== originalScopeCourseId) {
+      const canonicalCourse = courses.find((course) => Number(course.id || 0) === canonicalScopeCourseId) || null;
+      adminAcademicScope = {
+        ...adminAcademicScope,
+        courseId: canonicalScopeCourseId,
+        studyContextId: null,
+        selectedContext: null,
+        selectedCourse: canonicalCourse,
+        label: canonicalCourse ? String(canonicalCourse.name || '') : adminAcademicScope.label,
+      };
+      req.session.adminCourse = canonicalScopeCourseId;
+      req.session.adminAcademicScope = {
+        ...(req.session.adminAcademicScope || {}),
+        courseId: canonicalScopeCourseId,
+        studyContextId: null,
+        allowedCourseIds: visibleCourseIds,
+      };
+    }
   } catch (err) {
     return handleDbError(res, err, 'admin.scope');
   }
@@ -51715,6 +51749,23 @@ app.post('/admin/pathways/v2/schedule/save', requirePathwaysSectionAccess, write
       termId: Number(result && result.row && result.row.term_id) || focus.termId,
     }),
     logContext: 'admin.pathways.v2.schedule.save',
+  })
+));
+
+app.post('/admin/academic/cohorts/create', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.createCohortIntake(getAcademicV2Store(), req.body),
+    successMessageKey: 'intakeCreated',
+    focusBuilder: (result, focus) => ({
+      ...focus,
+      programId: Number(result && result.programId) || focus.programId,
+      cohortId: Number(result && result.cohortId) || focus.cohortId,
+      groupId: Number(result && result.row && result.row.id) || focus.groupId,
+      termId: null,
+      templateStageNumber: 1,
+    }),
+    extraParamsBuilder: () => ({ section: 'cohorts' }),
+    logContext: 'admin.academic.cohort.create',
   })
 ));
 

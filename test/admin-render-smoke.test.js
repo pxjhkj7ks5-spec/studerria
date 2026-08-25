@@ -306,6 +306,8 @@ test('simplified academic admin renders direct sections and compact cohort contr
   assert.match(html, /26 Київ/);
   assert.match(html, /P26K/);
   assert.match(html, /Семестр для всіх/);
+  assert.match(html, /Новий набір/);
+  assert.match(html, /\/admin\/academic\/cohorts\/create/);
   assert.doesNotMatch(html, />\s*Pathways\s*</i);
   assert.doesNotMatch(html, /workspace-tab|diagnostics-tab/i);
 });

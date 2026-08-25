@@ -11,7 +11,13 @@
   const catalogRows = Array.isArray(bachelorCatalogRows) ? bachelorCatalogRows : [];
   const activeProgram = selectedProgram || programList.find((item) => item.track_key === 'bachelor') || programList[0] || null;
   const activeProgramId = n(activeProgram && activeProgram.id);
+  const allProgramCohorts = cohortList.filter((item) => n(item.program_id) === activeProgramId);
   const programCohorts = cohortList.filter((item) => n(item.program_id) === activeProgramId && item.is_active !== false);
+  const currentCalendarYear = new Date().getUTCFullYear();
+  const existingAdmissionYears = allProgramCohorts.map((item) => n(item.admission_year)).filter(Boolean);
+  const suggestedAdmissionYear = existingAdmissionYears.includes(currentCalendarYear)
+    ? Math.max(currentCalendarYear, ...existingAdmissionYears) + 1
+    : currentCalendarYear;
   const cohortById = new Map(cohortList.map((item) => [n(item.id), item]));
   const currentGroups = groupList.filter((group) => {
     const cohort = cohortById.get(n(group.cohort_id));
@@ -109,15 +115,38 @@
         <% if (activeSection === 'cohorts') { %>
           <div class="academic-toolbar">
             <div><strong><%= currentGroups.length %></strong> активних наборів</div>
-            <% if (activeProgramId) { %>
-              <form method="post" action="/admin/pathways/v2/terms/activate-program" class="academic-inline-form">
-                <%- focusFields('cohorts') %>
-                <input type="hidden" name="program_id" value="<%= activeProgramId %>" />
-                <label for="globalTerm">Семестр для всіх</label>
-                <select id="globalTerm" name="term_number"><option value="1">1 семестр</option><option value="2">2 семестр</option><option value="3">3 семестр</option></select>
-                <button class="btn btn-sm btn-primary" type="submit">Застосувати</button>
-              </form>
-            <% } %>
+            <div class="academic-toolbar-actions">
+              <% if (activeProgramId) { %>
+                <form method="post" action="/admin/pathways/v2/terms/activate-program" class="academic-inline-form">
+                  <%- focusFields('cohorts') %>
+                  <input type="hidden" name="program_id" value="<%= activeProgramId %>" />
+                  <label for="globalTerm">Семестр для всіх</label>
+                  <select id="globalTerm" name="term_number"><option value="1">1 семестр</option><option value="2">2 семестр</option><option value="3">3 семестр</option></select>
+                  <button class="btn btn-sm btn-primary" type="submit">Застосувати</button>
+                </form>
+                <details class="academic-create-intake">
+                  <summary>Новий набір</summary>
+                  <form method="post" action="/admin/academic/cohorts/create">
+                    <%- focusFields('cohorts') %>
+                    <input type="hidden" name="program_id" value="<%= activeProgramId %>" />
+                    <div class="academic-field">
+                      <label for="newIntakeYear">Рік вступу</label>
+                      <input id="newIntakeYear" type="number" name="admission_year" min="2000" max="2100" value="<%= suggestedAdmissionYear %>" required />
+                    </div>
+                    <div class="academic-field">
+                      <label for="newIntakeCampus">Кампус</label>
+                      <select id="newIntakeCampus" name="campus_key">
+                        <option value="kyiv">Київ</option>
+                        <option value="both">Київ і Мюнхен</option>
+                        <option value="munich">Мюнхен</option>
+                      </select>
+                    </div>
+                    <p>Набір одразу отримає 1 курс, три семестри та предмети першого курсу.</p>
+                    <button class="btn btn-primary" type="submit">Створити набір</button>
+                  </form>
+                </details>
+              <% } %>
+            </div>
           </div>
           <div class="academic-table-wrap">
             <table class="academic-table">
