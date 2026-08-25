@@ -1056,7 +1056,10 @@
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Навчання</div>
             <% if (canManagePathways) { %>
-              <a class="admin-nav-link admin-nav-link--primary" href="<%= pathwaysPanelHref || '/admin/pathways' %>">Предмети й розклад</a>
+              <a class="admin-nav-link admin-nav-link--primary" href="/admin/academic?section=cohorts">Набори й курси</a>
+              <a class="admin-nav-link" href="/admin/academic?section=subjects">Предмети</a>
+              <a class="admin-nav-link" href="/admin/academic?section=schedule">Розклад</a>
+              <a class="admin-nav-link" href="/admin/academic?section=catalog">Бакалаврський каталог</a>
             <% } %>
             <% if (sectionAllowed('admin-homework')) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-homework">Домашні завдання</button>
@@ -1138,7 +1141,7 @@
             <button class="btn btn-outline-secondary btn-sm admin-mobile-top" type="button" id="adminMobileTopButton">Вгору</button>
           </div>
           <% if (canManagePathways) { %>
-            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="<%= buildScopedHref('/admin/pathways') %>">Предмети й розклад</a>
+            <a class="btn btn-outline-secondary btn-sm admin-mobile-pathway" href="<%= buildScopedHref('/admin/academic') %>">Навчання</a>
           <% } %>
         </div>
       </div>
@@ -1214,7 +1217,7 @@
                   </div>
                   <div class="admin-overview-actions d-flex gap-2 flex-wrap">
                     <% if (canManagePathways) { %>
-                      <a class="btn btn-primary btn-sm" href="<%= buildScopedHref('/admin/pathways') %>">Предмети й розклад</a>
+                      <a class="btn btn-primary btn-sm" href="<%= buildScopedHref('/admin/academic') %>">Навчання</a>
                     <% } %>
                     <% if (sectionAllowed('admin-homework')) { %>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-admin-nav="admin-homework">Домашні завдання</button>
@@ -1963,7 +1966,7 @@
               <% if (academicV2ScheduleLocked) { %>
                 <div class="alert alert-info mb-0">
                   Legacy schedule editing is disabled for Academic v2 courses.
-                  <a href="<%= `${pathwaysPanelHref || '/admin/pathways'}#schedule` %>">Open the Academic v2 schedule editor</a>.
+                  <a href="<%= `${pathwaysPanelHref || '/admin/academic'}?section=schedule` %>">Відкрити новий редактор розкладу</a>.
                 </div>
               <% } else { %>
               <form method="POST" action="/admin/schedule/add">

@@ -1,0 +1,214 @@
+<%
+  const n = (value) => Number(value || 0) || 0;
+  const allowedSections = ['cohorts', 'subjects', 'schedule', 'catalog'];
+  const activeSection = allowedSections.includes(String(requestedSection || '')) ? String(requestedSection) : 'cohorts';
+  const programList = Array.isArray(programs) ? programs : [];
+  const cohortList = Array.isArray(cohorts) ? cohorts : [];
+  const groupList = Array.isArray(groups) ? groups : [];
+  const termList = Array.isArray(terms) ? terms : [];
+  const groupSubjectList = Array.isArray(groupSubjects) ? groupSubjects : [];
+  const scheduleList = Array.isArray(scheduleEntries) ? scheduleEntries : [];
+  const catalogRows = Array.isArray(bachelorCatalogRows) ? bachelorCatalogRows : [];
+  const activeProgram = selectedProgram || programList.find((item) => item.track_key === 'bachelor') || programList[0] || null;
+  const activeProgramId = n(activeProgram && activeProgram.id);
+  const programCohorts = cohortList.filter((item) => n(item.program_id) === activeProgramId && item.is_active !== false);
+  const cohortById = new Map(cohortList.map((item) => [n(item.id), item]));
+  const currentGroups = groupList.filter((group) => {
+    const cohort = cohortById.get(n(group.cohort_id));
+    return n(group.program_id) === activeProgramId && group.is_active !== false
+      && cohort && n(group.stage_number) === n(cohort.current_stage_number);
+  });
+  const activeGroup = selectedGroup
+    || currentGroups.find((item) => n(item.id) === n(focus && focus.groupId))
+    || currentGroups[0]
+    || null;
+  const activeGroupId = n(activeGroup && activeGroup.id);
+  const activeTerms = termList.filter((item) => n(item.group_id) === activeGroupId && !item.is_archived);
+  const activeTerm = selectedTerm
+    || activeTerms.find((item) => item.is_active)
+    || activeTerms[0]
+    || null;
+  const activeTermId = n(activeTerm && activeTerm.id);
+  const visibleSubjects = groupSubjectList.filter((item) => n(item.group_id) === activeGroupId);
+  const visibleSchedule = scheduleList.filter((item) => (
+    n(item.group_id) === activeGroupId && (!activeTermId || n(item.term_id) === activeTermId)
+  ));
+  const compactIdentity = (group) => {
+    const year = String(n(group && group.admission_year) || '').slice(-2).padStart(2, '0');
+    const munich = String(group && group.campus_key || '') === 'munich';
+    return { label: `${year} ${munich ? 'Мюнхен' : 'Київ'}`, code: `P${year}${munich ? 'M' : 'K'}` };
+  };
+  const groupTerms = (groupId) => termList.filter((item) => n(item.group_id) === n(groupId) && !item.is_archived);
+  const focusFields = (section = activeSection, group = activeGroup, term = activeTerm) => `
+    <input type="hidden" name="section" value="${section}" />
+    <input type="hidden" name="focus_program_id" value="${activeProgramId || ''}" />
+    <input type="hidden" name="focus_cohort_id" value="${n(group && group.cohort_id) || ''}" />
+    <input type="hidden" name="focus_group_id" value="${n(group && group.id) || ''}" />
+    <input type="hidden" name="focus_term_id" value="${n(term && term.id) || ''}" />
+  `;
+  const activityLabel = { lecture: 'Лекція', seminar: 'Семінар', practice: 'Практика', lab: 'Лабораторна' };
+  const dayLabel = { Monday: 'Пн', Tuesday: 'Вт', Wednesday: 'Ср', Thursday: 'Чт', Friday: 'Пт', Saturday: 'Сб', Sunday: 'Нд' };
+%>
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" type="image/svg+xml" />
+    <%- include('partials/theme-bootstrap-head', { defaultTheme: 'light' }) %>
+    <title>Навчання · Studerria</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+    <link rel="stylesheet" href="/css/studerria-core.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+    <link rel="stylesheet" href="/css/pages/admin-academic.css?v=<%= encodeURIComponent(String(appVersion || '0.0.0')) %>" />
+  </head>
+  <body class="theme-light academic-admin-page">
+    <%- include('partials/theme-bootstrap-body') %>
+    <header class="academic-topbar">
+      <a class="academic-brand" href="/admin">Studerria <span>Адмінка</span></a>
+      <div class="academic-topbar-actions">
+        <a class="btn btn-sm btn-outline-secondary" href="/schedule">Перевірити розклад</a>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-theme-toggle="true">Тема</button>
+        <form method="post" action="/logout"><button class="btn btn-sm btn-outline-secondary" type="submit">Вийти</button></form>
+      </div>
+    </header>
+
+    <main class="academic-shell">
+      <aside class="academic-sidebar" aria-label="Адміністрування">
+        <a class="academic-sidebar-back" href="/admin">← Огляд адмінки</a>
+        <div class="academic-sidebar-title">Навчання</div>
+        <a class="academic-sidebar-link <%= activeSection === 'cohorts' ? 'is-active' : '' %>" href="/admin/academic?section=cohorts">Набори й курси</a>
+        <a class="academic-sidebar-link <%= activeSection === 'subjects' ? 'is-active' : '' %>" href="/admin/academic?section=subjects<%= activeGroupId ? `&group_id=${activeGroupId}` : '' %>">Предмети</a>
+        <a class="academic-sidebar-link <%= activeSection === 'schedule' ? 'is-active' : '' %>" href="/admin/academic?section=schedule<%= activeGroupId ? `&group_id=${activeGroupId}` : '' %>">Розклад</a>
+        <a class="academic-sidebar-link <%= activeSection === 'catalog' ? 'is-active' : '' %>" href="/admin/academic?section=catalog">Бакалаврський каталог</a>
+      </aside>
+
+      <section class="academic-content">
+        <div class="academic-heading">
+          <div>
+            <p class="academic-eyebrow"><%= activeProgram ? activeProgram.name : 'Навчальна програма' %></p>
+            <h1><%= activeSection === 'cohorts' ? 'Набори й курси' : activeSection === 'subjects' ? 'Предмети' : activeSection === 'schedule' ? 'Розклад' : 'Бакалаврський каталог' %></h1>
+            <p><%= activeSection === 'cohorts' ? 'Один рядок — один активний набір. Тут змінюється семестр і виконується перехід на наступний курс.' : activeSection === 'subjects' ? 'Предмети обраного набору без вкладених рівнів і технічних сутностей.' : activeSection === 'schedule' ? 'Вставте підготовлений текст — розклад одразу потрапить на сайт і в Telegram-бота.' : 'Єдине джерело предметів для всіх курсів бакалаврату.' %></p>
+          </div>
+          <% if (programList.length > 1) { %>
+            <form method="get" action="/admin/academic" class="academic-program-select">
+              <input type="hidden" name="section" value="<%= activeSection %>" />
+              <label for="programId">Програма</label>
+              <select id="programId" name="program_id" onchange="this.form.submit()">
+                <% programList.filter((item) => item.is_active !== false).forEach((program) => { %>
+                  <option value="<%= program.id %>" <%= n(program.id) === activeProgramId ? 'selected' : '' %>><%= program.name %></option>
+                <% }); %>
+              </select>
+            </form>
+          <% } %>
+        </div>
+
+        <% if (error) { %><div class="academic-notice is-error"><%= error %></div><% } %>
+        <% if (success) { %><div class="academic-notice is-success"><%= success %></div><% } %>
+        <% if (warning) { %><div class="academic-notice"><%= warning %></div><% } %>
+
+        <% if (activeSection === 'cohorts') { %>
+          <div class="academic-toolbar">
+            <div><strong><%= currentGroups.length %></strong> активних наборів</div>
+            <% if (activeProgramId) { %>
+              <form method="post" action="/admin/pathways/v2/terms/activate-program" class="academic-inline-form">
+                <%- focusFields('cohorts') %>
+                <input type="hidden" name="program_id" value="<%= activeProgramId %>" />
+                <label for="globalTerm">Семестр для всіх</label>
+                <select id="globalTerm" name="term_number"><option value="1">1 семестр</option><option value="2">2 семестр</option><option value="3">3 семестр</option></select>
+                <button class="btn btn-sm btn-primary" type="submit">Застосувати</button>
+              </form>
+            <% } %>
+          </div>
+          <div class="academic-table-wrap">
+            <table class="academic-table">
+              <thead><tr><th>Набір</th><th>Курс</th><th>Активний семестр</th><th>Студенти</th><th>Предмети</th><th>Дії</th></tr></thead>
+              <tbody>
+                <% currentGroups.forEach((group) => { const cohort = cohortById.get(n(group.cohort_id)); const identity = compactIdentity(group); const termsForGroup = groupTerms(group.id); const selectedActiveTerm = termsForGroup.find((item) => item.is_active) || termsForGroup[0]; %>
+                  <tr>
+                    <td><strong><%= identity.label %></strong><span class="academic-code"><%= identity.code %> · набір <%= group.admission_year %></span></td>
+                    <td><span class="academic-course-pill"><%= group.stage_number %> курс</span></td>
+                    <td>
+                      <form method="post" action="/admin/pathways/v2/terms/save" class="academic-term-form">
+                        <%- focusFields('cohorts', group, selectedActiveTerm) %>
+                        <input type="hidden" name="group_id" value="<%= group.id %>" /><input type="hidden" name="is_active" value="1" /><input type="hidden" name="is_archived" value="0" />
+                        <select name="term_number" aria-label="Активний семестр для <%= identity.label %>">
+                          <% [1,2,3].forEach((termNumber) => { %><option value="<%= termNumber %>" <%= n(selectedActiveTerm && selectedActiveTerm.term_number) === termNumber ? 'selected' : '' %>><%= termNumber %> семестр</option><% }); %>
+                        </select>
+                        <button type="submit">Зберегти</button>
+                      </form>
+                    </td>
+                    <td><%= n(group.enrolled_users) %></td><td><%= n(group.group_subject_count) %></td>
+                    <td><div class="academic-row-actions">
+                      <a href="/admin/academic?section=subjects&program_id=<%= activeProgramId %>&cohort_id=<%= group.cohort_id %>&group_id=<%= group.id %>">Предмети</a>
+                      <a href="/admin/academic?section=schedule&program_id=<%= activeProgramId %>&cohort_id=<%= group.cohort_id %>&group_id=<%= group.id %>">Розклад</a>
+                      <% if (cohort && n(cohort.current_stage_number) < 4) { %>
+                        <form method="post" action="/admin/pathways/v2/cohorts/<%= cohort.id %>/promote" onsubmit="return confirm('Перевести набір <%= identity.label %> на <%= n(cohort.current_stage_number) + 1 %> курс? Студенти та предмети нового курсу будуть перенесені автоматично.')">
+                          <%- focusFields('cohorts', group, selectedActiveTerm) %><input type="hidden" name="target_stage_number" value="<%= n(cohort.current_stage_number) + 1 %>" />
+                          <button type="submit">На <%= n(cohort.current_stage_number) + 1 %> курс</button>
+                        </form>
+                      <% } %>
+                    </div></td>
+                  </tr>
+                <% }); %>
+                <% if (!currentGroups.length) { %><tr><td colspan="6" class="academic-empty">Активних наборів поки немає.</td></tr><% } %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <% if (activeSection === 'subjects') { %>
+          <div class="academic-toolbar">
+            <form method="get" action="/admin/academic" class="academic-inline-form">
+              <input type="hidden" name="section" value="subjects" /><input type="hidden" name="program_id" value="<%= activeProgramId %>" />
+              <label for="subjectsGroup">Набір</label><select id="subjectsGroup" name="group_id" onchange="this.form.submit()"><% currentGroups.forEach((group) => { %><option value="<%= group.id %>" <%= n(group.id) === activeGroupId ? 'selected' : '' %>><%= compactIdentity(group).label %> · <%= group.stage_number %> курс</option><% }); %></select>
+            </form>
+            <% if (activeGroup) { %><form method="post" action="/admin/pathways/v2/groups/<%= activeGroup.id %>/apply-stage-template"><%- focusFields('subjects') %><button class="btn btn-sm btn-primary" type="submit">Підтягнути каталог <%= activeGroup.stage_number %> курсу</button></form><% } %>
+          </div>
+          <div class="academic-table-wrap"><table class="academic-table"><thead><tr><th>Предмет</th><th>Семестри</th><th>Формат</th><th>Групи</th><th>Викладачі</th></tr></thead><tbody>
+            <% visibleSubjects.forEach((subject) => { %><tr><td><strong><%= subject.title || subject.template_name %></strong></td><td><%= (subject.term_titles || []).join(', ') || '—' %></td><td><%= (subject.activity_types || []).map((item) => activityLabel[item] || item).join(', ') || '—' %></td><td><%= subject.group_count %></td><td><%= (subject.teacher_names || []).join(', ') || 'Не призначено' %></td></tr><% }); %>
+            <% if (!visibleSubjects.length) { %><tr><td colspan="5" class="academic-empty">Оберіть набір або підтягніть предмети з каталогу.</td></tr><% } %>
+          </tbody></table></div>
+        <% } %>
+
+        <% if (activeSection === 'schedule') { %>
+          <div class="academic-toolbar">
+            <form method="get" action="/admin/academic" class="academic-inline-form">
+              <input type="hidden" name="section" value="schedule" /><input type="hidden" name="program_id" value="<%= activeProgramId %>" />
+              <label for="scheduleGroup">Набір</label><select id="scheduleGroup" name="group_id"><% currentGroups.forEach((group) => { %><option value="<%= group.id %>" <%= n(group.id) === activeGroupId ? 'selected' : '' %>><%= compactIdentity(group).label %> · <%= group.stage_number %> курс</option><% }); %></select>
+              <label for="scheduleTerm">Семестр</label><select id="scheduleTerm" name="term_id"><% activeTerms.forEach((term) => { %><option value="<%= term.id %>" <%= n(term.id) === activeTermId ? 'selected' : '' %>><%= term.term_number %> семестр</option><% }); %></select>
+              <button class="btn btn-sm btn-outline-primary" type="submit">Показати</button>
+            </form>
+          </div>
+          <% if (activeGroup && activeTerm) { %>
+            <div class="academic-schedule-grid">
+              <form method="post" action="/admin/pathways/v2/schedule/import" class="academic-import-panel">
+                <%- focusFields('schedule') %><input type="hidden" name="group_id" value="<%= activeGroupId %>" /><input type="hidden" name="term_id" value="<%= activeTermId %>" />
+                <label for="scheduleText">Текст розкладу</label>
+                <textarea id="scheduleText" name="schedule_text" required spellcheck="false" placeholder="STUDERRIA_SCHEDULE_V2&#10;# Предмет | Тип | День | Пара | Тижні | Групи | Аудиторія&#10;Мікроекономіка | лекція | понеділок | 2 | 1-15 | усі | 4-201"></textarea>
+                <label class="academic-check"><input type="checkbox" name="replace_existing" value="1" /> Замінити поточний розклад цього семестру</label>
+                <button class="btn btn-primary" type="submit">Імпортувати розклад</button>
+                <p>Предмети та типи занять із бакалаврського каталогу будуть налаштовані автоматично.</p>
+              </form>
+              <div class="academic-current-schedule"><div class="academic-panel-title"><strong>Вже додано</strong><span><%= visibleSchedule.length %> занять</span></div>
+                <% visibleSchedule.slice(0, 16).forEach((entry) => { %><div class="academic-schedule-row"><span><%= dayLabel[entry.day_of_week] || entry.day_of_week %> · <%= entry.class_number %> пара</span><strong><%= entry.subject_title || entry.template_name %></strong><small><%= activityLabel[entry.activity_type] || entry.activity_type %><%= entry.room_label ? ` · ${entry.room_label}` : '' %></small></div><% }); %>
+                <% if (!visibleSchedule.length) { %><div class="academic-empty">У цьому семестрі ще немає занять.</div><% } %>
+                <% if (visibleSchedule.length > 16) { %><a class="academic-full-list" href="/admin/academic/schedule-list?group_id=<%= activeGroupId %>&term_id=<%= activeTermId %>">Відкрити всі заняття</a><% } %>
+              </div>
+            </div>
+          <% } else { %><div class="academic-empty academic-empty-block">Спочатку виберіть набір і семестр.</div><% } %>
+        <% } %>
+
+        <% if (activeSection === 'catalog') { %>
+          <div class="academic-toolbar"><div><strong><%= catalogRows.length %></strong> предметів у каталозі</div>
+            <% if (activeProgramId) { %><form method="post" action="/admin/pathways/v2/bachelor-catalog/sync"><%- focusFields('catalog') %><input type="hidden" name="program_id" value="<%= activeProgramId %>" /><input type="hidden" name="source_key" value="<%= selectedBachelorCatalogSourceKey || '' %>" /><button class="btn btn-sm btn-primary" type="submit">Синхронізувати каталог</button></form><% } %>
+          </div>
+          <div class="academic-table-wrap"><table class="academic-table"><thead><tr><th>Предмет</th><th>Курс</th><th>Семестр</th><th>Групи</th><th>Стан</th></tr></thead><tbody>
+            <% catalogRows.forEach((row) => { %><tr><td><strong><%= row.display_title %></strong><span class="academic-code"><%= row.source_code || row.source_section || '' %></span></td><td><%= row.current_stage_number || row.suggested_stage_number || '—' %></td><td><%= (row.current_term_numbers || row.suggested_term_numbers || []).join(', ') || '—' %></td><td><%= row.current_group_count || 2 %></td><td><span class="academic-status <%= row.status && row.status.tone === 'ok' ? 'is-ok' : '' %>"><%= row.status && row.status.label ? row.status.label : 'Не налаштовано' %></span></td></tr><% }); %>
+            <% if (!catalogRows.length) { %><tr><td colspan="5" class="academic-empty">Каталог поки порожній.</td></tr><% } %>
+          </tbody></table></div>
+        <% } %>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  </body>
+</html>

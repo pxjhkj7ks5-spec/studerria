@@ -2861,7 +2861,7 @@ app.use(async (req, res, next) => {
     res.locals.hasCustomAdminPanelAccess = false;
     res.locals.customAdminPanelHref = '/admin';
     res.locals.canManagePathways = false;
-    res.locals.pathwaysPanelHref = '/admin/pathways';
+    res.locals.pathwaysPanelHref = '/admin/academic';
     return next();
   }
   const roleKeys = getSessionRoleList(req);
@@ -2888,7 +2888,7 @@ app.use(async (req, res, next) => {
   res.locals.hasCustomAdminPanelAccess = canAccessAdminPanel && !hasLegacyStaffRole;
   res.locals.customAdminPanelHref = '/admin';
   res.locals.canManagePathways = canManagePathways;
-  res.locals.pathwaysPanelHref = '/admin/pathways';
+  res.locals.pathwaysPanelHref = '/admin/academic';
   return next();
 });
 
@@ -13200,10 +13200,12 @@ function parseAcademicV2Focus(source = {}) {
 
 function parseAcademicV2UiRestoreParams(source = {}) {
   const payload = source && typeof source === 'object' ? source : {};
+  const section = sanitizeCompactText(payload.section, 24);
   const workspaceTab = sanitizeCompactText(payload.workspace_tab || payload.workspaceTab, 40);
   const structureTab = sanitizeCompactText(payload.structure_tab || payload.structureTab, 40);
   const diagnosticsTab = sanitizeCompactText(payload.diagnostics_tab || payload.diagnosticsTab, 40);
   return {
+    ...(['cohorts', 'subjects', 'schedule', 'catalog'].includes(section) ? { section } : {}),
     ...(workspaceTab ? { workspace_tab: workspaceTab } : {}),
     ...(structureTab ? { structure_tab: structureTab } : {}),
     ...(diagnosticsTab ? { diagnostics_tab: diagnosticsTab } : {}),
@@ -13232,7 +13234,7 @@ function buildAcademicV2NoticeUrl(kind, message, focus = {}, extraParams = {}) {
     query.set(String(kind || '').trim().toLowerCase() === 'ok' ? 'ok' : 'err', String(message));
   }
   const queryString = query.toString();
-  return `/admin/pathways${queryString ? `?${queryString}` : ''}`;
+  return `/admin/academic${queryString ? `?${queryString}` : ''}`;
 }
 
 function parseAcademicV2ScheduleListFilters(source = {}) {
@@ -13251,7 +13253,7 @@ function parseAcademicV2ScheduleListFilters(source = {}) {
 
 function buildAcademicV2ScheduleListNoticeUrl(kind, message, focus = {}, filters = {}) {
   return buildAcademicV2NoticeUrl(kind, message, focus, filters)
-    .replace(/^\/admin\/pathways(?=\?|$)/, '/admin/pathways/schedule-list');
+    .replace(/^\/admin\/academic(?=\?|$)/, '/admin/academic/schedule-list');
 }
 
 function buildScheduleGeneratorUrl(req, runId = null, extraParams = {}) {
@@ -51044,7 +51046,11 @@ async function handleAcademicV2MutationRoute(req, res, {
   }
 }
 
-app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
+app.get(['/admin/academic', '/admin/pathways'], requirePathwaysSectionAccess, async (req, res) => {
+  if (req.path === '/admin/pathways' && String(req.query.legacy || '').trim() !== '1') {
+    const query = new URLSearchParams(req.query || {}).toString();
+    return res.redirect(`/admin/academic${query ? `?${query}` : ''}`);
+  }
   if (String(req.query.legacy || '').trim() === '1') {
     return res.redirect('/admin/pathways/legacy');
   }
@@ -51052,13 +51058,14 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
   const pageRole = normalizeRoleKey(
     (req && req.session && (req.session.role || (req.session.user && req.session.user.role))) || 'admin'
   );
-  const renderPage = (pageData) => res.render('admin-academic-v2', {
+  const renderPage = (pageData) => res.render('admin-academic', {
     role: pageRole,
     username: req.session.user.username,
     settings: settingsCache,
     error: String(req.query.err || ''),
     success: String(req.query.ok || ''),
     warning: String(req.query.warn || ''),
+    requestedSection: sanitizeCompactText(req.query.section, 24),
     requestedSubjectId: parsePositiveIntStrict(req.query.subject_id),
     requestedWorkspaceTab: sanitizeCompactText(req.query.workspace_tab, 40),
     requestedStructureTab: sanitizeCompactText(req.query.structure_tab, 40),
@@ -51093,7 +51100,11 @@ app.get('/admin/pathways', requirePathwaysSectionAccess, async (req, res) => {
   }
 });
 
-app.get('/admin/pathways/schedule-list', requirePathwaysSectionAccess, async (req, res) => {
+app.get(['/admin/academic/schedule-list', '/admin/pathways/schedule-list'], requirePathwaysSectionAccess, async (req, res) => {
+  if (req.path === '/admin/pathways/schedule-list') {
+    const query = new URLSearchParams(req.query || {}).toString();
+    return res.redirect(`/admin/academic/schedule-list${query ? `?${query}` : ''}`);
+  }
   const focus = parseAcademicV2Focus(req.query);
   const pageRole = normalizeRoleKey(
     (req && req.session && (req.session.role || (req.session.user && req.session.user.role))) || 'admin'
@@ -53611,14 +53622,14 @@ function getPathwaysRedirectState(req, overrides = {}) {
 
 function getLegacyAcademicWriteMovedMessage(req) {
   const isUk = getPreferredLang(req) === 'uk';
-  return isUk ? 'Academic config moved to /admin/pathways' : 'Academic config moved to /admin/pathways';
+  return isUk ? 'Академічне керування перенесено в новий розділ «Навчання».' : 'Academic management moved to the new Learning section.';
 }
 
 function getLegacyAcademicScheduleMovedMessage(req) {
   const isUk = getPreferredLang(req) === 'uk';
   return isUk
-    ? 'Розклад для Academic v2 редагується в /admin/pathways#schedule'
-    : 'Academic v2 schedule editing lives in /admin/pathways#schedule';
+    ? 'Розклад редагується в адмінці у розділі «Навчання → Розклад».'
+    : 'The schedule is managed in Admin → Learning → Schedule.';
 }
 
 function redirectLegacyAcademicWriteToV2(req, res) {

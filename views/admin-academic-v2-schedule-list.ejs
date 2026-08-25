@@ -63,7 +63,7 @@
       }
     });
     const query = params.toString();
-    return query ? `/admin/pathways?${query}` : '/admin/pathways';
+    return query ? `/admin/academic?section=schedule&${query}` : '/admin/academic?section=schedule';
   };
   const buildSelfHref = (overrides = {}) => {
     const merged = Object.assign({}, {
@@ -106,7 +106,7 @@
       params.set(String(key), String(rawValue));
     });
     const query = params.toString();
-    return query ? `/admin/pathways/schedule-list?${query}` : '/admin/pathways/schedule-list';
+    return query ? `/admin/academic/schedule-list?${query}` : '/admin/academic/schedule-list';
   };
   const buildWorkspaceEditorHref = (entry) => {
     const params = new URLSearchParams();
@@ -123,7 +123,7 @@
       params.set('schedule_entry_id', String(numberOrZero(entry.id)));
     }
     const query = params.toString();
-    return `${query ? `/admin/pathways?${query}` : '/admin/pathways'}#schedule`;
+    return query ? `/admin/academic?section=schedule&${query}` : '/admin/academic?section=schedule';
   };
   const activityOptionsBySubjectId = scopedGroupSubjectActivitiesList.reduce((map, activity) => {
     const subjectId = Number(activity.group_subject_id || 0);
@@ -429,7 +429,7 @@
               <a class="academic-v2-chip <%= activeWeekFilter === weekNumber ? 'academic-v2-chip--ok' : '' %>" href="<%= buildSelfHref({ week: weekNumber }) %>#all-slots">Тиждень <%= weekNumber %></a>
             <% }); %>
           </div>
-          <form class="academic-v2-form-grid academic-v2-form-grid--compact mt-3" method="get" action="/admin/pathways/schedule-list">
+          <form class="academic-v2-form-grid academic-v2-form-grid--compact mt-3" method="get" action="/admin/academic/schedule-list">
             <input type="hidden" name="program_id" value="<%= activeProgramId || '' %>" />
             <input type="hidden" name="cohort_id" value="<%= activeCohortId || '' %>" />
             <input type="hidden" name="group_id" value="<%= activeGroupId || '' %>" />

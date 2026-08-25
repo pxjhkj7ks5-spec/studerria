@@ -280,6 +280,36 @@ test('admin academic v2 renders bachelor catalog panel only for bachelor program
   assert.doesNotMatch(masterHtml, /Кодовий бакалаврський каталог/i);
 });
 
+test('simplified academic admin renders direct sections and compact cohort controls', async () => {
+  const fallback = academicV2Helpers.buildAcademicSetupPageFallback({
+    programId: 1,
+    cohortId: 10,
+    groupId: 20,
+    termId: 30,
+  });
+  const html = await renderView('admin-academic.ejs', baseRenderLocals({
+    ...fallback,
+    requestedSection: 'cohorts',
+    error: '',
+    success: '',
+    warning: '',
+    programs: [{ id: 1, name: 'ПЛЕД', track_key: 'bachelor', is_active: true }],
+    selectedProgram: { id: 1, name: 'ПЛЕД', track_key: 'bachelor', is_active: true },
+    cohorts: [{ id: 10, program_id: 1, admission_year: 2026, current_stage_number: 1, is_active: true }],
+    groups: [{ id: 20, cohort_id: 10, program_id: 1, admission_year: 2026, stage_number: 1, campus_key: 'kyiv', is_active: true, enrolled_users: 24, group_subject_count: 8 }],
+    terms: [{ id: 30, group_id: 20, term_number: 1, is_active: true, is_archived: false }],
+    selectedGroup: { id: 20, cohort_id: 10, program_id: 1, admission_year: 2026, stage_number: 1, campus_key: 'kyiv', is_active: true },
+    selectedTerm: { id: 30, group_id: 20, term_number: 1, is_active: true, is_archived: false },
+    focus: { programId: 1, cohortId: 10, groupId: 20, termId: 30 },
+  }));
+  assert.match(html, /Набори й курси/);
+  assert.match(html, /26 Київ/);
+  assert.match(html, /P26K/);
+  assert.match(html, /Семестр для всіх/);
+  assert.doesNotMatch(html, />\s*Pathways\s*</i);
+  assert.doesNotMatch(html, /workspace-tab|diagnostics-tab/i);
+});
+
 test('teacher workspace renders context-first filter surface', async () => {
   const html = await renderView('teacher-workspace.ejs', baseRenderLocals({
     role: 'teacher',
