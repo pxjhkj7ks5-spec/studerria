@@ -101,3 +101,23 @@ test('catalog displays corrected history spelling without changing its stored id
   assert.equal(history.template_name, legacyHistoryTitle);
   assert.equal(history.display_title, historyTitle);
 });
+
+test('political psychology PDF rows resolve through the catalog for year 2 term 1', () => {
+  const title = 'Політична психологія та нейромаркетинг';
+  const entries = listBachelorCatalogEntries().map((entry, i) => ({ ...entry, id: i + 1 }));
+  const subject = entries.find((entry) => entry.template_name === title);
+  assert.ok(subject);
+  assert.equal(subject.display_title, title);
+  assert.equal(subject.suggested_stage_number, 2);
+  assert.deepEqual(subject.suggested_term_numbers, [1]);
+  assert.equal(subject.default_flags.is_required, false);
+  assert.equal(subject.default_group_count, 1);
+  assert.equal(subject.default_activity_preset, 'lecture_seminar');
+  const parsed = parseScheduleImportText(`STUDERRIA_SCHEDULE_V2
+${title} | лекція | четвер | 5 | 1-5,8-12 | усі | 7-306
+${title} | семінар | четвер | 6 | 1-15 | усі | 7-302`);
+  assert.deepEqual(parsed.errors, []);
+  const index = indexScheduleSubjects(entries, ['template_name', 'display_title']);
+  assert.equal(parsed.entries.length, 2);
+  for (const row of parsed.entries) assert.deepEqual(index.get(normalizeScheduleSubjectName(row.subject)), [subject]);
+});

@@ -39,6 +39,8 @@ const {
 } = require('./lib/scheduleGeneratorBackups');
 const demoMode = require('./lib/demoMode');
 const telegramMiniApp = require('./lib/telegramMiniApp');
+const { getStudentSubjectChoiceSummary, resetAllStudentSubjectChoices } = require('./lib/studentSubjectReset');
+const { RESET_FLOW, createStuderriaTelegramSubjectReset } = require('./lib/studerriaTelegramSubjectReset');
 const {
   handleStuderriaTelegramDevPhotoCleanerMessage,
   logStuderriaTelegramDevPhotoCleanerIngress,
@@ -20466,6 +20468,12 @@ async function registerStuderriaTelegramBotCommands() {
     for (const registration of commandRegistrations) {
       await callStuderriaTelegramBotApi('setMyCommands', registration);
     }
+    for (const devId of getStuderriaTelegramDevIds()) {
+      await callStuderriaTelegramBotApi('setMyCommands', {
+        scope: { type: 'chat', chat_id: devId },
+        commands: [...STUDERRIA_TG_PRIVATE_BOT_COMMANDS, { command: 'resetsubjects', description: 'Dev: скинути вибір предметів усім' }],
+      }).catch((err) => console.error('Studerria dev commands registration failed', err && err.message));
+    }
   } catch (err) {
     console.error('Studerria Telegram bot commands registration failed', err && err.message ? err.message : err);
   }
@@ -20995,6 +21003,9 @@ async function sendStuderriaTelegramHelp(message = {}) {
   const lines = [
     'Studerria bot',
     'Коротка інструкція по командах',
+    ...(isStuderriaTelegramDevUser(message.from || {}) && isStuderriaTelegramPrivateChat(chat)
+      ? ['/resetsubjects — скинути вибір предметів усім користувачам після підтвердження. Тільки dev.']
+      : []),
     '',
     '1. Початок',
     `${startCommand} - відкрити Studerria mini app і привʼязати Telegram.`,
@@ -23253,6 +23264,31 @@ async function handleStuderriaTelegramGreetingConfirmCallback(callbackQuery = {}
     await editStuderriaTelegramMessage(callbackQuery, 'Не вдалося надіслати привітання. Перевір target chat ID і доступ бота до каналу.');
   }
 }
+
+const studerriaTelegramSubjectReset = createStuderriaTelegramSubjectReset({
+  isDevUser: isStuderriaTelegramDevUser,
+  actions: {
+    createActionToken: createStuderriaTelegramActionToken,
+    getActionPayload: getStuderriaTelegramActionPayload,
+    consumeActionPayload: consumeStuderriaTelegramActionPayload,
+  },
+  getSummary: async () => {
+    await ensureDbReady();
+    return getStudentSubjectChoiceSummary(getAcademicV2Store());
+  },
+  resetAll: async (actor) => {
+    await ensureDbReady();
+    return resetAllStudentSubjectChoices(getAcademicV2Store(), actor);
+  },
+  sendMessage: sendStuderriaTelegramMessage,
+  editMessage: editStuderriaTelegramMessage,
+  answerCallback: answerStuderriaTelegramCallback,
+  onReset: () => {
+    broadcast('users_updated');
+    broadcast('history_updated');
+  },
+  logger: console,
+});
 
 async function handleStuderriaTelegramDevUsersCommand(message = {}) {
   const chat = message && message.chat ? message.chat : null;
@@ -25698,6 +25734,10 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
       return;
     }
   }
+  if (String(payload.flow || '') === RESET_FLOW) {
+    await studerriaTelegramSubjectReset.handleCallback(callbackQuery);
+    return;
+  }
   if (String(payload.flow || '') === 'greeting_confirm') {
     await handleStuderriaTelegramGreetingConfirmCallback(callbackQuery, payload);
     return;
@@ -25749,6 +25789,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     const parsedCommand = parseStuderriaTelegramCommand(message, studerriaTelegramBotState.botUsername);
+    if (parsedCommand && parsedCommand.command === 'resetsubjects') {
+      await studerriaTelegramSubjectReset.handleCommand(message);
+      return;
+    }
     if ((parsedCommand && parsedCommand.command === 'chatid') || isStuderriaTelegramChatIdTextRequest(message)) {
       await handleStuderriaTelegramChatIdCommand(message);
       return;
