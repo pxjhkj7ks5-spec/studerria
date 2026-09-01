@@ -424,8 +424,8 @@ test('bachelor catalog source registry exposes the expected seed size', () => {
   const source = sources.find((item) => item.key === DEFAULT_BACHELOR_CATALOG_SOURCE_KEY);
 
   assert.ok(source);
-  assert.equal(source.entry_count, 81);
-  assert.equal(listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY).length, 81);
+  assert.equal(source.entry_count, 82);
+  assert.equal(listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY).length, 82);
   const sociology = listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY)
     .find((item) => item.template_name === 'Соціологія');
   assert.ok(sociology);
