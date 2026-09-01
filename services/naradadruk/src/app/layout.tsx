@@ -77,6 +77,14 @@ export default function RootLayout({
             description: siteDescription,
             inLanguage: "uk-UA",
             publisher: { "@id": `${absoluteSiteUrl()}#organization` },
+            potentialAction: {
+              "@type": "SearchAction",
+              target: {
+                "@type": "EntryPoint",
+                urlTemplate: absoluteSiteUrl("/catalog?q={search_term_string}"),
+              },
+              "query-input": "required name=search_term_string",
+            },
           },
         ]} />
         {children}
