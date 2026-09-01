@@ -7,7 +7,7 @@ const course = { course_id: 10, group_id: 20, campus_key: 'kyiv', program_name: 
 const term = { id: 30, start_date: '2026-08-31', weeks_count: 15 };
 const config = () => getDailyScheduleConfig({ STUDERRIA_TG_DAILY_SCHEDULE_ENABLED: 'true',
   STUDERRIA_TG_DAILY_SCHEDULE_CHAT_ID: '-100111', STUDERRIA_TG_DAILY_SCHEDULE_COURSE_ID: '10' });
-const user = (id, extra = {}) => ({ id, group_id: 20, telegram_username: `student_${id}`, full_name: `Студент ${id}`, ...extra });
+const user = (id, extra = {}) => ({ id, group_id: 20, telegram_id: String(1000 + id), telegram_username: `student_${id}`, full_name: `Студент ${id}`, ...extra });
 const row = (extra = {}) => ({ schedule_entry_id: 1, group_subject_id: 100, group_subject_activity_id: 101,
   term_id: 30, subject_name: 'Англійська', class_number: 1, day_of_week: 'Wednesday',
   activity_type: 'lecture', selected_group: 1, group_number: 1, ...extra });
@@ -156,12 +156,14 @@ test('weekends publish the chill message, while zero registered students have a 
   assert.doesNotMatch(noStudents, /чілім|пар немає/);
 });
 
-test('names use fallback and HTML escaping without clickable mentions', async () => {
+test('student blocks use readable ID-based mentions with escaped fallback names', async () => {
   const f = fixture([user(1, { telegram_username: '@nickname' }), user(2, { telegram_username: '', full_name: '<Оля> & Іра' })]);
   const text = buildDailyScheduleText(await collectDailySchedule(f.deps, course, '2026-09-02'));
-  assert.match(text, /<code>nickname<\/code>/);
-  assert.match(text, /&lt;Оля&gt; &amp; Іра/);
-  assert.doesNotMatch(text, /@|tg:\/\/|<a\b/);
+  assert.match(text, /<a href="tg:\/\/user\?id=1001">@nickname<\/a>/);
+  assert.match(text, /<a href="tg:\/\/user\?id=1002">&lt;Оля&gt; &amp; Іра<\/a>/);
+  assert.match(text, /<b>👥 .*<\/b>\n\n• <b>1 пара<\/b> · 08:30–09:50 · <b>Англійська<\/b>/);
+  assert.match(text, /<i>Лекція<\/i>/);
+  assert.doesNotMatch(text, /<code>|@@/);
 });
 
 test('long name lists compress before dropping any schedule block', async () => {
@@ -182,9 +184,9 @@ test('overflow removes whole blocks, preserves valid tags, and counts omitted st
   const text = buildDailyScheduleText(await collectDailySchedule(f.deps, course, '2026-09-02'));
   assert.ok(visibleLength(text) <= 3900);
   const omitted = Number(text.match(/Не показано студентів: (\d+)/)[1]);
-  assert.equal((text.match(/<code>/g) || []).length + omitted, 60);
+  assert.equal((text.match(/<a href=/g) || []).length + omitted, 60);
   const stack = [];
-  for (const [, close, tag] of text.matchAll(/<(\/?)(b|code)>/g)) {
+  for (const [, close, tag] of text.matchAll(/<(\/?)(b|a|i)(?:\s[^>]*)?>/g)) {
     if (close) assert.equal(stack.pop(), tag); else stack.push(tag);
   }
   assert.equal(stack.length, 0);
