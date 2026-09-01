@@ -60,6 +60,7 @@ test('configuration defaults are disabled, Kyiv 18:00, 30 seconds; invalid topic
   assert.equal(defaults.enabled, false);
   assert.equal(defaults.time.label, '18:00');
   assert.equal(defaults.checkIntervalMs, 30000);
+  assert.equal(getDailyScheduleConfig({ STUDERRIA_TG_DAILY_SCHEDULE_CHECK_INTERVAL_MS: '300000' }).checkIntervalMs, 60000);
   assert.equal(getDailyScheduleConfig({ STUDERRIA_TG_DAILY_SCHEDULE_THREAD_ID: 'bad' }).invalid, true);
   assert.equal(getDailyScheduleConfig({ STUDERRIA_TG_DAILY_SCHEDULE_COURSE_ID: '2025x' }).invalid, true);
   assert.equal(getDailyScheduleConfig({ STUDERRIA_TG_DAILY_SCHEDULE_TIME: '25:80' }).time.label, '18:00');
@@ -134,6 +135,15 @@ test('no lessons, incomplete setup, unavailable data and outside semester stay d
   assert.equal(digest.blocks.find((b) => b.status === 'unavailable').students.length, 3);
   assert.equal(digest.blocks.find((b) => b.status === 'outside_term').students.length, 1);
   assert.equal(digest.blocks.at(-1).status, 'empty');
+  const text = buildDailyScheduleText(digest);
+  assert.doesNotMatch(text, /ще не налаштовано|student_2/);
+});
+
+test('header contains only the target weekday and date', async () => {
+  const f = fixture();
+  const text = buildDailyScheduleText(await collectDailySchedule(f.deps, course, '2026-09-02'));
+  assert.ok(text.startsWith('<b>🌙 Розклад на середу</b>\n02.09.2026\n\n'));
+  assert.doesNotMatch(text, /ПЛЕД|2025|Київ/);
 });
 
 test('weekends publish the chill message, while zero registered students have a different message', async () => {
@@ -180,13 +190,13 @@ test('overflow removes whole blocks, preserves valid tags, and counts omitted st
   assert.equal(stack.length, 0);
 });
 
-test('automatic job is due at 18:00; same-day catchup and restart do not duplicate delivery', async () => {
+test('automatic job is due only at 18:00 and restart does not duplicate delivery', async () => {
   const f = fixture();
   const service = createDailyScheduleService(f.deps);
   f.current.date = new Date('2026-09-01T14:59:00Z');
   await service.tick();
   assert.equal(f.sent.length, 0);
-  f.current.date = new Date('2026-09-01T19:00:00Z');
+  f.current.date = new Date('2026-09-01T15:00:00Z');
   await Promise.all([service.tick(), service.tick()]);
   await service.tick();
   await createDailyScheduleService(f.deps).tick();
@@ -201,6 +211,40 @@ test('automatic job is due at 18:00; same-day catchup and restart do not duplica
   f.current.date = new Date('2026-09-03T15:00:00Z');
   await service.tick();
   assert.equal(f.sent.length, 2);
+});
+
+test('startup after the scheduled minute never catches up, but dev can still publish', async () => {
+  const f = fixture();
+  for (const timestamp of ['2026-09-01T15:01:00Z', '2026-09-01T19:00:00Z', '2026-09-01T20:59:00Z']) {
+    f.current.date = new Date(timestamp);
+    await createDailyScheduleService(f.deps).tick();
+  }
+  assert.equal(f.loads, 0);
+  assert.equal(f.sent.length, 0);
+  assert.equal(f.records.size, 0);
+  await createDailyScheduleService(f.deps).handleCommand(command());
+  assert.equal(f.sent.filter((message) => message.chatId === config().chatId).length, 1);
+});
+
+test('a slow lookup finishing after 18:00 cannot send a late automatic post', async () => {
+  const f = fixture();
+  f.deps.store.loadStudents = async () => { f.current.date = new Date('2026-09-01T15:01:00Z'); return [user(1)]; };
+  await createDailyScheduleService(f.deps).tick();
+  assert.equal(f.sent.length, 0);
+  assert.equal(f.records.size, 0);
+});
+
+test('all-incomplete profiles stay hidden without an empty channel post', async () => {
+  const f = fixture([user(1)], { scenarios: { 1: { setup: { nextStep: 'subjects' } } } });
+  const digest = await collectDailySchedule(f.deps, course, '2026-09-02');
+  assert.equal(buildDailyScheduleText(digest), null);
+  const service = createDailyScheduleService(f.deps);
+  await service.tick();
+  assert.equal(f.sent.length, 0);
+  await service.handleCommand(command(), 'preview');
+  await service.handleCommand(command());
+  assert.ok(f.sent.every((message) => message.chatId === 99 && !message.text.includes('student_1')));
+  assert.equal(f.records.size, 0);
 });
 
 test('disabled and incomplete configurations never load or send', async () => {
