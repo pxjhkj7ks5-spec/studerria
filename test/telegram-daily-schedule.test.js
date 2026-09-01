@@ -136,7 +136,7 @@ test('no lessons, incomplete setup, unavailable data and outside semester stay d
   assert.equal(digest.blocks.find((b) => b.status === 'outside_term').students.length, 1);
   assert.equal(digest.blocks.at(-1).status, 'empty');
   const text = buildDailyScheduleText(digest);
-  assert.doesNotMatch(text, /ще не налаштовано|student_2/);
+  assert.doesNotMatch(text, /ще не налаштовано|student_1|student_2|чілім|пар немає/);
 });
 
 test('header contains only the target weekday and date', async () => {
@@ -149,7 +149,11 @@ test('header contains only the target weekday and date', async () => {
 test('weekends publish the chill message, while zero registered students have a different message', async () => {
   const f = fixture();
   const weekend = buildDailyScheduleText(await collectDailySchedule(f.deps, course, '2026-09-06'));
-  assert.match(weekend, /Завтра чілім — пар немає/);
+  assert.equal(weekend, '😎 Завтра пар немає — чілім!');
+  const mixed = fixture([user(1), user(2)], { scenarios: { 2: { state: { scheduleRows: [] } } } });
+  const mixedText = buildDailyScheduleText(await collectDailySchedule(mixed.deps, course, '2026-09-02'));
+  assert.match(mixedText, /@student_1/);
+  assert.doesNotMatch(mixedText, /student_2|user\?id=1002|чілім|пар немає/);
   const empty = fixture([]);
   const noStudents = buildDailyScheduleText(await collectDailySchedule(empty.deps, course, '2026-09-02'));
   assert.match(noStudents, /ще немає зареєстрованих студентів/);
