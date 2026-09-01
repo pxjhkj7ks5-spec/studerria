@@ -41,6 +41,8 @@ const demoMode = require('./lib/demoMode');
 const telegramMiniApp = require('./lib/telegramMiniApp');
 const { getStudentSubjectChoiceSummary, resetAllStudentSubjectChoices } = require('./lib/studentSubjectReset');
 const { RESET_FLOW, createStuderriaTelegramSubjectReset } = require('./lib/studerriaTelegramSubjectReset');
+const { createDailyScheduleService, getDailyScheduleConfig } = require('./lib/studerriaTelegramDailySchedule');
+const { createDailyScheduleStore } = require('./lib/studerriaTelegramDailyScheduleStore');
 const {
   handleStuderriaTelegramDevPhotoCleanerMessage,
   logStuderriaTelegramDevPhotoCleanerIngress,
@@ -20385,13 +20387,14 @@ const studerriaTelegramLessonTypeLabels = {
   lab: 'Лаба',
 };
 
-async function callStuderriaTelegramBotApi(method, payload = {}) {
+async function callStuderriaTelegramBotApi(method, payload = {}, options = {}) {
   const token = getTelegramMiniBotToken();
   if (!token) throw new Error('missing_bot_token');
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal: options.signal,
   });
   const data = await response.json().catch(() => null);
   if (!response.ok || !data || data.ok !== true) {
@@ -20426,6 +20429,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
   { command: 'chatid', description: 'Dev: показати ID чату' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
+  { command: 'devschedule', description: 'Dev: розклад на завтра в канал' },
   { command: 'addrole', description: 'Dev: видати роль' },
   { command: 'giverole', description: 'Dev: видати роль' },
   { command: 'give', description: 'Dev: видати роль' },
@@ -20745,7 +20749,7 @@ async function sendStuderriaTelegramMessage(chatId, text, options = {}) {
     payload.parse_mode = String(options.parseMode);
   }
   try {
-    return await callStuderriaTelegramBotApi('sendMessage', payload);
+    return await callStuderriaTelegramBotApi('sendMessage', payload, { signal: options.signal });
   } catch (err) {
     if (payload.message_thread_id && !options.disableThreadFallback && isStuderriaTelegramThreadDeliveryError(err)) {
       const fallbackPayload = { ...payload };
@@ -21048,6 +21052,8 @@ async function sendStuderriaTelegramHelp(message = {}) {
     '',
     '6. Службові dev-команди',
     `${devUsersCommand} - список привʼязаних Telegram-користувачів. Тільки dev, тільки в особистому чаті.`,
+    '/devschedule — надіслати розклад на завтра в налаштований канал. Тільки dev в особистому чаті.',
+    '/devschedule preview — приватний перегляд без публікації в канал.',
     '/addrole starosta @username - видати роль starosta.',
     '/addrole starosta 123456789 - видати роль по Telegram ID.',
     '/deleterole starosta @username - забрати роль starosta.',
@@ -21625,259 +21631,39 @@ function buildStuderriaTelegramWeeklyScheduleText(context = {}, weekNumber = 1, 
   return lines.join('\n').slice(0, 3900);
 }
 
-const studerriaTelegramDailyScheduleState = {
-  started: false,
-  running: false,
-  lastRunKey: '',
-};
-
-function parseStuderriaTelegramDailyScheduleTime(value = '18:00') {
-  const match = String(value || '18:00').trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return { hour: 18, minute: 0, label: '18:00' };
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-    return { hour: 18, minute: 0, label: '18:00' };
-  }
-  return {
-    hour,
-    minute,
-    label: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-  };
-}
-
-function getStuderriaTelegramKyivClockParts(date = new Date()) {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Kyiv',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(date);
-  const getPart = (type) => parts.find((part) => part.type === type)?.value || '';
-  return {
-    dateIso: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
-    hour: Number(getPart('hour')),
-    minute: Number(getPart('minute')),
-  };
-}
-
-function getStuderriaTelegramDailyScheduleConfig(env = process.env) {
-  const enabledRaw = String(env.STUDERRIA_TG_DAILY_SCHEDULE_ENABLED || '').trim().toLowerCase();
-  const enabled = ['1', 'true', 'yes', 'on'].includes(enabledRaw);
-  const time = parseStuderriaTelegramDailyScheduleTime(env.STUDERRIA_TG_DAILY_SCHEDULE_TIME || '18:00');
-  const intervalRaw = Number(env.STUDERRIA_TG_DAILY_SCHEDULE_CHECK_INTERVAL_MS || 30000);
-  const checkIntervalMs = Number.isFinite(intervalRaw)
-    ? Math.max(10000, Math.min(300000, Math.floor(intervalRaw)))
-    : 30000;
-  return {
-    enabled,
-    chatId: String(env.STUDERRIA_TG_DAILY_SCHEDULE_CHAT_ID || '').trim(),
-    threadId: parsePositiveIntStrict(env.STUDERRIA_TG_DAILY_SCHEDULE_THREAD_ID),
-    actorTelegramId: normalizeTelegramId(env.STUDERRIA_TG_DAILY_SCHEDULE_ACTOR_TELEGRAM_ID),
-    courseId: parsePositiveIntStrict(env.STUDERRIA_TG_DAILY_SCHEDULE_COURSE_ID),
-    time,
-    checkIntervalMs,
-  };
-}
-
-async function loadStuderriaTelegramDailyScheduleContext(config = {}) {
-  let actorContext = null;
-  if (config.actorTelegramId) {
-    actorContext = await getStuderriaTelegramActorContext({ id: config.actorTelegramId }).catch((err) => {
-      console.error('Studerria Telegram daily schedule actor lookup failed', err && err.message ? err.message : err);
-      return null;
-    });
-  }
-  const actor = actorContext && actorContext.actor ? actorContext.actor : null;
-  const courseId = parsePositiveIntStrict(config.courseId)
-    || parsePositiveIntStrict(actor && (actor.schedule_course_id || actor.course_id));
-  if (!courseId) {
-    return { error: 'missing_course' };
-  }
-
-  const subjectScope = await getCourseSubjectAccessScope(courseId, { visibleOnly: true }).catch(() => null);
-  const activeSemester = await getActiveSemester(courseId).catch(() => null);
-  const runtimeTerm = subjectScope && subjectScope.source === 'academic_v2'
-    ? await academicV2RuntimeHelpers.loadCourseProjectionState(getAcademicV2Store(), courseId)
-      .then((state) => state.term)
-      .catch(() => null)
-    : null;
-  const runtimeSemester = runtimeTerm ? {
-    id: runtimeTerm.legacy_semester_id || runtimeTerm.id,
-    start_date: runtimeTerm.start_date,
-    weeks_count: runtimeTerm.weeks_count,
-  } : null;
-  const activeTerm = subjectScope && subjectScope.source === 'academic_v2'
-    ? (runtimeSemester || activeSemester)
-    : (activeSemester || runtimeSemester);
-  if (!activeTerm) {
-    return { error: 'missing_term', courseId, subjectScope };
-  }
-
-  return {
-    ...(actorContext || {}),
-    actor,
-    courseId,
-    subjectScope,
-    runtimeTerm,
-    activeSemester: activeTerm,
-    totalWeeks: Math.max(1, Number(activeTerm.weeks_count || 0) || 16),
-    showCourseWideSchedule: true,
-    displayBellSchedule: buildDisplayBellSchedule(
-      subjectScope && subjectScope.scope ? subjectScope.scope.campus_key : null
-    ),
-  };
-}
-
-function getStuderriaTelegramDailyScheduleWeekNumber(context = {}, dateIso = '') {
-  const totalWeeks = Math.max(1, Number(context.totalWeeks || 0) || 16);
-  let weekNumber = getAcademicWeekForSemester(new Date(`${dateIso}T12:00:00Z`), context.activeSemester);
-  if (weekNumber < 1) weekNumber = 1;
-  if (weekNumber > totalWeeks) weekNumber = totalWeeks;
-  return weekNumber;
-}
-
-function buildStuderriaTelegramDailyScheduleRowLine(row = {}, displayBellSchedule = bellSchedule) {
-  const classNumber = Number(row.class_number || 0);
-  const timeLabel = getScheduleTimeLabel(classNumber, displayBellSchedule);
-  const subjectName = sanitizeCompactText(row.subject_name || row.subject_title || row.name || 'Предмет', 120);
-  const lessonType = getStuderriaTelegramLessonTypeLabel(row.lesson_type || row.activity_type);
-  const groupLabel = normalizeStuderriaTelegramScheduleGroupLabel(row);
-  const roomLabel = sanitizeCompactText(row.room_label || row.room_name || row.room_code || '', 60);
-  const meta = [lessonType, groupLabel, roomLabel].filter(Boolean).join(' · ');
-  return [
-    `📌 ${classNumber || '-'} пара${timeLabel ? ` · ${timeLabel}` : ''}`,
-    `   ${subjectName}`,
-    meta ? `   ${meta}` : '',
-  ].filter(Boolean).join('\n');
-}
-
-function buildStuderriaTelegramDailyScheduleText(context = {}, targetIso = '', weekNumber = 1, rows = []) {
-  const dayName = getDayNameFromDate(targetIso);
-  const dayLabel = getStuderriaTelegramFullDayLabel(dayName);
-  const dateLabel = formatStuderriaTelegramDateLabel(targetIso);
-  const lines = [
-    '🌙 Розклад на завтра',
-    `${dayLabel}, ${dateLabel} · ${weekNumber} тиждень`,
-    '',
-    'Завтра є пари. Тримайте коротку карту дня для всіх груп:',
-    '',
-  ];
-  let visibleCount = 0;
-  for (const row of rows) {
-    const nextLines = [
-      ...lines,
-      visibleCount > 0 ? '' : null,
-      buildStuderriaTelegramDailyScheduleRowLine(row, context.displayBellSchedule),
-    ].filter((line) => line !== null);
-    if (nextLines.join('\n').length > 3800) break;
-    lines.splice(0, lines.length, ...nextLines);
-    visibleCount += 1;
-  }
-  if (visibleCount < rows.length) {
-    lines.push('');
-    lines.push('Частину пар не вмістив у повідомлення. Повний розклад є в Studerria.');
-  }
-  lines.push('');
-  lines.push('Studerria нагадала о 18:00, щоб завтра не почалося зненацька.');
-  return lines.join('\n').slice(0, 3900);
-}
-
-async function sendStuderriaTelegramDailyScheduleIfNeeded(config = {}) {
-  if (!getTelegramMiniBotToken() || !config.chatId) {
-    return { sent: false, reason: 'missing_token_or_chat' };
-  }
-  const targetIso = getStuderriaTelegramKyivDateWithOffset(1);
-  const context = await loadStuderriaTelegramDailyScheduleContext(config);
-  if (context.error) {
-    console.warn('Studerria Telegram daily schedule skipped', {
-      reason: context.error,
-      courseId: context.courseId || null,
-    });
-    return { sent: false, reason: context.error };
-  }
-  const dayName = getDayNameFromDate(targetIso);
-  const weekNumber = getStuderriaTelegramDailyScheduleWeekNumber(context, targetIso);
-  const rows = (await loadStuderriaTelegramWeeklyScheduleRows(context, weekNumber))
-    .filter((row) => row && row.day_of_week === dayName)
-    .sort((left, right) =>
-      (Number(left.class_number || 0) - Number(right.class_number || 0))
-      || (Number(left.group_number || 0) - Number(right.group_number || 0))
-      || String(left.subject_name || left.subject_title || '').localeCompare(String(right.subject_name || right.subject_title || ''))
-    );
-  if (!rows.length) {
-    console.log('Studerria Telegram daily schedule skipped: no lessons tomorrow', {
-      targetIso,
-      weekNumber,
-      courseId: context.courseId,
-    });
-    return { sent: false, reason: 'no_lessons', targetIso, weekNumber, courseId: context.courseId };
-  }
-  const message = await sendStuderriaTelegramMessage(
-    config.chatId,
-    buildStuderriaTelegramDailyScheduleText(context, targetIso, weekNumber, rows),
-    {
-      messageThreadId: config.threadId || null,
-      disableThreadFallback: true,
-    }
-  );
-  console.log('Studerria Telegram daily schedule sent', {
-    targetIso,
-    weekNumber,
-    courseId: context.courseId,
-    rows: rows.length,
-    chatId: config.chatId,
-    threadId: config.threadId || null,
-    messageId: message && message.message_id ? message.message_id : null,
-  });
-  return { sent: true, targetIso, weekNumber, courseId: context.courseId, rows: rows.length };
-}
+const studerriaTelegramDailySchedule = createDailyScheduleService({
+  store: createDailyScheduleStore(db),
+  ensureReady: ensureDbReady,
+  hasBotToken: () => Boolean(getTelegramMiniBotToken()),
+  loadSetup: (user) => loadTelegramMiniSetupState(user, { autoAssignRequired: false }),
+  loadSchedule: (user, weekNumber) => academicV2StudentHelpers.loadStudentScheduleData(
+    getAcademicV2Store(), user, { weekNumber }
+  ),
+  formatTime: (classNumber, campus) => getScheduleTimeLabel(classNumber, buildDisplayBellSchedule(campus)),
+  replyMarkup: () => {
+    const url = getStuderriaTelegramMiniAppDeepLink() || getStuderriaTelegramMiniAppWebUrl();
+    return { inline_keyboard: [[{ text: 'Мій розклад у Studeri', url }]] };
+  },
+  sendMessage: sendStuderriaTelegramMessage,
+  isDevUser: isStuderriaTelegramDevUser,
+  logger: console,
+});
+let studerriaTelegramDailyScheduleStarted = false;
 
 function startStuderriaTelegramDailyScheduleJob() {
-  const initialConfig = getStuderriaTelegramDailyScheduleConfig();
-  if (!initialConfig.enabled) return;
-  if (studerriaTelegramDailyScheduleState.started) return;
-  if (!initialConfig.chatId) {
-    console.warn('Studerria Telegram daily schedule disabled: missing STUDERRIA_TG_DAILY_SCHEDULE_CHAT_ID');
+  const config = getDailyScheduleConfig();
+  if (studerriaTelegramDailyScheduleStarted || !config.enabled) return;
+  if (config.invalid || !config.chatId || (!config.courseId && !config.actorTelegramId)) {
+    console.warn('Studerria daily schedule disabled: configure CHAT_ID, COURSE_ID and optional THREAD_ID');
     return;
   }
-  studerriaTelegramDailyScheduleState.started = true;
-  const tick = async () => {
-    const config = getStuderriaTelegramDailyScheduleConfig();
-    if (!config.enabled || !config.chatId) return;
-    const clock = getStuderriaTelegramKyivClockParts();
-    if (clock.hour !== config.time.hour || clock.minute !== config.time.minute) return;
-    const runKey = `${clock.dateIso}|${config.time.label}|${config.chatId}|${config.threadId || ''}`;
-    if (studerriaTelegramDailyScheduleState.lastRunKey === runKey || studerriaTelegramDailyScheduleState.running) {
-      return;
-    }
-    studerriaTelegramDailyScheduleState.running = true;
-    try {
-      await sendStuderriaTelegramDailyScheduleIfNeeded(config);
-      studerriaTelegramDailyScheduleState.lastRunKey = runKey;
-    } catch (err) {
-      console.error('Studerria Telegram daily schedule failed', err && err.message ? err.message : err);
-    } finally {
-      studerriaTelegramDailyScheduleState.running = false;
-    }
-  };
-  console.log('Studerria Telegram daily schedule job started', {
-    time: initialConfig.time.label,
-    chatId: initialConfig.chatId,
-    threadId: initialConfig.threadId || null,
+  studerriaTelegramDailyScheduleStarted = true;
+  const tick = () => studerriaTelegramDailySchedule.tick().catch((error) => {
+    console.error('Studerria daily schedule tick failed', error);
   });
-  tick().catch((err) => {
-    console.error('Studerria Telegram daily schedule startup tick failed', err && err.message ? err.message : err);
-  });
-  setInterval(() => {
-    tick().catch((err) => {
-      console.error('Studerria Telegram daily schedule tick failed', err && err.message ? err.message : err);
-    });
-  }, initialConfig.checkIntervalMs);
+  tick();
+  setInterval(tick, config.checkIntervalMs);
+  console.log('Studerria daily schedule job started', { time: config.time.label, timeZone: 'Europe/Kyiv' });
 }
 
 async function handleStuderriaTelegramShowCallback(callbackQuery = {}, payload = {}) {
@@ -25840,6 +25626,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     if (!parsedCommand) return;
+    if (parsedCommand.command === 'devschedule') {
+      await studerriaTelegramDailySchedule.handleCommand(message, parsedCommand.args);
+      return;
+    }
     if (parsedCommand.command === 'help') {
       await sendStuderriaTelegramHelp(message);
       return;

@@ -340,6 +340,50 @@ If GHCR package access is private, authenticate once on the server before pulls:
 echo "$GITHUB_TOKEN_WITH_READ_PACKAGES" | docker login ghcr.io -u "$GITHUB_USERNAME" --password-stdin
 ```
 
+## Щоденний розклад Studeri в Telegram
+
+У `docker/local/.env` заповніть (значення нижче — приклади, а не готові ID):
+
+```dotenv
+STUDERRIA_TG_DAILY_SCHEDULE_ENABLED=true
+STUDERRIA_TG_DAILY_SCHEDULE_CHAT_ID=-1001234567890
+STUDERRIA_TG_DAILY_SCHEDULE_COURSE_ID=123
+STUDERRIA_TG_DAILY_SCHEDULE_THREAD_ID=
+STUDERRIA_TG_DAILY_SCHEDULE_TIME=18:00
+STUDERRIA_TG_DAILY_SCHEDULE_CHECK_INTERVAL_MS=30000
+```
+
+- Використовується вже налаштований `STUDERRIA_TG_BOT_TOKEN`. Для dev-команд потрібен ваш `STUDERRIA_TG_DEV_TELEGRAM_ID`.
+- `CHAT_ID` — числовий ID каналу/групи або `@channelusername` публічного каналу. Додайте бота адміністратором каналу з правом публікувати повідомлення. Команда `/chatid` у потрібному чаті показує його ID і, для форумів, ID теми.
+- `THREAD_ID` залишайте порожнім для каналу чи основного чату; для теми форуму задайте її ID. Неправильна тема спричиняє помилку, без перенесення публікації в загальний чат.
+- `COURSE_ID` — саме `academic_v2_groups.legacy_course_id`, не `group_id` і не рік вступу. Щоб визначити значення, виконайте в БД запит нижче й виберіть потрібну програму, набір та кампус.
+- Час публікації завжди `Europe/Kyiv`, з урахуванням сезонної зміни часу. До заповнення конфігурації залишайте `ENABLED=false`.
+
+```sql
+SELECT g.legacy_course_id AS course_id, p.name AS program,
+       c.admission_year, g.label, g.campus_key, g.stage_number
+FROM academic_v2_groups g
+JOIN academic_v2_cohorts c ON c.id = g.cohort_id
+JOIN academic_v2_programs p ON p.id = c.program_id
+WHERE g.is_active = true AND c.is_active = true AND p.is_active = true
+  AND p.track_key IN ('bachelor', 'master')
+ORDER BY p.name, c.admission_year, g.campus_key, g.stage_number;
+```
+
+Після зміни лише `.env`, з кореня репозиторію на сервері:
+
+```bash
+bash scripts/server-update.sh app --no-build
+```
+
+В особистому чаті з ботом dev може виконати `/devschedule preview` для приватного перегляду або `/devschedule` для додаткової публікації в налаштований канал. Обидві команди працюють і при `ENABLED=false`; ручна публікація не скасовує автоматичну о 18:00. Нікнейми показуються без тегів. Якщо у всіх немає пар, бот пише «😎 Завтра чілім — пар немає». Незавершені профілі й недоступний розклад позначаються окремо.
+
+Розсилка завжди містить одне повідомлення: спочатку скорочуються довгі списки імен до трьох із «ще N», потім, за потреби, цілі кінцеві блоки з підрахунком непоказаних студентів. Кнопка веде в особистий розклад Studeri.
+
+Після перезапуску пропущена публікація надсилається до кінця поточного київського дня. Журнал `telegram_daily_schedule_deliveries` захищає від повтору навіть після перезапуску. `sending` означає незавершену спробу, `sent` — підтверджену доставку, `failed` — відмову Telegram, `uncertain` — непідтверджену доставку. Записи `sending`, `failed` і `uncertain` автоматично не повторюються: перевірте канал і за потреби виконайте нову `/devschedule`. Помилки також потрапляють у журнали `app`.
+
+Сумісність: необов’язковий `STUDERRIA_TG_DAILY_SCHEDULE_ACTOR_TELEGRAM_ID` дозволяє визначити курс за актуальною групою конкретного користувача, якщо `COURSE_ID` порожній. Для постійної прив’язки каналу рекомендовано явний `COURSE_ID`.
+
 ## Re-import the backup from scratch
 
 The PostgreSQL dump is imported only when the database volume is empty. To recreate the database and re-run the import:
