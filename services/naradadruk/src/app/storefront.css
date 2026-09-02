@@ -1364,6 +1364,15 @@
   box-shadow: 0 0 0 3px rgba(244, 123, 53, 0.1);
 }
 
+.form-grid input:disabled,
+.form-field input:disabled,
+.form-field textarea:disabled {
+  border-color: rgba(111, 103, 92, 0.12);
+  background: rgba(233, 230, 223, 0.62);
+  color: rgba(78, 73, 66, 0.48);
+  cursor: not-allowed;
+}
+
 .form-grid small,
 .form-field > small,
 .choice-group small,
@@ -1386,6 +1395,18 @@
 
 .form-field--options:focus-within {
   z-index: 8;
+}
+
+.form-field.is-disabled > span,
+.form-field.is-disabled > small {
+  color: rgba(78, 73, 66, 0.48);
+}
+
+.form-field > .form-field__success {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #2f7247;
 }
 
 .option-list {
@@ -1462,6 +1483,17 @@
 .choice-group label.is-active {
   border-color: rgba(244, 123, 53, 0.48);
   background: var(--accent-soft);
+}
+
+.choice-group.is-disabled label {
+  border-color: rgba(111, 103, 92, 0.12);
+  background: rgba(233, 230, 223, 0.48);
+  color: rgba(78, 73, 66, 0.48);
+  cursor: not-allowed;
+}
+
+.choice-group.is-disabled label:active {
+  transform: none;
 }
 
 .choice-group input {

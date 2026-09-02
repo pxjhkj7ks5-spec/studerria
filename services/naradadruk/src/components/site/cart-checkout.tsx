@@ -39,7 +39,10 @@ export function CartCheckout() {
   const [promo, setPromo] = useState<PromoPreview | null>(null);
   const [promoError, setPromoError] = useState("");
   const checkoutTracked = useRef(false);
+  const citySearchCache = useRef(new Map<string, Option[]>());
+  const destinationSearchCache = useRef(new Map<string, Option[]>());
   const regularTotal = items.reduce((sum, item) => sum + item.regularUnitPrice * item.quantity, 0);
+  const hasSelectedCity = cityRef.trim().length > 0;
 
   useEffect(() => {
     if (!hydrated || items.length === 0 || checkoutTracked.current) return;
@@ -73,58 +76,98 @@ export function CartCheckout() {
   }
 
   useEffect(() => {
-    if (cityRef) {
+    const query = cityName.trim();
+    if (cityRef || activeSuggestionField !== "city" || query.length < 2) {
       setCityOptions([]);
       return;
     }
-    const controller = new AbortController();
-    const timeout = window.setTimeout(async () => {
-      try {
-        const response = await fetch(withBasePath(`/api/nova-poshta/cities?q=${encodeURIComponent(cityName)}`), {
-          signal: controller.signal,
-        });
-        const payload = (await response.json()) as { options?: Option[] };
-        setCityOptions(payload.options ?? []);
-      } catch {
-        if (!controller.signal.aborted) setCityOptions([]);
-      }
-    }, 250);
-    return () => {
-      window.clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [cityName, cityRef]);
-
-  useEffect(() => {
-    if (deliveryMethod === "courier" || !cityRef || destinationRef) {
-      setDestinationOptions([]);
+    const cacheKey = query.toLocaleLowerCase("uk-UA");
+    const cachedOptions = citySearchCache.current.get(cacheKey);
+    if (cachedOptions) {
+      setCityOptions(cachedOptions);
       return;
     }
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ cityRef, method: deliveryMethod, q: destination });
-        const response = await fetch(withBasePath(`/api/nova-poshta/warehouses?${params}`), {
+        const response = await fetch(withBasePath(`/api/nova-poshta/cities?q=${encodeURIComponent(query)}`), {
           signal: controller.signal,
         });
+        if (!response.ok) throw new Error("City search failed");
         const payload = (await response.json()) as { options?: Option[] };
-        setDestinationOptions(payload.options ?? []);
+        const options = payload.options ?? [];
+        citySearchCache.current.set(cacheKey, options);
+        setCityOptions(options);
       } catch {
-        if (!controller.signal.aborted) setDestinationOptions([]);
+        if (!controller.signal.aborted) setCityOptions([]);
       }
-    }, 250);
+    }, 300);
     return () => {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [cityRef, deliveryMethod, destination, destinationRef]);
+  }, [activeSuggestionField, cityName, cityRef]);
+
+  useEffect(() => {
+    if (deliveryMethod === "courier" || !cityRef || destinationRef || activeSuggestionField !== "destination") {
+      setDestinationOptions([]);
+      return;
+    }
+    const query = destination.trim();
+    const cacheKey = `${cityRef}:${deliveryMethod}:${query.toLocaleLowerCase("uk-UA")}`;
+    const cachedOptions = destinationSearchCache.current.get(cacheKey);
+    if (cachedOptions) {
+      setDestinationOptions(cachedOptions);
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ cityRef, method: deliveryMethod, q: query });
+        const response = await fetch(withBasePath(`/api/nova-poshta/warehouses?${params}`), {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Warehouse search failed");
+        const payload = (await response.json()) as { options?: Option[] };
+        const options = payload.options ?? [];
+        destinationSearchCache.current.set(cacheKey, options);
+        setDestinationOptions(options);
+      } catch {
+        if (!controller.signal.aborted) setDestinationOptions([]);
+      }
+    }, 300);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [activeSuggestionField, cityRef, deliveryMethod, destination, destinationRef]);
 
   function chooseCity(option: Option) {
     setCityName(option.label);
     setCityRef(option.ref);
     setCityOptions([]);
+    setDeliveryMethod("branch");
     setDestination("");
     setDestinationRef("");
+    setDestinationOptions([]);
+    setActiveSuggestionField(null);
+  }
+
+  function changeCity(value: string) {
+    setCityName(value);
+    setCityRef("");
+    setDeliveryMethod("branch");
+    setDestination("");
+    setDestinationRef("");
+    setDestinationOptions([]);
+  }
+
+  function changeDeliveryMethod(value: DeliveryMethod) {
+    if (!hasSelectedCity) return;
+    setDeliveryMethod(value);
+    setDestination("");
+    setDestinationRef("");
+    setDestinationOptions([]);
     setActiveSuggestionField(null);
   }
 
@@ -146,6 +189,14 @@ export function CartCheckout() {
     if (items.length === 0 || isSubmitting) return;
     if (promoCode.trim() && !promo) {
       setError("Застосуйте промокод або очистьте поле перед оформленням.");
+      return;
+    }
+    if (!hasSelectedCity) {
+      setError("Оберіть місто зі списку — після цього відкриються способи доставки.");
+      return;
+    }
+    if (deliveryMethod !== "courier" && !destinationRef) {
+      setError(`Оберіть ${deliveryMethod === "parcel_locker" ? "поштомат" : "відділення"} зі списку.`);
       return;
     }
     setIsSubmitting(true);
@@ -267,19 +318,20 @@ export function CartCheckout() {
 
         <label className="form-field form-field--options">
           <span>Місто</span>
-          <input value={cityName} onChange={(event) => { setCityName(event.target.value); setCityRef(""); }} onFocus={() => setActiveSuggestionField("city")} onBlur={() => closeSuggestions("city")} autoComplete="address-level2" placeholder="Почніть вводити місто" minLength={2} maxLength={120} required />
+          <input value={cityName} onChange={(event) => changeCity(event.target.value)} onFocus={() => setActiveSuggestionField("city")} onBlur={() => closeSuggestions("city")} autoComplete="address-level2" placeholder="Почніть вводити місто" minLength={2} maxLength={120} required />
           {activeSuggestionField === "city" && cityOptions.length > 0 ? <div className="option-list">{cityOptions.map((option, index) => <button type="button" key={`${option.ref}:${option.label}:${index}`} onClick={() => chooseCity(option)}><strong>{option.label}</strong>{option.secondary ? <small>{option.secondary}</small> : null}</button>)}</div> : null}
+          {!hasSelectedCity ? <small id="delivery-city-hint">Введіть щонайменше 2 символи та оберіть місто зі списку.</small> : <small className="form-field__success"><Check aria-hidden size={13} /> Місто вибрано — доставка доступна.</small>}
         </label>
 
-        <fieldset className="choice-group">
+        <fieldset className={`choice-group${!hasSelectedCity ? " is-disabled" : ""}`} disabled={!hasSelectedCity} aria-describedby={!hasSelectedCity ? "delivery-city-hint" : undefined}>
           <legend>Спосіб доставки Новою поштою</legend>
           {([
             ["branch", "Відділення"],
             ["parcel_locker", "Поштомат"],
             ["courier", "Курʼєр"],
           ] as const).map(([value, label]) => (
-            <label key={value} className={deliveryMethod === value ? "is-active" : ""}>
-              <input type="radio" name="deliveryMethod" value={value} checked={deliveryMethod === value} onChange={() => { setDeliveryMethod(value); setDestination(""); setDestinationRef(""); }} />
+            <label key={value} className={hasSelectedCity && deliveryMethod === value ? "is-active" : ""}>
+              <input type="radio" name="deliveryMethod" value={value} checked={deliveryMethod === value} onChange={() => changeDeliveryMethod(value)} />
               <span><Check aria-hidden size={15} /> {label}</span>
             </label>
           ))}
@@ -288,11 +340,11 @@ export function CartCheckout() {
           Вартість доставки розраховує Нова пошта за чинними тарифами та сплачується окремо.
         </p>
 
-        <label className="form-field form-field--options">
+        <label className={`form-field form-field--options${!hasSelectedCity ? " is-disabled" : ""}`}>
           <span>{deliveryMethod === "courier" ? "Адреса доставки" : deliveryMethod === "parcel_locker" ? "Поштомат" : "Відділення"}</span>
-          <input value={destination} onChange={(event) => { setDestination(event.target.value); setDestinationRef(""); }} onFocus={() => setActiveSuggestionField("destination")} onBlur={() => closeSuggestions("destination")} autoComplete={deliveryMethod === "courier" ? "street-address" : "off"} placeholder={deliveryMethod === "courier" ? "Вулиця, будинок, квартира" : "Номер або адреса"} minLength={deliveryMethod === "courier" ? 5 : 1} maxLength={240} required />
+          <input value={destination} onChange={(event) => { setDestination(event.target.value); setDestinationRef(""); }} onFocus={() => setActiveSuggestionField("destination")} onBlur={() => closeSuggestions("destination")} autoComplete={deliveryMethod === "courier" ? "street-address" : "off"} placeholder={!hasSelectedCity ? "Спочатку оберіть місто" : deliveryMethod === "courier" ? "Вулиця, будинок, квартира" : "Номер або адреса"} minLength={deliveryMethod === "courier" ? 5 : 1} maxLength={240} disabled={!hasSelectedCity} required />
           {activeSuggestionField === "destination" && destinationOptions.length > 0 ? <div className="option-list">{destinationOptions.map((option) => <button type="button" key={option.ref} onClick={() => chooseDestination(option)}><strong>{option.label}</strong>{option.secondary ? <small>{option.secondary}</small> : null}</button>)}</div> : null}
-          {deliveryMethod !== "courier" && !cityRef ? <small>Вкажіть номер або повну адресу точки отримання.</small> : null}
+          {!hasSelectedCity ? <small>Поле відкриється після вибору міста.</small> : deliveryMethod === "courier" ? <small>Вкажіть вулицю, будинок і, за потреби, квартиру.</small> : <small>Почніть вводити номер або адресу й оберіть точку зі списку.</small>}
         </label>
 
         <fieldset className="choice-group choice-group--payment">
