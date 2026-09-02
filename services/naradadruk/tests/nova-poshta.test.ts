@@ -21,18 +21,22 @@ test("parcel locker search asks Nova Poshta for the parcel-locker warehouse type
     if (body.calledMethod === "getWarehouseTypes") {
       return Response.json({
         success: true,
-        data: [{ Ref: "parcel-locker-type", Description: "Поштомат" }],
+        data: [
+          { Ref: "bank-locker-type", Description: "Поштомат ПриватБанку" },
+          { Ref: "parcel-locker-type", Description: "Поштомат" },
+        ],
       });
     }
 
+    const typeRef = body.methodProperties.TypeOfWarehouseRef;
     return Response.json({
       success: true,
       data: [{
-        Ref: "locker-1",
-        Description: "Поштомат №1",
+        Ref: typeRef === "bank-locker-type" ? "locker-bank" : "locker-1",
+        Description: typeRef === "bank-locker-type" ? "Поштомат ПриватБанку" : "Поштомат №1",
         ShortAddress: "вул. Хрещатик, 1",
         CategoryOfWarehouse: "Поштомат",
-        TypeOfWarehouse: "parcel-locker-type",
+        TypeOfWarehouse: typeRef,
       }],
     });
   };
@@ -47,10 +51,18 @@ test("parcel locker search asks Nova Poshta for the parcel-locker warehouse type
 
   assert.equal(requestBodies[0].calledMethod, "getWarehouseTypes");
   assert.equal(requestBodies[1].calledMethod, "getWarehouses");
-  assert.equal(requestBodies[1].methodProperties.TypeOfWarehouseRef, "parcel-locker-type");
-  assert.deepEqual(result.options, [{
-    ref: "locker-1",
-    label: "Поштомат №1",
-    secondary: "вул. Хрещатик, 1",
-  }]);
+  assert.equal(requestBodies[1].methodProperties.TypeOfWarehouseRef, "bank-locker-type");
+  assert.equal(requestBodies[2].methodProperties.TypeOfWarehouseRef, "parcel-locker-type");
+  assert.deepEqual(result.options, [
+    {
+      ref: "locker-bank",
+      label: "Поштомат ПриватБанку",
+      secondary: "вул. Хрещатик, 1",
+    },
+    {
+      ref: "locker-1",
+      label: "Поштомат №1",
+      secondary: "вул. Хрещатик, 1",
+    },
+  ]);
 });

@@ -26,7 +26,7 @@ const fallbackCities = [
 ];
 
 let popularCitiesCache: { expiresAt: number; options: NovaPoshtaOption[] } | null = null;
-let parcelLockerTypeCache: { expiresAt: number; ref: string } | null = null;
+let parcelLockerTypeCache: { expiresAt: number; refs: string[] } | null = null;
 
 function getApiKey() {
   return process.env.NARADADRUK_NOVA_POSHTA_API_KEY?.trim() || "";
@@ -92,26 +92,26 @@ async function getPopularCities() {
   return options;
 }
 
-async function getParcelLockerTypeRef() {
+async function getParcelLockerTypeRefs() {
   if (parcelLockerTypeCache && parcelLockerTypeCache.expiresAt > Date.now()) {
-    return parcelLockerTypeCache.ref;
+    return parcelLockerTypeCache.refs;
   }
 
   const warehouseTypes = await callNovaPoshta<{
     Ref: string;
     Description: string;
   }>("AddressGeneral", "getWarehouseTypes", {});
-  const parcelLockerType = warehouseTypes?.find((type) => {
+  const parcelLockerTypeRefs = (warehouseTypes ?? []).filter((type) => {
     const description = type.Description.toLocaleLowerCase("uk-UA");
     return description.includes("поштомат") || description.includes("parcel locker");
-  });
+  }).map((type) => type.Ref);
 
-  if (!parcelLockerType) return "";
+  if (parcelLockerTypeRefs.length === 0) return [];
   parcelLockerTypeCache = {
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-    ref: parcelLockerType.Ref,
+    refs: parcelLockerTypeRefs,
   };
-  return parcelLockerType.Ref;
+  return parcelLockerTypeRefs;
 }
 
 export async function searchCities(query: string) {
@@ -162,26 +162,32 @@ export async function searchCities(query: string) {
 export async function searchWarehouses(cityRef: string, query: string, method: "branch" | "parcel_locker") {
   if (!cityRef || !getApiKey()) return { configured: false, options: [] as NovaPoshtaOption[] };
 
-  const parcelLockerTypeRef = method === "parcel_locker" ? await getParcelLockerTypeRef() : "";
+  const parcelLockerTypeRefs = method === "parcel_locker" ? await getParcelLockerTypeRefs() : [];
 
-  const data = await callNovaPoshta<{
+  type Warehouse = {
     Ref: string;
     Description: string;
     ShortAddress?: string;
     CategoryOfWarehouse?: string;
     TypeOfWarehouse?: string;
-  }>("AddressGeneral", "getWarehouses", {
-    CityRef: cityRef,
-    FindByString: query.trim(),
-    ...(parcelLockerTypeRef ? { TypeOfWarehouseRef: parcelLockerTypeRef } : {}),
-    Limit: "50",
-    Page: "1",
-  });
+  };
+  const typeFilters = parcelLockerTypeRefs.length > 0 ? parcelLockerTypeRefs : [""];
+  const warehouseResponses = await Promise.all(typeFilters.map((typeRef) =>
+    callNovaPoshta<Warehouse>("AddressGeneral", "getWarehouses", {
+      CityRef: cityRef,
+      FindByString: query.trim(),
+      ...(typeRef ? { TypeOfWarehouseRef: typeRef } : {}),
+      Limit: "50",
+      Page: "1",
+    })));
+  const data = [...new Map(
+    warehouseResponses.flatMap((response) => response ?? []).map((warehouse) => [warehouse.Ref, warehouse]),
+  ).values()];
 
   const filtered = (data ?? []).filter((warehouse) => {
     const haystack = `${warehouse.CategoryOfWarehouse || ""} ${warehouse.TypeOfWarehouse || ""} ${warehouse.Description || ""}`.toLocaleLowerCase("uk-UA");
     const isLocker = haystack.includes("поштомат") || haystack.includes("parcel locker");
-    return method === "parcel_locker" ? Boolean(parcelLockerTypeRef) || isLocker : !isLocker;
+    return method === "parcel_locker" ? parcelLockerTypeRefs.length > 0 || isLocker : !isLocker;
   });
 
   return {
