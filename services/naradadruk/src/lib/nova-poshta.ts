@@ -101,10 +101,15 @@ async function getParcelLockerTypeRefs() {
     Ref: string;
     Description: string;
   }>("AddressGeneral", "getWarehouseTypes", {});
-  const parcelLockerTypeRefs = (warehouseTypes ?? []).filter((type) => {
+  const matchingTypes = (warehouseTypes ?? []).filter((type) => {
     const description = type.Description.toLocaleLowerCase("uk-UA");
     return description.includes("поштомат") || description.includes("parcel locker");
-  }).map((type) => type.Ref);
+  });
+  const exactTypes = matchingTypes.filter((type) => {
+    const description = type.Description.trim().toLocaleLowerCase("uk-UA");
+    return description === "поштомат" || description === "parcel locker";
+  });
+  const parcelLockerTypeRefs = (exactTypes.length > 0 ? exactTypes : matchingTypes).map((type) => type.Ref);
 
   if (parcelLockerTypeRefs.length === 0) return [];
   parcelLockerTypeCache = {

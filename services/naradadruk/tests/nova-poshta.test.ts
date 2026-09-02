@@ -51,18 +51,11 @@ test("parcel locker search asks Nova Poshta for the parcel-locker warehouse type
 
   assert.equal(requestBodies[0].calledMethod, "getWarehouseTypes");
   assert.equal(requestBodies[1].calledMethod, "getWarehouses");
-  assert.equal(requestBodies[1].methodProperties.TypeOfWarehouseRef, "bank-locker-type");
-  assert.equal(requestBodies[2].methodProperties.TypeOfWarehouseRef, "parcel-locker-type");
-  assert.deepEqual(result.options, [
-    {
-      ref: "locker-bank",
-      label: "Поштомат ПриватБанку",
-      secondary: "вул. Хрещатик, 1",
-    },
-    {
-      ref: "locker-1",
-      label: "Поштомат №1",
-      secondary: "вул. Хрещатик, 1",
-    },
-  ]);
+  assert.equal(requestBodies[1].methodProperties.TypeOfWarehouseRef, "parcel-locker-type");
+  assert.equal(requestBodies.length, 2);
+  assert.deepEqual(result.options, [{
+    ref: "locker-1",
+    label: "Поштомат №1",
+    secondary: "вул. Хрещатик, 1",
+  }]);
 });
