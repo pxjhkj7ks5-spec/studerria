@@ -23,6 +23,9 @@ import {
   applyManualOrderText,
   buildManualOrderCreateData,
   chooseManualOrderKind,
+  completeManualCatalogSelection,
+  continueManualCatalogSelection,
+  removeManualCatalogItem,
   selectManualCatalogItem,
   type ManualCatalogItem,
   type ManualOrderSession,
@@ -1379,30 +1382,44 @@ function manualKindKeyboard() {
   };
 }
 
-function manualSelectionText(session: ManualOrderSession) {
-  if (!session.selection) return "Не вибрано";
-  if (session.selection.kind === "unique") return session.selection.description;
-  return [session.selection.item.productTitle, session.selection.item.variantLabel].filter(Boolean).join(" — ");
+function manualCatalogSelection(session: ManualOrderSession) {
+  return session.selection?.kind === "catalog" ? session.selection.items : [];
 }
 
 function manualSelectionPrice(session: ManualOrderSession) {
   if (!session.selection) return 0;
   return session.selection.kind === "unique"
     ? session.selection.agreedPrice
-    : session.selection.item.unitPrice;
+    : session.selection.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 }
 
 async function showManualOrderSummary(chatId: string, session: ManualOrderSession) {
+  const catalogItems = manualCatalogSelection(session);
+  const itemCount = catalogItems.reduce((sum, item) => sum + item.quantity, 0);
+  const selectionText = session.selection?.kind === "unique"
+    ? `<b>Товар:</b> ${escapeHtml(session.selection.description)}`
+    : [
+        `<b>Товари (${itemCount} шт.):</b>`,
+        ...catalogItems.map((item) => {
+          const title = [item.productTitle, item.variantLabel].filter(Boolean).join(" — ");
+          return `• ${escapeHtml(title)} × ${item.quantity} — ${money(item.unitPrice * item.quantity)}`;
+        }),
+      ].join("\n");
   return sendMessage(chatId, [
     "<b>Перевірте ручне замовлення</b>",
     `<b>Клієнт:</b> ${escapeHtml(session.customerName)}`,
     `<b>Телефон:</b> ${escapeHtml(session.phone)}`,
     `<b>Telegram:</b> ${escapeHtml(session.telegramContact)}`,
     `<b>Нова пошта:</b> ${escapeHtml(session.deliveryText)}`,
-    `<b>Товар:</b> ${escapeHtml(manualSelectionText(session))}`,
+    selectionText,
     `<b>Сума:</b> ${money(manualSelectionPrice(session))}`,
   ].join("\n"), {
     inline_keyboard: [
+      ...catalogItems.map((item) => [{
+        text: shortText(`− 1 · ${item.productTitle}${item.variantLabel ? ` — ${item.variantLabel}` : ""}`, 60),
+        callback_data: `manual:catalog:remove:${item.productId}:${item.variantId ?? 0}`,
+      }]),
+      ...(catalogItems.length > 0 ? [[{ text: "Додати ще товар", callback_data: "manual:catalog:more" }]] : []),
       [{ text: "Створити", callback_data: "manual:confirm" }],
       [{ text: "Скасувати", callback_data: "manual:cancel" }],
     ],
@@ -1442,7 +1459,7 @@ async function getManualCatalogItems(): Promise<ManualCatalogItem[]> {
   });
 }
 
-async function showManualCatalog(chatId: string, requestedPage = 0) {
+async function showManualCatalog(chatId: string, session: ManualOrderSession, requestedPage = 0) {
   const items = await getManualCatalogItems();
   if (items.length === 0) {
     return sendMessage(chatId, "У каталозі зараз немає доступних товарів із ціною.", manualKindKeyboard());
@@ -1454,13 +1471,25 @@ async function showManualCatalog(chatId: string, requestedPage = 0) {
     ...(page > 0 ? [{ text: "← Назад", callback_data: `manual:catalog:page:${page - 1}` }] : []),
     ...(page + 1 < pageCount ? [{ text: "Далі →", callback_data: `manual:catalog:page:${page + 1}` }] : []),
   ];
-  return sendMessage(chatId, `<b>Оберіть товар із каталогу</b>\nСторінка ${page + 1} з ${pageCount}`, {
+  const selectedItems = manualCatalogSelection(session);
+  const selectedCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const selectedTotal = manualSelectionPrice(session);
+  const selectionStatus = selectedCount > 0
+    ? `\nВибрано: ${selectedCount} шт. · ${money(selectedTotal)}`
+    : "\nНатискайте товари, щоб додати їх до замовлення.";
+  return sendMessage(chatId, `<b>Оберіть товари з каталогу</b>${selectionStatus}\nСторінка ${page + 1} з ${pageCount}`, {
     inline_keyboard: [
-      ...pageItems.map((item) => [{
-        text: shortText(`${item.productTitle}${item.variantLabel ? ` — ${item.variantLabel}` : ""} · ${money(item.unitPrice)}`, 60),
-        callback_data: `manual:catalog:item:${item.productId}:${item.variantId ?? 0}`,
-      }]),
+      ...pageItems.map((item) => {
+        const selected = selectedItems.find((entry) =>
+          entry.productId === item.productId && entry.variantId === item.variantId,
+        );
+        return [{
+          text: shortText(`${selected ? `${selected.quantity}× · ` : "+ "}${item.productTitle}${item.variantLabel ? ` — ${item.variantLabel}` : ""} · ${money(item.unitPrice)}`, 60),
+          callback_data: `manual:catalog:add:${item.productId}:${item.variantId ?? 0}:${page}`,
+        }];
+      }),
       ...(navigation.length ? [navigation] : []),
+      ...(selectedCount > 0 ? [[{ text: `Готово · ${selectedCount} шт. · ${money(selectedTotal)}`, callback_data: "manual:catalog:done" }]] : []),
       [{ text: "Скасувати", callback_data: "manual:cancel" }],
     ],
   });
@@ -2248,7 +2277,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
         chatId,
         message.message_id,
         () => next.step === "catalog"
-          ? showManualCatalog(chatId)
+          ? showManualCatalog(chatId, next)
           : sendMessage(chatId, "Опишіть унікальний товар або роботу одним повідомленням.", manualCancelKeyboard()),
         deleteOwnerMessage,
       );
@@ -2263,14 +2292,15 @@ async function handleCallback(callback: TelegramCallbackQuery) {
         "manual",
         chatId,
         message.message_id,
-        () => showManualCatalog(chatId, Number.isSafeInteger(page) ? page : 0),
+        () => showManualCatalog(chatId, manual, Number.isSafeInteger(page) ? page : 0),
         deleteOwnerMessage,
       );
       return;
     }
-    if (action === "catalog" && value === "item" && manual.step === "catalog") {
+    if (action === "catalog" && value === "add" && manual.step === "catalog") {
       const productId = Number(extra);
       const variantId = Number(callback.data.split(":")[4]);
+      const page = Number(callback.data.split(":")[5]);
       if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(variantId) || variantId < 0) {
         await answerCallback(callback.id, "Некоректний товар.");
         return;
@@ -2280,17 +2310,71 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       );
       if (!item) {
         await answerCallback(callback.id, "Товар уже недоступний.");
-        await showManualCatalog(chatId);
+        await showManualCatalog(chatId, manual);
         return;
       }
       const next = selectManualCatalogItem(manual, item);
-      await answerCallback(callback.id, "Товар вибрано.");
+      await answerCallback(callback.id, "Товар додано.");
+      await advanceOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => showManualCatalog(chatId, next, Number.isSafeInteger(page) ? page : 0),
+        deleteOwnerMessage,
+      );
+      manualOrders.set(chatId, next);
+      return;
+    }
+    if (action === "catalog" && value === "done" && manual.step === "catalog") {
+      const next = completeManualCatalogSelection(manual);
+      if (next.step !== "confirm") {
+        await answerCallback(callback.id, "Додайте хоча б один товар.");
+        return;
+      }
+      await answerCallback(callback.id);
       await advanceOwnerBotTransient(
         ownerBotTransientStates,
         "manual",
         chatId,
         message.message_id,
         () => showManualOrderSummary(chatId, next),
+        deleteOwnerMessage,
+      );
+      manualOrders.set(chatId, next);
+      return;
+    }
+    if (action === "catalog" && value === "more" && manual.step === "confirm") {
+      const next = continueManualCatalogSelection(manual);
+      await answerCallback(callback.id);
+      await advanceOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => showManualCatalog(chatId, next),
+        deleteOwnerMessage,
+      );
+      manualOrders.set(chatId, next);
+      return;
+    }
+    if (action === "catalog" && value === "remove" && manual.selection?.kind === "catalog") {
+      const productId = Number(extra);
+      const variantId = Number(callback.data.split(":")[4]);
+      if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(variantId) || variantId < 0) {
+        await answerCallback(callback.id, "Некоректний товар.");
+        return;
+      }
+      const next = removeManualCatalogItem(manual, productId, variantId || null);
+      await answerCallback(callback.id, "Один товар прибрано.");
+      await advanceOwnerBotTransient(
+        ownerBotTransientStates,
+        "manual",
+        chatId,
+        message.message_id,
+        () => next.step === "confirm"
+          ? showManualOrderSummary(chatId, next)
+          : showManualCatalog(chatId, next),
         deleteOwnerMessage,
       );
       manualOrders.set(chatId, next);

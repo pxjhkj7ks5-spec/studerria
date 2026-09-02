@@ -4,7 +4,10 @@ import {
   applyManualOrderText,
   buildManualOrderCreateData,
   chooseManualOrderKind,
+  completeManualCatalogSelection,
+  continueManualCatalogSelection,
   createManualOrderSession,
+  removeManualCatalogItem,
   selectManualCatalogItem,
 } from "../src/lib/manual-order";
 
@@ -34,7 +37,7 @@ test("manual order collects customer fields in separate sequential steps", () =>
   assert.equal(session.deliveryText, "Київ, відділення №15");
 });
 
-test("manual catalog order keeps the selected product relation and current price", () => {
+test("manual catalog order keeps multiple products, quantities, relations, and current prices", () => {
   let session = chooseManualOrderKind(enteredCustomer(), "catalog");
   session = selectManualCatalogItem(session, {
     productId: 78,
@@ -46,6 +49,28 @@ test("manual catalog order keeps the selected product relation and current price
     unitPrice: 225,
     regularUnitPrice: 250,
   });
+  session = selectManualCatalogItem(session, {
+    productId: 78,
+    productSlug: "raizer-pid-kolimator",
+    productTitle: "Райзер під коліматор",
+    productUrl: "https://example.com/naradadruk/product/raizer-pid-kolimator",
+    variantId: null,
+    variantLabel: "",
+    unitPrice: 225,
+    regularUnitPrice: 250,
+  });
+  session = selectManualCatalogItem(session, {
+    productId: 82,
+    productSlug: "trymach-dlia-navushnykiv",
+    productTitle: "Тримач для навушників",
+    productUrl: "https://example.com/naradadruk/product/trymach-dlia-navushnykiv",
+    variantId: 11,
+    variantLabel: "Чорний",
+    unitPrice: 300,
+    regularUnitPrice: 300,
+  });
+  assert.equal(session.step, "catalog");
+  session = completeManualCatalogSelection(session);
 
   const data = buildManualOrderCreateData(session, "11111111-1111-4111-8111-111111111111");
 
@@ -58,10 +83,41 @@ test("manual catalog order keeps the selected product relation and current price
   assert.equal(data.courierAddress, "");
   assert.equal(data.phone, "+380 67 123 45 67");
   assert.equal(data.telegramContact, "@olena_print");
-  assert.equal(data.items.create.productId, 78);
-  assert.equal(data.items.create.unitPrice, 225);
-  assert.equal(data.saleDiscountAmount, 25);
-  assert.equal(data.total, 225);
+  assert.equal(data.items.create.length, 2);
+  assert.equal(data.items.create[0].productId, 78);
+  assert.equal(data.items.create[0].quantity, 2);
+  assert.equal(data.items.create[0].unitPrice, 225);
+  assert.equal(data.items.create[1].productId, 82);
+  assert.equal(data.items.create[1].variantId, 11);
+  assert.equal(data.saleDiscountAmount, 50);
+  assert.equal(data.subtotal, 800);
+  assert.equal(data.total, 750);
+});
+
+test("manual catalog selection can be corrected before confirmation", () => {
+  const item = {
+    productId: 78,
+    productSlug: "raizer-pid-kolimator",
+    productTitle: "Райзер під коліматор",
+    productUrl: "https://example.com/naradadruk/product/raizer-pid-kolimator",
+    variantId: null,
+    variantLabel: "",
+    unitPrice: 225,
+    regularUnitPrice: 250,
+  };
+  let session = chooseManualOrderKind(enteredCustomer(), "catalog");
+  session = selectManualCatalogItem(session, item);
+  session = selectManualCatalogItem(session, item);
+  session = completeManualCatalogSelection(session);
+  session = removeManualCatalogItem(session, 78, null);
+  assert.equal(session.step, "confirm");
+  assert.equal(session.selection?.kind === "catalog" ? session.selection.items[0].quantity : 0, 1);
+  session = continueManualCatalogSelection(session);
+  assert.equal(session.step, "catalog");
+  session = removeManualCatalogItem(session, 78, null);
+  assert.equal(session.step, "catalog");
+  assert.equal(session.selection?.kind === "catalog" ? session.selection.items.length : -1, 0);
+  assert.equal(completeManualCatalogSelection(session).step, "catalog");
 });
 
 test("manual unique order stores its description and agreed price", () => {
@@ -71,9 +127,9 @@ test("manual unique order stores its description and agreed price", () => {
 
   const data = buildManualOrderCreateData(session, "22222222-2222-4222-8222-222222222222");
 
-  assert.equal(data.items.create.productTitle, "Індивідуальне кріплення за ескізом клієнта");
-  assert.equal(data.items.create.productUrl, "");
-  assert.equal(data.items.create.unitPrice, 740);
+  assert.equal(data.items.create[0].productTitle, "Індивідуальне кріплення за ескізом клієнта");
+  assert.equal(data.items.create[0].productUrl, "");
+  assert.equal(data.items.create[0].unitPrice, 740);
   assert.equal(data.total, 740);
 });
 

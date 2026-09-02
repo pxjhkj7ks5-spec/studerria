@@ -21,7 +21,7 @@ export type ManualCatalogItem = {
 };
 
 type ManualOrderSelection =
-  | { kind: "catalog"; item: ManualCatalogItem }
+  | { kind: "catalog"; items: Array<ManualCatalogItem & { quantity: number }> }
   | { kind: "unique"; description: string; agreedPrice: number };
 
 export type ManualOrderSession = {
@@ -126,7 +126,11 @@ export function chooseManualOrderKind(
   kind: "catalog" | "unique",
 ) {
   if (current.step !== "kind") return current;
-  return { ...current, step: kind === "catalog" ? "catalog" as const : "unique_description" as const };
+  return {
+    ...current,
+    step: kind === "catalog" ? "catalog" as const : "unique_description" as const,
+    selection: kind === "catalog" ? { kind: "catalog" as const, items: [] } : null,
+  };
 }
 
 export function selectManualCatalogItem(
@@ -134,11 +138,48 @@ export function selectManualCatalogItem(
   item: ManualCatalogItem,
 ) {
   if (current.step !== "catalog") return current;
+  const selectedItems = current.selection?.kind === "catalog" ? current.selection.items : [];
+  const existingIndex = selectedItems.findIndex((selected) =>
+    selected.productId === item.productId && selected.variantId === item.variantId,
+  );
+  const items = existingIndex === -1
+    ? [...selectedItems, { ...item, quantity: 1 }]
+    : selectedItems.map((selected, index) => index === existingIndex
+        ? { ...item, quantity: Math.min(selected.quantity + 1, 99) }
+        : selected);
   return {
     ...current,
-    step: "confirm" as const,
-    selection: { kind: "catalog" as const, item },
+    selection: { kind: "catalog" as const, items },
   };
+}
+
+export function removeManualCatalogItem(
+  current: ManualOrderSession,
+  productId: number,
+  variantId: number | null,
+) {
+  if (current.selection?.kind !== "catalog" || !["catalog", "confirm"].includes(current.step)) return current;
+  const items = current.selection.items.flatMap((selected) => {
+    if (selected.productId !== productId || selected.variantId !== variantId) return [selected];
+    return selected.quantity > 1 ? [{ ...selected, quantity: selected.quantity - 1 }] : [];
+  });
+  return {
+    ...current,
+    step: items.length > 0 ? current.step : "catalog" as const,
+    selection: { kind: "catalog" as const, items },
+  };
+}
+
+export function completeManualCatalogSelection(current: ManualOrderSession) {
+  if (current.step !== "catalog" || current.selection?.kind !== "catalog" || current.selection.items.length === 0) {
+    return current;
+  }
+  return { ...current, step: "confirm" as const };
+}
+
+export function continueManualCatalogSelection(current: ManualOrderSession) {
+  if (current.step !== "confirm" || current.selection?.kind !== "catalog") return current;
+  return { ...current, step: "catalog" as const };
 }
 
 export function buildManualOrderCreateData(session: ManualOrderSession, publicId: string) {
@@ -147,21 +188,21 @@ export function buildManualOrderCreateData(session: ManualOrderSession, publicId
   }
 
   const [firstName, ...lastNameParts] = session.customerName.split(/\s+/);
-  const item = session.selection.kind === "catalog"
-    ? {
-        productId: session.selection.item.productId,
-        productSlug: session.selection.item.productSlug,
-        productTitle: session.selection.item.productTitle,
-        productUrl: session.selection.item.productUrl,
-        variantId: session.selection.item.variantId,
-        variantLabel: session.selection.item.variantLabel,
-        quantity: 1,
-        unitPrice: session.selection.item.unitPrice,
-        regularUnitPrice: session.selection.item.regularUnitPrice,
-        saleDiscountAmount: session.selection.item.regularUnitPrice - session.selection.item.unitPrice,
-        totalPrice: session.selection.item.unitPrice,
-      }
-    : {
+  const items = session.selection.kind === "catalog"
+    ? session.selection.items.map((item) => ({
+        productId: item.productId,
+        productSlug: item.productSlug,
+        productTitle: item.productTitle,
+        productUrl: item.productUrl,
+        variantId: item.variantId,
+        variantLabel: item.variantLabel,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        regularUnitPrice: item.regularUnitPrice,
+        saleDiscountAmount: (item.regularUnitPrice - item.unitPrice) * item.quantity,
+        totalPrice: item.unitPrice * item.quantity,
+      }))
+    : [{
         productSlug: "",
         productTitle: session.selection.description,
         productUrl: "",
@@ -171,9 +212,10 @@ export function buildManualOrderCreateData(session: ManualOrderSession, publicId
         regularUnitPrice: session.selection.agreedPrice,
         saleDiscountAmount: 0,
         totalPrice: session.selection.agreedPrice,
-      };
-  const subtotal = item.regularUnitPrice;
-  const saleDiscountAmount = item.saleDiscountAmount;
+      }];
+  if (items.length === 0) throw new Error("Додайте хоча б один товар із каталогу.");
+  const subtotal = items.reduce((sum, item) => sum + item.regularUnitPrice * item.quantity, 0);
+  const saleDiscountAmount = items.reduce((sum, item) => sum + item.saleDiscountAmount, 0);
 
   return {
     publicId,
@@ -195,7 +237,7 @@ export function buildManualOrderCreateData(session: ManualOrderSession, publicId
     discountAmount: 0,
     total: subtotal - saleDiscountAmount,
     notificationStatus: "skipped" as const,
-    items: { create: item },
+    items: { create: items },
     events: {
       create: {
         eventType: "created",
