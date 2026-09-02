@@ -16,6 +16,10 @@ type CatalogProduct = {
   categorySlug: string;
   shortDescription: string;
   fullDescription: string;
+  useCaseNote: string;
+  benefitsNote: string;
+  compatibilityNote: string;
+  packageContentsNote: string;
   status: "draft" | "published";
   isFeatured: boolean;
   basePrice: number | null;
@@ -130,6 +134,10 @@ async function importProduct(
         categoryId,
         shortDescription: product.shortDescription,
         fullDescription: product.fullDescription,
+        useCaseNote: product.useCaseNote,
+        benefitsNote: product.benefitsNote,
+        compatibilityNote: product.compatibilityNote,
+        packageContentsNote: product.packageContentsNote,
         status: ProductStatus[product.status],
         isFeatured: product.isFeatured,
         basePrice: product.basePrice,
@@ -155,6 +163,10 @@ async function importProduct(
         categoryId,
         shortDescription: product.shortDescription,
         fullDescription: product.fullDescription,
+        useCaseNote: product.useCaseNote,
+        benefitsNote: product.benefitsNote,
+        compatibilityNote: product.compatibilityNote,
+        packageContentsNote: product.packageContentsNote,
         status: ProductStatus[product.status],
         isFeatured: product.isFeatured,
         basePrice: product.basePrice,

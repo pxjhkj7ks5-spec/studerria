@@ -8,7 +8,7 @@ const completeProduct = {
   fullDescription: "Міцна підставка для навушників, надрукована з практичного PETG для щоденного використання.",
   basePrice: 250,
   leadTime: "1–2 дні",
-  materialNote: "PETG",
+  materialNote: "Високоякісний PETG.",
   deliveryNote: "Нова пошта по Україні",
   paymentNote: "Переказ після підтвердження",
   variants: [],

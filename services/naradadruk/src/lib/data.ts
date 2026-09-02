@@ -197,7 +197,7 @@ export async function getSiteSettings() {
       supportTitle: "Готові рішення і кастомні вироби в одному потоці.",
       supportBody:
         "Каталог допомагає швидко переглянути асортимент, а нестандартні замовлення домовляються напряму.",
-      materialsNote: "PETG та інші практичні матеріали під задачу.",
+      materialsNote: "Високоякісний PETG.",
       leadTimeNote: "Від кількох годин до 3 днів залежно від складності.",
       deliveryNote: "Доставка по Україні, самовивіз у Києві.",
       paymentNote: publicPaymentNote,

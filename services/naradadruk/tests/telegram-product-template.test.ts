@@ -23,7 +23,7 @@ test("parses the documented template as a published product", () => {
   assert.equal(result.product.category, "Інше");
   assert.equal(result.product.basePrice, 350);
   assert.equal(result.product.shouldPublish, true);
-  assert.equal(result.product.material, "PETG");
+  assert.equal(result.product.material, "Високоякісний PETG");
 });
 
 test("keeps a valid product as a draft when publication is not affirmative", () => {

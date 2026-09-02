@@ -5,7 +5,9 @@ const prisma = new PrismaClient();
 async function main() {
   await prisma.siteSetting.upsert({
     where: { id: 1 },
-    update: {},
+    update: {
+      materialsNote: "Високоякісний PETG.",
+    },
     create: {
       id: 1,
       heroTitle: "3D друк, страйкбольні аксесуари та декор під ваш запит.",
@@ -14,7 +16,7 @@ async function main() {
       supportTitle: "Друкуємо те, що реально працює в щоденному користуванні.",
       supportBody:
         "Каталог зібраний як вітрина готових позицій, а нестандартні задачі домовляються напряму через Telegram.",
-      materialsNote: "PETG та інші практичні матеріали під задачу.",
+      materialsNote: "Високоякісний PETG.",
       leadTimeNote: "Від кількох годин до 3 днів залежно від складності.",
       deliveryNote: "Доставка по Україні, самовивіз у Києві.",
       paymentNote:

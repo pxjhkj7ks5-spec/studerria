@@ -23,6 +23,21 @@ async function main() {
   await prisma.$executeRawUnsafe(`UPDATE "Order" SET subtotal = total WHERE subtotal = 0 AND "discountAmount" = 0`);
   await prisma.$executeRawUnsafe(`UPDATE "OrderItem" SET "regularUnitPrice" = "unitPrice" WHERE "regularUnitPrice" = 0`);
 
+  const upgradedMaterialSettings = await prisma.siteSetting.updateMany({
+    where: {
+      materialsNote: {
+        in: [
+          "PETG та інші практичні матеріали під задачу.",
+          "PETG та інші матеріали під задачу",
+        ],
+      },
+    },
+    data: { materialsNote: "Високоякісний PETG." },
+  });
+  if (upgradedMaterialSettings.count > 0) {
+    console.info("[runtime-data] updated the public PETG material wording");
+  }
+
   const productImages = await prisma.productImage.findMany({
     select: { id: true, productId: true, fileName: true, urlPath: true },
     orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { id: "asc" }],
