@@ -26,6 +26,7 @@ const fallbackCities = [
 ];
 
 let popularCitiesCache: { expiresAt: number; options: NovaPoshtaOption[] } | null = null;
+let parcelLockerTypeCache: { expiresAt: number; ref: string } | null = null;
 
 function getApiKey() {
   return process.env.NARADADRUK_NOVA_POSHTA_API_KEY?.trim() || "";
@@ -91,6 +92,28 @@ async function getPopularCities() {
   return options;
 }
 
+async function getParcelLockerTypeRef() {
+  if (parcelLockerTypeCache && parcelLockerTypeCache.expiresAt > Date.now()) {
+    return parcelLockerTypeCache.ref;
+  }
+
+  const warehouseTypes = await callNovaPoshta<{
+    Ref: string;
+    Description: string;
+  }>("AddressGeneral", "getWarehouseTypes", {});
+  const parcelLockerType = warehouseTypes?.find((type) => {
+    const description = type.Description.toLocaleLowerCase("uk-UA");
+    return description.includes("поштомат") || description.includes("parcel locker");
+  });
+
+  if (!parcelLockerType) return "";
+  parcelLockerTypeCache = {
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    ref: parcelLockerType.Ref,
+  };
+  return parcelLockerType.Ref;
+}
+
 export async function searchCities(query: string) {
   const normalized = query.trim();
   if (!normalized) {
@@ -139,6 +162,8 @@ export async function searchCities(query: string) {
 export async function searchWarehouses(cityRef: string, query: string, method: "branch" | "parcel_locker") {
   if (!cityRef || !getApiKey()) return { configured: false, options: [] as NovaPoshtaOption[] };
 
+  const parcelLockerTypeRef = method === "parcel_locker" ? await getParcelLockerTypeRef() : "";
+
   const data = await callNovaPoshta<{
     Ref: string;
     Description: string;
@@ -148,14 +173,15 @@ export async function searchWarehouses(cityRef: string, query: string, method: "
   }>("AddressGeneral", "getWarehouses", {
     CityRef: cityRef,
     FindByString: query.trim(),
+    ...(parcelLockerTypeRef ? { TypeOfWarehouseRef: parcelLockerTypeRef } : {}),
     Limit: "50",
     Page: "1",
   });
 
   const filtered = (data ?? []).filter((warehouse) => {
-    const haystack = `${warehouse.CategoryOfWarehouse || ""} ${warehouse.Description || ""}`.toLocaleLowerCase("uk-UA");
+    const haystack = `${warehouse.CategoryOfWarehouse || ""} ${warehouse.TypeOfWarehouse || ""} ${warehouse.Description || ""}`.toLocaleLowerCase("uk-UA");
     const isLocker = haystack.includes("поштомат") || haystack.includes("parcel locker");
-    return method === "parcel_locker" ? isLocker : !isLocker;
+    return method === "parcel_locker" ? Boolean(parcelLockerTypeRef) || isLocker : !isLocker;
   });
 
   return {
@@ -167,4 +193,3 @@ export async function searchWarehouses(cityRef: string, query: string, method: "
     })),
   };
 }
-
