@@ -55,7 +55,7 @@ const schema = z.object({
   OBRIY_COLLECTORS_ENABLED: z.enum(["true", "false"]).default("true"),
   OBRIY_AIRSIGMA_SOURCE_IDENTIFIER: z.string().default(""),
   OBRIY_METRICS_TOKEN: z.string().default(""),
-  OBRIY_RELEASE_VERSION: z.string().default("0.1.0"),
+  OBRIY_RELEASE_VERSION: z.string().default("0.2.0"),
 });
 export type Config = z.infer<typeof schema> & {
   configured: boolean;

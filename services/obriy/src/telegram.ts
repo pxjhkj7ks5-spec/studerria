@@ -163,9 +163,11 @@ export class TelegramBot {
       );
       if (!inserted.rowCount) return;
       let uid = await this.store.chatUser(chatId, c);
+      let paired = false;
       if (command === "/start" && arg) {
         uid = await this.store.linkChat(c, arg, chatId);
         if (!uid) return;
+        paired = true;
       }
       if (!uid) return;
       // One command per chat per second; the opaque keyed hash never enters logs.
@@ -177,7 +179,7 @@ export class TelegramBot {
       let text = "";
       switch (command.split("@")[0]) {
         case "/start":
-          text = `Обрій підключено. Сповіщення стосуються зон, які ви додали у приватному кабінеті.\n${this.config.OBRIY_PUBLIC_URL}\n\n/status · /zones · /pause · /resume · /privacy · /delete_me\n\n${DISCLAIMER}`;
+          text = `${paired ? "Обрій підключено." : "Цей чат уже підключений до Обрію."} Сповіщення стосуються зон, які ви додали у приватному кабінеті.\n${this.config.OBRIY_PUBLIC_URL}\n\n/status · /zones · /pause · /resume · /privacy · /delete_me\n\n${DISCLAIMER}`;
           break;
         case "/status": {
           const user = await c.query(

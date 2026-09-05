@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f0f4f5">
+    <meta name="app-base" content="__APP_BASE__">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Ваш акаунт — Обрій</title>
+    <link rel="icon" href="__APP_BASE__/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="__APP_BASE__/styles.css">
+    <script src="__APP_BASE__/account.js" type="module"></script>
+  </head>
+  <body class="account-page login-page">
+    <main class="login-panel" aria-labelledby="login-title">
+      <div class="brand gate-brand" aria-label="Обрій">
+        <svg class="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M7 24a13 13 0 0 1 26 0M4 25h32M9 31h22" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg>
+        <span>Обрій<span class="brand-caption">ПЕРСОНАЛЬНИЙ МОНІТОРИНГ</span></span>
+      </div>
+      <div class="eyebrow">ОСОБИСТИЙ ПРОСТІР</div>
+      <h1 id="login-title">Ваш акаунт</h1>
+      <p class="gate-intro" id="account-intro">Ваші зони та Telegram будуть доступні лише вам.</p>
+      <div class="account-tabs" aria-label="Спосіб входу"><button id="signin-tab" type="button" aria-pressed="true">Увійти</button><button id="signup-tab" type="button" aria-pressed="false">Створити акаунт</button></div>
+      <form id="account-form">
+        <label for="username">Логін</label>
+        <input id="username" name="username" autocomplete="username" required maxlength="32" autofocus spellcheck="false" autocapitalize="none">
+        <label for="password">Пароль</label>
+        <div class="gate-password-field"><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="512"><button id="show-password" class="gate-password-toggle" type="button" aria-controls="password" aria-pressed="false">Показати</button></div>
+        <p id="password-note" class="field-note" hidden>Від 15 до 128 символів. Можна кілька слів із пробілами.</p>
+        <div id="confirm-field" hidden><label for="confirm-password">Повторіть пароль</label><input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" maxlength="512"></div>
+        <div id="account-error" class="form-error" role="alert" hidden></div>
+        <button id="account-submit" class="button button-primary full-width" type="submit">Увійти</button>
+      </form>
+      <p class="gate-footnote">Після входу додайте свої зони та підключіть Telegram.</p>
+    </main>
+  </body>
+</html>

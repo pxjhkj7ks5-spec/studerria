@@ -6,6 +6,7 @@ const dateFormat = new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'sh
 const timeFormat = new Intl.DateTimeFormat('uk-UA', { hour: '2-digit', minute: '2-digit' });
 let toastTimer;
 let lastZoneSignature;
+let navigatingToGate = false;
 
 class RequestError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -24,6 +25,7 @@ async function request(path, options = {}) {
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     if (!response.ok) {
+      if (response.status === 401 && path !== '/api/v1/auth/password') redirectToGate();
       const messages = {
         400: 'Перевірте введені дані й спробуйте ще раз.',
         401: 'Потрібно увійти з чинним ключем доступу.',
@@ -66,7 +68,13 @@ function icon(paths, className = '') {
 function showMessage(id, message = '') { const target = byId(id); target.textContent = message; target.hidden = !message; }
 function toast(message) { clearTimeout(toastTimer); showMessage('toast', message); toastTimer = setTimeout(() => showMessage('toast'), 5000); }
 function openDialog(id) { const dialog = byId(id); if (!dialog.open) dialog.showModal(); }
-function authenticatedAction(action) { if (!state.me) { openDialog('login-dialog'); return; } action(); }
+function redirectToGate() {
+  if (navigatingToGate) return;
+  navigatingToGate = true;
+  document.body.classList.add('session-ended');
+  window.location.replace(`${base}/`);
+}
+function authenticatedAction(action) { if (!state.loaded) return; if (!state.me) { refresh(); return; } action(); }
 function dateValue(value) { if (value === null || value === undefined || value === '') return null; const stamp = typeof value === 'number' ? value : Date.parse(value); return Number.isFinite(stamp) ? stamp : null; }
 function clockNow() { return dateValue(state.status?.serverTime) ?? Date.now(); }
 function relativeTime(value) {
@@ -140,9 +148,8 @@ function renderStatus() {
   byId('overview-description').textContent = description;
   byId('overview-updated').textContent = status?.serverTime ? `Перевірено о ${timeFormat.format(dateValue(status.serverTime) ?? Date.now())}` : 'Поточний стан невідомий';
   byId('version-label').textContent = status?.version ? `Обрій · v${String(status.version).slice(0, 24)}` : 'Обрій';
-  const account = byId('account-button');
-  account.firstChild.textContent = state.me ? 'Мій профіль' : 'Увійти';
   byId('delete-account-button').hidden = !state.me;
+  byId('profile-button').textContent = state.me?.account?.username ?? 'Акаунт';
   renderDelivery();
 }
 
@@ -173,7 +180,7 @@ function renderZones() {
   byId('zone-count').textContent = state.me ? String(zones.length) : '—';
   byId('nav-zone-count').textContent = state.me ? String(zones.length) : '—';
   if (!state.me) {
-    renderEmptyZone('Увійдіть, щоб додати свої зони', 'Ваші місця доступні лише після входу. Додайте зони та налаштуйте персональні повідомлення.', 'Увійти в особистий простір', () => openDialog('login-dialog'));
+    renderEmptyZone('Не вдалося завантажити зони', 'Перевірте з’єднання із сервером і спробуйте оновити дані.', 'Оновити дані', refresh);
     return;
   }
   if (!zones.length) {
@@ -247,7 +254,7 @@ function renderAssessments() {
   const assessments = Array.isArray(state.me?.assessments) ? state.me.assessments : [];
   const visible = assessments.filter((assessment) => !['NONE', 'RESOLVED'].includes(String(assessment.level).toUpperCase()));
   byId('assessment-count').textContent = state.me ? String(visible.length) : '—';
-  if (!state.me) { container.replaceChildren(element('p', 'empty-line', 'Оцінки з’являться після входу.')); return; }
+  if (!state.me) { container.replaceChildren(element('p', 'empty-line', 'Оцінки з’являться після відновлення з’єднання.')); return; }
   if (!visible.length) {
     const activeZones = state.me.zones?.some((zone) => zone.enabled !== false);
     const fresh = sourceInfo(state.status?.sources?.neptun, 'neptun').fresh;
@@ -286,7 +293,7 @@ function renderDelivery() {
   const degraded = state.status?.delivery?.state === 'degraded';
   const paused = isPaused();
   byId('delivery-title').textContent = !configured ? 'Бот ще не налаштований' : degraded ? 'Доставка з перебоями' : linked ? paused ? 'Доставку призупинено' : 'Telegram під’єднано' : 'У ваш Telegram';
-  byId('delivery-description').textContent = !configured ? 'Власник сервера має додати налаштування Telegram. Після цього ви зможете під’єднати свій чат.' : degraded ? 'Сервер зафіксував помилку Telegram. Повідомлення можуть затримуватися або не доставлятися.' : linked ? paused ? `Пауза до ${timeFormat.format(dateValue(state.me.user.pausedUntil))}. Моніторинг зон продовжується.` : 'Сигнали для активних зон надсилаються у ваш приватний чат із ботом.' : 'Під’єднайте приватного бота, щоб отримувати повідомлення для обраних зон.';
+  byId('delivery-description').textContent = !configured ? 'Власник сервера має додати налаштування Telegram. Після цього ви зможете під’єднати свій чат.' : degraded ? 'Сервер зафіксував помилку Telegram. Повідомлення можуть затримуватися або не доставлятися.' : linked ? paused ? `Пауза до ${timeFormat.format(dateValue(state.me.user.pausedUntil))}. Моніторинг зон продовжується.` : 'У Telegram надходять попередження для ваших зон. Інформаційні оцінки без достатніх даних залишаються на сайті.' : 'Під’єднайте приватного бота, щоб отримувати повідомлення для обраних зон.';
   byId('notification-status').textContent = byId('delivery-description').textContent;
   byId('generate-link-button').textContent = linked ? 'Під’єднати інший чат' : 'Під’єднати Telegram';
   byId('generate-link-button').disabled = !configured || !state.me;
@@ -297,16 +304,18 @@ function renderDelivery() {
 }
 
 async function refresh() {
-  if (state.refreshing || document.hidden) return;
+  if (state.refreshing || document.hidden || navigatingToGate) return;
   state.refreshing = true;
   byId('refresh-button').disabled = true;
   try {
     const status = await request('/api/v1/status');
     if (!status || typeof status !== 'object' || !status.sources) throw new RequestError(0, 'Не вдалося прочитати стан сервісу. Повторіть спробу пізніше.');
+    if (!status.authenticated) { redirectToGate(); return; }
     state.status = status;
-    state.me = status.authenticated ? await request('/api/v1/me') : null;
+    state.me = await request('/api/v1/me');
     showMessage('page-error');
   } catch (error) {
+    if (error.status === 401) { redirectToGate(); return; }
     state.status = null;
     state.me = null;
     showMessage('page-error', error.message);
@@ -314,7 +323,7 @@ async function refresh() {
     state.loaded = true;
     state.refreshing = false;
     byId('refresh-button').disabled = false;
-    renderStatus(); renderZones(); renderAssessments();
+    if (!navigatingToGate) { renderStatus(); renderZones(); renderAssessments(); }
   }
 }
 
@@ -322,7 +331,7 @@ async function mutate(button, action, message, errorTarget = 'page-error') {
   button.disabled = true;
   showMessage(errorTarget);
   try { await action(); await refresh(); if (message) toast(message); return true; }
-  catch (error) { showMessage(errorTarget, error.message); if (error.status === 401) { state.me = null; renderZones(); renderAssessments(); renderStatus(); } return false; }
+  catch (error) { if (error.status === 401) redirectToGate(); else showMessage(errorTarget, error.message); return false; }
   finally { button.disabled = false; }
 }
 
@@ -348,30 +357,14 @@ for (const button of document.querySelectorAll('[data-close]')) button.addEventL
 for (const dialog of document.querySelectorAll('dialog')) {
   dialog.addEventListener('click', (event) => { if (event.target !== dialog) return; const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); });
 }
-byId('login-dialog').addEventListener('close', () => { byId('access-token').value = ''; showMessage('login-error'); });
 byId('zone-dialog').addEventListener('close', () => { byId('zone-form').reset(); state.editingZone = null; });
 byId('notification-dialog').addEventListener('close', () => { byId('telegram-link-result').replaceChildren(); byId('telegram-link-result').hidden = true; });
-byId('account-button').addEventListener('click', () => { showMessage('account-error'); openDialog(state.me ? 'account-dialog' : 'login-dialog'); });
 byId('refresh-button').addEventListener('click', refresh);
 byId('privacy-button').addEventListener('click', () => { showMessage('privacy-error'); openDialog('privacy-dialog'); });
 byId('footer-privacy-button').addEventListener('click', () => { showMessage('privacy-error'); openDialog('privacy-dialog'); });
 byId('add-zone-button').addEventListener('click', () => authenticatedAction(() => openZone()));
 byId('notifications-button').addEventListener('click', () => authenticatedAction(openNotifications));
 byId('connect-telegram-button').addEventListener('click', () => authenticatedAction(openNotifications));
-
-byId('login-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector('[type=submit]');
-  button.disabled = true; showMessage('login-error');
-  try {
-    await request('/api/v1/session', { method: 'POST', body: { token: byId('access-token').value.trim() } });
-    byId('access-token').value = '';
-    byId('login-dialog').close();
-    await refresh();
-    if (state.me) toast('Ви увійшли у свій простір');
-  } catch (error) { showMessage('login-error', error.message); }
-  finally { button.disabled = false; }
-});
 
 byId('zone-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -429,14 +422,15 @@ byId('pause-button').addEventListener('click', async () => {
 });
 
 byId('logout-button').addEventListener('click', async () => {
-  const success = await mutate(byId('logout-button'), () => request('/api/v1/session', { method: 'DELETE' }), 'Ви вийшли з особистого простору', 'account-error');
-  if (success) { state.me = null; byId('account-dialog').close(); renderZones(); renderAssessments(); renderStatus(); }
+  const button = byId('logout-button'); button.disabled = true; showMessage('page-error');
+  try { await request('/api/v1/session', { method: 'DELETE' }); redirectToGate(); }
+  catch (error) { if (error.status === 401) redirectToGate(); else { showMessage('page-error', error.message); button.disabled = false; } }
 });
 
 byId('delete-account-button').addEventListener('click', async () => {
   if (!window.confirm('Видалити профіль, усі зони, налаштування та зв’язок із Telegram? Цю дію неможливо скасувати.')) return;
   const success = await mutate(byId('delete-account-button'), () => request('/api/v1/me', { method: 'DELETE' }), 'Профіль і зони видалено', 'privacy-error');
-  if (success) { state.me = null; byId('privacy-dialog').close(); renderZones(); renderAssessments(); renderStatus(); }
+  if (success) redirectToGate();
 });
 
 async function openChangelog() {
@@ -462,5 +456,19 @@ byId('footer-changelog-button').addEventListener('click', openChangelog);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 window.addEventListener('online', refresh);
 window.addEventListener('offline', () => { state.status = null; state.me = null; renderStatus(); renderZones(); renderAssessments(); showMessage('page-error', 'Немає з’єднання з мережею. Поточний стан загроз невідомий.'); });
+window.addEventListener('pagehide', () => document.body.classList.add('session-ended'));
+window.addEventListener('pageshow', (event) => { if (event.persisted) window.location.reload(); });
 setInterval(refresh, 15000);
 refresh();
+
+byId('profile-button').addEventListener('click', () => authenticatedAction(() => openDialog('profile-dialog')));
+byId('profile-dialog').addEventListener('close', () => { byId('password-form').reset(); showMessage('password-error'); });
+byId('password-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const password=byId('new-password').value, currentPassword=byId('current-password').value;
+  if(password.normalize('NFC')!==byId('repeat-password').value.normalize('NFC') || [...password.normalize('NFC')].length<15 || [...password.normalize('NFC')].length>128){showMessage('password-error','Використайте 15–128 символів і однаково повторіть пароль.');return;}
+  const button=byId('password-submit');button.disabled=true;showMessage('password-error');
+  try {await request('/api/v1/auth/password',{method:'POST',body:{currentPassword,password}});byId('profile-dialog').close();toast('Пароль змінено. Інші сесії завершено.');}
+  catch(error){showMessage('password-error',error.status===401?'Поточний пароль не підійшов.':error.message);}
+  finally{button.disabled=false;}
+});

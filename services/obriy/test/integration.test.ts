@@ -63,7 +63,17 @@ integration("real PostgreSQL privacy, ownership and delivery", () => {
       payload: { token: config.OBRIY_ADMIN_TOKEN },
     });
     expect(res.statusCode).toBe(200);
-    return res.cookies[0].value;
+    const signup = await app.inject({
+      method: "POST",
+      url: "/obriy/api/v1/auth/register",
+      cookies: { obriy_gate: res.cookies[0].value },
+      payload: {
+        username: "fixture_user",
+        password: "тихий вітер над осіннім озером",
+      },
+    });
+    expect(signup.statusCode, signup.body).toBe(200);
+    return signup.cookies[0].value;
   }
   async function linkedUser() {
     const uid = await store.owner(),

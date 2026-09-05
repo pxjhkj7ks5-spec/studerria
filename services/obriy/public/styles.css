@@ -2114,3 +2114,119 @@ h1 {
     padding-inline:11px;
   }
 }
+
+.session-ended > * {
+  visibility:hidden;
+}
+
+.login-page {
+  display:grid;
+  place-items:center;
+  min-height:100svh;
+  padding:32px 20px;
+  background:#f0f4f5;
+}
+
+.login-panel {
+  width:min(100%,400px);
+  max-width:400px;
+  margin:0;
+  padding:32px;
+  border:1px solid #e0e9e6;
+  border-radius:20px;
+  background:rgba(255,255,255,.9);
+  box-shadow:0 12px 48px #24483e08;
+}
+
+.gate-brand {
+  margin:0 0 32px;
+}
+
+.login-panel h1 {
+  font-size:23px;
+  letter-spacing:-.6px;
+}
+
+.gate-intro {
+  margin-top:9px;
+  color:#7b9088;
+  font-size:12px;
+  line-height:1.7;
+}
+
+.login-panel label {
+  display:block;
+  margin:23px 0 8px;
+  color:#526f63;
+  font-size:11px;
+  font-weight:570;
+}
+
+.gate-password-field {
+  position:relative;
+}
+
+.gate-password-field input {
+  width:100%;
+  min-height:46px;
+  padding:11px 87px 11px 12px;
+  border:1px solid #d9e5df;
+  border-radius:9px;
+  background:#fff;
+  color:#2c4e40;
+  font-size:16px;
+}
+
+.gate-password-toggle {
+  position:absolute;
+  top:5px;
+  right:5px;
+  bottom:5px;
+  min-width:72px;
+  padding:5px 8px;
+  border-radius:6px;
+  background:#edf5f0;
+  color:#497b69;
+  font-size:10px;
+  font-weight:550;
+}
+
+.gate-password-toggle:hover {
+  background:#e0eee6;
+}
+
+.login-panel .button-primary {
+  min-height:44px;
+  margin-top:20px;
+  font-size:12px;
+}
+
+.gate-footnote {
+  margin-top:22px;
+  text-align:center;
+  color:#8a9a93;
+  font-size:10px;
+}
+
+@media (max-width:420px) {
+  .login-panel {
+    padding:26px 23px;
+  }
+  .login-panel .gate-brand {
+    margin-bottom:28px;
+  }
+}
+
+.account-tabs { display: flex; gap: 6px; padding: 5px; margin: 22px 0; background: #e3eeea; border-radius: 14px; }
+.account-tabs button { flex: 1; padding: 11px 8px; border: 0; border-radius: 10px; color: #31574f; background: transparent; cursor: pointer; font: inherit; font-size: 14px; }
+.account-tabs button[aria-pressed="true"] { background: #fff; color: #143832; box-shadow: 0 2px 8px #1438320d; }
+.account-tabs button:focus-visible { outline: 2px solid #31574f; outline-offset: 2px; }
+.account-page label { margin-top: 14px; }
+
+.login-panel input { width:100%; min-height:46px; padding:11px 12px; border:1px solid #d9e5df; border-radius:9px; background:#fff; color:#2c4e40; font:inherit; font-size:16px; }
+.login-panel .gate-password-field input { padding-right:87px; }
+.login-panel label { font-size:13px; }
+.login-panel .gate-intro { font-size:14px; }
+.login-panel .gate-footnote { font-size:12px; }
+#profile-button { max-width:12ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media(max-width:700px) { .topbar .breadcrumb { display:none; } .topbar-actions { width:100%; justify-content:space-between; } }

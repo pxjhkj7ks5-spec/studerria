@@ -1,4 +1,4 @@
-import Fastify, { type FastifyRequest } from "fastify";
+import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import staticFiles from "@fastify/static";
@@ -9,6 +9,8 @@ import { type Config } from "./config.js";
 import { type Store } from "./store.js";
 import { type Runtime } from "./runtime.js";
 import { equalSecret } from "./security.js";
+import { Accounts } from "./accounts.js";
+import { AuthError } from "./password.js";
 const zoneBody = z
   .object({
     label: z.string().trim().min(1).max(40),
@@ -47,7 +49,9 @@ export async function buildServer(
   });
   const b = config.base,
     sessionName = "obriy_session",
+    gateName = "obriy_gate",
     secure = config.NODE_ENV === "production";
+  const accounts = new Accounts(config, store);
   const cookieOptions = {
     path: b || "/",
     httpOnly: true,
@@ -60,13 +64,29 @@ export async function buildServer(
     max: 180,
     timeWindow: "1 minute",
     errorResponseBuilder: () => ({
+      statusCode: 429,
       error: "Забагато запитів. Спробуйте пізніше.",
     }),
   });
-  const identify = async (req: FastifyRequest) =>
+  const sessionUser = async (req: FastifyRequest) =>
     config.configured && req.cookies[sessionName]
       ? store.sessionUser(req.cookies[sessionName]!)
       : null;
+  const identify = async (req: FastifyRequest) => {
+    const id = await sessionUser(req);
+    return id && (await accounts.account(id)) ? id : null;
+  };
+  const legacyUser = async (req: FastifyRequest) => {
+    const id = await sessionUser(req);
+    return id && !(await accounts.account(id)) ? id : null;
+  };
+  const requireGate = async (req: FastifyRequest) => {
+    if (
+      !(await accounts.gate(req.cookies[gateName])) &&
+      !(await legacyUser(req))
+    )
+      throw new AuthError(403, "Спочатку введіть спільний ключ доступу.");
+  };
   app.addHook("onRequest", async (req, reply) => {
     reply
       .header("Cache-Control", "no-store")
@@ -106,19 +126,23 @@ export async function buildServer(
     }
   });
   app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof AuthError) {
+      if (err.retryAfter) reply.header("Retry-After", err.retryAfter);
+      return reply.code(err.statusCode).send({ error: err.message });
+    }
     const error = err as { statusCode?: number };
     const code =
       error.statusCode && error.statusCode >= 400 && error.statusCode < 500
         ? error.statusCode
         : 500;
-    reply
-      .code(code)
-      .send({
-        error:
-          code === 500
-            ? "Сервіс тимчасово недоступний."
+    reply.code(code).send({
+      error:
+        code === 500
+          ? "Сервіс тимчасово недоступний."
+          : code === 429
+            ? "Забагато спроб. Зачекайте й спробуйте пізніше."
             : "Перевірте введені дані.",
-      });
+    });
   });
   const requireUser = async (req: FastifyRequest) => {
     const id = await identify(req);
@@ -136,14 +160,12 @@ export async function buildServer(
     }
     const ready =
       db && config.configured && runtime.leader && runtime.sourceFresh();
-    return reply
-      .code(ready ? 200 : 503)
-      .send({
-        ready,
-        database: db,
-        configured: config.configured,
-        sourceFresh: runtime.sourceFresh(),
-      });
+    return reply.code(ready ? 200 : 503).send({
+      ready,
+      database: db,
+      configured: config.configured,
+      sourceFresh: runtime.sourceFresh(),
+    });
   });
   app.get(`${b}/api/v1/status`, async (req) => ({
     service: "Обрій",
@@ -168,19 +190,38 @@ export async function buildServer(
   }));
   app.post(
     `${b}/api/v1/session`,
-    { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } },
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "15 minutes",
+          hook: "preHandler",
+          // All clients share the gateway IP; a proven owner can still enter after failed guesses.
+          allowList: (req: FastifyRequest) => {
+            const body = req.body as { token?: unknown } | undefined;
+            return (
+              config.configured &&
+              typeof body?.token === "string" &&
+              equalSecret(body.token, config.OBRIY_ADMIN_TOKEN)
+            );
+          },
+        },
+      },
+    },
     async (req, reply) => {
-      const body = z.object({ token: z.string().max(512) }).safeParse(req.body);
+      const body = z
+        .object({ token: z.string().min(1).max(512) })
+        .strict()
+        .safeParse(req.body);
       if (
         !config.configured ||
         !body.success ||
         !equalSecret(body.data.token, config.OBRIY_ADMIN_TOKEN)
       )
         return reply.code(401).send({ error: "Ключ доступу не підійшов." });
-      const id = await store.owner(),
-        token = await store.session(id);
+      const token = await accounts.openGate();
       return reply
-        .setCookie(sessionName, token, cookieOptions)
+        .setCookie(gateName, token, { ...cookieOptions, maxAge: 30 * 86400 })
         .send({ ok: true });
     },
   );
@@ -188,10 +229,74 @@ export async function buildServer(
     if (req.cookies[sessionName]) await store.logout(req.cookies[sessionName]!);
     return reply.clearCookie(sessionName, cookieOptions).send({ ok: true });
   });
+  app.get(`${b}/api/v1/access`, async (req) => ({
+    allowed:
+      (await accounts.gate(req.cookies[gateName])) ||
+      Boolean(await legacyUser(req)),
+    legacy: Boolean(await legacyUser(req)),
+    authenticated: Boolean(await identify(req)),
+  }));
+  const accountBody = z
+    .object({
+      username: z.string().min(1).max(128),
+      password: z.string().min(1).max(512),
+    })
+    .strict();
+  const accountRate = {
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: "15 minutes",
+        keyGenerator: (req: FastifyRequest) => req.cookies[gateName] ?? req.ip,
+      },
+    },
+  };
+  app.post(`${b}/api/v1/auth/register`, accountRate, async (req, reply) => {
+    await requireGate(req);
+    const body = accountBody.safeParse(req.body);
+    if (!body.success) throw new AuthError(400, "Перевірте логін і пароль.");
+    const token = await accounts.register(
+      body.data.username,
+      body.data.password,
+      await legacyUser(req),
+    );
+    return reply
+      .setCookie(sessionName, token, cookieOptions)
+      .send({ ok: true });
+  });
+  app.post(`${b}/api/v1/auth/login`, accountRate, async (req, reply) => {
+    await requireGate(req);
+    const body = accountBody.safeParse(req.body);
+    if (!body.success) throw new AuthError(400, "Перевірте логін і пароль.");
+    const token = await accounts.login(body.data.username, body.data.password);
+    return reply
+      .setCookie(sessionName, token, cookieOptions)
+      .send({ ok: true });
+  });
+  app.post(`${b}/api/v1/auth/password`, accountRate, async (req, reply) => {
+    const id = await requireUser(req);
+    const body = z
+      .object({
+        currentPassword: z.string().min(1).max(512),
+        password: z.string().min(1).max(512),
+      })
+      .strict()
+      .safeParse(req.body);
+    if (!body.success) throw new AuthError(400, "Перевірте пароль.");
+    const token = await accounts.change(
+      id,
+      body.data.currentPassword,
+      body.data.password,
+    );
+    return reply
+      .setCookie(sessionName, token, cookieOptions)
+      .send({ ok: true });
+  });
   app.get(`${b}/api/v1/me`, async (req) => {
     const id = await requireUser(req);
     return {
       user: await store.user(id),
+      account: { username: (await accounts.account(id))!.username },
       zones: await store.zones(id),
       assessments: await store.assessments(id),
     };
@@ -307,24 +412,36 @@ export async function buildServer(
       {
         version: config.OBRIY_RELEASE_VERSION,
         date: "2026-09-05",
-        items: ["Початковий випуск персонального моніторингу зон."],
+        items: ["Покращення доступу та зручності використання."],
       },
     ],
   }));
-  const html = await readFile(path.resolve("public/index.html"), "utf8");
-  app.get(b || "/", async (_req, reply) =>
-    reply.type("text/html").send(html.replaceAll("__APP_BASE__", b)),
-  );
-  if (b)
-    app.get(`${b}/`, async (_req, reply) =>
-      reply.type("text/html").send(html.replaceAll("__APP_BASE__", b)),
-    );
+  const [dashboardHtml, loginHtml, accountHtml] = await Promise.all([
+    readFile(path.resolve("public/index.html"), "utf8"),
+    readFile(path.resolve("public/login.html"), "utf8"),
+    readFile(path.resolve("public/account.html"), "utf8"),
+  ]);
+  const showPage = async (req: FastifyRequest, reply: FastifyReply) => {
+    const html = (await identify(req))
+      ? dashboardHtml
+      : (await accounts.gate(req.cookies[gateName])) || (await legacyUser(req))
+        ? accountHtml
+        : loginHtml;
+    return reply.type("text/html").send(html.replaceAll("__APP_BASE__", b));
+  };
+  app.get(b || "/", showPage);
+  if (b) app.get(`${b}/`, showPage);
+  app.get(`${b}/index.html`, showPage);
+  app.get(`${b}/login.html`, showPage);
+  app.get(`${b}/account.html`, showPage);
   await app.register(staticFiles, {
     root: path.resolve("public"),
     prefix: `${b}/`,
     index: false,
     decorateReply: false,
     cacheControl: false,
+    // HTML is served only by the session-aware routes above, including encoded URLs.
+    allowedPath: (pathname) => !pathname.toLowerCase().endsWith(".html"),
   });
   return app;
 }

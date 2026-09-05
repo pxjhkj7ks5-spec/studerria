@@ -1,6 +1,6 @@
 import pg, { type PoolClient } from "pg";
 import { randomUUID, createHmac } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { type Config } from "./config.js";
 import { Vault, hash, secretToken } from "./security.js";
@@ -70,16 +70,18 @@ export class Store {
     }
   }
   async migrate() {
-    const sql = await readFile(
-      path.resolve("migrations/001_initial.sql"),
-      "utf8",
-    );
+    const files = (await readdir(path.resolve("migrations")))
+      .filter((n) => /^\d{3}_[a-z_]+\.sql$/.test(n))
+      .sort();
     await this.transaction(async (c) => {
       await c.query("SELECT pg_advisory_xact_lock(718031,1)");
-      await c.query(sql);
-      await c.query(
-        "INSERT INTO obriy.schema_migrations(version) VALUES('001') ON CONFLICT DO NOTHING",
-      );
+      for (const name of files) {
+        await c.query(await readFile(path.resolve("migrations", name), "utf8"));
+        await c.query(
+          "INSERT INTO obriy.schema_migrations(version) VALUES($1) ON CONFLICT DO NOTHING",
+          [name.slice(0, 3)],
+        );
+      }
     });
   }
   async acquireLeader(onLost: () => void): Promise<boolean> {
@@ -143,7 +145,7 @@ export class Store {
   }
   async sessionUser(token: string): Promise<string | null> {
     const { rows } = await this.pool.query(
-      "SELECT user_id FROM obriy.sessions WHERE token_hash=$1 AND expires_at>now()",
+      "SELECT s.user_id FROM obriy.sessions s LEFT JOIN obriy.accounts a ON a.user_id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND s.auth_revision IS NOT DISTINCT FROM a.revision",
       [hash(token)],
     );
     return rows[0]?.user_id ?? null;
@@ -256,6 +258,9 @@ export class Store {
     const code = secretToken().slice(0, 24),
       expiresAt = new Date(Date.now() + 600000);
     await this.transaction(async (c) => {
+      await c.query("SELECT id FROM obriy.users WHERE id=$1 FOR UPDATE", [
+        userId,
+      ]);
       await c.query("DELETE FROM obriy.pairing_codes WHERE user_id=$1", [
         userId,
       ]);
@@ -271,14 +276,25 @@ export class Store {
     code: string,
     chatId: string,
   ): Promise<string | null> {
+    await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,718032))", [
+      this.chatHash(chatId),
+    ]);
+    const candidate = await c.query(
+      "SELECT user_id FROM obriy.pairing_codes WHERE code_hash=$1 AND expires_at>now()",
+      [hash(code)],
+    );
+    if (!candidate.rowCount) return null;
+    await c.query("SELECT id FROM obriy.users WHERE id=$1 FOR UPDATE", [
+      candidate.rows[0].user_id,
+    ]);
+    const existing = await this.chatUser(chatId, c);
+    if (existing && existing !== candidate.rows[0].user_id) return null;
     const result = await c.query(
       "DELETE FROM obriy.pairing_codes WHERE code_hash=$1 AND expires_at>now() RETURNING user_id",
       [hash(code)],
     );
     if (!result.rowCount) return null;
     const id = result.rows[0].user_id;
-    const existing = await this.chatUser(chatId, c);
-    if (existing && existing !== id) throw new Error("Chat already linked");
     await c.query(
       "UPDATE obriy.users SET chat_enc=$2,chat_hash=$3 WHERE id=$1",
       [id, this.vault.encrypt(chatId, `chat:${id}`), this.chatHash(chatId)],
@@ -561,8 +577,8 @@ export class Store {
   }
   async deliverable(d: Delivery) {
     const { rows } = await this.pool.query(
-      `SELECT 1 FROM obriy.notification_outbox o JOIN obriy.users u ON u.id=o.user_id LEFT JOIN obriy.zones z ON z.id=o.zone_id LEFT JOIN obriy.tracks t ON t.id=o.track_id WHERE o.id=$1 AND o.lease_token=$2 AND o.status='sending' AND o.expires_at>now() AND(o.category='command' OR ((u.paused_until IS NULL OR u.paused_until<=now()) AND z.enabled AND (($3='RESOLVED' AND t.status='resolved') OR ($3 IS DISTINCT FROM 'RESOLVED' AND t.status='active' AND t.data->>'advisory'='false' AND t.data#>>'{position,areaOnly}'='false' AND t.data#>>'{motion,speedKmh}' IS NOT NULL AND t.data#>>'{motion,confirmedAt}' IS NOT NULL AND (t.data->>'observedAt')::timestamptz>now()-interval '600 seconds'))))`,
-      [d.id, d.leaseToken, d.level ?? null],
+      `SELECT 1 FROM obriy.notification_outbox o JOIN obriy.users u ON u.id=o.user_id LEFT JOIN obriy.zones z ON z.id=o.zone_id LEFT JOIN obriy.tracks t ON t.id=o.track_id WHERE o.id=$1 AND o.lease_token=$2 AND u.chat_hash=$4 AND o.status='sending' AND o.expires_at>now() AND(o.category='command' OR ((u.paused_until IS NULL OR u.paused_until<=now()) AND z.enabled AND (($3='RESOLVED' AND t.status='resolved') OR ($3 IS DISTINCT FROM 'RESOLVED' AND t.status='active' AND t.data->>'advisory'='false' AND t.data#>>'{position,areaOnly}'='false' AND t.data#>>'{motion,speedKmh}' IS NOT NULL AND t.data#>>'{motion,confirmedAt}' IS NOT NULL AND (t.data->>'observedAt')::timestamptz>now()-interval '600 seconds'))))`,
+      [d.id, d.leaseToken, d.level ?? null, this.chatHash(d.chatId)],
     );
     return Boolean(rows.length);
   }
@@ -640,6 +656,10 @@ export class Store {
         "UPDATE obriy.notification_outbox SET status='expired' WHERE status IN ('pending','sending') AND expires_at<=now()",
       );
       await c.query("DELETE FROM obriy.sessions WHERE expires_at<now()");
+      await c.query("DELETE FROM obriy.access_gates WHERE expires_at<now()");
+      await c.query(
+        "DELETE FROM obriy.login_attempts WHERE attempted_at<now()-interval '5 minutes'",
+      );
       await c.query("DELETE FROM obriy.pairing_codes WHERE expires_at<now()");
       await c.query(
         "DELETE FROM obriy.source_events WHERE created_at<now()-$1*interval '1 hour'",

@@ -1,6 +1,6 @@
 # Обрій / Obriy
 
-Civilian, privacy-first contextual air-threat monitoring. This is a standalone KMA service at `/obriy`, with its own dependency lock and PostgreSQL schema (`obriy`). The supplied 58-page document is a product specification, not permission to change unrelated projects or operate external accounts. v0.1 is server-first Telegram delivery plus a small authenticated web workspace. PWA push/native and unidentified AirSigma are explicitly deferred as in the specification.
+Civilian, privacy-first contextual air-threat monitoring. This is a standalone KMA service at `/obriy`, with its own dependency lock and PostgreSQL schema (`obriy`). The supplied 58-page document is a product specification, not permission to change unrelated projects or operate external accounts. v0.2 is server-first Telegram delivery plus a small authenticated web workspace. PWA push/native and unidentified AirSigma are explicitly deferred as in the specification.
 
 ## Implementation boundaries
 
@@ -15,7 +15,7 @@ Civilian, privacy-first contextual air-threat monitoring. This is a standalone K
 
 NEPTUN → singleton collector → normalized tracks → deterministic risk per protected zone → one database transaction (state + outbox) → leased delivery worker → Telegram. alerts.in.ua contributes administrative context only. Neither upstream receives user coordinates or identifiers. The client talks only to this service. No LLM or guessed weapon speed is in the decision path.
 
-Exact zones and Telegram chat identifiers use AES-256-GCM with random 96-bit IVs and field/owner binding as additional authenticated data. Key lives in runtime env, separate from PostgreSQL/backups. No public registration: owner access key bootstraps one owner; one-use pairing code associates an explicitly consenting private Telegram chat. Web access uses an opaque HttpOnly session. Telegram supports private commands after pairing. The service can serve a truthful setup-required workspace without credentials; protected endpoints remain locked.
+Exact zones and Telegram chat identifiers use AES-256-GCM with random 96-bit IVs and field/owner binding as additional authenticated data. Key lives in runtime env, separate from PostgreSQL/backups. Registration requires a shared access key, exchanged for an opaque 30-day HttpOnly gate cookie. Each user then has a unique normalized username and a salted scrypt password hash (N=131072/r=8/p=1; one concurrent KDF per process). The gate never grants access to profiles. Personal sessions carry credential revisions and are scoped to one user; password changes revoke old sessions transactionally. Login attempt budgets persist per account in PostgreSQL. An existing legacy session can attach its own profile to a new account; registration with only the shared key always creates a separate user. Telegram pairing requires a one-use code issued in the authenticated account, and a private chat cannot belong to two users. Static HTML is blocked; session-aware routes return a gate, account entry or dashboard page. Shared source-health status remains public without personal data.
 
 ## Reliability and limits
 

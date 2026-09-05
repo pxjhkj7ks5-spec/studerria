@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f0f4f5">
+    <meta name="app-base" content="__APP_BASE__">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Вхід — Обрій</title>
+    <link rel="icon" href="__APP_BASE__/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="__APP_BASE__/styles.css">
+    <script src="__APP_BASE__/login.js" type="module"></script>
+  </head>
+  <body class="login-page">
+    <main class="login-panel" aria-labelledby="login-title">
+      <div class="brand gate-brand" aria-label="Обрій">
+        <svg class="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M7 24a13 13 0 0 1 26 0M4 25h32M9 31h22" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg>
+        <span>Обрій<span class="brand-caption">ПЕРСОНАЛЬНИЙ МОНІТОРИНГ</span></span>
+      </div>
+      <div class="eyebrow">ПРИВАТНИЙ ДОСТУП</div>
+      <h1 id="login-title">Увійти в Обрій</h1>
+      <p class="gate-intro">Введіть спільний ключ доступу. Далі ви зможете увійти у свій акаунт або створити новий.</p>
+      <form id="login-form">
+        <label for="access-token">Ключ доступу</label>
+        <div class="gate-password-field">
+          <input id="access-token" name="password" type="password" autocomplete="current-password" required maxlength="512" autofocus spellcheck="false" autocapitalize="none">
+          <button id="show-key-button" class="gate-password-toggle" type="button" aria-controls="access-token" aria-pressed="false" aria-label="Показати ключ доступу">Показати</button>
+        </div>
+        <div id="login-error" class="form-error" role="alert" hidden></div>
+        <button id="login-button" class="button button-primary full-width" type="submit">Увійти</button>
+      </form>
+      <p class="gate-footnote">Ключ надає власник сервісу. На цьому пристрої доступ збережеться на 30 днів.</p>
+    </main>
+  </body>
+</html>
