@@ -1,0 +1,60 @@
+name: Obriy
+on:
+  push:
+    branches: [main]
+    paths: ['services/obriy/**', 'middleware/serviceProxies.js', 'scripts/*obriy*', 'scripts/server-update.sh', 'docker/local/docker-compose.yml', '.github/workflows/obriy.yml']
+  pull_request:
+    paths: ['services/obriy/**', 'middleware/serviceProxies.js', 'scripts/*obriy*', 'scripts/server-update.sh', 'docker/local/docker-compose.yml', '.github/workflows/obriy.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: obriy
+          POSTGRES_PASSWORD: integration-only-password
+          POSTGRES_DB: obriy_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U obriy -d obriy_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run:
+        working-directory: services/obriy
+    env:
+      OBRIY_TEST_DATABASE_URL: postgres://obriy:integration-only-password@127.0.0.1:5432/obriy_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/obriy/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:simulation
+      - run: npm audit --omit=dev
+      - run: npm run build
+      - name: Check Compose configuration
+        working-directory: .
+        run: docker compose --env-file docker/local/.env.example -f docker/local/docker-compose.yml config --quiet
+      - name: Build service image
+        working-directory: .
+        run: docker build -t obriy-ci services/obriy
+      - name: Smoke production process without external integrations
+        run: |
+          docker run -d --name obriy-smoke --network host -e NODE_ENV=production -e PORT=4189 -e OBRIY_DATABASE_URL="$OBRIY_TEST_DATABASE_URL" -e OBRIY_PUBLIC_URL=https://example.invalid/obriy -e OBRIY_COLLECTORS_ENABLED=false obriy-ci
+          for attempt in $(seq 1 30); do
+            if curl --fail http://127.0.0.1:4189/obriy/healthz; then exit 0; fi
+            sleep 2
+          done
+          docker logs obriy-smoke
+          exit 1
+      - name: Remove smoke container
+        if: always()
+        run: docker rm -f obriy-smoke || true

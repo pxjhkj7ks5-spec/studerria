@@ -227,3 +227,17 @@ test('naradadruk old paths redirect after the public host switch is enabled', as
     'https://naradadruk.studerria.com/catalog?q=mount',
   );
 });
+
+test('obriy claims its isolated path but not similar names', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, { env: {}, logger: { error() {} } });
+  for (const pathname of ['/obriy', '/obriy/api/v1/zones']) {
+    const res = createFakeResponse();
+    await runHandlers(app.handlers, { path: pathname, url: pathname }, res);
+    assert.equal(res.statusCode, 404);
+    assert.equal(res.body, 'Not found');
+  }
+  const res = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/obriy-other', url: '/obriy-other' }, res);
+  assert.equal(res.headersSent, false);
+});

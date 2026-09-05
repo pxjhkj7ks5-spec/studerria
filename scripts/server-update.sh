@@ -26,6 +26,7 @@ Services:
   ykg          /ykg sidecar
   slashtg      /tg sidecar
   withlforl    /withlforl sidecar
+  obriy        /obriy private monitoring sidecar
   osix         /osix sidecar
   shieldline   /shieldline sidecar
   db           PostgreSQL
@@ -53,6 +54,7 @@ normalize_service() {
     ykg|young-killers-group|youngkillersgroup) echo "ykg" ;;
     slashtg|slash-tg|tg) echo "slashtg" ;;
     withlforl|with-l-for-l) echo "withlforl" ;;
+    obriy|obrii) echo "obriy" ;;
     osix) echo "osix" ;;
     shieldline|shield-line) echo "shieldline" ;;
     db|postgres|postgresql) echo "db" ;;
@@ -182,7 +184,7 @@ backup_stateful_data() {
   fi
 
   case "$SERVICE" in
-    app|db)
+    app|db|obriy)
       backup_postgres_database
       ;;
     charredmap)
@@ -288,6 +290,10 @@ if [ -n "$dirty_blocking" ]; then
 fi
 
 git pull --rebase
+
+if [ "$SERVICE" = "obriy" ]; then
+  bash "$ROOT_DIR/scripts/setup-obriy-env.sh" "$ROOT_DIR/docker/local/.env"
+fi
 
 cd "$ROOT_DIR/docker/local"
 

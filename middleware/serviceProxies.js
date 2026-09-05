@@ -6,6 +6,7 @@ const NARADADRUK_BASE_PATH = '/naradadruk';
 const YKG_BASE_PATH = '/ykg';
 const WITHLFORL_BASE_PATH = '/withlforl';
 const OSIX_BASE_PATH = '/osix';
+const OBRIY_BASE_PATH = '/obriy';
 const SHIELDLINE_BASE_PATH = '/shieldline';
 const DEFAULT_SLASHTG_BASE_PATH = '/tg';
 
@@ -133,6 +134,7 @@ function registerServiceProxies(app, deps = {}) {
   const naradadrukPublicHost = normalizePublicHost(env.NARADADRUK_PUBLIC_HOST);
   const withlforlProxyTarget = String(env.WITHLFORL_PROXY_TARGET || '').trim();
   const osixProxyTarget = String(env.OSIX_PROXY_TARGET || '').trim();
+  const obriyProxyTarget = String(env.OBRIY_PROXY_TARGET || '').trim();
   const shieldlineProxyTarget = String(env.SHIELDLINE_PROXY_TARGET || '').trim();
   const slashtgProxyTarget = String(env.SLASHTG_PROXY_TARGET || '').trim();
   const slashtgBasePath = String(env.SLASHTG_BASE_PATH || DEFAULT_SLASHTG_BASE_PATH).trim() || DEFAULT_SLASHTG_BASE_PATH;
@@ -182,6 +184,7 @@ function registerServiceProxies(app, deps = {}) {
     logLabel: 'Withlforl',
     logger,
   });
+  const obriyProxy = createServiceProxy({ target: obriyProxyTarget, basePath: OBRIY_BASE_PATH, serviceName: 'Obriy', logLabel: 'Obriy', logger });
   const osixProxy = createServiceProxy({
     target: osixProxyTarget,
     basePath: OSIX_BASE_PATH,
@@ -273,6 +276,12 @@ function registerServiceProxies(app, deps = {}) {
       return respondServiceUnavailable(res, 'Withlforl', 404);
     }
     return withlforlProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (!isServiceRequest(req, OBRIY_BASE_PATH)) return next();
+    if (!obriyProxy) return respondServiceUnavailable(res, 'Obriy', 404);
+    return obriyProxy(req, res, next);
   });
 
   app.use((req, res, next) => {

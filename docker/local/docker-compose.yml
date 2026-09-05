@@ -529,6 +529,56 @@ services:
     cap_drop:
       - ALL
 
+  obriy:
+    build:
+      context: ../../services/obriy
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 45s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      OBRIY_BASE_PATH: /obriy
+      OBRIY_PUBLIC_URL: ${OBRIY_PUBLIC_URL:-https://studerria.com/obriy}
+      OBRIY_DB_HOST: db
+      OBRIY_DB_PORT: 5432
+      OBRIY_DB_USER: ${POSTGRES_USER:-studerria}
+      OBRIY_DB_PASSWORD: ${POSTGRES_PASSWORD:-studerria_local}
+      OBRIY_DB_NAME: ${POSTGRES_DB:-student_portal}
+      OBRIY_ENCRYPTION_KEY: ${OBRIY_ENCRYPTION_KEY:-}
+      OBRIY_ADMIN_TOKEN: ${OBRIY_ADMIN_TOKEN:-}
+      OBRIY_METRICS_TOKEN: ${OBRIY_METRICS_TOKEN:-}
+      OBRIY_TELEGRAM_BOT_TOKEN: ${OBRIY_TELEGRAM_BOT_TOKEN:-}
+      OBRIY_TELEGRAM_BOT_USERNAME: ${OBRIY_TELEGRAM_BOT_USERNAME:-}
+      OBRIY_TELEGRAM_WEBHOOK_SECRET: ${OBRIY_TELEGRAM_WEBHOOK_SECRET:-}
+      OBRIY_TELEGRAM_MODE: ${OBRIY_TELEGRAM_MODE:-polling}
+      OBRIY_ALERTS_TOKEN: ${OBRIY_ALERTS_TOKEN:-}
+      OBRIY_NEPTUN_POLL_MS: ${OBRIY_NEPTUN_POLL_MS:-15000}
+      OBRIY_HEARTBEAT_MS: ${OBRIY_HEARTBEAT_MS:-60000}
+      OBRIY_ALERTS_POLL_MS: ${OBRIY_ALERTS_POLL_MS:-15000}
+      OBRIY_DEFAULT_RADIUS_KM: ${OBRIY_DEFAULT_RADIUS_KM:-10}
+      OBRIY_RETENTION_DAYS: ${OBRIY_RETENTION_DAYS:-30}
+      OBRIY_RAW_RETENTION_HOURS: ${OBRIY_RAW_RETENTION_HOURS:-24}
+      OBRIY_SESSION_HOURS: ${OBRIY_SESSION_HOURS:-12}
+      OBRIY_AIRSIGMA_SOURCE_IDENTIFIER: ${OBRIY_AIRSIGMA_SOURCE_IDENTIFIER:-}
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/obriy/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
   app:
     build:
       context: ../..
@@ -567,6 +617,7 @@ services:
       SLASHTG_BASE_PATH: ${SLASHTG_BASE_PATH:-/tg}
       WITHLFORL_PROXY_TARGET: http://withlforl:8080
       OSIX_PROXY_TARGET: http://osix:8080
+      OBRIY_PROXY_TARGET: http://obriy:8080
       SHIELDLINE_PROXY_TARGET: http://shieldline:8080
       STUDERRIA_TG_BOT_TOKEN: ${STUDERRIA_TG_BOT_TOKEN:-}
       STUDERRIA_TG_BOT_USERNAME: ${STUDERRIA_TG_BOT_USERNAME:-}

@@ -13,3 +13,5 @@ services/charredmap
 services/shieldline
 docker/local/db/init/*.sql
 docker/local/db/init/*.sql.gz
+
+services/obriy
