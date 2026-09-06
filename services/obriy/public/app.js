@@ -1,7 +1,7 @@
 const rawBase = document.querySelector('meta[name="app-base"]')?.content ?? '/obriy';
 const base = /^\/[a-zA-Z0-9/_-]*$/.test(rawBase) ? rawBase.replace(/\/$/, '') : '/obriy';
 const byId = (id) => document.getElementById(id);
-const state = { status: null, me: null, refreshing: false, editingZone: null, loaded: false, notificationCodeExpires: null };
+const state = { status: null, me: null, bulletins: null, refreshing: false, editingZone: null, loaded: false, notificationCodeExpires: null };
 const dateFormat = new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const timeFormat = new Intl.DateTimeFormat('uk-UA', { hour: '2-digit', minute: '2-digit' });
 let toastTimer;
@@ -305,6 +305,35 @@ function renderDelivery() {
   byId('pause-button').disabled = !state.me;
 }
 
+function renderBulletins() {
+  const data = state.bulletins;
+  const mode = byId('bulletin-mode');
+  const workerAt = dateValue(data?.worker?.lastSuccessAt);
+  const workerHealthy = workerAt !== null && clockNow() - workerAt < 90000;
+  mode.textContent = !data ? 'Не вдалося завантажити оголошення.' : data.mode === 'disabled' ? 'Збір оголошень вимкнено.' : !workerHealthy ? 'Обробка оголошень ще запускається або затримується.' : data.deliveryReady ? 'Попередження увімкнено для обраних місць. Вебперегляд каналів може мати затримки.' : 'Пробний режим: збираємо оголошення без відправлення. Увімкнення доступне після перевірки та 24 годин збору.';
+  const sources = byId('bulletin-sources'); sources.replaceChildren();
+  for (const [name, source] of Object.entries(state.status?.sources?.channels ?? {})) {
+    const info = sourceInfo(source, 'channel');
+    sources.append(element('p', 'field-note', `@${name} · ${info.label} · ${relativeTime(source.lastSuccessAt)}`));
+  }
+  const list = byId('bulletins-list'); list.replaceChildren();
+  if (!data?.items?.length) {
+    list.append(element('p', 'empty-line', 'Оголошень для ваших підписок поки немає. Оберіть місто або район у налаштуваннях зони. Відсутність дописів не означає безпеки.'));
+    return;
+  }
+  for (const item of data.items) {
+    const row = element('article', 'bulletin-item');
+    const zone = state.me?.zones?.find(z => z.id === item.zoneId);
+    const names = item.areaIds.map(id => data.areas.find(a => a.id === id)?.label).filter(Boolean).join(', ');
+    row.append(element('h3', '', `${zone?.label ?? 'Зона'} · ${names}`));
+    row.append(element('p', '', item.kind === 'warning' ? (item.uncertain ? 'Можливе попередження джерела' : 'Джерело опублікувало попередження') : 'Джерело повідомляє про завершення. Перевіряйте офіційний відбій.'));
+    row.append(element('p', 'field-note', (item.reasons ?? []).join(' ')));
+    const link = element('a', 'bulletin-link', `@${item.source} · ${dateFormat.format(new Date(item.publishedAt))} ↗`);
+    if (/^https:\/\/t\.me\/(AerisRimor|kyiv_airdef|kievinform_ua1)\/\d+$/.test(item.url)) { link.href=item.url; link.target='_blank'; link.rel='noopener noreferrer'; }
+    row.append(link); list.append(row);
+  }
+}
+
 async function refresh() {
   if (state.refreshing || document.hidden || navigatingToGate) return;
   state.refreshing = true;
@@ -315,17 +344,18 @@ async function refresh() {
     if (!status.authenticated) { redirectToGate(); return; }
     state.status = status;
     state.me = await request('/api/v1/me');
+    state.bulletins = await request('/api/v1/bulletins');
     showMessage('page-error');
   } catch (error) {
     if (error.status === 401) { redirectToGate(); return; }
     state.status = null;
-    state.me = null;
+    state.me = null; state.bulletins = null;
     showMessage('page-error', error.message);
   } finally {
     state.loaded = true;
     state.refreshing = false;
     byId('refresh-button').disabled = false;
-    if (!navigatingToGate) { renderStatus(); renderZones(); renderAssessments(); }
+    if (!navigatingToGate) { renderStatus(); renderZones(); renderAssessments(); renderBulletins(); }
   }
 }
 
@@ -348,6 +378,14 @@ function openZone(zone = null) {
   byId('zone-radius').value = zone?.radiusKm ?? (Number.isFinite(defaultRadius) && defaultRadius >= 1 && defaultRadius <= 100 ? String(defaultRadius) : '');
   byId('zone-oblast').value = zone?.oblast ?? '';
   byId('zone-region').value = zone?.regionUid ?? '';
+  const options = byId('bulletin-area-options');
+  options.replaceChildren();
+  for (const area of state.bulletins?.areas ?? []) {
+    const label = element('label', 'checkbox-label');
+    const input = document.createElement('input'); input.type = 'checkbox'; input.value = area.id; input.name = 'bulletinArea';
+    input.checked = (zone?.bulletinAreas ?? []).includes(area.id);
+    label.append(input, document.createTextNode(area.label)); options.append(label);
+  }
   byId('zone-enabled').checked = zone?.enabled !== false;
   showMessage('zone-error');
   openDialog('zone-dialog');
@@ -375,6 +413,7 @@ byId('zone-form').addEventListener('submit', async (event) => {
     label: byId('zone-label').value.trim(),
     lat: Number(byId('zone-lat').value), lon: Number(byId('zone-lon').value), radiusKm: Number(byId('zone-radius').value),
     oblast: byId('zone-oblast').value.trim() || (state.editingZone ? null : undefined), regionUid: byId('zone-region').value.trim() || (state.editingZone ? null : undefined), enabled: byId('zone-enabled').checked,
+    bulletinAreas: [...document.querySelectorAll('input[name=bulletinArea]:checked')].map(input => input.value),
   };
   if (!body.label || ![body.lat, body.lon, body.radiusKm].every(Number.isFinite) || Math.abs(body.lat) > 90 || Math.abs(body.lon) > 180 || body.radiusKm < 1 || body.radiusKm > 100) { showMessage('zone-error', 'Вкажіть назву, допустимі координати та радіус від 1 до 100 км.'); return; }
   const path = state.editingZone ? `/api/v1/zones/${encodeURIComponent(state.editingZone)}` : '/api/v1/zones';
@@ -457,7 +496,7 @@ byId('footer-changelog-button').addEventListener('click', openChangelog);
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 window.addEventListener('online', refresh);
-window.addEventListener('offline', () => { state.status = null; state.me = null; renderStatus(); renderZones(); renderAssessments(); showMessage('page-error', 'Немає з’єднання з мережею. Поточний стан загроз невідомий.'); });
+window.addEventListener('offline', () => { state.status = null; state.me = null; state.bulletins = null; renderStatus(); renderZones(); renderAssessments(); renderBulletins(); showMessage('page-error', 'Немає з’єднання з мережею. Поточний стан загроз невідомий.'); });
 window.addEventListener('pagehide', () => document.body.classList.add('session-ended'));
 window.addEventListener('pageshow', (event) => { if (event.persisted) window.location.reload(); });
 setInterval(refresh, 15000);

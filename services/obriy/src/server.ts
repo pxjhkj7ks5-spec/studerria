@@ -13,6 +13,8 @@ import { type Runtime } from "./runtime.js";
 import { equalSecret } from "./security.js";
 import { Accounts } from "./accounts.js";
 import { AuthError } from "./password.js";
+import { AREAS } from "./bulletins/areas.js";
+import { BulletinStore } from "./bulletins/store.js";
 const zoneBody = z
   .object({
     label: z.string().trim().min(1).max(40),
@@ -34,6 +36,11 @@ const zoneBody = z
       .transform((v) => v ?? undefined)
       .optional(),
     enabled: z.boolean().default(true),
+    bulletinAreas: z
+      .array(z.string().refine((id) => AREAS.some((a) => a.id === id)))
+      .max(AREAS.length)
+      .transform((ids) => [...new Set(ids)])
+      .optional(),
   })
   .strict();
 const uuid = z.string().uuid();
@@ -54,6 +61,7 @@ export async function buildServer(
     gateName = "obriy_gate",
     secure = config.NODE_ENV === "production";
   const accounts = new Accounts(config, store);
+  const bulletins = new BulletinStore(store);
   const cookieOptions = {
     path: b || "/",
     httpOnly: true,
@@ -310,6 +318,16 @@ export async function buildServer(
   app.get(`${b}/api/v1/zones`, async (req) => ({
     zones: await store.zones(await requireUser(req)),
   }));
+  app.get(`${b}/api/v1/bulletins`, async (req) => {
+    const userId = await requireUser(req);
+    return {
+      items: await bulletins.feed(userId),
+      areas: AREAS.map(({ id, label, parent }) => ({ id, label, parent })),
+      mode: config.OBRIY_BULLETIN_MODE,
+      deliveryReady: await bulletins.deliveryReady(),
+      worker: await store.getRuntime("bulletin-worker"),
+    };
+  });
   app.post(`${b}/api/v1/zones`, async (req, reply) => {
     const id = await requireUser(req),
       body = zoneBody.safeParse(req.body);
@@ -451,18 +469,25 @@ export async function buildServer(
     )
       return reply.code(404).send();
     const counts = await store.counts();
+    const channelMetrics = Object.entries(runtime.health().channels)
+      .map(
+        ([channel, health]) =>
+          `obriy_bulletin_source_live{channel="${channel}"} ${health.state === "live" ? 1 : 0}\n` +
+          `obriy_bulletin_last_success_seconds{channel="${channel}"} ${health.lastSuccessAt ? Date.parse(health.lastSuccessAt) / 1000 : 0}\n`,
+      )
+      .join("");
     return reply
       .type("text/plain; version=0.0.4")
       .send(
-        `obriy_source_fresh ${runtime.sourceFresh() ? 1 : 0}\nobriy_leader ${runtime.leader ? 1 : 0}\nobriy_rejected_events_total ${runtime.rejected}\nobriy_active_tracks ${counts.tracks}\nobriy_outbox_pending ${counts.pending}\nobriy_outbox_dead ${counts.dead}\n`,
+        `obriy_source_fresh ${runtime.sourceFresh() ? 1 : 0}\nobriy_leader ${runtime.leader ? 1 : 0}\nobriy_rejected_events_total ${runtime.rejected}\nobriy_active_tracks ${counts.tracks}\nobriy_outbox_pending ${counts.pending}\nobriy_outbox_dead ${counts.dead}\n${channelMetrics}`,
       );
   });
   app.get(`${b}/changelog.json`, async () => ({
     items: [
       {
         version: config.OBRIY_RELEASE_VERSION,
-        date: "2026-09-05",
-        items: ["Покращення доступу та зручності використання."],
+        date: "2026-09-06",
+        items: ["Поточні доопрацювання для кращого щоденного досвіду."],
       },
     ],
   }));

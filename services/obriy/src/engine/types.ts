@@ -87,6 +87,8 @@ export interface Zone {
   regionUid?: string;
   oblast?: string;
   enabled: boolean;
+  /** Explicit civil bulletin subscriptions; unrelated to position or radius. */
+  bulletinAreas?: string[];
 }
 export interface Point {
   lat: number;

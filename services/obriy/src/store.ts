@@ -231,7 +231,7 @@ export class Store {
         [id, minutes],
       );
       await db.query(
-        "UPDATE obriy.notification_outbox SET status='cancelled' WHERE user_id=$1 AND category='risk' AND status IN ('pending','sending')",
+        "UPDATE obriy.notification_outbox SET status='cancelled' WHERE user_id=$1 AND category IN ('risk','telegram_observation') AND status IN ('pending','sending')",
         [id],
       );
       await db.query(
@@ -576,6 +576,36 @@ export class Store {
     });
   }
   async deliverable(d: Delivery) {
+    if (d.category === "telegram_observation") {
+      if (
+        this.config.OBRIY_BULLETIN_MODE !== "live" ||
+        this.config.OBRIY_BULLETIN_APPROVED !== "true"
+      )
+        return false;
+      const { rows } = await this.pool.query(
+        `SELECT 1 FROM obriy.notification_outbox o
+        JOIN obriy.users u ON u.id=o.user_id JOIN obriy.zones z ON z.id=o.zone_id
+        JOIN obriy.bulletin_decisions d ON d.id=o.bulletin_decision_id
+        JOIN obriy.channel_messages m ON m.id=d.message_id
+        JOIN obriy.channel_cursors c ON c.channel=m.channel
+        WHERE o.id=$1 AND o.lease_token=$2 AND u.chat_hash=$3 AND o.category='telegram_observation'
+        AND o.status='sending' AND o.expires_at>now() AND z.enabled AND z.user_id=u.id
+        AND z.revision=d.zone_revision AND m.revision=d.message_revision AND m.processed_revision=m.revision
+        AND (u.paused_until IS NULL OR u.paused_until<=now())
+        AND c.last_success_at>now()-interval '90 seconds' AND m.published_at<=now()
+        AND (CASE WHEN $5='CORRECTION' THEN m.received_at ELSE m.published_at END)>now()-$4*interval '1 millisecond'
+        AND (m.parsed->>'kind'='warning' OR $5='CORRECTION')
+        AND (SELECT count(*) FROM obriy.channel_cursors WHERE channel IN ('AerisRimor','kyiv_airdef','kievinform_ua1') AND initialized_at<=now()-interval '24 hours')=3`,
+        [
+          d.id,
+          d.leaseToken,
+          this.chatHash(d.chatId),
+          this.config.OBRIY_BULLETIN_MAX_AGE_MS,
+          d.level,
+        ],
+      );
+      return Boolean(rows.length);
+    }
     const { rows } = await this.pool.query(
       `SELECT 1 FROM obriy.notification_outbox o JOIN obriy.users u ON u.id=o.user_id LEFT JOIN obriy.zones z ON z.id=o.zone_id LEFT JOIN obriy.tracks t ON t.id=o.track_id WHERE o.id=$1 AND o.lease_token=$2 AND u.chat_hash=$4 AND o.status='sending' AND o.expires_at>now() AND(o.category='command' OR ((u.paused_until IS NULL OR u.paused_until<=now()) AND z.enabled AND (($3='RESOLVED' AND t.status='resolved') OR ($3 IS DISTINCT FROM 'RESOLVED' AND t.status='active' AND t.data->>'advisory'='false' AND t.data#>>'{position,areaOnly}'='false' AND t.data#>>'{motion,speedKmh}' IS NOT NULL AND t.data#>>'{motion,confirmedAt}' IS NOT NULL AND (t.data->>'observedAt')::timestamptz>now()-interval '600 seconds'))))`,
       [d.id, d.leaseToken, d.level ?? null, this.chatHash(d.chatId)],
@@ -663,6 +693,14 @@ export class Store {
       await c.query("DELETE FROM obriy.pairing_codes WHERE expires_at<now()");
       await c.query(
         "DELETE FROM obriy.source_events WHERE created_at<now()-$1*interval '1 hour'",
+        [this.config.OBRIY_RAW_RETENTION_HOURS],
+      );
+      await c.query(
+        "DELETE FROM obriy.channel_messages WHERE received_at<now()-$1*interval '1 hour'",
+        [this.config.OBRIY_RAW_RETENTION_HOURS],
+      );
+      await c.query(
+        "DELETE FROM obriy.channel_message_revisions WHERE created_at<now()-$1*interval '1 hour'",
         [this.config.OBRIY_RAW_RETENTION_HOURS],
       );
       await c.query(

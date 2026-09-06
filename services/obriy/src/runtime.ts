@@ -15,8 +15,12 @@ import {
 } from "./ingestion/index.js";
 import { TelegramBot, Dispatcher, riskText } from "./telegram.js";
 import { hash, logEvent } from "./security.js";
+import { BulletinStore } from "./bulletins/store.js";
+import { BulletinCollector } from "./bulletins/collector.js";
+import { CHANNELS } from "./bulletins/types.js";
 const disabled = (): SourceHealth => ({ state: "disabled" });
 export class Runtime {
+  bulletins?: BulletinCollector;
   neptun?: NeptunCollector;
   alerts?: AlertsCollector;
   bot: TelegramBot;
@@ -42,6 +46,9 @@ export class Runtime {
     return {
       neptun: this.neptun?.health() ?? disabled(),
       alerts: this.alerts?.health() ?? disabled(),
+      channels:
+        this.bulletins?.health() ??
+        Object.fromEntries(CHANNELS.map((c) => [c, disabled()])),
     };
   }
   sourceFresh() {
@@ -72,6 +79,16 @@ export class Runtime {
     if (!this.leader)
       throw new Error("Another Obriy ingestion owner is active");
     if (this.config.OBRIY_COLLECTORS_ENABLED === "true") {
+      if (
+        this.config.configured &&
+        this.config.OBRIY_BULLETIN_MODE !== "disabled"
+      ) {
+        this.bulletins = new BulletinCollector(
+          this.config,
+          new BulletinStore(this.store),
+        );
+        this.bulletins.start();
+      }
       this.neptun = new NeptunCollector({
         wsUrl: this.config.OBRIY_NEPTUN_WS_URL,
         restUrl: this.config.OBRIY_NEPTUN_REST_URL,
@@ -257,6 +274,7 @@ export class Runtime {
     if (this.cleanupTimer) clearInterval(this.cleanupTimer);
     await Promise.all([
       this.neptun?.stop(),
+      this.bulletins?.stop(),
       this.alerts?.stop(),
       this.bot.stop(),
       this.dispatcher.stop(),

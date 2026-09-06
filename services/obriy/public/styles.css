@@ -2234,3 +2234,15 @@ h1 {
 .telegram-test-button { margin-top: 10px; }
 .telegram-test-options { display: grid; gap: 10px; }
 .telegram-test-options .button { justify-content: flex-start; white-space: normal; text-align: left; }
+
+/* Civil bulletin subscriptions reuse the dashboard's typography and surfaces. */
+.bulletin-section { margin: 28px 0; }
+.bulletin-item { padding: 16px 0; border-bottom: 1px solid rgba(120,130,145,.18); }
+.bulletin-item h3 { font-size: 15px; margin: 0 0 8px; }
+.bulletin-item p { margin: 6px 0; }
+.bulletin-link { color: inherit; font-size: 13px; text-underline-offset: 3px; }
+.bulletin-settings { border: 1px solid rgba(120,130,145,.25); border-radius: 12px; margin: 20px 0; padding: 12px; }
+.bulletin-settings legend { font-weight: 600; padding: 0 6px; }
+.bulletin-area-options { max-height: 200px; overflow: auto; }
+.bulletin-area-options .checkbox-label { margin: 10px 0; }
+.bulletin-sources { margin: 12px 0; }
