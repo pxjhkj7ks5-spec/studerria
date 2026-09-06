@@ -1,4 +1,13 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { Dispatcher, type TelegramClient } from "../src/telegram.js";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { loadConfig, type Config } from "../src/config.js";
@@ -134,6 +143,86 @@ integration(
         cookies: { obriy_session: token },
       });
     }
+
+    it("queues every test type only for the authenticated chat, even paused, with a per-user limit", async () => {
+      const token = await login();
+      const userId = await store!.sessionUser(token);
+      const sendTest = (type: string, cookie = token, extra = {}) =>
+        app!.inject({
+          method: "POST",
+          url: `${base}/api/v1/telegram/test`,
+          cookies: cookie ? { obriy_session: cookie } : {},
+          payload: { type, ...extra },
+        });
+      expect((await sendTest("HIGH", "")).statusCode).toBe(401);
+      expect((await sendTest("HIGH")).statusCode).toBe(409);
+      await app!.close();
+      app = await buildServer(
+        {
+          ...config,
+          OBRIY_TELEGRAM_MODE: "polling",
+          OBRIY_TELEGRAM_BOT_TOKEN: "synthetic-not-used",
+        },
+        store!,
+        runtime!,
+      );
+      expect((await sendTest("HIGH")).statusCode).toBe(409);
+      const pairing = await store!.pairingCode(userId!);
+      await store!.transaction((c) =>
+        store!.linkChat(c, pairing.code, "100001"),
+      );
+      await store!.pause(userId!, 60);
+      expect((await sendTest("INVALID")).statusCode).toBe(400);
+      expect(
+        (await sendTest("HIGH", token, { chatId: "another-chat" })).statusCode,
+      ).toBe(400);
+      for (const type of [
+        "CONNECTION",
+        "INFO",
+        "WATCH",
+        "WARNING",
+        "HIGH",
+        "RESOLVED",
+      ])
+        expect((await sendTest(type)).statusCode).toBe(202);
+      expect((await sendTest("HIGH")).statusCode).toBe(429);
+      const rows = (
+        await store!.pool.query(
+          "SELECT * FROM obriy.notification_outbox WHERE dedupe_key LIKE 'test:%' ORDER BY created_at",
+        )
+      ).rows;
+      expect(rows).toHaveLength(6);
+      for (const row of rows) {
+        expect(row.user_id).toBe(userId);
+        expect(row.zone_id).toBeNull();
+        expect(row.track_id).toBeNull();
+        const payload = store!.vault.decrypt<{ text: string }>(
+          row.payload_enc,
+          `outbox:${row.id}`,
+        );
+        expect(payload.text).toContain(
+          "ТЕСТОВЕ ПОВІДОМЛЕННЯ — НЕ РЕАЛЬНА ПОДІЯ",
+        );
+      }
+      const send = vi.fn(async () => {});
+      const dispatcher = new Dispatcher(
+        store!,
+        { send } as unknown as TelegramClient,
+        () => false,
+      );
+      await dispatcher.tick();
+      expect(send).toHaveBeenCalledWith(
+        "100001",
+        expect.stringContaining("ТЕСТОВЕ ПОВІДОМЛЕННЯ"),
+      );
+      expect(
+        (
+          await store!.pool.query(
+            "SELECT count(*)::int AS n FROM obriy.notification_outbox WHERE status='sent'",
+          )
+        ).rows[0].n,
+      ).toBe(1);
+    });
 
     it.each([base, `${base}/`, `${base}/index.html`])(
       "serves only the login page at %s without an authenticated session",

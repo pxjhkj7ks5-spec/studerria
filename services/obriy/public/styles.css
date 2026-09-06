@@ -2230,3 +2230,7 @@ h1 {
 .login-panel .gate-footnote { font-size:12px; }
 #profile-button { max-width:12ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 @media(max-width:700px) { .topbar .breadcrumb { display:none; } .topbar-actions { width:100%; justify-content:space-between; } }
+
+.telegram-test-button { margin-top: 10px; }
+.telegram-test-options { display: grid; gap: 10px; }
+.telegram-test-options .button { justify-content: flex-start; white-space: normal; text-align: left; }

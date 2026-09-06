@@ -297,6 +297,8 @@ function renderDelivery() {
   byId('notification-status').textContent = byId('delivery-description').textContent;
   byId('generate-link-button').textContent = linked ? 'Під’єднати інший чат' : 'Під’єднати Telegram';
   byId('generate-link-button').disabled = !configured || !state.me;
+  byId('test-telegram-button').disabled = !configured || !linked;
+  byId('test-telegram-button').title = linked ? 'Надіслати приклад у свій Telegram' : 'Спочатку під’єднайте Telegram';
   byId('pause-title').textContent = paused ? 'Сповіщення на паузі' : 'Доставка повідомлень';
   byId('pause-description').textContent = paused ? `Автоматично відновиться о ${timeFormat.format(dateValue(state.me.user.pausedUntil))}.` : 'Можна призупинити на одну годину.';
   byId('pause-button').textContent = paused ? 'Відновити' : 'Пауза на 1 год';
@@ -471,4 +473,21 @@ byId('password-form').addEventListener('submit', async event => {
   try {await request('/api/v1/auth/password',{method:'POST',body:{currentPassword,password}});byId('profile-dialog').close();toast('Пароль змінено. Інші сесії завершено.');}
   catch(error){showMessage('password-error',error.status===401?'Поточний пароль не підійшов.':error.message);}
   finally{button.disabled=false;}
+});
+
+byId('test-telegram-button').addEventListener('click', () => authenticatedAction(() => {
+  showMessage('telegram-test-error'); showMessage('telegram-test-result'); openDialog('telegram-test-dialog');
+}));
+let telegramTestSending = false;
+for (const button of document.querySelectorAll('[data-test-type]')) button.addEventListener('click', async () => {
+  if (telegramTestSending) return;
+  telegramTestSending = true;
+  const buttons = document.querySelectorAll('[data-test-type]');
+  buttons.forEach((item) => { item.disabled = true; });
+  showMessage('telegram-test-error'); showMessage('telegram-test-result', 'Додаємо тест до черги…');
+  try {
+    await request('/api/v1/telegram/test', { method: 'POST', body: { type: button.dataset.testType } });
+    showMessage('telegram-test-result', 'Тест додано до черги. Перевірте свій Telegram — доставка може зайняти кілька секунд.');
+  } catch (error) { showMessage('telegram-test-result'); showMessage('telegram-test-error', error.message); }
+  finally { telegramTestSending = false; buttons.forEach((item) => { item.disabled = false; }); }
 });

@@ -2,6 +2,8 @@ import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import staticFiles from "@fastify/static";
+import { randomUUID } from "node:crypto";
+import { telegramTestTypes, telegramTestText } from "./telegram.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -373,6 +375,54 @@ export async function buildServer(
       };
     },
   );
+  app.post(`${b}/api/v1/telegram/test`, async (req, reply) => {
+    const id = await requireUser(req);
+    const body = z
+      .object({ type: z.enum(telegramTestTypes) })
+      .strict()
+      .safeParse(req.body);
+    if (!body.success)
+      return reply
+        .code(400)
+        .send({ error: "Оберіть тип тестового повідомлення." });
+    if (
+      !config.OBRIY_TELEGRAM_BOT_TOKEN ||
+      config.OBRIY_TELEGRAM_MODE === "disabled"
+    )
+      return reply
+        .code(409)
+        .send({ error: "Telegram-бот ще не налаштований." });
+    const result = await store.transaction(async (c) => {
+      const user = await c.query(
+        "SELECT chat_enc IS NOT NULL AS linked FROM obriy.users WHERE id=$1 FOR UPDATE",
+        [id],
+      );
+      if (!user.rows[0]?.linked) return "unlinked";
+      const recent = await c.query(
+        "SELECT count(*)::int AS n FROM obriy.notification_outbox WHERE user_id=$1 AND dedupe_key LIKE 'test:%' AND created_at>now()-interval '1 minute'",
+        [id],
+      );
+      if (recent.rows[0].n >= 6) return "limited";
+      return (await store.enqueue(
+        c,
+        id,
+        telegramTestText(body.data.type),
+        `test:${randomUUID()}`,
+      ))
+        ? "queued"
+        : "unlinked";
+    });
+    if (result === "unlinked")
+      return reply
+        .code(409)
+        .send({ error: "Спочатку під’єднайте свій Telegram." });
+    if (result === "limited")
+      return reply
+        .header("Retry-After", "60")
+        .code(429)
+        .send({ error: "До 6 тестів за хвилину. Спробуйте трохи пізніше." });
+    return reply.code(202).send({ queued: true });
+  });
   app.post(`${b}/telegram/webhook`, async (req) => {
     await runtime.bot.handle(req.body);
     return { ok: true };

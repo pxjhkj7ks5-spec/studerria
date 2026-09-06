@@ -44,6 +44,32 @@ export function riskText(
     .filter(Boolean)
     .join("\n");
 }
+export const telegramTestTypes = [
+  "CONNECTION",
+  "INFO",
+  "WATCH",
+  "WARNING",
+  "HIGH",
+  "RESOLVED",
+] as const;
+export function telegramTestText(
+  type: (typeof telegramTestTypes)[number],
+): string {
+  const examples = {
+    CONNECTION:
+      "✅ Перевірка підключення\nВаш Telegram отримує повідомлення від Обрію.",
+    INFO: "ℹ️ Інформація — INFO\nПриклад інформаційного спостереження. У звичайному режимі цей рівень показується лише на сайті.",
+    WATCH:
+      "👁 Спостереження — WATCH\nПриклад події, за якою система спостерігає. У звичайному режимі цей рівень показується лише на сайті.",
+    WARNING:
+      "⚠️ Увага до обраної зони\nБпЛА: може наближатися до обраної зони.\nРівень: WARNING.",
+    HIGH: "🚨 Потенційна загроза\nРакета: може наближатися до обраної зони.\nОцінений коридор може перетнути захисну зону.\nРівень: HIGH.",
+    RESOLVED:
+      "Джерело більше не показує попереднє спостереження. Це не означає відбій тривоги.\nРівень: RESOLVED.",
+  };
+  return `🧪 ТЕСТОВЕ ПОВІДОМЛЕННЯ — НЕ РЕАЛЬНА ПОДІЯ\n\n${examples[type]}\n\nЦе вигаданий приклад для перевірки доставки.\n${DISCLAIMER}`;
+}
+
 export class TelegramError extends Error {
   constructor(
     readonly code: string,
