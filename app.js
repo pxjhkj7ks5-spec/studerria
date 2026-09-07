@@ -19977,7 +19977,7 @@ async function saveTelegramMiniSubjectChoices(req, userId) {
   const normalizedUserId = Number(userId || 0);
   const userRow = await db.get(
     `
-      SELECT id, course_id, admission_id, study_context_id, study_program_id, study_track, group_id
+      SELECT id, course_id, admission_id, study_context_id, study_program_id, study_track, group_id, show_full_schedule
       FROM users
       WHERE id = ?
     `,
@@ -20047,6 +20047,10 @@ async function saveTelegramMiniSubjectChoices(req, userId) {
   if (hasMissingRequired) {
     throw new Error('missing_group');
   }
+  await db.run(
+    'UPDATE users SET show_full_schedule = ? WHERE id = ?',
+    [String(req.body.show_full_schedule || '').trim() === '1', normalizedUserId]
+  );
 }
 
 function normalizeTelegramMiniAllowedCourseIds(scopeState = {}) {
@@ -21404,7 +21408,9 @@ function buildStuderriaTelegramScheduleRowLine(row = {}, displayBellSchedule = b
   const lessonType = getStuderriaTelegramLessonTypeLabel(row.lesson_type || row.activity_type);
   const groupLabel = normalizeStuderriaTelegramScheduleGroupLabel(row);
   const roomLabel = sanitizeCompactText(row.room_label || row.room_name || row.room_code || '', 60);
-  const meta = [lessonType, groupLabel, roomLabel].filter(Boolean).join(' · ');
+  const deliveryMode = String(row.delivery_mode || '').toLowerCase();
+  const deliveryLabel = deliveryMode === 'online' ? 'Онлайн' : (deliveryMode === 'mixed' ? 'Змішано' : (deliveryMode === 'offline' ? 'Офлайн' : ''));
+  const meta = [lessonType, groupLabel, deliveryLabel, roomLabel].filter(Boolean).join(' · ');
   const head = `${classNumber || '-'}. ${timeLabel ? `${timeLabel} · ` : ''}${subjectName}`;
   return meta ? `${head}\n   ${meta}` : head;
 }
@@ -22009,6 +22015,7 @@ async function findStuderriaTelegramUserByActor(telegramUser = {}) {
         u.group_id,
         u.telegram_id,
         u.telegram_username,
+        u.show_full_schedule,
         COALESCE(v2_group.legacy_course_id, u.course_id) AS schedule_course_id,
         v2_group.id AS academic_group_id,
         v2_group.label AS academic_group_label
@@ -27604,7 +27611,8 @@ app.get('/register/subjects', async (req, res) => {
           study_context_id,
           study_program_id,
           study_track,
-          group_id
+          group_id,
+          show_full_schedule
         FROM users
         WHERE id = ?
       `,
@@ -27822,6 +27830,11 @@ app.post('/register/subjects', registerLimiter, async (req, res) => {
     if (hasMissingRequired) {
       return res.redirect('/register/subjects?error=missing-group');
     }
+
+    await db.run(
+      'UPDATE users SET show_full_schedule = ? WHERE id = ?',
+      [String(req.body.show_full_schedule || '').trim() === '1', userId]
+    );
 
     const user = await db.get(
       'SELECT id, full_name, role, schedule_group, course_id, group_id, language FROM users WHERE id = ?',
@@ -35827,8 +35840,8 @@ app.get('/schedule', requireLogin, async (req, res) => {
             scheduleState && scheduleState.term ? scheduleState.term.start_date : null
           ),
           use_local_time: useLocalTime,
-          room_id: null,
-          room_label: '',
+          room_id: parsePositiveIntStrict(row.room_id),
+          room_label: sanitizeCompactText(row.room_label || row.room_name || row.room_code || '', 80),
         };
         if (scheduleByDay[normalizedRow.day_of_week]) {
           scheduleByDay[normalizedRow.day_of_week].push(normalizedRow);
@@ -51583,6 +51596,15 @@ app.post('/admin/pathways/v2/schedule/save', requirePathwaysSectionAccess, write
       termId: Number(result && result.row && result.row.term_id) || focus.termId,
     }),
     logContext: 'admin.pathways.v2.schedule.save',
+  })
+));
+
+app.post('/admin/pathways/v2/schedule/day-formats', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
+  handleAcademicV2MutationRoute(req, res, {
+    run: () => academicV2Helpers.saveGroupDayFormats(getAcademicV2Store(), req.body),
+    successMessage: 'Формат навчання за днями збережено.',
+    extraParamsBuilder: () => ({ workspace_tab: 'schedule' }),
+    logContext: 'admin.pathways.v2.schedule.day-formats',
   })
 ));
 

@@ -57,6 +57,7 @@
             <p>
               <% if (item.lesson_type) { %><span><%= item.lesson_type %></span><% } %>
               <% if (item.group_number) { %><span>Group <%= item.group_number %></span><% } %>
+              <% if (item.delivery_mode) { %><span><%= item.delivery_mode === 'online' ? 'Онлайн' : (item.delivery_mode === 'mixed' ? 'Змішано' : 'Офлайн') %></span><% } %>
               <% if (item.room_label) { %><span><%= item.room_label %></span><% } %>
             </p>
             <div class="tg-lesson-actions">
@@ -71,7 +72,7 @@
                   Подивитись ДЗ <span><%= homeworkItems.length %></span>
                 </button>
               <% } %>
-              <button
+              <% if (item.compat_homework_enabled !== false) { %><button
                 class="tg-inline-action"
                 type="button"
                 data-tg-homework-open
@@ -85,7 +86,7 @@
                 data-subject-name="<%= item.subject_name || 'Предмет' %>"
               >
                 Додати ДЗ
-              </button>
+              </button><% } %>
             </div>
           </div>
         </div>

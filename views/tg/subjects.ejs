@@ -36,6 +36,13 @@
     <p class="tg-inline-note" data-tg-subject-remaining><%= pendingSubjectsCount ? ('Залишилось обрати: ' + pendingSubjectsCount) : 'Усе готово.' %></p>
   <% } %>
   <form class="tg-form" method="POST" action="/studerria-tg/subjects" data-tg-subject-picker>
+    <label class="tg-disclosure">
+      <span>
+        <strong>Показати весь розклад</strong>
+        <small>Усі предмети й усі групи. За замовчуванням вимкнено.</small>
+      </span>
+      <input type="checkbox" name="show_full_schedule" value="1" <%= subjectState && subjectState.user && subjectState.user.show_full_schedule ? 'checked' : '' %> />
+    </label>
     <%- include('subject-picker', { registerSubjectCards: subjectCards }) %>
     <button class="tg-primary" type="submit">Зберегти</button>
   </form>

@@ -166,6 +166,17 @@
   const toAttr = (value) => JSON.stringify(value || {}).replace(/'/g, '&#39;');
   const campusLabelByKey = new Map(campusOptions.map((campus) => [campus.value, campus.label]));
   const allGroupsList = Array.isArray(groups) ? groups : [];
+  const groupDayFormatsList = Array.isArray(groupDayFormats) ? groupDayFormats : [];
+  const dayFormatByKey = new Map(groupDayFormatsList.map((item) => [`${Number(item.group_id || 0)}|${item.day_of_week}`, item.delivery_mode]));
+  const dayFormatLabels = new Map([
+    ['Monday', 'Понеділок'], ['Tuesday', 'Вівторок'], ['Wednesday', 'Середа'],
+    ['Thursday', 'Четвер'], ['Friday', 'Пʼятниця'], ['Saturday', 'Субота'], ['Sunday', 'Неділя'],
+  ]);
+  const formatMatrixGroups = allGroupsList
+    .filter((group) => !activeProgramId || Number(group.program_id || 0) === activeProgramId)
+    .filter((group) => group.is_active !== false && Number(group.is_active) !== 0)
+    .sort((left, right) => Number(left.stage_number || 0) - Number(right.stage_number || 0)
+      || String(left.campus_key || '').localeCompare(String(right.campus_key || '')));
   const allTermsList = Array.isArray(terms) ? terms : [];
   const allGroupSubjectsList = Array.isArray(groupSubjects) ? groupSubjects : [];
   const sharedGroupSubjectLinksList = Array.isArray(sharedGroupSubjectLinks) ? sharedGroupSubjectLinks : [];
@@ -2760,6 +2771,40 @@
                   <a class="academic-v2-chip" href="<%= buildScheduleListHref() %>">Усі слоти окремо</a>
                 </div>
               </div>
+              <% if (formatMatrixGroups.length) { %>
+                <form method="post" action="/admin/pathways/v2/schedule/day-formats" class="academic-v2-subcard mb-3">
+                  <%- renderFocusFields() %>
+                  <div class="academic-v2-section-head academic-v2-section-head--tight">
+                    <div>
+                      <div class="academic-v2-subcard-topline">Формат навчання</div>
+                      <h3 class="h6 mb-1">Дні × курси</h3>
+                      <div class="academic-v2-muted">Познач, які дні проходять офлайн, онлайн або змішано. Позначка зʼявиться в mini app і повідомленнях бота.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Зберегти формати</button>
+                  </div>
+                  <div class="academic-v2-table-wrap mt-3">
+                    <table class="table academic-v2-table align-middle">
+                      <thead><tr><th>День</th><% formatMatrixGroups.forEach((group) => { %><th><%= group.label || (`Курс ${group.stage_number || ''}`) %></th><% }); %></tr></thead>
+                      <tbody>
+                        <% dayOptions.forEach((dayName) => { %>
+                          <tr>
+                            <th><%= dayFormatLabels.get(dayName) || dayName %></th>
+                            <% formatMatrixGroups.forEach((group) => { const currentMode = dayFormatByKey.get(`${Number(group.id || 0)}|${dayName}`) || 'offline'; %>
+                              <td>
+                                <select class="form-select form-select-sm" name="mode_<%= group.id %>_<%= dayName %>">
+                                  <option value="offline" <%= currentMode === 'offline' ? 'selected' : '' %>>Офлайн</option>
+                                  <option value="online" <%= currentMode === 'online' ? 'selected' : '' %>>Онлайн</option>
+                                  <option value="mixed" <%= currentMode === 'mixed' ? 'selected' : '' %>>Змішано</option>
+                                </select>
+                              </td>
+                            <% }); %>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                </form>
+              <% } %>
               <% if (selectedGroup) { %>
                 <div class="academic-v2-stack">
                   <form method="post" action="/admin/pathways/v2/schedule/import" class="academic-v2-subcard academic-v2-import-card">

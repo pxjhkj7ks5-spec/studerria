@@ -384,6 +384,13 @@
               <% } %>
 
               <form method="POST" action="/register/subjects" id="registerGroupsForm" data-reg-groups-form novalidate>
+                <label class="reg-groups-row reg-groups-row--schedule-scope">
+                  <span class="reg-groups-row__title-stack">
+                    <strong><%= lang === 'en' ? 'Show the full schedule' : 'Показати весь розклад' %></strong>
+                    <small><%= lang === 'en' ? 'All subjects and all groups. Off by default.' : 'Усі предмети й усі групи. За замовчуванням вимкнено.' %></small>
+                  </span>
+                  <input type="checkbox" name="show_full_schedule" value="1" <%= subjectState && subjectState.user && subjectState.user.show_full_schedule ? 'checked' : '' %> />
+                </label>
                 <% subjectCards.forEach(function(subject) { %>
                   <% if (subject.autoAssigned) { %>
                     <input type="hidden" name="subject_<%= subject.id %>" value="<%= subject.selectedGroup || 1 %>" />

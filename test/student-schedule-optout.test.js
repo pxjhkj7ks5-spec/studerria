@@ -66,4 +66,18 @@ for (const trackKey of ['bachelor', 'master']) {
     optoutsByUser.delete(user.id);
     assert.deepEqual(ids(await load()), [1, 3, 4, 5]);
   });
+
+  test(`${trackKey}: full schedule includes every visible subject and subgroup with room and day format`, async () => {
+    const { store, optoutsByUser } = createStore(trackKey);
+    optoutsByUser.set(1, [102]);
+    const state = await loadStudentScheduleData(store, {
+      id: 1,
+      group_id: 1,
+      course_id: 110,
+      show_full_schedule: true,
+    }, { weekNumber: 1, debug: true });
+    assert.deepEqual(state.scheduleRows.map((row) => row.schedule_entry_id), [1, 2, 3, 4, 5]);
+    assert.ok(state.debug.row_decisions.every((row) => row.included && row.reason_code === 'included_full_schedule'));
+    assert.ok(state.scheduleRows.every((row) => row.show_full_schedule === true));
+  });
 }

@@ -5,7 +5,7 @@ const academic = require('../lib/academicV2');
 const migration = require('../migrations/066_pled_year2_first_term_catalog');
 
 const scheduleTitles = [
-  'Академічна іноземна мова', 'Мікроекономіка', 'Політичні системи сучасності. Політична компаративістика',
+  'Іноземна мова (за професійним спрямуванням)', 'Мікроекономіка', 'Політичні системи сучасності. Політична компаративістика',
   'Соціологія', 'Міжнародні економічні відносини', 'Історія європейської цивілізації. Культурна спадщина Європи',
   'Політична психологія та нейромаркетинг', 'Іспанська мова', 'Німецька мова',
 ];
@@ -16,7 +16,7 @@ test('year 2 first-term defaults contain exactly the PDF subjects plus optional 
   const entries = targetEntries();
   assert.deepEqual(entries.map((e) => e.display_title).sort(), [...scheduleTitles, militaryTitle].sort());
   assert.equal(entries.find((e) => e.source_code === '2.2.2.').default_flags.is_required, false);
-  for (const name of ['Академічна іноземна мова', 'Іспанська мова']) {
+  for (const name of ['Іноземна мова (за професійним спрямуванням)', 'Іспанська мова']) {
     assert.equal(entries.find((e) => e.display_title === name).default_activity_preset, 'seminar_only');
   }
   const expected = [[3, true], [2, true], [2, true], [2, true], [2, true], [1, false], [1, false], [2, false], [1, false], [1, false]];
@@ -24,9 +24,9 @@ test('year 2 first-term defaults contain exactly the PDF subjects plus optional 
     const entry = entries.find((e) => e.display_title === title);
     assert.deepEqual([entry.default_group_count, entry.default_flags.is_required], expected[index]);
   });
-  const academicLanguage = listBachelorCatalogEntries().filter((e) => e.template_name === scheduleTitles[0]);
-  assert.equal(academicLanguage.length, 2);
-  assert.deepEqual(academicLanguage.find((e) => e.suggested_stage_number === 1).suggested_term_numbers, [1, 2]);
+  const professionalLanguage = entries.find((e) => e.source_code === '1.1.16.');
+  assert.equal(professionalLanguage.default_group_count, 3);
+  assert.equal(professionalLanguage.default_activity_preset, 'seminar_only');
   for (const code of ['1.1.16.', '1.1.20.', '2.2.1.1.', '2.2.1.2.', '2.2.2.']) {
     assert.ok(listBachelorCatalogEntries().find((e) => e.source_code === code).suggested_term_numbers.includes(2));
   }

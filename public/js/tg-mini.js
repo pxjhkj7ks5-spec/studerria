@@ -340,6 +340,15 @@
       form.dataset.tgSubjectPickerBound = '1';
       form.addEventListener('change', (event) => {
         if (!event.target || !event.target.matches('input[type="radio"], input[type="checkbox"]')) return;
+        const card = event.target.closest('[data-tg-subject-card]');
+        if (card && event.target.matches('input[type="checkbox"][name^="optout_"]') && event.target.checked) {
+          card.querySelectorAll('input[type="radio"][name^="subject_"]').forEach((radio) => {
+            radio.checked = false;
+          });
+        } else if (card && event.target.matches('input[type="radio"][name^="subject_"]')) {
+          const optout = card.querySelector('input[type="checkbox"][name^="optout_"]');
+          if (optout) optout.checked = false;
+        }
         updateSubjectPickerState(form);
       });
       updateSubjectPickerState(form);

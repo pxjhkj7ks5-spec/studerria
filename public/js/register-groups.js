@@ -341,6 +341,7 @@
       optoutButton.addEventListener('click', () => {
         setOptedOut(row, true);
         setSelectedGroup(row, null);
+        getButtons(row).forEach((button) => button.blur());
         updateUI();
       });
     }

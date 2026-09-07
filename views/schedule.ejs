@@ -2378,6 +2378,7 @@
                           : ''; %>
                   <% const sessionCardClass = sessionKind ? `has-session session-${sessionKind}` : ''; %>
                   <% const groupLabel = cls.group_label ? cls.group_label : `${t('schedule.group.single')} ${cls.group_number}`; %>
+                  <% const deliveryLabel = cls.delivery_mode === 'online' ? 'Онлайн' : (cls.delivery_mode === 'mixed' ? 'Змішано' : (cls.delivery_mode === 'offline' ? 'Офлайн' : '')); %>
                     <% const attendanceStorageSubjectId = Number(cls.legacy_subject_id || cls.subject_id || 0); %>
                     <% const attendanceCourseId = Number(cls.course_id || cls.owner_course_id || 0); %>
                     <% const attendanceSlotKey = (attendanceStorageSubjectId > 0 && attendanceCourseId > 0 && cls.class_date && Number(cls.class_number || 0) > 0)
@@ -2389,7 +2390,7 @@
                     <% const next = idx < dayEntries.length - 1 ? dayEntries[idx + 1] : null; %>
                     <% const chainPrev = prev && prev.subject_id === cls.subject_id && cls.class_number === prev.class_number + 1; %>
                     <% const chainNext = next && next.subject_id === cls.subject_id && next.class_number === cls.class_number + 1; %>
-                    <% const tooltipParts = [subjectName, groupLabel, `${scheduleViewText.classLabel} ${cls.class_number}`, timeLabel]; %>
+                    <% const tooltipParts = [subjectName, groupLabel, `${scheduleViewText.classLabel} ${cls.class_number}`, timeLabel, deliveryLabel, cls.room_label || ''].filter(Boolean); %>
                     <% if (sessionChipText) { tooltipParts.push(sessionChipText); } %>
                     <% if (showTypeBadge) { tooltipParts.push(typeLabel); } %>
                     <div
@@ -2430,7 +2431,7 @@
                             <span class="lesson-pill"><%= typeLabel %></span>
                           <% } %>
                         </div>
-                        <div class="schedule-meta classMeta"><%= groupLabel %> · <%= scheduleViewText.classLabel %> <%= cls.class_number %></div>
+                        <div class="schedule-meta classMeta"><%= [groupLabel, `${scheduleViewText.classLabel} ${cls.class_number}`, deliveryLabel, cls.room_label || ''].filter(Boolean).join(' · ') %></div>
                       </div>
                       <div class="schedule-aside">
                         <div class="schedule-time classTime"><%= timeLabel %></div>
