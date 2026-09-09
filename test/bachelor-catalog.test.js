@@ -424,8 +424,8 @@ test('bachelor catalog source registry exposes the expected seed size', () => {
   const source = sources.find((item) => item.key === DEFAULT_BACHELOR_CATALOG_SOURCE_KEY);
 
   assert.ok(source);
-  assert.equal(source.entry_count, 81);
-  assert.equal(listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY).length, 81);
+  assert.equal(source.entry_count, 84);
+  assert.equal(listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY).length, 84);
   const sociology = listBachelorCatalogEntries(DEFAULT_BACHELOR_CATALOG_SOURCE_KEY)
     .find((item) => item.template_name === 'Соціологія');
   assert.ok(sociology);
@@ -446,7 +446,7 @@ test('bachelor catalog keeps third-semester placements alongside approved timeta
 
   assert.ok(secondForeignLanguage);
   assert.equal(secondForeignLanguage.suggested_stage_number, 3);
-  assert.deepEqual(secondForeignLanguage.suggested_term_numbers, [1, 3]);
+  assert.deepEqual(secondForeignLanguage.suggested_term_numbers, [3]);
 
   assert.ok(finalExam);
   assert.equal(finalExam.suggested_stage_number, 4);

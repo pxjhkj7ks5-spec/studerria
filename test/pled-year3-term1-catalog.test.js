@@ -13,7 +13,8 @@ const expected = new Map([
   ['Саморозвиток Лідера та Практики командотворення', [2, true]],
   ['Міжнародне публічне право. Міжнародне економічне право, англійською', [2, true]],
   ['Інституції ЄС і ухвалення політичних рішень', [1, false]],
-  ['Друга іноземна мова', [3, false]],
+  ['Іспанська мова', [2, false]],
+  ['Німецька мова', [1, false]],
   ['Стратегічні комунікації і GR', [2, true]],
 ]);
 
@@ -30,7 +31,8 @@ test('year 3 first-term catalog matches the corrected curator configuration', ()
       expected.get(entry.display_title)
     );
   }
-  assert.equal(entries.find((entry) => entry.source_code === '2.2.1.').default_activity_preset, 'seminar_only');
+  assert.equal(entries.find((entry) => entry.source_code === 'schedule.2026.year3.spanish').default_activity_preset, 'seminar_only');
+  assert.equal(entries.find((entry) => entry.source_code === 'schedule.2026.year3.german').default_activity_preset, 'seminar_only');
   for (const sourceCode of ['1.1.28.', '2.1.1.3.', '2.1.4.3.', '2.2.8.']) {
     assert.ok(!entries.some((entry) => entry.source_code === sourceCode));
   }
@@ -43,7 +45,7 @@ test('year 3 schedule text resolves against the corrected catalog and separates 
   );
   const parsed = parseScheduleImportText(scheduleText);
   assert.equal(parsed.errors.length, 0);
-  assert.equal(parsed.entries.length, 24);
+  assert.equal(parsed.entries.length, 26);
   const index = indexScheduleSubjects(
     targetEntries().map((entry, indexValue) => ({ ...entry, id: indexValue + 1 })),
     ['display_title', 'template_name']
@@ -51,8 +53,10 @@ test('year 3 schedule text resolves against the corrected catalog and separates 
   for (const row of parsed.entries) {
     assert.equal(index.get(normalizeScheduleSubjectName(row.subject)).length, 1);
   }
-  const languageRows = parsed.entries.filter((row) => row.subject === 'Друга іноземна мова');
-  assert.deepEqual(languageRows.map((row) => row.targetGroupNumbers), [[1, 3], [1, 3], [2], [2]]);
+  const spanishRows = parsed.entries.filter((row) => row.subject === 'Іспанська мова');
+  const germanRows = parsed.entries.filter((row) => row.subject === 'Німецька мова');
+  assert.deepEqual(spanishRows.map((row) => row.targetGroupNumbers), [[1], [1], [2], [2]]);
+  assert.deepEqual(germanRows.map((row) => row.targetGroupNumbers), [[1], [1]]);
 });
 
 test('year 3 catalog reconciliation requires a transaction', async () => {
