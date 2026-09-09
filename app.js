@@ -53,6 +53,12 @@ const {
   parseStuderriaTelegramGreetingCommand,
 } = require('./lib/studerriaTelegramGreeting');
 const {
+  createStuderriaTelegramDevAutoReplyStore,
+  isStuderriaTelegramGroupChat,
+  parseStuderriaTelegramDevAutoReplyArgs,
+  shouldSendStuderriaTelegramDevAutoReply,
+} = require('./lib/studerriaTelegramDevAutoReply');
+const {
   createStuderriaTelegramActionToken,
   getStuderriaTelegramActionPayload,
   consumeStuderriaTelegramActionPayload,
@@ -1714,6 +1720,7 @@ const db = {
     };
   },
 };
+const studerriaTelegramDevAutoReplyStore = createStuderriaTelegramDevAutoReplyStore(db);
 
 const txRun = async (client, sql, params = []) => {
   const result = await client.query(convertPlaceholders(sql), params);
@@ -20434,6 +20441,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'chatid', description: 'Dev: показати ID чату' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
   { command: 'devschedule', description: 'Dev: розклад на завтра в канал' },
+  { command: 'devreply', description: 'Dev: автовідповідь на повідомлення юзера' },
   { command: 'addrole', description: 'Dev: видати роль' },
   { command: 'giverole', description: 'Dev: видати роль' },
   { command: 'give', description: 'Dev: видати роль' },
@@ -21058,6 +21066,8 @@ async function sendStuderriaTelegramHelp(message = {}) {
     `${devUsersCommand} - список привʼязаних Telegram-користувачів. Тільки dev, тільки в особистому чаті.`,
     '/devschedule — надіслати розклад на завтра в налаштований канал. Тільки dev в особистому чаті.',
     '/devschedule preview — приватний перегляд без публікації в канал.',
+    '/devreply set @username Фраза — відповідати цією фразою на кожне повідомлення користувача в групах.',
+    '/devreply on | off | status | clear — керування dev-автовідповіддю.',
     '/addrole starosta @username - видати роль starosta.',
     '/addrole starosta 123456789 - видати роль по Telegram ID.',
     '/deleterole starosta @username - забрати роль starosta.',
@@ -22878,6 +22888,111 @@ async function resolveStuderriaTelegramRoleTarget(rawTarget = '') {
     `,
     [username]
   );
+}
+
+function formatStuderriaTelegramDevAutoReplyRule(rule = null) {
+  if (!rule) {
+    return 'Автовідповідь ще не налаштована.';
+  }
+  const target = rule.targetUsername
+    ? `@${rule.targetUsername}`
+    : `Telegram ID ${rule.targetTelegramId}`;
+  return [
+    `Автовідповідь: ${rule.enabled ? 'увімкнена' : 'вимкнена'}`,
+    `Користувач: ${target}`,
+    `Фраза: ${rule.replyText}`,
+    '',
+    'Працює для повідомлень цього користувача в усіх групах, де бот бачить повідомлення.',
+  ].join('\n');
+}
+
+async function handleStuderriaTelegramDevAutoReplyCommand(message = {}, parsedCommand = {}) {
+  if (!parsedCommand || parsedCommand.command !== 'devreply') return false;
+  const chat = message && message.chat ? message.chat : null;
+  const chatId = chat && chat.id ? chat.id : null;
+  if (!chatId) return true;
+  if (!isStuderriaTelegramDevUser(message.from || {})) {
+    await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
+    return true;
+  }
+  if (!isStuderriaTelegramPrivateChat(chat)) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Це dev-команда. Налаштуй її в приватному чаті з ботом.',
+      { sourceMessage: message }
+    );
+    return true;
+  }
+  const action = parseStuderriaTelegramDevAutoReplyArgs(parsedCommand.args);
+  if (!action) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      [
+        'Формат:',
+        '/devreply set @username Фраза відповіді',
+        '/devreply set 123456789 Фраза відповіді',
+        '/devreply on — увімкнути',
+        '/devreply off — вимкнути',
+        '/devreply status — показати налаштування',
+        '/devreply clear — видалити налаштування',
+      ].join('\n'),
+      { sourceMessage: message }
+    );
+    return true;
+  }
+  await ensureDbReady();
+  const actorTelegramId = normalizeTelegramId(message.from && message.from.id);
+  if (action.action === 'set') {
+    let targetTelegramId = action.targetTelegramId;
+    let targetUsername = action.targetUsername;
+    if (targetUsername) {
+      const linkedUser = await db.get(
+        `SELECT telegram_id, telegram_username FROM users WHERE LOWER(COALESCE(telegram_username, '')) = ? LIMIT 1`,
+        [targetUsername]
+      );
+      if (linkedUser) {
+        targetTelegramId = normalizeTelegramId(linkedUser.telegram_id) || '';
+        targetUsername = normalizeStuderriaTelegramUsername(linkedUser.telegram_username) || targetUsername;
+      }
+    }
+    const rule = await studerriaTelegramDevAutoReplyStore.setRule({
+      targetTelegramId,
+      targetUsername,
+      replyText: action.replyText,
+    }, actorTelegramId);
+    await sendStuderriaTelegramMessage(chatId, `Готово.\n\n${formatStuderriaTelegramDevAutoReplyRule(rule)}`, { sourceMessage: message });
+    return true;
+  }
+  if (action.action === 'clear') {
+    await studerriaTelegramDevAutoReplyStore.clear();
+    await sendStuderriaTelegramMessage(chatId, 'Автовідповідь видалено.', { sourceMessage: message });
+    return true;
+  }
+  if (action.action === 'on' || action.action === 'off') {
+    const rule = await studerriaTelegramDevAutoReplyStore.setEnabled(action.action === 'on', actorTelegramId);
+    if (!rule) {
+      await sendStuderriaTelegramMessage(
+        chatId,
+        'Спочатку задай користувача і фразу: /devreply set @username Фраза відповіді',
+        { sourceMessage: message }
+      );
+      return true;
+    }
+    await sendStuderriaTelegramMessage(chatId, formatStuderriaTelegramDevAutoReplyRule(rule), { sourceMessage: message });
+    return true;
+  }
+  const rule = await studerriaTelegramDevAutoReplyStore.getRule();
+  await sendStuderriaTelegramMessage(chatId, formatStuderriaTelegramDevAutoReplyRule(rule), { sourceMessage: message });
+  return true;
+}
+
+async function handleStuderriaTelegramDevAutoReplyMessage(message = {}) {
+  if (!message || !isStuderriaTelegramGroupChat(message.chat) || !message.from || message.from.is_bot) return false;
+  await ensureDbReady();
+  const rule = await studerriaTelegramDevAutoReplyStore.getRule();
+  if (!shouldSendStuderriaTelegramDevAutoReply(message, rule)) return false;
+  await sendStuderriaTelegramMessage(message.chat.id, rule.replyText, { sourceMessage: message });
+  return true;
 }
 
 function formatStuderriaTelegramDevUserRow(row = {}, index = 0) {
@@ -25588,6 +25703,12 @@ async function handleStuderriaTelegramBotUpdate(update) {
     }
     if ((parsedCommand && parsedCommand.command === 'chatid') || isStuderriaTelegramChatIdTextRequest(message)) {
       await handleStuderriaTelegramChatIdCommand(message);
+      return;
+    }
+    if (await handleStuderriaTelegramDevAutoReplyCommand(message, parsedCommand)) {
+      return;
+    }
+    if (await handleStuderriaTelegramDevAutoReplyMessage(message)) {
       return;
     }
     if (await handleStuderriaTelegramDevGreetingCommand(message)) {
