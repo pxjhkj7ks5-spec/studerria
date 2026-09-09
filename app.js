@@ -13223,7 +13223,7 @@ function parseAcademicV2UiRestoreParams(source = {}) {
   const structureTab = sanitizeCompactText(payload.structure_tab || payload.structureTab, 40);
   const diagnosticsTab = sanitizeCompactText(payload.diagnostics_tab || payload.diagnosticsTab, 40);
   return {
-    ...(['cohorts', 'subjects', 'schedule', 'catalog'].includes(section) ? { section } : {}),
+    ...(['cohorts', 'subjects', 'schedule', 'formats', 'catalog'].includes(section) ? { section } : {}),
     ...(workspaceTab ? { workspace_tab: workspaceTab } : {}),
     ...(structureTab ? { structure_tab: structureTab } : {}),
     ...(diagnosticsTab ? { diagnostics_tab: diagnosticsTab } : {}),
@@ -51734,7 +51734,10 @@ app.post('/admin/pathways/v2/schedule/day-formats', requirePathwaysSectionAccess
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.saveGroupDayFormats(getAcademicV2Store(), req.body),
     successMessage: 'Формат навчання за днями збережено.',
-    extraParamsBuilder: () => ({ workspace_tab: 'schedule' }),
+    extraParamsBuilder: () => ({
+      section: String(req.body && req.body.section || '') === 'formats' ? 'formats' : 'schedule',
+      workspace_tab: 'schedule',
+    }),
     logContext: 'admin.pathways.v2.schedule.day-formats',
   })
 ));
@@ -51742,7 +51745,7 @@ app.post('/admin/pathways/v2/schedule/day-formats', requirePathwaysSectionAccess
 app.post('/admin/academic/cohorts/create', requirePathwaysSectionAccess, writeLimiter, async (req, res) => (
   handleAcademicV2MutationRoute(req, res, {
     run: () => academicV2Helpers.createCohortIntake(getAcademicV2Store(), req.body),
-    successMessageKey: 'intakeCreated',
+    successMessage: 'Набір підготовлено й додано до списку.',
     focusBuilder: (result, focus) => ({
       ...focus,
       programId: Number(result && result.programId) || focus.programId,

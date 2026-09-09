@@ -308,8 +308,27 @@ test('simplified academic admin renders direct sections and compact cohort contr
   assert.match(html, /Семестр для всіх/);
   assert.match(html, /Новий набір/);
   assert.match(html, /\/admin\/academic\/cohorts\/create/);
+  assert.match(html, /Формат навчання/);
   assert.doesNotMatch(html, />\s*Pathways\s*</i);
   assert.doesNotMatch(html, /workspace-tab|diagnostics-tab/i);
+
+  const formatsHtml = await renderView('admin-academic.ejs', baseRenderLocals({
+    ...fallback,
+    requestedSection: 'formats',
+    error: '',
+    success: '',
+    warning: '',
+    programs: [{ id: 1, name: 'ПЛЕД', track_key: 'bachelor', is_active: true }],
+    selectedProgram: { id: 1, name: 'ПЛЕД', track_key: 'bachelor', is_active: true },
+    cohorts: [{ id: 10, program_id: 1, admission_year: 2026, current_stage_number: 1, is_active: true }],
+    groups: [{ id: 20, cohort_id: 10, program_id: 1, admission_year: 2026, stage_number: 1, campus_key: 'kyiv', is_active: true }],
+    groupDayFormats: [{ group_id: 20, day_of_week: 'Tuesday', delivery_mode: 'online' }],
+    focus: { programId: 1, cohortId: 10, groupId: 20, termId: 30 },
+  }));
+  assert.match(formatsHtml, /Дні × набори/);
+  assert.match(formatsHtml, /mode_20_Tuesday/);
+  assert.match(formatsHtml, /value="online" selected>Онлайн/);
+  assert.match(formatsHtml, /name="section" value="formats"/);
 });
 
 test('teacher workspace renders context-first filter surface', async () => {

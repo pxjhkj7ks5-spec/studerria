@@ -1,6 +1,6 @@
 <%
   const n = (value) => Number(value || 0) || 0;
-  const allowedSections = ['cohorts', 'subjects', 'schedule', 'catalog'];
+  const allowedSections = ['cohorts', 'subjects', 'schedule', 'formats', 'catalog'];
   const activeSection = allowedSections.includes(String(requestedSection || '')) ? String(requestedSection) : 'cohorts';
   const programList = Array.isArray(programs) ? programs : [];
   const cohortList = Array.isArray(cohorts) ? cohorts : [];
@@ -39,6 +39,9 @@
   const visibleSchedule = scheduleList.filter((item) => (
     n(item.group_id) === activeGroupId && (!activeTermId || n(item.term_id) === activeTermId)
   ));
+  const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const dayFormatLabels = { Monday: 'Понеділок', Tuesday: 'Вівторок', Wednesday: 'Середа', Thursday: 'Четвер', Friday: 'Пʼятниця', Saturday: 'Субота', Sunday: 'Неділя' };
+  const dayFormatByKey = new Map((Array.isArray(groupDayFormats) ? groupDayFormats : []).map((item) => [`${n(item.group_id)}|${item.day_of_week}`, item.delivery_mode]));
   const compactIdentity = (group) => {
     const year = String(n(group && group.admission_year) || '').slice(-2).padStart(2, '0');
     const munich = String(group && group.campus_key || '') === 'munich';
@@ -85,6 +88,7 @@
         <a class="academic-sidebar-link <%= activeSection === 'cohorts' ? 'is-active' : '' %>" href="/admin/academic?section=cohorts">Набори й курси</a>
         <a class="academic-sidebar-link <%= activeSection === 'subjects' ? 'is-active' : '' %>" href="/admin/academic?section=subjects<%= activeGroupId ? `&group_id=${activeGroupId}` : '' %>">Предмети</a>
         <a class="academic-sidebar-link <%= activeSection === 'schedule' ? 'is-active' : '' %>" href="/admin/academic?section=schedule<%= activeGroupId ? `&group_id=${activeGroupId}` : '' %>">Розклад</a>
+        <a class="academic-sidebar-link <%= activeSection === 'formats' ? 'is-active' : '' %>" href="/admin/academic?section=formats<%= activeProgramId ? `&program_id=${activeProgramId}` : '' %>">Формат навчання</a>
         <a class="academic-sidebar-link <%= activeSection === 'catalog' ? 'is-active' : '' %>" href="/admin/academic?section=catalog">Бакалаврський каталог</a>
       </aside>
 
@@ -92,8 +96,8 @@
         <div class="academic-heading">
           <div>
             <p class="academic-eyebrow"><%= activeProgram ? activeProgram.name : 'Навчальна програма' %></p>
-            <h1><%= activeSection === 'cohorts' ? 'Набори й курси' : activeSection === 'subjects' ? 'Предмети' : activeSection === 'schedule' ? 'Розклад' : 'Бакалаврський каталог' %></h1>
-            <p><%= activeSection === 'cohorts' ? 'Один рядок — один активний набір. Тут змінюється семестр і виконується перехід на наступний курс.' : activeSection === 'subjects' ? 'Предмети обраного набору без вкладених рівнів і технічних сутностей.' : activeSection === 'schedule' ? 'Вставте підготовлений текст — розклад одразу потрапить на сайт і в Telegram-бота.' : 'Єдине джерело предметів для всіх курсів бакалаврату.' %></p>
+            <h1><%= activeSection === 'cohorts' ? 'Набори й курси' : activeSection === 'subjects' ? 'Предмети' : activeSection === 'schedule' ? 'Розклад' : activeSection === 'formats' ? 'Формат навчання' : 'Бакалаврський каталог' %></h1>
+            <p><%= activeSection === 'cohorts' ? 'Один рядок — один активний набір. Тут змінюється семестр і виконується перехід на наступний курс.' : activeSection === 'subjects' ? 'Предмети обраного набору без вкладених рівнів і технічних сутностей.' : activeSection === 'schedule' ? 'Вставте підготовлений текст — розклад одразу потрапить на сайт і в Telegram-бота.' : activeSection === 'formats' ? 'Позначте для кожного набору, які дні проходять офлайн, онлайн або у змішаному форматі.' : 'Єдине джерело предметів для всіх курсів бакалаврату.' %></p>
           </div>
           <% if (programList.length > 1) { %>
             <form method="get" action="/admin/academic" class="academic-program-select">
@@ -225,6 +229,33 @@
               </div>
             </div>
           <% } else { %><div class="academic-empty academic-empty-block">Спочатку виберіть набір і семестр.</div><% } %>
+        <% } %>
+
+        <% if (activeSection === 'formats') { %>
+          <% if (currentGroups.length) { %>
+            <form method="post" action="/admin/pathways/v2/schedule/day-formats" class="academic-formats-card">
+              <%- focusFields('formats') %>
+              <div class="academic-formats-head">
+                <div><strong>Дні × набори</strong><span>Позначки використовуються на сайті, у mini app і повідомленнях бота.</span></div>
+                <button class="btn btn-primary" type="submit">Зберегти формати</button>
+              </div>
+              <div class="academic-table-wrap">
+                <table class="academic-table academic-formats-table">
+                  <thead><tr><th>День</th><% currentGroups.forEach((group) => { %><th><%= compactIdentity(group).label %></th><% }); %></tr></thead>
+                  <tbody>
+                    <% dayOptions.forEach((dayName) => { %>
+                      <tr>
+                        <th><%= dayFormatLabels[dayName] %></th>
+                        <% currentGroups.forEach((group) => { const currentMode = dayFormatByKey.get(`${n(group.id)}|${dayName}`) || 'offline'; %>
+                          <td><select name="mode_<%= group.id %>_<%= dayName %>" aria-label="<%= dayFormatLabels[dayName] %>, <%= compactIdentity(group).label %>"><option value="offline" <%= currentMode === 'offline' ? 'selected' : '' %>>Офлайн</option><option value="online" <%= currentMode === 'online' ? 'selected' : '' %>>Онлайн</option><option value="mixed" <%= currentMode === 'mixed' ? 'selected' : '' %>>Змішано</option></select></td>
+                        <% }); %>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </form>
+          <% } else { %><div class="academic-empty academic-empty-block">Спочатку додайте активний набір.</div><% } %>
         <% } %>
 
         <% if (activeSection === 'catalog') { %>
