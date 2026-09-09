@@ -21066,7 +21066,8 @@ async function sendStuderriaTelegramHelp(message = {}) {
     `${devUsersCommand} - список привʼязаних Telegram-користувачів. Тільки dev, тільки в особистому чаті.`,
     '/devschedule — надіслати розклад на завтра в налаштований канал. Тільки dev в особистому чаті.',
     '/devschedule preview — приватний перегляд без публікації в канал.',
-    '/devreply set @username Фраза — відповідати цією фразою на кожне повідомлення користувача в групах.',
+    '/devreply set @username 5 Фраза — відповісти цією фразою на 5 повідомлень користувача в групах.',
+    '/devreply set @username r Фраза — випадково обрати від 2 до 20 відповідей.',
     '/devreply on | off | status | clear — керування dev-автовідповіддю.',
     '/addrole starosta @username - видати роль starosta.',
     '/addrole starosta 123456789 - видати роль по Telegram ID.',
@@ -22897,10 +22898,14 @@ function formatStuderriaTelegramDevAutoReplyRule(rule = null) {
   const target = rule.targetUsername
     ? `@${rule.targetUsername}`
     : `Telegram ID ${rule.targetTelegramId}`;
+  const usage = rule.replyLimit
+    ? `${rule.repliesSent}/${rule.replyLimit}`
+    : 'без ліміту';
   return [
     `Автовідповідь: ${rule.enabled ? 'увімкнена' : 'вимкнена'}`,
     `Користувач: ${target}`,
     `Фраза: ${rule.replyText}`,
+    `Спрацювань: ${usage}`,
     '',
     'Працює для повідомлень цього користувача в усіх групах, де бот бачить повідомлення.',
   ].join('\n');
@@ -22929,8 +22934,10 @@ async function handleStuderriaTelegramDevAutoReplyCommand(message = {}, parsedCo
       chatId,
       [
         'Формат:',
-        '/devreply set @username Фраза відповіді',
-        '/devreply set 123456789 Фраза відповіді',
+        '/devreply set @username 5 Фраза відповіді',
+        '/devreply set 123456789 5 Фраза відповіді',
+        '/devreply set @username r Фраза — випадковий ліміт від 2 до 20',
+        'Число необовʼязкове: без нього ліміт не встановлюється.',
         '/devreply on — увімкнути',
         '/devreply off — вимкнути',
         '/devreply status — показати налаштування',
@@ -22958,6 +22965,7 @@ async function handleStuderriaTelegramDevAutoReplyCommand(message = {}, parsedCo
     const rule = await studerriaTelegramDevAutoReplyStore.setRule({
       targetTelegramId,
       targetUsername,
+      replyLimit: action.replyLimit,
       replyText: action.replyText,
     }, actorTelegramId);
     await sendStuderriaTelegramMessage(chatId, `Готово.\n\n${formatStuderriaTelegramDevAutoReplyRule(rule)}`, { sourceMessage: message });
@@ -22973,7 +22981,7 @@ async function handleStuderriaTelegramDevAutoReplyCommand(message = {}, parsedCo
     if (!rule) {
       await sendStuderriaTelegramMessage(
         chatId,
-        'Спочатку задай користувача і фразу: /devreply set @username Фраза відповіді',
+        'Спочатку задай користувача, кількість і фразу: /devreply set @username 5 Фраза відповіді',
         { sourceMessage: message }
       );
       return true;
@@ -22991,7 +22999,9 @@ async function handleStuderriaTelegramDevAutoReplyMessage(message = {}) {
   await ensureDbReady();
   const rule = await studerriaTelegramDevAutoReplyStore.getRule();
   if (!shouldSendStuderriaTelegramDevAutoReply(message, rule)) return false;
-  await sendStuderriaTelegramMessage(message.chat.id, rule.replyText, { sourceMessage: message });
+  const claimedRule = await studerriaTelegramDevAutoReplyStore.claimReply();
+  if (!claimedRule) return false;
+  await sendStuderriaTelegramMessage(message.chat.id, claimedRule.replyText, { sourceMessage: message });
   return true;
 }
 
