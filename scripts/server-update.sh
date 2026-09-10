@@ -306,7 +306,32 @@ if [ "$PULL" -eq 1 ]; then
   docker compose pull "${update_targets[@]}" || echo "No pullable image for $SERVICE; continuing with local Compose update."
 fi
 
+# Fail before writing another backup or starting an expensive image export.
+# containerd can use a separate filesystem from DockerRootDir.
+minimum_free_kb="${MIN_FREE_DISK_KB:-5242880}"
+if ! [[ "$minimum_free_kb" =~ ^[1-9][0-9]*$ ]]; then
+  echo "MIN_FREE_DISK_KB must be a positive integer." >&2
+  exit 2
+fi
+docker_root="$(docker info --format '{{.DockerRootDir}}')"
+ensure_backup_dir
+check_update_disk_space() {
+  local storage_path free_kb
+  for storage_path in "$BACKUP_DIR" "$docker_root" /var/lib/containerd; do
+    [ -d "$storage_path" ] || continue
+    free_kb="$(df -Pk "$storage_path" | awk 'END {print $4}')"
+    if ! [[ "$free_kb" =~ ^[0-9]+$ ]] || [ "$free_kb" -lt "$minimum_free_kb" ]; then
+      echo "Insufficient free disk space at $storage_path: ${free_kb} KiB; minimum ${minimum_free_kb} KiB." >&2
+      echo "Inspect df -h and docker system df. Free space before retrying; backups and volumes have not been deleted." >&2
+      exit 1
+    fi
+  done
+}
+
+check_update_disk_space
+
 backup_stateful_data
+check_update_disk_space
 
 compose_up=(docker compose up -d)
 if [ "$BUILD" -eq 1 ]; then

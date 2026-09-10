@@ -10,5 +10,14 @@ test
 uploads
 .local
 services
+# Runtime backups must never become image layers (including custom backup paths).
+backups
+**/*.dump
+**/*.tgz
+tmp
+.env
+.env.*
+**/.env
+**/.env.*
 docker/local/db/init/*.sql
 docker/local/db/init/*.sql.gz
