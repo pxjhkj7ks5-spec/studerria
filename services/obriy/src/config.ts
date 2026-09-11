@@ -50,6 +50,7 @@ const schema = z.object({
   OBRIY_ALERTS_POLL_MS: integer(15000, 12000, 300000),
   OBRIY_DEFAULT_RADIUS_KM: integer(10, 1, 100),
   OBRIY_RETENTION_DAYS: integer(30, 1, 90),
+  OBRIY_RISK_RETENTION_HOURS: integer(24, 1, 72),
   OBRIY_RAW_RETENTION_HOURS: integer(24, 1, 72),
   OBRIY_SESSION_HOURS: integer(12, 1, 168),
   OBRIY_COLLECTORS_ENABLED: z.enum(["true", "false"]).default("true"),

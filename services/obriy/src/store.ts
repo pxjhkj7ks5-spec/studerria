@@ -482,7 +482,7 @@ export class Store {
         [zone.id, track.internalId, next.state, enc],
       );
       await c.query(
-        "INSERT INTO obriy.risk_assessments(zone_id,track_id,data_enc,engine_version) VALUES($1,$2,$3,$4)",
+        "INSERT INTO obriy.risk_assessments(zone_id,track_id,data_enc,engine_version) SELECT $1,$2,$3,$4 WHERE NOT EXISTS (SELECT 1 FROM obriy.risk_assessments WHERE zone_id=$1 AND track_id=$2 AND created_at>now()-interval '5 minutes')",
         [zone.id, track.internalId, enc, assessment.engineConfigVersion],
       );
     });
@@ -680,6 +680,19 @@ export class Store {
   }
   async cleanup() {
     const days = this.config.OBRIY_RETENTION_DAYS;
+    // Short independent transactions avoid holding user locks during history cleanup.
+    // Bound each run; any remaining backlog is handled on subsequent runs.
+    for (let batch = 0; batch < 20; batch++) {
+      const result = await this.pool.query(
+        `DELETE FROM obriy.risk_assessments WHERE id IN (
+          SELECT id FROM obriy.risk_assessments
+          WHERE created_at<now()-$1*interval '1 hour'
+          ORDER BY created_at LIMIT 5000 FOR UPDATE SKIP LOCKED
+        )`,
+        [this.config.OBRIY_RISK_RETENTION_HOURS],
+      );
+      if ((result.rowCount ?? 0) < 5000) break;
+    }
     await this.transaction(async (c) => {
       await c.query("SELECT id FROM obriy.users ORDER BY id FOR UPDATE");
       await c.query(
@@ -714,7 +727,6 @@ export class Store {
         [days],
       );
       for (const table of [
-        "risk_assessments",
         "notification_outbox",
         "notifications",
         "audit_events",
