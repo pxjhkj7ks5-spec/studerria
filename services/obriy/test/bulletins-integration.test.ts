@@ -161,7 +161,7 @@ describe.skipIf(!url)("civil bulletins with isolated PostgreSQL", () => {
     expect(send).toHaveBeenCalledOnce();
     expect(send.mock.calls[0]).toEqual([
       "987654321",
-      expect.stringContaining("Канал опублікував попередження"),
+      expect.stringContaining("Згадка джерела для вашого місця"),
     ]);
   });
   it("cancels a claimed message immediately when a post is edited", async () => {
@@ -201,15 +201,59 @@ describe.skipIf(!url)("civil bulletins with isolated PostgreSQL", () => {
       expect(await bulletins.feed(uid)).toHaveLength(1);
     },
   );
-  it("requires both approval and the full 24-hour warmup", async () => {
+  it("requires approval and at least one fresh initialized source", async () => {
     store.config.OBRIY_BULLETIN_APPROVED = "false";
     expect(await bulletins.deliveryReady()).toBe(false);
     store.config.OBRIY_BULLETIN_APPROVED = "true";
     await store.pool.query(
       "UPDATE obriy.channel_cursors SET initialized_at=now() WHERE channel='kyiv_airdef'",
     );
+    expect(await bulletins.deliveryReady()).toBe(true);
+    await store.pool.query(
+      "UPDATE obriy.channel_cursors SET last_success_at=now()-interval '5 minutes'",
+    );
     expect(await bulletins.deliveryReady()).toBe(false);
-    await ingest();
+  });
+  it("automatically matches Hnidyn for an existing radius zone", async () => {
+    await store.saveZone(
+      uid,
+      {
+        ...zoneInput,
+        lat: 50.32571,
+        lon: 30.71474,
+        radiusKm: 2,
+        bulletinAreas: [],
+      },
+      zoneId,
+    );
+    await ingest("Гнідин — БпЛА, в укриття");
+    expect(await pending()).toHaveLength(1);
+  });
+  it("deduplicates cross-source warnings within 15 seconds despite uncertainty", async () => {
+    await ingest("Київ: увага", 2, 10000);
+    await ingest("Київ: ймовірна загроза", 3, 0, "kyiv_airdef");
+    expect(await pending()).toHaveLength(1);
+  });
+  it("allows another warning beyond 15 seconds", async () => {
+    await ingest("Київ: увага", 2, 20000);
+    await ingest("Київ: увага", 3, 0, "kyiv_airdef");
+    expect(await pending()).toHaveLength(2);
+  });
+  it("queues ballistic HIGH immediately without place or corroboration", async () => {
+    await store.saveZone(uid, { ...zoneInput, bulletinAreas: [] }, zoneId);
+    await ingest("Пуски балістики! ОТРК");
+    expect(await pending()).toHaveLength(1);
+    const delivery = (await store.claim())!;
+    expect(delivery.level).toBe("HIGH");
+    expect(await store.deliverable(delivery)).toBe(true);
+  });
+  it("honors general ballistic opt out", async () => {
+    await store.saveZone(
+      uid,
+      { ...zoneInput, ballisticWarnings: false },
+      zoneId,
+    );
+    await ingest("Пуски балістики");
     expect(await pending()).toHaveLength(0);
   });
   it("does not send bootstrap or stale posts after activation", async () => {

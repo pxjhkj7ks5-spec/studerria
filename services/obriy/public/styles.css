@@ -2246,3 +2246,12 @@ h1 {
 .bulletin-area-options { max-height: 200px; overflow: auto; }
 .bulletin-area-options .checkbox-label { margin: 10px 0; }
 .bulletin-sources { margin: 12px 0; }
+
+.radius-preview { margin: 18px 0; padding: 12px; border: 1px solid #d5dfeb; border-radius: 20px; background: #f5f9fd; }
+#radius-map { width:100%; height:260px; display:block; background: radial-gradient(ellipse at center,#fff,#edf4f8); border-radius:14px; }
+#radius-map text { font-size:11px; fill:#37465a; }
+.radius-circle { fill:#2685e51c; stroke:#2685e5; stroke-width:1.5; }
+.radius-axis { stroke:#b4c3d5; stroke-dasharray:3 5; fill:none; }
+.radius-place { fill:#456788; }
+.radius-center { fill:#087aff; stroke:white; stroke-width:2; }
+#radius-places { max-height:160px; overflow:auto; font-size:13px; padding-left:22px; }

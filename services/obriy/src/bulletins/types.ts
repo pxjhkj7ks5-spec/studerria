@@ -20,5 +20,6 @@ export interface Bulletin {
   kind: "warning" | "all_clear_report" | "other";
   areaIds: string[];
   uncertain: boolean;
+  urgent?: boolean;
   reasons: string[];
 }

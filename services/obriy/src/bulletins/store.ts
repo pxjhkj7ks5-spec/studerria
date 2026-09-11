@@ -3,6 +3,7 @@ import type { Store } from "../store.js";
 import type { Zone } from "../engine/types.js";
 import { hash } from "../security.js";
 import { AREAS, matchingAreas } from "./areas.js";
+import { zoneAreas, areaLabel } from "./settlements.js";
 import { parseBulletin } from "./parser.js";
 import {
   CHANNELS,
@@ -86,10 +87,10 @@ export class BulletinStore {
       return false;
     const { rows } = await this.store.pool.query(
       `SELECT count(*)::int AS n FROM obriy.channel_cursors
-      WHERE channel=ANY($1::text[]) AND initialized_at<=now()-interval '24 hours'`,
+      WHERE channel=ANY($1::text[]) AND last_success_at>now()-interval '90 seconds'`,
       [CHANNELS],
     );
-    return rows[0].n === CHANNELS.length;
+    return rows[0].n > 0;
   }
   async processOne(): Promise<boolean> {
     if (
@@ -113,20 +114,55 @@ export class BulletinStore {
         row.data_enc,
         `bulletin:${row.id}`,
       );
-      const parsed = parseBulletin(message.text);
-      const old: Bulletin | null = row.parsed;
-      const fingerprint = hash(
-        JSON.stringify([parsed.kind, parsed.areaIds, parsed.uncertain]),
-      );
       const zones = await c.query(
         "SELECT * FROM obriy.zones WHERE enabled ORDER BY id FOR UPDATE",
+      );
+      const zoneData = new Map(
+        zones.rows.map((z) => [
+          z.id,
+          this.store.vault.decrypt<Omit<Zone, "id" | "userId">>(
+            z.data_enc,
+            `zone:${z.id}:${z.user_id}`,
+          ),
+        ]),
+      );
+      const selected = new Map(
+        zones.rows.map((z) => [z.id, zoneAreas(zoneData.get(z.id)!)]),
+      );
+      const catalogue = [
+        ...new Map(
+          [...AREAS, ...[...selected.values()].flat()].map((a) => [a.id, a]),
+        ).values(),
+      ];
+      const parsed = parseBulletin(message.text, catalogue);
+      const old: Bulletin | null = row.parsed;
+      const fingerprint = hash(
+        JSON.stringify([parsed.kind, parsed.areaIds, Boolean(parsed.urgent)]),
       );
       for (const z of zones.rows) {
         const zone = this.store.vault.decrypt<Omit<Zone, "id" | "userId">>(
           z.data_enc,
           `zone:${z.id}:${z.user_id}`,
         );
-        const matches = matchingAreas(zone.bulletinAreas ?? [], parsed.areaIds);
+        const localAreas = selected.get(z.id)!;
+        const subscriptions = [
+          ...new Set([
+            ...localAreas.map((a) => a.id),
+            ...localAreas.flatMap((a) => (a.parent ? [a.parent] : [])),
+          ]),
+        ];
+        const matches = [
+          ...new Set([
+            ...matchingAreas(subscriptions, parsed.areaIds),
+            ...parsed.areaIds.filter((id) => subscriptions.includes(id)),
+          ]),
+        ];
+        if (
+          parsed.urgent &&
+          zone.ballisticWarnings !== false &&
+          parsed.areaIds.includes("ballistic-general")
+        )
+          matches.push("ballistic-general");
         const previousSent = await c.query(
           `SELECT d.area_ids FROM obriy.bulletin_decisions d
           JOIN obriy.notifications n ON n.outbox_id IN (SELECT id FROM obriy.notification_outbox WHERE bulletin_decision_id=d.id)
@@ -169,13 +205,19 @@ export class BulletinStore {
         )
           continue;
         const duplicate = await c.query(
-          `SELECT 1 FROM obriy.bulletin_decisions d JOIN obriy.notification_outbox o ON o.bulletin_decision_id=d.id
-          WHERE d.zone_id=$1 AND d.fingerprint=$2 AND d.message_id<>$3 AND o.status IN ('pending','sending','sent')
-          AND d.created_at>now()-$4*interval '1 millisecond' LIMIT 1`,
+          `SELECT 1 FROM obriy.bulletin_decisions d
+          JOIN obriy.notification_outbox o ON o.bulletin_decision_id=d.id
+          JOIN obriy.channel_messages m ON m.id=d.message_id
+          WHERE o.user_id=$1 AND o.status IN ('pending','sending','sent')
+          AND d.area_ids @> $3::jsonb
+          AND (d.message_id=$2 OR COALESCE((m.parsed->>'urgent')::boolean,false)=$4)
+          AND abs(extract(epoch FROM (m.published_at-$5::timestamptz))*1000)<=$6 LIMIT 1`,
           [
-            z.id,
-            fingerprint,
+            z.user_id,
             row.id,
+            JSON.stringify(decisionAreas),
+            Boolean(parsed.urgent),
+            message.publishedAt,
             this.store.config.OBRIY_BULLETIN_COOLDOWN_MS,
           ],
         );
@@ -187,13 +229,10 @@ export class BulletinStore {
           JSON.stringify(old) === JSON.stringify(parsed)
         )
           continue;
-        const names = decisionAreas
-          .map((id) => AREAS.find((a) => a.id === id)?.label)
-          .filter(Boolean)
-          .join(", ");
+        const names = decisionAreas.map(areaLabel).filter(Boolean).join(", ");
         const text = correction
           ? `Обрій · ${zone.label}\nУточнення: джерело змінило попереднє оголошення для ${names}. Це не означає відбій тривоги.\n${message.url}`
-          : `Обрій · ${zone.label}\n${parsed.uncertain ? "Можлива загроза" : "Канал опублікував попередження"}: ${names}.\nОголошення стосується міста або району вашої підписки.\nЧас джерела: ${new Intl.DateTimeFormat("uk-UA", { timeZone: "Europe/Kyiv", hour: "2-digit", minute: "2-digit" }).format(new Date(message.publishedAt))}\n${message.url}\nПеревіряйте офіційну тривогу та дотримуйтеся вказівок цивільного захисту.`;
+          : `Обрій · ${zone.label}\n${parsed.urgent ? "🔴 HIGH · Балістика / ОТРК · прямуйте в укриття" : parsed.uncertain ? "Можлива загроза" : "⚠️ Згадка джерела для вашого місця"}: ${names}.\nЗбіг із населеним пунктом у радіусі або додатковою підпискою. Загальне попередження не визначає місце загрози.\nЧас джерела: ${new Intl.DateTimeFormat("uk-UA", { timeZone: "Europe/Kyiv", hour: "2-digit", minute: "2-digit" }).format(new Date(message.publishedAt))}\n${message.url}\nПеревіряйте офіційну тривогу та дотримуйтеся вказівок цивільного захисту.`;
         const outboxId = randomUUID();
         await c.query(
           `INSERT INTO obriy.notification_outbox(id,dedupe_key,user_id,zone_id,payload_enc,category,expires_at,bulletin_decision_id)
@@ -205,7 +244,14 @@ export class BulletinStore {
             z.user_id,
             z.id,
             this.store.vault.encrypt(
-              { text, level: correction ? "CORRECTION" : "BULLETIN" },
+              {
+                text,
+                level: correction
+                  ? "CORRECTION"
+                  : parsed.urgent
+                    ? "HIGH"
+                    : "BULLETIN",
+              },
               `outbox:${outboxId}`,
             ),
             new Date(
@@ -234,6 +280,8 @@ export class BulletinStore {
       id: r.id,
       zoneId: r.zone_id,
       areaIds: r.area_ids,
+      areaNames: r.area_ids.map(areaLabel),
+      urgent: Boolean(r.parsed.urgent),
       publishedAt: r.published_at.toISOString(),
       kind: r.parsed.kind,
       uncertain: r.parsed.uncertain,

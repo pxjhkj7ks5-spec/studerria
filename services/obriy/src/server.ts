@@ -14,6 +14,7 @@ import { equalSecret } from "./security.js";
 import { Accounts } from "./accounts.js";
 import { AuthError } from "./password.js";
 import { AREAS } from "./bulletins/areas.js";
+import { nearbySettlements } from "./bulletins/settlements.js";
 import { BulletinStore } from "./bulletins/store.js";
 const zoneBody = z
   .object({
@@ -36,6 +37,8 @@ const zoneBody = z
       .transform((v) => v ?? undefined)
       .optional(),
     enabled: z.boolean().default(true),
+    bulletinRadius: z.boolean().optional(),
+    ballisticWarnings: z.boolean().optional(),
     bulletinAreas: z
       .array(z.string().refine((id) => AREAS.some((a) => a.id === id)))
       .max(AREAS.length)
@@ -326,6 +329,25 @@ export async function buildServer(
       mode: config.OBRIY_BULLETIN_MODE,
       deliveryReady: await bulletins.deliveryReady(),
       worker: await store.getRuntime("bulletin-worker"),
+    };
+  });
+  app.post(`${b}/api/v1/zones/preview`, async (req, reply) => {
+    await requireUser(req);
+    const parsed = zoneBody
+      .pick({ lat: true, lon: true, radiusKm: true })
+      .safeParse(req.body);
+    if (!parsed.success)
+      return reply.code(400).send({ error: "Некоректна точка або радіус" });
+    return {
+      places: nearbySettlements(parsed.data, parsed.data.radiusKm).map(
+        ({ id, label, lat, lon, distanceKm }) => ({
+          id,
+          label,
+          lat,
+          lon,
+          distanceKm,
+        }),
+      ),
     };
   });
   app.post(`${b}/api/v1/zones`, async (req, reply) => {

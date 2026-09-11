@@ -89,6 +89,8 @@ export interface Zone {
   enabled: boolean;
   /** Explicit civil bulletin subscriptions; unrelated to position or radius. */
   bulletinAreas?: string[];
+  bulletinRadius?: boolean;
+  ballisticWarnings?: boolean;
 }
 export interface Point {
   lat: number;

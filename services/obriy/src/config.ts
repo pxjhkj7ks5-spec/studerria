@@ -57,10 +57,10 @@ const schema = z.object({
   OBRIY_BULLETIN_APPROVED: z.enum(["true", "false"]).default("false"),
   OBRIY_BULLETIN_POLL_MS: integer(15000, 15000, 300000),
   OBRIY_BULLETIN_MAX_AGE_MS: integer(180000, 30000, 180000),
-  OBRIY_BULLETIN_COOLDOWN_MS: integer(300000, 60000, 3600000),
+  OBRIY_BULLETIN_COOLDOWN_MS: integer(15000, 1000, 3600000),
   OBRIY_AIRSIGMA_SOURCE_IDENTIFIER: z.string().default(""),
   OBRIY_METRICS_TOKEN: z.string().default(""),
-  OBRIY_RELEASE_VERSION: z.string().default("0.3.0"),
+  OBRIY_RELEASE_VERSION: z.string().default("0.4.0"),
 });
 export type Config = z.infer<typeof schema> & {
   configured: boolean;

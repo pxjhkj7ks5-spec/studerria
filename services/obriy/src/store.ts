@@ -595,7 +595,7 @@ export class Store {
         AND c.last_success_at>now()-interval '90 seconds' AND m.published_at<=now()
         AND (CASE WHEN $5='CORRECTION' THEN m.received_at ELSE m.published_at END)>now()-$4*interval '1 millisecond'
         AND (m.parsed->>'kind'='warning' OR $5='CORRECTION')
-        AND (SELECT count(*) FROM obriy.channel_cursors WHERE channel IN ('AerisRimor','kyiv_airdef','kievinform_ua1') AND initialized_at<=now()-interval '24 hours')=3`,
+`,
         [
           d.id,
           d.leaseToken,

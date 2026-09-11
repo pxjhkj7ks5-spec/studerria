@@ -147,7 +147,18 @@ export class BulletinCollector {
       } catch (error) {
         if (signal.aborted) break;
         failures++;
-        this.states[channel] = { ...this.states[channel], state: "degraded" };
+        this.states[channel] = {
+          ...this.states[channel],
+          state: "degraded",
+          errorCode:
+            error instanceof ChannelFetchError
+              ? "http"
+              : error instanceof Error && /timeout/i.test(error.name)
+                ? "timeout"
+                : error instanceof TypeError
+                  ? "network"
+                  : "format",
+        };
         waitMs =
           Math.max(
             Math.min(300000, 15000 * 2 ** Math.min(failures, 5)),

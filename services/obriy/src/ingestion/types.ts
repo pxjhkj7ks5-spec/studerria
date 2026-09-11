@@ -4,6 +4,7 @@ export interface SourceHealth {
   lastSnapshotAt?: string;
   lastSuccessAt?: string;
   transport?: string;
+  errorCode?: "timeout" | "network" | "http" | "format";
 }
 
 export interface SecondaryObservation {

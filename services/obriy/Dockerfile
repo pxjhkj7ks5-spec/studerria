@@ -15,6 +15,7 @@ COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./
 COPY --chown=node:node migrations ./migrations
 COPY --chown=node:node public ./public
+COPY --chown=node:node data ./data
 USER node
 EXPOSE 8080
 CMD ["node", "dist/src/main.js"]

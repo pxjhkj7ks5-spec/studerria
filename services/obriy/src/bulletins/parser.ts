@@ -1,4 +1,4 @@
-import { AREAS } from "./areas.js";
+import { AREAS, type BulletinArea } from "./areas.js";
 import type { Bulletin } from "./types.js";
 
 export function normalizeText(input: string): string {
@@ -39,12 +39,15 @@ function editDistance(a: string, b: string): number {
   }
   return row[b.length];
 }
-function mentions(text: string): { ids: string[]; fuzzy: boolean } {
+function mentions(
+  text: string,
+  catalogue: BulletinArea[],
+): { ids: string[]; fuzzy: boolean } {
   const words = text.split(" ");
   const ids = new Set<string>();
   let fuzzy = false;
   for (let i = 0; i < words.length; i++) {
-    const exact = AREAS.filter((a) =>
+    const exact = catalogue.filter((a) =>
       a.aliases.some(
         (alias) =>
           words.slice(i, i + alias.split(" ").length).join(" ") === alias,
@@ -74,7 +77,10 @@ function mentions(text: string): { ids: string[]; fuzzy: boolean } {
 /** Civil bulletins only: explicit warning language + explicit locality in the same sentence.
  * No object type/count, heading, position, reply inheritance or cross-post tracking.
  */
-export function parseBulletin(input: string): Bulletin {
+export function parseBulletin(
+  input: string,
+  catalogue: BulletinArea[] = AREAS,
+): Bulletin {
   const result: Bulletin = {
     version: "civil-1",
     kind: "other",
@@ -82,6 +88,7 @@ export function parseBulletin(input: string): Bulletin {
     uncertain: false,
     reasons: [],
   };
+  const urgentAreas = new Set<string>();
   const states = new Map<string, "warning" | "all_clear_report">();
   const allClear =
     /(?:відбій|отбой|скасовано тривогу|тривог[ауи] (?:скасовано|немає))/u;
@@ -90,7 +97,7 @@ export function parseBulletin(input: string): Bulletin {
   const excluded =
     /(?:відбійник|навчан|навчальн|тестов|перевірка систем|вчора|позавчора|історі|реклама|підписуй|збір коштів|донат|дтп|авто |футбол|фільм|завтра|після відбою)/u;
   const negative =
-    /(?:немає загроз|загроз[аи] немає|не підтверд|хибн|помилков|без загроз|не оголош|не було тривог)/u;
+    /(?:немає загроз|загроз[аи] немає|не підтверд|хибн|помилков|без загроз|не оголош|не було тривог|немає (?:балістик[а-яіїє]*|пуск)|пусків(?: балістик[а-яіїє]*| ракет)? немає|без (?:пуск|балістик)|не зафіксован|не підтверджен)/u;
   // Splitting clauses prevents attaching the place in an unrelated news paragraph to a warning.
   for (const clause of input.slice(0, 16384).split(/[\n.!?;]+/u)) {
     const normalized = normalizeText(clause);
@@ -116,12 +123,27 @@ export function parseBulletin(input: string): Bulletin {
       })
       .join(" ");
     if (!text || excluded.test(text)) continue;
-    const places = mentions(text);
+    const places = mentions(text, catalogue);
+    const ballistic = /(?:балістик|баллистик|балістич|баллистич|отрк)/u.test(
+      text,
+    );
+    if (ballistic && !places.ids.length) places.ids.push("ballistic-general");
     if (!places.ids.length) continue;
     if (allClear.test(text) || negative.test(text)) {
-      places.ids.forEach((id) => states.set(id, "all_clear_report"));
-    } else if (warning.test(text)) {
-      places.ids.forEach((id) => states.set(id, "warning"));
+      places.ids.forEach((id) => {
+        states.set(id, "all_clear_report");
+        urgentAreas.delete(id);
+      });
+    } else if (
+      places.ids.some((id) => id.startsWith("gn-")) ||
+      warning.test(text) ||
+      ballistic ||
+      /(?:шахед|бпла|дрон|ракет)/u.test(text)
+    ) {
+      places.ids.forEach((id) => {
+        states.set(id, "warning");
+        if (ballistic) urgentAreas.add(id);
+      });
     } else continue;
     result.uncertain ||=
       corrected ||
@@ -143,10 +165,15 @@ export function parseBulletin(input: string): Bulletin {
     .filter(([, kind]) => kind === result.kind)
     .map(([id]) => id)
     .sort();
+  if (
+    result.kind === "warning" &&
+    result.areaIds.some((id) => urgentAreas.has(id))
+  )
+    result.urgent = true;
   result.reasons = [...new Set(result.reasons)];
   if (result.areaIds.length)
     result.reasons.unshift(
-      "Місце прямо назване в оголошенні; підписка на місто або район.",
+      "Місце прямо назване джерелом; зіставлення з радіусом або додатковою підпискою.",
     );
   return result;
 }

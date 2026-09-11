@@ -310,23 +310,23 @@ function renderBulletins() {
   const mode = byId('bulletin-mode');
   const workerAt = dateValue(data?.worker?.lastSuccessAt);
   const workerHealthy = workerAt !== null && clockNow() - workerAt < 90000;
-  mode.textContent = !data ? 'Не вдалося завантажити оголошення.' : data.mode === 'disabled' ? 'Збір оголошень вимкнено.' : !workerHealthy ? 'Обробка оголошень ще запускається або затримується.' : data.deliveryReady ? 'Попередження увімкнено для обраних місць. Вебперегляд каналів може мати затримки.' : 'Пробний режим: збираємо оголошення без відправлення. Увімкнення доступне після перевірки та 24 годин збору.';
+  mode.textContent = !data ? 'Не вдалося завантажити оголошення.' : data.mode === 'disabled' ? 'Збір оголошень вимкнено.' : !workerHealthy ? 'Обробка оголошень ще запускається або затримується.' : data.deliveryReady ? 'Попередження увімкнено для обраних місць. Вебперегляд каналів може мати затримки.' : 'Пробний режим: збираємо оголошення без відправлення. Для доставки потрібен активний режим і доступне джерело.';
   const sources = byId('bulletin-sources'); sources.replaceChildren();
   for (const [name, source] of Object.entries(state.status?.sources?.channels ?? {})) {
     const info = sourceInfo(source, 'channel');
-    sources.append(element('p', 'field-note', `@${name} · ${info.label} · ${relativeTime(source.lastSuccessAt)}`));
+    sources.append(element('p', 'field-note', `@${name} · ${info.label} · ${relativeTime(source.lastSuccessAt)}${source.errorCode ? " · " + ({timeout:"Джерело не відповідає вчасно",network:"Помилка з’єднання",http:"Вебперегляд недоступний або обмежений",format:"Не вдалося прочитати сторінку"}[source.errorCode] ?? "Помилка джерела") : ""}`));
   }
   const list = byId('bulletins-list'); list.replaceChildren();
   if (!data?.items?.length) {
-    list.append(element('p', 'empty-line', 'Оголошень для ваших підписок поки немає. Оберіть місто або район у налаштуваннях зони. Відсутність дописів не означає безпеки.'));
+    list.append(element('p', 'empty-line', 'Оголошень для ваших підписок поки немає. Перевірте радіус і налаштування зони. Відсутність дописів не означає безпеки.'));
     return;
   }
   for (const item of data.items) {
     const row = element('article', 'bulletin-item');
     const zone = state.me?.zones?.find(z => z.id === item.zoneId);
-    const names = item.areaIds.map(id => data.areas.find(a => a.id === id)?.label).filter(Boolean).join(', ');
+    const names = (item.areaNames ?? item.areaIds.map(id => data.areas.find(a => a.id === id)?.label).filter(Boolean)).join(', ');
     row.append(element('h3', '', `${zone?.label ?? 'Зона'} · ${names}`));
-    row.append(element('p', '', item.kind === 'warning' ? (item.uncertain ? 'Можливе попередження джерела' : 'Джерело опублікувало попередження') : 'Джерело повідомляє про завершення. Перевіряйте офіційний відбій.'));
+    row.append(element('p', '', item.kind === 'warning' ? (item.urgent ? '🔴 HIGH · Балістика / ОТРК' : item.uncertain ? 'Можливе попередження джерела' : 'Джерело опублікувало попередження') : 'Джерело повідомляє про завершення. Перевіряйте офіційний відбій.'));
     row.append(element('p', 'field-note', (item.reasons ?? []).join(' ')));
     const link = element('a', 'bulletin-link', `@${item.source} · ${dateFormat.format(new Date(item.publishedAt))} ↗`);
     if (/^https:\/\/t\.me\/(AerisRimor|kyiv_airdef|kievinform_ua1)\/\d+$/.test(item.url)) { link.href=item.url; link.target='_blank'; link.rel='noopener noreferrer'; }
@@ -387,8 +387,11 @@ function openZone(zone = null) {
     label.append(input, document.createTextNode(area.label)); options.append(label);
   }
   byId('zone-enabled').checked = zone?.enabled !== false;
+  byId('zone-bulletin-radius').checked = zone?.bulletinRadius !== false;
+  byId('zone-ballistic').checked = zone?.ballisticWarnings !== false;
   showMessage('zone-error');
   openDialog('zone-dialog');
+  previewRadius();
 }
 
 function openNotifications() { showMessage('notification-error'); byId('telegram-link-result').replaceChildren(); byId('telegram-link-result').hidden = true; renderDelivery(); openDialog('notification-dialog'); }
@@ -413,6 +416,7 @@ byId('zone-form').addEventListener('submit', async (event) => {
     label: byId('zone-label').value.trim(),
     lat: Number(byId('zone-lat').value), lon: Number(byId('zone-lon').value), radiusKm: Number(byId('zone-radius').value),
     oblast: byId('zone-oblast').value.trim() || (state.editingZone ? null : undefined), regionUid: byId('zone-region').value.trim() || (state.editingZone ? null : undefined), enabled: byId('zone-enabled').checked,
+    bulletinRadius: byId('zone-bulletin-radius').checked, ballisticWarnings: byId('zone-ballistic').checked,
     bulletinAreas: [...document.querySelectorAll('input[name=bulletinArea]:checked')].map(input => input.value),
   };
   if (!body.label || ![body.lat, body.lon, body.radiusKm].every(Number.isFinite) || Math.abs(body.lat) > 90 || Math.abs(body.lon) > 180 || body.radiusKm < 1 || body.radiusKm > 100) { showMessage('zone-error', 'Вкажіть назву, допустимі координати та радіус від 1 до 100 км.'); return; }
@@ -430,6 +434,7 @@ byId('location-button').addEventListener('click', () => {
     if (!byId('zone-dialog').open) return;
     byId('zone-lat').value = position.coords.latitude.toFixed(5);
     byId('zone-lon').value = position.coords.longitude.toFixed(5);
+    previewRadius();
     toast('Геопозицію підставлено. Збережіть зону, щоб застосувати її.');
   }, (error) => {
     button.disabled = false;
@@ -530,3 +535,41 @@ for (const button of document.querySelectorAll('[data-test-type]')) button.addEv
   } catch (error) { showMessage('telegram-test-result'); showMessage('telegram-test-error', error.message); }
   finally { telegramTestSending = false; buttons.forEach((item) => { item.disabled = false; }); }
 });
+
+let previewTimer, previewRevision = 0;
+for (const id of ['zone-lat', 'zone-lon', 'zone-radius']) byId(id).addEventListener('input', () => {
+  ++previewRevision; clearTimeout(previewTimer); previewTimer = setTimeout(previewRadius, 300);
+});
+async function previewRadius() {
+  const revision = ++previewRevision;
+  const map = byId('radius-map'), summary = byId('radius-summary'), list = byId('radius-places');
+  map.replaceChildren(); list.replaceChildren();
+  const lat = Number(byId('zone-lat').value), lon = Number(byId('zone-lon').value), radiusKm = Number(byId('zone-radius').value);
+  if (!byId('zone-lat').value || !byId('zone-lon').value || !Number.isFinite(lat + lon + radiusKm) || Math.abs(lat)>90 || Math.abs(lon)>180 || radiusKm<1 || radiusKm>100) {
+    summary.textContent = 'Вкажіть координати та радіус від 1 до 100 км.'; return;
+  }
+  summary.textContent = 'Завантажуємо населені пункти…';
+  try {
+    const {places} = await request('/api/v1/zones/preview', {method:'POST', body:{lat,lon,radiusKm}});
+    if (revision !== previewRevision || !byId('zone-dialog').open) return;
+    const svg = (tag, attrs, text) => { const n=document.createElementNS('http://www.w3.org/2000/svg',tag); for(const [k,v] of Object.entries(attrs)) n.setAttribute(k,String(v)); if(text) n.textContent=text; map.append(n); return n; };
+    svg('circle',{cx:200,cy:150,r:120,class:'radius-circle'});
+    svg('path',{d:'M200 20V280 M70 150H330',class:'radius-axis'});
+    svg('text',{x:200,y:16,'text-anchor':'middle'},'Пн');
+    svg('text',{x:12,y:22},`${radiusKm} км`);
+    const rad = Math.PI / 180;
+    for (const [i,p] of places.entries()) {
+      const dy=(p.lat-lat)*rad, dx=(p.lon-lon)*rad;
+      const a=Math.sin(dy/2)**2+Math.cos(lat*rad)*Math.cos(p.lat*rad)*Math.sin(dx/2)**2;
+      const distance=6371.0088*2*Math.asin(Math.sqrt(Math.min(1,a)));
+      const bearing=Math.atan2(Math.sin(dx)*Math.cos(p.lat*rad),Math.cos(lat*rad)*Math.sin(p.lat*rad)-Math.sin(lat*rad)*Math.cos(p.lat*rad)*Math.cos(dx));
+      const x=200+120*distance/radiusKm*Math.sin(bearing), y=150-120*distance/radiusKm*Math.cos(bearing);
+      const dot=svg('circle',{cx:x,cy:y,r:3,class:'radius-place'});
+      const title=document.createElementNS('http://www.w3.org/2000/svg','title'); title.textContent=p.label; dot.append(title);
+      if(i<8) svg('text',{x:x+5,y:y-5,class:'radius-place-label'},p.label);
+      list.append(element('li','',`${p.label} · ${p.distanceKm.toFixed(1)} км`));
+    }
+    svg('circle',{cx:200,cy:150,r:5,class:'radius-center'});
+    summary.textContent = `У радіусі ${radiusKm} км: ${places.length} населених пунктів. Мапа центрів поселень; коло оновлюється зі зміною радіуса.`;
+  } catch(error) { if(revision===previewRevision) summary.textContent=error.message; }
+}
