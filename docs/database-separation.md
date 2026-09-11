@@ -1,6 +1,26 @@
 # PostgreSQL service separation
 
-Status: preflight only. No production connections or data have been changed.
+Status: audit and isolated restore rehearsal available. No production connections or data have been changed.
+
+## Restore rehearsal
+
+Run `bash scripts/rehearse-database-separation.sh obriy`, then separately run
+`bash scripts/rehearse-database-separation.sh shieldline` on the server.
+The script takes a consistent service-scoped dump, uses the exact source PostgreSQL
+image, restores with errors fatal into a fresh volume, lists exact restored row counts
+and sequence values, and stops the rehearsal container. It refuses to overwrite
+existing targets. CPU is limited to one core and RAM to 1 GiB. `--network none`
+and no published ports prevent application or external access. The administrator
+credential is unique to rehearsal, not a production application credential.
+
+Backups and inventories are retained under `backups/db-rehearsal/` with private
+permissions. Treat dumps and the generated credential file as sensitive.
+Failure retains artifacts for diagnosis; an unsuccessful target may still be running.
+This stage creates only rehearsal resources; it neither changes production connections
+nor runs application workers. Compare live counts only during the final paused-writer
+cutover: the source continues changing while this rehearsal runs.
+Do not start applications against these targets or treat their copies as current.
+Report `RESTORE_REHEARSAL_OK` and the inventory before preparing cutover.
 
 Target: retain the existing Studerria PostgreSQL; move Obriy and Shieldline to
 separate PostgreSQL 18 instances, named volumes and dedicated credentials.
