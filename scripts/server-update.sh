@@ -166,10 +166,14 @@ backup_postgres_database() {
     backup_service=obriy-db
     backup_label=obriy-postgres
   fi
+  if [ "$SERVICE" = shieldline ] && [ -f "$ROOT_DIR/.local/shieldline-database-cutover.json" ]; then
+    backup_service=shieldline-db
+    backup_label=shieldline-postgres
+  fi
   container_id="$(docker compose ps -q "$backup_service" 2>/dev/null || true)"
   if [ -z "$container_id" ]; then
     if [ "$backup_service" != db ]; then
-      echo 'Dedicated Obriy database is unavailable; refusing update without its backup.' >&2
+      echo 'Dedicated service database is unavailable; refusing update without its backup.' >&2
       return 1
     fi
     echo "Postgres backup skipped: db container is not running."
@@ -182,7 +186,7 @@ backup_postgres_database() {
   if ! docker compose exec -T "$backup_service" sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$backup_file"; then
     rm -f "$backup_file"
     if [ "$backup_service" != db ]; then
-      echo 'Dedicated Obriy backup failed; update cancelled.' >&2
+      echo 'Dedicated service backup failed; update cancelled.' >&2
       return 1
     fi
     echo "Warning: PostgreSQL backup failed; update will continue." >&2
@@ -316,6 +320,15 @@ import json, sys
 state = json.load(open(sys.argv[1]))
 if state.get('phase') != 'complete':
     sys.exit('Obriy database migration is unfinished; inspect its state before updating.')
+PY
+fi
+
+if [ "$SERVICE" = shieldline ] && [ -f "$ROOT_DIR/.local/shieldline-database-cutover.json" ]; then
+  python3 - "$ROOT_DIR/.local/shieldline-database-cutover.json" <<'PY'
+import json, sys
+state = json.load(open(sys.argv[1]))
+if state.get('phase') != 'complete':
+    sys.exit('Shieldline database migration is unfinished; inspect its state before updating.')
 PY
 fi
 

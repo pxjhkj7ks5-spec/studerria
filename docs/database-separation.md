@@ -1,7 +1,36 @@
 # PostgreSQL service separation
 
 Status: audit, isolated rehearsal and operator-run Obriy cutover available.
-Shieldline production cutover remains a separate subsequent step.
+Shieldline has a separate operator-run cutover after Obriy is healthy.
+
+## Shieldline cutover
+
+After its rehearsal succeeds and Obriy's state is `complete`, run
+`python3 scripts/separate-shieldline-database.py --execute` during a Shieldline
+maintenance window. The main service and all three workers are stopped before
+the final dump. A non-graceful writer shutdown aborts the operation. Only
+`public.shieldline_*` tables/sequences are copied; cross-boundary foreign keys
+block migration. Row digests, counts and sequence states must match the stopped
+source before any target application starts.
+
+The existing JSON Compose override from the Obriy migration is backed up privately
+and merged, never replaced wholesale. Effective configurations of ALL unrelated
+services must remain identical. If the override changes concurrently, activation
+is refused. Shieldline gets `shieldline-db`, its own internal network, volume,
+administrator and restricted application role. Passwords remain local and gitignored.
+
+The main service starts first and must pass the PostgreSQL health endpoint. Workers
+then start and must publish fresh heartbeats into the target. An intentionally
+disabled admin bot is exempt from heartbeat checks. Its drop-pending-updates option
+is set to false so restarting does not discard pending Telegram updates.
+
+Success: `SHIELDLINE_DATABASE_SEPARATED_OK`. State:
+`.local/shieldline-database-cutover.json`. Before activation, failure resumes the
+original writers and retains the original override. After activation, failure pauses
+ALL Shieldline writers and never resumes the stale source automatically. Source
+tables and dump remain intact. Do not rerun, remove state, or start old containers
+after an error without inspecting the migration phase. Subsequent service updates
+back up the dedicated Shieldline database and refuse to proceed if that backup fails.
 
 ## Obriy cutover
 
