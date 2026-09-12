@@ -1,6 +1,39 @@
 # PostgreSQL service separation
 
-Status: audit and isolated restore rehearsal available. No production connections or data have been changed.
+Status: audit, isolated rehearsal and operator-run Obriy cutover available.
+Shieldline production cutover remains a separate subsequent step.
+
+## Obriy cutover
+
+Only after a successful rehearsal and within an Obriy maintenance window, run
+`python3 scripts/separate-obriy-database.py --execute` from the server checkout.
+This stops Obriy while dumping and verifying its complete data. Allow several minutes
+for the large history table. Studerria and Shieldline remain running.
+
+The command refuses existing targets, existing Compose overrides, unexpected connections,
+Compose/live environment drift, less than 10 GiB free space, or cross-schema foreign keys.
+It creates a dedicated PostgreSQL with no published ports on an internal network,
+1 GiB memory limit, one CPU, separate volume and fresh credentials. The application
+role has no superuser, role-management or database-creation privilege; it owns only
+its dedicated database/schema for migrations. The administrator password is in a
+private file under `.local/obriy-database-secrets/`; never rotate/delete that file during cleanup.
+The active Compose override also contains a credential and is mode 600/gitignored.
+Do not remove these paths in generic backup rotation.
+
+All source/target table row counts and sorted row-digest fingerprints, plus sequence
+state, must match before activation. The source is checked twice to detect continued
+writes. Existing Obriy encryption keys are preserved. Server update backups then
+select `obriy-db` and fail closed if its backup fails.
+
+State lives in `.local/obriy-database-cutover.json`. A state other than `complete`
+blocks further Obriy updates. Failure before activation restarts the original container;
+failure after activation pauses Obriy and requires explicit reconciliation of target
+writes, not an automatic switch to stale data. All databases/dumps remain intact.
+Do not erase state to retry or run whole-stack Compose during migration.
+The final success marker is `OBRIY_DATABASE_SEPARATED_OK`.
+
+Existing source tables are deliberately retained. Shared PostgreSQL backups therefore
+still contain the old Obriy snapshot until a later approved source cleanup.
 
 ## Restore rehearsal
 

@@ -12,6 +12,7 @@ uploads
 services
 # Runtime backups must never become image layers (including custom backup paths).
 backups
+docker/local/docker-compose.override.yml
 **/*.dump
 **/*.tgz
 tmp

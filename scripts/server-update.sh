@@ -161,17 +161,30 @@ backup_compose_volume_mount() {
 }
 
 backup_postgres_database() {
-  container_id="$(docker compose ps -q db 2>/dev/null || true)"
+  local backup_service=db backup_label=postgres
+  if [ "$SERVICE" = obriy ] && [ -f "$ROOT_DIR/.local/obriy-database-cutover.json" ]; then
+    backup_service=obriy-db
+    backup_label=obriy-postgres
+  fi
+  container_id="$(docker compose ps -q "$backup_service" 2>/dev/null || true)"
   if [ -z "$container_id" ]; then
+    if [ "$backup_service" != db ]; then
+      echo 'Dedicated Obriy database is unavailable; refusing update without its backup.' >&2
+      return 1
+    fi
     echo "Postgres backup skipped: db container is not running."
     return 0
   fi
 
   ensure_backup_dir
-  backup_file="$BACKUP_DIR/postgres-$(timestamp).dump"
+  backup_file="$BACKUP_DIR/${backup_label}-$(timestamp).dump"
   echo "Backing up PostgreSQL database to $backup_file"
-  if ! docker compose exec -T db sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$backup_file"; then
+  if ! docker compose exec -T "$backup_service" sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$backup_file"; then
     rm -f "$backup_file"
+    if [ "$backup_service" != db ]; then
+      echo 'Dedicated Obriy backup failed; update cancelled.' >&2
+      return 1
+    fi
     echo "Warning: PostgreSQL backup failed; update will continue." >&2
     return 0
   fi
@@ -296,6 +309,15 @@ if [ "$SERVICE" = "obriy" ]; then
 fi
 
 cd "$ROOT_DIR/docker/local"
+
+if [ "$SERVICE" = obriy ] && [ -f "$ROOT_DIR/.local/obriy-database-cutover.json" ]; then
+  python3 - "$ROOT_DIR/.local/obriy-database-cutover.json" <<'PY'
+import json, sys
+state = json.load(open(sys.argv[1]))
+if state.get('phase') != 'complete':
+    sys.exit('Obriy database migration is unfinished; inspect its state before updating.')
+PY
+fi
 
 update_targets=("$SERVICE")
 if [ "$SERVICE" = "shieldline" ]; then

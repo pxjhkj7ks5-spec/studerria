@@ -148,6 +148,7 @@ vite.config.ts.timestamp-*
 artifacts/
 output/
 backups/
+docker/local/docker-compose.override.yml
 uploads/*
 !uploads/.gitkeep
 
