@@ -14,7 +14,7 @@ test('OSINT config requires its own connection string and ignores Studerria DB c
 });
 
 test('Compose keeps OSINT database private and passes no main DB credential variables to the sidecar', () => {
-  const compose = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'docker', 'local', 'docker-compose.yml'), 'utf8');
+  const compose = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'docker', 'local', 'docker-compose.osint.yml'), 'utf8');
   const serviceBlock = compose.slice(compose.indexOf('  osint-graph:'), compose.indexOf('\n  app:', compose.indexOf('  osint-graph:')));
   assert.match(compose, /osint-db:/);
   assert.match(compose, /osint_private:\n\s+internal: true/);
