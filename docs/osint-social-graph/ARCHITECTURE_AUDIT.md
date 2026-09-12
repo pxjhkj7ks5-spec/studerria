@@ -24,7 +24,7 @@ Audit date: 2026-09-12. This document describes the checked-in `main` worktree b
 
 ### Deployment and networking
 
-- The authoritative deployment target is `docker/local/docker-compose.yml`, used both locally and by the current server update scripts. A changed service is rebuilt independently with `scripts/server-update.sh <service>`.
+- The authoritative deployment target is Docker Compose under `docker/local`. The base stack is in `docker-compose.yml`; isolated OSINT services also have an additive `docker-compose.osint.yml` overlay so server-local base Compose customizations can remain untouched. A changed service is rebuilt independently with `scripts/server-update.sh <service>`.
 - The main `app` container is the public entry point and reverse-proxies sidecars with `http-proxy-middleware`. The checked-in Compose file currently uses the default Compose network and exposes only selected ports.
 - The production notes describe a trusted reverse-proxy/Cloudflare Tunnel hop and configure Express `TRUST_PROXY` accordingly. The exact external proxy configuration is not stored in this repository.
 - No current Cloud Run deployment manifest, Cloud Build deployment pipeline or active Cloud SQL provisioning configuration exists in the repository. `app.js` retains a legacy `/cloudsql/<INSTANCE_CONNECTION_NAME>` host fallback, but project rules explicitly identify Docker Compose as the active target.

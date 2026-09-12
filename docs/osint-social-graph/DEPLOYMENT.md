@@ -8,6 +8,8 @@ The repository has no active Cloud Run deployment pipeline. The supported profil
 - `osint-graph`: read-only filesystem, dropped capabilities, no published port, both app-facing and private DB networks;
 - `app`: authenticated/RBAC gateway only; it never connects to the OSINT database.
 
+These additions are also defined in `docker/local/docker-compose.osint.yml`. The update script layers that file over the base Compose configuration for `app` and `osint`, including on servers where the base file is intentionally retained as a local `skip-worktree` configuration.
+
 Generate secrets once:
 
 ```bash

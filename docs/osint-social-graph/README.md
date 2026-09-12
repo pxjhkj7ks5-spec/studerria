@@ -21,7 +21,7 @@ From the repository root:
 
 ```bash
 bash scripts/setup-osint-env.sh docker/local/.env
-docker compose -f docker/local/docker-compose.yml up -d --build osint-db osint-graph app
+docker compose -f docker/local/docker-compose.yml -f docker/local/docker-compose.osint.yml up -d --build osint-db osint-graph app
 ```
 
 Open `http://localhost:3000/osint` after signing in with an account whose active role has `osint-access`. The OSINT API is intentionally unreachable through Studerria for every other user.

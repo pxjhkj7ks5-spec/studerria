@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="docker/local/docker-compose.yml"
+TRACKED_COMPOSE_FILE="docker/local/docker-compose.yml"
+OSINT_COMPOSE_FILE="docker-compose.osint.yml"
 LOG_TAIL="${LOG_TAIL:-80}"
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-120}"
 HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-2}"
@@ -306,9 +307,9 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! git diff --quiet -- "$COMPOSE_FILE" || ! git diff --cached --quiet -- "$COMPOSE_FILE"; then
-  echo "Keeping server-local $COMPOSE_FILE changes out of git pulls."
-  git update-index --skip-worktree "$COMPOSE_FILE"
+if ! git diff --quiet -- "$TRACKED_COMPOSE_FILE" || ! git diff --cached --quiet -- "$TRACKED_COMPOSE_FILE"; then
+  echo "Keeping server-local $TRACKED_COMPOSE_FILE changes out of git pulls."
+  git update-index --skip-worktree "$TRACKED_COMPOSE_FILE"
 fi
 
 dirty_blocking="$(
@@ -333,6 +334,17 @@ if [ "$SERVICE" = "osint" ]; then
 fi
 
 cd "$ROOT_DIR/docker/local"
+
+# The server may intentionally keep a customized base Compose file with
+# skip-worktree. Keep OSINT pullable as an additive overlay and apply the
+# gateway environment to later app-only rebuilds as well.
+if [ "$SERVICE" = "osint" ] || [ "$SERVICE" = "app" ]; then
+  if [ ! -f "$OSINT_COMPOSE_FILE" ]; then
+    echo "Missing OSINT Compose overlay: docker/local/$OSINT_COMPOSE_FILE" >&2
+    exit 1
+  fi
+  export COMPOSE_FILE="docker-compose.yml:$OSINT_COMPOSE_FILE"
+fi
 
 if [ "$SERVICE" = obriy ] && [ -f "$ROOT_DIR/.local/obriy-database-cutover.json" ]; then
   python3 - "$ROOT_DIR/.local/obriy-database-cutover.json" <<'PY'
