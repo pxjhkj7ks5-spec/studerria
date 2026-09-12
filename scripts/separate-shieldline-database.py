@@ -78,9 +78,46 @@ def inventory(container, user, database):
 SERVICES = ['shieldline', 'shieldline-projection-worker', 'shieldline-notification-worker', 'shieldline-admin-bot-worker']
 
 
+def validate_retry(state, source_id, original_override):
+    if state.get('phase') != 'failed-before-activation-source-retained':
+        raise RuntimeError('Retry is only allowed before activation')
+    if state.get('source_container') != source_id or state.get('target') != 'kma-local-shieldline-db-1':
+        raise RuntimeError('Retry source or target changed')
+    prior = Path(state['run_dir']).resolve()
+    if prior.parent != (ROOT / 'backups/db-cutover').resolve():
+        raise RuntimeError('Unexpected previous run directory')
+    if (prior / 'original-override.json').read_bytes() != original_override:
+        raise RuntimeError('Override changed since failed attempt')
+    target = inspect(state['target'])
+    if (target['Config']['Labels'].get('com.docker.compose.service') != 'shieldline-db'
+            or target['Image'] != inspect(source_id)['Image']
+            or set(target['NetworkSettings']['Networks']) != {'kma-local_shieldline_private'}
+            or target['HostConfig'].get('PortBindings')
+            or not target['State'].get('Running')):
+        raise RuntimeError('Unexpected retry target configuration')
+    members = json.loads(output(['docker', 'network', 'inspect', 'kma-local_shieldline_private']))[0]['Containers']
+    if set(members) != {target['Id']}:
+        raise RuntimeError('Another container is attached to the target network')
+    if not any(m.get('Name') == 'kma-local_shieldline_pg_data' and m.get('Destination') == '/var/lib/postgresql' for m in target.get('Mounts', [])):
+        raise RuntimeError('Unexpected retry target volume')
+    if sql(state['target'], 'shieldline_admin', 'shieldline', """
+        SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema';
+    """) != '0':
+        raise RuntimeError('Retry target is not empty; no changes made')
+    if sql(state['target'], 'shieldline_admin', 'shieldline',
+           "SELECT count(*) FROM pg_stat_activity WHERE backend_type='client backend' AND pid<>pg_backend_pid();") != '0':
+        raise RuntimeError('Retry target has other clients')
+    credentials = STATE.parent / 'shieldline-database-secrets/.env.database'
+    saved = dict(line.split('=', 1) for line in credentials.read_text().splitlines() if '=' in line)
+    if any(saved.get(key) != env(target).get(key) for key in ['POSTGRES_USER', 'POSTGRES_DB', 'POSTGRES_PASSWORD']):
+        raise RuntimeError('Retry credentials mismatch')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute', action='store_true', help='Stop Shieldline, copy/verify data, then switch it')
+    parser.add_argument('--retry-failed', action='store_true', help='Reuse a verified empty pre-activation target')
     args = parser.parse_args()
     if not args.execute:
         parser.error('No changes made. Use --execute only for the planned Shieldline maintenance window.')
@@ -91,7 +128,10 @@ def main():
     os.umask(0o077)
     if os.environ.get('COMPOSE_FILE') or os.environ.get('COMPOSE_PROJECT_NAME'):
         raise RuntimeError('Custom Compose environment detected; review before cutover')
-    if STATE.exists():
+    retry_state = json.loads(STATE.read_text()) if args.retry_failed and STATE.exists() else None
+    if args.retry_failed and retry_state is None:
+        raise RuntimeError('No failed attempt to retry')
+    if STATE.exists() and not args.retry_failed:
         raise RuntimeError('Existing cutover state found; inspect it instead of rerunning')
     for name in ['compose.yaml', 'compose.yml', 'compose.override.yaml', 'compose.override.yml',
                  'docker-compose.override.yaml']:
@@ -134,13 +174,16 @@ def main():
         if len(writers) != 1 or not cid.startswith(writers[0]):
             raise RuntimeError(f'Unexpected number of {service} writers')
         if (values.get('SHIELDLINE_DB_HOST') != 'db' or values.get('SHIELDLINE_DB_NAME') != database
+                or values.get('SHIELDLINE_DATABASE_URL')
                 or set(current['NetworkSettings']['Networks']) != {'kma-local_default'}):
             raise RuntimeError(f'Unexpected connection/network: {service}')
         if any(str(value) != values.get(key) for key, value in effective['services'][service].get('environment', {}).items()):
             raise RuntimeError(f'Compose environment differs from running {service}')
         original_ids[service] = cid
         original_envs[service] = values
-    for object_type, name in [('container', 'kma-local-shieldline-db-1'), ('volume', 'kma-local_shieldline_pg_data')]:
+    if retry_state is not None:
+        validate_retry(retry_state, source_id, original_override)
+    for object_type, name in ([] if retry_state is not None else [('container', 'kma-local-shieldline-db-1'), ('volume', 'kma-local_shieldline_pg_data')]):
         if subprocess.run(['docker', object_type, 'inspect', name], stdout=subprocess.DEVNULL,
                           stderr=subprocess.DEVNULL).returncode == 0:
             raise RuntimeError(f'Target already exists: {name}; refusing to overwrite')
@@ -166,10 +209,11 @@ def main():
     STATE.parent.mkdir(exist_ok=True)
     admin_password, app_password = secrets.token_hex(32), secrets.token_hex(32)
     credential_dir = STATE.parent / 'shieldline-database-secrets'
-    credential_dir.mkdir(exist_ok=False)
+    credential_dir.mkdir(exist_ok=retry_state is not None)
     credentials = credential_dir / '.env.database'
-    with credentials.open('x') as stream:
-        stream.write(f'POSTGRES_USER=shieldline_admin\nPOSTGRES_DB=shieldline\nPOSTGRES_PASSWORD={admin_password}\n')
+    if retry_state is None:
+        with credentials.open('x') as stream:
+            stream.write(f'POSTGRES_USER=shieldline_admin\nPOSTGRES_DB=shieldline\nPOSTGRES_PASSWORD={admin_password}\n')
     definition = {
         'name': 'kma-local',
         'services': {'shieldline-db': {
@@ -187,7 +231,13 @@ def main():
     run(['docker', 'compose', '-f', str(stage), 'config', '--quiet'], stdout=subprocess.DEVNULL)
     state = {'phase': 'preparing', 'source_container': source_id, 'original_containers': original_ids,
              'run_dir': str(run_dir), 'target': 'kma-local-shieldline-db-1'}
-    private_json(STATE, state)
+    if retry_state is not None:
+        private_json(run_dir / 'previous-state.json', retry_state)
+        replacement_state = run_dir / 'new-state.json'
+        private_json(replacement_state, state)
+        replacement_state.replace(STATE)
+    else:
+        private_json(STATE, state)
 
     def phase(value):
         state['phase'] = value
@@ -200,7 +250,8 @@ def main():
     activated = False
     override_created = False
     try:
-        run(['docker', 'compose', '-f', str(stage), 'up', '-d', 'shieldline-db'], stdout=subprocess.DEVNULL)
+        if retry_state is None:
+            run(['docker', 'compose', '-f', str(stage), 'up', '-d', 'shieldline-db'], stdout=subprocess.DEVNULL)
         target = 'kma-local-shieldline-db-1'
         for attempt in range(90):
             if inspect(target)['State'].get('Health', {}).get('Status') == 'healthy':
@@ -209,15 +260,18 @@ def main():
         else:
             raise RuntimeError('New database not healthy')
         sql(target, 'shieldline_admin', 'shieldline',
-            f"CREATE ROLE shieldline_app LOGIN PASSWORD '{app_password}' NOSUPERUSER NOCREATEDB NOCREATEROLE; "
+            f"{'ALTER' if retry_state is not None else 'CREATE'} ROLE shieldline_app LOGIN PASSWORD '{app_password}' NOSUPERUSER NOCREATEDB NOCREATEROLE; "
             'ALTER DATABASE shieldline OWNER TO shieldline_app; REVOKE CONNECT ON DATABASE shieldline FROM PUBLIC; '
             'GRANT CONNECT ON DATABASE shieldline TO shieldline_app;')
         phase('stopping-source-writer')
-        for cid in original_ids.values():
+        for service, cid in original_ids.items():
             stopped_ids.append(cid)
             run(['docker', 'stop', '--time', '60', cid], stdout=subprocess.DEVNULL)
-            if inspect(cid)['State'].get('ExitCode') not in (0, 143):
-                raise RuntimeError('A writer did not stop gracefully; inspect before retrying')
+            stopped = inspect(cid)['State']
+            if stopped.get('Running') or stopped.get('ExitCode') not in (0, 143):
+                state['failed_service'] = service
+                state['failed_exit_code'] = stopped.get('ExitCode')
+                raise RuntimeError(f'{service} did not stop gracefully (exit={stopped.get("ExitCode")}); inspect before retrying')
         phase('copying')
         baseline = inventory(source_id, user, database)
         with (run_dir / 'source.dump').open('xb') as dump:

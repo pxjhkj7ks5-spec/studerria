@@ -120,3 +120,13 @@ Deployment prerequisites: the existing update script backs up shared PostgreSQL 
 Obriy/Shieldline. It must be changed to select their actual database before cutover;
 all four Shieldline service definitions must move together. Server-local Compose
 changes must be inspected and preserved, not replaced wholesale.
+# Retrying an interrupted Shieldline preparation
+
+After fixing the source shutdown issue, an operator may run
+`python3 scripts/separate-shieldline-database.py --execute --retry-failed`.
+This is a real maintenance-window cutover, not a dry run. It is allowed only for
+`failed-before-activation-source-retained`, with unchanged source and override,
+an isolated empty target and no other database clients. Existing credentials and
+target volume are retained; previous state is archived in the new backup directory.
+Current writer container IDs are rediscovered. A fresh dump and full comparison
+are required. Failures after activation still prohibit automatic rollback.
