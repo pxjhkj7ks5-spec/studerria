@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { installShutdown } from "./serverShutdown.mjs";
 import { createHmac, randomInt, randomUUID } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -640,7 +641,8 @@ const handleHttpRequest = async (req, res) => {
   sendFile(res, indexPath);
 };
 
-createServer(instrumentHttpHandler(handleHttpRequest)).listen(port, "0.0.0.0", () => {
+const httpServer = createServer(instrumentHttpHandler(handleHttpRequest));
+httpServer.listen(port, "0.0.0.0", () => {
   console.log(`Shieldline listening on 0.0.0.0:${port}${basePath || "/"}`);
 });
 
@@ -648,4 +650,4 @@ if (storageDriver === "json") {
   const notificationTimer = setInterval(() => { void deliverTelegramNotifications(); }, 30_000);
   notificationTimer.unref();
 }
-process.once("SIGTERM", () => { void shutdownTelemetry(); });
+installShutdown(httpServer, shutdownTelemetry);
