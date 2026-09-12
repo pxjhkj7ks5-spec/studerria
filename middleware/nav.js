@@ -153,6 +153,7 @@ function buildUserNav(req, res) {
     flags: {
       canAccessAdminPanel: Boolean(req && req.canAccessAdminPanel),
       canManagePathways: Boolean(req && req.canManagePathways),
+      canAccessOsint: Boolean(req && req.canAccessOsint),
       allowMessages: Boolean(settings && settings.allow_messages),
       allowCustomDeadlines: Boolean(settings && settings.allow_custom_deadlines),
       canUseCustomDeadlines: canUseCustomDeadlines({ roles }, settings),

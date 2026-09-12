@@ -1,0 +1,28 @@
+{
+  "name": "@studerria/osint-graph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Isolated Studerria Social Graph MVP",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "test:integration": "node --test test/integration/*.test.js",
+    "check": "node --check src/server.js && node --check src/app.js"
+  },
+  "dependencies": {
+    "csv-parse": "^7.0.2",
+    "cytoscape": "^3.33.1",
+    "ejs": "^4.0.1",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "multer": "^2.1.1",
+    "pg": "^8.17.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.4"
+  }
+}

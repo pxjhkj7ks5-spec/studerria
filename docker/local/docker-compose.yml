@@ -584,6 +584,74 @@ services:
       retries: 12
       start_period: 30s
 
+  osint-db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${OSINT_DB_NAME:-studerria_osint}
+      POSTGRES_USER: osint_owner
+      POSTGRES_PASSWORD: ${OSINT_DB_OWNER_PASSWORD:-studerria_osint_owner_local}
+      OSINT_DB_USER: ${OSINT_DB_USER:-studerria_osint}
+      OSINT_DB_PASSWORD: ${OSINT_DB_PASSWORD:-studerria_osint_local}
+    volumes:
+      - osint_postgres_data:/var/lib/postgresql
+      - ./osint-db-init.sh:/docker-entrypoint-initdb.d/10-osint-app-role.sh:ro
+    networks:
+      - osint_private
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  osint-graph:
+    build:
+      context: ../../services/osint-graph
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    depends_on:
+      osint-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 8080
+      OSINT_BASE_PATH: /osint
+      OSINT_DATABASE_URL: postgresql://${OSINT_DB_USER:-studerria_osint}:${OSINT_DB_PASSWORD:-studerria_osint_local}@osint-db:5432/${OSINT_DB_NAME:-studerria_osint}
+      OSINT_GATEWAY_SECRET: ${OSINT_GATEWAY_SECRET:-}
+      OSINT_GITHUB_TOKEN: ${OSINT_GITHUB_TOKEN:-}
+      OSINT_MAX_GRAPH_NODES: ${OSINT_MAX_GRAPH_NODES:-500}
+      OSINT_GRAPH_WARNING_NODES: ${OSINT_GRAPH_WARNING_NODES:-300}
+      OSINT_MAX_GRAPH_RELATIONSHIPS: ${OSINT_MAX_GRAPH_RELATIONSHIPS:-2000}
+      OSINT_MAX_IMPORT_BYTES: ${OSINT_MAX_IMPORT_BYTES:-5242880}
+      OSINT_MAX_IMPORT_RECORDS: ${OSINT_MAX_IMPORT_RECORDS:-5000}
+      OSINT_COLLECTOR_TIMEOUT_MS: ${OSINT_COLLECTOR_TIMEOUT_MS:-15000}
+      OSINT_WEB_MAX_PAGES: ${OSINT_WEB_MAX_PAGES:-5}
+      OSINT_WEB_MAX_RESPONSE_BYTES: ${OSINT_WEB_MAX_RESPONSE_BYTES:-2097152}
+      OSINT_RETENTION_DAYS: ${OSINT_RETENTION_DAYS:-90}
+      OSINT_API_RATE_LIMIT_PER_MINUTE: ${OSINT_API_RATE_LIMIT_PER_MINUTE:-120}
+      OSINT_ASSERTION_MAX_AGE_SECONDS: ${OSINT_ASSERTION_MAX_AGE_SECONDS:-60}
+      OSINT_RUN_CONCURRENCY: ${OSINT_RUN_CONCURRENCY:-1}
+    networks:
+      - default
+      - osint_private
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/osint/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   app:
     build:
       context: ../..
@@ -624,6 +692,8 @@ services:
       OSIX_PROXY_TARGET: http://osix:8080
       OBRIY_PROXY_TARGET: http://obriy:8080
       SHIELDLINE_PROXY_TARGET: http://shieldline:8080
+      OSINT_PROXY_TARGET: http://osint-graph:8080
+      OSINT_GATEWAY_SECRET: ${OSINT_GATEWAY_SECRET:-}
       STUDERRIA_TG_BOT_TOKEN: ${STUDERRIA_TG_BOT_TOKEN:-}
       STUDERRIA_TG_BOT_USERNAME: ${STUDERRIA_TG_BOT_USERNAME:-}
       STUDERRIA_TG_APP_SHORT_NAME: ${STUDERRIA_TG_APP_SHORT_NAME:-}
@@ -675,3 +745,8 @@ volumes:
   clickhouse_data:
   loki_data:
   promtail_positions:
+  osint_postgres_data:
+
+networks:
+  osint_private:
+    internal: true

@@ -29,6 +29,7 @@ Services:
   obriy        /obriy private monitoring sidecar
   osix         /osix sidecar
   shieldline   /shieldline sidecar
+  osint        /osint protected Social Graph sidecar and gateway
   db           PostgreSQL
   redis        Redis
   loki         Loki
@@ -57,6 +58,7 @@ normalize_service() {
     obriy|obrii) echo "obriy" ;;
     osix) echo "osix" ;;
     shieldline|shield-line) echo "shieldline" ;;
+    osint|osint-graph|social-graph) echo "osint" ;;
     db|postgres|postgresql) echo "db" ;;
     redis) echo "redis" ;;
     loki) echo "loki" ;;
@@ -170,8 +172,23 @@ backup_postgres_database() {
     backup_service=shieldline-db
     backup_label=shieldline-postgres
   fi
+  if [ "$SERVICE" = osint ]; then
+    backup_service=osint-db
+    backup_label=osint-postgres
+  fi
   container_id="$(docker compose ps -q "$backup_service" 2>/dev/null || true)"
   if [ -z "$container_id" ]; then
+    if [ "$backup_service" = osint-db ]; then
+      existing_volume="$(
+        docker volume ls -q \
+          --filter label=com.docker.compose.volume=osint_postgres_data \
+          2>/dev/null | head -n 1
+      )"
+      if [ -z "$existing_volume" ]; then
+        echo 'OSINT PostgreSQL backup skipped: this is the first deployment and no data volume exists.'
+        return 0
+      fi
+    fi
     if [ "$backup_service" != db ]; then
       echo 'Dedicated service database is unavailable; refusing update without its backup.' >&2
       return 1
@@ -201,7 +218,7 @@ backup_stateful_data() {
   fi
 
   case "$SERVICE" in
-    app|db|obriy)
+    app|db|obriy|osint)
       backup_postgres_database
       ;;
     charredmap)
@@ -311,6 +328,9 @@ git pull --rebase
 if [ "$SERVICE" = "obriy" ]; then
   bash "$ROOT_DIR/scripts/setup-obriy-env.sh" "$ROOT_DIR/docker/local/.env"
 fi
+if [ "$SERVICE" = "osint" ]; then
+  bash "$ROOT_DIR/scripts/setup-osint-env.sh" "$ROOT_DIR/docker/local/.env"
+fi
 
 cd "$ROOT_DIR/docker/local"
 
@@ -335,6 +355,9 @@ fi
 update_targets=("$SERVICE")
 if [ "$SERVICE" = "shieldline" ]; then
   update_targets=(shieldline shieldline-projection-worker shieldline-notification-worker shieldline-admin-bot-worker)
+fi
+if [ "$SERVICE" = "osint" ]; then
+  update_targets=(osint-db osint-graph app)
 fi
 
 if [ "$PULL" -eq 1 ]; then

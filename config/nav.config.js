@@ -22,6 +22,15 @@ const navConfig = {
       matchMode: 'prefix',
     },
     {
+      id: 'osint-social-graph',
+      label: 'Social Graph',
+      href: '/osint',
+      section: 'main',
+      rolesAllowed: APP_ROLES,
+      requiredFlags: ['canAccessOsint'],
+      matchMode: 'prefix',
+    },
+    {
       id: 'home',
       label: 'Головна',
       labelKey: 'nav.home',
