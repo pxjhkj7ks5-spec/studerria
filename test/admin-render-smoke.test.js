@@ -139,6 +139,23 @@ test('admin shell renders with canonical academic scope helpers', async () => {
   assert.match(html, /admin|Overview|Academic Setup/i);
 });
 
+test('admin renders Telegram schedule binding management', async () => {
+  const html = await renderView('admin.ejs', baseRenderLocals({
+    telegramScheduleAdminData: {
+      timeLabel: '18:00',
+      eligibleGroups: [{ academic_group_id: 20, program_name: 'ПЛЕД', admission_year: 2025, stage_number: 2, campus_key: 'kyiv', label: 'ПЛЕД 2025' }],
+      bindings: [{ id: 4, academic_group_id: 20, program_name: 'ПЛЕД', admission_year: 2025, stage_number: 2,
+        campus_key: 'kyiv', label: 'ПЛЕД 2025', chat_id: '-100444', thread_id: 12, is_enabled: true,
+        last_status: 'sent', last_delivery_at: '2026-09-13T15:00:00Z', last_target_date: '2026-09-14' }],
+    },
+  }));
+  assert.match(html, /Розсилка розкладу/);
+  assert.match(html, /-100444/);
+  assert.match(html, /topic\s*<code>12<\/code>/);
+  assert.match(html, /\/admin\/telegram-schedule-bindings\/4\/update/);
+  assert.match(html, /\/admin\/telegram-schedule-bindings\/4\/delete/);
+});
+
 test('admin overview renders with canonical scope locals', async () => {
   const html = await renderView('admin-overview.ejs', baseRenderLocals({
     dashboardStats: { users: 1, subjects: 2, homework: 3, teamworkTasks: 0, teamworkGroups: 0, teamworkMembers: 0 },

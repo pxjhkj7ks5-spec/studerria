@@ -1080,6 +1080,9 @@
           </div>
           <div class="admin-sidebar-section">
             <div class="admin-sidebar-title">Зв’язок</div>
+            <% if (sectionAllowed('admin-tg-schedule')) { %>
+              <button class="admin-nav-link" type="button" data-admin-nav="admin-tg-schedule">Розсилка розкладу</button>
+            <% } %>
             <% if (sectionAllowed('admin-support') && supportSectionVisible) { %>
               <button class="admin-nav-link" type="button" data-admin-nav="admin-support"><%= t('admin.supportSectionNav') %></button>
             <% } %>
@@ -1182,6 +1185,14 @@
         return acc;
       }, {})); %>
       <% const telegramMiniStatsData = typeof telegramMiniAdminStats !== 'undefined' && telegramMiniAdminStats ? telegramMiniAdminStats : { summary: {}, users: [], actions: [] }; %>
+      <% const telegramScheduleData = typeof telegramScheduleAdminData !== 'undefined' && telegramScheduleAdminData ? telegramScheduleAdminData : { bindings: [], eligibleGroups: [], timeLabel: '18:00' }; %>
+      <% const telegramScheduleBindings = Array.isArray(telegramScheduleData.bindings) ? telegramScheduleData.bindings : []; %>
+      <% const telegramScheduleGroups = Array.isArray(telegramScheduleData.eligibleGroups) ? telegramScheduleData.eligibleGroups : []; %>
+      <% const telegramScheduleGroupLabel = function(group) {
+        const campus = group && group.campus_key === 'munich' ? 'Мюнхен' : 'Київ';
+        const primary = group && group.label ? group.label : [group && group.program_name, group && group.admission_year].filter(Boolean).join(' ');
+        return [primary, group && group.stage_number ? group.stage_number + ' курс' : '', campus].filter(Boolean).join(' · ');
+      }; %>
       <% const telegramMiniSummary = telegramMiniStatsData.summary || {}; %>
       <% const telegramMiniSecurity = telegramMiniStatsData.security || {}; %>
       <% const telegramMiniSecuritySummary = telegramMiniSecurity.summary || {}; %>
@@ -3232,6 +3243,123 @@
           </div>
         </div>
 
+        <% } %>
+
+        <% if (sectionAllowed('admin-tg-schedule')) { %>
+        <div id="admin-tg-schedule" class="admin-panel" data-admin-title="Telegram / Розсилка розкладу">
+          <div class="telegram-schedule-header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+              <div>
+                <div class="small text-uppercase text-muted fw-semibold mb-1">Telegram</div>
+                <h5 class="card-title mb-1">Розсилка розкладу</h5>
+                <div class="text-muted">Активні прив’язки отримують розклад на завтра щодня рівно о <strong><%= telegramScheduleData.timeLabel || '18:00' %></strong> за Києвом.</div>
+              </div>
+              <span class="badge rounded-pill text-bg-primary"><%= telegramScheduleBindings.filter(function(row) { return row.is_enabled === true || Number(row.is_enabled) === 1; }).length %> активних</span>
+          </div>
+
+          <div class="row g-4">
+            <div class="col-xl-5">
+              <div class="card telegram-schedule-form-card">
+                <div class="card-body">
+                  <h6 class="mb-1">Додати новий курс</h6>
+                  <p class="small text-muted mb-3">Бот має бути доданий у чат або канал і мати право надсилати повідомлення.</p>
+                  <form method="POST" action="/admin/telegram-schedule-bindings" class="row g-3">
+                    <div class="col-12">
+                      <label class="form-label" for="telegramScheduleGroup">Курс</label>
+                      <select class="form-select" id="telegramScheduleGroup" name="academic_group_id" required>
+                        <option value="">Оберіть курс</option>
+                        <% telegramScheduleGroups.forEach(function(group) { %>
+                          <option value="<%= group.academic_group_id %>"><%= telegramScheduleGroupLabel(group) %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="col-md-7">
+                      <label class="form-label" for="telegramScheduleChatId">Chat ID</label>
+                      <input class="form-control" id="telegramScheduleChatId" name="chat_id" inputmode="numeric" placeholder="-1001234567890" pattern="-?[1-9][0-9]*" required />
+                    </div>
+                    <div class="col-md-5">
+                      <label class="form-label" for="telegramScheduleThreadId">Thread ID</label>
+                      <input class="form-control" id="telegramScheduleThreadId" name="thread_id" type="number" min="1" step="1" placeholder="Необов’язково" />
+                    </div>
+                    <div class="col-12">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" id="telegramScheduleEnabled" name="is_enabled" value="1" type="checkbox" checked />
+                        <label class="form-check-label" for="telegramScheduleEnabled">Одразу увімкнути розсилку</label>
+                      </div>
+                    </div>
+                    <div class="col-12 d-grid">
+                      <button class="btn btn-primary" type="submit" <%= telegramScheduleGroups.length ? '' : 'disabled' %>>Додати прив’язку</button>
+                    </div>
+                  </form>
+                  <div class="small text-muted mt-3">Щоб дізнатися значення, староста або dev може написати <code>/chatid</code> у потрібному чаті чи topic.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-7">
+              <div class="telegram-schedule-list">
+                <% telegramScheduleBindings.forEach(function(binding) {
+                  const enabled = binding.is_enabled === true || Number(binding.is_enabled) === 1;
+                  const statusLabels = { sent: 'Надіслано', sending: 'Надсилання', failed: 'Помилка', uncertain: 'Не підтверджено' };
+                  const statusClasses = { sent: 'success', sending: 'primary', failed: 'danger', uncertain: 'warning' };
+                %>
+                  <article class="card telegram-schedule-binding-card">
+                    <div class="card-body">
+                      <div class="d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                          <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                            <h6 class="mb-0"><%= telegramScheduleGroupLabel(binding) %></h6>
+                            <span class="badge rounded-pill text-bg-<%= enabled ? 'success' : 'secondary' %>"><%= enabled ? 'Увімкнено' : 'Вимкнено' %></span>
+                          </div>
+                          <div class="telegram-schedule-destination"><code><%= binding.chat_id %></code><% if (binding.thread_id) { %><span>topic <code><%= binding.thread_id %></code></span><% } %></div>
+                        </div>
+                        <form method="POST" action="/admin/telegram-schedule-bindings/<%= binding.id %>/toggle">
+                          <input type="hidden" name="is_enabled" value="<%= enabled ? '0' : '1' %>" />
+                          <button class="btn btn-sm btn-outline-<%= enabled ? 'secondary' : 'success' %>" type="submit"><%= enabled ? 'Вимкнути' : 'Увімкнути' %></button>
+                        </form>
+                      </div>
+                      <div class="telegram-schedule-last mt-3">
+                        <% if (binding.last_status) { %>
+                          <span class="badge text-bg-<%= statusClasses[binding.last_status] || 'secondary' %>"><%= statusLabels[binding.last_status] || binding.last_status %></span>
+                          <span class="small text-muted">Остання спроба: <%= formatAdminDateTime(binding.last_delivery_at) %><% if (binding.last_target_date) { %> · розклад на <%= String(binding.last_target_date).slice(0, 10).split('-').reverse().join('.') %><% } %></span>
+                        <% } else { %>
+                          <span class="small text-muted">Надсилань із цієї прив’язки ще не було.</span>
+                        <% } %>
+                      </div>
+                      <% if (binding.last_error) { %><div class="small text-danger mt-2"><%= String(binding.last_error).slice(0, 240) %></div><% } %>
+                      <details class="mt-3">
+                        <summary class="small fw-semibold">Редагувати</summary>
+                        <form method="POST" action="/admin/telegram-schedule-bindings/<%= binding.id %>/update" class="row g-2 mt-1">
+                          <div class="col-12">
+                            <select class="form-select form-select-sm" name="academic_group_id" required>
+                              <% telegramScheduleGroups.forEach(function(group) { %>
+                                <option value="<%= group.academic_group_id %>" <%= Number(group.academic_group_id) === Number(binding.academic_group_id) ? 'selected' : '' %>><%= telegramScheduleGroupLabel(group) %></option>
+                              <% }); %>
+                            </select>
+                          </div>
+                          <div class="col-md-7"><input class="form-control form-control-sm" name="chat_id" value="<%= binding.chat_id %>" pattern="-?[1-9][0-9]*" required /></div>
+                          <div class="col-md-5"><input class="form-control form-control-sm" name="thread_id" type="number" min="1" step="1" value="<%= binding.thread_id || '' %>" placeholder="Thread ID" /></div>
+                          <div class="col-12 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <div class="form-check form-switch mb-0">
+                              <input class="form-check-input" id="bindingEnabled<%= binding.id %>" name="is_enabled" value="1" type="checkbox" <%= enabled ? 'checked' : '' %> />
+                              <label class="form-check-label small" for="bindingEnabled<%= binding.id %>">Активна</label>
+                            </div>
+                            <button class="btn btn-sm btn-primary" type="submit">Зберегти</button>
+                          </div>
+                        </form>
+                        <form method="POST" action="/admin/telegram-schedule-bindings/<%= binding.id %>/delete" class="mt-2 text-end">
+                          <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Видалити цю Telegram-прив’язку? Історія доставок залишиться в журналі.">Видалити</button>
+                        </form>
+                      </details>
+                    </div>
+                  </article>
+                <% }); %>
+                <% if (!telegramScheduleBindings.length) { %>
+                  <div class="card"><div class="card-body text-center py-5"><div class="h6 mb-1">Прив’язок ще немає</div><div class="small text-muted">Додайте перший курс і Telegram-чат у формі.</div></div></div>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
         <% } %>
 
         <% if (sectionAllowed('admin-visit-analytics')) { %>

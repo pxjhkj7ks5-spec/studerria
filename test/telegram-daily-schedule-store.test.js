@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { Pool } = require('pg');
 const { createDailyScheduleStore } = require('../lib/studerriaTelegramDailyScheduleStore');
 const migration = require('../migrations/067_telegram_daily_schedule_deliveries');
+const bindingsMigration = require('../migrations/076_telegram_daily_schedule_bindings');
 
 // Run against an isolated local PostgreSQL socket; never use the app's database credentials.
 test('daily schedule roster and delivery claims use PostgreSQL constraints', {
@@ -19,15 +20,20 @@ test('daily schedule roster and delivery claims use PostgreSQL constraints', {
     CREATE TABLE academic_v2_programs (id INTEGER PRIMARY KEY, name TEXT, is_active BOOLEAN, track_key TEXT);
     CREATE TABLE academic_v2_cohorts (id INTEGER PRIMARY KEY, program_id INTEGER, admission_year INTEGER, is_active BOOLEAN);
     CREATE TABLE academic_v2_groups (id INTEGER PRIMARY KEY, cohort_id INTEGER, legacy_course_id INTEGER,
-      campus_key TEXT, label TEXT, is_active BOOLEAN);
+      campus_key TEXT, label TEXT, stage_number INTEGER DEFAULT 1, is_active BOOLEAN);
     CREATE TABLE users (id INTEGER PRIMARY KEY, full_name TEXT, role TEXT, group_id INTEGER, course_id INTEGER,
-      schedule_group TEXT, study_context_id INTEGER, telegram_id TEXT, telegram_username TEXT, is_active INTEGER);
-    CREATE TABLE access_roles (id INTEGER PRIMARY KEY, key TEXT, is_active BOOLEAN);
+      schedule_group TEXT, study_context_id INTEGER, telegram_id TEXT, telegram_username TEXT, is_active INTEGER,
+      show_full_schedule BOOLEAN DEFAULT FALSE);
+    CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE access_roles (id INTEGER PRIMARY KEY, key TEXT UNIQUE, is_active BOOLEAN);
+    CREATE TABLE access_permissions (id SERIAL PRIMARY KEY, key TEXT UNIQUE, label TEXT, category TEXT);
+    CREATE TABLE access_role_permissions (role_id INTEGER, permission_id INTEGER, allowed BOOLEAN,
+      created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ, PRIMARY KEY (role_id, permission_id));
     CREATE TABLE user_roles (user_id INTEGER, role_id INTEGER);
     INSERT INTO academic_v2_programs VALUES (1, 'ПЛЕД', true, 'bachelor');
     INSERT INTO academic_v2_cohorts VALUES (1, 1, 2025, true), (2, 1, 2026, true);
-    INSERT INTO academic_v2_groups VALUES (20, 1, 10, 'kyiv', 'ПЛЕД 2025', true),
-      (21, 2, 11, 'kyiv', 'ПЛЕД 2026', true), (22, 1, 12, 'kyiv', 'Архів', false);
+    INSERT INTO academic_v2_groups VALUES (20, 1, 10, 'kyiv', 'ПЛЕД 2025', 2, true),
+      (21, 2, 11, 'kyiv', 'ПЛЕД 2026', 1, true), (22, 1, 12, 'kyiv', 'Архів', 2, false);
     INSERT INTO access_roles VALUES (1, 'student', true), (2, 'starosta', true), (3, 'teacher', true);
     INSERT INTO users (id, full_name, role, group_id, course_id, telegram_id, is_active) VALUES
       (1, 'Stale legacy course', 'student', 20, 999, '1001', 1),
@@ -55,6 +61,10 @@ test('daily schedule roster and delivery claims use PostgreSQL constraints', {
     run: query,
   });
 
+  await migration.up(pool);
+  await bindingsMigration.up(pool);
+  await bindingsMigration.up(pool);
+
   await t.test('uses the current academic group, active linked students and current student/starosta roles', async () => {
     const course = await store.loadCourse({ courseId: 10 });
     assert.equal(course.group_id, 20);
@@ -66,13 +76,12 @@ test('daily schedule roster and delivery claims use PostgreSQL constraints', {
   });
 
   await t.test('ambiguous course mapping is rejected instead of mixing student groups', async () => {
-    await pool.query("INSERT INTO academic_v2_groups VALUES (23, 1, 10, 'munich', 'Мюнхен', true)");
+    await pool.query("INSERT INTO academic_v2_groups VALUES (23, 1, 10, 'munich', 'Мюнхен', 2, true)");
     await assert.rejects(store.loadCourse({ courseId: 10 }), /один активний/);
     await pool.query('DELETE FROM academic_v2_groups WHERE id = 23');
   });
 
   await t.test('migration is repeatable and concurrent claims admit exactly one sender', async () => {
-    await migration.up(pool);
     await migration.up(pool);
     const delivery = { key: 'automatic|2026-09-02|-100111|10', mode: 'automatic',
       targetIso: '2026-09-02', chatId: '-100111', threadId: null, courseId: 10 };
@@ -90,5 +99,31 @@ test('daily schedule roster and delivery claims use PostgreSQL constraints', {
     assert.equal(await store.claimDelivery({ ...delivery, key: 'manual|99:1', mode: 'manual' }), null);
     await assert.rejects(store.finishDelivery(manual.id, 'not_a_status'), /check constraint/);
     assert.ok(parameterQueries > 0);
+  });
+
+  await t.test('legacy import runs once and binding CRUD enforces destination uniqueness', async () => {
+    const imported = await store.importLegacyBinding({ enabled: true, courseId: 10, chatId: '-100500', threadId: 55 });
+    assert.ok(imported);
+    assert.equal((await store.listBindings()).length, 1);
+    assert.equal(await store.importLegacyBinding({ enabled: true, courseId: 11, chatId: '-100501' }), null);
+
+    const created = await store.createBinding({ academicGroupId: 21, chatId: '-100600', threadId: null, isEnabled: true, actorId: 1 });
+    assert.ok(created.id);
+    await assert.rejects(
+      store.createBinding({ academicGroupId: 20, chatId: '-100600', threadId: null, isEnabled: true, actorId: 1 }),
+      /unique constraint/
+    );
+    const updated = await store.updateBinding(created.id, {
+      academicGroupId: 21, chatId: '-100600', threadId: 77, isEnabled: false, actorId: 1,
+    });
+    assert.equal(Number(updated.thread_id), 77);
+    assert.equal(updated.is_enabled, false);
+    assert.equal((await store.listBindings({ activeOnly: true })).length, 1);
+    assert.equal((await store.listEligibleGroups()).length, 2);
+    await store.setBindingEnabled(created.id, true, 1);
+    assert.ok(await store.getBinding(created.id, { activeOnly: true }));
+    await store.deleteBinding(imported.id);
+    assert.equal(await store.importLegacyBinding({ enabled: true, courseId: 10, chatId: '-100500', threadId: 55 }), null);
+    assert.equal((await store.listBindings()).some((row) => row.chat_id === '-100500'), false);
   });
 });

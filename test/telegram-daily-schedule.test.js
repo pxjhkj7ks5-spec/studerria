@@ -347,3 +347,67 @@ test('private acknowledgement failure cannot trigger a second channel post', asy
   assert.equal(f.sent.length, 1);
   assert.equal(Array.from(f.records.values())[0].status, 'sent');
 });
+
+test('automatic delivery processes multiple bindings independently', async () => {
+  const f = fixture();
+  f.deps.store.importLegacyBinding = async () => null;
+  f.deps.store.listBindings = async () => [
+    { id: 1, academic_group_id: 20, course_id: 10, chat_id: '-100111', label: 'ПЛЕД 2025' },
+    { id: 2, academic_group_id: 20, course_id: 10, chat_id: '-100222', thread_id: 77, label: 'ПЛЕД 2025 topic' },
+  ];
+  const send = f.deps.sendMessage;
+  f.deps.sendMessage = async (chatId, text, options) => {
+    if (chatId === '-100222') {
+      throw Object.assign(new Error('bad topic'), { telegramResponse: { ok: false, error_code: 400 } });
+    }
+    return send(chatId, text, options);
+  };
+  const service = createDailyScheduleService(f.deps);
+  await service.tick();
+  assert.equal(f.sent.filter((message) => message.chatId === '-100111').length, 1);
+  assert.equal(f.sent.filter((message) => message.chatId === '-100222').length, 0);
+  assert.deepEqual(Array.from(f.records.values()).map((record) => [record.bindingId, record.status]), [[1, 'sent'], [2, 'failed']]);
+  await service.tick();
+  assert.equal(f.records.size, 2);
+});
+
+test('dev schedule menu selects one binding and protects send callbacks by actor and token', async () => {
+  const f = fixture();
+  const tokens = new Map();
+  const edits = [];
+  let tokenNumber = 0;
+  f.deps.store.importLegacyBinding = async () => null;
+  f.deps.store.listBindings = async () => [
+    { id: 4, academic_group_id: 20, course_id: 10, chat_id: '-100444', thread_id: 12, label: 'ПЛЕД 2025' },
+  ];
+  f.deps.store.getBinding = async (id) => Number(id) === 4
+    ? { id: 4, academic_group_id: 20, course_id: 10, chat_id: '-100444', thread_id: 12, label: 'ПЛЕД 2025' }
+    : null;
+  f.deps.createActionToken = (payload) => {
+    const token = `token-${++tokenNumber}`;
+    tokens.set(token, payload);
+    return token;
+  };
+  f.deps.consumeActionPayload = (token) => {
+    const payload = tokens.get(token) || null;
+    tokens.delete(token);
+    return payload;
+  };
+  f.deps.editMessage = async (_query, text, replyMarkup) => edits.push({ text, replyMarkup });
+  f.deps.answerCallback = async () => {};
+  const service = createDailyScheduleService(f.deps);
+  await service.handleCommand(command());
+  const selectToken = f.sent[0].options.replyMarkup.inline_keyboard[0][0].callback_data;
+  const selectPayload = tokens.get(selectToken);
+  await service.handleCallback({ id: 'select', from: { id: 99 }, message: { chat: { id: 99, type: 'private' } }, data: selectToken }, selectPayload);
+  assert.match(edits[0].text, /ПЛЕД 2025.*-100444\/12/);
+  const sendToken = edits[0].replyMarkup.inline_keyboard[0][1].callback_data;
+  const sendPayload = tokens.get(sendToken);
+  await service.handleCallback({ id: 'wrong', from: { id: 98 }, message: { chat: { id: 98, type: 'private' } }, data: sendToken }, sendPayload);
+  assert.equal(f.records.size, 0);
+  await service.handleCallback({ id: 'send', from: { id: 99 }, message: { chat: { id: 99, type: 'private' } }, data: sendToken }, sendPayload);
+  assert.equal(f.sent.filter((message) => message.chatId === '-100444').length, 1);
+  assert.equal(Array.from(f.records.values())[0].bindingId, 4);
+  await service.handleCallback({ id: 'repeat', from: { id: 99 }, message: { chat: { id: 99, type: 'private' } }, data: sendToken }, sendPayload);
+  assert.equal(f.sent.filter((message) => message.chatId === '-100444').length, 1);
+});

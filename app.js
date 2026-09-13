@@ -423,6 +423,7 @@ const ADMIN_SECTION_OPTIONS = [
   { id: 'admin-tg-homework', label: 'TG ДЗ' },
   { id: 'admin-users', label: 'Користувачі' },
   { id: 'admin-tg-users', label: 'Telegram users' },
+  { id: 'admin-tg-schedule', label: 'Розсилка розкладу' },
   { id: 'admin-teachers', label: 'Заявки викладачів' },
   { id: 'admin-subjects', label: 'Дисципліни' },
   { id: 'admin-semesters', label: 'Семестри' },
@@ -2849,6 +2850,7 @@ const requireImportExportSectionAccess = requireAdminSectionAccess('admin-import
 const requireScheduleGeneratorSectionAccess = requireAdminSectionAccess('admin-schedule-generator');
 const requireHomeworkSectionAccess = requireAdminSectionAccess('admin-homework');
 const requireUsersSectionAccess = requireAdminSectionAccess('admin-users');
+const requireTelegramScheduleSectionAccess = requireAdminSectionAccess('admin-tg-schedule');
 function requireTelegramUsersSectionAccess(req, res, next) {
   if (hasTelegramUsersSectionAccess(req)) {
     return next();
@@ -20438,7 +20440,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'start', description: 'Відкрити Studerria mini app' },
   { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
-  { command: 'chatid', description: 'Dev: показати ID чату' },
+  { command: 'chatid', description: 'Dev/староста: показати ID чату' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
   { command: 'devschedule', description: 'Dev: розклад на завтра в канал' },
   { command: 'devreply', description: 'Dev: автовідповідь на повідомлення юзера' },
@@ -20463,7 +20465,7 @@ const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
 const STUDERRIA_TG_GROUP_BOT_COMMANDS = [
   { command: 'help', description: 'Показати інструкцію' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
-  { command: 'chatid', description: 'Dev: показати ID чату' },
+  { command: 'chatid', description: 'Dev/староста: показати ID чату' },
   { command: 'showpari', description: 'Показати пари за тиждень' },
   { command: 'teamwork', description: 'Створити Teamwork команди' },
   { command: 'openteam', description: 'Відкрити вступ у Teamwork' },
@@ -21064,8 +21066,9 @@ async function sendStuderriaTelegramHelp(message = {}) {
     '',
     '6. Службові dev-команди',
     `${devUsersCommand} - список привʼязаних Telegram-користувачів. Тільки dev, тільки в особистому чаті.`,
-    '/devschedule — надіслати розклад на завтра в налаштований канал. Тільки dev в особистому чаті.',
-    '/devschedule preview — приватний перегляд без публікації в канал.',
+    '/devschedule — обрати привʼязку, переглянути й надіслати розклад на завтра. Тільки dev в особистому чаті.',
+    '/devschedule preview — обрати привʼязку й одразу відкрити приватний перегляд.',
+    '/chatid — показати ID поточного чату й topic. Доступно dev і зареєстрованій старості.',
     '/devreply set @username 5 Фраза — відповісти цією фразою на 5 повідомлень користувача в групах.',
     '/devreply set @username r Фраза — випадково обрати від 2 до 20 відповідей.',
     '/devreply on | off | status | clear — керування dev-автовідповіддю.',
@@ -21648,8 +21651,9 @@ function buildStuderriaTelegramWeeklyScheduleText(context = {}, weekNumber = 1, 
   return lines.join('\n').slice(0, 3900);
 }
 
+const studerriaTelegramDailyScheduleStore = createDailyScheduleStore(db);
 const studerriaTelegramDailySchedule = createDailyScheduleService({
-  store: createDailyScheduleStore(db),
+  store: studerriaTelegramDailyScheduleStore,
   ensureReady: ensureDbReady,
   hasBotToken: () => Boolean(getTelegramMiniBotToken()),
   loadSetup: (user) => loadTelegramMiniSetupState(user, { autoAssignRequired: false }),
@@ -21663,24 +21667,24 @@ const studerriaTelegramDailySchedule = createDailyScheduleService({
   },
   sendMessage: sendStuderriaTelegramMessage,
   isDevUser: isStuderriaTelegramDevUser,
+  createActionToken: createStuderriaTelegramActionToken,
+  consumeActionPayload: consumeStuderriaTelegramActionPayload,
+  editMessage: editStuderriaTelegramMessage,
+  answerCallback: answerStuderriaTelegramCallback,
   logger: console,
 });
 let studerriaTelegramDailyScheduleStarted = false;
 
 function startStuderriaTelegramDailyScheduleJob() {
   const config = getDailyScheduleConfig();
-  if (studerriaTelegramDailyScheduleStarted || !config.enabled) return;
-  if (config.invalid || !config.chatId || (!config.courseId && !config.actorTelegramId)) {
-    console.warn('Studerria daily schedule disabled: configure CHAT_ID, COURSE_ID and optional THREAD_ID');
-    return;
-  }
+  if (studerriaTelegramDailyScheduleStarted || !getTelegramMiniBotToken()) return;
   studerriaTelegramDailyScheduleStarted = true;
   const tick = () => studerriaTelegramDailySchedule.tick().catch((error) => {
     console.error('Studerria daily schedule tick failed', error);
   });
   tick();
   setInterval(tick, config.checkIntervalMs);
-  console.log('Studerria daily schedule job started', { time: config.time.label, timeZone: 'Europe/Kyiv' });
+  console.log('Studerria daily schedule job started', { time: config.time.label, timeZone: 'Europe/Kyiv', source: 'database' });
 }
 
 async function handleStuderriaTelegramShowCallback(callbackQuery = {}, payload = {}) {
@@ -23032,17 +23036,20 @@ function isStuderriaTelegramChatIdTextRequest(message = {}) {
   ].includes(normalized);
 }
 
-function canShowStuderriaTelegramChatId(message = {}) {
+async function canShowStuderriaTelegramChatId(message = {}, { allowStarosta = false } = {}) {
   const chatType = String(message && message.chat && message.chat.type || '').toLowerCase();
   if (chatType === 'channel') return true;
-  return isStuderriaTelegramDevUser(message.from || {});
+  if (isStuderriaTelegramDevUser(message.from || {})) return true;
+  if (!allowStarosta || !message.from || message.from.is_bot || message.sender_chat) return false;
+  const context = await getStuderriaTelegramActorContext(message.from || {}).catch(() => null);
+  return Boolean(context && context.actor && context.roleKeys.includes('starosta'));
 }
 
-async function handleStuderriaTelegramChatIdCommand(message = {}) {
+async function handleStuderriaTelegramChatIdCommand(message = {}, options = {}) {
   const chat = message && message.chat ? message.chat : null;
   const chatId = chat && chat.id ? chat.id : null;
   if (!chatId) return true;
-  if (!canShowStuderriaTelegramChatId(message)) {
+  if (!(await canShowStuderriaTelegramChatId(message, options))) {
     await sendStuderriaTelegramMessage(chatId, 'Недостатньо прав.', { sourceMessage: message });
     return true;
   }
@@ -25660,6 +25667,10 @@ async function handleStuderriaTelegramCallbackQuery(callbackQuery = {}) {
     await handleStuderriaTelegramGreetingConfirmCallback(callbackQuery, payload);
     return;
   }
+  if (String(payload.flow || '') === 'daily_schedule') {
+    await studerriaTelegramDailySchedule.handleCallback(callbackQuery, payload);
+    return;
+  }
   await answerStuderriaTelegramCallback(callbackQuery);
   if (String(payload.flow || '').startsWith('notification_')) {
     await handleStuderriaTelegramManualNotificationCallback(callbackQuery, payload);
@@ -25712,7 +25723,9 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     if ((parsedCommand && parsedCommand.command === 'chatid') || isStuderriaTelegramChatIdTextRequest(message)) {
-      await handleStuderriaTelegramChatIdCommand(message);
+      await handleStuderriaTelegramChatIdCommand(message, {
+        allowStarosta: Boolean(parsedCommand && parsedCommand.command === 'chatid'),
+      });
       return;
     }
     if (await handleStuderriaTelegramDevAutoReplyCommand(message, parsedCommand)) {
@@ -49732,6 +49745,131 @@ app.post('/teamwork/react', requireLogin, writeLimiter, async (req, res) => {
   }
 });
 
+function parseTelegramScheduleBindingInput(body = {}) {
+  const academicGroupId = parsePositiveIntStrict(body.academic_group_id);
+  const chatId = String(body.chat_id || '').trim();
+  const threadRaw = String(body.thread_id || '').trim();
+  const threadId = threadRaw ? parsePositiveIntStrict(threadRaw) : null;
+  if (!academicGroupId) throw new Error('Оберіть активний академічний курс.');
+  if (!/^-?[1-9][0-9]*$/.test(chatId)) throw new Error('Chat ID має бути цілим числом, відмінним від нуля.');
+  if (threadRaw && !threadId) throw new Error('Thread ID має бути додатним цілим числом.');
+  return {
+    academicGroupId,
+    chatId,
+    threadId,
+    isEnabled: ['1', 'true', 'yes', 'on'].includes(String(body.is_enabled || '').trim().toLowerCase()),
+  };
+}
+
+async function assertTelegramScheduleAcademicGroup(academicGroupId) {
+  const row = await db.get(`
+    SELECT g.id
+    FROM academic_v2_groups g
+    JOIN academic_v2_cohorts c ON c.id = g.cohort_id
+    JOIN academic_v2_programs p ON p.id = c.program_id
+    WHERE g.id = ? AND g.legacy_course_id IS NOT NULL
+      AND COALESCE(g.is_active, TRUE) = TRUE
+      AND COALESCE(c.is_active, TRUE) = TRUE
+      AND COALESCE(p.is_active, TRUE) = TRUE
+      AND p.track_key IN ('bachelor', 'master')
+    LIMIT 1
+  `, [academicGroupId]);
+  if (!row) throw new Error('Обраний академічний курс неактивний або недоступний.');
+}
+
+function telegramScheduleAdminRedirect(req, kind, message) {
+  return buildAdminScopedNoticeUrl(req, kind, message, { tab: 'admin-tg-schedule' });
+}
+
+function telegramScheduleAdminError(req, res, error) {
+  const duplicate = error && (error.code === '23505' || /unique|duplicate/i.test(String(error.message || '')));
+  const message = duplicate
+    ? 'Цей chat ID і thread ID уже привʼязані.'
+    : sanitizeCompactText(error && error.message ? error.message : 'Не вдалося зберегти привʼязку.', 240);
+  return res.redirect(telegramScheduleAdminRedirect(req, 'err', message));
+}
+
+app.post('/admin/telegram-schedule-bindings', requireTelegramScheduleSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    const input = parseTelegramScheduleBindingInput(req.body);
+    await assertTelegramScheduleAcademicGroup(input.academicGroupId);
+    const created = await studerriaTelegramDailyScheduleStore.createBinding({
+      ...input,
+      actorId: Number(req.session.user.id) || null,
+    });
+    logAction(db, req, 'telegram_schedule_binding_create', {
+      binding_id: created.id,
+      academic_group_id: input.academicGroupId,
+      chat_id: input.chatId,
+      thread_id: input.threadId,
+      is_enabled: input.isEnabled,
+    });
+    return res.redirect(telegramScheduleAdminRedirect(req, 'ok', 'Привʼязку розсилки додано.'));
+  } catch (error) {
+    return telegramScheduleAdminError(req, res, error);
+  }
+});
+
+app.post('/admin/telegram-schedule-bindings/:id/update', requireTelegramScheduleSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    const id = parsePositiveIntStrict(req.params.id);
+    if (!id) throw new Error('Некоректна привʼязка.');
+    const input = parseTelegramScheduleBindingInput(req.body);
+    await assertTelegramScheduleAcademicGroup(input.academicGroupId);
+    const updated = await studerriaTelegramDailyScheduleStore.updateBinding(id, {
+      ...input,
+      actorId: Number(req.session.user.id) || null,
+    });
+    if (!updated) throw new Error('Привʼязку не знайдено.');
+    logAction(db, req, 'telegram_schedule_binding_update', {
+      binding_id: id,
+      academic_group_id: input.academicGroupId,
+      chat_id: input.chatId,
+      thread_id: input.threadId,
+      is_enabled: input.isEnabled,
+    });
+    return res.redirect(telegramScheduleAdminRedirect(req, 'ok', 'Привʼязку розсилки оновлено.'));
+  } catch (error) {
+    return telegramScheduleAdminError(req, res, error);
+  }
+});
+
+app.post('/admin/telegram-schedule-bindings/:id/toggle', requireTelegramScheduleSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    const id = parsePositiveIntStrict(req.params.id);
+    if (!id) throw new Error('Некоректна привʼязка.');
+    const isEnabled = ['1', 'true', 'yes', 'on'].includes(String(req.body.is_enabled || '').trim().toLowerCase());
+    const updated = await studerriaTelegramDailyScheduleStore.setBindingEnabled(
+      id,
+      isEnabled,
+      Number(req.session.user.id) || null
+    );
+    if (!updated) throw new Error('Привʼязку не знайдено.');
+    logAction(db, req, 'telegram_schedule_binding_toggle', { binding_id: id, is_enabled: isEnabled });
+    return res.redirect(telegramScheduleAdminRedirect(req, 'ok', isEnabled ? 'Розсилку увімкнено.' : 'Розсилку вимкнено.'));
+  } catch (error) {
+    return telegramScheduleAdminError(req, res, error);
+  }
+});
+
+app.post('/admin/telegram-schedule-bindings/:id/delete', requireTelegramScheduleSectionAccess, writeLimiter, async (req, res) => {
+  try {
+    const id = parsePositiveIntStrict(req.params.id);
+    if (!id) throw new Error('Некоректна привʼязка.');
+    const deleted = await studerriaTelegramDailyScheduleStore.deleteBinding(id);
+    if (!deleted) throw new Error('Привʼязку не знайдено.');
+    logAction(db, req, 'telegram_schedule_binding_delete', {
+      binding_id: id,
+      academic_group_id: deleted.academic_group_id,
+      chat_id: deleted.chat_id,
+      thread_id: deleted.thread_id,
+    });
+    return res.redirect(telegramScheduleAdminRedirect(req, 'ok', 'Привʼязку видалено.'));
+  } catch (error) {
+    return telegramScheduleAdminError(req, res, error);
+  }
+});
+
 const buildAdminTemplateLocals = (overrides = {}) => ({
   schedule: [],
   homework: [],
@@ -49758,6 +49896,7 @@ const buildAdminTemplateLocals = (overrides = {}) => ({
   selectedSupportRequest: null,
   supportSectionVisible: false,
   activeAdminTab: '',
+  telegramScheduleAdminData: { bindings: [], eligibleGroups: [], timeLabel: '18:00' },
   courses: [],
   teacherRequests: [],
   semesters: [],
@@ -50843,6 +50982,23 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
     } catch (tgStatsErr) {
       console.error('Database error (admin.telegramMiniStats)', tgStatsErr);
     }
+    let telegramScheduleAdminData = { bindings: [], eligibleGroups: [], timeLabel: getDailyScheduleConfig().time.label };
+    if (hasAdminSectionAccess(req, 'admin-tg-schedule')) {
+      try {
+        await studerriaTelegramDailyScheduleStore.importLegacyBinding(getDailyScheduleConfig());
+        const [bindings, eligibleGroups] = await Promise.all([
+          studerriaTelegramDailyScheduleStore.listBindings(),
+          studerriaTelegramDailyScheduleStore.listEligibleGroups(),
+        ]);
+        telegramScheduleAdminData = {
+          bindings,
+          eligibleGroups,
+          timeLabel: getDailyScheduleConfig().time.label,
+        };
+      } catch (scheduleBindingErr) {
+        console.error('Database error (admin.telegramScheduleBindings)', scheduleBindingErr);
+      }
+    }
     try {
         const projectionAlert = buildAcademicV2CourseProjectionAlert(req, courseSubjectScope.projectionIssues, 'course');
         res.render('admin', buildAdminTemplateLocals({
@@ -50865,6 +51021,7 @@ app.get('/admin', requireAdminPanelAccess, async (req, res, next) => {
                                       supportRequests,
                                       selectedSupportRequest,
                                       telegramMiniAdminStats,
+                                      telegramScheduleAdminData,
                                       supportSectionVisible: isAdminPanelOwner,
                                       activeAdminTab: typeof req.query.tab === 'string' ? req.query.tab : '',
                                       courses,

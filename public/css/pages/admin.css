@@ -1770,3 +1770,54 @@ body.theme-light .admin-nav {
   font-size: 0.64rem;
   font-weight: 700;
 }
+.telegram-schedule-form-card,
+.telegram-schedule-binding-card {
+  border: 1px solid color-mix(in srgb, var(--border-color, #cbd5e1) 64%, transparent);
+  background: color-mix(in srgb, var(--card-bg, #fff) 90%, transparent);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+
+.telegram-schedule-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color, #cbd5e1) 58%, transparent);
+}
+
+.telegram-schedule-form-card {
+  position: sticky;
+  top: 5.5rem;
+}
+
+.telegram-schedule-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.telegram-schedule-binding-card {
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.telegram-schedule-binding-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.11);
+}
+
+.telegram-schedule-destination,
+.telegram-schedule-last {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.telegram-schedule-binding-card details > summary {
+  cursor: pointer;
+  color: var(--bs-primary);
+}
+
+@media (max-width: 1199.98px) {
+  .telegram-schedule-form-card {
+    position: static;
+  }
+}
