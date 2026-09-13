@@ -12,23 +12,13 @@
   <body class="login-page" data-base-path="<%= basePath %>">
     <div class="login-grid" aria-hidden="true"></div>
     <main class="login-shell">
-      <section class="login-intro">
-        <a class="brand" href="<%= basePath %>" aria-label="Social Graph">
-          <span class="brand-mark">SG</span>
-          <span><strong>Social Graph</strong><small>isolated OSINT service</small></span>
-        </a>
-        <div class="login-copy">
-          <span class="eyebrow">Private operator access</span>
-          <h1>Observed links.<br />Explicit evidence.</h1>
-          <p>Окремий захищений контур для аналізу публічних зв’язків. Вхід Studerria тут не використовується.</p>
-        </div>
-        <div class="login-safety"><span class="privacy-dot"></span> Окрема сесія · окрема база · audit logging</div>
-      </section>
       <section class="login-access" aria-labelledby="loginTitle">
         <div class="login-form-wrap">
-          <span class="eyebrow">Authentication</span>
-          <h2 id="loginTitle">Увійти до контуру</h2>
-          <p>Використай окремі credentials Social Graph.</p>
+          <a class="brand" href="<%= basePath %>" aria-label="Social Graph">
+            <span class="brand-mark">SG</span>
+            <span><strong>Social Graph</strong><small>OSINT</small></span>
+          </a>
+          <h1 id="loginTitle">Вхід</h1>
           <form id="loginForm" autocomplete="on">
             <label>Логін<input name="username" autocomplete="username" required maxlength="120" autofocus /></label>
             <label>Пароль<input name="password" type="password" autocomplete="current-password" required maxlength="256" /></label>

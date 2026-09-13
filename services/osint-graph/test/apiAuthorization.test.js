@@ -22,7 +22,8 @@ const app = createApp({ config, store, collectors: new Map(), executor: { enqueu
 test('direct-link service shows its own login and rejects unauthenticated API access', async () => {
   const page = await request(app).get('/osint');
   assert.equal(page.status, 200);
-  assert.match(page.text, /окремі credentials Social Graph/i);
+  assert.match(page.text, /<h1 id="loginTitle">Вхід<\/h1>/i);
+  assert.doesNotMatch(page.text, /Вхід Studerria|audit logging|Explicit evidence/i);
   const result = await request(app).get('/osint/api/investigations');
   assert.equal(result.status, 401);
   assert.equal(result.body.error, 'authentication_required');
