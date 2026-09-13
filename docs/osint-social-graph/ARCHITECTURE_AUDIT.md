@@ -33,9 +33,8 @@ Audit date: 2026-09-12. This document describes the checked-in `main` worktree b
 
 ## What can be reused
 
-- Studerria's login, session expiry, secure cookie and role-assignment flows.
-- The existing PostgreSQL RBAC model and Role Studio UI by adding one explicit `osint-access` permission. No email allowlist is needed.
-- The public app as a narrow authenticated reverse-proxy/gateway at `/osint` and `/api/osint`.
+- Security patterns from Studerria/OSIX: secure cookies, bounded sessions, login throttling and audit logging, reimplemented inside the isolated service rather than sharing state.
+- The public app as a path-only reverse proxy at `/osint`, matching other isolated services.
 - Helmet/security-header principles, same-origin CSRF gate, request IDs, service health checks, read-only containers, dropped Linux capabilities and Compose service health dependencies.
 - PostgreSQL, JavaScript migrations and application-side deterministic graph algorithms. Neo4j and Redis are unnecessary for the MVP.
 - Polling for persisted collector/analysis run statuses. The existing WebSocket server should not be coupled to the new service in the first version.
@@ -46,14 +45,14 @@ Audit date: 2026-09-12. This document describes the checked-in `main` worktree b
 - The primary Studerria database, its database user or its connection string for OSINT entities, relationships, observations, uploads, runs or audit events.
 - Browser-only route hiding as authorization. Both the Studerria gateway and OSINT service boundary must reject unauthorized/direct requests.
 - Main-app controllers for collectors or graph analysis. Collection, normalization, storage and analysis belong entirely to the isolated service.
-- Main Studerria sessions inside the sidecar. Sharing the session secret or session store would widen the blast radius.
-- Generic public sidecar proxy registration, because it runs before Studerria session middleware and is intentionally unauthenticated.
+- Main Studerria sessions, RBAC permissions or navigation inside the sidecar. Sharing the session secret/store or presenting a portal button would violate the product boundary.
+- Gateway assertions based on Studerria identity. The sidecar must authenticate its operator independently.
 - Existing general-purpose upload storage. OSINT imports are parsed in memory under separate size/record limits and are never executed or publicly served.
 - The legacy Cloud Run/Cloud SQL fallback as evidence of an active cloud deployment.
 
 ## Integration risks
 
-1. **Authorization bypass:** a public or generic proxy route could bypass the RBAC check. The OSINT routes must be registered after session/RBAC middleware and the sidecar must require a signed gateway assertion.
+1. **Authorization bypass:** the path proxy is intentionally authentication-neutral, so every product API must verify the Social Graph-owned session and every mutation must verify CSRF.
 2. **Credential crossover:** reusing `POSTGRES_*` would expose the portal database. Compose must use distinct `OSINT_DB_*` values and a dedicated database container/volume/user.
 3. **IDOR:** every investigation, entity, path, import and run query must be scoped to a caller-visible investigation. MVP access is shared among OSINT-authorized operators, with actor IDs preserved in the audit log.
 4. **SSRF:** the website collector can reach internal services unless scheme, port, hostname, DNS result and every redirect are validated and the connection is pinned to an approved public address.
@@ -67,23 +66,22 @@ Audit date: 2026-09-12. This document describes the checked-in `main` worktree b
 
 ```text
 browser
-  | Studerria secure session + same-origin CSRF policy
+  | direct /osint link
   v
-Studerria app
-  | lookup role permissions in primary Studerria DB
-  | short-lived HMAC gateway assertion (user id, timestamp, nonce)
+Studerria path proxy (no identity or permission lookup)
   v
 osint-graph service (no Studerria DB credentials)
+  | standalone login/session/CSRF
   | REST + graph UI + collectors + in-process job abstraction
   v
 osint-db PostgreSQL
   dedicated database, role, password, migrations and volume
 ```
 
-- UI URL: `/osint`; API prefix: `/api/osint`.
-- Permission: `osint-access` in the main RBAC catalog. It is granted through Role Studio (for example to a custom `osint_admin` role), never by email.
-- Trust boundary: the sidecar accepts all product requests only with a valid `OSINT_GATEWAY_SECRET` HMAC assertion and enforces replay/age limits. The secret is not sent to the browser.
-- Storage: investigation-owned entities make deletion deterministic: deleting an investigation cascades through entities, accounts, facts, evidence, observations, interactions, runs and findings. Actor IDs are opaque references to Studerria users and have no foreign key to the primary database.
+- UI URL: `/osint`; API prefix: `/osint/api`.
+- Access: direct URL plus separate `OSINT_ADMIN_USERNAME`/`OSINT_ADMIN_PASSWORD`; no Studerria menu item, role or account is involved.
+- Trust boundary: the sidecar accepts product requests only with its own signed session. A random CSRF value is exposed only inside the authenticated page/session response and required on mutations.
+- Storage: investigation-owned entities make deletion deterministic: deleting an investigation cascades through entities, accounts, facts, evidence, observations, interactions, runs and findings. The MVP audit actor is the isolated operator ID and has no relation to a Studerria user.
 - Jobs: collector and analysis runs are persisted and executed by a bounded in-process worker in the MVP. The UI polls their status. No Redis dependency is introduced.
 - Collectors: manual JSON/CSV, official GitHub REST and a bounded SSRF-safe website collector are supported. Instagram remains a manual-import adapter unless official platform capabilities materially change.
 - Graph: PostgreSQL adjacency data is analyzed application-side for degree, mutual/common neighbors, paths, connected components, articulation/bridge nodes and deterministic communities. Cytoscape.js is used for the interactive graph rather than custom SVG.

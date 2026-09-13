@@ -6,6 +6,7 @@ const NARADADRUK_BASE_PATH = '/naradadruk';
 const YKG_BASE_PATH = '/ykg';
 const WITHLFORL_BASE_PATH = '/withlforl';
 const OSIX_BASE_PATH = '/osix';
+const OSINT_BASE_PATH = '/osint';
 const OBRIY_BASE_PATH = '/obriy';
 const SHIELDLINE_BASE_PATH = '/shieldline';
 const DEFAULT_SLASHTG_BASE_PATH = '/tg';
@@ -134,6 +135,7 @@ function registerServiceProxies(app, deps = {}) {
   const naradadrukPublicHost = normalizePublicHost(env.NARADADRUK_PUBLIC_HOST);
   const withlforlProxyTarget = String(env.WITHLFORL_PROXY_TARGET || '').trim();
   const osixProxyTarget = String(env.OSIX_PROXY_TARGET || '').trim();
+  const osintProxyTarget = String(env.OSINT_PROXY_TARGET || '').trim();
   const obriyProxyTarget = String(env.OBRIY_PROXY_TARGET || '').trim();
   const shieldlineProxyTarget = String(env.SHIELDLINE_PROXY_TARGET || '').trim();
   const slashtgProxyTarget = String(env.SLASHTG_PROXY_TARGET || '').trim();
@@ -190,6 +192,13 @@ function registerServiceProxies(app, deps = {}) {
     basePath: OSIX_BASE_PATH,
     serviceName: 'OSIX',
     logLabel: 'OSIX',
+    logger,
+  });
+  const osintProxy = createServiceProxy({
+    target: osintProxyTarget,
+    basePath: OSINT_BASE_PATH,
+    serviceName: 'Social Graph',
+    logLabel: 'Social Graph',
     logger,
   });
   const shieldlineProxy = createServiceProxy({
@@ -292,6 +301,16 @@ function registerServiceProxies(app, deps = {}) {
       return respondServiceUnavailable(res, 'OSIX', 404);
     }
     return osixProxy(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (!isServiceRequest(req, OSINT_BASE_PATH)) {
+      return next();
+    }
+    if (!osintProxy) {
+      return respondServiceUnavailable(res, 'Social Graph', 404);
+    }
+    return osintProxy(req, res, next);
   });
 
   app.use((req, res, next) => {

@@ -3,9 +3,9 @@ name: OSINT Social Graph
 on:
   push:
     branches: [main]
-    paths: ['services/osint-graph/**', 'app.js', 'config/nav.config.js', 'middleware/nav.js', 'middleware/osintGateway.js', 'migrations/075_osint_access_permission.js', 'views/admin.ejs', 'test/osint-gateway.test.js', 'docs/osint-social-graph/**', 'docker/local/docker-compose.yml', 'docker/local/docker-compose.osint.yml', 'docker/local/osint-db-init.sh', 'scripts/server-update.sh', 'scripts/*osint*', '.github/workflows/osint-graph.yml']
+    paths: ['services/osint-graph/**', 'app.js', 'middleware/serviceProxies.js', 'migrations/075_osint_access_permission.js', 'migrations/076_remove_osint_portal_permission.js', 'test/service-proxies.test.js', 'docs/osint-social-graph/**', 'docker/local/docker-compose.yml', 'docker/local/docker-compose.osint.yml', 'docker/local/osint-db-init.sh', 'scripts/server-update.sh', 'scripts/*osint*', '.github/workflows/osint-graph.yml']
   pull_request:
-    paths: ['services/osint-graph/**', 'app.js', 'config/nav.config.js', 'middleware/nav.js', 'middleware/osintGateway.js', 'migrations/075_osint_access_permission.js', 'views/admin.ejs', 'test/osint-gateway.test.js', 'docs/osint-social-graph/**', 'docker/local/docker-compose.yml', 'docker/local/docker-compose.osint.yml', 'docker/local/osint-db-init.sh', 'scripts/server-update.sh', 'scripts/*osint*', '.github/workflows/osint-graph.yml']
+    paths: ['services/osint-graph/**', 'app.js', 'middleware/serviceProxies.js', 'migrations/075_osint_access_permission.js', 'migrations/076_remove_osint_portal_permission.js', 'test/service-proxies.test.js', 'docs/osint-social-graph/**', 'docker/local/docker-compose.yml', 'docker/local/docker-compose.osint.yml', 'docker/local/osint-db-init.sh', 'scripts/server-update.sh', 'scripts/*osint*', '.github/workflows/osint-graph.yml']
   workflow_dispatch:
 
 permissions:

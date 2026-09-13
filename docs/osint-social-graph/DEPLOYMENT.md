@@ -6,7 +6,7 @@ The repository has no active Cloud Run deployment pipeline. The supported profil
 
 - `osint-db`: PostgreSQL 18, dedicated database/user/volume, internal network only;
 - `osint-graph`: read-only filesystem, dropped capabilities, no published port, both app-facing and private DB networks;
-- `app`: authenticated/RBAC gateway only; it never connects to the OSINT database.
+- `app`: path-only reverse proxy for `/osint`; it never authenticates OSINT users or connects to the OSINT database.
 
 These additions are also defined in `docker/local/docker-compose.osint.yml`. The update script layers that file over the base Compose configuration for `app` and `osint`, including on servers where the base file is intentionally retained as a local `skip-worktree` configuration.
 
@@ -22,7 +22,7 @@ Deploy only this service boundary:
 bash scripts/server-update.sh osint
 ```
 
-The service update pulls Git, creates missing OSINT secrets, backs up an existing OSINT database, rebuilds `osint-db`, `osint-graph`, and the gateway-bearing `app`, waits for each health check and prints logs. A first deploy skips backup only when no OSINT Compose volume exists.
+The service update pulls Git, creates missing OSINT database/login/session secrets, backs up an existing OSINT database, rebuilds `osint-db`, `osint-graph`, and the path-proxying `app`, waits for each health check and prints logs. A first deploy skips backup only when no OSINT Compose volume exists.
 
 ## Cloud Run / Cloud SQL future profile
 

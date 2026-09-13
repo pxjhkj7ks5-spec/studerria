@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Social Graph · Вхід</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23007f93'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial' font-size='26' font-weight='700' fill='white'%3ESG%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="<%= basePath %>/assets/app.css" />
+    <script src="<%= basePath %>/assets/login.js" defer></script>
+  </head>
+  <body class="login-page" data-base-path="<%= basePath %>">
+    <div class="login-grid" aria-hidden="true"></div>
+    <main class="login-shell">
+      <section class="login-intro">
+        <a class="brand" href="<%= basePath %>" aria-label="Social Graph">
+          <span class="brand-mark">SG</span>
+          <span><strong>Social Graph</strong><small>isolated OSINT service</small></span>
+        </a>
+        <div class="login-copy">
+          <span class="eyebrow">Private operator access</span>
+          <h1>Observed links.<br />Explicit evidence.</h1>
+          <p>Окремий захищений контур для аналізу публічних зв’язків. Вхід Studerria тут не використовується.</p>
+        </div>
+        <div class="login-safety"><span class="privacy-dot"></span> Окрема сесія · окрема база · audit logging</div>
+      </section>
+      <section class="login-access" aria-labelledby="loginTitle">
+        <div class="login-form-wrap">
+          <span class="eyebrow">Authentication</span>
+          <h2 id="loginTitle">Увійти до контуру</h2>
+          <p>Використай окремі credentials Social Graph.</p>
+          <form id="loginForm" autocomplete="on">
+            <label>Логін<input name="username" autocomplete="username" required maxlength="120" autofocus /></label>
+            <label>Пароль<input name="password" type="password" autocomplete="current-password" required maxlength="256" /></label>
+            <button class="primary login-submit" type="submit"><span>Увійти</span><i aria-hidden="true">→</i></button>
+            <p id="loginStatus" class="login-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

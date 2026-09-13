@@ -2,30 +2,23 @@
 
 ## Product boundary
 
-Social Graph is an internal investigation workspace beside Studerria, not an academic portal module. Studerria owns identity and permission assignment. The isolated service owns every investigation, observation, fact, inference, collector run and graph calculation.
+Social Graph is an internal investigation workspace beside Studerria, not an academic portal module. The isolated service owns authentication, sessions, every investigation, observation, fact, inference, collector run and graph calculation.
 
-The only cross-boundary user data is an opaque numeric Studerria user ID and a display label in a short-lived signed request assertion. The OSINT service has no main-database credentials and does not call main-database APIs.
+Studerria acts only as a path reverse proxy. No Studerria identity, session, role, permission, cookie secret, database credential or account data crosses into Social Graph.
 
 ## Runtime components
 
-- **Studerria gateway:** checks the `osint-access` permission on every UI/API request, applies the existing CSRF/session controls, strips spoofable identity headers and signs a fresh internal assertion.
-- **OSINT API/UI:** Express sidecar at `services/osint-graph`, mounted externally only through Studerria at `/osint` and `/api/osint`.
+- **Path proxy:** the existing app forwards `/osint` as it does for other isolated services; it performs no portal authentication for this route.
+- **OSINT API/UI:** Express sidecar at `services/osint-graph`, externally reachable only through `/osint`, with its API under `/osint/api`.
+- **Standalone auth:** dedicated environment credentials, a service-owned signed HttpOnly/Secure/SameSite=Strict cookie, login throttling and CSRF token checks.
 - **OSINT database:** dedicated PostgreSQL service, database, user, password and volume. Its network is internal to Compose.
 - **Run executor:** bounded in-process queue. State is persisted before work begins and terminal status is persisted after work ends. Startup recovery fails stale `queued/running` runs explicitly.
 - **Collectors:** adapters implementing a common metadata, `collect()` and `normalize()` contract. The first automated adapters are GitHub REST and safe bounded web collection; manual import is always available.
 - **Analysis:** deterministic application-side graph algorithms and transparent scoring. The summarizer interface consumes structured metrics and currently produces templates, not LLM output.
 
-## Gateway assertion
+## Authentication boundary
 
-The gateway adds `X-Studerria-OSINT-*` headers containing actor ID, display label, timestamp, nonce and an HMAC-SHA256 signature. The signature covers version, actor, timestamp and nonce. The service:
-
-1. requires all fields;
-2. validates the timestamp window;
-3. compares the signature in constant time;
-4. rejects replayed nonces;
-5. removes expired nonce entries.
-
-The Compose network boundary is primary; the HMAC is defense in depth and protects a mistakenly exposed service from anonymous product API access.
+The login endpoint compares the dedicated operator credentials in constant time and is independently rate-limited. A successful login creates an HMAC-signed, expiring session containing only the operator label, isolated actor ID and random CSRF token. Product APIs reject missing/invalid sessions; mutating requests additionally require the matching `X-OSINT-CSRF` header. Logout clears the service cookie. The cookie path is `/osint`, so it is not sent to ordinary Studerria routes.
 
 ## Data ownership and deletion
 

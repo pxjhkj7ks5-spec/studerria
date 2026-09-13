@@ -6,7 +6,7 @@ const { randomUUID } = require('crypto');
 const express = require('express');
 const helmet = require('helmet');
 const multer = require('multer');
-const { createAssertionVerifier, gatewayAuthMiddleware } = require('./auth/gatewayAssertion');
+const { createSessionToken, passwordMatches, readSession, requireAdminSession, requireCsrf } = require('./auth/adminSession');
 const { parseImportFiles, parseJsonDataset } = require('./import/parser');
 const { analyzeGraph, buildGraph, shortestPath } = require('./analysis/graphEngine');
 const { attachConnectionScores } = require('./jobs');
@@ -30,6 +30,39 @@ function createRateLimiter({ limit, now = () => Date.now() }) {
   };
 }
 
+function createLoginLimiter({ limit = 8, windowMs = 15 * 60 * 1000, now = () => Date.now() } = {}) {
+  const buckets = new Map();
+  return (req, res, next) => {
+    const key = String(req.ip || req.socket?.remoteAddress || 'unknown');
+    const current = now();
+    const bucket = buckets.get(key);
+    if (!bucket || bucket.expiresAt <= current) {
+      buckets.set(key, { count: 1, expiresAt: current + windowMs });
+      if (buckets.size > 2000) {
+        for (const [bucketKey, value] of buckets.entries()) if (value.expiresAt <= current) buckets.delete(bucketKey);
+        while (buckets.size > 2000) buckets.delete(buckets.keys().next().value);
+      }
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > limit) return res.status(429).json({ ok: false, error: 'login_rate_limited' });
+    return next();
+  };
+}
+
+function requireSameOrigin(req, res, next) {
+  const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+  if (fetchSite === 'cross-site') return res.status(403).json({ ok: false, error: 'origin_forbidden' });
+  const origin = String(req.headers.origin || '').trim();
+  if (!origin) return next();
+  try {
+    if (new URL(origin).host !== String(req.headers.host || '')) return res.status(403).json({ ok: false, error: 'origin_forbidden' });
+  } catch (_error) {
+    return res.status(403).json({ ok: false, error: 'origin_forbidden' });
+  }
+  return next();
+}
+
 function safeApiError(error) {
   const code = String(error?.code || error?.message || 'internal_error').split('\n')[0].slice(0, 160);
   const known = new Set([
@@ -45,6 +78,7 @@ function safeApiError(error) {
 
 function createApp({ config, store, collectors, executor }) {
   const app = express();
+  const apiBase = `${config.basePath}/api`;
   app.disable('x-powered-by');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.set('view engine', 'ejs');
@@ -75,7 +109,7 @@ function createApp({ config, store, collectors, executor }) {
   }));
   app.use(express.json({ limit: config.maxImportBytes }));
 
-  app.get('/api/osint/health', async (_req, res) => {
+  app.get(`${apiBase}/health`, async (_req, res) => {
     try {
       const database = await store.health();
       return res.json({ ok: true, status: 'healthy', database: database.database, databaseUser: database.user });
@@ -84,42 +118,71 @@ function createApp({ config, store, collectors, executor }) {
     }
   });
 
-  const verify = createAssertionVerifier({ secret: config.gatewaySecret, maxAgeSeconds: config.assertionMaxAgeSeconds });
-  app.use(gatewayAuthMiddleware(verify));
-  app.use(createRateLimiter({ limit: config.rateLimitPerMinute }));
-  app.use('/osint/assets', express.static(path.join(__dirname, '..', 'public'), { immutable: config.isProduction, maxAge: config.isProduction ? '1d' : 0 }));
-  app.get('/osint/vendor/cytoscape.min.js', (_req, res) => res.sendFile(require.resolve('cytoscape/dist/cytoscape.min.js')));
+  app.use(`${config.basePath}/assets`, express.static(path.join(__dirname, '..', 'public'), { immutable: config.isProduction, maxAge: config.isProduction ? '1d' : 0 }));
+  app.get(`${config.basePath}/vendor/cytoscape.min.js`, (_req, res) => res.sendFile(require.resolve('cytoscape/dist/cytoscape.min.js')));
+  app.post(`${apiBase}/auth/login`, requireSameOrigin, createLoginLimiter(), async (req, res) => {
+    const username = String(req.body?.username || '').trim().slice(0, 120);
+    const password = String(req.body?.password || '').slice(0, 256);
+    if (!passwordMatches(username, config.adminUsername) || !passwordMatches(password, config.adminPassword)) {
+      console.warn(JSON.stringify({ event: 'osint_login_failed', request_id: req.requestId }));
+      return res.status(401).json({ ok: false, error: 'invalid_credentials' });
+    }
+    const token = createSessionToken({ username: config.adminUsername, secret: config.sessionSecret, ttlSeconds: config.adminSessionTtlSeconds });
+    res.cookie(config.adminCookieName, token, {
+      httpOnly: true,
+      secure: config.adminCookieSecure,
+      sameSite: 'strict',
+      path: config.basePath,
+      maxAge: config.adminSessionTtlSeconds * 1000,
+    });
+    await store.audit(1, 'auth.login', 'session', null, { username: config.adminUsername });
+    return res.json({ ok: true });
+  });
 
-  app.get(['/osint', '/osint/'], (req, res) => res.render('index', {
-    actor: req.osintActor,
-    limits: { maxNodes: config.maxGraphNodes, warningNodes: config.warningGraphNodes },
-  }));
+  app.get([config.basePath, `${config.basePath}/`], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const actor = readSession(req, config);
+    if (!actor) return res.render('login', { basePath: config.basePath });
+    return res.render('index', {
+      actor,
+      csrfToken: actor.csrf,
+      limits: { maxNodes: config.maxGraphNodes, warningNodes: config.warningGraphNodes },
+    });
+  });
 
-  app.get('/api/osint/collectors', (_req, res) => res.json({ ok: true, collectors: Array.from(collectors.entries()).filter(([key]) => key !== 'manual').map(([key, collector]) => ({ key, ...collector.describe() })) }));
-  app.get('/api/osint/investigations', async (_req, res, next) => {
+  app.use(apiBase, requireAdminSession(config), requireCsrf, createRateLimiter({ limit: config.rateLimitPerMinute }));
+  app.post(`${apiBase}/auth/logout`, async (req, res) => {
+    res.clearCookie(config.adminCookieName, { httpOnly: true, secure: config.adminCookieSecure, sameSite: 'strict', path: config.basePath });
+    await store.audit(req.osintActor.id, 'auth.logout', 'session', null, { username: req.osintActor.label });
+    return res.json({ ok: true });
+  });
+  app.get(`${apiBase}/auth/session`, (req, res) => res.json({ ok: true, actor: { label: req.osintActor.label }, csrfToken: req.osintActor.csrf }));
+
+  app.get('/osint/api/collectors', (_req, res) => res.json({ ok: true, collectors: Array.from(collectors.entries()).filter(([key]) => key !== 'manual').map(([key, collector]) => ({ key, ...collector.describe() })) }));
+  app.get('/osint/api/investigations', async (_req, res, next) => {
     try { res.json({ ok: true, investigations: await store.listInvestigations() }); } catch (error) { next(error); }
   });
-  app.post('/api/osint/investigations', async (req, res, next) => {
+  app.post('/osint/api/investigations', async (req, res, next) => {
     try {
       const investigation = await store.createInvestigation({ name: req.body?.name, description: req.body?.description, actorId: req.osintActor.id });
       res.status(201).json({ ok: true, investigation });
     } catch (error) { next(error); }
   });
-  app.get('/api/osint/investigations/:id', async (req, res, next) => {
+  app.get('/osint/api/investigations/:id', async (req, res, next) => {
     try {
       const investigation = await store.getInvestigation(req.params.id);
       if (!investigation) return res.status(404).json({ ok: false, error: 'investigation_not_found' });
       return res.json({ ok: true, investigation, findings: await store.listFindings(req.params.id) });
     } catch (error) { return next(error); }
   });
-  app.delete('/api/osint/investigations/:id', async (req, res, next) => {
+  app.delete('/osint/api/investigations/:id', async (req, res, next) => {
     try {
       const deleted = await store.deleteInvestigation(req.params.id, req.osintActor.id);
       if (!deleted) return res.status(404).json({ ok: false, error: 'investigation_not_found' });
       return res.json({ ok: true, deleted });
     } catch (error) { return next(error); }
   });
-  app.post('/api/osint/investigations/:id/entities', async (req, res, next) => {
+  app.post('/osint/api/investigations/:id/entities', async (req, res, next) => {
     try {
       normalizeEntityInput(req.body || {});
       const current = await store.getGraph(req.params.id);
@@ -141,7 +204,7 @@ function createApp({ config, store, collectors, executor }) {
       callback(allowed ? null : new Error('unsupported_import_type'), allowed);
     },
   });
-  app.post('/api/osint/investigations/:id/import', upload.array('files', 2), async (req, res, next) => {
+  app.post('/osint/api/investigations/:id/import', upload.array('files', 2), async (req, res, next) => {
     try {
       const dataset = parseImportFiles(req.files, { maxRecords: config.maxImportRecords });
       const result = await store.importDataset(req.params.id, dataset, {
@@ -153,7 +216,7 @@ function createApp({ config, store, collectors, executor }) {
       return res.status(201).json({ ok: true, result });
     } catch (error) { return next(error); }
   });
-  app.post('/api/osint/demo', async (req, res, next) => {
+  app.post('/osint/api/demo', async (req, res, next) => {
     try {
       const file = fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'demo-social-graph.json'));
       const dataset = parseJsonDataset(file, { maxRecords: config.maxImportRecords });
@@ -167,7 +230,7 @@ function createApp({ config, store, collectors, executor }) {
       return res.status(201).json({ ok: true, investigation, result });
     } catch (error) { return next(error); }
   });
-  app.post('/api/osint/investigations/:id/collect', async (req, res, next) => {
+  app.post('/osint/api/investigations/:id/collect', async (req, res, next) => {
     try {
       const collectorKey = cleanText(req.body?.collector, { max: 40, required: true }).toLowerCase();
       if (!['github', 'web'].includes(collectorKey) || !collectors.has(collectorKey)) return res.status(400).json({ ok: false, error: 'collector_not_supported' });
@@ -179,28 +242,28 @@ function createApp({ config, store, collectors, executor }) {
       return res.status(202).json({ ok: true, run });
     } catch (error) { return next(error); }
   });
-  app.post('/api/osint/investigations/:id/analyze', async (req, res, next) => {
+  app.post('/osint/api/investigations/:id/analyze', async (req, res, next) => {
     try {
       const run = await store.createRun({ investigationId: req.params.id, kind: 'ANALYSIS', parameters: {}, actorId: req.osintActor.id });
       executor.enqueue(run);
       return res.status(202).json({ ok: true, run });
     } catch (error) { return next(error); }
   });
-  app.get('/api/osint/investigations/:id/runs/:runId', async (req, res, next) => {
+  app.get('/osint/api/investigations/:id/runs/:runId', async (req, res, next) => {
     try {
       const run = await store.getRun(req.params.id, req.params.runId);
       if (!run) return res.status(404).json({ ok: false, error: 'run_not_found' });
       return res.json({ ok: true, run });
     } catch (error) { return next(error); }
   });
-  app.get('/api/osint/investigations/:id/graph', async (req, res, next) => {
+  app.get('/osint/api/investigations/:id/graph', async (req, res, next) => {
     try {
       const graph = await store.getGraph(req.params.id);
       const analysis = analyzeGraph(graph.entities, graph.relationships);
       return res.json({ ok: true, graph, analysis, limits: { maxNodes: config.maxGraphNodes, warningNodes: config.warningGraphNodes } });
     } catch (error) { return next(error); }
   });
-  app.get('/api/osint/investigations/:id/entities/:entityId', async (req, res, next) => {
+  app.get('/osint/api/investigations/:id/entities/:entityId', async (req, res, next) => {
     try {
       const entity = await store.getEntity(req.params.id, req.params.entityId);
       if (!entity) return res.status(404).json({ ok: false, error: 'entity_not_found' });
@@ -208,7 +271,7 @@ function createApp({ config, store, collectors, executor }) {
       return res.json({ ok: true, entity, connectionScores: attachConnectionScores(graph, req.params.entityId) });
     } catch (error) { return next(error); }
   });
-  app.get('/api/osint/investigations/:id/entities/:entityId/neighbors', async (req, res, next) => {
+  app.get('/osint/api/investigations/:id/entities/:entityId/neighbors', async (req, res, next) => {
     try {
       const depth = Math.min(2, Math.max(1, Number(req.query.depth) || 1));
       const graphData = await store.getGraph(req.params.id);
@@ -225,7 +288,7 @@ function createApp({ config, store, collectors, executor }) {
       return res.json({ ok: true, depth, entities: graphData.entities.filter((entity) => ids.has(String(entity.id))).slice(0, config.maxGraphNodes) });
     } catch (error) { return next(error); }
   });
-  app.get('/api/osint/investigations/:id/path', async (req, res, next) => {
+  app.get('/osint/api/investigations/:id/path', async (req, res, next) => {
     try {
       const graphData = await store.getGraph(req.params.id);
       const pathIds = shortestPath(buildGraph(graphData.entities, graphData.relationships), req.query.from, req.query.to);
@@ -233,7 +296,7 @@ function createApp({ config, store, collectors, executor }) {
       return res.json({ ok: true, path: pathIds.map((id) => byId.get(id)).filter(Boolean) });
     } catch (error) { return next(error); }
   });
-  app.get('/api/osint/path', async (req, res, next) => {
+  app.get('/osint/api/path', async (req, res, next) => {
     req.params.id = req.query.investigation;
     if (!req.params.id) return res.status(400).json({ ok: false, error: 'investigation_required' });
     try {

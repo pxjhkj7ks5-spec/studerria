@@ -4,7 +4,7 @@ Checked 2026-09-12 against official provider documentation. Platform access, pri
 
 | Source | Official API | Public data available | Auth / rate / cost | Restrictions | MVP status |
 | --- | --- | --- | --- | --- | --- |
-| Manual JSON/CSV | Local importer | Operator-supplied entities, relationships and provenance | Studerria `osint-access`; local limits | Operator must have a lawful basis and provide source URLs | **SUPPORTED** |
+| Manual JSON/CSV | Local importer | Operator-supplied entities, relationships and provenance | Standalone Social Graph session; local limits | Operator must have a lawful basis and provide source URLs | **SUPPORTED** |
 | GitHub | REST API | Public user profile, followers/following, organizations, repositories, public events and contributor metadata where exposed | Token optional; 60 requests/hour unauthenticated and normally 5,000/hour authenticated; secondary limits also apply | Public-only; response availability and event retention vary | **SUPPORTED** |
 | Website/domain | Standard HTTP(S) | HTML title/description, obvious links, social links and published contact links | No shared API; site-specific policies | Shallow collection only; no auth bypass; SSRF/size/time/page controls | **SUPPORTED** |
 | Instagram | Instagram API with Instagram Login; Instagram API with Facebook Login | Professional account management/insights; Business Discovery can return limited metadata for other professional accounts | Meta app/user tokens, permissions and review depending on use | No official arbitrary consumer-profile network or follower/following identity-list endpoint; do not build on scraping | **MANUAL IMPORT** |

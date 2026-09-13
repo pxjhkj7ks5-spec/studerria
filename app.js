@@ -16,7 +16,6 @@ const bcrypt = require('bcryptjs');
 const pkg = require('./package.json');
 const navMiddleware = require('./middleware/nav');
 const { registerServiceProxies } = require('./middleware/serviceProxies');
-const { registerOsintGateway } = require('./middleware/osintGateway');
 const { registerPublicRoutes } = require('./routes/publicRoutes');
 const { registerSystemRoutes } = require('./routes/systemRoutes');
 const supportHelpers = require('./lib/support');
@@ -469,19 +468,13 @@ const JOURNAL_PERMISSION_OPTIONS = [
   { key: 'journal-full', label: 'Журнал: повний доступ', category: 'feature' },
 ];
 
-const INTERNAL_SERVICE_PERMISSION_OPTIONS = [
-  { key: 'osint-access', label: 'Social Graph: доступ', category: 'internal_service' },
-];
-
 const RBAC_PERMISSION_OPTIONS = [
   ...ADMIN_SECTION_PERMISSION_OPTIONS,
   ...JOURNAL_PERMISSION_OPTIONS,
-  ...INTERNAL_SERVICE_PERMISSION_OPTIONS,
 ];
 
 const JOURNAL_OWN_PERMISSION = 'journal-own';
 const JOURNAL_FULL_PERMISSION = 'journal-full';
-const OSINT_ACCESS_PERMISSION = 'osint-access';
 const REVIEW_QUEUE_OVERDUE_HOURS = 48;
 const REVIEW_QUEUE_ITEM_LIMIT = 120;
 const HOMEWORK_REVIEW_SLA_SUBJECT_LIMIT = 8;
@@ -2877,12 +2870,10 @@ app.use(async (req, res, next) => {
     req.allowedAdminSections = [];
     req.canAccessAdminPanel = false;
     req.canManagePathways = false;
-    req.canAccessOsint = false;
     res.locals.hasCustomAdminPanelAccess = false;
     res.locals.customAdminPanelHref = '/admin';
     res.locals.canManagePathways = false;
     res.locals.pathwaysPanelHref = '/admin/academic';
-    res.locals.canAccessOsint = false;
     return next();
   }
   const roleKeys = getSessionRoleList(req);
@@ -2903,26 +2894,15 @@ app.use(async (req, res, next) => {
     || (Array.isArray(allowedSections)
       && (allowedSections.includes('admin-subjects') || allowedSections.includes('admin-courses')));
   const hasLegacyStaffRole = roleKeys.some((key) => ['admin', 'deanery', 'starosta'].includes(key));
-  let canAccessOsint = false;
-  try {
-    const internalPermissions = await getRolePermissionKeysForRoleKeys(roleKeys, ['internal_service']);
-    canAccessOsint = internalPermissions.has(OSINT_ACCESS_PERMISSION);
-  } catch (_error) {
-    canAccessOsint = false;
-  }
   req.allowedAdminSections = isAdmin ? null : allowedSections;
   req.canAccessAdminPanel = canAccessAdminPanel;
   req.canManagePathways = canManagePathways;
-  req.canAccessOsint = canAccessOsint;
   res.locals.hasCustomAdminPanelAccess = canAccessAdminPanel && !hasLegacyStaffRole;
   res.locals.customAdminPanelHref = '/admin';
   res.locals.canManagePathways = canManagePathways;
   res.locals.pathwaysPanelHref = '/admin/academic';
-  res.locals.canAccessOsint = canAccessOsint;
   return next();
 });
-
-registerOsintGateway(app);
 
 app.use(navMiddleware);
 

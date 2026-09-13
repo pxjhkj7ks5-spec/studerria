@@ -2,11 +2,11 @@
 
 ## MVP delivered
 
-The first release establishes the isolated database/service boundary, permission gateway, investigations, manual creation/import, GitHub and safe website collectors, provenance, deterministic graph analytics, transparent scoring, graph-first UI, audit log, retention, demo fixture and security/tests.
+The first release establishes the isolated database/service/authentication boundary, investigations, manual creation/import, GitHub and safe website collectors, provenance, deterministic graph analytics, transparent scoring, graph-first UI, audit log, retention, demo fixture and security/tests.
 
 ## Version 2 priorities
 
-1. Operator-level investigation sharing and ownership rules instead of the shared `osint-access` workspace.
+1. Multiple standalone operator accounts with investigation ownership and sharing rules.
 2. Durable worker lease/queue and multi-replica replay/rate limiting after real workload measurements; avoid Redis until it solves an observed problem.
 3. Review workflow for imported facts, annotations and explicit entity merge/split with provenance preservation.
 4. Temporal observations, graph deltas and scheduled re-collection with source-specific retention.

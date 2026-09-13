@@ -1,6 +1,6 @@
 # Social Graph / OSINT Graph MVP
 
-Social Graph is an isolated, permission-gated Studerria service for analysing relationships that are explicitly present in public or manually supplied data. It does not identify people, claim personal acquaintance, or turn structural inferences into facts.
+Social Graph is an isolated, direct-link service beside Studerria for analysing relationships that are explicitly present in public or manually supplied data. It does not use the Studerria account/session, identify people, claim personal acquaintance, or turn structural inferences into facts.
 
 ## MVP capabilities
 
@@ -24,13 +24,13 @@ bash scripts/setup-osint-env.sh docker/local/.env
 docker compose -f docker/local/docker-compose.yml -f docker/local/docker-compose.osint.yml up -d --build osint-db osint-graph app
 ```
 
-Open `http://localhost:3000/osint` after signing in with an account whose active role has `osint-access`. The OSINT API is intentionally unreachable through Studerria for every other user.
+Open `http://localhost:3000/osint` directly and sign in with the separate Social Graph username/password. No link is added to the Studerria navigation.
 
 The first `osint-db` start creates database `studerria_osint`, owner `osint_owner`, and a minimally privileged application login. `osint-graph` then applies only its own migrations. It receives no primary Studerria database credentials.
 
-## Grant access
+## Access
 
-In Studerria Role Studio, grant the `osint-access` permission to a dedicated role and assign that role to the intended operator. The migration grants it to the existing administrator role so the feature can be configured after release. No email address is hardcoded.
+Access is configured only through `OSINT_ADMIN_USERNAME`, `OSINT_ADMIN_PASSWORD`, and `OSINT_SESSION_SECRET`. The service issues its own HTTP-only, Secure, SameSite=Strict cookie and requires a session-bound CSRF token for mutations. Studerria roles and credentials do not grant access.
 
 ## Demo and imports
 
@@ -43,7 +43,8 @@ JSON must contain `entities` and `relationships` arrays. CSV can be one entity f
 Copy only fake examples from `services/osint-graph/.env.example` and `docker/local/.env.example`. Required production values are:
 
 - `OSINT_DATABASE_URL` — connection string for the separate OSINT database;
-- `OSINT_GATEWAY_SECRET` — at least 32 random characters, shared only by the Studerria gateway and OSINT sidecar;
+- `OSINT_ADMIN_USERNAME` and `OSINT_ADMIN_PASSWORD` — separate operator credentials;
+- `OSINT_SESSION_SECRET` — at least 32 random characters for the service-owned signed session;
 - `OSINT_DB_OWNER_PASSWORD` and `OSINT_DB_PASSWORD` — distinct generated database secrets.
 
 Optional controls include `OSINT_GITHUB_TOKEN`, graph/import/page limits, collector timeout, rate limit, retention days and run concurrency. Secrets must remain in untracked environment files or a secret manager.

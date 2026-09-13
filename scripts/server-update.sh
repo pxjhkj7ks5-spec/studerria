@@ -30,7 +30,7 @@ Services:
   obriy        /obriy private monitoring sidecar
   osix         /osix sidecar
   shieldline   /shieldline sidecar
-  osint        /osint protected Social Graph sidecar and gateway
+  osint        /osint standalone protected Social Graph sidecar
   db           PostgreSQL
   redis        Redis
   loki         Loki
@@ -337,7 +337,7 @@ cd "$ROOT_DIR/docker/local"
 
 # The server may intentionally keep a customized base Compose file with
 # skip-worktree. Keep OSINT pullable as an additive overlay and apply the
-# gateway environment to later app-only rebuilds as well.
+# path-proxy environment to later app-only rebuilds as well.
 if [ "$SERVICE" = "osint" ] || [ "$SERVICE" = "app" ]; then
   if [ ! -f "$OSINT_COMPOSE_FILE" ]; then
     echo "Missing OSINT Compose overlay: docker/local/$OSINT_COMPOSE_FILE" >&2

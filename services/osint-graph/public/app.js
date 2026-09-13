@@ -11,8 +11,10 @@
   const colorFor = (entity) => ({ github: '#6f7a8b', instagram: '#dd5287', telegram: '#3e9ed8', x: '#30343b', linkedin: '#3276b5', tiktok: '#d04a72' }[entity.platform] || ({ PERSON: '#38a47a', ORGANIZATION: '#d49a3e', DOMAIN: '#826bd3', WEBSITE: '#826bd3', EMAIL: '#bd668c', PUBLIC_CHANNEL: '#3e9ed8' }[entity.type] || '#78909c'));
 
   async function api(path, options = {}) {
-    const response = await fetch(`/api/osint${path}`, { credentials: 'same-origin', headers: { accept: 'application/json', ...(options.body instanceof FormData ? {} : { 'content-type': 'application/json' }), ...(options.headers || {}) }, ...options });
+    const method = String(options.method || 'GET').toUpperCase();
+    const response = await fetch(`/osint/api${path}`, { credentials: 'same-origin', headers: { accept: 'application/json', ...(options.body instanceof FormData ? {} : { 'content-type': 'application/json' }), ...(!['GET', 'HEAD', 'OPTIONS'].includes(method) ? { 'x-osint-csrf': document.body.dataset.csrf } : {}), ...(options.headers || {}) }, ...options });
     const payload = await response.json().catch(() => ({ ok: false, error: 'invalid_response' }));
+    if (response.status === 401) { window.location.assign('/osint'); throw new Error('authentication_required'); }
     if (!response.ok) throw new Error(payload.error || `request_${response.status}`);
     return payload;
   }
@@ -286,6 +288,7 @@
   $('#fitGraph').addEventListener('click', () => state.cy?.animate({ fit: { eles: state.cy.elements(':visible'), padding: 90 } }, { duration: 350 }));
   $('#toggleFindings').addEventListener('click', () => $('#findingsDrawer').classList.toggle('open'));
   $('#themeToggle').addEventListener('click', () => { const root = document.documentElement; const next = root.dataset.theme === 'dark' ? 'light' : 'dark'; root.dataset.theme = next; localStorage.setItem('osint-theme', next); if (state.graph) renderGraph(); });
+  $('#logoutButton').addEventListener('click', async () => { try { await api('/auth/logout', { method: 'POST', body: '{}' }); } finally { window.location.assign('/osint'); } });
   const savedTheme = localStorage.getItem('osint-theme'); if (savedTheme) document.documentElement.dataset.theme = savedTheme; else if (matchMedia('(prefers-color-scheme:dark)').matches) document.documentElement.dataset.theme = 'dark';
   loadInvestigations().catch((error) => toast(error.message, true));
 })();

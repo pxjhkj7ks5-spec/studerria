@@ -1,10 +1,13 @@
 # OSINT API
 
-All product endpoints are under `/api/osint` and require a valid Studerria session with `osint-access`; direct sidecar requests also require the internal signed gateway assertion. JSON errors use `{ "ok": false, "error": "stable_code" }`. Collector and analysis work returns `202` and is polled by run ID.
+All product endpoints are under `/osint/api` and require the separate Social Graph session. Mutating endpoints additionally require the session CSRF token in `X-OSINT-CSRF`. JSON errors use `{ "ok": false, "error": "stable_code" }`. Collector and analysis work returns `202` and is polled by run ID.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Database-aware service health; protected by the public Studerria gateway |
+| `GET` | `/health` | Database-aware service health (no credentials returned) |
+| `POST` | `/auth/login` | Create a standalone Social Graph session |
+| `GET` | `/auth/session` | Read the current operator label and CSRF token |
+| `POST` | `/auth/logout` | End the standalone session |
 | `GET` | `/collectors` | Supported collector capabilities |
 | `GET` | `/investigations` | List authorized workspace investigations |
 | `POST` | `/investigations` | Create investigation |

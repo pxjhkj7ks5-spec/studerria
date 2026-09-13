@@ -36,7 +36,11 @@ services:
       PORT: 8080
       OSINT_BASE_PATH: /osint
       OSINT_DATABASE_URL: postgresql://${OSINT_DB_USER:-studerria_osint}:${OSINT_DB_PASSWORD:-studerria_osint_local}@osint-db:5432/${OSINT_DB_NAME:-studerria_osint}
-      OSINT_GATEWAY_SECRET: ${OSINT_GATEWAY_SECRET:-}
+      OSINT_ADMIN_USERNAME: ${OSINT_ADMIN_USERNAME:-osint-admin}
+      OSINT_ADMIN_PASSWORD: ${OSINT_ADMIN_PASSWORD:-}
+      OSINT_SESSION_SECRET: ${OSINT_SESSION_SECRET:-}
+      OSINT_ADMIN_COOKIE_SECURE: ${OSINT_ADMIN_COOKIE_SECURE:-true}
+      OSINT_ADMIN_SESSION_TTL_SECONDS: ${OSINT_ADMIN_SESSION_TTL_SECONDS:-28800}
       OSINT_GITHUB_TOKEN: ${OSINT_GITHUB_TOKEN:-}
       OSINT_MAX_GRAPH_NODES: ${OSINT_MAX_GRAPH_NODES:-500}
       OSINT_GRAPH_WARNING_NODES: ${OSINT_GRAPH_WARNING_NODES:-300}
@@ -48,7 +52,6 @@ services:
       OSINT_WEB_MAX_RESPONSE_BYTES: ${OSINT_WEB_MAX_RESPONSE_BYTES:-2097152}
       OSINT_RETENTION_DAYS: ${OSINT_RETENTION_DAYS:-90}
       OSINT_API_RATE_LIMIT_PER_MINUTE: ${OSINT_API_RATE_LIMIT_PER_MINUTE:-120}
-      OSINT_ASSERTION_MAX_AGE_SECONDS: ${OSINT_ASSERTION_MAX_AGE_SECONDS:-60}
       OSINT_RUN_CONCURRENCY: ${OSINT_RUN_CONCURRENCY:-1}
     networks:
       - default
@@ -61,7 +64,7 @@ services:
     cap_drop:
       - ALL
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/osint/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/osint/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -70,7 +73,6 @@ services:
   app:
     environment:
       OSINT_PROXY_TARGET: http://osint-graph:8080
-      OSINT_GATEWAY_SECRET: ${OSINT_GATEWAY_SECRET:-}
 
 volumes:
   osint_postgres_data:

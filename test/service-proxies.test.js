@@ -6,6 +6,7 @@ const {
   normalizePublicHost,
   registerServiceProxies,
 } = require('../middleware/serviceProxies');
+const { navConfig } = require('../config/nav.config');
 
 function createFakeApp() {
   const handlers = [];
@@ -117,6 +118,24 @@ test('osix child paths are claimed by service middleware', async () => {
 
   assert.equal(res.statusCode, 404);
   assert.equal(res.body, 'Not found');
+});
+
+test('Social Graph is an isolated direct-link service route', async () => {
+  const app = createFakeApp();
+  registerServiceProxies(app, { env: {}, logger: { error() {} } });
+  for (const pathname of ['/osint', '/osint/api/investigations']) {
+    const res = createFakeResponse();
+    await runHandlers(app.handlers, { path: pathname, url: pathname }, res);
+    assert.equal(res.statusCode, 404);
+    assert.equal(res.body, 'Not found');
+  }
+  const similar = createFakeResponse();
+  await runHandlers(app.handlers, { path: '/osint-public', url: '/osint-public' }, similar);
+  assert.equal(similar.headersSent, false);
+});
+
+test('Social Graph is not advertised in the Studerria navigation', () => {
+  assert.equal(navConfig.items.some((item) => item.id === 'osint-social-graph' || item.href === '/osint'), false);
 });
 
 test('shieldline proxy path is claimed by service middleware', async () => {
