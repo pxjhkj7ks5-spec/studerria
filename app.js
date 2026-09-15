@@ -20439,6 +20439,7 @@ async function callStuderriaTelegramBotApiMultipart(method, formData) {
 const STUDERRIA_TG_PRIVATE_BOT_COMMANDS = [
   { command: 'start', description: 'Відкрити Studerria mini app' },
   { command: 'help', description: 'Показати інструкцію' },
+  { command: 'toggletag', description: 'Увімкнути або вимкнути тег у розсилці' },
   { command: 'helloabracadabra', description: 'Магічний пінг для груп' },
   { command: 'chatid', description: 'Dev/староста: показати ID чату' },
   { command: 'devusers', description: 'Dev: показати зареєстрованих юзерів' },
@@ -21005,6 +21006,7 @@ async function sendStuderriaTelegramHelp(message = {}) {
   const commandSuffix = isStuderriaTelegramPrivateChat(chat) ? '' : `@${botUsername}`;
   const startCommand = `/start${commandSuffix}`;
   const helpCommand = `/help${commandSuffix}`;
+  const toggleTagCommand = `/toggletag${commandSuffix}`;
   const helloCommand = `/helloabracadabra${commandSuffix}`;
   const teamworkCommand = `/teamwork${commandSuffix}`;
   const closeTeamCommand = `/closeteam${commandSuffix}`;
@@ -21028,6 +21030,8 @@ async function sendStuderriaTelegramHelp(message = {}) {
     '1. Початок',
     `${startCommand} - відкрити Studerria mini app і привʼязати Telegram.`,
     `${helpCommand} - показати цю довідку.`,
+    `${toggleTagCommand} - увімкнути або вимкнути активний тег у курсовій розсилці.`,
+    'Коли тег вимкнений, бот пише твій username без @ і не створює згадку.',
     `${helloCommand} - перевірити, що бот бачить повідомлення в чаті.`,
     '',
     '2. Mini app',
@@ -22124,6 +22128,33 @@ async function handleStuderriaTelegramNotificationPreferenceCommand(message = {}
     enabled
       ? 'Готово, особисті повідомлення від бота увімкнені.'
       : 'Готово, особисті повідомлення від бота вимкнені.',
+    { sourceMessage: message }
+  );
+}
+
+async function handleStuderriaTelegramTagPreferenceCommand(message = {}) {
+  const chatId = message && message.chat ? message.chat.id : null;
+  if (!chatId) return;
+  if (!isStuderriaTelegramPrivateChat(message.chat)) {
+    await sendStuderriaTelegramMessage(
+      chatId,
+      'Для цього напиши /toggletag боту в особисті.',
+      { sourceMessage: message }
+    );
+    return;
+  }
+  const telegramId = normalizeTelegramId(message && message.from ? message.from.id : null);
+  if (!telegramId) {
+    await sendStuderriaTelegramMessage(chatId, 'Не бачу твій Telegram ID. Спробуй ще раз.', { sourceMessage: message });
+    return;
+  }
+  await ensureDbReady();
+  const preference = await studerriaTelegramDailyScheduleStore.toggleTagPreference(telegramId);
+  await sendStuderriaTelegramMessage(
+    chatId,
+    preference.tag_enabled
+      ? 'Готово. У курсовій розсилці бот знову тегатиме тебе.'
+      : 'Готово. У курсовій розсилці бот писатиме твій username без @ і без тегу.',
     { sourceMessage: message }
   );
 }
@@ -25777,6 +25808,10 @@ async function handleStuderriaTelegramBotUpdate(update) {
       return;
     }
     if (!parsedCommand) return;
+    if (parsedCommand.command === 'toggletag') {
+      await handleStuderriaTelegramTagPreferenceCommand(message);
+      return;
+    }
     if (parsedCommand.command === 'devschedule') {
       await studerriaTelegramDailySchedule.handleCommand(message, parsedCommand.args);
       return;

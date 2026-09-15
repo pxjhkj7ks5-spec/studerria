@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const { createDailyScheduleStore } = require('../lib/studerriaTelegramDailyScheduleStore');
 const migration = require('../migrations/067_telegram_daily_schedule_deliveries');
 const bindingsMigration = require('../migrations/076_telegram_daily_schedule_bindings');
+const tagPreferencesMigration = require('../migrations/077_telegram_tag_preferences');
 
 // Run against an isolated local PostgreSQL socket; never use the app's database credentials.
 test('daily schedule roster and delivery claims use PostgreSQL constraints', {
@@ -64,6 +65,8 @@ test('daily schedule roster and delivery claims use PostgreSQL constraints', {
   await migration.up(pool);
   await bindingsMigration.up(pool);
   await bindingsMigration.up(pool);
+  await tagPreferencesMigration.up(pool);
+  await tagPreferencesMigration.up(pool);
 
   await t.test('uses the current academic group, active linked students and current student/starosta roles', async () => {
     const course = await store.loadCourse({ courseId: 10 });
@@ -73,6 +76,14 @@ test('daily schedule roster and delivery claims use PostgreSQL constraints', {
     assert.equal(actorCourse.course_id, 10);
     await assert.rejects(store.loadCourse({ courseId: 12 }), /активний студентський курс/);
     await assert.rejects(store.loadCourse({ courseId: 404 }), /активний студентський курс/);
+  });
+
+  await t.test('tag preference toggles for any Telegram ID and joins the course roster', async () => {
+    assert.equal((await store.toggleTagPreference('1001')).tag_enabled, false);
+    assert.equal((await store.loadStudents({ group_id: 20, course_id: 10 }))[0].telegram_tag_enabled, false);
+    assert.equal((await store.toggleTagPreference('1001')).tag_enabled, true);
+    assert.equal((await store.toggleTagPreference('999999')).tag_enabled, false);
+    await assert.rejects(store.toggleTagPreference('unknown'), /invalid_telegram_id/);
   });
 
   await t.test('ambiguous course mapping is rejected instead of mixing student groups', async () => {

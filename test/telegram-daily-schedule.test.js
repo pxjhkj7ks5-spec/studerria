@@ -170,6 +170,13 @@ test('student blocks use readable ID-based mentions with escaped fallback names'
   assert.doesNotMatch(text, /<code>|@@/);
 });
 
+test('tag opt-out keeps the username visible without @ or an active mention', async () => {
+  const f = fixture([user(1, { telegram_username: '@nickname', telegram_tag_enabled: false })]);
+  const text = buildDailyScheduleText(await collectDailySchedule(f.deps, course, '2026-09-02'));
+  assert.match(text, /👥 nickname/);
+  assert.doesNotMatch(text, /@nickname|tg:\/\/user\?id=1001/);
+});
+
 test('long name lists compress before dropping any schedule block', async () => {
   const f = fixture(Array.from({ length: 70 }, (_, i) => user(i + 1, { telegram_username: `name${i}_${'x'.repeat(90)}` })));
   const text = buildDailyScheduleText(await collectDailySchedule(f.deps, course, '2026-09-02'));
