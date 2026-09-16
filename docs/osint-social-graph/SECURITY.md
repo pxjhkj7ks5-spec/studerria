@@ -16,7 +16,7 @@ The session secret and operator password are server-only. The sidecar has no Stu
 | XSS | EJS escaped output, DOM escaping, safe URL protocols, CSP, no remote scripts | Public text still requires safe rendering in future export formats |
 | SQL injection | Parameterised `pg` queries and strict enum/input validation | Migration SQL is trusted application code |
 | SSRF | HTTP(S) only, default ports only, hostname/IP denylist, DNS validation, connection pinned to an approved public IP, redirects revalidated, byte/page/time limits | DNS rebinding defence depends on the pinned Node lookup remaining in use |
-| Upload abuse | In-memory parsing, two-file/5 MiB defaults, record and row-size limits, extension/type allowlist, no execution or public persistence | Large but valid imports still consume bounded process memory |
+| Upload abuse | In-memory parsing, two-file/5 MiB defaults, record/row/ZIP-entry/decompressed-size limits, extension/type allowlist, no extraction to disk, execution or public persistence | Large but valid imports still consume bounded process memory |
 | CSV injection | Formula-leading values are prefixed before storage | Exports added later must repeat this defence |
 | Malicious JSON | depth/key/size/prototype validation and graph limits | Arbitrary metadata is retained only within configured bounds |
 | Rate abuse | Separate login throttle, per-session API rate limit, bounded collector depth/concurrency, graph and Instagram cost/result caps | Rate state is per process in MVP |
@@ -28,6 +28,8 @@ The session secret and operator password are server-only. The sidecar has no Stu
 GitHub uses official public REST endpoints. The optional token never enters browser responses or logs. Website collection is intentionally shallow and does not bypass authentication, robots controls or access restrictions.
 
 Instagram follower identities are not available from Meta's official general-purpose APIs. The optional collector therefore sends only the requested public username, direction and bounded result count to the configured third-party provider. The provider token stays in the server environment and is sent in an Authorization header, never a URL or browser response. Instagram passwords, cookies and sessions are not accepted. Provider output is allowlisted to graph fields; contact enrichment is discarded. Enabling the provider requires a separate legal, privacy, retention and vendor review.
+
+The free Instagram Data Export importer accepts one ZIP, reads only JSON files with the expected `followers_and_following` paths, rejects encrypted archives, caps archive entries and declared/streamed decompressed bytes, ignores all unrelated export content and never writes the archive to disk. It requires the exporting account's username and records platform-export provenance. Operators must only import their own export or data supplied with an appropriate lawful basis.
 
 ## Privacy and audit
 

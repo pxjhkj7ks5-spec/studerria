@@ -68,6 +68,8 @@ function safeApiError(error) {
   const known = new Set([
     'investigation_not_found','invalid_json','invalid_csv','invalid_dataset_shape','too_many_records','unknown_csv_shape',
     'unsupported_import_type','import_file_required','graph_node_limit_exceeded','graph_relationship_limit_exceeded',
+    'invalid_instagram_export_zip','invalid_instagram_export_json','instagram_export_files_missing','instagram_export_no_connections',
+    'instagram_export_too_large','instagram_export_too_many_files','instagram_export_zip_must_be_single','encrypted_import_not_supported',
     'invalid_entity_type','invalid_relationship_type','invalid_username','invalid_url','required_text_missing','text_too_long',
     'self_relationship','invalid_weight','invalid_confidence','metadata_too_deep','metadata_too_large','invalid_metadata_key',
   ]);
@@ -200,16 +202,22 @@ function createApp({ config, store, collectors, executor }) {
       const mime = String(file.mimetype || '').toLowerCase();
       const jsonMime = ['application/json', 'text/json', 'application/octet-stream'].includes(mime);
       const csvMime = ['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain', 'application/octet-stream'].includes(mime);
-      const allowed = (name.endsWith('.json') && jsonMime) || (name.endsWith('.csv') && csvMime);
+      const zipMime = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'].includes(mime);
+      const allowed = (name.endsWith('.json') && jsonMime) || (name.endsWith('.csv') && csvMime) || (name.endsWith('.zip') && zipMime);
       callback(allowed ? null : new Error('unsupported_import_type'), allowed);
     },
   });
   app.post('/osint/api/investigations/:id/import', upload.array('files', 2), async (req, res, next) => {
     try {
-      const dataset = parseImportFiles(req.files, { maxRecords: config.maxImportRecords });
+      const isInstagramExport = req.files?.length === 1 && String(req.files[0].originalname || '').toLowerCase().endsWith('.zip');
+      const dataset = await parseImportFiles(req.files, {
+        maxRecords: config.maxImportRecords,
+        ownerUsername: req.body?.instagram_username,
+        maxUncompressedBytes: config.maxImportBytes * 2,
+      });
       const result = await store.importDataset(req.params.id, dataset, {
         actorId: req.osintActor.id,
-        collector: 'manual-import',
+        collector: isInstagramExport ? 'instagram-data-export' : 'manual-import',
         maxNodes: config.maxGraphNodes,
         maxRelationships: config.maxGraphRelationships,
       });

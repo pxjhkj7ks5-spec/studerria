@@ -14,7 +14,7 @@ All product endpoints are under `/osint/api` and require the separate Social Gra
 | `GET` | `/investigations/:id` | Investigation and latest findings |
 | `DELETE` | `/investigations/:id` | Cascade-delete investigation data |
 | `POST` | `/investigations/:id/entities` | Add one normalised entity |
-| `POST` | `/investigations/:id/import` | Import up to two multipart CSV/JSON files |
+| `POST` | `/investigations/:id/import` | Import up to two CSV/JSON files or one official Instagram Data Export ZIP |
 | `POST` | `/investigations/:id/collect` | Queue bounded `github`, `instagram` or `web` collection |
 | `POST` | `/investigations/:id/analyze` | Queue deterministic analysis |
 | `GET` | `/investigations/:id/runs/:runId` | Poll persisted job status/result |
@@ -38,6 +38,8 @@ All product endpoints are under `/osint/api` and require the separate Social Gra
 ```
 
 Relationship provenance is required by collectors and demo/import data should provide `source_url`. A relationship may have multiple evidence records. `INFERENCE` rows additionally reference their input facts; collectors do not fabricate them.
+
+For a no-cost Instagram import, submit one `.zip` as multipart field `files` and the exporting account username as `instagram_username`. The ZIP must contain Meta's JSON `followers_and_following/followers*.json` and/or `following.json` files. Other archive content is ignored and the original file is not retained.
 
 ## Collector requests
 

@@ -27,6 +27,11 @@
       instagram_provider_timeout: 'Instagram provider не відповів вчасно.',
       instagram_no_public_connections: 'Публічні підписки або підписники недоступні.',
       instagram_provider_failed: 'Instagram provider не зміг завершити збір.',
+      invalid_instagram_export_zip: 'Instagram export ZIP пошкоджений або має невірний формат.',
+      instagram_export_files_missing: 'У ZIP не знайдено followers/following JSON.',
+      instagram_export_no_connections: 'У Instagram export немає доступних зв’язків.',
+      instagram_export_too_large: 'Розпаковані Instagram-дані перевищують дозволений розмір.',
+      invalid_username: 'Вкажіть коректний Instagram username власника export.',
     }[message] || message);
   }
 
@@ -254,7 +259,14 @@
   $('[data-form="import-graph"]').addEventListener('click', async (event) => {
     if (!event.target.closest('button.primary')) return;
     const form = event.currentTarget; if (!form.reportValidity()) return;
+    const hasZip = Array.from(form.elements.files.files || []).some((file) => file.name.toLowerCase().endsWith('.zip'));
+    if (hasZip && !form.elements.instagram_username.value.trim()) return toast('Вкажіть Instagram username власника export', true);
     try { const data = new FormData(form); await api(`/investigations/${state.current.id}/import`, { method: 'POST', body: data }); form.closest('dialog').close(); form.reset(); await selectInvestigation(state.current.id); toast('Graph imported'); } catch (error) { toast(error.message, true); }
+  });
+  $('#graphImportFiles').addEventListener('change', (event) => {
+    const hasZip = Array.from(event.currentTarget.files || []).some((file) => file.name.toLowerCase().endsWith('.zip'));
+    $('#instagramExportOwner').hidden = !hasZip;
+    $('#instagramExportOwner input').required = hasZip;
   });
   function syncCollectorFields() {
     const selected = $('#collectorSelect').value;

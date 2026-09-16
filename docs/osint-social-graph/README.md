@@ -5,7 +5,7 @@ Social Graph is an isolated, direct-link service beside Studerria for analysing 
 ## MVP capabilities
 
 - create and delete investigations;
-- add entities manually or import bounded JSON/CSV files;
+- add entities manually or import bounded JSON/CSV files and official Instagram Data Export ZIP archives;
 - automatically attempt bounded public Instagram followers/following collection through an explicitly configured third-party provider;
 - collect public GitHub data through the official REST API;
 - inspect a small number of public web pages with SSRF protection;
@@ -15,6 +15,8 @@ Social Graph is an isolated, direct-link service beside Studerria for analysing 
 - persist collector/analysis runs and audit operator actions.
 
 Instagram collection is best-effort and disabled until an Apify provider token is configured. It does not use an Instagram password or session cookie, never bypasses private profiles, and labels third-party observations with explicit provenance. Meta's official API still does not expose arbitrary follower/following identity lists. See [SOURCE_RESEARCH.md](./SOURCE_RESEARCH.md).
+
+A free fallback requires no provider account: request the account owner's Instagram export with only **Followers and following**, select **JSON**, then upload the resulting ZIP and enter its owner username. The archive parser finds the connection files, creates directional `FOLLOWS` facts and discards unrelated archive content. This covers the operator's own/consensually supplied account export, not arbitrary third-party profiles.
 
 ## Local start
 
@@ -37,7 +39,7 @@ Access is configured only through `OSINT_ADMIN_USERNAME`, `OSINT_ADMIN_PASSWORD`
 
 Use **Demo graph** in the UI to load the 24-entity fictitious dataset at `services/osint-graph/fixtures/demo-social-graph.json`.
 
-JSON must contain `entities` and `relationships` arrays. CSV can be one entity file (`id,type,name,platform,username,url`) and one relationship file (`source,target,type,weight,source_url`). Two files may be uploaded together. Imported cells that begin with spreadsheet formulas are neutralised before storage, uploads remain in memory, and files are never executed or served.
+JSON must contain `entities` and `relationships` arrays. CSV can be one entity file (`id,type,name,platform,username,url`) and one relationship file (`source,target,type,weight,source_url`). Two files may be uploaded together. An Instagram ZIP must be uploaded alone and requires the owner's username. Imported cells that begin with spreadsheet formulas are neutralised before storage, ZIP entry count/decompressed size are capped, uploads remain in memory, and files are never executed or served.
 
 ## Environment
 

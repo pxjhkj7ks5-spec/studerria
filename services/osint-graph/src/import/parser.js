@@ -2,6 +2,7 @@
 
 const { parse } = require('csv-parse/sync');
 const { normalizeEntityInput, normalizeRelationshipInput, neutralizeSpreadsheetFormula } = require('../security/validation');
+const { parseInstagramExportZip } = require('./instagramExport');
 
 function sanitizeCsvEntityRow(row) {
   const output = { ...row };
@@ -48,8 +49,13 @@ function combineDatasets(datasets, { maxRecords = 5000 } = {}) {
   return combined;
 }
 
-function parseImportFiles(files, options = {}) {
+async function parseImportFiles(files, options = {}) {
   if (!Array.isArray(files) || !files.length) throw new Error('import_file_required');
+  const zipFiles = files.filter((file) => String(file.originalname || '').toLowerCase().endsWith('.zip'));
+  if (zipFiles.length) {
+    if (files.length !== 1) throw new Error('instagram_export_zip_must_be_single');
+    return parseInstagramExportZip(zipFiles[0].buffer, options);
+  }
   return combineDatasets(files.map((file) => {
     const name = String(file.originalname || '').toLowerCase();
     const mime = String(file.mimetype || '').toLowerCase();

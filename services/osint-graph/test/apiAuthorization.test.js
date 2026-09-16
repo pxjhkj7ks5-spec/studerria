@@ -3,7 +3,20 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const yazl = require('yazl');
 const { createApp } = require('../src/app');
+
+function instagramExportZip() {
+  return new Promise((resolve, reject) => {
+    const archive = new yazl.ZipFile();
+    const chunks = [];
+    archive.outputStream.on('data', (chunk) => chunks.push(chunk));
+    archive.outputStream.on('error', reject);
+    archive.outputStream.on('end', () => resolve(Buffer.concat(chunks)));
+    archive.addBuffer(Buffer.from(JSON.stringify([{ string_list_data: [{ value: 'public.friend' }] }])), 'connections/followers_and_following/followers_1.json');
+    archive.end();
+  });
+}
 
 const config = {
   basePath: '/osint', adminUsername: 'operator', adminPassword: 'standalone-test-password',
@@ -15,10 +28,15 @@ const config = {
 };
 const audits = [];
 const enqueued = [];
+const imports = [];
 const store = {
   listInvestigations: async () => [], health: async () => ({ database: 'studerria_osint', user: 'studerria_osint' }),
   audit: async (...args) => audits.push(args),
   createRun: async ({ investigationId, kind, collector, parameters, actorId }) => ({ id: 'run-1', investigation_id: investigationId, kind, collector, parameters, created_by: actorId }),
+  importDataset: async (investigationId, dataset, options) => {
+    imports.push({ investigationId, dataset, options });
+    return { entities: dataset.entities.length, relationships: dataset.relationships.length };
+  },
 };
 const collectors = new Map([['instagram', { describe: () => ({ name: 'instagram-public-provider', configured: true }) }]]);
 const app = createApp({ config, store, collectors, executor: { enqueue: (run) => enqueued.push(run) } });
@@ -64,6 +82,14 @@ test('standalone credentials create an isolated secure session', async () => {
   assert.equal(enqueued[0].parameters.username, '@public.account');
   assert.equal(enqueued[0].parameters.direction, 'both');
   assert.equal(enqueued[0].parameters.limit, 200);
+  const archive = await instagramExportZip();
+  const imported = await agent.post('/osint/api/investigations/case-1/import')
+    .set('x-osint-csrf', session.body.csrfToken)
+    .field('instagram_username', 'owner')
+    .attach('files', archive, { filename: 'instagram-export.zip', contentType: 'application/zip' });
+  assert.equal(imported.status, 201);
+  assert.deepEqual(imported.body.result, { entities: 2, relationships: 1 });
+  assert.equal(imports[0].options.collector, 'instagram-data-export');
   const logout = await agent.post('/osint/api/auth/logout').set('x-osint-csrf', session.body.csrfToken).send({});
   assert.equal(logout.status, 200);
   assert.ok(audits.some((entry) => entry[1] === 'auth.login'));
