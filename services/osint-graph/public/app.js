@@ -19,10 +19,21 @@
     return payload;
   }
 
+  function readableError(message) {
+    return ({
+      instagram_provider_not_configured: 'Instagram provider не налаштований на сервері.',
+      instagram_provider_unauthorized: 'Instagram provider відхилив API token.',
+      instagram_provider_rate_limited: 'Instagram provider тимчасово обмежив запити.',
+      instagram_provider_timeout: 'Instagram provider не відповів вчасно.',
+      instagram_no_public_connections: 'Публічні підписки або підписники недоступні.',
+      instagram_provider_failed: 'Instagram provider не зміг завершити збір.',
+    }[message] || message);
+  }
+
   function toast(message, error = false) {
     const item = document.createElement('div');
     item.className = `toast${error ? ' error' : ''}`;
-    item.textContent = message;
+    item.textContent = error ? readableError(message) : message;
     $('#toastStack').append(item);
     setTimeout(() => item.remove(), 3600);
   }
@@ -211,7 +222,7 @@
     $('#runStatus').hidden = false;
     $('#runStatus strong').textContent = run.kind === 'ANALYSIS' ? 'Graph analysis running' : `${run.collector} collector running`;
     try {
-      for (let attempt = 0; attempt < 90; attempt += 1) {
+      for (let attempt = 0; attempt < 330; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const payload = await api(`/investigations/${run.investigation_id}/runs/${run.id}`);
         if (payload.run.status === 'completed') {
@@ -245,11 +256,16 @@
     const form = event.currentTarget; if (!form.reportValidity()) return;
     try { const data = new FormData(form); await api(`/investigations/${state.current.id}/import`, { method: 'POST', body: data }); form.closest('dialog').close(); form.reset(); await selectInvestigation(state.current.id); toast('Graph imported'); } catch (error) { toast(error.message, true); }
   });
-  $('#collectorSelect').addEventListener('change', () => $$('[data-collector-field]').forEach((field) => { field.hidden = field.dataset.collectorField !== $('#collectorSelect').value; }));
+  function syncCollectorFields() {
+    const selected = $('#collectorSelect').value;
+    $$('[data-collector-field]').forEach((field) => { field.hidden = !field.dataset.collectorField.split(/\s+/).includes(selected); });
+  }
+  $('#collectorSelect').addEventListener('change', syncCollectorFields);
+  syncCollectorFields();
   $('[data-form="collect"]').addEventListener('click', async (event) => {
     if (!event.target.closest('button.primary')) return;
     const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
-    if ((values.collector === 'github' && !values.username) || (values.collector === 'web' && !values.url)) return toast('Заповніть collector input', true);
+    if ((['github', 'instagram'].includes(values.collector) && !values.username) || (values.collector === 'web' && !values.url)) return toast('Заповніть collector input', true);
     try { const payload = await api(`/investigations/${state.current.id}/collect`, { method: 'POST', body: JSON.stringify(values) }); form.closest('dialog').close(); pollRun(payload.run).catch((error) => toast(error.message, true)); } catch (error) { toast(error.message, true); }
   });
   $('[data-form="find-path"]').addEventListener('click', async (event) => {

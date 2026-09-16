@@ -15,7 +15,7 @@ All product endpoints are under `/osint/api` and require the separate Social Gra
 | `DELETE` | `/investigations/:id` | Cascade-delete investigation data |
 | `POST` | `/investigations/:id/entities` | Add one normalised entity |
 | `POST` | `/investigations/:id/import` | Import up to two multipart CSV/JSON files |
-| `POST` | `/investigations/:id/collect` | Queue `github` or `web` collection |
+| `POST` | `/investigations/:id/collect` | Queue bounded `github`, `instagram` or `web` collection |
 | `POST` | `/investigations/:id/analyze` | Queue deterministic analysis |
 | `GET` | `/investigations/:id/runs/:runId` | Poll persisted job status/result |
 | `GET` | `/investigations/:id/graph` | Entities, relationships, interactions and metrics |
@@ -48,5 +48,11 @@ Relationship provenance is required by collectors and demo/import data should pr
 ```json
 { "collector": "web", "url": "https://example.org" }
 ```
+
+```json
+{ "collector": "instagram", "username": "public.account", "direction": "both", "limit": 100 }
+```
+
+Instagram queues a best-effort third-party provider run. The configured service maximum overrides the requested limit. Missing provider configuration and provider failures are saved as stable run errors rather than silently producing an empty graph.
 
 The GitHub depth is clamped to 1–2. Website page, redirect, response-size and duration limits are server configuration. The graph rejects growth above the configured node/relationship caps.

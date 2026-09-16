@@ -1,13 +1,13 @@
 # Public-source capability research
 
-Checked 2026-09-12 against official provider documentation. Platform access, pricing and terms drift; revalidate before enabling or expanding any collector.
+Checked 2026-09-16 against official provider documentation. Platform access, pricing and terms drift; revalidate before enabling or expanding any collector.
 
 | Source | Official API | Public data available | Auth / rate / cost | Restrictions | MVP status |
 | --- | --- | --- | --- | --- | --- |
 | Manual JSON/CSV | Local importer | Operator-supplied entities, relationships and provenance | Standalone Social Graph session; local limits | Operator must have a lawful basis and provide source URLs | **SUPPORTED** |
 | GitHub | REST API | Public user profile, followers/following, organizations, repositories, public events and contributor metadata where exposed | Token optional; 60 requests/hour unauthenticated and normally 5,000/hour authenticated; secondary limits also apply | Public-only; response availability and event retention vary | **SUPPORTED** |
 | Website/domain | Standard HTTP(S) | HTML title/description, obvious links, social links and published contact links | No shared API; site-specific policies | Shallow collection only; no auth bypass; SSRF/size/time/page controls | **SUPPORTED** |
-| Instagram | Instagram API with Instagram Login; Instagram API with Facebook Login | Professional account management/insights; Business Discovery can return limited metadata for other professional accounts | Meta app/user tokens, permissions and review depending on use | No official arbitrary consumer-profile network or follower/following identity-list endpoint; do not build on scraping | **MANUAL IMPORT** |
+| Instagram | Meta APIs for professional accounts; optional Apify provider adapter | Official API: professional metadata/counts/media. Provider: best-effort public follower/following identities | Meta app review for official APIs; separate Apify token and per-result cost for provider | No official arbitrary follower/following identity-list endpoint; provider is non-official, can drift/fail and needs separate terms/privacy review | **PARTIAL / PROVIDER-DEPENDENT** |
 | Telegram | Telegram API/TDLib/MTProto and Bot API | Public channel/supergroup content and metadata as permitted | Telegram app/bot credentials and method-specific limits | Participant lists may be hidden; access and privacy settings matter; no broad identity graph promised | **NOT SUPPORTED** |
 | X | X API | User lookup and follower/following resources in approved products | Pay-per-use; current resource pricing and endpoint rate limits apply | Paid usage, caps and developer policy make it a deliberate later integration | **NOT SUPPORTED** |
 | LinkedIn | LinkedIn APIs | Authenticated member basics and approved organization/marketing data | OAuth, product access and app review | Not an arbitrary public profile/network collection API; organization operations are role/permission constrained | **NOT SUPPORTED** |
@@ -21,7 +21,7 @@ The collector uses only GitHub's official REST resources documented under [REST 
 
 Meta's current [Instagram API with Instagram Login documentation](https://www.postman.com/meta/workspace/instagram/documentation/23987686-9386f468-7714-490f-9bfc-9442db5c8f00) targets Instagram professional accounts (businesses and creators) and their authorised management workflows. The [Facebook Login / Business Discovery collection](https://www.postman.com/meta/instagram/folder/u4g5a2a/instagram-api-with-facebook-login) documents discovery of limited metadata for other professional accounts. These official surfaces do not provide arbitrary public consumer profiles' follower/following identity lists.
 
-Therefore automated Instagram collection is not implemented. The collector boundary is ready for a compliant future adapter, while the MVP accepts lawfully obtained CSV/JSON or account-owner data exports. Brittle browser scraping is explicitly outside the architecture.
+The service therefore does not pretend that Meta supplies these lists. It can optionally invoke a separately configured [Apify Actor](https://apify.com/zaver.api/instagram-followers-scraper) through Apify's [official Actor API](https://docs.apify.com/api/v2). Apify supports bearer-token authentication and synchronous dataset results. This adapter is third-party, non-official and best-effort: it is disabled without a token, capped by node/result/cost/time limits, never receives Instagram credentials, discards contact enrichment and stores provider provenance with `confidence=0.9`. A failure or partial direction is exposed explicitly. Manual import remains the reliable fallback.
 
 ## Other social platforms
 

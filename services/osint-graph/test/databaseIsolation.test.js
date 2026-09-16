@@ -8,8 +8,10 @@ const { loadConfig } = require('../src/config');
 
 test('OSINT config requires its own connection string and ignores Studerria DB credentials', () => {
   assert.throws(() => loadConfig({ NODE_ENV: 'test', DB_HOST: 'main-db', DB_NAME: 'student_portal' }), /OSINT_DATABASE_URL/);
-  const config = loadConfig({ NODE_ENV: 'test', OSINT_DATABASE_URL: 'postgres://osint@osint-db/studerria_osint', DB_NAME: 'student_portal' });
+  const config = loadConfig({ NODE_ENV: 'test', OSINT_DATABASE_URL: 'postgres://osint@osint-db/studerria_osint', DB_NAME: 'student_portal', OSINT_INSTAGRAM_APIFY_TOKEN: 'server-only-provider-token', OSINT_INSTAGRAM_MAX_CONNECTIONS: '900' });
   assert.equal(config.databaseUrl.includes('studerria_osint'), true);
+  assert.equal(config.instagramApifyToken, 'server-only-provider-token');
+  assert.equal(config.instagramMaxConnections, 500);
   assert.equal(Object.hasOwn(config, 'DB_NAME'), false);
 });
 
@@ -20,8 +22,9 @@ test('Compose keeps OSINT database private and passes no main DB credential vari
   assert.match(compose, /osint-db:/);
   assert.match(compose, /osint_private:\n\s+internal: true/);
   assert.match(serviceBlock, /OSINT_DATABASE_URL:/);
+  assert.match(serviceBlock, /OSINT_INSTAGRAM_APIFY_TOKEN:/);
   assert.doesNotMatch(serviceBlock, /\n\s+DB_(HOST|USER|PASS|NAME):/);
   assert.doesNotMatch(serviceBlock, /ports:/);
   assert.match(appBlock, /OSINT_PROXY_TARGET:/);
-  assert.doesNotMatch(appBlock, /OSINT_(DATABASE_URL|DB_PASSWORD|ADMIN_PASSWORD|SESSION_SECRET):/);
+  assert.doesNotMatch(appBlock, /OSINT_(DATABASE_URL|DB_PASSWORD|ADMIN_PASSWORD|SESSION_SECRET|INSTAGRAM_APIFY_TOKEN):/);
 });

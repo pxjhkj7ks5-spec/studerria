@@ -13,7 +13,7 @@ Studerria acts only as a path reverse proxy. No Studerria identity, session, rol
 - **Standalone auth:** dedicated environment credentials, a service-owned signed HttpOnly/Secure/SameSite=Strict cookie, login throttling and CSRF token checks.
 - **OSINT database:** dedicated PostgreSQL service, database, user, password and volume. Its network is internal to Compose.
 - **Run executor:** bounded in-process queue. State is persisted before work begins and terminal status is persisted after work ends. Startup recovery fails stale `queued/running` runs explicitly.
-- **Collectors:** adapters implementing a common metadata, `collect()` and `normalize()` contract. The first automated adapters are GitHub REST and safe bounded web collection; manual import is always available.
+- **Collectors:** adapters implementing a common metadata, `collect()` and `normalize()` contract. Automated adapters are GitHub REST, safe bounded web collection and an optional third-party Instagram provider; manual import is always available.
 - **Analysis:** deterministic application-side graph algorithms and transparent scoring. The summarizer interface consumes structured metrics and currently produces templates, not LLM output.
 
 ## Authentication boundary
@@ -47,7 +47,7 @@ Nodes use both type-specific shapes/icons and color. Confidence, provenance and 
 
 - No Neo4j, Redis queue or LLM dependency.
 - No browser access to collector tokens.
-- No Instagram/X/LinkedIn/TikTok/Telegram scraping.
+- No Instagram passwords, cookies or direct in-service browser scraping. The optional Instagram adapter calls a separately reviewed provider and labels its evidence as non-official.
 - No shared entities across investigations.
 - No raw evidence archive or screenshot capture.
 - No collector concurrency above the configured worker limit.

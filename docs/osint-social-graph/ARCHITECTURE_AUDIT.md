@@ -60,7 +60,7 @@ Audit date: 2026-09-12. This document describes the checked-in `main` worktree b
 6. **Evidence confusion:** inferred clusters and scores can be mistaken for facts. Facts, inferences and their input evidence require separate fields/tables and distinct UI labels.
 7. **Sensitive logging:** tokens, raw import bodies and full collector payloads must not appear in stdout or audit metadata.
 8. **Long-running work:** an in-process MVP worker can lose a running task during restart. Runs must be persisted as `queued/running/completed/failed`; restart recovery must mark abandoned runs failed. A durable external queue remains a later option.
-9. **External API drift:** Instagram, X, LinkedIn, TikTok and Telegram access changes frequently. Unsupported collectors must remain manual/disabled rather than fall back to brittle scraping.
+9. **External API drift:** Instagram, X, LinkedIn, TikTok and Telegram access changes frequently. The optional Instagram provider must fail explicitly and preserve manual import as fallback; unsupported collectors remain disabled.
 
 ## Proposed MVP architecture
 
@@ -83,7 +83,7 @@ osint-db PostgreSQL
 - Trust boundary: the sidecar accepts product requests only with its own signed session. A random CSRF value is exposed only inside the authenticated page/session response and required on mutations.
 - Storage: investigation-owned entities make deletion deterministic: deleting an investigation cascades through entities, accounts, facts, evidence, observations, interactions, runs and findings. The MVP audit actor is the isolated operator ID and has no relation to a Studerria user.
 - Jobs: collector and analysis runs are persisted and executed by a bounded in-process worker in the MVP. The UI polls their status. No Redis dependency is introduced.
-- Collectors: manual JSON/CSV, official GitHub REST and a bounded SSRF-safe website collector are supported. Instagram remains a manual-import adapter unless official platform capabilities materially change.
+- Collectors: manual JSON/CSV, official GitHub REST, a bounded SSRF-safe website collector and an optional bounded third-party Instagram adapter are supported. Instagram provider facts carry explicit non-official provenance; manual import remains the stable fallback.
 - Graph: PostgreSQL adjacency data is analyzed application-side for degree, mutual/common neighbors, paths, connected components, articulation/bridge nodes and deterministic communities. Cytoscape.js is used for the interactive graph rather than custom SVG.
 - Deployment: add `osint-db` on an internal-only Compose network and `osint-graph` on both that network and the app-facing Compose network. Do not publish either service port in production.
 

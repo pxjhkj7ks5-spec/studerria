@@ -233,10 +233,22 @@ function createApp({ config, store, collectors, executor }) {
   app.post('/osint/api/investigations/:id/collect', async (req, res, next) => {
     try {
       const collectorKey = cleanText(req.body?.collector, { max: 40, required: true }).toLowerCase();
-      if (!['github', 'web'].includes(collectorKey) || !collectors.has(collectorKey)) return res.status(400).json({ ok: false, error: 'collector_not_supported' });
-      const parameters = collectorKey === 'github'
-        ? { username: cleanText(req.body?.username, { max: 160, required: true }), depth: Math.min(2, Math.max(1, Number(req.body?.depth) || 1)) }
-        : { url: cleanText(req.body?.url, { max: 2048, required: true }) };
+      if (!['github', 'instagram', 'web'].includes(collectorKey) || !collectors.has(collectorKey)) return res.status(400).json({ ok: false, error: 'collector_not_supported' });
+      if (collectorKey === 'instagram' && collectors.get(collectorKey).describe().configured === false) {
+        return res.status(503).json({ ok: false, error: 'instagram_provider_not_configured' });
+      }
+      let parameters;
+      if (collectorKey === 'github') {
+        parameters = { username: cleanText(req.body?.username, { max: 160, required: true }), depth: Math.min(2, Math.max(1, Number(req.body?.depth) || 1)) };
+      } else if (collectorKey === 'instagram') {
+        parameters = {
+          username: cleanText(req.body?.username, { max: 2048, required: true }),
+          direction: ['followers', 'following', 'both'].includes(req.body?.direction) ? req.body.direction : 'both',
+          limit: Math.min(config.instagramMaxConnections, Math.max(10, Math.floor(Number(req.body?.limit) || 100))),
+        };
+      } else {
+        parameters = { url: cleanText(req.body?.url, { max: 2048, required: true }) };
+      }
       const run = await store.createRun({ investigationId: req.params.id, kind: 'COLLECTOR', collector: collectorKey, parameters, actorId: req.osintActor.id });
       executor.enqueue(run);
       return res.status(202).json({ ok: true, run });

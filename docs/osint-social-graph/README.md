@@ -6,6 +6,7 @@ Social Graph is an isolated, direct-link service beside Studerria for analysing 
 
 - create and delete investigations;
 - add entities manually or import bounded JSON/CSV files;
+- automatically attempt bounded public Instagram followers/following collection through an explicitly configured third-party provider;
 - collect public GitHub data through the official REST API;
 - inspect a small number of public web pages with SSRF protection;
 - preserve a source URL, collector, observation time and confidence for facts;
@@ -13,7 +14,7 @@ Social Graph is an isolated, direct-link service beside Studerria for analysing 
 - explore the graph with filters, focus/hide/expand controls and a provenance inspector;
 - persist collector/analysis runs and audit operator actions.
 
-Instagram and the other constrained social platforms are manual-import-only in this release. See [SOURCE_RESEARCH.md](./SOURCE_RESEARCH.md).
+Instagram collection is best-effort and disabled until an Apify provider token is configured. It does not use an Instagram password or session cookie, never bypasses private profiles, and labels third-party observations with explicit provenance. Meta's official API still does not expose arbitrary follower/following identity lists. See [SOURCE_RESEARCH.md](./SOURCE_RESEARCH.md).
 
 ## Local start
 
@@ -46,6 +47,8 @@ Copy only fake examples from `services/osint-graph/.env.example` and `docker/loc
 - `OSINT_ADMIN_USERNAME` and `OSINT_ADMIN_PASSWORD` — separate operator credentials;
 - `OSINT_SESSION_SECRET` — at least 32 random characters for the service-owned signed session;
 - `OSINT_DB_OWNER_PASSWORD` and `OSINT_DB_PASSWORD` — distinct generated database secrets.
+
+To enable automatic Instagram attempts, set `OSINT_INSTAGRAM_APIFY_TOKEN`. The default community Actor is configurable through `OSINT_INSTAGRAM_APIFY_ACTOR_ID`; review its current terms, output and price before enabling it. `OSINT_INSTAGRAM_MAX_CONNECTIONS` and `OSINT_INSTAGRAM_MAX_COST_USD` cap each run.
 
 Optional controls include `OSINT_GITHUB_TOKEN`, graph/import/page limits, collector timeout, rate limit, retention days and run concurrency. Secrets must remain in untracked environment files or a secret manager.
 

@@ -32,7 +32,7 @@ Create `studerria_osint` plus a dedicated login in Cloud SQL using [Google's dat
 
 ## Cost envelope
 
-The current Compose MVP adds no managed-service bill: it consumes CPU, memory, disk and backups on the existing server. Keep one OSINT worker, no Redis/Neo4j, shallow collectors and a 90-day retention window; GitHub public REST and manual imports have no per-request platform charge.
+The current Compose MVP adds no mandatory managed-service bill: it consumes CPU, memory, disk and backups on the existing server. Keep one OSINT worker, no Redis/Neo4j, shallow collectors and a 90-day retention window; GitHub public REST and manual imports have no per-request platform charge. Automatic Instagram collection adds third-party per-result charges only when `OSINT_INSTAGRAM_APIFY_TOKEN` is configured; result and dollar caps must remain enabled.
 
 For a future cloud profile, Cloud Run is pay-per-use and currently advertises a free allocation before usage pricing; see [Cloud Run pricing](https://cloud.google.com/run). A separate database in an existing Cloud SQL instance generally adds storage/backup use but no second compute instance. A separate `db-f1-micro` instance is listed at $0.0105/hour in `us-central1` (about $7.67 for 730 hours) before storage, backups, networking and regional price differences; it has no SLA. Treat this only as a dated planning example and calculate the intended region in the [official Cloud SQL pricing table](https://cloud.google.com/sql/pricing) before provisioning. X and other paid APIs are not enabled in MVP.
 

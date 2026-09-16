@@ -6,6 +6,12 @@ function integerEnv(source, key, fallback, { min = 1, max = Number.MAX_SAFE_INTE
   return Math.min(max, Math.max(min, Math.floor(parsed)));
 }
 
+function numberEnv(source, key, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  const parsed = Number(source[key]);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
 function loadConfig(source = process.env) {
   const isProduction = String(source.NODE_ENV || '').trim() === 'production';
   const databaseUrl = String(source.OSINT_DATABASE_URL || '').trim();
@@ -28,6 +34,11 @@ function loadConfig(source = process.env) {
     adminCookieSecure: isProduction ? String(source.OSINT_ADMIN_COOKIE_SECURE || 'true').trim().toLowerCase() !== 'false' : String(source.OSINT_ADMIN_COOKIE_SECURE || 'false').trim().toLowerCase() === 'true',
     adminSessionTtlSeconds: integerEnv(source, 'OSINT_ADMIN_SESSION_TTL_SECONDS', 28800, { min: 900, max: 604800 }),
     githubToken: String(source.OSINT_GITHUB_TOKEN || '').trim(),
+    instagramApifyToken: String(source.OSINT_INSTAGRAM_APIFY_TOKEN || '').trim(),
+    instagramApifyActorId: String(source.OSINT_INSTAGRAM_APIFY_ACTOR_ID || 'zaver.api~instagram-followers-scraper').trim(),
+    instagramMaxConnections: integerEnv(source, 'OSINT_INSTAGRAM_MAX_CONNECTIONS', 200, { min: 10, max: 500 }),
+    instagramProviderTimeoutMs: integerEnv(source, 'OSINT_INSTAGRAM_PROVIDER_TIMEOUT_MS', 120000, { min: 30000, max: 300000 }),
+    instagramMaxCostUsd: numberEnv(source, 'OSINT_INSTAGRAM_MAX_COST_USD', 1, { min: 0.1, max: 20 }),
     maxGraphNodes: integerEnv(source, 'OSINT_MAX_GRAPH_NODES', 500, { min: 20, max: 5000 }),
     warningGraphNodes: integerEnv(source, 'OSINT_GRAPH_WARNING_NODES', 300, { min: 10, max: 4000 }),
     maxGraphRelationships: integerEnv(source, 'OSINT_MAX_GRAPH_RELATIONSHIPS', 2000, { min: 20, max: 20000 }),
@@ -42,4 +53,4 @@ function loadConfig(source = process.env) {
   });
 }
 
-module.exports = { loadConfig, integerEnv };
+module.exports = { loadConfig, integerEnv, numberEnv };

@@ -19,13 +19,15 @@ The session secret and operator password are server-only. The sidecar has no Stu
 | Upload abuse | In-memory parsing, two-file/5 MiB defaults, record and row-size limits, extension/type allowlist, no execution or public persistence | Large but valid imports still consume bounded process memory |
 | CSV injection | Formula-leading values are prefixed before storage | Exports added later must repeat this defence |
 | Malicious JSON | depth/key/size/prototype validation and graph limits | Arbitrary metadata is retained only within configured bounds |
-| Rate abuse | Separate login throttle, per-session API rate limit, bounded collector depth/concurrency, graph caps | Rate state is per process in MVP |
+| Rate abuse | Separate login throttle, per-session API rate limit, bounded collector depth/concurrency, graph and Instagram cost/result caps | Rate state is per process in MVP |
 | Secret leakage | Server-only environment, redacted structured logs, no request bodies/passwords/session tokens | Operator must keep `.env` untracked and rotate leaked credentials |
 | Evidence confusion | `FACT`/`INFERENCE` status, evidence tables, confidence and “Why” UI | Imported source truth still depends on operator diligence |
 
 ## Collector safety
 
-GitHub uses official public REST endpoints. The optional token never enters browser responses or logs. Website collection is intentionally shallow and does not bypass authentication, robots controls or access restrictions. Instagram and constrained networks do not use brittle scraping.
+GitHub uses official public REST endpoints. The optional token never enters browser responses or logs. Website collection is intentionally shallow and does not bypass authentication, robots controls or access restrictions.
+
+Instagram follower identities are not available from Meta's official general-purpose APIs. The optional collector therefore sends only the requested public username, direction and bounded result count to the configured third-party provider. The provider token stays in the server environment and is sent in an Authorization header, never a URL or browser response. Instagram passwords, cookies and sessions are not accepted. Provider output is allowlisted to graph fields; contact enrichment is discarded. Enabling the provider requires a separate legal, privacy, retention and vendor review.
 
 ## Privacy and audit
 

@@ -123,6 +123,7 @@ class RunExecutor {
           maxRelationships: this.config.maxGraphRelationships,
         });
         result.rateLimitRemaining = dataset.rateLimitRemaining ?? null;
+        if (dataset.provider) result.provider = dataset.provider;
       } else {
         const graphData = await this.store.getGraph(run.investigation_id);
         const analysis = analyzeGraph(graphData.entities, graphData.relationships);

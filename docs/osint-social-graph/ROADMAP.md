@@ -17,7 +17,7 @@ The first release establishes the isolated database/service/authentication bound
 
 ## Deferred source work
 
-Instagram advanced collection, Telegram network analysis, X, TikTok and LinkedIn remain disabled until official access, cost and use-case approval are established. Also deferred: username enumeration, image similarity, cross-platform identity resolution and automated scraping.
+The best-effort Instagram provider should be replaced or supplemented if Meta exposes follower identities through an approved official surface. Telegram network analysis, X, TikTok and LinkedIn remain disabled until official access, cost and use-case approval are established. Also deferred: username enumeration, image similarity and cross-platform identity resolution.
 
 ## Optional AI layer
 
