@@ -32,8 +32,9 @@ function parseCsvBuffer(buffer, { maxRecords = 5000 } = {}) {
   }
   if (rows.length > maxRecords) throw new Error('too_many_records');
   if (!rows.length) return { entities: [], relationships: [] };
+  for (const row of rows) if (row.metadata) { try { row.metadata = JSON.parse(row.metadata); } catch { throw new Error('invalid_metadata'); } }
   const keys = new Set(Object.keys(rows[0]).map((key) => key.toLowerCase()));
-  if (keys.has('source') && keys.has('target')) return { entities: [], relationships: rows.map(normalizeRelationshipInput) };
+  if ((keys.has('source') && keys.has('target')) || (keys.has('source_entity_id') && keys.has('target_entity_id'))) return { entities: [], relationships: rows.map(normalizeRelationshipInput) };
   if (keys.has('type') && (keys.has('name') || keys.has('username') || keys.has('canonical_name'))) {
     return { entities: rows.map((row) => normalizeEntityInput(sanitizeCsvEntityRow(row))), relationships: [] };
   }

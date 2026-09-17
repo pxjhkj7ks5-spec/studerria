@@ -3,7 +3,6 @@
 const { loadConfig } = require('./config');
 const { createPool, migrate } = require('./db');
 const { OsintStore } = require('./store');
-const { createCollectors } = require('./collectors');
 const { RunExecutor } = require('./jobs');
 const { createApp } = require('./app');
 
@@ -13,7 +12,7 @@ async function main() {
   await migrate(pool);
   const store = new OsintStore(pool);
   const recovered = await store.recoverInterruptedRuns();
-  const collectors = createCollectors(config);
+  const collectors = new Map();
   const executor = new RunExecutor({ store, collectors, config });
   const app = createApp({ config, store, collectors, executor });
   const server = app.listen(config.port, '0.0.0.0', () => {
@@ -29,10 +28,7 @@ async function main() {
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
-  const retentionTimer = setInterval(() => store.purgeExpired(config.retentionDays).catch((error) => {
-    console.error(JSON.stringify({ event: 'osint_retention_failed', error: String(error.message || error).slice(0, 160) }));
-  }), 24 * 60 * 60 * 1000);
-  retentionTimer.unref();
+  // Manual investigations persist until an operator explicitly deletes them.
 }
 
 main().catch((error) => {

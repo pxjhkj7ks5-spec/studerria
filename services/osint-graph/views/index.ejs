@@ -1,103 +1,14 @@
 <!doctype html>
-<html lang="uk">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="color-scheme" content="dark light" />
-    <title>Social Graph · OSINT</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23007f93'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial' font-size='26' font-weight='700' fill='white'%3ESG%3C/text%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/osint/assets/app.css?v=1.13.31" />
-    <script src="/osint/vendor/cytoscape.min.js" defer></script>
-    <script src="/osint/assets/app.js?v=1.13.31" defer></script>
-  </head>
-  <body data-actor="<%= actor.label %>" data-csrf="<%= csrfToken %>" data-max-nodes="<%= limits.maxNodes %>" data-warning-nodes="<%= limits.warningNodes %>">
-    <div class="ambient" aria-hidden="true"></div>
-    <header class="topbar">
-      <a class="brand" href="/osint" aria-label="Social Graph">
-        <span class="brand-mark">SG</span>
-        <span><strong>Social Graph</strong><small>protected OSINT workspace</small></span>
-      </a>
-      <div class="topbar-status">
-        <span class="privacy-dot"></span>
-        <span>Лише відкриті джерела</span>
-        <button class="icon-button" id="themeToggle" type="button" aria-label="Змінити тему">◐</button>
-        <span class="actor"><%= actor.label %></span>
-        <button class="logout-button" id="logoutButton" type="button">Вийти</button>
-      </div>
-    </header>
-
-    <div class="workspace">
-      <aside class="rail rail-left" aria-label="Investigations">
-        <div class="rail-head">
-          <div><span class="eyebrow">Workspace</span><h1>Розслідування</h1></div>
-          <button class="primary compact" data-open="newInvestigation">＋ Нове</button>
-        </div>
-        <label class="search-field"><span>⌕</span><input id="investigationSearch" type="search" placeholder="Знайти investigation" /></label>
-        <div id="investigationList" class="investigation-list" aria-live="polite"></div>
-        <button class="demo-action" id="createDemo" type="button"><span>◈</span><span><strong>Відкрити demo graph</strong><small>24 вигадані сутності · 3 кластери</small></span></button>
-        <div class="rail-foot"><span>Дані ізольовані</span><small>Окрема PostgreSQL database</small></div>
-      </aside>
-
-      <main class="graph-stage">
-        <div class="graph-toolbar">
-          <div class="investigation-title"><span class="eyebrow" id="investigationMeta">Оберіть investigation</span><h2 id="investigationTitle">Social Graph</h2></div>
-          <div class="action-row">
-            <button data-open="addEntity" disabled>＋ Entity</button>
-            <button data-open="importGraph" disabled>⇧ Import</button>
-            <button data-open="collectData" disabled>◎ Collect</button>
-            <button id="analyzeGraph" disabled>⌁ Analyze</button>
-            <button data-open="findPath" disabled>↝ Path</button>
-            <button class="danger-ghost" id="deleteInvestigation" disabled aria-label="Видалити investigation">⌫</button>
-          </div>
-        </div>
-
-        <div class="filterbar" id="filterbar" aria-label="Graph filters">
-          <label><span>Платформа</span><select id="platformFilter"><option value="all">Усі</option></select></label>
-          <label><span>Зв’язок</span><select id="relationshipFilter"><option value="all">Усі</option></select></label>
-          <label class="confidence"><span>Confidence ≥ <output id="confidenceOutput">0.00</output></span><input id="confidenceFilter" type="range" min="0" max="1" step="0.05" value="0" /></label>
-          <label><span>Кластер</span><select id="clusterFilter"><option value="all">Усі</option></select></label>
-          <label class="graph-search"><span>⌕</span><input id="graphSearch" type="search" placeholder="Search entity" /></label>
-          <button id="fitGraph" class="icon-button" title="Показати весь граф">⌗</button>
-        </div>
-
-        <div id="graph" role="application" aria-label="Interactive relationship graph"></div>
-        <section id="emptyState" class="empty-state">
-          <span class="empty-orbit" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="eyebrow">Observed network</span>
-          <h2>Почніть із одного публічного сигналу</h2>
-          <p>Додайте сутність, імпортуйте JSON/CSV або запустіть безпечне демо. Припущення завжди відокремлені від фактів.</p>
-          <div><button class="primary" data-open="newInvestigation">Нове investigation</button><button id="emptyDemo">Demo graph</button></div>
-        </section>
-        <div class="legend" id="legend">
-          <span><i class="person"></i>Person</span><span><i class="account"></i>Account</span><span><i class="organization"></i>Organization</span><span><i class="website"></i>Web</span>
-          <span class="legend-divider"></span><span><b class="fact-line"></b>Fact</span><span><b class="inference-line"></b>Inference</span>
-        </div>
-        <div class="run-status" id="runStatus" hidden><span class="spinner"></span><strong>Collector running</strong><small>Збір обмежено системними лімітами</small></div>
-        <div class="node-warning" id="nodeWarning" hidden></div>
-      </main>
-
-      <aside class="rail rail-right" id="inspector" aria-label="Entity inspector">
-        <div class="inspector-placeholder">
-          <span class="selection-glyph">⌁</span><h2>Оберіть entity</h2><p>Зв’язки, sources, score і пояснення з’являться тут.</p>
-        </div>
-      </aside>
-    </div>
-
-    <section class="findings-drawer" id="findingsDrawer" aria-label="Analysis findings">
-      <button class="drawer-handle" id="toggleFindings"><span>Findings</span><strong id="findingCount">0</strong><i>⌃</i></button>
-      <div class="drawer-body"><div id="analysisSummary" class="analysis-summary"></div><div id="findingsList" class="findings-list"></div></div>
-    </section>
-
-    <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-
-    <dialog id="newInvestigation"><form method="dialog" data-form="new-investigation"><header><span class="eyebrow">New case</span><h2>Створити investigation</h2><button value="cancel" aria-label="Закрити">×</button></header><label>Назва<input name="name" required maxlength="160" placeholder="Public ecosystem map" /></label><label>Опис<textarea name="description" maxlength="2000" rows="3" placeholder="Мета і дозволений scope"></textarea></label><footer><button value="cancel">Скасувати</button><button class="primary" value="default">Створити</button></footer></form></dialog>
-
-    <dialog id="addEntity"><form method="dialog" data-form="add-entity"><header><span class="eyebrow">Manual fact</span><h2>Додати entity</h2><button value="cancel" aria-label="Закрити">×</button></header><div class="form-grid"><label>Тип<select name="type"><option>PERSON</option><option selected>SOCIAL_ACCOUNT</option><option>ORGANIZATION</option><option>DOMAIN</option><option>WEBSITE</option><option>PUBLIC_CHANNEL</option><option>EMAIL</option><option>OTHER</option></select></label><label>Платформа<input name="platform" placeholder="github" /></label></div><label>Display name<input name="display_name" required maxlength="500" placeholder="Alex North" /></label><label>Username<input name="username" maxlength="160" placeholder="alexnorth" /></label><label>Public URL<input name="url" type="url" maxlength="2048" placeholder="https://github.com/alexnorth" /></label><footer><button value="cancel">Скасувати</button><button class="primary" value="default">Додати</button></footer></form></dialog>
-
-    <dialog id="importGraph"><form method="dialog" data-form="import-graph"><header><span class="eyebrow">Manual import</span><h2>Імпортувати graph</h2><button value="cancel" aria-label="Закрити">×</button></header><label class="dropzone"><input id="graphImportFiles" name="files" type="file" accept=".json,.csv,.zip,application/json,text/csv,application/zip" multiple required /><span>JSON, до 2 CSV або Instagram export ZIP</span><small>max 5 MB/file · архів не зберігається</small></label><label id="instagramExportOwner" hidden>Instagram username власника export<input name="instagram_username" maxlength="30" placeholder="username" /></label><p class="form-note">Для безплатного Instagram-імпорту в Accounts Center замовте лише Followers and following у форматі JSON. Сервіс сам знайде файли в ZIP і побудує зв’язки. Пароль або session cookie не потрібні.</p><footer><button value="cancel">Скасувати</button><button class="primary" value="default">Імпортувати</button></footer></form></dialog>
-
-    <dialog id="collectData"><form method="dialog" data-form="collect"><header><span class="eyebrow">Public sources</span><h2>Запустити collector</h2><button value="cancel" aria-label="Закрити">×</button></header><label>Collector<select name="collector" id="collectorSelect"><option value="instagram">Instagram followers / following</option><option value="github">GitHub REST API</option><option value="web">Website / domain</option></select></label><label data-collector-field="github instagram">Username / Instagram URL<input name="username" maxlength="2048" placeholder="username" /></label><label data-collector-field="web" hidden>Public URL<input name="url" type="url" maxlength="2048" placeholder="https://example.org" /></label><label data-collector-field="github" hidden>Depth<select name="depth"><option value="1">1 hop</option><option value="2">2 hops · bounded</option></select></label><div class="form-grid" data-collector-field="instagram"><label>Зв’язки<select name="direction"><option value="both">Підписники + підписки</option><option value="followers">Лише підписники</option><option value="following">Лише підписки</option></select></label><label>Ліміт<select name="limit"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select></label></div><p class="form-note" data-collector-field="instagram">Instagram запускається через налаштований public-data provider. Це не офіційний Meta API; результат може бути частковим. Приватні профілі не обходяться.</p><p class="form-note" data-collector-field="github" hidden>GitHub використовує офіційний public REST API та зберігає URL кожного observed fact.</p><p class="form-note" data-collector-field="web" hidden>Website collector читає лише обмежену кількість публічних сторінок із SSRF-захистом.</p><footer><button value="cancel">Скасувати</button><button class="primary" value="default">Collect</button></footer></form></dialog>
-
-    <dialog id="findPath"><form method="dialog" data-form="find-path"><header><span class="eyebrow">Graph path</span><h2>Найкоротший шлях</h2><button value="cancel" aria-label="Закрити">×</button></header><label>Від<select name="from" required></select></label><label>До<select name="to" required></select></label><div id="pathResult" class="path-result"></div><footer><button value="cancel">Закрити</button><button class="primary" value="default">Знайти</button></footer></form></dialog>
-  </body>
-</html>
+<html lang="uk" data-theme="dark">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OSINT · Investigation Graph</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Ctext y=%2750%27 font-size=%2755%27%3E◎%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="/osint/assets/workspace.css?v=1.13.32"><script src="/osint/vendor/cytoscape.min.js" defer></script><script src="/osint/assets/workspace.js?v=1.13.32" defer></script></head>
+<body data-csrf="<%= csrfToken %>" data-actor="<%= actor.label %>">
+<header class="top"><a href="/osint" class="brand"><span>◎</span> OSINT <small>Investigation Graph</small></a><span class="operator"><%= actor.label %></span><button id="logout">Вийти</button></header>
+<div class="shell">
+<aside class="sidebar"><div class="section-label">РОЗСЛІДУВАННЯ <button id="newCase" title="Створити розслідування">＋</button></div><select id="cases" aria-label="Розслідування"><option value="">Оберіть розслідування</option></select><input type="search" id="search" placeholder="Пошук у розслідуванні" aria-label="Пошук"><div class="section-label">СУТНОСТІ <button data-action="entity">＋</button></div><div id="entityList" class="entity-list"></div>
+<details open><summary>Фільтри</summary><label>Тип сутності<select id="typeFilter"><option value="">Усі типи</option></select></label><label>Тип зв’язку<select id="relationFilter"><option value="">Усі зв’язки</option></select></label><label>Статус<select id="statusFilter"><option value="">Усі статуси</option><option>FACT</option><option>INFERENCE</option><option>HYPOTHESIS</option></select></label><label>Докази<select id="evidenceFilter"><option value="">Усі</option><option value="yes">З доказами</option><option value="no">Без доказів</option></select></label><label>Джерело<select id="sourceFilter"><option value="">Усі джерела</option></select></label><label>Створено від<input type="date" id="dateFilter"></label></details>
+<div class="section-label">ШАРИ <button data-action="layer">＋</button></div><div id="layers"></div><div class="section-label">ЗАЧІПКИ <button data-action="lead">＋</button></div><div id="leadList"></div><footer class="sidefoot">Ручний workspace <span>●</span></footer></aside>
+<main><div class="case-head"><div><p class="eyebrow">INVESTIGATION WORKSPACE</p><h1 id="caseTitle">Карта розслідування</h1></div><button id="caseMenu" aria-label="Редагувати розслідування">Налаштування</button></div><div id="stats" class="stats"></div><div class="tools"><button class="primary" data-action="entity">＋ Сутність</button><button data-action="relationship">↗ Зв’язок</button><button data-action="source">＋ Доказ</button><button data-action="lead">＋ Зачіпка</button><span class="spacer"></span><button id="groupSelected">Група</button><button id="mergeSelected">Об’єднати</button><button id="import">Імпорт</button><button id="export">Експорт</button></div><nav id="views" aria-label="Представлення"><button class="active" data-view="Graph">Graph</button><button data-view="Table">Table</button><button data-view="Timeline">Timeline</button><button data-view="Evidence">Evidence</button><button data-view="Leads">Leads</button><button data-view="Notes">Notes</button><button data-view="Analysis">Analysis</button></nav>
+<section class="canvas-area"><div id="graph" aria-label="Граф розслідування"></div><div id="viewContent" hidden></div><div id="empty"><span>◎</span><h2>Почніть із першої зачіпки</h2><p>Створіть розслідування й додайте сутність на карту.</p><button class="primary" id="emptyCreate">Створити розслідування</button></div><div id="graphFooter"><span>── FACT</span><span>┄ INFERENCE</span><span>··· HYPOTHESIS</span><small>Подвійний клік — сутність · Shift + drag — зв’язок</small><button id="fit">Вписати</button><button id="layout">Упорядкувати</button></div></section></main>
+<aside id="inspector" class="inspector"><div class="placeholder"><span>↗</span><h2>Деталі та докази</h2><p>Оберіть сутність або зв’язок на графі.</p></div></aside></div>
+<dialog id="editor"><form id="editorForm"><header><h2 id="editorTitle"></h2><button type="button" id="closeEditor" aria-label="Закрити">×</button></header><div id="fields"></div><p id="formError" role="alert"></p><footer><button type="button" id="cancelEditor">Скасувати</button><button class="primary" type="submit">Зберегти</button></footer></form></dialog><div id="context" hidden></div><div id="toast" role="status" hidden></div>
+</body></html>

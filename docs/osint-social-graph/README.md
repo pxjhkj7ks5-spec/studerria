@@ -1,3 +1,5 @@
+> Current product: [OSINT Investigation Graph](../../services/osint-graph/README.md). The manual workspace supersedes the collector-oriented behavior described below; collection is disabled and investigations no longer expire automatically.
+
 # Social Graph / OSINT Graph MVP
 
 Social Graph is an isolated, direct-link service beside Studerria for analysing relationships that are explicitly present in public or manually supplied data. It does not use the Studerria account/session, identify people, claim personal acquaintance, or turn structural inferences into facts.

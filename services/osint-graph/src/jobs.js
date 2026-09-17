@@ -39,7 +39,7 @@ function analysisFindings(graphData, analysis) {
     findings.push({
       type: 'CLUSTER',
       title: `${cluster.replace('-', ' ')} · ${ids.length} entities`,
-      explanation: `These entities form a densely connected structural community in the imported or collected public facts.`,
+      explanation: `These entities form a densely connected structural community in the recorded relationships, including any inferences or hypotheses.`,
       entityIds: ids,
       metadata: { cluster, size: ids.length },
     });
@@ -51,8 +51,8 @@ function analysisFindings(graphData, analysis) {
     findings.push({
       type: 'MUTUAL_CONNECTION',
       title: `${leftEntity.display_name} ↔ ${rightEntity.display_name}`,
-      explanation: 'A reciprocal directed connection is present in the observed facts.',
-      confidence: 1,
+      explanation: 'A reciprocal directed connection is recorded in the graph. Its source status must be checked in the evidence inspector.',
+      confidence: null,
       entityIds: [left, right],
       metadata: {},
     });
@@ -113,17 +113,7 @@ class RunExecutor {
     try {
       let result;
       if (run.kind === 'COLLECTOR') {
-        const collector = this.collectors.get(run.collector);
-        if (!collector) throw new Error('collector_not_supported');
-        const dataset = await collector.collect(run.parameters);
-        result = await this.store.importDataset(run.investigation_id, dataset, {
-          actorId: run.created_by,
-          collector: collector.name,
-          maxNodes: this.config.maxGraphNodes,
-          maxRelationships: this.config.maxGraphRelationships,
-        });
-        result.rateLimitRemaining = dataset.rateLimitRemaining ?? null;
-        if (dataset.provider) result.provider = dataset.provider;
+        throw new Error('collectors_disabled_manual_workspace');
       } else {
         const graphData = await this.store.getGraph(run.investigation_id);
         const analysis = analyzeGraph(graphData.entities, graphData.relationships);

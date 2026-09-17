@@ -1,3 +1,5 @@
+> Current product: [OSINT Investigation Graph](../../services/osint-graph/README.md). The manual workspace supersedes the collector-oriented behavior described below; collection is disabled and investigations no longer expire automatically.
+
 # OSINT API
 
 All product endpoints are under `/osint/api` and require the separate Social Graph session. Mutating endpoints additionally require the session CSRF token in `X-OSINT-CSRF`. JSON errors use `{ "ok": false, "error": "stable_code" }`. Collector and analysis work returns `202` and is polled by run ID.

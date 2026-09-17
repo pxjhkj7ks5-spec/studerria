@@ -10,7 +10,7 @@ const { createSessionToken, passwordMatches, readSession, requireAdminSession, r
 const { parseImportFiles, parseJsonDataset } = require('./import/parser');
 const { analyzeGraph, buildGraph, shortestPath } = require('./analysis/graphEngine');
 const { attachConnectionScores } = require('./jobs');
-const { normalizeEntityInput, cleanText } = require('./security/validation');
+const { normalizeEntityInput } = require('./security/validation');
 
 function createRateLimiter({ limit, now = () => Date.now() }) {
   const buckets = new Map();
@@ -71,7 +71,7 @@ function safeApiError(error) {
     'invalid_instagram_export_zip','invalid_instagram_export_json','instagram_export_files_missing','instagram_export_no_connections',
     'instagram_export_too_large','instagram_export_too_many_files','instagram_export_zip_must_be_single','encrypted_import_not_supported',
     'invalid_entity_type','invalid_relationship_type','invalid_username','invalid_url','required_text_missing','text_too_long',
-    'self_relationship','invalid_weight','invalid_confidence','metadata_too_deep','metadata_too_large','invalid_metadata_key',
+    'fact_requires_evidence_or_direct_observation','invalid_epistemic_status','invalid_metadata','self_relationship','invalid_weight','invalid_confidence','metadata_too_deep','metadata_too_large','invalid_metadata_key',
   ]);
   if (code.startsWith('relationship_reference_missing:')) return { status: 400, code: 'relationship_reference_missing' };
   if (known.has(code)) return { status: error.status || (code === 'investigation_not_found' ? 404 : 400), code };
@@ -152,7 +152,10 @@ function createApp({ config, store, collectors, executor }) {
     });
   });
 
-  app.use(apiBase, requireAdminSession(config), requireCsrf, createRateLimiter({ limit: config.rateLimitPerMinute }));
+  app.use(apiBase, (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  }, requireAdminSession(config), requireCsrf, createRateLimiter({ limit: config.rateLimitPerMinute }));
   app.post(`${apiBase}/auth/logout`, async (req, res) => {
     res.clearCookie(config.adminCookieName, { httpOnly: true, secure: config.adminCookieSecure, sameSite: 'strict', path: config.basePath });
     await store.audit(req.osintActor.id, 'auth.logout', 'session', null, { username: req.osintActor.label });
@@ -160,7 +163,7 @@ function createApp({ config, store, collectors, executor }) {
   });
   app.get(`${apiBase}/auth/session`, (req, res) => res.json({ ok: true, actor: { label: req.osintActor.label }, csrfToken: req.osintActor.csrf }));
 
-  app.get('/osint/api/collectors', (_req, res) => res.json({ ok: true, collectors: Array.from(collectors.entries()).filter(([key]) => key !== 'manual').map(([key, collector]) => ({ key, ...collector.describe() })) }));
+  app.get('/osint/api/collectors', (_req, res) => res.json({ ok: true, collectors: [] }));
   app.get('/osint/api/investigations', async (_req, res, next) => {
     try { res.json({ ok: true, investigations: await store.listInvestigations() }); } catch (error) { next(error); }
   });
@@ -238,30 +241,7 @@ function createApp({ config, store, collectors, executor }) {
       return res.status(201).json({ ok: true, investigation, result });
     } catch (error) { return next(error); }
   });
-  app.post('/osint/api/investigations/:id/collect', async (req, res, next) => {
-    try {
-      const collectorKey = cleanText(req.body?.collector, { max: 40, required: true }).toLowerCase();
-      if (!['github', 'instagram', 'web'].includes(collectorKey) || !collectors.has(collectorKey)) return res.status(400).json({ ok: false, error: 'collector_not_supported' });
-      if (collectorKey === 'instagram' && collectors.get(collectorKey).describe().configured === false) {
-        return res.status(503).json({ ok: false, error: 'instagram_provider_not_configured' });
-      }
-      let parameters;
-      if (collectorKey === 'github') {
-        parameters = { username: cleanText(req.body?.username, { max: 160, required: true }), depth: Math.min(2, Math.max(1, Number(req.body?.depth) || 1)) };
-      } else if (collectorKey === 'instagram') {
-        parameters = {
-          username: cleanText(req.body?.username, { max: 2048, required: true }),
-          direction: ['followers', 'following', 'both'].includes(req.body?.direction) ? req.body.direction : 'both',
-          limit: Math.min(config.instagramMaxConnections, Math.max(10, Math.floor(Number(req.body?.limit) || 100))),
-        };
-      } else {
-        parameters = { url: cleanText(req.body?.url, { max: 2048, required: true }) };
-      }
-      const run = await store.createRun({ investigationId: req.params.id, kind: 'COLLECTOR', collector: collectorKey, parameters, actorId: req.osintActor.id });
-      executor.enqueue(run);
-      return res.status(202).json({ ok: true, run });
-    } catch (error) { return next(error); }
-  });
+  app.post('/osint/api/investigations/:id/collect', (_req, res) => res.status(410).json({ ok: false, error: 'collectors_disabled_manual_workspace' }));
   app.post('/osint/api/investigations/:id/analyze', async (req, res, next) => {
     try {
       const run = await store.createRun({ investigationId: req.params.id, kind: 'ANALYSIS', parameters: {}, actorId: req.osintActor.id });
@@ -325,6 +305,8 @@ function createApp({ config, store, collectors, executor }) {
       return res.json({ ok: true, path: pathIds });
     } catch (error) { return next(error); }
   });
+
+  require('./workspace').registerWorkspace(app, { store, config });
 
   app.use((error, _req, res, _next) => {
     if (error instanceof multer.MulterError) {

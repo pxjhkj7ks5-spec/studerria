@@ -79,3 +79,22 @@ test('Instagram export ZIP enforces decompressed size and expected files', async
   const wrong = await zipBuffer({ 'profile.json': '{}' });
   await assert.rejects(() => parseInstagramExportZip(wrong, { ownerUsername: 'owner' }), /instagram_export_files_missing/);
 });
+
+test('manual imports preserve uncertainty, custom types and metadata through normalization', () => {
+  const { normalizeRelationshipInput, normalizeEntityInput } = require('../src/security/validation');
+  for (const status of ['FACT', 'INFERENCE', 'HYPOTHESIS']) {
+    const dataset = parseJsonDataset(Buffer.from(JSON.stringify({
+      entities: [{ id: 'a', type: 'CUSTOM TYPE', name: 'A', metadata: { username: 'a@example.org', url: 'https://example.org', notes: 'line one\nline two' } }, { id: 'b', type: 'DOCUMENT', name: 'B' }],
+      relationships: [{ source: 'a', target: 'b', type: 'навчався разом', label: 'Навчався разом', epistemic_status: status, explanation: 'Explicit observation', source_url: 'https://example.org/source' }],
+    })));
+    const relation = normalizeRelationshipInput(dataset.relationships[0]);
+    assert.equal(relation.status, status);
+    assert.equal(relation.explanation, 'Explicit observation');
+    assert.equal(relation.metadata.label, 'Навчався разом');
+    const entity = normalizeEntityInput(dataset.entities[0]);
+    assert.equal(entity.username, 'a@example.org');
+    assert.equal(entity.profileUrl, 'https://example.org/');
+    assert.equal(entity.metadata.notes, 'line one\nline two');
+  }
+  assert.equal(normalizeRelationshipInput({ source: 'a', target: 'b' }).status, 'HYPOTHESIS');
+});

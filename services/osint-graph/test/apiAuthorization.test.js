@@ -74,14 +74,12 @@ test('standalone credentials create an isolated secure session', async () => {
   assert.deepEqual(allowed.body.investigations, []);
   collectors.set('instagram', { describe: () => ({ name: 'instagram-public-provider', configured: false }) });
   const unconfigured = await agent.post('/osint/api/investigations/case-1/collect').set('x-osint-csrf', session.body.csrfToken).send({ collector: 'instagram', username: '@public.account' });
-  assert.equal(unconfigured.status, 503);
-  assert.equal(unconfigured.body.error, 'instagram_provider_not_configured');
+  assert.equal(unconfigured.status, 410);
+  assert.equal(unconfigured.body.error, 'collectors_disabled_manual_workspace');
   collectors.set('instagram', { describe: () => ({ name: 'instagram-public-provider', configured: true }) });
   const collect = await agent.post('/osint/api/investigations/case-1/collect').set('x-osint-csrf', session.body.csrfToken).send({ collector: 'instagram', username: '@public.account', direction: 'both', limit: 1000 });
-  assert.equal(collect.status, 202);
-  assert.equal(enqueued[0].parameters.username, '@public.account');
-  assert.equal(enqueued[0].parameters.direction, 'both');
-  assert.equal(enqueued[0].parameters.limit, 200);
+  assert.equal(collect.status, 410);
+  assert.equal(enqueued.length, 0);
   const archive = await instagramExportZip();
   const imported = await agent.post('/osint/api/investigations/case-1/import')
     .set('x-osint-csrf', session.body.csrfToken)

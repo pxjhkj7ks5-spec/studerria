@@ -89,7 +89,7 @@ class OsintStore {
         metadata=entities.metadata || EXCLUDED.metadata,
         updated_at=NOW()
       RETURNING *
-    `, [id, investigationId, entity.type, entity.canonicalName, entity.displayName, json(entity.metadata)]);
+    `, [id, investigationId, entity.type, entity.canonicalName, entity.displayName, json({ ...entity.metadata, platform: entity.platform, username: entity.username, url: entity.profileUrl })]);
     const stored = result.rows[0];
     if (entity.platform && entity.username) {
       await client.query(`
@@ -107,7 +107,7 @@ class OsintStore {
           metadata=social_accounts.metadata || EXCLUDED.metadata,
           observed_at=NOW()
       `, [randomUUID(), investigationId, stored.id, entity.platform, entity.username, entity.profileUrl, entity.displayName, entity.bio || null,
-        entity.metadata.avatar_url || null, entity.metadata.followers_count ?? null, entity.metadata.following_count ?? null, json(entity.metadata)]);
+        entity.metadata.avatar_url || null, entity.metadata.followers_count ?? null, entity.metadata.following_count ?? null, json({ ...entity.metadata, platform: entity.platform, username: entity.username, url: entity.profileUrl })]);
     }
     return { stored, normalized: entity };
   }
@@ -136,6 +136,7 @@ class OsintStore {
   } = {}) {
     const summary = await this.withTransaction(async (client) => {
       await this.ensureInvestigation(investigationId, client);
+      await client.query('SELECT id FROM investigations WHERE id=$1 FOR UPDATE', [investigationId]);
       const referenceMap = new Map();
       let entitiesCreatedOrUpdated = 0;
       for (const rawEntity of dataset.entities || []) {
@@ -167,21 +168,22 @@ class OsintStore {
       let relationshipsCreatedOrUpdated = 0;
       for (const rawRelationship of dataset.relationships || []) {
         const relationship = normalizeRelationshipInput(rawRelationship);
+        if (relationship.status === 'FACT' && !relationship.sourceUrl && !relationship.explanation) throw new Error('fact_requires_evidence_or_direct_observation');
         const sourceId = referenceMap.get(relationship.source);
         const targetId = referenceMap.get(relationship.target);
         if (!sourceId || !targetId) throw new Error(`relationship_reference_missing:${relationship.source}:${relationship.target}`);
         const relationshipId = randomUUID();
         const inserted = await client.query(`
           INSERT INTO relationships (
-            id,investigation_id,source_entity_id,target_entity_id,relationship_type,epistemic_status,weight,confidence,metadata
-          ) VALUES ($1,$2,$3,$4,$5,'FACT',$6,$7,$8::jsonb)
+            id,investigation_id,source_entity_id,target_entity_id,relationship_type,epistemic_status,weight,confidence,metadata,explanation,created_by
+          ) VALUES ($1,$2,$3,$4,$5,$9,$6,$7,$8::jsonb,$10,$11)
           ON CONFLICT (investigation_id,source_entity_id,target_entity_id,relationship_type,epistemic_status) DO UPDATE SET
             weight=GREATEST(relationships.weight,EXCLUDED.weight),
             confidence=GREATEST(relationships.confidence,EXCLUDED.confidence),
             metadata=relationships.metadata || EXCLUDED.metadata,
             last_observed_at=NOW()
           RETURNING id
-        `, [relationshipId, investigationId, sourceId, targetId, relationship.type, relationship.weight, relationship.confidence, json(relationship.metadata)]);
+        `, [relationshipId, investigationId, sourceId, targetId, relationship.type, relationship.weight, relationship.confidence, json(relationship.metadata), relationship.status, relationship.explanation, actorId]);
         const storedRelationshipId = inserted.rows[0].id;
         const sourceUrl = relationship.sourceUrl || `urn:studerria-osint:${collector}:${storedRelationshipId}`;
         await client.query(`
@@ -190,6 +192,14 @@ class OsintStore {
           ON CONFLICT (relationship_id,collector,source_url) DO UPDATE SET observed_at=NOW(), confidence=GREATEST(relationship_evidence.confidence,EXCLUDED.confidence)
         `, [randomUUID(), storedRelationshipId, referenceMap.get(`observation:${relationship.source}`) || null,
           collector === 'manual-import' ? 'MANUAL_IMPORT' : 'PUBLIC_SOURCE', sourceUrl, collector, relationship.confidence, json({})]);
+        if (relationship.sourceUrl) {
+          const existingSource = await client.query("SELECT r.id FROM workspace_records r JOIN workspace_links l ON l.record_id=r.id WHERE r.investigation_id=$1 AND r.kind='source' AND r.data->>'url'=$2 AND l.relationship_id=$3", [investigationId, relationship.sourceUrl, storedRelationshipId]);
+          if (!existingSource.rowCount) {
+            const sourceId = randomUUID();
+            await client.query("INSERT INTO workspace_records(id,investigation_id,kind,data,created_by) VALUES($1,$2,'source',$3,$4)", [sourceId, investigationId, json({ title: 'Imported source', url: relationship.sourceUrl, epistemic_status: relationship.status, description: relationship.explanation, collector }), actorId]);
+            await client.query('INSERT INTO workspace_links(record_id,investigation_id,relationship_id) VALUES($1,$2,$3)', [sourceId, investigationId, storedRelationshipId]);
+          }
+        }
         relationshipsCreatedOrUpdated += 1;
       }
       let interactionsCreated = 0;

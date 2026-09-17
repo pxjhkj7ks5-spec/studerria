@@ -1,3 +1,5 @@
+> Current product: [OSINT Investigation Graph](../../services/osint-graph/README.md). The manual workspace supersedes the collector-oriented behavior described below; collection is disabled and investigations no longer expire automatically.
+
 # Social Graph architecture
 
 ## Product boundary
