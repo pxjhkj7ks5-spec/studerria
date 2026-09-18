@@ -87,6 +87,48 @@ test(
         b = await entity("A. Example"),
         c = await entity("Company"),
         foreign = await entity("Foreign", other);
+      const layout = [
+        { id: a.id, x: 12.25, y: -40 },
+        { id: b.id, x: 400, y: 500 },
+      ];
+      await request(app)
+        .patch(`/osint/api/investigations/${id}/layout`)
+        .send({ positions: layout })
+        .expect(401);
+      await agent
+        .patch(`/osint/api/investigations/${id}/layout`)
+        .send({ positions: layout })
+        .expect(403);
+      await call("patch", "/layout", { positions: layout }).expect(200);
+      let persisted = (
+        await pool.query("SELECT metadata FROM entities WHERE id=$1", [a.id])
+      ).rows[0].metadata;
+      assert.deepEqual(persisted.position, { x: 12.25, y: -40 });
+      assert.equal(persisted.notes, "Alice notes");
+      for (const positions of [
+        [
+          { id: a.id, x: 8, y: 9 },
+          { id: foreign.id, x: 1, y: 2 },
+        ],
+        [{ id: a.id, x: "1", y: 0 }],
+        [{ id: a.id, x: null, y: 0 }],
+        [{ id: a.id, x: 1e20, y: 0 }],
+        [layout[0], layout[0]],
+      ])
+        await call("patch", "/layout", { positions }).expect(400);
+      persisted = (
+        await pool.query("SELECT metadata FROM entities WHERE id=$1", [a.id])
+      ).rows[0].metadata;
+      assert.deepEqual(persisted.position, { x: 12.25, y: -40 });
+      assert.equal(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM audit_logs WHERE action='layout.save' AND metadata->>'investigation_id'=$1",
+            [id],
+          )
+        ).rows[0].n,
+        1,
+      );
       await call("post", "/relationships", {
         source: a.id,
         target: foreign.id,
@@ -143,6 +185,45 @@ test(
         })
         .expect(200);
       await call("get", `/sources/${source.id}/file`, {}, other).expect(404);
+      const previewPath = `/osint/api/investigations/${id}/sources/${source.id}/preview`;
+      await request(app).get(previewPath).expect(401);
+      await call("get", `/sources/${source.id}/preview`, {}, other).expect(404);
+      await agent.get(previewPath).expect(415);
+      await agent
+        .post(`/osint/api/investigations/${id}/sources/${source.id}/file`)
+        .set("x-osint-csrf", csrf)
+        .attach("file", Buffer.from('<svg onload="alert(1)"></svg>'), {
+          filename: "fake.png",
+          contentType: "image/png",
+        })
+        .expect(200);
+      await agent.get(previewPath).expect(415);
+      const png = Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=",
+        "base64",
+      );
+      await agent
+        .post(`/osint/api/investigations/${id}/sources/${source.id}/file`)
+        .set("x-osint-csrf", csrf)
+        .attach("file", png, {
+          filename: "proof.png",
+          contentType: "application/octet-stream",
+        })
+        .expect(200);
+      const preview = await agent.get(previewPath).expect(200);
+      assert.equal(preview.headers["content-type"], "image/png");
+      assert.equal(preview.headers["x-content-type-options"], "nosniff");
+      assert.equal(preview.headers["cache-control"], "no-store");
+      assert.match(preview.headers["content-disposition"], /^inline/);
+      // Keep the existing round-trip fixture unchanged after preview security checks.
+      await agent
+        .post(`/osint/api/investigations/${id}/sources/${source.id}/file`)
+        .set("x-osint-csrf", csrf)
+        .attach("file", content, {
+          filename: "proof.txt",
+          contentType: "text/plain",
+        })
+        .expect(200);
       const lead = await record(
         "lead",
         "Verify ownership",

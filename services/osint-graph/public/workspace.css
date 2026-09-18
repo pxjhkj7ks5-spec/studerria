@@ -706,3 +706,480 @@ pre {
     transition: none !important;
   }
 }
+/* Investigation workflow: compact tools, contextual panels and searchable forms. */
+.shell {
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+}
+.shell.inspector-collapsed {
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+.shell.inspector-collapsed #inspectorPanel {
+  display: none;
+}
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.panel-tabs {
+  padding: 0;
+  gap: 14px;
+  font-size: 11px;
+  margin: 12px 0;
+}
+.panel-tabs button {
+  white-space: nowrap;
+}
+.sidebar .entity-list {
+  max-height: none;
+}
+.sidebar {
+  display: flex;
+  flex-direction: column;
+}
+.sidebar section {
+  min-height: 0;
+  overflow: auto;
+}
+.search-label {
+  margin-top: 15px;
+}
+.sidebar .checkrow {
+  font-size: 11px;
+  color: var(--muted);
+}
+#toggleFilters {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+}
+#filterCount {
+  float: right;
+  color: var(--accent);
+}
+#filtersPanel {
+  border-bottom: 1px solid var(--line);
+  padding: 0 0 12px;
+  margin-top: 8px;
+}
+#filtersPanel label {
+  display: block;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+#filtersPanel input,
+#filtersPanel select {
+  padding: 6px;
+}
+.tools {
+  position: relative;
+}
+.more-menu {
+  position: relative;
+}
+.more-menu > summary {
+  cursor: pointer;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  list-style: none;
+}
+.more-menu > div {
+  position: absolute;
+  right: 0;
+  top: 38px;
+  min-width: 225px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  z-index: 30;
+  box-shadow: 0 14px 35px #0008;
+}
+.more-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+}
+#saveStatus {
+  font-size: 10px;
+  color: var(--muted);
+}
+#saveStatus.failed {
+  color: #e8aaa5;
+}
+#selectionTools {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+#connectHint {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #263a33;
+  padding: 10px 16px;
+  border-bottom: 1px solid #49685a;
+}
+#connectHint span {
+  flex: 1;
+}
+#connectHint button {
+  font-size: 11px;
+}
+.mobile-only {
+  display: none;
+}
+#graphFooter {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 42px;
+  font-size: 9px;
+}
+#graphFooter span {
+  white-space: nowrap;
+}
+#graph {
+  bottom: 50px;
+}
+.inspector > nav {
+  overflow: auto;
+}
+.inspector .section-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.status-help {
+  display: block;
+  line-height: 1.5;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 8px;
+}
+.picker {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px;
+  margin: 12px 0;
+}
+.picker legend {
+  padding: 0 5px;
+  color: var(--muted);
+}
+.picker-list {
+  max-height: 165px;
+  overflow: auto;
+  margin-top: 8px;
+}
+.picker-list label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px;
+  margin: 0;
+  color: var(--text);
+}
+.picker-list label input {
+  margin: 0;
+  width: auto;
+}
+.picker .chosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+.picker .chosen span {
+  background: #2d3b35;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.picker-search {
+  margin-top: 0;
+}
+.type-picker .type-options {
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 7px 0;
+}
+.type-picker button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #30443b;
+}
+.type-picker button {
+  font-size: 12px;
+}
+.type-picker [data-type-custom] {
+  margin-top: 8px;
+}
+.form-note {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 10px 0;
+}
+.form-extra {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 16px;
+}
+.form-extra summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.count-chip {
+  white-space: nowrap;
+}
+.evidence-thumb {
+  display: block;
+  max-height: 160px;
+  max-width: 100%;
+  object-fit: contain;
+  margin: 9px 0;
+}
+.preview-button {
+  margin: 6px 0;
+}
+#imageDialog {
+  width: 900px;
+}
+#imageDialog img {
+  display: block;
+  max-width: 100%;
+  max-height: 75dvh;
+  object-fit: contain;
+  margin: auto;
+}
+#closeImage {
+  float: right;
+}
+#confirmDialog p {
+  margin: 16px 0;
+  white-space: pre-wrap;
+}
+#confirmDialog {
+  max-width: 480px;
+}
+.list-row:focus-visible,
+tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.inspector [data-inspector-section] {
+  padding-top: 8px;
+}
+.status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sidebar-open #sidebarPanel,
+.inspector-open #inspectorPanel {
+  visibility: visible;
+}
+.empty-list {
+  padding: 16px 0;
+  color: var(--muted);
+}
+.inspector .record-title {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+#formError:empty {
+  display: none;
+}
+dialog form[aria-busy="true"] {
+  cursor: progress;
+}
+dialog form[aria-busy="true"] input,
+dialog form[aria-busy="true"] textarea {
+  pointer-events: none;
+}
+@media (max-width: 1200px) {
+  .shell {
+    grid-template-columns: 220px minmax(0, 1fr) 280px;
+  }
+  .shell.inspector-collapsed {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .stats {
+    gap: 10px;
+  }
+  .panel-tabs {
+    gap: 10px;
+  }
+  .case-head h1 {
+    font-size: 20px;
+  }
+  #graphFooter {
+    gap: 8px;
+  }
+  #graphFooter span {
+    font-size: 8px;
+  }
+}
+@media (max-width: 950px) {
+  .shell,
+  .shell.inspector-collapsed {
+    display: block;
+    height: calc(100dvh - 58px);
+    min-height: 0;
+  }
+  .shell main {
+    height: 100%;
+  }
+  .mobile-only {
+    display: inline-flex;
+  }
+  #sidebarPanel,
+  #inspectorPanel {
+    position: fixed;
+    top: 58px;
+    bottom: 0;
+    z-index: 40;
+    width: min(350px, 92vw);
+    max-height: none;
+    box-shadow: 0 10px 50px #0009;
+    display: none;
+  }
+  #sidebarPanel {
+    left: 0;
+  }
+  #inspectorPanel {
+    right: 0;
+  }
+  .shell.sidebar-open #sidebarPanel,
+  .shell.inspector-open #inspectorPanel {
+    display: flex;
+    flex-direction: column;
+  }
+  .shell.inspector-open #inspectorPanel #inspector {
+    overflow: auto;
+  }
+  .shell.inspector-collapsed.inspector-open #inspectorPanel {
+    display: flex;
+  }
+  .sidebar .entity-list {
+    max-height: none;
+  }
+  .canvas-area {
+    min-height: 200px;
+  }
+  .brand small {
+    display: inline;
+  }
+  .case-head {
+    padding: 14px 16px;
+  }
+  .stats {
+    padding: 0 16px 12px;
+  }
+  .tools {
+    padding: 9px 12px;
+  }
+  #graphFooter {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  #graphFooter span {
+    font-size: 9px;
+  }
+  .panel-tabs {
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 540px) {
+  .brand small {
+    display: none;
+  }
+  .case-head h1 {
+    font-size: 18px;
+  }
+  .tools .spacer {
+    display: block;
+  }
+  #saveStatus {
+    width: auto;
+    margin-left: auto;
+  }
+  .tools {
+    gap: 6px;
+  }
+  .tools button {
+    font-size: 11px;
+  }
+  #selectionTools {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  #graphFooter span {
+    font-size: 8px;
+  }
+  #connectHint {
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+  .more-menu > div {
+    right: 0;
+  }
+  .stats {
+    font-size: 10px;
+  }
+  .stats b {
+    font-size: 12px;
+  }
+  #views {
+    gap: 18px;
+  }
+  #graph {
+    bottom: 65px;
+  }
+}
+
+.entity-choice {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.entity-choice > input {
+  width: 14px;
+  flex: 0 0 14px;
+  margin: 0;
+}
+.entity-choice > .list-row {
+  min-width: 0;
+  flex: 1;
+}
+.entity-choice > .list-row > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inspector h2 {
+  overflow-wrap: anywhere;
+}
+.picker label {
+  overflow-wrap: anywhere;
+}
+.picker-options input {
+  flex-shrink: 0;
+}
+button:focus-visible,
+summary:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #bfdbcf;
+  outline-offset: 3px;
+}

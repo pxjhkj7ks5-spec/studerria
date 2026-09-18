@@ -13,57 +13,13 @@
           "'": "&#39;",
         })[c],
     );
-  const types = [
-    "PERSON",
-    "ORGANIZATION",
-    "SOCIAL_ACCOUNT",
-    "USERNAME",
-    "EMAIL",
-    "PHONE",
-    "WEBSITE",
-    "DOMAIN",
-    "LOCATION",
-    "POST",
-    "DOCUMENT",
-    "IMAGE",
-    "EVENT",
-    "OTHER",
-  ];
-  const relations = [
-    "OWNS",
-    "USES",
-    "WORKS_AT",
-    "FOUNDED",
-    "MEMBER_OF",
-    "FOLLOWS",
-    "MENTIONS",
-    "TAGGED",
-    "COMMENTED",
-    "COLLABORATED_WITH",
-    "LINKED_TO",
-    "LOCATED_AT",
-    "PARTICIPATED_IN",
-    "SAME_PERSON_AS",
-    "POSSIBLY_SAME_PERSON_AS",
-    "ASSOCIATED_WITH",
-    "RELATED_TO",
-  ];
-  const names = {
-    PERSON: "Людина",
-    ORGANIZATION: "Організація",
-    SOCIAL_ACCOUNT: "Соціальний акаунт",
-    USERNAME: "Username",
-    EMAIL: "Email",
-    PHONE: "Телефон",
-    WEBSITE: "Сайт",
-    DOMAIN: "Домен",
-    LOCATION: "Місце",
-    POST: "Публікація",
-    DOCUMENT: "Документ",
-    IMAGE: "Зображення",
-    EVENT: "Подія",
-    OTHER: "Інше",
-  };
+  const uk = window.OsintUk;
+  const names = uk.entities;
+  const relName = (r) =>
+    r.metadata?.label ||
+    uk.relationships[r.relationship_type] ||
+    r.relationship_type;
+  const plural = (n, forms) => uk.count(n, forms).replace(/^[\d\s ]+/, "");
   const glyph = (t) =>
     ({
       PERSON: "●",
@@ -102,6 +58,10 @@
     connect: null,
     positions: {},
     table: "entities",
+    inspectorTab: "overview",
+    saveQueue: new Map(),
+    saveTimer: null,
+    saving: false,
   };
   const recs = (kind) => state.w?.records.filter((r) => r.kind === kind) || [];
   const linked = (record, kind, id) =>
@@ -118,7 +78,7 @@
         })
       : "—";
   const badge = (status) =>
-    `<span class="badge ${esc(status)}">${esc(status)}</span>`;
+    `<span class="badge ${esc(status)}" title="${esc(uk.hints[status] || "")}">${esc(uk.statuses[status] || status)}</span>`;
   function toast(message) {
     $("#toast").textContent = message;
     $("#toast").hidden = false;
@@ -141,7 +101,7 @@
       throw Error("Потрібен вхід");
     }
     const data = await response.json();
-    if (!response.ok) throw Error(data.error || "Помилка запиту");
+    if (!response.ok) throw Error(uk.error(data.error));
     return data;
   }
   const route = (path) => `/investigations/${state.id}${path}`;
@@ -151,7 +111,7 @@
     return (...args) =>
       Promise.resolve()
         .then(() => fn(...args))
-        .catch((e) => toast(e.message));
+        .catch((e) => toast(uk.error(e)));
   }
   function requireCase() {
     if (!state.id) {
@@ -173,19 +133,25 @@
     }
   }
   async function openCase(id) {
+    await flushLayout();
     state.cy?.destroy();
     state.cy = null;
     state.id = id;
     state.selected = null;
     state.positions = {};
     state.hiddenLayers.clear();
+    setConnect(null);
+    resetFilters();
+    $("#search").value = "";
     $("#inspector").innerHTML =
       '<div class="placeholder"><h2>Деталі та докази</h2><p>Оберіть сутність або зв’язок.</p></div>';
     await refresh();
   }
   async function refresh() {
     if (!state.id) return;
-    const data = await api(route("/workspace"));
+    const caseId = state.id;
+    const data = await api(`/investigations/${caseId}/workspace`);
+    if (caseId !== state.id) return;
     state.w = data.workspace;
     state.analysis = data.analysis;
     $("#caseTitle").textContent = state.w.investigation.name;
@@ -194,28 +160,25 @@
     renderSidebar();
     renderGraph();
     renderView();
-    if (state.selected) inspect(state.selected.kind, state.selected.id);
+    if (state.selected) inspect(state.selected.kind, state.selected.id, false);
   }
   function renderStats() {
-    const w = state.w;
     const counts = [
-      [w.entities.length, "сутностей"],
-      [w.relationships.length, "зв’язків"],
-      [recs("lead").length, "зачіпок"],
+      [state.w.entities.length, ["сутність", "сутності", "сутностей"]],
+      [state.w.relationships.length, ["зв’язок", "зв’язки", "зв’язків"]],
       [
         recs("lead").filter(
           (r) => !["CONFIRMED", "DISMISSED"].includes(r.data.status),
         ).length,
-        "відкритих",
+        ["відкрита зачіпка", "відкриті зачіпки", "відкритих зачіпок"],
       ],
-      ...["FACT", "INFERENCE", "HYPOTHESIS"].map((s) => [
-        w.relationships.filter((r) => r.epistemic_status === s).length,
-        s,
-      ]),
-      [recs("source").length, "доказів"],
+      [recs("source").length, ["доказ", "докази", "доказів"]],
     ];
     $("#stats").innerHTML = counts
-      .map(([v, k]) => `<span><b>${v}</b>${k}</span>`)
+      .map(
+        ([n, forms]) =>
+          `<span class="count-chip"><b>${new Intl.NumberFormat("uk-UA").format(n)}</b>${esc(plural(n, forms))}</span>`,
+      )
       .join("");
   }
   function renderFilters() {
@@ -230,7 +193,7 @@
       [
         "relationFilter",
         [...new Set(state.w.relationships.map((e) => e.relationship_type))].map(
-          (x) => [x, x],
+          (x) => [x, uk.relationships[x] || x],
         ),
       ],
       ["sourceFilter", recs("source").map((r) => [r.id, r.data.title])],
@@ -260,17 +223,7 @@
         (rel && item.relationship_type !== rel))
     )
       return false;
-    if (
-      search &&
-      !JSON.stringify([
-        item,
-        ...recs("note")
-          .filter((r) => linked(r, kind, item.id))
-          .map((r) => r.data),
-      ])
-        .toLowerCase()
-        .includes(search)
-    )
+    if (search && $("#onlyMatches").checked && !matches(kind, item))
       return false;
     const count =
       sources(kind, item.id).length +
@@ -299,12 +252,13 @@
     if (!state.w) return;
     $("#entityList").innerHTML =
       state.w.entities
-        .filter((e) => passes("entity", e))
+        .filter((e) => passes("entity", e) && matches("entity", e))
         .map(
           (e) =>
-            `<button class="list-row" data-inspect="entity" data-id="${e.id}"><span class="glyph">${glyph(e.type)}</span><span>${esc(e.display_name)}</span></button>`,
+            `<div class="entity-choice"><input type="checkbox" data-select-entity="${e.id}" aria-label="Вибрати: ${esc(e.display_name)}" ${state.cy?.getElementById(e.id).selected() ? "checked" : ""}><button class="list-row" data-inspect="entity" data-id="${e.id}"><span class="glyph">${glyph(e.type)}</span><span>${esc(e.display_name)}</span></button></div>`,
         )
-        .join("") || "<small>Немає сутностей</small>";
+        .join("") ||
+      "<p class='empty-list'>Немає сутностей за цим запитом.</p>";
     $("#layers").innerHTML =
       recs("layer")
         .map(
@@ -324,23 +278,10 @@
   }
   function renderGraph() {
     const previous = state.cy;
-    const viewport = previous
-      ? { zoom: previous.zoom(), pan: previous.pan() }
-      : {};
-    if (previous) {
-      previous
-        .nodes()
-        .filter((n) => !n.isParent())
-        .forEach((n) => (state.positions[n.id()] = n.position()));
-      previous.destroy();
-    }
     const w = state.w;
     if (!w) return;
-    const entities = w.entities.filter((e) => passes("entity", e)),
-      ids = new Set(entities.map((e) => e.id));
-    const groups = recs("group").filter((g) =>
-      g.links.some((l) => l.kind === "entity" && ids.has(l.id)),
-    );
+    const entities = w.entities;
+    const groups = recs("group");
     const parent = new Map();
     groups.forEach((g) =>
       g.links.forEach((l) => {
@@ -365,27 +306,51 @@
             y: 110 + Math.floor(i / 5) * 140,
           },
       })),
-      ...w.relationships
-        .filter(
-          (r) =>
-            ids.has(r.source_entity_id) &&
-            ids.has(r.target_entity_id) &&
-            passes("relationship", r),
-        )
-        .map((r) => ({
-          data: {
-            id: r.id,
-            source: r.source_entity_id,
-            target: r.target_entity_id,
-            label: r.metadata.label || r.relationship_type,
-            status: r.epistemic_status,
-          },
-        })),
+      ...w.relationships.map((r) => ({
+        data: {
+          id: r.id,
+          source: r.source_entity_id,
+          target: r.target_entity_id,
+          label: relName(r),
+          status: r.epistemic_status,
+        },
+      })),
     ];
+    if (previous) {
+      previous.batch(() => {
+        const ids = new Set(elements.map((e) => e.data.id));
+        previous
+          .elements()
+          .filter((e) => !ids.has(e.id()))
+          .remove();
+        for (const el of elements) {
+          const node = previous.getElementById(el.data.id);
+          if (!node.length) {
+            previous.add(el);
+            continue;
+          }
+          if (
+            node.isNode() &&
+            !el.data.group &&
+            node.parent().id() !== el.data.parent
+          )
+            node.move({ parent: el.data.parent || null });
+          if (
+            node.isEdge() &&
+            (node.source().id() !== el.data.source ||
+              node.target().id() !== el.data.target)
+          )
+            node.move({ source: el.data.source, target: el.data.target });
+          node.data(el.data);
+        }
+      });
+      applyVisibility();
+      selectionTools();
+      return;
+    }
     state.cy = cytoscape({
       container: $("#graph"),
       elements,
-      ...viewport,
       layout: { name: "preset", fit: !previous, padding: 70 },
       boxSelectionEnabled: true,
       selectionType: "additive",
@@ -404,6 +369,7 @@
             label: "data(label)",
             color: "#cfd8d3",
             "font-size": 11,
+            "min-zoomed-font-size": 8,
             "text-valign": "bottom",
             "text-margin-y": 9,
             "text-max-width": 130,
@@ -435,6 +401,7 @@
             "curve-style": "bezier",
             label: "data(label)",
             "font-size": 9,
+            "min-zoomed-font-size": 7,
             color: "#9daea5",
             "text-rotation": "autorotate",
             "text-background-color": "#111418",
@@ -469,6 +436,15 @@
           },
         },
         { selector: "node:selected", style: { width: 42, height: 42 } },
+        { selector: ".filtered", style: { display: "none" } },
+        {
+          selector: ".search-match",
+          style: {
+            "border-color": "#f0e1a2",
+            "border-width": 3,
+            "line-color": "#f0e1a2",
+          },
+        },
       ],
     });
     if (!previous && state.cy.zoom() > 1.25) {
@@ -480,10 +456,13 @@
         editRecord(state.w.records.find((r) => r.id === e.target.id()));
         return;
       }
-      if (state.connect && state.connect !== e.target.id()) {
-        const from = state.connect;
-        state.connect = null;
-        editRelationship(null, from, e.target.id());
+      if (state.connect !== null) {
+        if (!state.connect) setConnect(e.target.id());
+        else if (state.connect !== e.target.id()) {
+          const from = state.connect;
+          setConnect(null);
+          editRelationship(null, from, e.target.id());
+        }
       } else inspect("entity", e.target.id());
     });
     state.cy.on("tap", "edge", (e) => inspect("relationship", e.target.id()));
@@ -498,20 +477,9 @@
     state.cy.on("cxttap", "node", (e) => {
       if (!e.target.isParent()) context(e.target.id(), e.originalEvent);
     });
-    state.cy.on(
-      "dragfree",
-      "node",
-      guarded(async (e) => {
-        if (e.target.isParent()) return;
-        state.positions[e.target.id()] = e.target.position();
-        const entity = w.entities.find((x) => x.id === e.target.id());
-        await send(
-          "/entities/" + entity.id,
-          { metadata: { ...entity.metadata, position: e.target.position() } },
-          "PATCH",
-        );
-        entity.metadata.position = e.target.position();
-      }),
+    state.cy.on("select unselect", selectionTools);
+    state.cy.on("dragfree", "node", () =>
+      queuePositions(state.cy.nodes().filter((n) => !n.isParent())),
     );
     let dragFrom = null;
     state.cy.on("mousedown", "node", (e) => {
@@ -534,16 +502,189 @@
           editRelationship(null, from, e.target.id());
       }
     });
-    $("#empty").hidden = entities.length > 0 || state.view !== "Graph";
-    $("#empty h2").textContent = w.entities.length
+    applyVisibility();
+    selectionTools();
+  }
+  function matches(kind, item) {
+    const q = $("#search").value.trim().toLocaleLowerCase("uk");
+    if (!q) return true;
+    const data = [
+      item.display_name,
+      item.canonical_name,
+      item.username,
+      item.profile_url,
+      item.explanation,
+      item.metadata?.notes,
+      item.metadata?.username,
+      item.metadata?.url,
+      item.metadata?.email,
+      item.metadata?.phone,
+      item.metadata?.aliases,
+      kind === "relationship" ? relName(item) : names[item.type],
+      ...recs("note")
+        .filter((r) => linked(r, kind, item.id))
+        .flatMap((r) => [r.data.title, r.data.description, r.data.notes]),
+    ];
+    return data.filter(Boolean).join(" ").toLocaleLowerCase("uk").includes(q);
+  }
+  function applyVisibility() {
+    if (!state.cy || !state.w) return;
+    const edges = state.w.relationships.filter((r) =>
+      passes("relationship", r),
+    );
+    const edgeFilter = $("#statusFilter").value || $("#relationFilter").value;
+    const endpoints = new Set(
+      edges.flatMap((r) => [r.source_entity_id, r.target_entity_id]),
+    );
+    const ids = new Set(
+      state.w.entities
+        .filter((e) => (edgeFilter ? endpoints.has(e.id) : passes("entity", e)))
+        .map((e) => e.id),
+    );
+    state.cy.batch(() => {
+      for (const e of state.w.entities)
+        state.cy
+          .getElementById(e.id)
+          .toggleClass("filtered", !ids.has(e.id))
+          .toggleClass(
+            "search-match",
+            !!$("#search").value && matches("entity", e),
+          );
+      const allowedEdges = new Set(
+        edges
+          .filter(
+            (r) => ids.has(r.source_entity_id) && ids.has(r.target_entity_id),
+          )
+          .map((r) => r.id),
+      );
+      for (const r of state.w.relationships)
+        state.cy
+          .getElementById(r.id)
+          .toggleClass("filtered", !allowedEdges.has(r.id))
+          .toggleClass(
+            "search-match",
+            !!$("#search").value && matches("relationship", r),
+          );
+      state.cy
+        .nodes(":parent")
+        .forEach((g) =>
+          g.toggleClass(
+            "filtered",
+            !g.descendants().some((n) => !n.hasClass("filtered")),
+          ),
+        );
+    });
+    $("#empty").hidden = ids.size > 0 || state.view !== "Graph";
+    $("#empty h2").textContent = state.w.entities.length
       ? "Немає збігів"
       : "Додайте першу сутність";
-    $("#empty p").textContent = w.entities.length
-      ? "Змініть фільтри, щоб повернути об’єкти на карту."
-      : "Подвійний клік на canvas або кнопка «Сутність».";
-    $("#emptyCreate").textContent = "＋ Сутність";
+    $("#empty p").textContent = state.w.entities.length
+      ? "Скиньте фільтри, щоб повернути об’єкти на карту."
+      : "Подвійний клік на полотні або кнопка «Додати сутність».";
+    $("#emptyCreate").textContent = state.w.entities.length
+      ? "Скинути фільтри"
+      : "Додати сутність";
+    $("#filterCount").textContent =
+      [
+        "typeFilter",
+        "relationFilter",
+        "statusFilter",
+        "evidenceFilter",
+        "sourceFilter",
+        "dateFilter",
+      ].filter((id) => $("#" + id).value).length +
+      state.hiddenLayers.size +
+      Number($("#onlyMatches").checked);
   }
-  function inspect(kind, id) {
+  function resetFilters() {
+    for (const id of [
+      "typeFilter",
+      "relationFilter",
+      "statusFilter",
+      "evidenceFilter",
+      "sourceFilter",
+      "dateFilter",
+    ])
+      $("#" + id).value = "";
+    $("#onlyMatches").checked = false;
+    state.hiddenLayers.clear();
+  }
+  function selectionTools() {
+    if (!state.cy) return;
+    const n = state.cy.nodes(":selected").filter((n) => !n.isParent()).length;
+    $("#selectionTools").hidden = n < 2;
+    $("#selectionCount").textContent = `Вибрано: ${n}`;
+    document
+      .querySelectorAll("[data-select-entity]")
+      .forEach(
+        (c) =>
+          (c.checked = state.cy
+            .getElementById(c.dataset.selectEntity)
+            .selected()),
+      );
+    $("#mergeSelected").disabled = n !== 2;
+  }
+  function setConnect(id) {
+    state.connect = id;
+    $("#connectHint").hidden = id === null;
+    $("#connectMode").setAttribute("aria-pressed", String(id !== null));
+    $("#connectHint span").textContent = id
+      ? `Перша сутність: ${name(id)}. Оберіть другу.`
+      : "Оберіть першу сутність на графі.";
+  }
+  function queuePositions(nodes) {
+    nodes.forEach((n) => {
+      const p = { id: n.id(), ...n.position() };
+      state.positions[n.id()] = { x: p.x, y: p.y };
+      state.saveQueue.set(n.id(), p);
+    });
+    $("#saveStatus").textContent = "Зберігається…";
+    $("#saveStatus").classList.remove("failed");
+    clearTimeout(state.saveTimer);
+    state.saveTimer = setTimeout(() => flushLayout().catch(() => {}), 250);
+  }
+  async function flushLayout() {
+    clearTimeout(state.saveTimer);
+    if (state.saving) {
+      await state.saving;
+      if (state.saveQueue.size) return flushLayout();
+      return;
+    }
+    if (!state.saveQueue.size) return;
+    $("#saveStatus").textContent = "Зберігається…";
+    $("#saveStatus").classList.remove("failed");
+    const positions = [...state.saveQueue.values()],
+      inv = state.id;
+    state.saveQueue.clear();
+    state.saving = api(`/investigations/${inv}/layout`, {
+      method: "PATCH",
+      body: JSON.stringify({ positions }),
+    })
+      .then(() => {
+        for (const p of positions) {
+          const e = state.w?.entities.find((e) => e.id === p.id);
+          if (e) e.metadata.position = { x: p.x, y: p.y };
+        }
+        $("#saveStatus").textContent = state.saveQueue.size
+          ? "Зберігається…"
+          : "Збережено";
+        $("#retryLayout").hidden = true;
+      })
+      .catch((e) => {
+        for (const p of positions)
+          if (!state.saveQueue.has(p.id)) state.saveQueue.set(p.id, p);
+        $("#saveStatus").textContent = "Не вдалося зберегти";
+        $("#saveStatus").classList.add("failed");
+        $("#retryLayout").hidden = false;
+        throw e;
+      })
+      .finally(() => {
+        state.saving = false;
+      });
+    await state.saving;
+  }
+  function inspect(kind, id, reveal = true) {
+    if (state.selected?.id !== id) state.inspectorTab = "overview";
     state.selected = { kind, id };
     const item =
       kind === "entity"
@@ -560,7 +701,7 @@
       kind === "entity"
         ? item.display_name
         : kind === "relationship"
-          ? item.metadata.label || item.relationship_type
+          ? relName(item)
           : item.data.title;
     const notes =
       item.metadata?.notes || item.data?.notes || item.data?.description || "";
@@ -572,8 +713,15 @@
           )
         : [];
     const evidence = sources(kind, id);
+    if (reveal) {
+      document.querySelector(".shell").classList.remove("inspector-collapsed");
+      document.querySelector(".shell").classList.add("inspector-open");
+      document.querySelector(".shell").classList.remove("sidebar-open");
+      $("#toggleInspector").setAttribute("aria-expanded", "true");
+      $("#toggleSidebar").setAttribute("aria-expanded", "false");
+    }
     $("#inspector").innerHTML =
-      `<p class="eyebrow">${esc(kind === "entity" ? names[item.type] || item.type : kind)}</p><h2>${esc(title)}</h2><div class="sub">${status ? badge(status) : ""} ${item.confidence != null ? `Confidence ${Math.round(item.confidence * 100)}%` : ""}</div>${kind === "relationship" ? `<p>${esc(name(item.source_entity_id))} → ${esc(name(item.target_entity_id))}</p>` : ""}<div class="sub">Створено ${date(item.created_at || item.first_observed_at)}<br>Автор: ${esc(item.created_by || "Імпорт / попередня версія")}</div><p>${esc(item.explanation || "")}</p><p>${esc(notes)}</p>${kind === "entity" ? `<div class="sub">${esc(item.metadata.platform || item.platform || "")} ${esc(item.metadata.username || item.username || "")}<br>${urlLink(item.metadata.url || item.profile_url)}</div>` : ""}<div class="actions"><button data-edit-selected>Редагувати</button>${kind === "entity" ? "<button data-connect>З’єднати</button><button data-duplicate>Дублювати</button>" : ""}<button data-add-linked="source">＋ Доказ</button><button data-add-linked="note">＋ Нотатка</button><button data-add-linked="lead">＋ Зачіпка</button><button class="danger" data-delete-selected>Видалити</button></div>${kind === "lead" ? `<div class="actions"><button data-lead-entity>Створити сутність</button><button data-lead-relationship>Створити зв’язок</button><button data-close-lead>Закрити зачіпку</button></div><p>${esc(item.data.status)} · ${esc(item.data.priority)}</p>` : ""}<h3>Джерела та докази · ${evidence.length}</h3>${evidence.map(sourceCard).join("") || '<p class="muted">Джерела ще не прикріплені.</p>'}${(item.evidence || []).map((e) => `<div class="evidence-item">${urlLink(e.source_url)}<small>${esc(e.collector)} · ${date(e.observed_at)}</small></div>`).join("")}<h3>Нотатки</h3>${
+      `<section data-inspector-section="overview"><p class="eyebrow">${esc(kind === "entity" ? names[item.type] || item.type : uk.kinds[kind])}</p><h2>${esc(title)}</h2><div class="sub">${status ? badge(status) : ""} ${item.confidence != null ? `Впевненість ${Math.round(item.confidence * 100)}%` : ""}</div>${kind === "relationship" ? `<p>${esc(name(item.source_entity_id))} → ${esc(name(item.target_entity_id))}</p>` : ""}<div class="sub">Створено ${date(item.created_at || item.first_observed_at)}<br>Автор: ${esc(item.created_by || "Імпорт / попередня версія")}</div><p>${esc(item.explanation || "")}</p><p>${esc(notes)}</p>${kind === "entity" ? `<div class="sub">${esc(item.metadata.platform || item.platform || "")} ${esc(item.metadata.username || item.username || "")}<br>${urlLink(item.metadata.url || item.profile_url)}</div>` : ""}<div class="actions"><button data-edit-selected>Редагувати</button>${kind === "entity" ? "<button data-connect>З’єднати</button><button data-duplicate>Дублювати</button>" : ""}<button data-add-linked="source">＋ Доказ</button><button data-add-linked="note">＋ Нотатка</button><button data-add-linked="lead">＋ Зачіпка</button><button class="danger" data-delete-selected>Видалити</button></div>${kind === "lead" ? `<div class="actions"><button data-lead-entity>Створити сутність</button><button data-lead-relationship>Створити зв’язок</button><button data-lead-state="CONFIRMED">Підтвердити</button><button data-lead-state="DISMISSED">Відхилити</button><button data-lead-state="INVESTIGATING">Повернути в роботу</button></div><p>${esc(uk.leads[item.data.status])} · ${esc(uk.priorities[item.data.priority])}</p>` : ""}</section><section data-inspector-section="evidence"><h3>Джерела та докази · ${evidence.length}</h3>${evidence.map(sourceCard).join("") || '<p class="muted">Джерела ще не прикріплені.</p>'}${(item.evidence || []).map((e) => `<div class="evidence-item">${urlLink(e.source_url)}<small>${esc(e.collector)} · ${date(e.observed_at)}</small></div>`).join("")}</section><section data-inspector-section="notes"><h3>Нотатки</h3>${
         recs("note")
           .filter((r) => linked(r, kind, id))
           .map(
@@ -581,7 +729,7 @@
               `<div class="evidence-item"><button data-record="${r.id}">${esc(r.data.title)}</button><p>${esc(r.data.description)}</p></div>`,
           )
           .join("") || "<small>Нотаток поки немає.</small>"
-      }<h3>Пов’язані сутності</h3>${connected.map((r) => `<button class="list-row" data-inspect="relationship" data-id="${r.id}">${badge(r.epistemic_status)} ${esc(name(r.source_entity_id === id ? r.target_entity_id : r.source_entity_id))}</button>`).join("")}${kind === "relationship" ? [item.source_entity_id, item.target_entity_id].map((e) => `<button class="list-row" data-inspect="entity" data-id="${e}">${esc(name(e))}</button>`).join("") : ""}${
+      }</section><section data-inspector-section="connections"><h3>Пов’язані сутності</h3>${connected.map((r) => `<button class="list-row" data-inspect="relationship" data-id="${r.id}">${badge(r.epistemic_status)} ${esc(name(r.source_entity_id === id ? r.target_entity_id : r.source_entity_id))}</button>`).join("")}${kind === "relationship" ? [item.source_entity_id, item.target_entity_id].map((e) => `<button class="list-row" data-inspect="entity" data-id="${e}">${esc(name(e))}</button>`).join("") : ""}${
         kind === "lead"
           ? item.links
               .filter((l) => l.kind === "entity")
@@ -595,9 +743,25 @@
         .filter((r) => linked(r, kind, id))
         .map(
           (r) =>
-            `<button class="list-row" data-inspect="lead" data-id="${r.id}">${esc(r.data.title)} · ${esc(r.data.status)}</button>`,
+            `<button class="list-row" data-inspect="lead" data-id="${r.id}">${esc(r.data.title)} · ${esc(uk.leads[r.data.status])}</button>`,
         )
-        .join("")}`;
+        .join("")}</section>`;
+    inspectorTabs();
+  }
+  function inspectorTabs() {
+    document
+      .querySelectorAll("[data-inspector-section]")
+      .forEach(
+        (e) => (e.hidden = e.dataset.inspectorSection !== state.inspectorTab),
+      );
+    document
+      .querySelectorAll("[data-inspector-tab]")
+      .forEach((e) =>
+        e.classList.toggle(
+          "active",
+          e.dataset.inspectorTab === state.inspectorTab,
+        ),
+      );
   }
   function urlLink(value) {
     try {
@@ -608,7 +772,7 @@
     return "";
   }
   function sourceCard(r) {
-    return `<div class="evidence-item"><button data-record="${r.id}">${esc(r.data.title)}</button> ${badge(r.data.epistemic_status || "FACT")}<p>${esc(r.data.quote || r.data.description || "")}</p>${urlLink(r.data.url)}${r.file_name ? `<p><a href="/osint/api${route("/sources/" + r.id + "/file")}">↓ ${esc(r.file_name)}</a></p>` : ""}<small>${date(r.data.observed_at || r.created_at)} · Автор ${esc(r.created_by)}</small>${r.data.merge_snapshot || r.data.entity_origins || r.data.legacy_raw_data || r.data.legacy_metadata ? `<details><summary>Походження запису</summary><pre>${esc(JSON.stringify(r.data.merge_snapshot || r.data, null, 2))}</pre></details>` : ""}</div>`;
+    return `<div class="evidence-item"><button data-record="${r.id}">${esc(r.data.title)}</button> ${badge(r.data.epistemic_status || "FACT")}<p>${esc(r.data.quote || r.data.description || "")}</p>${urlLink(r.data.url)}${r.file_name ? `<p><a href="/osint/api${route("/sources/" + r.id + "/file")}">↓ ${esc(r.file_name)}</a> ${/\.(png|jpe?g|webp)$/i.test(r.file_name) ? `<button data-preview="${r.id}">Переглянути зображення</button>` : ""}</p>` : ""}<small>${date(r.data.observed_at || r.created_at)} · Автор ${esc(r.data.author || r.created_by)}</small>${r.data.merge_snapshot || r.data.entity_origins || r.data.legacy_raw_data || r.data.legacy_metadata ? `<details><summary>Походження запису</summary><pre>${esc(JSON.stringify(r.data.merge_snapshot || r.data, null, 2))}</pre></details>` : ""}</div>`;
   }
   function renderView() {
     const graph = state.view === "Graph";
@@ -622,6 +786,7 @@
         b.classList.toggle("active", b.dataset.view === state.view),
       );
     if (graph) {
+      applyVisibility();
       state.cy?.resize();
       return;
     }
@@ -636,7 +801,7 @@
       const rows = entities
         ? state.w.entities.filter((e) => passes("entity", e))
         : state.w.relationships.filter((r) => passes("relationship", r));
-      el.innerHTML = `<div class="view-head"><h2>Таблиця</h2><div><button data-table="entities">Сутності</button> <button data-table="relationships">Зв’язки</button></div></div><table><thead><tr>${(entities ? ["Тип", "Назва", "Ідентифікатори", "Зв’язки", "Джерела", "Нотатки", "Створено"] : ["Від → До", "Тип", "Статус", "Confidence", "Джерела", "Нотатки", "Створено"]).map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr data-inspect="${entities ? "entity" : "relationship"}" data-id="${r.id}">${(entities ? [names[r.type] || r.type, r.display_name, [r.metadata.username || r.username, r.metadata.url || r.profile_url, r.canonical_name].filter(Boolean).join(" · "), state.w.relationships.filter((x) => x.source_entity_id === r.id || x.target_entity_id === r.id).length, sources("entity", r.id).length, r.metadata.notes, date(r.created_at)] : [`${name(r.source_entity_id)} → ${name(r.target_entity_id)}`, r.metadata.label || r.relationship_type, r.epistemic_status, Math.round(r.confidence * 100) + "%", sources("relationship", r.id).length + (r.evidence?.length || 0), r.metadata.notes || r.explanation, date(r.created_at || r.first_observed_at)]).map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      el.innerHTML = `<div class="view-head"><h2>Таблиця</h2><div><button data-table="entities">Сутності</button> <button data-table="relationships">Зв’язки</button></div></div><table><thead><tr>${(entities ? ["Тип", "Назва", "Ідентифікатори", "Зв’язки", "Джерела", "Нотатки", "Створено"] : ["Від → До", "Тип", "Статус", "Впевненість", "Джерела", "Нотатки", "Створено"]).map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr tabindex="0" role="button" data-inspect="${entities ? "entity" : "relationship"}" data-id="${r.id}">${(entities ? [names[r.type] || r.type, r.display_name, [r.metadata.username || r.username, r.metadata.url || r.profile_url, r.canonical_name].filter(Boolean).join(" · "), state.w.relationships.filter((x) => x.source_entity_id === r.id || x.target_entity_id === r.id).length, sources("entity", r.id).length, r.metadata.notes, date(r.created_at)] : [`${name(r.source_entity_id)} → ${name(r.target_entity_id)}`, relName(r), uk.statuses[r.epistemic_status], Math.round(r.confidence * 100) + "%", sources("relationship", r.id).length + (r.evidence?.length || 0), r.metadata.notes || r.explanation, date(r.created_at || r.first_observed_at)]).map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
     } else if (state.view === "Timeline") {
       const items = [];
       for (const [kind, list] of [
@@ -671,7 +836,7 @@
         items
           .map(
             ({ kind, r, field, time }) =>
-              `<div class="timeline-row"><small>${date(time)} · ${field}</small><button ${kind === "source" ? `data-record="${r.id}"` : `data-inspect="${kind}" data-id="${r.id}"`}>${esc(r.display_name || r.data?.title || r.metadata?.label || r.relationship_type)}</button> ${r.epistemic_status ? badge(r.epistemic_status) : ""}</div>`,
+              `<div class="timeline-row"><small>${date(time)} · ${esc(uk.dates[field] || field)}</small><button ${kind === "source" ? `data-record="${r.id}"` : `data-inspect="${kind}" data-id="${r.id}"`}>${esc(r.display_name || r.data?.title || relName(r))}</button> ${r.epistemic_status ? badge(r.epistemic_status) : ""}</div>`,
           )
           .join("");
     } else if (["Evidence", "Leads", "Notes"].includes(state.view)) {
@@ -680,7 +845,7 @@
       ];
       const query = $("#search").value.trim().toLowerCase();
       el.innerHTML =
-        `<div class="view-head"><h2>${state.view}</h2><button data-action="${kind}" class="primary">＋ Додати</button></div>` +
+        `<div class="view-head"><h2>${uk.views[state.view]}</h2><button data-action="${kind}" class="primary">＋ Додати</button></div>` +
         recs(kind)
           .filter(
             (r) =>
@@ -689,7 +854,7 @@
           .map((r) =>
             kind === "source"
               ? sourceCard(r)
-              : `<div class="record-row"><div class="content"><h2>${esc(r.data.title)}</h2><p>${esc(r.data.description)}</p><small>${esc(r.data.status || "")} ${esc(r.data.priority || "")} · ${date(r.created_at)}</small><p>${r.links
+              : `<div class="record-row"><div class="content"><h2>${esc(r.data.title)}</h2><p>${esc(r.data.description)}</p><small>${esc(uk.leads[r.data.status] || "")} ${esc(uk.priorities[r.data.priority] || "")} · ${date(r.created_at)}</small><p>${r.links
                   .filter((l) => l.kind === "entity")
                   .map((l) => esc(name(l.id)))
                   .join(
@@ -697,12 +862,18 @@
                   )}</p></div><button ${kind === "lead" ? `data-inspect="lead" data-id="${r.id}"` : `data-record="${r.id}"`}>Відкрити</button></div>`,
           )
           .join("");
+      if (!el.querySelector(".evidence-item,.record-row"))
+        el.innerHTML +=
+          '<p class="empty-list">Записів поки немає або вони не відповідають пошуку. Додайте запис чи змініть запит.</p>';
     } else if (state.view === "Analysis") {
       const a = state.analysis;
-      el.innerHTML = `<div class="view-head"><h2>Analysis</h2><button id="runAnalysis">Зберегти аналіз</button></div><p class="muted">Структура поточного графа. Центральність не підтверджує гіпотези чи особисті зв’язки.</p><h3>Шлях та спільні сусіди</h3><div class="pair"><label>Від<select id="pathFrom">${entityOptions()}</select></label><label>До<select id="pathTo">${entityOptions()}</select></label></div><button id="findPath">Знайти</button><p id="pathResult"></p><h3>Degree centrality</h3><table><thead><tr><th>Сутність</th><th>Degree</th><th>Centrality</th></tr></thead><tbody>${(a.metrics || []).map((m) => `<tr data-inspect="entity" data-id="${m.entityId}"><td>${esc(name(m.entityId))}</td><td>${m.degree}</td><td>${esc((m.degree / Math.max(1, state.w.entities.length - 1)).toFixed(3))}</td></tr>`).join("")}</tbody></table><h3>Bridge nodes</h3><p>${(a.bridgeEntityIds || []).map(name).map(esc).join(" · ") || "Немає"}</p><h3>Connected components</h3><p>${(a.connectedComponents || []).map((ids) => ids.map(name).map(esc).join(" · ")).join("<br>")}</p><h3>Communities</h3>${Object.entries(
+      el.innerHTML = `<div class="view-head"><h2>Аналіз</h2><button id="runAnalysis">Зберегти аналіз</button></div><p class="muted">Структура поточного графа. Центральність не підтверджує гіпотези чи особисті зв’язки.</p><h3>Шлях та спільні сусіди</h3><div class="pair"><label>Від<select id="pathFrom">${entityOptions()}</select></label><label>До<select id="pathTo">${entityOptions()}</select></label></div><button id="findPath">Знайти</button><p id="pathResult"></p><h3>Центральність за кількістю зв’язків</h3><table><thead><tr><th>Сутність</th><th>Сусіди</th><th>Центральність</th></tr></thead><tbody>${(a.metrics || []).map((m) => `<tr tabindex="0" role="button" data-inspect="entity" data-id="${m.entityId}"><td>${esc(name(m.entityId))}</td><td>${m.degree}</td><td>${esc(new Intl.NumberFormat("uk-UA", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(m.degree / Math.max(1, state.w.entities.length - 1)))}</td></tr>`).join("")}</tbody></table><h3>Вузли, що з’єднують частини графа</h3><p>${(a.bridgeEntityIds || []).map(name).map(esc).join(" · ") || "Немає"}</p><h3>Компоненти зв’язності</h3><p>${(a.connectedComponents || []).map((ids) => ids.map(name).map(esc).join(" · ")).join("<br>")}</p><h3>Спільноти</h3>${Object.entries(
         a.communities || {},
       )
-        .map(([id, c]) => `<p>${esc(name(id))} · ${esc(c)}</p>`)
+        .map(
+          ([id, c]) =>
+            `<p>${esc(name(id))} · Спільнота ${esc(c.split("-").pop())}</p>`,
+        )
         .join("")}`;
       el.innerHTML +=
         "<h3>Збережені висновки</h3>" +
@@ -717,7 +888,9 @@
   const options = (values, selected) =>
     values
       .map((x) => {
-        const [v, t] = Array.isArray(x) ? x : [x, x];
+        const [v, t] = Array.isArray(x)
+          ? x
+          : [x, uk.statuses[x] || uk.leads[x] || uk.priorities[x] || x];
         return `<option value="${esc(v)}" ${String(v) === String(selected) ? "selected" : ""}>${esc(t)}</option>`;
       })
       .join("");
@@ -733,46 +906,205 @@
       selected,
     );
   const multi = (label, key, values, selected = []) =>
-    `<label>${label}<select name="${key}" multiple>${values.map(([v, t]) => `<option value="${esc(v)}" ${selected.includes(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><small>⌘ / Ctrl — вибрати декілька</small></label>`;
+    `<fieldset class="picker" data-picker="${key}"><legend>${label}</legend><input type="search" placeholder="Знайти у списку" aria-label="Пошук: ${label}"><div class="chosen"></div><div class="picker-options">${values.map(([v, t]) => `<label><input type="checkbox" name="${key}" value="${esc(v)}" ${selected.includes(v) ? "checked" : ""}>${esc(t)}</label>`).join("")}</div></fieldset>`;
+  function updatePickers() {
+    document.querySelectorAll(".picker").forEach((p) => {
+      const q = p
+        .querySelector("input[type=search]")
+        .value.toLocaleLowerCase("uk");
+      p.querySelectorAll(".picker-options label").forEach(
+        (l) => (l.hidden = !l.textContent.toLocaleLowerCase("uk").includes(q)),
+      );
+      p.querySelector(".chosen").textContent =
+        [...p.querySelectorAll("input:checked")]
+          .map((c) => c.parentElement.textContent)
+          .join(" · ") || "Нічого не вибрано";
+    });
+  }
+  function typePicker(dictionary, value) {
+    return `<div class="type-picker"><label>Пошук типу<input type="search" data-type-search placeholder="Почніть вводити назву"></label><label>Тип<select name="type">${options([...Object.entries(dictionary), ["__custom", "Власний тип"]], dictionary[value] ? value : "__custom")}</select></label><label data-custom-type ${dictionary[value] ? "hidden" : ""}>Власний тип<input name="custom_type" ${dictionary[value] ? "" : "required"} maxlength="80" value="${esc(dictionary[value] ? "" : value)}"></label></div>`;
+  }
+  function entityFields() {
+    const type = $("#fields select[name=type]")?.value;
+    for (const key of ["platform", "username", "url"]) {
+      const el = $("#fields input[name=" + key + "]");
+      if (!el) continue;
+      const label = el.closest("label");
+      if (key === "platform")
+        label.hidden = !["SOCIAL_ACCOUNT", "PUBLIC_CHANNEL"].includes(type);
+      if (key === "username") {
+        label.hidden = ![
+          "SOCIAL_ACCOUNT",
+          "PUBLIC_CHANNEL",
+          "USERNAME",
+          "EMAIL",
+          "PHONE",
+        ].includes(type);
+        label.firstChild.textContent =
+          type === "EMAIL"
+            ? "Адреса електронної пошти"
+            : type === "PHONE"
+              ? "Номер телефону"
+              : "Ім’я користувача";
+      }
+      if (key === "url")
+        label.hidden = ![
+          "SOCIAL_ACCOUNT",
+          "PUBLIC_CHANNEL",
+          "WEBSITE",
+          "DOMAIN",
+          "POST",
+          "DOCUMENT",
+          "IMAGE",
+        ].includes(type);
+    }
+  }
   function dates(d = {}) {
     return (
-      "<details><summary>Дати</summary>" +
-      ["event_date", "valid_from", "valid_to", "observed_at"]
-        .map((k) =>
-          input(
-            {
-              event_date: "Дата події",
-              valid_from: "Дійсне від",
-              valid_to: "Дійсне до",
-              observed_at: "Дата спостереження",
-            }[k],
-            k,
-            d[k] ? String(d[k]).slice(0, 10) : "",
-            "date",
-          ),
-        )
+      '<details class="form-extra"><summary>Дати й час</summary><p class="muted">Час показано в часовому поясі пристрою. Незмінені дати зберігають початкову точність.</p>' +
+      Object.keys(uk.dates)
+        .filter((k) => k !== "created_at")
+        .map((k) => {
+          const original = d[k] || "";
+          const dt = original ? new Date(original) : null;
+          const local =
+            dt && !isNaN(dt)
+              ? new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
+                  .toISOString()
+                  .slice(0, 23)
+              : "";
+          return `<label>${uk.dates[k]}<input type="datetime-local" step="0.001" name="${k}" value="${local}" data-initial="${local}" data-original-date="${esc(original)}"></label>`;
+        })
         .join("") +
       "</details>"
     );
   }
+  let draftStack = [],
+    draftBaseline = "",
+    returnFocus = null,
+    editorBusy = false;
+  const fingerprint = () =>
+    JSON.stringify(
+      [...new FormData($("#editorForm"))].map(([k, v]) => [
+        k,
+        v instanceof File ? [v.name, v.size, v.lastModified] : v,
+      ]),
+    );
+  function askConfirm(title, text) {
+    return new Promise((resolve) => {
+      const d = $("#confirmDialog");
+      $("#confirmTitle").textContent = title;
+      $("#confirmText").textContent = text;
+      const done = (value) => {
+        d.close();
+        resolve(value);
+      };
+      $("#confirmYes").onclick = () => done(true);
+      $("#confirmNo").onclick = () => done(false);
+      d.oncancel = (e) => {
+        e.preventDefault();
+        done(false);
+      };
+      d.showModal();
+    });
+  }
+  function finishEditor(sourceId) {
+    if (draftStack.length) {
+      const d = draftStack.pop();
+      $("#fields").replaceChildren(...d.nodes);
+      $("#editorTitle").textContent = d.title;
+      $("#editorForm").onsubmit = d.submit;
+      $("#formError").textContent = d.error;
+      draftBaseline = d.baseline;
+      if (sourceId) {
+        const picker = $("[data-picker=source_ids]");
+        if (picker) {
+          const selected = [...picker.querySelectorAll("input:checked")].map(
+            (e) => e.value,
+          );
+          selected.push(sourceId);
+          picker.outerHTML = multi(
+            "Прикріпити джерела",
+            "source_ids",
+            recs("source").map((r) => [r.id, r.data.title]),
+            selected,
+          );
+        }
+      }
+      updatePickers();
+      d.focus?.focus();
+      return;
+    }
+    $("#editor").close();
+    (returnFocus?.isConnected && returnFocus.getClientRects().length
+      ? returnFocus
+      : $("#inspector [data-edit-selected]") || $(".tools [data-action=entity]")
+    )?.focus();
+  }
+  async function closeEditor() {
+    if (editorBusy) {
+      toast("Зачекайте завершення збереження.");
+      return;
+    }
+    if (
+      fingerprint() !== draftBaseline &&
+      !(await askConfirm(
+        "Відкинути чернетку?",
+        "Незбережені зміни цієї форми буде втрачено.",
+      ))
+    )
+      return;
+    finishEditor();
+  }
   function dialog(title, html, save) {
+    if (!$("#editor").open) returnFocus = document.activeElement;
     $("#editorTitle").textContent = title;
     $("#fields").innerHTML = html;
     $("#formError").textContent = "";
+    $("#editorForm button[type=submit]").textContent = "Зберегти";
+    document
+      .querySelectorAll("[data-original-date]")
+      .forEach((i) => (i.dataset.initial = i.value));
+    draftBaseline = fingerprint();
+    updatePickers();
+    $(
+      "#fields input:not([type=hidden]),#fields select,#fields textarea",
+    )?.focus();
     $("#editorForm").onsubmit = async (e) => {
       e.preventDefault();
-      const button = e.submitter;
+      const button = e.submitter || $("#editorForm button[type=submit]");
+      if (editorBusy) return;
+      editorBusy = true;
       button.disabled = true;
       try {
-        await save(new FormData(e.target));
-        $("#editor").close();
+        const f = new FormData(e.target);
+        document
+          .querySelectorAll("[data-original-date]")
+          .forEach((i) =>
+            f.set(
+              i.name,
+              i.value === i.dataset.initial
+                ? i.dataset.originalDate
+                : i.value
+                  ? new Date(i.value).toISOString()
+                  : "",
+            ),
+          );
+        if (f.get("type") === "__custom") f.set("type", f.get("custom_type"));
+        f.delete("custom_type");
+        const result = await save(f);
+        finishEditor(result);
       } catch (error) {
-        $("#formError").textContent = error.message;
+        $("#formError").textContent = uk.error(error);
       } finally {
+        editorBusy = false;
         button.disabled = false;
       }
     };
-    $("#editor").showModal();
+    if (!$("#editor").open) $("#editor").showModal();
+    $(
+      "#fields input:not([type=hidden]),#fields select,#fields textarea",
+    )?.focus();
   }
   function editCase(existing = false) {
     const i = existing ? state.w?.investigation : null;
@@ -800,15 +1132,28 @@
     const d = item?.metadata || preset;
     dialog(
       item ? "Редагувати сутність" : "Нова сутність",
-      `<div class="pair"><label>Тип<input name="type" list="entityTypes" value="${esc(item?.type || "PERSON")}" required maxlength="80"><datalist id="entityTypes">${options(types.map((t) => [t, names[t]]))}</datalist></label>${input("Назва", "display_name", item?.display_name || preset.title || "", "text", true)}</div>` +
-        input("Платформа", "platform", d.platform || item?.platform || "") +
+      typePicker(uk.entities, item?.type || "PERSON") +
         input(
-          "Username / Email / Телефон",
+          "Назва",
+          "display_name",
+          item?.display_name || preset.title || "",
+          "text",
+          true,
+        ) +
+        input(
+          "Платформа (для акаунта)",
+          "platform",
+          d.platform || item?.platform || "",
+        ) +
+        input(
+          "Ім’я користувача, адреса пошти або телефон",
           "username",
           d.username || item?.username || "",
         ) +
-        input("URL", "url", d.url || item?.profile_url || "", "url") +
+        input("Посилання", "url", d.url || item?.profile_url || "", "url") +
+        '<details class="form-extra"><summary>Додаткові відомості</summary>' +
         area("Нотатки", "notes", d.notes || "") +
+        "</details>" +
         dates(d),
       async (f) => {
         const body = Object.fromEntries(f);
@@ -832,6 +1177,7 @@
         inspect("entity", result.entity.id);
       },
     );
+    entityFields();
   }
   function editRelationship(item = null, from = null, to = null, lead = null) {
     if (!requireCase()) return;
@@ -842,7 +1188,8 @@
     const d = item?.metadata || {};
     dialog(
       item ? "Редагувати зв’язок" : "Новий зв’язок",
-      `<div class="pair"><label>Від<select name="source">${entityOptions(item?.source_entity_id || from)}</select></label><label>До<select name="target">${entityOptions(item?.target_entity_id || to || state.w.entities.find((e) => e.id !== (from || state.w.entities[0].id))?.id)}</select></label></div><label>Тип<input name="type" list="relationTypes" value="${esc(item?.relationship_type || "RELATED_TO")}" required maxlength="80"><datalist id="relationTypes">${options(relations)}</datalist></label>` +
+      `<div class="pair"><label>Від<select name="source">${entityOptions(item?.source_entity_id || from)}</select></label><label>До<select name="target">${entityOptions(item?.target_entity_id || to || state.w.entities.find((e) => e.id !== (from || state.w.entities[0].id))?.id)}</select></label></div>` +
+        typePicker(uk.relationships, item?.relationship_type || "RELATED_TO") +
         input("Власна назва зв’язку", "label", d.label || "") +
         '<div class="pair">' +
         select(
@@ -851,7 +1198,8 @@
           ["FACT", "INFERENCE", "HYPOTHESIS"],
           item?.epistemic_status || "HYPOTHESIS",
         ) +
-        `<label>Confidence (0–1)<input type="number" min="0" max="1" step="0.05" name="confidence" value="${item?.confidence ?? 0.5}" required></label></div>` +
+        `<label>Впевненість аналітика, %<input type="number" min="0" max="100" step="any" name="confidence" value="${Number(((item?.confidence ?? 0.5) * 100).toFixed(10))}" required></label></div>` +
+        '<p class="muted">Оцінка впевненості не перетворює гіпотезу на факт. Для факту потрібне джерело або опис безпосереднього спостереження. Аналітичний висновок — інтерпретація відомостей; гіпотеза — припущення для перевірки.</p>' +
         area(
           "Підстава / безпосереднє спостереження",
           "explanation",
@@ -864,9 +1212,11 @@
           recs("source").map((r) => [r.id, r.data.title]),
           item ? sources("relationship", item.id).map((r) => r.id) : [],
         ) +
+        '<button type="button" id="inlineSource">＋ Створити джерело</button>' +
         dates(d),
       async (f) => {
         const body = Object.fromEntries(f);
+        body.confidence = Number(body.confidence) / 100;
         body.source_ids = f.getAll("source_ids");
         body.metadata = d;
         const result = await send(
@@ -904,7 +1254,7 @@
       ...state.w.entities.map((e) => ["entity:" + e.id, e.display_name]),
       ...state.w.relationships.map((r) => [
         "relationship:" + r.id,
-        `${name(r.source_entity_id)} → ${name(r.target_entity_id)} · ${r.metadata.label || r.relationship_type}`,
+        `${name(r.source_entity_id)} → ${name(r.target_entity_id)} · ${relName(r)}`,
       ]),
       ...recs("lead")
         .filter((r) => r.id !== record?.id)
@@ -916,15 +1266,16 @@
       area("Опис", "description", d.description || "");
     if (kind === "source")
       html +=
-        input("URL", "url", d.url || "", "url") +
+        input("Посилання", "url", d.url || "", "url") +
         area("Цитата", "quote", d.quote || "") +
+        input("Автор джерела", "author", d.author || "") +
         select(
           "Статус спостереження",
           "epistemic_status",
           ["FACT", "INFERENCE", "HYPOTHESIS"],
           d.epistemic_status || "FACT",
         ) +
-        `<label>Файл / screenshot (до 10 MB)<input type="file" name="file"></label>${record?.file_name ? `<small>Збережено: ${esc(record.file_name)}</small>` : ""}` +
+        `<label>Файл / знімок екрана (до 10 МіБ)<input type="file" name="file"></label>${record?.file_name ? `<small>Збережено: ${esc(record.file_name)}</small>` : ""}` +
         dates(d);
     if (kind === "lead")
       html +=
@@ -955,6 +1306,7 @@
       );
     if (record)
       html += `<button type="button" class="danger" data-delete-record="${record.id}">Видалити</button>`;
+    let savedBody = null;
     dialog(
       {
         source: "Джерело / доказ",
@@ -976,11 +1328,16 @@
             return { kind, id };
           }),
         };
-        const result = await send(
-          record ? "/records/" + record.id : "/records",
-          body,
-          record ? "PATCH" : "POST",
-        );
+        const result =
+          savedBody === JSON.stringify(body)
+            ? { record }
+            : await send(
+                record ? "/records/" + record.id : "/records",
+                body,
+                record ? "PATCH" : "POST",
+              );
+        record = result.record;
+        savedBody = JSON.stringify(body);
         const file = f.get("file");
         if (file?.size) {
           const fd = new FormData();
@@ -992,6 +1349,7 @@
         }
         await refresh();
         if (kind === "lead") inspect("lead", result.record.id);
+        return kind === "source" ? result.record.id : null;
       },
     );
   }
@@ -1025,11 +1383,17 @@
     const s = state.selected;
     if (
       !s ||
-      !confirm(
-        "Видалити об’єкт і його прив’язки? Джерела залишаться в Evidence.",
-      )
+      !(await askConfirm(
+        "Видалити «" +
+          (selectedItem()?.display_name ||
+            selectedItem()?.data?.title ||
+            relName(selectedItem())) +
+          "»?",
+        "Об’єкт і його прив’язки буде видалено. Джерела залишаться в розділі «Докази».",
+      ))
     )
       return;
+    await flushLayout();
     await send(
       s.kind === "entity"
         ? "/entities/" + s.id
@@ -1058,10 +1422,15 @@
   }
   async function merge() {
     if (!requireCase()) return;
+    await flushLayout();
     const selected = state.cy
       .nodes(":selected")
       .filter((n) => !n.isParent())
       .map((n) => n.id());
+    if (selected.length !== 2) {
+      toast("Оберіть рівно дві сутності на графі.");
+      return;
+    }
     dialog(
       "Об’єднати дублікати",
       `<p class="muted">Першу сутність буде приєднано до другої. Спочатку перегляньте зміни.</p><label>Дублікат<select name="from">${entityOptions(selected[0])}</select></label><label>Зберегти<select name="to">${entityOptions(selected[1])}</select></label><button type="button" id="previewMerge">Переглянути зміни</button><div id="mergePreview"></div>`,
@@ -1071,8 +1440,10 @@
           throw Error("Спочатку перегляньте зміни для вибраної пари");
         await send("/merge", body);
         state.selected = null;
+        $("#inspector").innerHTML =
+          '<p class="muted">Оберіть сутність або зв’язок.</p>';
         await refresh();
-        toast("Сутності об’єднано; оригінал збережено у provenance");
+        toast("Сутності об’єднано; походження даних збережено");
       },
     );
     $("#editorForm button[type=submit]").textContent = "Об’єднати";
@@ -1087,14 +1458,72 @@
     guarded(async (event) => {
       const b = event.target.closest("button,[data-inspect]");
       if (!b) return;
+      if (b.dataset.side) {
+        document
+          .querySelectorAll("[data-side-panel]")
+          .forEach((e) => (e.hidden = e.dataset.sidePanel !== b.dataset.side));
+        document
+          .querySelectorAll("[data-side]")
+          .forEach((e) => e.classList.toggle("active", e === b));
+      }
+      if (b.dataset.inspectorTab) {
+        state.inspectorTab = b.dataset.inspectorTab;
+        inspectorTabs();
+      }
+      if (b.dataset.closePanel) {
+        document
+          .querySelector(".shell")
+          .classList.remove(b.dataset.closePanel + "-open");
+        if (b.dataset.closePanel === "inspector")
+          document.querySelector(".shell").classList.add("inspector-collapsed");
+        state.cy?.resize();
+      }
+      if (b.dataset.closePanel) {
+        syncPanels();
+        $(
+          b.dataset.closePanel === "sidebar"
+            ? "#toggleSidebar"
+            : "#toggleInspector",
+        ).focus();
+      }
+      if (b.dataset.preview) {
+        $("#evidenceImage").src =
+          "/osint/api" + route("/sources/" + b.dataset.preview + "/preview");
+        $("#imageError").hidden = true;
+        $("#imageDialog").showModal();
+      }
+      if (b.id === "inlineSource") {
+        draftStack.push({
+          nodes: [...$("#fields").childNodes],
+          title: $("#editorTitle").textContent,
+          submit: $("#editorForm").onsubmit,
+          error: $("#formError").textContent,
+          baseline: draftBaseline,
+          focus: b,
+        });
+        editRecord(null, "source");
+      }
       if (b.dataset.action) {
+        document.querySelector(".more-menu").open = false;
         action(b.dataset.action);
         return;
       }
       if (b.dataset.inspect) {
+        if (b.dataset.inspect === "entity" && state.connect !== null) {
+          if (!state.connect) {
+            setConnect(b.dataset.id);
+          } else if (state.connect !== b.dataset.id) {
+            const from = state.connect;
+            setConnect(null);
+            editRelationship(null, from, b.dataset.id);
+          }
+          return;
+        }
         inspect(b.dataset.inspect, b.dataset.id);
         if (b.dataset.inspect === "entity") {
-          state.cy?.getElementById(b.dataset.id).select();
+          const node = state.cy?.getElementById(b.dataset.id);
+          node?.select();
+          if (node?.length) state.cy.center(node);
         }
         return;
       }
@@ -1114,7 +1543,7 @@
       }
       if (b.hasAttribute("data-edit-selected")) editSelected();
       if (b.hasAttribute("data-connect")) {
-        state.connect = state.selected.id;
+        setConnect(state.selected.id);
         toast("Оберіть другу сутність на графі");
       }
       if (b.hasAttribute("data-duplicate")) duplicate();
@@ -1122,7 +1551,15 @@
       if (b.dataset.addLinked)
         editRecord(null, b.dataset.addLinked, state.selected);
       if (b.dataset.deleteRecord) {
-        if (confirm("Видалити запис і його вкладення?")) {
+        if (
+          await askConfirm(
+            "Видалити «" +
+              (state.w.records.find((r) => r.id === b.dataset.deleteRecord)
+                ?.data.title || "запис") +
+              "»?",
+            "Запис і його вкладення буде остаточно видалено.",
+          )
+        ) {
           await send("/records/" + b.dataset.deleteRecord, {}, "DELETE");
           $("#editor").close();
           await refresh();
@@ -1140,10 +1577,10 @@
         );
       if (b.hasAttribute("data-lead-relationship"))
         editRelationship(null, null, null, selectedItem());
-      if (b.hasAttribute("data-close-lead")) {
+      if (b.dataset.leadState) {
         await send(
           "/records/" + state.selected.id,
-          { data: { status: "CONFIRMED" } },
+          { data: { status: b.dataset.leadState } },
           "PATCH",
         );
         await refresh();
@@ -1155,13 +1592,16 @@
         else if (a === "delete") await deleteSelected();
         else if (a === "duplicate") duplicate();
         else if (a === "connect") {
-          state.connect = state.selected.id;
+          setConnect(state.selected.id);
           toast("Оберіть другу сутність");
         } else editRecord(null, a, state.selected);
       }
       if (
         b.id === "deleteCase" &&
-        confirm("Остаточно видалити розслідування з усіма даними?")
+        (await askConfirm(
+          "Видалити «" + state.w.investigation.name + "»?",
+          "Усі сутності, зв’язки, докази та вкладення буде остаточно видалено.",
+        ))
       ) {
         await send("", {}, "DELETE");
         $("#editor").close();
@@ -1173,7 +1613,7 @@
         const body = Object.fromEntries(new FormData($("#editorForm")));
         const { preview: p } = await send("/merge-preview", body);
         $("#mergePreview").innerHTML =
-          `<h3>${esc(p.from.display_name)} → ${esc(p.to.display_name)}</h3><p>Буде перенесено зв’язків: ${p.relationships.length}. Джерела, нотатки, зачіпки й шари будуть переприв’язані. Оригінальні дані збережуться окремим доказом.</p><ul>${p.relationships.map((r) => `<li>${esc(name(r.source_entity_id))} → ${esc(name(r.target_entity_id))} · ${esc(r.relationship_type)} · ${esc(r.epistemic_status)}</li>`).join("")}</ul>`;
+          `<h3>${esc(p.from.display_name)} → ${esc(p.to.display_name)}</h3><p>Буде перенесено зв’язків: ${p.relationships.length}. Джерела, нотатки, зачіпки й шари будуть переприв’язані. Оригінальні дані збережуться окремим доказом.</p><ul>${p.relationships.map((r) => `<li>${esc(name(r.source_entity_id))} → ${esc(name(r.target_entity_id))} · ${esc(relName(r))} · ${esc(uk.statuses[r.epistemic_status])}</li>`).join("")}</ul>`;
         $("#mergePreview").dataset.key = JSON.stringify(body);
       }
       if (b.id === "findPath") {
@@ -1205,12 +1645,21 @@
   );
   $("#newCase").onclick = () => editCase();
   $("#caseMenu").onclick = () => requireCase() && editCase(true);
-  $("#emptyCreate").onclick = () => (state.id ? editEntity() : editCase());
+  $("#emptyCreate").onclick = () => {
+    if (state.w?.entities.length) {
+      resetFilters();
+      renderSidebar();
+      applyVisibility();
+    } else state.id ? editEntity() : editCase();
+  };
   $("#cases").onchange = guarded(
     (e) => e.target.value && openCase(e.target.value),
   );
-  $("#closeEditor").onclick = $("#cancelEditor").onclick = () =>
-    $("#editor").close();
+  $("#closeEditor").onclick = $("#cancelEditor").onclick = closeEditor;
+  $("#editor").addEventListener("cancel", (e) => {
+    e.preventDefault();
+    closeEditor();
+  });
   $("#editor").addEventListener("close", () => {
     $("#editorForm button[type=submit]").textContent = "Зберегти";
   });
@@ -1220,6 +1669,7 @@
   });
   for (const id of [
     "search",
+    "onlyMatches",
     "typeFilter",
     "relationFilter",
     "statusFilter",
@@ -1229,19 +1679,22 @@
   ])
     $("#" + id).addEventListener("input", () => {
       renderSidebar();
-      renderGraph();
+      applyVisibility();
       renderView();
     });
   $("#layers").onchange = (e) => {
     if (e.target.dataset.layer) {
       if (e.target.checked) state.hiddenLayers.delete(e.target.dataset.layer);
       else state.hiddenLayers.add(e.target.dataset.layer);
-      renderGraph();
+      applyVisibility();
       renderSidebar();
     }
   };
-  $("#fit").onclick = () => state.cy?.fit(undefined, 65);
-  $("#layout").onclick = () =>
+  $("#fit").onclick = () => state.cy?.fit(state.cy.elements(":visible"), 65);
+  $("#layout").onclick = () => {
+    state.cy?.one("layoutstop", () =>
+      queuePositions(state.cy.nodes().filter((n) => !n.isParent())),
+    );
     state.cy
       ?.layout({
         name: "cose",
@@ -1250,6 +1703,7 @@
         nodeRepulsion: () => 7000,
       })
       .run();
+  };
   $("#groupSelected").onclick = () => {
     if (!requireCase()) return;
     const ids = state.cy
@@ -1257,9 +1711,11 @@
       .filter((n) => !n.isParent())
       .map((n) => n.id());
     editRecord(null, "group");
-    const select = $("#fields select[name=links]");
-    for (const o of select.options)
-      o.selected = ids.includes(o.value.split(":")[1]);
+    document
+      .querySelectorAll("#fields input[name=links]")
+      .forEach((o) => (o.checked = ids.includes(o.value.split(":")[1])));
+    updatePickers();
+    draftBaseline = fingerprint();
   };
   $("#mergeSelected").onclick = guarded(merge);
   $("#import").onclick = () => {
@@ -1301,10 +1757,117 @@
     );
   };
   document.addEventListener("keydown", (e) => {
+    if (
+      (e.key === "Enter" || e.key === " ") &&
+      e.target.matches("tr[data-inspect]")
+    ) {
+      e.preventDefault();
+      e.target.click();
+    }
     if (e.key === "Escape") {
       $("#context").hidden = true;
-      state.connect = null;
+      setConnect(null);
+      if (!$("#editor").open && !$("#imageDialog").open) {
+        document
+          .querySelector(".shell")
+          .classList.remove("sidebar-open", "inspector-open");
+        syncPanels();
+      }
     }
   });
-  loadCases().catch((e) => toast(e.message));
+  $("#toggleFilters").onclick = () => {
+    $("#filtersPanel").hidden = !$("#filtersPanel").hidden;
+    $("#toggleFilters").setAttribute(
+      "aria-expanded",
+      String(!$("#filtersPanel").hidden),
+    );
+  };
+  $("#resetFilters").onclick = () => {
+    resetFilters();
+    $("#search").value = "";
+    renderSidebar();
+    applyVisibility();
+    renderView();
+  };
+  $("#connectMode").onclick = () =>
+    requireCase() && setConnect(state.connect === null ? "" : null);
+  $("#cancelConnect").onclick = () => setConnect(null);
+  $("#connectForm").onclick = () => {
+    const from = state.connect;
+    setConnect(null);
+    editRelationship(null, from || null);
+  };
+  $("#retryLayout").onclick = guarded(flushLayout);
+  function syncPanels() {
+    const shell = document.querySelector(".shell");
+    $("#toggleSidebar").setAttribute(
+      "aria-expanded",
+      String(shell.classList.contains("sidebar-open")),
+    );
+    $("#toggleInspector").setAttribute(
+      "aria-expanded",
+      String(
+        matchMedia("(max-width:950px)").matches
+          ? shell.classList.contains("inspector-open")
+          : !shell.classList.contains("inspector-collapsed"),
+      ),
+    );
+  }
+  $("#toggleInspector").onclick = () => {
+    document.querySelector(".shell").classList.toggle("inspector-collapsed");
+    document.querySelector(".shell").classList.toggle("inspector-open");
+    syncPanels();
+    state.cy?.resize();
+  };
+  $("#toggleSidebar").onclick = () => {
+    document.querySelector(".shell").classList.toggle("sidebar-open");
+    syncPanels();
+  };
+  $("#closeImage").onclick = () => $("#imageDialog").close();
+  $("#evidenceImage").onerror = () => {
+    $("#imageError").hidden = false;
+  };
+  document.addEventListener("input", (e) => {
+    if (e.target.closest(".picker")) updatePickers();
+    if (e.target.hasAttribute("data-type-search")) {
+      const q = e.target.value.toLocaleLowerCase("uk");
+      e.target
+        .closest(".type-picker")
+        .querySelectorAll("option")
+        .forEach(
+          (o) =>
+            (o.hidden =
+              o.value !== "__custom" &&
+              !o.textContent.toLocaleLowerCase("uk").includes(q)),
+        );
+    }
+  });
+  document.addEventListener("change", (e) => {
+    if (e.target.dataset.selectEntity) {
+      const n = state.cy?.getElementById(e.target.dataset.selectEntity);
+      if (e.target.checked) n?.select();
+      else n?.unselect();
+    }
+    if (e.target.name === "type") {
+      const custom = $("[data-custom-type]");
+      if (custom) {
+        custom.hidden = e.target.value !== "__custom";
+        custom.querySelector("input").required = !custom.hidden;
+      }
+      if ($("#fields input[name=display_name]")) entityFields();
+    }
+  });
+  window.addEventListener("beforeunload", (e) => {
+    if (
+      draftStack.length ||
+      state.saveQueue.size ||
+      state.saving ||
+      editorBusy ||
+      ($("#editor").open && fingerprint() !== draftBaseline)
+    ) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+  loadCases().catch((e) => toast(uk.error(e)));
 })();

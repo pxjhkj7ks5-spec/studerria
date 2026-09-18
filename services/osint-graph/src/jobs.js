@@ -13,7 +13,7 @@ function analysisFindings(graphData, analysis) {
     findings.push({
       type: 'TOP_CONNECTED',
       title: entity.display_name,
-      explanation: `${entity.display_name} is structurally central in this observed network with ${metric.degree} distinct connection(s).`,
+      explanation: `${entity.display_name}: кількість окремих сусідів у графі — ${metric.degree}. Це характеристика структури, а не підтвердження реальних відносин.`,
       entityIds: [entity.id],
       metadata: metric,
     });
@@ -24,7 +24,7 @@ function analysisFindings(graphData, analysis) {
     findings.push({
       type: 'BRIDGE_ENTITY',
       title: entity.display_name,
-      explanation: `Removing this observed node separates parts of the current graph. This describes topology, not authority or intent.`,
+      explanation: `Видалення цієї сутності розділяє частини графа. Це характеристика структури, а не впливу чи намірів.`,
       entityIds: [entity.id],
       metadata: {},
     });
@@ -38,8 +38,8 @@ function analysisFindings(graphData, analysis) {
     if (ids.length < 2) continue;
     findings.push({
       type: 'CLUSTER',
-      title: `${cluster.replace('-', ' ')} · ${ids.length} entities`,
-      explanation: `These entities form a densely connected structural community in the recorded relationships, including any inferences or hypotheses.`,
+      title: `Спільнота ${cluster.split('-').pop()} · сутностей: ${ids.length}`,
+      explanation: `Ці сутності утворюють щільно пов’язану спільноту. Аналіз враховує також аналітичні висновки й гіпотези.`,
       entityIds: ids,
       metadata: { cluster, size: ids.length },
     });
@@ -51,7 +51,7 @@ function analysisFindings(graphData, analysis) {
     findings.push({
       type: 'MUTUAL_CONNECTION',
       title: `${leftEntity.display_name} ↔ ${rightEntity.display_name}`,
-      explanation: 'A reciprocal directed connection is recorded in the graph. Its source status must be checked in the evidence inspector.',
+      explanation: 'У графі зафіксовано зв’язок в обох напрямках. Перевірте статус і джерела в панелі доказів.',
       confidence: null,
       entityIds: [left, right],
       metadata: {},
@@ -72,7 +72,7 @@ function analysisFindings(graphData, analysis) {
       findings.push({
         type: 'INTERESTING_PATH',
         title: path.map((id) => byId.get(String(id))?.display_name || id).join(' → '),
-        explanation: 'This is a shortest observed path crossing a structural bridge. It describes graph connectivity, not a personal relationship.',
+        explanation: 'Найкоротший шлях проходить через вузол, який з’єднує частини графа. Це не є підтвердженням особистих відносин.',
         entityIds: path,
         metadata: { hops: path.length - 1 },
       });

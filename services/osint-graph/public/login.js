@@ -23,9 +23,7 @@
       if (!response.ok) throw new Error(payload.error || 'login_failed');
       window.location.assign(basePath);
     } catch (error) {
-      status.textContent = error.message === 'login_rate_limited'
-        ? 'Забагато спроб. Спробуй пізніше.'
-        : 'Неправильний логін або пароль.';
+      status.textContent = window.OsintUk.error(error);
       button.disabled = false;
       button.classList.remove('loading');
     }

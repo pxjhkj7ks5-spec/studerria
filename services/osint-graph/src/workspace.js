@@ -159,6 +159,42 @@ function registerWorkspace(app, { store, config }) {
       );
       return result;
     });
+  app.patch(
+    `${base}/layout`,
+    wrap(async (req, res) => {
+      const positions = req.body?.positions;
+      if (
+        !Array.isArray(positions) ||
+        positions.length > config.maxGraphNodes ||
+        new Set(positions.map((p) => p?.id)).size !== positions.length ||
+        positions.some(
+          (p) =>
+            !uuid(p?.id) ||
+            typeof p.x !== "number" ||
+            typeof p.y !== "number" ||
+            !Number.isFinite(p.x) ||
+            !Number.isFinite(p.y) ||
+            Math.abs(p.x) > 1e7 ||
+            Math.abs(p.y) > 1e7,
+        )
+      )
+        fail("invalid_layout");
+      await mutate(req, "layout.save", async (c) => {
+        const rows = await c.query(
+          "SELECT id FROM entities WHERE investigation_id=$1 AND id=ANY($2::uuid[])",
+          [req.params.id, positions.map((p) => p.id)],
+        );
+        if (rows.rowCount !== positions.length) fail("reference_not_found");
+        for (const p of positions)
+          await c.query(
+            "UPDATE entities SET metadata=jsonb_set(metadata,'{position}',$3::jsonb),updated_at=now() WHERE investigation_id=$1 AND id=$2",
+            [req.params.id, p.id, JSON.stringify({ x: p.x, y: p.y })],
+          );
+        return { id: req.params.id };
+      });
+      res.json({ ok: true });
+    }),
+  );
   app.get(
     `${base}/workspace`,
     wrap(async (req, res) => {
@@ -514,6 +550,52 @@ function registerWorkspace(app, { store, config }) {
     }),
   );
   app.get(
+    `${base}/sources/:sourceId/preview`,
+    wrap(async (req, res) => {
+      const file = (
+        await store.pool.query(
+          "SELECT f.* FROM evidence_files f JOIN workspace_records r ON r.id=f.source_id WHERE r.investigation_id=$1 AND r.id=$2",
+          [req.params.id, req.params.sourceId],
+        )
+      ).rows[0];
+      if (!file) fail("file_not_found", 404);
+      const b = file.content;
+      let mime = null;
+      if (
+        b.length >= 24 &&
+        b
+          .subarray(0, 8)
+          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) &&
+        b.toString("ascii", 12, 16) === "IHDR"
+      )
+        mime = "image/png";
+      if (
+        b.length >= 4 &&
+        b[0] === 255 &&
+        b[1] === 216 &&
+        b[2] === 255 &&
+        b[b.length - 2] === 255 &&
+        b[b.length - 1] === 217
+      )
+        mime = "image/jpeg";
+      if (
+        b.length >= 16 &&
+        b.toString("ascii", 0, 4) === "RIFF" &&
+        b.toString("ascii", 8, 12) === "WEBP" &&
+        ["VP8 ", "VP8L", "VP8X"].includes(b.toString("ascii", 12, 16))
+      )
+        mime = "image/webp";
+      if (!mime) fail("preview_not_supported", 415);
+      res
+        .set("Content-Type", mime)
+        .set("Cache-Control", "no-store")
+        .set("X-Content-Type-Options", "nosniff")
+        .set("Content-Security-Policy", "default-src 'none'; sandbox")
+        .set("Content-Disposition", "inline")
+        .send(b);
+    }),
+  );
+  app.get(
     `${base}/sources/:sourceId/file`,
     wrap(async (req, res) => {
       const f = (
@@ -626,8 +708,8 @@ function registerWorkspace(app, { store, config }) {
             archive,
             req.params.id,
             JSON.stringify({
-              title: `Merge: ${p.from.display_name}`,
-              description: "Original entity and relationships before merge",
+              title: `Об’єднання: ${p.from.display_name}`,
+              description: "Початкові дані сутності та зв’язків до об’єднання",
               merge_snapshot: p,
               epistemic_status: "FACT",
             }),
@@ -923,9 +1005,9 @@ async function restore(c, inv, d, actor, config) {
   }
   // Retain original authors, identifiers and all exported ancillary provenance in the archive.
   const provenance = {
-    title: "Import provenance",
+    title: "Походження імпортованих даних",
     description:
-      "Original authors, identifiers and relationships from imported investigation",
+      "Початкові автори, ідентифікатори та зв’язки імпортованого розслідування",
     original_investigation: d.investigation,
     entity_origins: d.entities.map((e) => ({
       id: e.id,

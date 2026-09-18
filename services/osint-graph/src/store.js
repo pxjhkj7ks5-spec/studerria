@@ -196,7 +196,7 @@ class OsintStore {
           const existingSource = await client.query("SELECT r.id FROM workspace_records r JOIN workspace_links l ON l.record_id=r.id WHERE r.investigation_id=$1 AND r.kind='source' AND r.data->>'url'=$2 AND l.relationship_id=$3", [investigationId, relationship.sourceUrl, storedRelationshipId]);
           if (!existingSource.rowCount) {
             const sourceId = randomUUID();
-            await client.query("INSERT INTO workspace_records(id,investigation_id,kind,data,created_by) VALUES($1,$2,'source',$3,$4)", [sourceId, investigationId, json({ title: 'Imported source', url: relationship.sourceUrl, epistemic_status: relationship.status, description: relationship.explanation, collector }), actorId]);
+            await client.query("INSERT INTO workspace_records(id,investigation_id,kind,data,created_by) VALUES($1,$2,'source',$3,$4)", [sourceId, investigationId, json({ title: 'Імпортоване джерело', url: relationship.sourceUrl, epistemic_status: relationship.status, description: relationship.explanation, collector }), actorId]);
             await client.query('INSERT INTO workspace_links(record_id,investigation_id,relationship_id) VALUES($1,$2,$3)', [sourceId, investigationId, storedRelationshipId]);
           }
         }
