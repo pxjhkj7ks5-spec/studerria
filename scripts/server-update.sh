@@ -8,6 +8,7 @@ LOG_TAIL="${LOG_TAIL:-80}"
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-120}"
 HEALTH_POLL_INTERVAL_SECONDS="${HEALTH_POLL_INTERVAL_SECONDS:-2}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups/server-update}"
+BACKUP_KEEP_COUNT="${BACKUP_KEEP_COUNT:-5}"
 SERVICE="app"
 BUILD=1
 PULL=0
@@ -129,7 +130,24 @@ ensure_backup_dir() {
   mkdir -p "$BACKUP_DIR"
 }
 
+finish_backup() {
+  local partial="$1" final="$2"
+  if [ ! -s "$partial" ] || [ -e "$final" ]; then
+    echo "Refusing empty backup or existing destination: $final" >&2
+    rm -f -- "$partial"
+    return 1
+  fi
+  mv -n -- "$partial" "$final"
+  if [ -e "$partial" ]; then
+    echo "Backup destination appeared concurrently: $final" >&2
+    rm -f -- "$partial"
+    return 1
+  fi
+  python3 "$ROOT_DIR/scripts/rotate-update-backups.py" "$final" --keep "$BACKUP_KEEP_COUNT"
+}
+
 backup_compose_volume_mount() {
+  local partial_file
   service_name="$1"
   mount_destination="$2"
   backup_label="$3"
@@ -152,19 +170,22 @@ backup_compose_volume_mount() {
 
   ensure_backup_dir
   backup_file="$BACKUP_DIR/${backup_label}-$(timestamp).tgz"
+  partial_file="$(mktemp "$BACKUP_DIR/.${backup_label}-XXXXXX.partial")"
   echo "Backing up Docker volume $volume_name to $backup_file"
   if ! docker run --rm \
     -v "$volume_name:/source:ro" \
     -v "$BACKUP_DIR:/backup" \
     alpine:3.20 \
-    sh -c "cd /source && tar czf /backup/$(basename "$backup_file") ."; then
+    sh -c "cd /source && tar czf /backup/$(basename "$partial_file") ."; then
+    rm -f -- "$partial_file"
     echo "Warning: volume backup failed for $service_name; update will continue." >&2
     return 0
   fi
+  finish_backup "$partial_file" "$backup_file"
 }
 
 backup_postgres_database() {
-  local backup_service=db backup_label=postgres
+  local backup_service=db backup_label=postgres partial_file
   if [ "$SERVICE" = obriy ] && [ -f "$ROOT_DIR/.local/obriy-database-cutover.json" ]; then
     backup_service=obriy-db
     backup_label=obriy-postgres
@@ -200,9 +221,10 @@ backup_postgres_database() {
 
   ensure_backup_dir
   backup_file="$BACKUP_DIR/${backup_label}-$(timestamp).dump"
+  partial_file="$(mktemp "$BACKUP_DIR/.${backup_label}-XXXXXX.partial")"
   echo "Backing up PostgreSQL database to $backup_file"
-  if ! docker compose exec -T "$backup_service" sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$backup_file"; then
-    rm -f "$backup_file"
+  if ! docker compose exec -T "$backup_service" sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$partial_file"; then
+    rm -f -- "$partial_file"
     if [ "$backup_service" != db ]; then
       echo 'Dedicated service backup failed; update cancelled.' >&2
       return 1
@@ -210,6 +232,7 @@ backup_postgres_database() {
     echo "Warning: PostgreSQL backup failed; update will continue." >&2
     return 0
   fi
+  finish_backup "$partial_file" "$backup_file"
 }
 
 backup_stateful_data() {
@@ -297,6 +320,15 @@ wait_for_service_ready() {
 if ! [[ "$HEALTH_WAIT_SECONDS" =~ ^[1-9][0-9]*$ ]] ||
   ! [[ "$HEALTH_POLL_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "HEALTH_WAIT_SECONDS and HEALTH_POLL_INTERVAL_SECONDS must be positive integers." >&2
+  exit 2
+fi
+
+if ! [[ "$BACKUP_KEEP_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+  echo "BACKUP_KEEP_COUNT must be a positive integer." >&2
+  exit 2
+fi
+if [ "$BACKUP_DATA" -eq 1 ] && ! command -v python3 >/dev/null 2>&1; then
+  echo "Python 3 is required for safe backup rotation." >&2
   exit 2
 fi
 
@@ -392,7 +424,7 @@ check_update_disk_space() {
     free_kb="$(df -Pk "$storage_path" | awk 'END {print $4}')"
     if ! [[ "$free_kb" =~ ^[0-9]+$ ]] || [ "$free_kb" -lt "$minimum_free_kb" ]; then
       echo "Insufficient free disk space at $storage_path: ${free_kb} KiB; minimum ${minimum_free_kb} KiB." >&2
-      echo "Inspect df -h and docker system df. Free space before retrying; backups and volumes have not been deleted." >&2
+      echo "Inspect df -h and docker system df. Free space before retrying; no emergency cleanup will be performed." >&2
       exit 1
     fi
   done

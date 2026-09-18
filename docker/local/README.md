@@ -133,6 +133,21 @@ Before updating stateful services, the helper writes a local safety backup under
 
 Use `--skip-backup` only when you have already made a fresh manual backup.
 
+Successful new backups are published atomically and registered with a `.complete`
+sidecar. After each successful backup, rotation keeps the newest five registered
+copies **of that same database/volume label and format**. Set `BACKUP_KEEP_COUNT`
+to another positive count when invoking the helper. Failed or skipped backups do
+not trigger rotation. A rotation error stops the update before rebuilding.
+
+Existing backups without `.complete` markers, manual/recovery/cutover directories,
+and Docker volumes are never pruned. Do not manually mark historical archives as
+complete: backups from before database separation may contain additional data.
+To retain a registered copy indefinitely, create an adjacent `<filename>.keep`
+file; pinned copies may exceed the count limit. Interrupted `.partial` files are
+not counted or automatically removed. Python 3 is required for rotation.
+The free-space guard remains active before backup creation, so a full disk still
+requires manual cleanup. Rotation bounds future backup counts, not total bytes.
+
 If this is the first update on a server where `docker/local/docker-compose.yml` is already locally modified and `git pull --rebase` refuses to run, do this once:
 
 ```bash
