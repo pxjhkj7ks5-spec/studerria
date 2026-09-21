@@ -6,6 +6,7 @@ export const analyticsEventNames = [
   "Product Open",
   "Catalog Filter",
   "Add to Cart",
+  "Add Bundle to Cart",
   "Checkout Open",
   "Order Placed",
   "Telegram Lead",
@@ -18,7 +19,7 @@ export type PlausibleEventName = Exclude<AnalyticsEventName, "Page View">;
 export type PlausibleEventProps = Partial<{
   campaign: string;
   location: string;
-  intent: "product" | "custom" | "catalog";
+  intent: "product" | "custom" | "catalog" | "bundle";
   product_slug: string;
   category: string;
   value: number;

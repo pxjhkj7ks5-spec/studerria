@@ -6,6 +6,7 @@ import {
   Truck,
 } from "@phosphor-icons/react/ssr";
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ProductCard } from "@/components/site/product-card";
 import { ProductGallery } from "@/components/site/product-gallery";
@@ -15,6 +16,7 @@ import { StructuredData } from "@/components/site/structured-data";
 import {
   getProductBySlug,
   getRelatedProducts,
+  getProductReviews,
   getSiteSettings,
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
@@ -67,9 +69,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const [settings, relatedProducts] = await Promise.all([
+  const [settings, relatedProducts, reviews] = await Promise.all([
     getSiteSettings(),
     getRelatedProducts(product.categoryId, product.id),
+    getProductReviews(product.id),
   ]);
   const detailItems = [
     {
@@ -233,6 +236,19 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
           </section>
         ) : null}
+
+        <section className="site-container product-reviews" aria-labelledby="product-reviews-title">
+          <div className="section-heading section-heading--split">
+            <div><p className="eyebrow">Досвід клієнтів</p><h2 id="product-reviews-title">Відгуки про виріб</h2></div>
+            <a className="ghost-pill" href={withBasePath(`/reviews?product=${encodeURIComponent(product.slug)}`)}>{reviews.length ? "Залишити відгук" : "Стати першим"}</a>
+          </div>
+          {reviews.length ? <div className="product-reviews__grid">{reviews.map((review) => <article className="review-card" key={review.id}>
+            <header><div><strong>{review.isAnonymous || !review.displayName ? "Анонімно" : review.displayName}</strong>{review.verifiedPurchase ? <span className="review-verified">Підтверджене замовлення</span> : null}</div><time dateTime={review.createdAt.toISOString()}>{new Intl.DateTimeFormat("uk-UA", { dateStyle: "long", timeZone: "Europe/Kyiv" }).format(review.createdAt)}</time></header>
+            <p>{review.body}</p>
+            {review.images.length ? <div className="review-card__images">{review.images.map((image) => <a href={withBasePath(image.urlPath)} target="_blank" rel="noreferrer" key={image.id}><Image src={withBasePath(image.urlPath)} alt={image.alt} width={520} height={520} unoptimized /></a>)}</div> : null}
+          </article>)}</div> : <div className="product-reviews__empty"><p>Для цього виробу ще немає відгуків.</p><span>Поділіться досвідом — фото можна додати у формі.</span></div>}
+          {reviews.length ? <a className="text-link" href={withBasePath("/reviews")}>Переглянути всі відгуки</a> : null}
+        </section>
       </main>
     </PublicFrame>
   );

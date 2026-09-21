@@ -92,6 +92,7 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
           <a href="#analytics">Статистика</a>
           <a href="#orders">Замовлення</a>
           <a href={withBasePath(`${getAdminRoute()}/reviews`)}>Відгуки</a>
+          <a href={withBasePath(`${getAdminRoute()}/bundles`)}>Комплекти</a>
           <a href={withBasePath(`${getAdminRoute()}/promo-codes`)}>Промокоди</a>
           <a href="#products">Товари</a>
           <a href="#storefront">Вітрина</a>

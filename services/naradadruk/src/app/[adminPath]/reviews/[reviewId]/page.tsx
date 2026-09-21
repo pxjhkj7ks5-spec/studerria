@@ -1,10 +1,10 @@
 import Image from "next/image";
 import { ReviewStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
-import { deleteReviewAction, moderateReviewAction } from "@/app/actions/admin";
+import { deleteReviewAction, moderateReviewAction, updateReviewProductsAction } from "@/app/actions/admin";
 import { assertAdminPath, getAdminRoute, requireAdminSession } from "@/lib/auth";
 import { withBasePath } from "@/lib/base-path";
-import { getAdminReview } from "@/lib/data";
+import { getAdminReview, getReviewAssignableProducts } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export default async function AdminReviewPage({ params, searchParams }: {
   assertAdminPath(adminPath);
   const id = Number(reviewId);
   if (!Number.isInteger(id) || id <= 0) notFound();
-  const review = await getAdminReview(id);
+  const [review, products] = await Promise.all([getAdminReview(id), getReviewAssignableProducts()]);
   if (!review) notFound();
   return (
     <main className="mx-auto w-full max-w-[1000px] px-4 py-6 md:px-6 md:py-8">
@@ -35,6 +35,16 @@ export default async function AdminReviewPage({ params, searchParams }: {
           {review.status !== ReviewStatus.rejected && !review.moderatedAt ? <form action={moderateReviewAction}><input type="hidden" name="reviewId" value={review.id} /><input type="hidden" name="status" value="rejected" /><button className="ghost-pill" type="submit">Приховати</button></form> : null}
           <form action={deleteReviewAction}><input type="hidden" name="reviewId" value={review.id} /><button className="ghost-pill" type="submit">Видалити назавжди</button></form>
         </div>
+      </section>
+      <section className="glass-panel mt-6 rounded-[2rem] p-6">
+        <p className="text-xs uppercase tracking-[0.28em] text-[--accent]">Storefront</p>
+        <h2 className="mt-2 font-display text-3xl tracking-[-0.05em] text-white">Пов’язані товари</h2>
+        <p className="mt-3 text-sm text-[--muted]">Відгук з’явиться на сторінках обраних товарів. Позначка підтвердженого замовлення від цього не змінюється.</p>
+        <form action={updateReviewProductsAction} className="mt-5 grid gap-3">
+          <input type="hidden" name="reviewId" value={review.id} />
+          {products.map((product) => <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm text-white" key={product.id}><input type="checkbox" name="productIds" value={product.id} defaultChecked={review.products.some((link) => link.productId === product.id)} className="h-5 w-5" /><span>{product.title}</span><small className="ml-auto text-[--muted]">{product.status}</small></label>)}
+          <button className="accent-pill mt-2 w-fit" type="submit">Зберегти прив’язки</button>
+        </form>
       </section>
     </main>
   );

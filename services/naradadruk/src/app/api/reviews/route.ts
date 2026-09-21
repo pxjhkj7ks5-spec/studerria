@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Prisma, ReviewStatus } from "@prisma/client";
+import { Prisma, ProductStatus, ReviewStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { createPrivacyHash } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getClientAddress, reviewInputSchema } from "@/lib/review-validation";
 import { deleteUploadFile, saveReviewImage, type StoredUpload } from "@/lib/storage";
 import { notifyOwnerAboutReview } from "@/lib/telegram-reviews";
+import { resolveReviewProductIds } from "@/lib/review-products";
 
 export const runtime = "nodejs";
 
@@ -59,10 +60,11 @@ export async function POST(request: Request) {
   }
 
   const orderPublicId = String(formData.get("orderPublicId") ?? "").trim();
+  const requestedProductId = Number(String(formData.get("productId") ?? ""));
   const reviewOrder = orderPublicId
     ? await prisma.order.findUnique({
         where: { publicId: orderPublicId },
-        select: { id: true, review: { select: { id: true } } },
+        select: { id: true, review: { select: { id: true } }, items: { select: { productId: true } } },
       })
     : null;
   if (orderPublicId && !reviewOrder) {
@@ -70,6 +72,11 @@ export async function POST(request: Request) {
   }
   if (reviewOrder?.review) {
     return NextResponse.json({ error: "Відгук за цим замовленням уже надіслано." }, { status: 409 });
+  }
+  const productIds = resolveReviewProductIds(reviewOrder?.items ?? null, requestedProductId || null);
+  if (!reviewOrder && productIds.length) {
+    const product = await prisma.product.findFirst({ where: { id: productIds[0], status: ProductStatus.published, category: { isVisible: true } }, select: { id: true } });
+    if (!product) return NextResponse.json({ error: "Обраний товар недоступний." }, { status: 400 });
   }
 
   const addressHash = createPrivacyHash("review-ip", getClientAddress(request));
@@ -111,6 +118,7 @@ export async function POST(request: Request) {
         contentHash,
         orderId: reviewOrder?.id ?? null,
         verifiedPurchase: Boolean(reviewOrder),
+        products: productIds.length ? { create: productIds.map((productId) => ({ productId })) } : undefined,
         images: {
           create: stored.map((image, index) => ({
             fileName: image.fileName,

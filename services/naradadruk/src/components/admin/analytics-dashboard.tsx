@@ -26,6 +26,7 @@ const eventLabels: Record<AnalyticsEventName, string> = {
   "Product Open": "Відкриття товару",
   "Catalog Filter": "Пошук або фільтр",
   "Add to Cart": "Додавання в кошик",
+  "Add Bundle to Cart": "Додавання комплекту",
   "Checkout Open": "Початок оформлення",
   "Order Placed": "Оформлене замовлення",
   "Telegram Lead": "Перехід у Telegram",

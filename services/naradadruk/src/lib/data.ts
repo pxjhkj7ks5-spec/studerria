@@ -5,6 +5,7 @@ import { deleteUploadFile } from "@/lib/storage";
 import { formatPrice, slugify } from "@/lib/utils";
 import { effectiveUnitPrice, isSaleActive, productPricePresentation } from "@/lib/pricing";
 import { moderateReview } from "@/lib/review-moderation";
+import { bundleReadiness } from "@/lib/bundles";
 import {
   buildAnalyticsReport,
   getAnalyticsQueryStart,
@@ -22,6 +23,8 @@ export const publicProductSelect = {
   benefitsNote: true,
   specificationsNote: true,
   compatibilityNote: true,
+  purposeTags: true,
+  compatibilityTags: true,
   packageContentsNote: true,
   status: true,
   isFeatured: true,
@@ -154,7 +157,7 @@ function presentPublicProduct<T extends Prisma.ProductGetPayload<{ select: typeo
 }
 
 async function generateUniqueSlug(
-  model: "category" | "product",
+  model: "category" | "product" | "bundle",
   source: string,
   excludeId?: number,
 ) {
@@ -163,10 +166,11 @@ async function generateUniqueSlug(
   let attempt = 1;
 
   while (true) {
-    const existing =
-      model === "category"
-        ? await prisma.category.findUnique({ where: { slug: candidate } })
-        : await prisma.product.findUnique({ where: { slug: candidate } });
+    const existing = model === "category"
+      ? await prisma.category.findUnique({ where: { slug: candidate } })
+      : model === "product"
+        ? await prisma.product.findUnique({ where: { slug: candidate } })
+        : await prisma.bundle.findUnique({ where: { slug: candidate } });
 
     if (!existing || existing.id === excludeId) {
       return candidate;
@@ -311,6 +315,43 @@ export async function getCatalogProducts(input?: { categorySlug?: string; search
   });
 
   return products.map(presentPublicProduct);
+}
+
+const bundleInclude = {
+  items: {
+    include: {
+      product: { select: publicProductSelect },
+      variant: true,
+    },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  },
+} satisfies Prisma.BundleInclude;
+
+function presentBundle(bundle: Prisma.BundleGetPayload<{ include: typeof bundleInclude }>) {
+  const items = bundle.items.map((item) => ({
+    ...item,
+    product: presentPublicProduct(item.product),
+  }));
+  const readiness = bundleReadiness(items.map((item) => ({
+    productId: item.productId,
+    variantId: item.variantId,
+    quantity: item.quantity,
+    product: {
+      status: item.product.status,
+      basePrice: item.product.basePrice,
+      variants: item.product.variants,
+    },
+  })));
+  return { ...bundle, items, readiness };
+}
+
+export async function getVisibleBundles() {
+  const bundles = await prisma.bundle.findMany({
+    where: { isVisible: true },
+    include: bundleInclude,
+    orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+  });
+  return bundles.map(presentBundle).filter((bundle) => bundle.readiness.ready);
 }
 
 export async function getCategoryBySlug(slug: string) {
@@ -537,6 +578,18 @@ export async function permanentlyDeleteOrder(publicId: string) {
 export async function getApprovedReviews(limit = 60) {
   return prisma.review.findMany({
     where: { status: ReviewStatus.approved },
+    include: {
+      images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      products: { include: { product: { select: { id: true, title: true, slug: true } } } },
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: limit,
+  });
+}
+
+export async function getProductReviews(productId: number, limit = 6) {
+  return prisma.review.findMany({
+    where: { status: ReviewStatus.approved, products: { some: { productId } } },
     include: { images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
     orderBy: [{ createdAt: "desc" }],
     take: limit,
@@ -553,6 +606,7 @@ export async function getReviewOrderContext(publicId: string) {
       id: true,
       publicId: true,
       review: { select: { id: true } },
+      items: { where: { productId: { not: null } }, select: { productId: true, productTitle: true } },
     },
   });
 }
@@ -563,6 +617,7 @@ export async function getAdminReviews(status?: ReviewStatus) {
     include: {
       images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       order: { select: { publicId: true } },
+      products: { include: { product: { select: { id: true, title: true } } } },
     },
     orderBy: [{ createdAt: "desc" }],
     take: 200,
@@ -575,8 +630,24 @@ export async function getAdminReview(id: number) {
     include: {
       images: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       order: { select: { publicId: true } },
+      products: { include: { product: { select: { id: true, title: true } } } },
     },
   });
+}
+
+export async function getReviewAssignableProducts() {
+  return prisma.product.findMany({
+    select: { id: true, title: true, status: true },
+    orderBy: [{ title: "asc" }],
+  });
+}
+
+export async function setReviewProducts(reviewId: number, productIds: number[]) {
+  const uniqueIds = [...new Set(productIds)];
+  await prisma.$transaction([
+    prisma.reviewProduct.deleteMany({ where: { reviewId } }),
+    ...(uniqueIds.length ? [prisma.reviewProduct.createMany({ data: uniqueIds.map((productId) => ({ reviewId, productId })) })] : []),
+  ]);
 }
 
 export async function setReviewStatus(id: number, status: ReviewStatus) {
@@ -913,6 +984,8 @@ export async function updateProduct(input: {
   benefitsNote: string;
   specificationsNote: string;
   compatibilityNote: string;
+  purposeTags: string;
+  compatibilityTags: string;
   packageContentsNote: string;
   status: ProductStatus;
   isFeatured: boolean;
@@ -953,6 +1026,8 @@ export async function updateProduct(input: {
       benefitsNote: input.benefitsNote,
       specificationsNote: input.specificationsNote,
       compatibilityNote: input.compatibilityNote,
+      purposeTags: input.purposeTags,
+      compatibilityTags: input.compatibilityTags,
       packageContentsNote: input.packageContentsNote,
       status: input.status,
       isFeatured: input.isFeatured,
@@ -975,6 +1050,66 @@ export async function updateProduct(input: {
       sortOrder: input.sortOrder,
     },
   });
+}
+
+export async function getAdminBundles() {
+  const bundles = await prisma.bundle.findMany({ include: bundleInclude, orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }] });
+  return bundles.map(presentBundle);
+}
+
+export async function getAdminBundle(id: number) {
+  const [bundle, products] = await Promise.all([
+    prisma.bundle.findUnique({ where: { id }, include: bundleInclude }),
+    prisma.product.findMany({ include: { variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } }, orderBy: [{ title: "asc" }] }),
+  ]);
+  return bundle ? { bundle: presentBundle(bundle), products } : null;
+}
+
+export async function saveBundle(input: { id?: number; title: string; slug?: string; shortDescription: string; isVisible: boolean; sortOrder: number }) {
+  const slug = await generateUniqueSlug("bundle", input.slug || input.title, input.id);
+  if (input.isVisible && input.id) {
+    const existing = await prisma.bundle.findUnique({ where: { id: input.id }, include: bundleInclude });
+    if (!existing) throw new Error("Комплект не знайдено.");
+    const readiness = presentBundle(existing).readiness;
+    if (!readiness.ready) throw new Error(readiness.reason);
+  }
+  return input.id
+    ? prisma.bundle.update({ where: { id: input.id }, data: { title: input.title, slug, shortDescription: input.shortDescription, isVisible: input.isVisible, sortOrder: input.sortOrder } })
+    : prisma.bundle.create({ data: { title: input.title, slug, shortDescription: input.shortDescription, isVisible: false, sortOrder: input.sortOrder } });
+}
+
+export async function saveBundleItem(input: { bundleId: number; itemId?: number; productId: number; variantId: number | null; quantity: number; sortOrder: number }) {
+  const product = await prisma.product.findUnique({ where: { id: input.productId }, include: { variants: true } });
+  if (!product) throw new Error("Товар не знайдено.");
+  if (input.variantId !== null && !product.variants.some((variant) => variant.id === input.variantId)) throw new Error("Варіант не належить обраному товару.");
+  if (input.itemId) {
+    const existingItem = await prisma.bundleItem.findUnique({ where: { id: input.itemId }, select: { bundleId: true } });
+    if (!existingItem || existingItem.bundleId !== input.bundleId) throw new Error("Позицію комплекту не знайдено.");
+  }
+  const item = input.itemId
+    ? prisma.bundleItem.update({ where: { id: input.itemId }, data: { productId: input.productId, variantId: input.variantId, quantity: input.quantity, sortOrder: input.sortOrder } })
+    : prisma.bundleItem.create({ data: input });
+  const saved = await item;
+  await hideInvalidBundle(input.bundleId);
+  return saved;
+}
+
+async function hideInvalidBundle(bundleId: number) {
+  const bundle = await prisma.bundle.findUnique({ where: { id: bundleId }, include: bundleInclude });
+  if (bundle?.isVisible && !presentBundle(bundle).readiness.ready) {
+    await prisma.bundle.update({ where: { id: bundleId }, data: { isVisible: false } });
+  }
+}
+
+export async function deleteBundleItem(id: number, bundleId: number) {
+  const item = await prisma.bundleItem.findUnique({ where: { id }, select: { bundleId: true } });
+  if (!item || item.bundleId !== bundleId) throw new Error("Позицію комплекту не знайдено.");
+  await prisma.bundleItem.delete({ where: { id } });
+  await hideInvalidBundle(item.bundleId);
+}
+
+export async function deleteBundle(id: number) {
+  await prisma.bundle.delete({ where: { id } });
 }
 
 export async function deleteProduct(productId: number) {

@@ -8,14 +8,19 @@ type ReviewOrderContext = {
   publicId: string;
   number: string;
   alreadySubmitted: boolean;
+  items: Array<{ productId: number | null; productTitle: string }>;
 };
 
 export function ReviewForm({
   orderContext,
   invalidOrderLink = false,
+  products = [],
+  selectedProductId,
 }: {
   orderContext?: ReviewOrderContext | null;
   invalidOrderLink?: boolean;
+  products?: Array<{ id: number; title: string }>;
+  selectedProductId?: number | null;
 }) {
   const router = useRouter();
   const [anonymous, setAnonymous] = useState(false);
@@ -62,6 +67,17 @@ export function ReviewForm({
         <div className="status-message status-message--error" role="alert">
           Посилання на замовлення недійсне. Попросіть майстерню надіслати нове.
         </div>
+      ) : null}
+
+      {!orderContext && products.length ? (
+        <label className="form-field">
+          <span>Товар <small>(необов’язково)</small></span>
+          <select name="productId" defaultValue={selectedProductId ?? ""}>
+            <option value="">Загальний відгук про NaradaDruk</option>
+            {products.map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}
+          </select>
+          <small>Допоможе показати відгук на сторінці відповідного виробу.</small>
+        </label>
       ) : null}
 
       <label className="form-field">

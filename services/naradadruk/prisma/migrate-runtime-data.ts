@@ -22,6 +22,13 @@ async function main() {
   await prisma.$executeRawUnsafe(`UPDATE "Order" SET status = 'closed' WHERE status IN ('completed', 'cancelled')`);
   await prisma.$executeRawUnsafe(`UPDATE "Order" SET subtotal = total WHERE subtotal = 0 AND "discountAmount" = 0`);
   await prisma.$executeRawUnsafe(`UPDATE "OrderItem" SET "regularUnitPrice" = "unitPrice" WHERE "regularUnitPrice" = 0`);
+  await prisma.$executeRawUnsafe(`
+    INSERT OR IGNORE INTO "ReviewProduct" ("reviewId", "productId")
+    SELECT DISTINCT review.id, item."productId"
+    FROM "Review" AS review
+    JOIN "OrderItem" AS item ON item."orderId" = review."orderId"
+    WHERE review."orderId" IS NOT NULL AND item."productId" IS NOT NULL
+  `);
 
   const upgradedMaterialSettings = await prisma.siteSetting.updateMany({
     where: {

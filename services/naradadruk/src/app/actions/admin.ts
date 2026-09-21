@@ -15,6 +15,8 @@ import {
   createAnalyticsIpExclusion,
   createProduct,
   createProductImage,
+  deleteBundle,
+  deleteBundleItem,
   deleteAnalyticsIpExclusion,
   deleteCategory,
   deleteProduct,
@@ -24,11 +26,14 @@ import {
   deleteVariant,
   permanentlyDeleteOrder,
   saveCategory,
+  saveBundle,
+  saveBundleItem,
   saveSiteSettings,
   savePromoCode,
   saveVariant,
   setCoverImage,
   setReviewStatus,
+  setReviewProducts,
   updateProduct,
   updateProductImage,
   updateOrderStatus,
@@ -85,6 +90,8 @@ const productUpdateSchema = z.object({
   benefitsNote: z.string().trim().max(3000),
   specificationsNote: z.string().trim().max(3000),
   compatibilityNote: z.string().trim().max(2000),
+  purposeTags: z.string().trim().max(2000),
+  compatibilityTags: z.string().trim().max(2000),
   packageContentsNote: z.string().trim().max(2000),
   status: z.nativeEnum(ProductStatus),
   isFeatured: z.boolean(),
@@ -125,6 +132,24 @@ const imageMetaSchema = z.object({
   productId: z.number().int().positive(),
   imageId: z.number().int().positive().optional(),
   alt: z.string().trim().max(140),
+  sortOrder: z.number().int(),
+});
+
+const bundleSchema = z.object({
+  id: z.number().int().positive().optional(),
+  title: z.string().trim().min(3, "Назва комплекту занадто коротка."),
+  slug: z.string().trim().optional(),
+  shortDescription: z.string().trim().min(8, "Опис комплекту занадто короткий.").max(400),
+  isVisible: z.boolean(),
+  sortOrder: z.number().int(),
+});
+
+const bundleItemSchema = z.object({
+  bundleId: z.number().int().positive(),
+  itemId: z.number().int().positive().optional(),
+  productId: z.number().int().positive(),
+  variantId: z.number().int().positive().nullable(),
+  quantity: z.number().int().min(1).max(20),
   sortOrder: z.number().int(),
 });
 
@@ -314,6 +339,8 @@ export async function updateProductAction(formData: FormData) {
     benefitsNote: String(formData.get("benefitsNote") ?? ""),
     specificationsNote: String(formData.get("specificationsNote") ?? ""),
     compatibilityNote: String(formData.get("compatibilityNote") ?? ""),
+    purposeTags: String(formData.get("purposeTags") ?? ""),
+    compatibilityTags: String(formData.get("compatibilityTags") ?? ""),
     packageContentsNote: String(formData.get("packageContentsNote") ?? ""),
     status: String(formData.get("status") ?? ProductStatus.draft),
     isFeatured: parseCheckbox(formData.get("isFeatured")),
@@ -348,6 +375,68 @@ export async function updateProductAction(formData: FormData) {
     const message = error instanceof Error ? error.message : "Товар не збережено.";
     redirect(messagePath(adminProductPath(parsed.data.productId), "error", message));
   }
+}
+
+function adminBundlePath(bundleId: number) {
+  return `${getAdminRoute()}/bundles/${bundleId}`;
+}
+
+export async function saveBundleAction(formData: FormData) {
+  await requireAdminSession();
+  const parsed = bundleSchema.safeParse({
+    id: parseOptionalInt(formData.get("id")) ?? undefined,
+    title: String(formData.get("title") ?? ""),
+    slug: String(formData.get("slug") ?? ""),
+    shortDescription: String(formData.get("shortDescription") ?? ""),
+    isVisible: parseCheckbox(formData.get("isVisible")),
+    sortOrder: parseOptionalInt(formData.get("sortOrder")) ?? 0,
+  });
+  const fallback = `${getAdminRoute()}/bundles`;
+  if (!parsed.success) redirect(messagePath(fallback, "error", parsed.error.issues[0]?.message ?? "Комплект не збережено."));
+  try {
+    const bundle = await saveBundle(parsed.data);
+    redirect(messagePath(adminBundlePath(bundle.id), "ok", "Комплект збережено."));
+  } catch (error) {
+    redirect(messagePath(parsed.data.id ? adminBundlePath(parsed.data.id) : fallback, "error", error instanceof Error ? error.message : "Комплект не збережено."));
+  }
+}
+
+export async function saveBundleItemAction(formData: FormData) {
+  await requireAdminSession();
+  const [selectedProductId, selectedVariantId = "base"] = String(formData.get("selection") ?? "").split(":");
+  const parsed = bundleItemSchema.safeParse({
+    bundleId: parseOptionalInt(formData.get("bundleId")),
+    itemId: parseOptionalInt(formData.get("itemId")) ?? undefined,
+    productId: parseOptionalInt(formData.get("productId")) ?? Number(selectedProductId),
+    variantId: parseOptionalInt(formData.get("variantId")) ?? (selectedVariantId === "base" ? null : Number(selectedVariantId)),
+    quantity: parseOptionalInt(formData.get("quantity")),
+    sortOrder: parseOptionalInt(formData.get("sortOrder")) ?? 0,
+  });
+  const bundleId = parseOptionalInt(formData.get("bundleId")) ?? 0;
+  if (!parsed.success) redirect(messagePath(adminBundlePath(bundleId), "error", parsed.error.issues[0]?.message ?? "Позицію не збережено."));
+  try {
+    await saveBundleItem(parsed.data);
+    redirect(messagePath(adminBundlePath(parsed.data.bundleId), "ok", "Склад комплекту оновлено."));
+  } catch (error) {
+    redirect(messagePath(adminBundlePath(parsed.data.bundleId), "error", error instanceof Error ? error.message : "Позицію не збережено."));
+  }
+}
+
+export async function deleteBundleItemAction(formData: FormData) {
+  await requireAdminSession();
+  const bundleId = parseOptionalInt(formData.get("bundleId"));
+  const itemId = parseOptionalInt(formData.get("itemId"));
+  if (!bundleId || !itemId) redirect(messagePath(`${getAdminRoute()}/bundles`, "error", "Позицію не знайдено."));
+  await deleteBundleItem(itemId, bundleId);
+  redirect(messagePath(adminBundlePath(bundleId), "ok", "Позицію видалено."));
+}
+
+export async function deleteBundleAction(formData: FormData) {
+  await requireAdminSession();
+  const id = parseOptionalInt(formData.get("id"));
+  if (!id) redirect(messagePath(`${getAdminRoute()}/bundles`, "error", "Комплект не знайдено."));
+  await deleteBundle(id);
+  redirect(messagePath(`${getAdminRoute()}/bundles`, "ok", "Комплект видалено."));
 }
 
 export async function deleteProductAction(formData: FormData) {
@@ -509,6 +598,15 @@ export async function moderateReviewAction(formData: FormData) {
     already_hidden: "Відгук уже приховано.",
   } as const;
   redirect(messagePath(reviewPath, "ok", successMessages[outcome]));
+}
+
+export async function updateReviewProductsAction(formData: FormData) {
+  await requireAdminSession();
+  const reviewId = parseOptionalInt(formData.get("reviewId"));
+  if (!reviewId) redirect(messagePath(`${getAdminRoute()}/reviews`, "error", "Відгук не знайдено."));
+  const productIds = formData.getAll("productIds").map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
+  await setReviewProducts(reviewId, productIds);
+  redirect(messagePath(`${getAdminRoute()}/reviews/${reviewId}`, "ok", "Прив’язки до товарів оновлено."));
 }
 
 export async function deleteReviewAction(formData: FormData) {

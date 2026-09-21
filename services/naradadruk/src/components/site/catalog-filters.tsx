@@ -8,6 +8,11 @@ type CatalogFiltersProps = {
   categories: Array<{ id: number; name: string; slug: string }>;
   categorySlug: string;
   query: string;
+  sort: string;
+  purpose: string;
+  compatibility: string;
+  purposes: string[];
+  compatibilities: string[];
 };
 
 export function CatalogFilters({
@@ -15,6 +20,11 @@ export function CatalogFilters({
   categories,
   categorySlug,
   query,
+  sort,
+  purpose,
+  compatibility,
+  purposes,
+  compatibilities,
 }: CatalogFiltersProps) {
   return (
     <form
@@ -50,6 +60,36 @@ export function CatalogFilters({
               {category.name}
             </option>
           ))}
+        </select>
+      </label>
+
+      {purposes.length ? (
+        <label className="catalog-select catalog-select--facet">
+          <span className="sr-only">Призначення</span>
+          <select name="purpose" defaultValue={purpose}>
+            <option value="">Усі призначення</option>
+            {purposes.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+      ) : null}
+
+      {compatibilities.length ? (
+        <label className="catalog-select catalog-select--facet">
+          <span className="sr-only">Сумісність</span>
+          <select name="compatibility" defaultValue={compatibility}>
+            <option value="">Уся сумісність</option>
+            {compatibilities.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+      ) : null}
+
+      <label className="catalog-select catalog-select--sort">
+        <span className="sr-only">Сортування</span>
+        <select name="sort" defaultValue={sort}>
+          <option value="recommended">Рекомендовані</option>
+          <option value="newest">Спочатку нові</option>
+          <option value="price-asc">Ціна: від нижчої</option>
+          <option value="price-desc">Ціна: від вищої</option>
         </select>
       </label>
 

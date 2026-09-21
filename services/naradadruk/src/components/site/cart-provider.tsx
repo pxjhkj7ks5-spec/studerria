@@ -11,9 +11,9 @@ import {
 } from "react";
 import {
   clampCartQuantity,
-  getCartItemKey,
   type CartItem,
   type CartProductInput,
+  mergeCartItems,
 } from "@/lib/cart";
 
 const storageKey = "naradadruk-cart-v1";
@@ -24,6 +24,7 @@ type CartContextValue = {
   total: number;
   hydrated: boolean;
   addItem: (item: CartProductInput, quantity?: number) => void;
+  addItems: (items: Array<{ item: CartProductInput; quantity: number }>) => void;
   updateQuantity: (key: string, quantity: number) => void;
   removeItem: (key: string) => void;
   clearCart: () => void;
@@ -78,18 +79,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [hydrated, items]);
 
   const addItem = useCallback((input: CartProductInput, quantity = 1) => {
-    const key = getCartItemKey(input.productId, input.variantId);
-    setItems((current) => {
-      const existing = current.find((item) => item.key === key);
-      if (existing) {
-        return current.map((item) =>
-          item.key === key
-            ? { ...item, quantity: clampCartQuantity(item.quantity + quantity) }
-            : item,
-        );
-      }
-      return [...current, { ...input, key, quantity: clampCartQuantity(quantity) }];
-    });
+    setItems((current) => mergeCartItems(current, [{ item: input, quantity }]));
+  }, []);
+
+  const addItems = useCallback((additions: Array<{ item: CartProductInput; quantity: number }>) => {
+    setItems((current) => mergeCartItems(current, additions));
   }, []);
 
   const updateQuantity = useCallback((key: string, quantity: number) => {
@@ -115,11 +109,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       total: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
       hydrated,
       addItem,
+      addItems,
       updateQuantity,
       removeItem,
       clearCart,
     }),
-    [addItem, clearCart, hydrated, items, removeItem, updateQuantity],
+    [addItem, addItems, clearCart, hydrated, items, removeItem, updateQuantity],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

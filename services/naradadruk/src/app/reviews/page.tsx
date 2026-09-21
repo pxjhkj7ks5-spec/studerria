@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PublicFrame } from "@/components/site/public-frame";
 import { ReviewForm } from "@/components/site/review-form";
 import { StructuredData } from "@/components/site/structured-data";
-import { getApprovedReviews, getReviewOrderContext, getSiteSettings } from "@/lib/data";
+import { getApprovedReviews, getCatalogProducts, getReviewOrderContext, getSiteSettings } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
 import { siteName } from "@/lib/constants";
 import { absoluteSiteUrl } from "@/lib/site-url";
@@ -26,14 +26,16 @@ function reviewDate(value: Date) {
 export default async function ReviewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ order?: string }>;
+  searchParams: Promise<{ order?: string; product?: string }>;
 }) {
   const query = await searchParams;
-  const [settings, reviews, reviewOrder] = await Promise.all([
+  const [settings, reviews, reviewOrder, products] = await Promise.all([
     getSiteSettings(),
     getApprovedReviews(),
     query.order ? getReviewOrderContext(query.order) : null,
+    getCatalogProducts(),
   ]);
+  const selectedProduct = query.product ? products.find((product) => product.slug === query.product) : null;
   return (
     <PublicFrame telegramUrl={settings.telegramUrl}>
       <StructuredData data={{
@@ -49,7 +51,7 @@ export default async function ReviewsPage({
           <div className="site-container section-heading">
             <p className="eyebrow">Реальний досвід</p>
             <h1>Відгуки про NaradaDruk</h1>
-            <p>Нові відгуки з’являються тут одразу. Власник може приховати відгук після перевірки, а позначку підтвердженої покупки додаємо лише за перевіреними даними.</p>
+            <p>Тут зібрані відгуки наших клієнтів. Позначка «Підтверджене замовлення» означає, що покупку перевірено.</p>
           </div>
         </section>
 
@@ -86,8 +88,11 @@ export default async function ReviewsPage({
               publicId: reviewOrder.publicId,
               number: reviewOrder.publicId.slice(0, 8).toUpperCase(),
               alreadySubmitted: Boolean(reviewOrder.review),
+              items: reviewOrder.items,
             } : null}
             invalidOrderLink={Boolean(query.order && !reviewOrder)}
+            products={products.map((product) => ({ id: product.id, title: product.title }))}
+            selectedProductId={selectedProduct?.id ?? null}
           />
         </section>
       </main>

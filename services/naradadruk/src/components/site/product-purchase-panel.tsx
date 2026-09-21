@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
 import { AddToCartButton } from "@/components/site/add-to-cart-button";
 import { TrackedLink } from "@/components/site/tracked-link";
@@ -51,6 +51,9 @@ export function ProductPurchasePanel({
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(
     variants[0]?.id ?? null,
   );
+  const [added, setAdded] = useState(false);
+  const [showMobileBar, setShowMobileBar] = useState(false);
+  const primaryActionRef = useRef<HTMLDivElement>(null);
   const selectedVariant =
     variants.find((variant) => variant.id === selectedVariantId) ?? null;
   const currentPrice = selectedVariant ? formatPrice(selectedVariant.price) : priceLabel;
@@ -73,6 +76,20 @@ export function ProductPurchasePanel({
     regularUnitPrice: selectedVariant?.regularPrice ?? regularBasePrice ?? unitPrice,
     imageUrl: coverImageUrl,
   } : null;
+  function showAddedState() {
+    setAdded(true);
+    window.setTimeout(() => setAdded(false), 1600);
+  }
+  useEffect(() => {
+    const action = primaryActionRef.current;
+    if (!action || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setShowMobileBar(!entry.isIntersecting && entry.boundingClientRect.top < 0), {
+      rootMargin: "0px 0px 96px 0px",
+      threshold: 0.15,
+    });
+    observer.observe(action);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <>
@@ -109,13 +126,13 @@ export function ProductPurchasePanel({
           </div>
         ) : null}
 
-        <div className="purchase-panel__action">
+        <div className="purchase-panel__action" ref={primaryActionRef}>
           <div>
             <span>Орієнтовна ціна</span>
             <span className="sale-price-line">{oldPrice ? <del className="old-price">{oldPrice}</del> : null}<strong>{currentPrice}</strong></span>
             {isOnSale ? <small>{saleEndsAt ? `Акція до ${new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(saleEndsAt))}` : "Акційна ціна діє зараз"}</small> : null}
           </div>
-          {cartItem ? <AddToCartButton className="accent-pill accent-pill--large" item={cartItem} /> : null}
+          {cartItem ? <AddToCartButton className="accent-pill accent-pill--large" item={cartItem} added={added} onAdded={showAddedState} /> : null}
         </div>
         <p className="purchase-panel__custom">
           Потрібні інші розміри, колір або власна модель? Індивідуальні замовлення погоджуємо окремо.
@@ -131,12 +148,13 @@ export function ProductPurchasePanel({
         </p>
       </div>
 
-      <div className="mobile-purchase-bar">
+      <div className={showMobileBar ? "mobile-purchase-bar is-visible" : "mobile-purchase-bar"} aria-hidden={!showMobileBar}>
         <div>
           <span>{productTitle}</span>
+          {selectedVariant ? <small>{selectedVariant.label}</small> : null}
           <span className="sale-price-line">{oldPrice ? <del className="old-price">{oldPrice}</del> : null}<strong>{currentPrice}</strong></span>
         </div>
-        {cartItem ? <AddToCartButton className="accent-pill" compactLabel item={cartItem} /> : null}
+        {cartItem ? <AddToCartButton className="accent-pill" compactLabel item={cartItem} added={added} onAdded={showAddedState} /> : null}
       </div>
     </>
   );

@@ -210,6 +210,14 @@ export default async function ProductEditorPage({ params, searchParams }: Produc
                   <textarea name="compatibilityNote" defaultValue={product.compatibilityNote} />
                 </div>
                 <div className="field-shell md:col-span-2">
+                  <span>Фільтр «Призначення», одне значення з нового рядка</span>
+                  <textarea name="purposeTags" defaultValue={product.purposeTags} placeholder="Організація робочого столу&#10;Зберігання спорядження" />
+                </div>
+                <div className="field-shell md:col-span-2">
+                  <span>Фільтр «Сумісність», одне значення з нового рядка</span>
+                  <textarea name="compatibilityTags" defaultValue={product.compatibilityTags} placeholder="M-LOK&#10;Picatinny" />
+                </div>
+                <div className="field-shell md:col-span-2">
                   <span>Комплектація</span>
                   <textarea name="packageContentsNote" defaultValue={product.packageContentsNote} />
                 </div>

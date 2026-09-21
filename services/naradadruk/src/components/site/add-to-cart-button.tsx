@@ -10,10 +10,14 @@ export function AddToCartButton({
   item,
   className = "accent-pill",
   compactLabel = false,
+  added: controlledAdded,
+  onAdded,
 }: {
   item: CartProductInput;
   className?: string;
   compactLabel?: boolean;
+  added?: boolean;
+  onAdded?: () => void;
 }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
@@ -28,13 +32,14 @@ export function AddToCartButton({
       items: 1,
     });
     setAdded(true);
+    onAdded?.();
     window.setTimeout(() => setAdded(false), 1600);
   }
 
   return (
     <button className={className} type="button" onClick={handleClick}>
-      {added ? <Check aria-hidden size={18} weight="bold" /> : <ShoppingBag aria-hidden size={18} />}
-      <span>{added ? "У кошику" : compactLabel ? "Додати" : "Додати в кошик"}</span>
+      {(controlledAdded ?? added) ? <Check aria-hidden size={18} weight="bold" /> : <ShoppingBag aria-hidden size={18} />}
+      <span>{(controlledAdded ?? added) ? "У кошику" : compactLabel ? "Додати" : "Додати в кошик"}</span>
     </button>
   );
 }
