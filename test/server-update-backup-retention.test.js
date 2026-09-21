@@ -19,11 +19,11 @@ function backup(dir, day, label = 'postgres', managed = true, extension = 'dump'
   if (managed) fs.writeFileSync(`${file}.complete`, '');
   return file;
 }
-function rotate(file, keep = 5) {
+function rotate(file, keep = 2) {
   return spawnSync('python3', ['scripts/rotate-update-backups.py', file, '--keep', String(keep)], { encoding: 'utf8' });
 }
 
-test('keeps newest five of same label; preserves historical, other services and pins', (t) => {
+test('keeps newest two of same label; preserves historical, other services and pins', (t) => {
   const dir = fixture(t);
   const files = Array.from({ length: 8 }, (_, i) => backup(dir, i + 1));
   fs.writeFileSync(`${files[0]}.keep`, '');
@@ -34,7 +34,7 @@ test('keeps newest five of same label; preserves historical, other services and 
   assert.ok(!fs.existsSync(files[1]));
   assert.ok(!fs.existsSync(`${files[1]}.complete`));
   assert.ok(!fs.existsSync(files[2]));
-  for (const file of [...files.slice(3), historical, other]) assert.ok(fs.existsSync(file));
+  for (const file of [...files.slice(6), historical, other]) assert.ok(fs.existsSync(file));
 });
 
 test('custom limit rotates volume archives without touching partial files or directories', (t) => {

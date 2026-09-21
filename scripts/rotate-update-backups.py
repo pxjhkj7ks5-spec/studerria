@@ -42,6 +42,6 @@ def rotate(backup, keep):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("backup", type=Path)
-    parser.add_argument("--keep", type=int, default=5)
+    parser.add_argument("--keep", type=int, default=2)
     args = parser.parse_args()
     rotate(args.backup, args.keep)
