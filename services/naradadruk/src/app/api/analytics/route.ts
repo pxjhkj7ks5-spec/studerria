@@ -12,7 +12,7 @@ const analyticsPayloadSchema = z.object({
   sessionId: z.string().trim().max(80).default(""),
   props: z
     .object({
-      campaign: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,79}$/).optional(),
+      campaign: z.union([z.literal(""), z.string().regex(/^[a-z0-9][a-z0-9_-]{0,79}$/)]).optional(),
       location: z.string().trim().max(80).optional(),
       intent: z.enum(["product", "custom", "catalog"]).optional(),
       product_slug: z.string().trim().max(120).optional(),
