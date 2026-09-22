@@ -63,6 +63,7 @@ normalize_service() {
     osint|osint-graph|social-graph) echo "osint" ;;
     db|postgres|postgresql) echo "db" ;;
     redis) echo "redis" ;;
+    clickhouse) echo "clickhouse" ;;
     loki) echo "loki" ;;
     promtail) echo "promtail" ;;
     *)
