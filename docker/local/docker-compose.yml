@@ -1,9 +1,16 @@
 name: kma-local
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-student_portal}
       POSTGRES_USER: ${POSTGRES_USER:-studerria}
@@ -23,6 +30,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *default-logging
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
     ports:
       - "${REDIS_PORT_FORWARD:-6379}:6379"
@@ -38,6 +46,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.12-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       CLICKHOUSE_DB: ${OSIX_CLICKHOUSE_DATABASE:-osix}
       CLICKHOUSE_USER: ${OSIX_CLICKHOUSE_USER:-default}
@@ -57,6 +66,7 @@ services:
   loki:
     image: grafana/loki:3.1.1
     restart: unless-stopped
+    logging: *default-logging
     command: ["-config.file=/etc/loki/config.yml"]
     ports:
       - "${LOKI_PORT_FORWARD:-3100}:3100"
@@ -73,6 +83,7 @@ services:
   promtail:
     image: grafana/promtail:3.1.1
     restart: unless-stopped
+    logging: *default-logging
     command: ["-config.file=/etc/promtail/config.yml"]
     depends_on:
       loki:
@@ -90,6 +101,7 @@ services:
         NEXT_PUBLIC_BASE_PATH: /charredmap
     init: true
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: ${CHARREDMAP_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
@@ -129,6 +141,7 @@ services:
         NEXT_PUBLIC_BASE_PATH: /china-map
     init: true
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: ${CHINAMAP_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
@@ -161,6 +174,7 @@ services:
         NEXT_PUBLIC_BASE_PATH: ${NARADADRUK_BASE_PATH:-/naradadruk}
     init: true
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: ${NARADADRUK_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
@@ -211,6 +225,7 @@ services:
         NEXT_PUBLIC_BASE_PATH: ${YKG_BASE_PATH:-/ykg}
     init: true
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: ${YKG_NODE_ENV:-production}
       HOSTNAME: 0.0.0.0
@@ -257,6 +272,7 @@ services:
         NEXT_PUBLIC_BASE_PATH: /tg
     init: true
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: ${SLASHTG_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
@@ -299,6 +315,7 @@ services:
         NEXT_PUBLIC_BASE_PATH: /withlforl
     init: true
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: ${WITHLFORL_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
@@ -329,6 +346,7 @@ services:
       dockerfile: Dockerfile
     init: true
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -394,6 +412,7 @@ services:
         SHIELDLINE_BASE_PATH: /shieldline
     init: true
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: ${SHIELDLINE_NODE_ENV:-development}
       HOSTNAME: 0.0.0.0
@@ -453,6 +472,7 @@ services:
     image: kma-local-shieldline
     init: true
     restart: unless-stopped
+    logging: *default-logging
     command: ["node", "worker.mjs"]
     environment:
       SHIELDLINE_WORKER_ROLE: projection
@@ -478,6 +498,7 @@ services:
     image: kma-local-shieldline
     init: true
     restart: unless-stopped
+    logging: *default-logging
     command: ["node", "worker.mjs"]
     environment:
       SHIELDLINE_WORKER_ROLE: notification
@@ -504,6 +525,7 @@ services:
     image: kma-local-shieldline
     init: true
     restart: unless-stopped
+    logging: *default-logging
     command: ["node", "adminBotWorker.mjs"]
     environment:
       SHIELDLINE_ADMIN_BOT_ENABLED: ${SHIELDLINE_ADMIN_BOT_ENABLED:-false}
@@ -535,6 +557,7 @@ services:
       dockerfile: Dockerfile
     init: true
     restart: unless-stopped
+    logging: *default-logging
     stop_grace_period: 45s
     depends_on:
       db:
@@ -590,6 +613,7 @@ services:
       dockerfile: docker/local/Dockerfile
     init: true
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
