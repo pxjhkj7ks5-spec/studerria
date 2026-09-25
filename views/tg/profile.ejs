@@ -1,5 +1,5 @@
 <section class="tg-page-head tg-profile-head">
-  <div class="tg-page-title-row"><h1>Профіль</h1><span class="tg-settings-icon" aria-label="Налаштування">⌁</span></div>
+  <div class="tg-page-title-row"><h1>Профіль</h1><span class="tg-settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06A1.7 1.7 0 0 0 16 18.44a1.7 1.7 0 0 0-1 1.56v.1h-2.7V20a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.86 15a1.7 1.7 0 0 0-1.56-1H6.2v-2.7h.1a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.9-1.9.06.06A1.7 1.7 0 0 0 11.3 6.2V6.1H14v.1a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1h.1V14H20a1.7 1.7 0 0 0-1.56 1Z" /></svg></span></div>
   <% if (placement && placement.group_label) { %>
     <p class="tg-muted"><%= placement.group_label %></p>
   <% } %>
@@ -45,7 +45,7 @@
 
 <section class="tg-card tg-profile-card">
   <form class="tg-profile-form" method="POST" action="/studerria-tg/profile">
-    <div class="tg-avatar" aria-hidden="true"><%= profileInitials %></div>
+    <div class="tg-avatar" aria-hidden="true"><% if (user && user.telegram_photo_url) { %><img src="<%= user.telegram_photo_url %>" alt="" /><% } else { %><%= profileInitials %><% } %></div>
     <div class="tg-profile-fields">
       <strong class="tg-profile-name"><%= profileName %></strong>
       <% if (user && user.telegram_username) { %><span class="tg-profile-username">@<%= user.telegram_username %></span><% } %>
@@ -69,24 +69,21 @@
 <section class="tg-profile-section">
   <h2>Моя програма</h2>
   <div class="tg-program-row">
-    <span class="tg-program-icon" aria-hidden="true">⌂</span>
-    <div><strong><%= placement && placement.group_label ? placement.group_label : 'Програма Studerria' %></strong><span>Ваші предмети й розклад</span></div>
+    <span class="tg-program-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3.5 9.5 8.5-4 8.5 4-8.5 4-8.5-4Z" /><path d="M6.5 11v4.2c2.9 2 8.1 2 11 0V11M20.5 10v5" /></svg></span>
+    <div><strong><%= placement && placement.group_label ? placement.group_label : 'Програма Studerria' %></strong><span>Ваші предмети й розклад</span></div><span class="tg-chevron" aria-hidden="true">›</span>
   </div>
 </section>
 
-<section class="tg-profile-section">
-  <h2>Швидкі дії</h2>
-  <div class="tg-quick-actions">
-    <a href="/studerria-tg/subjects"><span>◫</span>Мої предмети</a>
-    <a href="/studerria-tg/teamwork"><span>◌</span>Teamwork</a>
-    <a href="/studerria-tg/schedule"><span>◷</span>Розклад</a>
-  </div>
+<section class="tg-profile-section tg-profile-list">
+  <a class="tg-profile-row" href="/studerria-tg/subjects"><span class="tg-row-icon"><svg viewBox="0 0 24 24"><path d="M4.5 5.5A2.5 2.5 0 0 1 7 3h3.5a2 2 0 0 1 1.5.68L12 20.5a2 2 0 0 0-1.5-.68H7a2.5 2.5 0 0 0-2.5 2.5V5.5ZM19.5 5.5A2.5 2.5 0 0 0 17 3h-3.5a2 2 0 0 0-1.5.68V20.5a2 2 0 0 1 1.5-.68H17a2.5 2.5 0 0 1 2.5 2.5V5.5Z" /></svg></span><span><strong>Мої предмети</strong><small>Групи, викладачі, налаштування</small></span><b>›</b></a>
+  <a class="tg-profile-row" href="/studerria-tg/teamwork"><span class="tg-row-icon"><svg viewBox="0 0 24 24"><circle cx="8.5" cy="8" r="2.8" /><circle cx="16.5" cy="8.5" r="2.4" /><path d="M3.8 19c.5-2.8 2.25-4.5 4.7-4.5s4.2 1.7 4.7 4.5M13.8 14.8c2.3.25 3.75 1.72 4.2 4.2" /></svg></span><span><strong>Teamwork</strong><small>Командна робота та проєкти</small></span><b>›</b></a>
+  <a class="tg-profile-row" href="/studerria-tg/schedule"><span class="tg-row-icon"><svg viewBox="0 0 24 24"><path d="M7 3.5v3M17 3.5v3M4.5 9.25h15M6.75 5.5h10.5a2.25 2.25 0 0 1 2.25 2.25v9.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-9.5A2.25 2.25 0 0 1 6.75 5.5Z" /><path d="M8 13h2.5M13.5 13H16" /></svg></span><span><strong>Розклад</strong><small>Пари та домашні завдання</small></span><b>›</b></a>
 </section>
 
 <section class="tg-profile-section tg-settings-list">
   <h2>Налаштування</h2>
   <div class="tg-settings-row">
-    <span class="tg-settings-row-icon" aria-hidden="true">➤</span>
+    <span class="tg-settings-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21 3-7.5 18-2.9-7.6L3 10.5 21 3Z" /><path d="m10.6 13.4 3.2-3.2" /></svg></span>
     <div><strong>Telegram</strong>
   <% if (user && user.telegram_id) { %>
     <span><%= user.telegram_username ? '@' + user.telegram_username : 'Привʼязано' %></span>

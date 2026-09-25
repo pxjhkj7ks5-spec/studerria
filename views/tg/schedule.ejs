@@ -11,7 +11,12 @@
     : '';
 %>
 <section class="tg-page-head tg-schedule-head">
-  <h1>Розклад</h1>
+  <div class="tg-page-title-row">
+    <h1>Розклад</h1>
+    <span class="tg-header-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M7 3.5v3M17 3.5v3M4.5 9.25h15M6.75 5.5h10.5a2.25 2.25 0 0 1 2.25 2.25v9.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-9.5A2.25 2.25 0 0 1 6.75 5.5Z" /><path d="M8 13h2.5M13.5 13H16M8 16.5h2.5" /></svg>
+    </span>
+  </div>
   <div class="tg-weekbar">
     <a class="tg-week-button" href="/studerria-tg/schedule?week=<%= Math.max(1, Number(currentWeek || 1) - 1) %>" aria-label="Попередній тиждень">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7" /></svg>
@@ -67,10 +72,11 @@
         <% const homeworkItems = Array.isArray(item.homework_items) ? item.homework_items : []; %>
         <% const lessonMeta = `${item.subject_name || 'Предмет'}${item.class_number ? ` · ${item.class_number} пара` : ''}${item.group_number ? ` · група ${item.group_number}` : ''}${item.class_date ? ` · ${item.class_date}` : ''}`; %>
         <% const lessonKind = String(item.lesson_type || '').toLowerCase(); %>
+        <% const lessonTimes = String(item.time_label || '').split('-').map(function(value) { return value.trim(); }).filter(Boolean); %>
         <div class="tg-lesson <%= lessonKind.includes('сем') ? 'tg-lesson--seminar' : (lessonKind.includes('лек') ? 'tg-lesson--lecture' : '') %>">
           <div class="tg-lesson-time">
-            <strong aria-label="Пара <%= item.class_number || '' %>"><%= item.class_number || '' %></strong>
-            <span><%= item.time_label || '' %></span>
+            <strong aria-label="Початок <%= lessonTimes[0] || '' %>"><%= lessonTimes[0] || item.class_number || '' %></strong>
+            <span><%= lessonTimes[1] || '' %></span>
           </div>
           <div>
             <h3><%= item.subject_name %></h3>

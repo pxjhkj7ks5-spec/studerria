@@ -33,7 +33,7 @@
 <section class="tg-page-head tg-register-head">
   <p class="tg-kicker">Studerria</p>
   <h1>Реєстрація</h1>
-  <p class="tg-muted">Підключаємо Telegram до студентського простору.</p>
+  <p class="tg-muted">Оберіть курс, щоб отримати розклад, предмети та доступ до Teamwork.</p>
 </section>
 
 <% if (registerError) { %>
@@ -42,14 +42,14 @@
 
 <% if (currentStep === 'course') { %>
   <section class="tg-card tg-register-card">
-    <div class="tg-stepper" aria-label="Крок 1 з 2">
-      <span class="is-active">1 Курс</span><span>2 Предмети</span><span>3 Готово</span>
+    <div class="tg-stepper" aria-label="Крок 1 з 3">
+      <span class="is-active"><b>1</b><i>Курс</i></span><span><b>2</b><i>Предмети</i></span><span><b>3</b><i>Готово</i></span>
     </div>
-    <div class="tg-card-head">
+    <div class="tg-card-head tg-register-section-head">
       <div>
-        <h2>Оберіть курс</h2>
-        <p class="tg-muted">Вибір визначить ваш розклад, предмети й Teamwork.</p>
+        <h2>Доступні програми</h2>
       </div>
+      <span class="tg-register-archive">Архів ›</span>
     </div>
     <div class="tg-account-chip">
       <div class="tg-account-avatar" aria-hidden="true"><%= actorInitials %></div>
@@ -94,15 +94,15 @@
           <span>Спробуйте відкрити mini app пізніше.</span>
         </div>
       <% } %>
-      <button class="tg-primary" type="submit" <%= !courseList.length ? 'disabled' : '' %>>Продовжити</button>
+      <div class="tg-register-cta"><button class="tg-primary" type="submit" <%= !courseList.length ? 'disabled' : '' %>>Продовжити</button></div>
     </form>
   </section>
 <% } %>
 
 <% if (currentStep === 'subjects') { %>
   <section class="tg-card tg-register-card">
-    <div class="tg-stepper" aria-label="Крок 2 з 2">
-      <span>1 Курс</span><span class="is-active">2 Предмети</span><span>3 Готово</span>
+    <div class="tg-stepper" aria-label="Крок 2 з 3">
+      <span><b>1</b><i>Курс</i></span><span class="is-active"><b>2</b><i>Предмети</i></span><span><b>3</b><i>Готово</i></span>
     </div>
     <div class="tg-card-head">
       <div>
