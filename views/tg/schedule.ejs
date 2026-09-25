@@ -57,35 +57,39 @@
   <% const tgTodayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' }); %>
   <% (days || []).forEach(function(day) { %>
     <% const dayDate = scheduleDayDates && scheduleDayDates[day] ? scheduleDayDates[day] : null; %>
+    <% const rows = scheduleByDay && scheduleByDay[day] ? scheduleByDay[day] : []; %>
     <article class="tg-day <%= dayDate && dayDate.iso === tgTodayIso ? 'is-today' : '' %>" <%= dayDate && dayDate.iso === tgTodayIso ? 'data-tg-current-day' : '' %>>
       <h2>
-        <span><%= day %><% if (dayDate && dayDate.iso === tgTodayIso) { %><em>Сьогодні</em><% } %></span>
+        <span class="tg-day-name"><%= day %><% if (dayDate && dayDate.iso === tgTodayIso) { %><em>Сьогодні</em><% } %></span>
         <% if (dayDate && dayDate.label) { %>
           <time datetime="<%= dayDate.iso || '' %>"><%= dayDate.label %></time>
         <% } %>
+        <small><%= rows.length ? `${rows.length} ${rows.length >= 5 ? 'занять' : 'заняття'}` : 'Без занять' %></small>
       </h2>
-      <% const rows = scheduleByDay && scheduleByDay[day] ? scheduleByDay[day] : []; %>
       <% if (!rows.length) { %>
-        <p class="tg-muted">Немає пар.</p>
+        <p class="tg-day-empty">На цей день пар немає.</p>
       <% } %>
       <% rows.forEach(function(item) { %>
         <% const homeworkItems = Array.isArray(item.homework_items) ? item.homework_items : []; %>
         <% const lessonMeta = `${item.subject_name || 'Предмет'}${item.class_number ? ` · ${item.class_number} пара` : ''}${item.group_number ? ` · група ${item.group_number}` : ''}${item.class_date ? ` · ${item.class_date}` : ''}`; %>
         <% const lessonKind = String(item.lesson_type || '').toLowerCase(); %>
-        <% const lessonTimes = String(item.time_label || '').split('-').map(function(value) { return value.trim(); }).filter(Boolean); %>
-        <div class="tg-lesson <%= lessonKind.includes('сем') ? 'tg-lesson--seminar' : (lessonKind.includes('лек') ? 'tg-lesson--lecture' : '') %>">
+        <% const lessonTone = /сем|seminar/.test(lessonKind) ? 'seminar' : (/лек|lecture/.test(lessonKind) ? 'lecture' : 'neutral'); %>
+        <% const lessonLabel = lessonTone === 'seminar' ? 'Семінар' : (lessonTone === 'lecture' ? 'Лекція' : (lessonKind === 'practice' ? 'Практика' : item.lesson_type)); %>
+        <% const lessonTimes = String(item.time_label || '').split(/[-–—]/).map(function(value) { return value.trim(); }).filter(Boolean); %>
+        <div class="tg-lesson tg-lesson--<%= lessonTone %>">
           <div class="tg-lesson-time">
             <strong aria-label="Початок <%= lessonTimes[0] || '' %>"><%= lessonTimes[0] || item.class_number || '' %></strong>
             <span><%= lessonTimes[1] || '' %></span>
           </div>
-          <div>
+          <div class="tg-lesson-content">
             <h3><%= item.subject_name %></h3>
             <p class="tg-lesson-meta">
-              <% if (item.lesson_type) { %><span class="tg-lesson-type"><%= item.lesson_type %></span><% } %>
+              <% if (item.lesson_type) { %><span class="tg-lesson-type"><%= lessonLabel %></span><% } %>
               <% if (item.group_number) { %><span>Group <%= item.group_number %></span><% } %>
-              <% if (item.delivery_mode) { %><span><%= item.delivery_mode === 'online' ? 'Онлайн' : (item.delivery_mode === 'mixed' ? 'Змішано' : 'Офлайн') %></span><% } %>
-              <% if (item.room_label) { %><span class="tg-lesson-room"><%= item.room_label %></span><% } %>
             </p>
+            <% if (item.room_label || (item.delivery_mode && item.delivery_mode !== 'offline')) { %>
+              <p class="tg-lesson-location"><%= item.room_label || (item.delivery_mode === 'online' ? 'Онлайн' : 'Змішано') %></p>
+            <% } %>
             <div class="tg-lesson-actions">
               <% if (homeworkItems.length) { %>
                 <button

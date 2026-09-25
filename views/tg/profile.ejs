@@ -1,8 +1,5 @@
 <section class="tg-page-head tg-profile-head">
-  <div class="tg-page-title-row"><h1>Профіль</h1><span class="tg-settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06A1.7 1.7 0 0 0 16 18.44a1.7 1.7 0 0 0-1 1.56v.1h-2.7V20a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.86 15a1.7 1.7 0 0 0-1.56-1H6.2v-2.7h.1a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.9-1.9.06.06A1.7 1.7 0 0 0 11.3 6.2V6.1H14v.1a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1h.1V14H20a1.7 1.7 0 0 0-1.56 1Z" /></svg></span></div>
-  <% if (placement && placement.group_label) { %>
-    <p class="tg-muted"><%= placement.group_label %></p>
-  <% } %>
+  <div class="tg-page-title-row"><h1>Профіль</h1><a class="tg-settings-icon" href="#tgProfileLanguage" aria-label="Налаштування мови"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06A1.7 1.7 0 0 0 16 18.44a1.7 1.7 0 0 0-1 1.56v.1h-2.7V20a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.86 15a1.7 1.7 0 0 0-1.56-1H6.2v-2.7h.1a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1h.1V14H20a1.7 1.7 0 0 0-1.56 1Z" /></svg></a></div>
 </section>
 
 <%
@@ -19,7 +16,7 @@
   };
 %>
 <%
-  const profileName = user && user.full_name ? String(user.full_name).trim() : 'Andriy';
+  const profileName = user && user.full_name ? String(user.full_name).trim() : 'Студент';
   const profileNameParts = profileName
     .split(/\s+/)
     .filter(Boolean);
@@ -49,7 +46,7 @@
     <div class="tg-profile-fields">
       <strong class="tg-profile-name"><%= profileName %></strong>
       <% if (user && user.telegram_username) { %><span class="tg-profile-username">@<%= user.telegram_username %></span><% } %>
-      <label>
+      <label id="tgProfileLanguage">
         <span class="tg-sr-only">Мова</span>
         <select name="language" aria-label="Мова">
           <option value="uk" <%= user && user.language === 'uk' ? 'selected' : '' %>>Українська</option>
@@ -68,10 +65,10 @@
 
 <section class="tg-profile-section">
   <h2>Моя програма</h2>
-  <div class="tg-program-row">
+  <a class="tg-program-row" href="/studerria-tg/subjects">
     <span class="tg-program-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3.5 9.5 8.5-4 8.5 4-8.5 4-8.5-4Z" /><path d="M6.5 11v4.2c2.9 2 8.1 2 11 0V11M20.5 10v5" /></svg></span>
     <div><strong><%= placement && placement.group_label ? placement.group_label : 'Програма Studerria' %></strong><span>Ваші предмети й розклад</span></div><span class="tg-chevron" aria-hidden="true">›</span>
-  </div>
+  </a>
 </section>
 
 <section class="tg-profile-section tg-profile-list">
@@ -87,7 +84,7 @@
     <div><strong>Telegram</strong>
   <% if (user && user.telegram_id) { %>
     <span><%= user.telegram_username ? '@' + user.telegram_username : 'Привʼязано' %></span>
-    </div><span class="tg-chevron" aria-hidden="true">›</span>
+    </div>
   <% } else { %>
     <span>Ще не привʼязано</span></div>
     <form class="tg-form tg-link-form" method="POST" action="/studerria-tg/profile/link-telegram" data-tg-link-form>
