@@ -4789,8 +4789,15 @@
         return Date.UTC(y, m - 1, d);
       }
 
+      function getWeekStartUtc(dateStr) {
+        const dateUtc = parseDateUtc(dateStr);
+        if (dateUtc === null) return null;
+        const daysSinceMonday = (new Date(dateUtc).getUTCDay() + 6) % 7;
+        return dateUtc - daysSinceMonday * 86400000;
+      }
+
       function getWeekRange(week) {
-        const startUtc = parseDateUtc(semesterStartDate);
+        const startUtc = getWeekStartUtc(semesterStartDate);
         if (startUtc === null) return null;
         const safeWeek = clampWeek(week);
         const start = new Date(startUtc + ((safeWeek - 1) * 7 * 86400000));
@@ -4812,7 +4819,7 @@
 
       function getKyivAcademicWeek() {
         if (!semesterStartDate) return clampWeek(currentWeek);
-        const startUtc = parseDateUtc(semesterStartDate);
+        const startUtc = getWeekStartUtc(semesterStartDate);
         if (startUtc === null) return clampWeek(currentWeek);
         const { year, month, day } = getKyivDateParts();
         const kyivDayUtc = Date.UTC(year, month - 1, day);

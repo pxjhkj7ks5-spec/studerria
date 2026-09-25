@@ -918,6 +918,70 @@ body.theme-light .snav-mobile-logout-btn {
     width: 100%;
   }
 
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item--has-children {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu--flyout {
+    position: static;
+    top: auto;
+    left: auto;
+    width: 100%;
+    min-width: 0;
+    margin: 1px 0 3px;
+    padding: 2px 0 2px 18px;
+    border: 0 !important;
+    border-left: 1px solid rgba(165, 180, 252, 0.2) !important;
+    border-radius: 0;
+    background: transparent !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    z-index: auto;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu[hidden] {
+    display: none !important;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-list {
+    width: 100%;
+    gap: 2px;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.84rem;
+  }
+
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:hover,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:focus-visible,
+  body.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-subopen > .snav-menu-link {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu,
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu--flyout {
+    border-left-color: rgba(99, 102, 241, 0.2) !important;
+  }
+
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:hover,
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-menu-link:focus-visible,
+  body.theme-light.page-authenticated.studerria-theme .studerria-nav-shell .snav-item.is-subopen > .snav-menu-link {
+    background: rgba(255, 255, 255, 0.52);
+  }
+
   body.page-authenticated.studerria-theme .studerria-nav-shell .snav-link {
     position: relative;
     width: 100%;
