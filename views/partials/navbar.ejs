@@ -296,7 +296,11 @@
   const mobileSections = [];
   visibleNavItems.forEach((item) => {
     if (Array.isArray(item.children) && item.children.length) {
-      const sectionItems = flattenMobileItems(item.children, [String(item.label || '')]);
+      const sectionItems = [];
+      if ((item.href && !item.isDisabledLink) || item.navAction) {
+        sectionItems.push(toMobileDescriptor(item, []));
+      }
+      sectionItems.push(...flattenMobileItems(item.children, [String(item.label || '')]));
       if (sectionItems.length) {
         mobileSections.push({
           title: String(item.label || ''),
@@ -522,10 +526,34 @@
           cursor: not-allowed !important;
         }
         @media (max-width: 720px) {
+          .studerria-nav-shell .snav-account-card {
+            display: none;
+          }
+          .studerria-nav-shell .snav-logout-form {
+            display: none !important;
+          }
+          .studerria-nav-shell .snav-logout-btn {
+            display: none !important;
+          }
           .snav-demo-switch {
-            order: -1;
-            width: 100%;
+            order: 0;
+            width: auto;
+            flex: 0 0 auto;
+            gap: 2px;
+            padding: 2px;
             justify-content: center;
+          }
+          .snav-demo-badge {
+            display: none;
+          }
+          .snav-demo-option {
+            padding: 5px 8px;
+            font-size: 0.72rem;
+          }
+        }
+        @media (max-width: 420px) {
+          .studerria-nav-shell .snav-mobile-meta {
+            display: none;
           }
         }
       </style>
