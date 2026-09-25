@@ -1,9 +1,28 @@
-<section class="tg-page-head">
+<%
+  const tgScheduleDates = Object.values(scheduleDayDates || {}).filter(function(value) { return value && value.iso; });
+  const tgFormatWeekDate = function(iso) {
+    if (!iso) return '';
+    return new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'short', timeZone: 'Europe/Kyiv' })
+      .format(new Date(`${iso}T12:00:00Z`))
+      .replace('.', '');
+  };
+  const tgWeekRange = tgScheduleDates.length
+    ? `${tgFormatWeekDate(tgScheduleDates[0].iso)} – ${tgFormatWeekDate(tgScheduleDates[tgScheduleDates.length - 1].iso)}`
+    : '';
+%>
+<section class="tg-page-head tg-schedule-head">
   <h1>Розклад</h1>
   <div class="tg-weekbar">
-    <a href="/studerria-tg/schedule?week=<%= Math.max(1, Number(currentWeek || 1) - 1) %>" aria-label="Previous week">Prev</a>
-    <strong>Week <%= currentWeek || 1 %> / <%= totalWeeks || 1 %></strong>
-    <a href="/studerria-tg/schedule?week=<%= Math.min(Number(totalWeeks || 1), Number(currentWeek || 1) + 1) %>" aria-label="Next week">Next</a>
+    <a class="tg-week-button" href="/studerria-tg/schedule?week=<%= Math.max(1, Number(currentWeek || 1) - 1) %>" aria-label="Попередній тиждень">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7" /></svg>
+    </a>
+    <div class="tg-week-label">
+      <strong><%= tgWeekRange || 'Поточний тиждень' %></strong>
+      <span>Тиждень <%= currentWeek || 1 %> / <%= totalWeeks || 1 %></span>
+    </div>
+    <a class="tg-week-button" href="/studerria-tg/schedule?week=<%= Math.min(Number(totalWeeks || 1), Number(currentWeek || 1) + 1) %>" aria-label="Наступний тиждень">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 5 7 7-7 7" /></svg>
+    </a>
   </div>
 </section>
 
@@ -33,9 +52,9 @@
   <% const tgTodayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' }); %>
   <% (days || []).forEach(function(day) { %>
     <% const dayDate = scheduleDayDates && scheduleDayDates[day] ? scheduleDayDates[day] : null; %>
-    <article class="tg-day <%= dayDate && dayDate.iso === tgTodayIso ? 'is-today' : '' %>">
+    <article class="tg-day <%= dayDate && dayDate.iso === tgTodayIso ? 'is-today' : '' %>" <%= dayDate && dayDate.iso === tgTodayIso ? 'data-tg-current-day' : '' %>>
       <h2>
-        <span><%= day %></span>
+        <span><%= day %><% if (dayDate && dayDate.iso === tgTodayIso) { %><em>Сьогодні</em><% } %></span>
         <% if (dayDate && dayDate.label) { %>
           <time datetime="<%= dayDate.iso || '' %>"><%= dayDate.label %></time>
         <% } %>
@@ -47,18 +66,19 @@
       <% rows.forEach(function(item) { %>
         <% const homeworkItems = Array.isArray(item.homework_items) ? item.homework_items : []; %>
         <% const lessonMeta = `${item.subject_name || 'Предмет'}${item.class_number ? ` · ${item.class_number} пара` : ''}${item.group_number ? ` · група ${item.group_number}` : ''}${item.class_date ? ` · ${item.class_date}` : ''}`; %>
-        <div class="tg-lesson">
+        <% const lessonKind = String(item.lesson_type || '').toLowerCase(); %>
+        <div class="tg-lesson <%= lessonKind.includes('сем') ? 'tg-lesson--seminar' : (lessonKind.includes('лек') ? 'tg-lesson--lecture' : '') %>">
           <div class="tg-lesson-time">
             <strong aria-label="Пара <%= item.class_number || '' %>"><%= item.class_number || '' %></strong>
             <span><%= item.time_label || '' %></span>
           </div>
           <div>
             <h3><%= item.subject_name %></h3>
-            <p>
-              <% if (item.lesson_type) { %><span><%= item.lesson_type %></span><% } %>
+            <p class="tg-lesson-meta">
+              <% if (item.lesson_type) { %><span class="tg-lesson-type"><%= item.lesson_type %></span><% } %>
               <% if (item.group_number) { %><span>Group <%= item.group_number %></span><% } %>
               <% if (item.delivery_mode) { %><span><%= item.delivery_mode === 'online' ? 'Онлайн' : (item.delivery_mode === 'mixed' ? 'Змішано' : 'Офлайн') %></span><% } %>
-              <% if (item.room_label) { %><span><%= item.room_label %></span><% } %>
+              <% if (item.room_label) { %><span class="tg-lesson-room"><%= item.room_label %></span><% } %>
             </p>
             <div class="tg-lesson-actions">
               <% if (homeworkItems.length) { %>

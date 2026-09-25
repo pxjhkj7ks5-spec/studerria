@@ -1,5 +1,5 @@
-<section class="tg-page-head">
-  <h1>Профіль</h1>
+<section class="tg-page-head tg-profile-head">
+  <div class="tg-page-title-row"><h1>Профіль</h1><span class="tg-settings-icon" aria-label="Налаштування">⌁</span></div>
   <% if (placement && placement.group_label) { %>
     <p class="tg-muted"><%= placement.group_label %></p>
   <% } %>
@@ -48,6 +48,7 @@
     <div class="tg-avatar" aria-hidden="true"><%= profileInitials %></div>
     <div class="tg-profile-fields">
       <strong class="tg-profile-name"><%= profileName %></strong>
+      <% if (user && user.telegram_username) { %><span class="tg-profile-username">@<%= user.telegram_username %></span><% } %>
       <label>
         <span class="tg-sr-only">Мова</span>
         <select name="language" aria-label="Мова">
@@ -65,27 +66,37 @@
   </form>
 </section>
 
-<section class="tg-card">
-  <h2>Telegram</h2>
+<section class="tg-profile-section">
+  <h2>Моя програма</h2>
+  <div class="tg-program-row">
+    <span class="tg-program-icon" aria-hidden="true">⌂</span>
+    <div><strong><%= placement && placement.group_label ? placement.group_label : 'Програма Studerria' %></strong><span>Ваші предмети й розклад</span></div>
+  </div>
+</section>
+
+<section class="tg-profile-section">
+  <h2>Швидкі дії</h2>
+  <div class="tg-quick-actions">
+    <a href="/studerria-tg/subjects"><span>◫</span>Мої предмети</a>
+    <a href="/studerria-tg/teamwork"><span>◌</span>Teamwork</a>
+    <a href="/studerria-tg/schedule"><span>◷</span>Розклад</a>
+  </div>
+</section>
+
+<section class="tg-profile-section tg-settings-list">
+  <h2>Налаштування</h2>
+  <div class="tg-settings-row">
+    <span class="tg-settings-row-icon" aria-hidden="true">➤</span>
+    <div><strong>Telegram</strong>
   <% if (user && user.telegram_id) { %>
-    <p class="tg-link-line"><%= user.telegram_username ? '@' + user.telegram_username : 'Привʼязано' %></p>
+    <span><%= user.telegram_username ? '@' + user.telegram_username : 'Привʼязано' %></span>
+    </div><span class="tg-chevron" aria-hidden="true">›</span>
   <% } else { %>
-    <p class="tg-muted">Telegram ще не привʼязано.</p>
+    <span>Ще не привʼязано</span></div>
     <form class="tg-form tg-link-form" method="POST" action="/studerria-tg/profile/link-telegram" data-tg-link-form>
       <input type="hidden" name="initData" data-tg-init-data value="" />
-      <button class="tg-secondary" type="submit">Спробувати ще раз привʼязати</button>
+      <button class="tg-row-action" type="submit">Підключити</button>
       <p class="tg-muted tg-link-status" data-tg-link-status hidden></p>
     </form>
   <% } %>
-</section>
-
-<section class="tg-card">
-  <h2>Предмети</h2>
-  <p class="tg-muted">Тут можна змінити групи та предмети, які формують розклад і Teamwork.</p>
-  <a class="tg-disclosure" href="/studerria-tg/subjects">
-    <span>Налаштувати предмети</span>
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="m9 5 7 7-7 7" />
-    </svg>
-  </a>
 </section>

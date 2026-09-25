@@ -190,6 +190,7 @@
     bindScheduleHomeworkModal();
     bindScheduleHomeworkViewModal();
     bindScheduleFilePreviewModal();
+    focusCurrentScheduleDay();
     primeFastPages();
     applyTelegramChrome();
   }
@@ -837,6 +838,15 @@
     });
   }
 
+  function focusCurrentScheduleDay() {
+    const currentDay = document.querySelector('[data-tg-current-day]');
+    if (!currentDay || document.body.dataset.currentPage !== 'schedule') return;
+    window.requestAnimationFrame(() => {
+      const top = currentDay.getBoundingClientRect().top + window.scrollY - 18;
+      if (top > 80) window.scrollTo({ top, behavior: 'smooth' });
+    });
+  }
+
   function primeFastPages() {
     const urls = new Map();
     document.querySelectorAll('a[href]').forEach((anchor) => {
@@ -884,6 +894,7 @@
   bindScheduleHomeworkModal();
   bindScheduleHomeworkViewModal();
   bindScheduleFilePreviewModal();
+  focusCurrentScheduleDay();
   primeFastPages();
   syncTelegramSession();
 })();

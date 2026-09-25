@@ -26440,9 +26440,9 @@ app.get('/studerria-tg/schedule', requireTelegramMiniStudent, async (req, res) =
         return !homeworkGroup || !cardGroup || homeworkGroup === cardGroup;
       });
     };
-    const activeDays = Array.from(new Set((scheduleState.scheduleRows || []).map((row) => row.day_of_week).filter(Boolean)));
-    const orderedDays = fullWeekDays.filter((day) => activeDays.includes(day));
-    const fallbackDays = orderedDays.length ? orderedDays : [...daysOfWeek];
+    // Keep the whole selected week visible in the mini app. Empty days are useful
+    // orientation points and avoid turning the schedule into a day-tab interface.
+    const fallbackDays = [...fullWeekDays];
     const scheduleByDay = {};
     fallbackDays.forEach((day) => {
       scheduleByDay[day] = [];
