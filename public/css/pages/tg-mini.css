@@ -478,7 +478,7 @@ html.is-tg-dark .tg-success {
   position: relative;
   overflow: hidden;
 }
-.tg-lesson::before { content: ''; position: absolute; top: 14px; left: 7px; width: 3px; height: 48px; border-radius: 999px; background: var(--tg-muted-soft); }
+.tg-lesson::before { content: ''; position: absolute; top: 12px; left: 4px; width: 3px; height: min(72px, calc(100% - 24px)); border-radius: 999px; background: var(--tg-muted-soft); }
 .tg-lesson--lecture::before { background: var(--tg-lecture); }
 .tg-lesson--seminar::before { background: var(--tg-seminar); }
 
