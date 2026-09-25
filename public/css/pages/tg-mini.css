@@ -452,7 +452,7 @@ html.is-tg-dark .tg-success {
   font-size: 0.88rem;
   font-weight: 720;
 }
-.tg-day h2 small { color: var(--tg-muted); font-size: .73rem; font-weight: 550; text-align: right; }
+.tg-day h2 small { color: var(--tg-muted); font-size: .73rem; font-weight: 550; text-align: right; white-space: nowrap; }
 .tg-day-name { min-width: 0; }
 .tg-day-empty { margin: 0 0 2px 2px; color: var(--tg-muted); font-size: .82rem; }
 
@@ -488,15 +488,15 @@ html.is-tg-dark .tg-success {
 
 .tg-lesson-time {
   display: grid;
-  align-content: center;
+  align-content: start;
   justify-items: start;
   gap: 5px;
-  padding: 12px 6px 12px 11px;
+  padding: 13px 6px 10px 11px;
   border-right: 1px solid var(--tg-divider);
   background: var(--tg-field-bg);
 }
-.tg-lesson-content { min-width: 0; padding: 12px; }
-.tg-lesson-content h3 { margin: 0 0 7px; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.tg-lesson-content { min-width: 0; padding: 10px 11px; }
+.tg-lesson-content h3 { margin: 0 0 6px; overflow-wrap: anywhere; }
 
 .tg-lesson-time strong {
   color: var(--tg-theme-text);
@@ -535,13 +535,13 @@ html.is-tg-dark .tg-success {
 .tg-lesson--lecture .tg-lesson-type { background: var(--tg-lecture-soft); color: var(--tg-lecture); }
 .tg-lesson--seminar .tg-lesson-type { background: var(--tg-seminar-soft); color: var(--tg-seminar); }
 .tg-lesson-meta .tg-lesson-type + span::before { display: none; }
-.tg-lesson .tg-lesson-location { display: block; margin-top: 6px; color: var(--tg-muted); font-size: .76rem; }
+.tg-lesson .tg-lesson-location { display: block; margin-top: 5px; color: var(--tg-muted); font-size: .76rem; }
 
 .tg-lesson-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 7px;
 }
 
 .tg-tabs-strip {
@@ -813,7 +813,7 @@ html.is-tg-dark .tg-form select option {
   border-color: color-mix(in srgb, var(--tg-theme-accent) 52%, transparent);
   background: var(--tg-theme-accent);
   color: #fff;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--tg-theme-accent) 24%, transparent);
+  box-shadow: none;
 }
 
 .tg-inline-action--primary span {

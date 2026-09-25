@@ -6,6 +6,12 @@
       .format(new Date(`${iso}T12:00:00Z`))
       .replace('.', '');
   };
+  const tgFormatDayName = function(iso, fallback) {
+    if (!iso) return fallback;
+    const label = new Intl.DateTimeFormat('uk-UA', { weekday: 'long', timeZone: 'Europe/Kyiv' })
+      .format(new Date(`${iso}T12:00:00Z`));
+    return label.charAt(0).toLocaleUpperCase('uk-UA') + label.slice(1);
+  };
   const tgWeekRange = tgScheduleDates.length
     ? `${tgFormatWeekDate(tgScheduleDates[0].iso)} – ${tgFormatWeekDate(tgScheduleDates[tgScheduleDates.length - 1].iso)}`
     : '';
@@ -60,7 +66,7 @@
     <% const rows = scheduleByDay && scheduleByDay[day] ? scheduleByDay[day] : []; %>
     <article class="tg-day <%= dayDate && dayDate.iso === tgTodayIso ? 'is-today' : '' %>" <%= dayDate && dayDate.iso === tgTodayIso ? 'data-tg-current-day' : '' %>>
       <h2>
-        <span class="tg-day-name"><%= day %><% if (dayDate && dayDate.iso === tgTodayIso) { %><em>Сьогодні</em><% } %></span>
+        <span class="tg-day-name"><%= tgFormatDayName(dayDate && dayDate.iso, day) %><% if (dayDate && dayDate.iso === tgTodayIso) { %><em>Сьогодні</em><% } %></span>
         <% if (dayDate && dayDate.label) { %>
           <time datetime="<%= dayDate.iso || '' %>"><%= dayDate.label %></time>
         <% } %>
@@ -95,11 +101,12 @@
                 <button
                   class="tg-inline-action tg-inline-action--primary"
                   type="button"
+                  aria-label="Подивитись домашні завдання: <%= homeworkItems.length %>"
                   data-tg-homework-view
                   data-tg-homework-view-meta="<%= lessonMeta %>"
                   data-tg-homework-items="<%= JSON.stringify(homeworkItems) %>"
                 >
-                  Подивитись ДЗ <span><%= homeworkItems.length %></span>
+                  ДЗ <span><%= homeworkItems.length %></span>
                 </button>
               <% } %>
               <% if (item.compat_homework_enabled !== false) { %><button
