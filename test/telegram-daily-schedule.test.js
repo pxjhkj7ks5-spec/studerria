@@ -149,7 +149,7 @@ test('header contains only the target weekday and date', async () => {
 test('weekends publish the chill message, while zero registered students have a different message', async () => {
   const f = fixture();
   const weekend = buildDailyScheduleText(await collectDailySchedule(f.deps, course, '2026-09-06'));
-  assert.equal(weekend, '😎 Завтра пар немає — чілім!');
+  assert.equal(weekend, 'Завтра чіл');
   const mixed = fixture([user(1), user(2)], { scenarios: { 2: { state: { scheduleRows: [] } } } });
   const mixedText = buildDailyScheduleText(await collectDailySchedule(mixed.deps, course, '2026-09-02'));
   assert.match(mixedText, /@student_1/);
