@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
 import { AddToCartButton } from "@/components/site/add-to-cart-button";
 import { TrackedLink } from "@/components/site/tracked-link";
-import { buildTelegramLink } from "@/lib/telegram";
+import { withBasePath } from "@/lib/base-path";
 import { formatPrice } from "@/lib/utils";
 
 type ProductVariant = {
@@ -29,6 +29,7 @@ type ProductPurchasePanelProps = {
   saleEndsAt: string | null;
   shortDescription: string;
   telegramUrl: string;
+  leadTime: string;
   variants: ProductVariant[];
 };
 
@@ -45,7 +46,7 @@ export function ProductPurchasePanel({
   isOnSale,
   saleEndsAt,
   shortDescription,
-  telegramUrl,
+  leadTime,
   variants,
 }: ProductPurchasePanelProps) {
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(
@@ -60,11 +61,7 @@ export function ProductPurchasePanel({
   const oldPrice = selectedVariant && selectedVariant.price < selectedVariant.regularPrice
     ? formatPrice(selectedVariant.regularPrice)
     : regularPriceLabel;
-  const customUrl = buildTelegramLink({
-    baseUrl: telegramUrl,
-    intent: "custom",
-    productTitle,
-  });
+  const customUrl = withBasePath(`/custom?product=${encodeURIComponent(productSlug)}`);
   const unitPrice = selectedVariant?.price ?? basePrice;
   const cartItem = typeof unitPrice === "number" ? {
     productId,
@@ -104,6 +101,7 @@ export function ProductPurchasePanel({
         </div>
 
         <h1>{productTitle}</h1>
+        <p className="purchase-panel__lead-time">Виготовлення: {leadTime || "Термін погодимо перед виготовленням"}</p>
         <p className="purchase-panel__description">{shortDescription}</p>
 
         {variants.length > 0 ? (
@@ -114,6 +112,7 @@ export function ProductPurchasePanel({
                 <button
                   key={variant.id}
                   type="button"
+                  aria-pressed={variant.id === selectedVariantId}
                   className={variant.id === selectedVariantId ? "is-active" : ""}
                   onClick={() => setSelectedVariantId(variant.id)}
                 >
@@ -128,7 +127,7 @@ export function ProductPurchasePanel({
 
         <div className="purchase-panel__action" ref={primaryActionRef}>
           <div>
-            <span>Орієнтовна ціна</span>
+            <span>Ціна</span>
             <span className="sale-price-line">{oldPrice ? <del className="old-price">{oldPrice}</del> : null}<strong>{currentPrice}</strong></span>
             {isOnSale ? <small>{saleEndsAt ? `Акція до ${new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(saleEndsAt))}` : "Акційна ціна діє зараз"}</small> : null}
           </div>
@@ -138,12 +137,10 @@ export function ProductPurchasePanel({
           Потрібні інші розміри, колір або власна модель? Індивідуальні замовлення погоджуємо окремо.
           <TrackedLink
             href={customUrl}
-            target="_blank"
-            rel="noreferrer"
             eventName="Custom Lead"
             eventProps={{ location: "product-purchase-panel", intent: "custom", product_slug: productSlug, category }}
           >
-            Написати в Telegram <ArrowRight aria-hidden size={16} />
+            Замовити свій варіант <ArrowRight aria-hidden size={16} />
           </TrackedLink>
         </p>
       </div>

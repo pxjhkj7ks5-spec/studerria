@@ -23,10 +23,29 @@ export function minimumProductPrice(product: {
   basePrice: number | null;
   variants: Array<{ price: number }>;
 }) {
-  const prices = product.basePrice === null
+  const prices = product.variants.length
     ? product.variants.map((variant) => variant.price)
-    : [product.basePrice];
+    : product.basePrice === null ? [] : [product.basePrice];
   return prices.length ? Math.min(...prices) : Number.POSITIVE_INFINITY;
+}
+
+export function parsePriceBound(value?: string) {
+  if (!value?.trim()) return undefined;
+  const price = Number(value);
+  return Number.isSafeInteger(price) && price >= 0 && price <= 10_000_000 ? price : undefined;
+}
+
+export function withinPriceRange(product: Parameters<typeof minimumProductPrice>[0], minimum?: number, maximum?: number) {
+  const price = minimumProductPrice(product);
+  if (minimum === undefined && maximum === undefined) return true;
+  return Number.isFinite(price) && (minimum === undefined || price >= minimum) && (maximum === undefined || price <= maximum);
+}
+
+export function compactLeadTime(value: string) {
+  const clean = value.trim().replace(/\.$/, "");
+  if (clean.length <= 24) return clean;
+  const days = clean.match(/до\s+(\d+)\s+дн/i);
+  return days ? `До ${days[1]} днів` : "Термін уточнюється";
 }
 
 export function sortCatalogProducts<T extends {

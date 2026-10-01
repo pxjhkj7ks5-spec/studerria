@@ -1,3 +1,4 @@
+import { legacyCategorySlug, suggestedCategory } from "../src/lib/catalog-taxonomy";
 import { createHash } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -259,9 +260,9 @@ async function deleteDownloadedImages(images: DownloadedImage[]) {
   );
 }
 
-async function resolveCategory(categoryValue: string) {
+async function resolveCategory(categoryValue: string, title: string) {
   const categories = await prisma.category.findMany({ where: { isVisible: true } });
-  const normalized = categoryValue.trim().toLocaleLowerCase("uk-UA");
+  const normalized = suggestedCategory(title, legacyCategorySlug(categoryValue));
   const slug = slugify(categoryValue);
 
   return categories.find(
@@ -346,7 +347,7 @@ async function importTemplatePost(channel: string, post: TelegramPost) {
   }
 
   const product = parsed.product;
-  const category = await resolveCategory(product.category);
+  const category = await resolveCategory(product.category, product.title);
 
   if (!category) {
     await saveFailedImport(

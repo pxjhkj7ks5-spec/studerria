@@ -155,6 +155,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <aside className="product-layout__aside">
               <ProductPurchasePanel
+                leadTime={product.leadTime || settings.leadTimeNote}
                 category={product.category.name}
                 productId={product.id}
                 productSlug={product.slug}

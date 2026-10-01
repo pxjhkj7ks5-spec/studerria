@@ -91,6 +91,7 @@ export default async function AdminPage({ params, searchParams }: AdminPageProps
         <nav className="admin-nav" aria-label="Розділи адмінки">
           <a href="#analytics">Статистика</a>
           <a href="#orders">Замовлення</a>
+          <a href={withBasePath(`${getAdminRoute()}/catalog-quality`)}>Наповнення каталогу</a>
           <a href={withBasePath(`${getAdminRoute()}/reviews`)}>Відгуки</a>
           <a href={withBasePath(`${getAdminRoute()}/bundles`)}>Комплекти</a>
           <a href={withBasePath(`${getAdminRoute()}/promo-codes`)}>Промокоди</a>

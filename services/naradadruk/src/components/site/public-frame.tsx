@@ -1,3 +1,4 @@
+import { MobileNavigation } from "@/components/site/mobile-navigation";
 import type { ReactNode } from "react";
 import { CartProvider } from "@/components/site/cart-provider";
 import { PageViewTracker } from "@/components/site/page-view-tracker";
@@ -17,6 +18,7 @@ export function PublicFrame({ children, telegramUrl }: PublicFrameProps) {
         <SiteHeader telegramUrl={telegramUrl} />
         <div className="storefront__content">{children}</div>
         <SiteFooter telegramUrl={telegramUrl} />
+        <MobileNavigation />
       </div>
     </CartProvider>
   );

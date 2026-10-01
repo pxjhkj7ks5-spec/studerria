@@ -12,7 +12,6 @@ import {
   getVisibleCategories,
 } from "@/lib/data";
 import { withBasePath } from "@/lib/base-path";
-import { buildTelegramLink } from "@/lib/telegram";
 import { siteName } from "@/lib/constants";
 import { absoluteSiteUrl } from "@/lib/site-url";
 
@@ -56,10 +55,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     notFound();
   }
 
-  const customUrl = buildTelegramLink({
-    baseUrl: settings.telegramUrl,
-    intent: "custom",
-  });
+  const customUrl = withBasePath("/custom");
   const productList = products.length > 0
     ? {
         "@context": "https://schema.org",

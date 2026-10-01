@@ -30,7 +30,6 @@ import {
   siteShareTitle,
 } from "@/lib/constants";
 import { absoluteSiteUrl } from "@/lib/site-url";
-import { buildTelegramLink } from "@/lib/telegram";
 import { StructuredData } from "@/components/site/structured-data";
 
 export const dynamic = "force-dynamic";
@@ -72,10 +71,7 @@ export default async function HomePage() {
   ]);
   const { saleProducts, popularProducts, newProducts } = productSections;
 
-  const customUrl = buildTelegramLink({
-    baseUrl: settings.telegramUrl,
-    intent: "custom",
-  });
+  const customUrl = withBasePath("/custom");
 
   const processSteps = [
     {
@@ -120,7 +116,7 @@ export default async function HomePage() {
 
   const faqItems = [
     ["З яких матеріалів ви друкуєте?", settings.materialsNote],
-    ["Скільки коштує 3D-друк?", "Ціна залежить від розміру, матеріалу та складності. Надішліть задачу в Telegram — уточнимо вартість до старту."],
+    ["Скільки коштує 3D-друк?", "Ціна залежить від розміру, матеріалу та складності. Надішліть заявку — уточнимо вартість до старту."],
     ["Скільки часу займає виготовлення?", settings.leadTimeNote],
     ["Як відбувається доставка?", settings.deliveryNote],
     ["Як оплатити замовлення?", publicPaymentNote],
@@ -156,12 +152,10 @@ export default async function HomePage() {
                 <TrackedLink
                   className="accent-pill accent-pill--large"
                   href={customUrl}
-                  target="_blank"
-                  rel="noreferrer"
                   eventName="Custom Lead"
                   eventProps={{ location: "hero", intent: "custom" }}
                 >
-                  Надрукувати своє
+                  Надрукувати файл
                   <ArrowRight aria-hidden size={18} />
                 </TrackedLink>
                 <TrackedLink
@@ -170,9 +164,10 @@ export default async function HomePage() {
                   eventName="Catalog Open"
                   eventProps={{ location: "hero", intent: "catalog" }}
                 >
-                  Переглянути каталог
+                  Готові вироби
                   <ArrowRight aria-hidden size={18} />
                 </TrackedLink>
+                <a className="ghost-pill ghost-pill--large" href={withBasePath("/custom?mode=model")}>Замовити 3D-модель <ArrowRight aria-hidden size={18} /></a>
               </div>
             </div>
 
@@ -281,8 +276,6 @@ export default async function HomePage() {
                 <TrackedLink
                   className="accent-pill accent-pill--large"
                   href={customUrl}
-                  target="_blank"
-                  rel="noreferrer"
                   eventName="Custom Lead"
                   eventProps={{ location: "empty-catalog", intent: "custom" }}
                 >
@@ -323,48 +316,6 @@ export default async function HomePage() {
           </section>
         ) : null}
 
-        <section className="site-section site-section--process" id="process">
-          <div className="site-container process-layout">
-            <div className="section-heading">
-              <p className="eyebrow">Від задачі до деталі</p>
-              <h2>Три кроки. Без технічної бюрократії.</h2>
-              <p>Пишете як є — ми допомагаємо з матеріалом, моделлю та виробництвом.</p>
-            </div>
-
-            <div className="process-grid">
-              {processSteps.map((step, index) => {
-                const Icon = step.icon;
-                return (
-                  <article key={step.title} className="process-step">
-                    <div className="process-step__topline">
-                      <span className="process-step__icon">
-                        <Icon aria-hidden size={23} />
-                      </span>
-                      <p className="process-step__number">0{index + 1}</p>
-                    </div>
-                    <h3>{step.title}</h3>
-                    <p>{step.body}</p>
-                    {index === 0 ? (
-                      <TrackedLink
-                        className="process-step__link"
-                        href={customUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        eventName="Custom Lead"
-                        eventProps={{ location: "process", intent: "custom" }}
-                        aria-label="Показати задачу в Telegram"
-                      >
-                        Почати з повідомлення
-                        <ArrowRight aria-hidden size={18} />
-                      </TrackedLink>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
         {showcaseImages.length > 0 ? (
           <section className="site-section site-section--showcase">
             <div className="site-container">
@@ -403,6 +354,46 @@ export default async function HomePage() {
           </section>
         ) : null}
 
+        <section className="site-section site-section--process" id="process">
+          <div className="site-container process-layout">
+            <div className="section-heading">
+              <p className="eyebrow">Від задачі до деталі</p>
+              <h2>Три кроки. Без технічної бюрократії.</h2>
+              <p>Пишете як є — ми допомагаємо з матеріалом, моделлю та виробництвом.</p>
+            </div>
+
+            <div className="process-grid">
+              {processSteps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <article key={step.title} className="process-step">
+                    <div className="process-step__topline">
+                      <span className="process-step__icon">
+                        <Icon aria-hidden size={23} />
+                      </span>
+                      <p className="process-step__number">0{index + 1}</p>
+                    </div>
+                    <h3>{step.title}</h3>
+                    <p>{step.body}</p>
+                    {index === 0 ? (
+                      <TrackedLink
+                        className="process-step__link"
+                        href={customUrl}
+                        eventName="Custom Lead"
+                        eventProps={{ location: "process", intent: "custom" }}
+                        aria-label="Описати задачу"
+                      >
+                        Описати задачу
+                        <ArrowRight aria-hidden size={18} />
+                      </TrackedLink>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         <section className="site-section site-section--compact" id="delivery">
           <div className="site-container trust-grid">
             {trustItems.map((item) => {
@@ -440,6 +431,8 @@ export default async function HomePage() {
           </div>
         </section>
 
+        <section className="site-section site-section--compact"><div className="site-container section-heading"><p className="eyebrow">Досвід клієнтів</p><h2>Відгуки про нашу роботу</h2><p>Досвід покупців і фотографії готових виробів.</p><a className="ghost-pill" href={withBasePath("/reviews")}>Переглянути відгуки</a></div></section>
+
         <section className="site-section site-section--closing">
           <div className="site-container closing-cta">
             <div>
@@ -456,7 +449,7 @@ export default async function HomePage() {
                 eventName="Custom Lead"
                 eventProps={{ location: "closing-cta", intent: "custom" }}
               >
-                Надрукувати своє
+                Надрукувати файл
                 <ArrowRight aria-hidden size={18} />
               </TrackedLink>
               <TrackedLink

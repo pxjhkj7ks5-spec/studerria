@@ -1,3 +1,4 @@
+import { storefrontCategories } from "../src/lib/catalog-taxonomy";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -10,7 +11,7 @@ async function main() {
     },
     create: {
       id: 1,
-      heroTitle: "3D друк, страйкбольні аксесуари та декор під ваш запит.",
+      heroTitle: "3D-друк для вашої задачі",
       heroSubtitle:
         "Narada Druk робить серійні перевірені моделі та індивідуальні вироби для дому, сетапу й страйкболу без зайвого тертя в замовленні.",
       supportTitle: "Друкуємо те, що реально працює в щоденному користуванні.",
@@ -26,26 +27,7 @@ async function main() {
     },
   });
 
-  const categories = [
-    {
-      name: "Декор",
-      slug: "dekor",
-      description: "Тематичні вироби для столу, полиці та робочого простору.",
-      sortOrder: 10,
-    },
-    {
-      name: "Інше",
-      slug: "inshe",
-      description: "Практичні вироби, підставки, органайзери та аксесуари.",
-      sortOrder: 20,
-    },
-    {
-      name: "STRIKEBALL",
-      slug: "strajkbol",
-      description: "Аксесуари, кріплення та комплектуючі для спорядження.",
-      sortOrder: 30,
-    },
-  ];
+  const categories = storefrontCategories;
 
   for (const category of categories) {
     await prisma.category.upsert({
@@ -55,21 +37,7 @@ async function main() {
     });
   }
 
-  const activeCategories = await prisma.category.findMany({
-    where: { slug: { in: categories.map((category) => category.slug) } },
-    select: { id: true, slug: true },
-  });
-  const fallbackCategory = activeCategories.find((category) => category.slug === "inshe");
-  if (fallbackCategory) {
-    const activeIds = activeCategories.map((category) => category.id);
-    await prisma.product.updateMany({
-      where: { categoryId: { notIn: activeIds } },
-      data: { categoryId: fallbackCategory.id },
-    });
-    await prisma.category.deleteMany({
-      where: { id: { notIn: activeIds } },
-    });
-  }
+
 }
 
 main()

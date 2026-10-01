@@ -1,3 +1,4 @@
+import { storefrontCategories, suggestedCategory } from "../src/lib/catalog-taxonomy";
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -103,7 +104,7 @@ async function importProduct(
   product: CatalogProduct,
   categoryIds: Map<string, number>,
 ) {
-  const categoryId = categoryIds.get(product.categorySlug);
+  const categoryId = categoryIds.get(suggestedCategory(product.title, product.categorySlug));
 
   if (!categoryId) {
     throw new Error(`Unknown category "${product.categorySlug}" for "${product.title}".`);
@@ -223,7 +224,7 @@ async function main() {
 
   const categoryIds = new Map<string, number>();
 
-  for (const category of payload.categories) {
+  for (const category of [...payload.categories.filter((item) => !storefrontCategories.some((known) => known.slug === item.slug)), ...storefrontCategories]) {
     const savedCategory = await prisma.category.upsert({
       where: { slug: category.slug },
       update: {
@@ -247,19 +248,6 @@ async function main() {
   for (const product of payload.products) {
     await importProduct(product, categoryIds);
   }
-
-  const activeCategoryIds = [...categoryIds.values()];
-  const fallbackCategoryId = categoryIds.get("inshe");
-  if (!fallbackCategoryId) {
-    throw new Error('Catalog must include the fallback category "inshe".');
-  }
-  await prisma.product.updateMany({
-    where: { categoryId: { notIn: activeCategoryIds } },
-    data: { categoryId: fallbackCategoryId },
-  });
-  await prisma.category.deleteMany({
-    where: { id: { notIn: activeCategoryIds } },
-  });
 
   console.log(
     `[catalog] imported ${payload.products.length} products from ${catalogFile}`,

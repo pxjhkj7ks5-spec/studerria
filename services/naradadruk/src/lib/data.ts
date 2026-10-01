@@ -195,7 +195,7 @@ export async function getSiteSettings() {
   return prisma.siteSetting.create({
     data: {
       id: 1,
-      heroTitle: "3D друк, страйкбольні аксесуари та декор під ваш запит.",
+      heroTitle: "3D-друк для вашої задачі",
       heroSubtitle:
         "Narada Druk збирає перевірені моделі та кастомні вироби в один каталог із прямим переходом у Telegram.",
       supportTitle: "Готові рішення і кастомні вироби в одному потоці.",
@@ -252,7 +252,7 @@ export async function getVisibleCategories() {
     }
   }
 
-  return categories.map((category) => ({
+  return categories.filter((category) => (countMap.get(category.id) ?? 0) > 0).map((category) => ({
     ...category,
     publishedCount: countMap.get(category.id) ?? 0,
     representativeImage: imageMap.get(category.id) ?? null,

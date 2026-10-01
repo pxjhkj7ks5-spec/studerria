@@ -9,6 +9,8 @@ type CatalogFiltersProps = {
   categorySlug: string;
   query: string;
   sort: string;
+  minPrice?: number;
+  maxPrice?: number;
   purpose: string;
   compatibility: string;
   purposes: string[];
@@ -21,6 +23,8 @@ export function CatalogFilters({
   categorySlug,
   query,
   sort,
+  minPrice,
+  maxPrice,
   purpose,
   compatibility,
   purposes,
@@ -51,6 +55,7 @@ export function CatalogFilters({
         />
       </label>
 
+      <details className="catalog-extra" open={Boolean(categorySlug || purpose || compatibility || minPrice !== undefined || maxPrice !== undefined || sort !== "recommended")}><summary>Фільтри й сортування</summary><div className="catalog-extra__fields">
       <label className="catalog-select">
         <span className="sr-only">Категорія</span>
         <select name="category" defaultValue={categorySlug}>
@@ -93,9 +98,13 @@ export function CatalogFilters({
         </select>
       </label>
 
+      <label className="form-field"><span>Ціна від, грн</span><input name="minPrice" type="number" min="0" max="10000000" step="1" defaultValue={minPrice} /></label>
+      <label className="form-field"><span>Ціна до, грн</span><input name="maxPrice" type="number" min="0" max="10000000" step="1" defaultValue={maxPrice} /></label>
+      </div></details>
       <button className="accent-pill" type="submit">
         Знайти
       </button>
+      <a className="catalog-reset" href={action}>Скинути</a>
     </form>
   );
 }

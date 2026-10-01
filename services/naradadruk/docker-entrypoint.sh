@@ -114,6 +114,9 @@ if [ -f "$PRICING_FILE" ]; then
   fi
 fi
 
+echo "[entrypoint] upgrading storefront categories"
+./node_modules/.bin/tsx prisma/upgrade-storefront.ts
+
 case "${TELEGRAM_AUTO_IMPORT_ENABLED:-true}" in
   0|false|FALSE|no|NO|off|OFF)
     echo "[entrypoint] Telegram catalog sync disabled"

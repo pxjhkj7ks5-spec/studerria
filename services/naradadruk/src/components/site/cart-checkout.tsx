@@ -313,7 +313,7 @@ export function CartCheckout() {
           <label><span>Імʼя</span><input name="firstName" autoComplete="given-name" minLength={2} maxLength={60} required /></label>
           <label><span>Прізвище</span><input name="lastName" autoComplete="family-name" minLength={2} maxLength={60} required /></label>
           <label><span>Телефон</span><input name="phone" type="tel" autoComplete="tel" placeholder="+380…" required /><small>Для даних одержувача Нової пошти.</small></label>
-          <label><span>Telegram для звʼязку</span><input name="telegramContact" placeholder="@username або номер" minLength={3} maxLength={80} required /><small>Для підтвердження деталей замовлення.</small></label>
+          <label><span>Telegram для звʼязку</span><input name="telegramContact" placeholder="@username або номер" minLength={3} maxLength={80} required /><small>Потрібен для підтвердження деталей. Реквізити передаємо після підтвердження замовлення.</small></label>
         </div>
 
         <label className="form-field form-field--options">

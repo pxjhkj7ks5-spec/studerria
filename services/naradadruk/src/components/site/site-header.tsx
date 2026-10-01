@@ -1,6 +1,5 @@
 import { PaperPlaneTilt, SquaresFour } from "@phosphor-icons/react/ssr";
 import { withBasePath } from "@/lib/base-path";
-import { buildTelegramLink } from "@/lib/telegram";
 import { TrackedLink } from "@/components/site/tracked-link";
 import { CartLink } from "@/components/site/cart-link";
 
@@ -8,11 +7,8 @@ type SiteHeaderProps = {
   telegramUrl: string;
 };
 
-export function SiteHeader({ telegramUrl }: SiteHeaderProps) {
-  const customUrl = buildTelegramLink({
-    baseUrl: telegramUrl,
-    intent: "custom",
-  });
+export function SiteHeader({}: SiteHeaderProps) {
+  const customUrl = withBasePath("/custom");
 
   return (
     <header className="site-header">
@@ -35,7 +31,7 @@ export function SiteHeader({ telegramUrl }: SiteHeaderProps) {
           <a href={withBasePath("/catalog")}>Каталог</a>
           <a href={withBasePath("/reviews")}>Відгуки</a>
           <a href={withBasePath("/#process")}>Як це працює</a>
-          <a href={withBasePath("/#delivery")}>Доставка</a>
+          <a href={withBasePath("/delivery")}>Доставка</a>
         </nav>
 
         <div className="site-header__actions">
@@ -51,8 +47,6 @@ export function SiteHeader({ telegramUrl }: SiteHeaderProps) {
           <TrackedLink
             className="accent-pill site-header__cta"
             href={customUrl}
-            target="_blank"
-            rel="noreferrer"
             eventName="Custom Lead"
             eventProps={{ location: "header", intent: "custom" }}
           >

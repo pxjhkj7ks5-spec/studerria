@@ -13,8 +13,8 @@ import {
 
 function apply(session: ReturnType<typeof createManualOrderSession>, value: string) {
   const result = applyManualOrderText(session, value);
-  assert.equal(result.ok, true);
   if (!result.ok) throw new Error(result.error);
+  assert.equal(result.ok, true);
   return result.session;
 }
 
@@ -84,6 +84,9 @@ test("manual catalog order keeps multiple products, quantities, relations, and c
   assert.equal(data.phone, "+380 67 123 45 67");
   assert.equal(data.telegramContact, "@olena_print");
   assert.equal(data.items.create.length, 2);
+  assert.ok("productId" in data.items.create[0]);
+  assert.ok("productId" in data.items.create[1]);
+  assert.ok("variantId" in data.items.create[1]);
   assert.equal(data.items.create[0].productId, 78);
   assert.equal(data.items.create[0].quantity, 2);
   assert.equal(data.items.create[0].unitPrice, 225);

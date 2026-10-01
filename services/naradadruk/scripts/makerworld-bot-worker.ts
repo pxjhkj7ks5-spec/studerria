@@ -1,3 +1,4 @@
+import { legacyCategorySlug } from "../src/lib/catalog-taxonomy";
 import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -584,7 +585,7 @@ async function resolveDraftCategory(categoryName = "") {
   const categories = await prisma.category.findMany({
     orderBy: [{ isVisible: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
   });
-  const normalized = categoryName.trim().toLocaleLowerCase("uk-UA");
+  const normalized = legacyCategorySlug(categoryName);
   return (
     categories.find((category) =>
       normalized && [category.name, category.slug].some((value) => value.toLocaleLowerCase("uk-UA") === normalized)

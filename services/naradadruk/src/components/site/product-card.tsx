@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { compactLeadTime } from "@/lib/catalog";
 import { withBasePath } from "@/lib/base-path";
 import { TrackedLink } from "@/components/site/tracked-link";
 import { AddToCartButton } from "@/components/site/add-to-cart-button";
@@ -64,7 +65,7 @@ export function ProductCard({
       <div className="product-card__body">
         <div className="product-card__meta">
           <span>{product.category.name}</span>
-          {product.leadTime ? <span>{product.leadTime}</span> : null}
+          {product.leadTime ? <span title={product.leadTime}>{compactLeadTime(product.leadTime)}</span> : null}
         </div>
 
         <div>
