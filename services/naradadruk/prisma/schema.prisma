@@ -2,6 +2,56 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum CustomRequestStatus {
+  new
+  assessing
+  quoted
+  closed
+}
+
+model CustomRequest {
+  id                 Int                 @id @default(autoincrement())
+  publicId           String              @unique
+  submissionKey      String              @unique
+  contentHash        String
+  ipHash             String
+  mode               String
+  name               String
+  telegramContact    String
+  phone              String              @default("")
+  description        String
+  quantity           Int                 @default(1)
+  dimensions         String              @default("")
+  desiredDate        String              @default("")
+  budget             Int?
+  modelUrl           String              @default("")
+  productSlug        String              @default("")
+  status             CustomRequestStatus @default(new)
+  agreedPrice        Int?
+  agreedLeadTime     String              @default("")
+  ownerNote          String              @default("")
+  notificationStatus NotificationStatus  @default(pending)
+  notificationError  String              @default("")
+  notificationLease  DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  attachments        CustomRequestAttachment[]
+
+  @@index([status, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([ipHash, contentHash, createdAt])
+}
+
+model CustomRequestAttachment {
+  id           Int           @id @default(autoincrement())
+  requestId    Int
+  fileName     String        @unique
+  originalName String
+  size         Int
+  mimeType     String
+  request      CustomRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")

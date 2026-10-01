@@ -32,7 +32,8 @@ function event(
 test("parseAnalyticsRange accepts supported periods and defaults to 30", () => {
   assert.equal(parseAnalyticsRange("7"), 7);
   assert.equal(parseAnalyticsRange("90"), 90);
-  assert.equal(parseAnalyticsRange("14"), 30);
+  assert.equal(parseAnalyticsRange("14"), 14);
+  assert.equal(parseAnalyticsRange("12"), 30);
   assert.equal(parseAnalyticsRange(undefined), 30);
 });
 

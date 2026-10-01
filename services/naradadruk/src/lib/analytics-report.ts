@@ -17,7 +17,7 @@ const shortDayFormatter = new Intl.DateTimeFormat("uk-UA", {
   month: "short",
 });
 
-export const analyticsRanges = [7, 30, 90] as const;
+export const analyticsRanges = [7, 14, 30, 90] as const;
 export type AnalyticsRange = (typeof analyticsRanges)[number];
 
 export type AnalyticsEventRecord = {

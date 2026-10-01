@@ -101,6 +101,10 @@ export function ProductPurchasePanel({
         </div>
 
         <h1>{productTitle}</h1>
+        <div className="purchase-panel__headline-price" aria-live="polite">
+          <span>Ціна</span>
+          <span className="sale-price-line">{oldPrice ? <del className="old-price">{oldPrice}</del> : null}<strong>{currentPrice}</strong></span>
+        </div>
         <p className="purchase-panel__lead-time">Виготовлення: {leadTime || "Термін погодимо перед виготовленням"}</p>
         <p className="purchase-panel__description">{shortDescription}</p>
 

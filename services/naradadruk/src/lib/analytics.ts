@@ -11,6 +11,9 @@ export const analyticsEventNames = [
   "Order Placed",
   "Telegram Lead",
   "Custom Lead",
+  "Custom Request Open",
+  "Custom Request Start",
+  "Custom Request Submitted",
 ] as const;
 
 export type AnalyticsEventName = (typeof analyticsEventNames)[number];
@@ -37,7 +40,7 @@ declare global {
   }
 }
 
-function getAnalyticsSessionId() {
+export function getAnalyticsSessionId() {
   try {
     const existing = window.localStorage.getItem(analyticsSessionStorageKey);
 
@@ -109,10 +112,10 @@ export function trackAnalytics(
     return;
   }
 
-  trackInternal(eventName, props);
+  try { trackInternal(eventName, props); } catch { /* Analytics must not interrupt shopping or forms. */ }
 
   if (eventName !== "Page View" && typeof window.plausible === "function") {
-    window.plausible(eventName, props ? { props } : undefined);
+    try { window.plausible(eventName, props ? { props } : undefined); } catch { /* External analytics is optional. */ }
   }
 }
 

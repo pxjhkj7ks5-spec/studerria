@@ -30,11 +30,15 @@ const eventLabels: Record<AnalyticsEventName, string> = {
   "Checkout Open": "Початок оформлення",
   "Order Placed": "Оформлене замовлення",
   "Telegram Lead": "Перехід у Telegram",
+  "Custom Request Open": "Відкриття заявки",
+  "Custom Request Start": "Початок заявки",
+  "Custom Request Submitted": "Збережені заявки",
   "Custom Lead": "Запит на власний виріб",
 };
 
 const periodLabels = {
   7: "7 днів",
+  14: "14 днів",
   30: "30 днів",
   90: "90 днів",
 } as const;

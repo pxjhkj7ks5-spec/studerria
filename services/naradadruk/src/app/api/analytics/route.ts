@@ -83,7 +83,7 @@ export async function POST(request: Request) {
 
     const parsed = analyticsPayloadSchema.safeParse(await request.json());
 
-    if (!parsed.success) {
+    if (!parsed.success || parsed.data.name === "Custom Request Submitted") {
       return NextResponse.json({ ok: false }, { status: 400 });
     }
 
