@@ -31,6 +31,7 @@ import {
   type ManualOrderSession,
 } from "../src/lib/manual-order";
 import { effectiveUnitPrice } from "../src/lib/pricing";
+import { editOrder, OrderEditError, orderEditFields, type OrderEditField } from "../src/lib/order-edit";
 import {
   beginManualOrder,
   handleManualOrderTextUpdate,
@@ -141,8 +142,9 @@ const prisma = new PrismaClient();
 const sessions = new Map<string, DraftSession>();
 const manualOrders = new Map<string, ManualOrderSession>();
 const awaitingOrderComments = new Map<string, { publicId: string; cardMessageId: number }>();
-type MarketplaceSession = { productId: number | null; postUrl: string | null };
+type MarketplaceSession = { productId: number | null; postUrl: string | null; query?: string; page?: number };
 const marketplaceSessions = new Map<string, MarketplaceSession>();
+const awaitingOrderEdits = new Map<string, { publicId: string; updatedAt: Date; field: OrderEditField; itemId?: number; actorId: number }>();
 const ownerBotTransientStates: OwnerBotTransientStates = new Map();
 let dashboardMessageId: number | null = null;
 const botToken = process.env.NARADADRUK_ORDER_TELEGRAM_BOT_TOKEN?.trim() || "";
@@ -912,37 +914,40 @@ async function attachMarketplacePost(product: MarketplaceProduct, rawUrl: string
   });
 }
 
-async function recentMarketplaceProducts() {
+async function recentMarketplaceProducts(page = 0, query = "") {
+  const searchable = query ? await prisma.product.findMany({ where: { status: ProductStatus.published }, select: { id: true, title: true } }) : null;
+  const normalizedQuery = query.normalize("NFKC").toLocaleLowerCase("uk-UA");
+  const matchingIds = searchable?.filter((product) => product.title.normalize("NFKC").toLocaleLowerCase("uk-UA").includes(normalizedQuery)).map((product) => product.id);
   return prisma.product.findMany({
-    where: { status: ProductStatus.published },
+    where: { status: ProductStatus.published, ...(matchingIds ? { id: { in: matchingIds } } : {}) },
     select: marketplaceProductSelect,
-    orderBy: [{ sourceTelegramPublishedAt: "desc" }, { updatedAt: "desc" }],
-    take: 10,
+    orderBy: [{ sourceTelegramPublishedAt: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }, { id: "desc" }],
+    skip: page * 10,
+    take: 11,
   });
 }
 
 async function showMarketplaceProducts(chatId: string, intro: string, triggerMessageId: number) {
-  const products = await recentMarketplaceProducts();
+  const state = marketplaceSessions.get(chatId);
+  const page = state?.page ?? 0;
+  const products = await recentMarketplaceProducts(page, state?.query);
   if (products.length === 0) {
-    marketplaceSessions.delete(chatId);
-    await completeOwnerBotTransient(
-      ownerBotTransientStates,
-      "marketplace",
-      chatId,
-      triggerMessageId,
-      () => sendMessage(chatId, "Опублікованих товарів для репоста ще немає."),
-      deleteOwnerMessage,
-    );
+    await sendTransientPrompt("marketplace", chatId, triggerMessageId, "Товарів не знайдено. Надішліть іншу назву або поверніться до каталогу.", { inline_keyboard: [[{ text: "Усі товари", callback_data: "marketplace:all" }], [{ text: "Скасувати", callback_data: "marketplace:cancel" }]] });
     return;
   }
-  await sendTransientPrompt("marketplace", chatId, triggerMessageId, intro, {
+  await sendTransientPrompt("marketplace", chatId, triggerMessageId, `${intro}\n\nСторінка ${page + 1}${state?.query ? ` · Пошук: ${escapeHtml(state.query)}` : ""}. Для пошуку надішліть назву товару.`, {
     inline_keyboard: [
-      ...products.map((product) => [{
+      ...products.slice(0, 10).map((product) => [{
         text: `${originalChannelPostUrl(product) ? "🔗" : "▫️"} ${shortText(product.title, 48)}`,
         callback_data: `marketplace:product:${product.id}`,
       }]),
+      [
+        ...(page > 0 ? [{ text: "← Новіші", callback_data: `marketplace:page:${page - 1}` }] : []),
+        ...(products.length > 10 ? [{ text: "Давніші →", callback_data: `marketplace:page:${page + 1}` }] : []),
+      ],
+      ...(state?.query ? [[{ text: "Усі товари", callback_data: "marketplace:all" }]] : []),
       [{ text: "Скасувати", callback_data: "marketplace:cancel" }],
-    ],
+    ].filter((row) => row.length > 0),
   });
 }
 
@@ -1346,12 +1351,30 @@ async function showOrderCard(chatId: string, publicId: string, replaceMessageId?
     : order.status === "accepted" ? [{ text: "Відправлено", callback_data: `order:status:${publicId}:shipped` }]
     : [];
   const reviewUrl = `${absoluteSiteUrl("/reviews")}?order=${encodeURIComponent(order.publicId)}`;
-  const keyboard = { inline_keyboard: [statusButtons, [{ text: "Додати коментар", callback_data: `order:comment:${publicId}` }], [{ text: "Відгук для покупця", url: reviewUrl }], order.status !== "closed" ? [{ text: "Закрити", callback_data: `order:close:${publicId}` }] : [], [{ text: "До активних", callback_data: "order:list" }]].filter((row) => row.length > 0) };
+  const keyboard = { inline_keyboard: [statusButtons, [{ text: "Редагувати замовлення", callback_data: `order:edit:${publicId}` }], [{ text: "Додати коментар", callback_data: `order:comment:${publicId}` }], [{ text: "Відгук для покупця", url: reviewUrl }], order.status !== "closed" ? [{ text: "Закрити", callback_data: `order:close:${publicId}` }] : [], [{ text: "До активних", callback_data: "order:list" }]].filter((row) => row.length > 0) };
   if (replaceMessageId) {
     const edited = await telegramJson("editMessageText", { chat_id: chatId, message_id: replaceMessageId, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: keyboard }).catch(() => null);
     if (edited) return;
   }
   await sendMessage(chatId, text, keyboard);
+}
+
+async function showOrderEditMenu(chatId: string, publicId: string, triggerMessageId: number) {
+  const order = await prisma.order.findUnique({ where: { publicId }, include: { items: true } });
+  if (!order) { await sendMessage(chatId, "Замовлення не знайдено."); return; }
+  await sendTransientPrompt("order-edit", chatId, triggerMessageId, `Що змінити в замовленні #${orderNumber(publicId)}?`, {
+    inline_keyboard: [
+      ...Object.entries(orderEditFields).filter(([field]) => !["quantity", "unitPrice", "productTitle"].includes(field)).map(([field, label]) => [{ text: label, callback_data: `order:field:${publicId}:${Object.keys(orderEditFields).indexOf(field)}` }]),
+      ...order.items.map((item, index) => [
+        { text: `${index + 1}. Кількість · ${shortText(item.productTitle, 25)}`, callback_data: `order:item:${publicId}:q${item.id}` },
+        ...(order.source === "manual" && item.productId === null && !item.productSlug ? [
+          { text: "Ціна", callback_data: `order:item:${publicId}:p${item.id}` },
+          { text: "Назва", callback_data: `order:item:${publicId}:t${item.id}` },
+        ] : []),
+      ]),
+      [{ text: "Назад до замовлення", callback_data: `order:view:${publicId}` }],
+    ],
+  });
 }
 
 async function changeOrderStatus(publicId: string, nextStatus: keyof typeof orderStatusText) {
@@ -1737,7 +1760,11 @@ async function handleMessage(message: TelegramMessage) {
     ownerBotTransientStates,
     sendMessage,
     deleteOwnerMessage,
-  )) return;
+  )) {
+    awaitingOrderEdits.delete(String(message.chat.id));
+    await clearOwnerBotTransient(ownerBotTransientStates, "order-edit", String(message.chat.id), 0, deleteOwnerMessage);
+    return;
+  }
   if (!isAuthorizedOwnerChat(message)) return;
   if (!message.text && message.caption) message.text = message.caption;
   const chatId = String(message.chat.id);
@@ -1767,6 +1794,30 @@ async function handleMessage(message: TelegramMessage) {
 
   if (!message.text) return;
   const command = splitCommand(message.text);
+
+  const editing = awaitingOrderEdits.get(chatId);
+  if (editing && editing.actorId === message.from?.id) {
+    if (command?.command === "cancel") {
+      awaitingOrderEdits.delete(chatId);
+      await clearOwnerBotTransient(ownerBotTransientStates, "order-edit", chatId, message.message_id, deleteOwnerMessage);
+      await showOrderCard(chatId, editing.publicId);
+      return;
+    }
+    if (!command) {
+      try {
+        await prisma.$transaction((transaction) => editOrder(transaction, { ...editing, raw: message.text! }));
+      } catch (error) {
+        await rememberOwnerBotCorrection(ownerBotTransientStates, "order-edit", chatId, message.message_id, () => sendMessage(chatId, escapeHtml(error instanceof OrderEditError ? error.message : "Не вдалося зберегти зміни. Спробуйте ще раз.")));
+        return;
+      }
+      awaitingOrderEdits.delete(chatId);
+      await completeOwnerBotTransient(ownerBotTransientStates, "order-edit", chatId, message.message_id, () => sendMessage(chatId, "Зміни збережено."), deleteOwnerMessage);
+      await showOrderCard(chatId, editing.publicId);
+      return;
+    }
+    awaitingOrderEdits.delete(chatId);
+    await clearOwnerBotTransient(ownerBotTransientStates, "order-edit", chatId, 0, deleteOwnerMessage);
+  }
 
   if (command && ["marketplace", "repost"].includes(command.command)) {
     try {
@@ -1814,7 +1865,14 @@ async function handleMessage(message: TelegramMessage) {
         const attached = await attachMarketplacePost(product, message.text);
         await sendMarketplaceCopy(chatId, attached, originalChannelPostUrl(attached), message.message_id);
       } else {
-        await startMarketplaceFlow(chatId, message.text, message.message_id);
+        if (/^(?:https?:\/\/)?(?:t\.me|telegram\.me)\//i.test(message.text.trim())) {
+          await startMarketplaceFlow(chatId, message.text, message.message_id);
+        } else {
+          const query = message.text.trim();
+          if (!query || query.length > 100) throw new Error("Введіть назву товару до 100 символів.");
+          marketplaceSessions.set(chatId, { ...marketplace, query, page: 0 });
+          await showMarketplaceProducts(chatId, "Оберіть товар із результатів пошуку:", message.message_id);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Не вдалося зберегти посилання на допис.";
@@ -2148,6 +2206,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   }
   const chatId = String(message.chat.id);
   if (callback.data === "order:list") {
+    awaitingOrderEdits.delete(chatId);
+    await clearOwnerBotTransient(ownerBotTransientStates, "order-edit", chatId, 0, deleteOwnerMessage);
     await answerCallback(callback.id);
     await showOrdersDashboard(chatId, message.message_id);
     return;
@@ -2156,8 +2216,36 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     const [, action, publicId, value] = callback.data.split(":");
     if (!/^[0-9a-f-]{36}$/i.test(publicId || "")) { await answerCallback(callback.id, "Некоректне замовлення."); return; }
     if (action === "view") {
+      awaitingOrderEdits.delete(chatId);
+      await clearOwnerBotTransient(ownerBotTransientStates, "order-edit", chatId, 0, deleteOwnerMessage);
       await answerCallback(callback.id);
       await showOrderCard(chatId, publicId, message.message_id);
+    } else if (action === "edit") {
+      awaitingOrderEdits.delete(chatId);
+      marketplaceSessions.delete(chatId);
+      manualOrders.delete(chatId);
+      awaitingOrderComments.delete(chatId);
+      await answerCallback(callback.id);
+      await showOrderEditMenu(chatId, publicId, message.message_id);
+    } else if (action === "field" || action === "item") {
+      const itemMatch = action === "item" ? /^([qpt])([1-9]\d*)$/.exec(value ?? "") : null;
+      const field = action === "field" ? (/^\d+$/.test(value ?? "") ? Object.keys(orderEditFields)[Number(value)] as OrderEditField : undefined) : ({ q: "quantity", p: "unitPrice", t: "productTitle" } as const)[itemMatch?.[1] as "q" | "p" | "t"];
+      const itemId = itemMatch ? Number(itemMatch[2]) : undefined;
+      const order = await prisma.order.findUnique({ where: { publicId }, include: { items: true } });
+      const item = order?.items.find((entry) => entry.id === itemId);
+      const itemField = ["quantity", "unitPrice", "productTitle"].includes(field ?? "");
+      if (!order || !field || !Object.hasOwn(orderEditFields, field) || (itemField && !item) || (action === "field" && itemField) || (["unitPrice", "productTitle"].includes(field) && !(order.source === "manual" && item?.productId === null && !item.productSlug))) {
+        await answerCallback(callback.id, "Дія вже неактуальна."); return;
+      }
+      marketplaceSessions.delete(chatId);
+      manualOrders.delete(chatId);
+      awaitingOrderComments.delete(chatId);
+      awaitingOrderEdits.set(chatId, { publicId, field, itemId, updatedAt: order.updatedAt, actorId: callback.from.id });
+      const current = itemField ? item![field as "quantity" | "unitPrice" | "productTitle"] : order[field as keyof typeof order];
+      const hint = field === "paymentMethod" ? "Введіть: післяплата або переказ." : field === "deliveryMethod" ? "Введіть: відділення, поштомат або курʼєр." : field === "quantity" ? "Введіть кількість від 1 до 20. Для каталожного товару ціна оновиться з каталогу." : "Надішліть нове значення. Для очищення необовʼязкового поля — «-».";
+      const displayCurrent = field === "paymentMethod" ? paymentText[order.paymentMethod] : field === "deliveryMethod" ? ({ branch: "Відділення", parcel_locker: "Поштомат", courier: "Курʼєр" })[order.deliveryMethod] : String(current || "Не вказано");
+      await answerCallback(callback.id);
+      await sendTransientPrompt("order-edit", chatId, message.message_id, `<b>${orderEditFields[field]}</b>\nЗараз: ${escapeHtml(displayCurrent)}\n\n${hint}\n/cancel — скасувати.`, { inline_keyboard: [[{ text: "Назад", callback_data: `order:edit:${publicId}` }]] });
     } else if (action === "status" && ["accepted", "shipped"].includes(value)) {
       const result = await changeOrderStatus(publicId, value as "accepted" | "shipped");
       await answerCallback(callback.id, result.changed ? "Статус оновлено." : "Кнопка вже неактуальна.");
@@ -2200,6 +2288,15 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     }
     await answerCallback(callback.id);
     await startManualOrder(chatId, message.message_id);
+    return;
+  }
+  if (callback.data === "marketplace:all" || callback.data?.startsWith("marketplace:page:")) {
+    const state = marketplaceSessions.get(chatId);
+    const page = callback.data === "marketplace:all" ? 0 : Number(callback.data.split(":")[2]);
+    if (!state || !Number.isSafeInteger(page) || page < 0 || page > 100000) { await answerCallback(callback.id, "Почніть з /marketplace."); return; }
+    marketplaceSessions.set(chatId, { ...state, page, ...(callback.data === "marketplace:all" ? { query: "" } : {}) });
+    await answerCallback(callback.id);
+    await showMarketplaceProducts(chatId, "Оберіть товар:", message.message_id);
     return;
   }
   if (callback.data === "marketplace:cancel") {

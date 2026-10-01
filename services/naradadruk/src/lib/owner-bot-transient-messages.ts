@@ -1,4 +1,4 @@
-export type OwnerBotTransientScope = "manual" | "marketplace" | "makerworld" | "order-comment";
+export type OwnerBotTransientScope = "manual" | "marketplace" | "makerworld" | "order-comment" | "order-edit";
 
 export type OwnerBotTransientState = {
   promptMessageId: number | null;
